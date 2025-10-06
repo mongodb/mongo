@@ -1107,6 +1107,9 @@ private:
     std::pair<SbStage, PlanStageSlots> buildNestedLoopJoinEmbeddingNode(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<SbStage, PlanStageSlots> buildHashJoinEmbeddingNode(const QuerySolutionNode* root,
+                                                                  const PlanStageReqs& reqs);
+
     std::pair<SbStage, PlanStageSlots> buildUnpackTsBucket(const QuerySolutionNode* root,
                                                            const PlanStageReqs& reqs);
 

@@ -1579,7 +1579,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
                 "Unknown operation in join predicate",
                 predicate.op == QSNJoinPredicate::ComparisonOp::Eq);
 
-        // Generate an expression for one predicate, which evalutes a path on each document and
+        // Generate an expression for one predicate, which evaluates a path on each document and
         // compares the resulting values. Any path that fails to evaluate, because of a missing or
         // non-object path component, gets treated as if it evaluated to a null value for the
         // purposes of this comparison. This behavior matches MQL localField/foreignField $lookup
@@ -1627,10 +1627,143 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
                                                             std::move(embeddingFieldName),
                                                             nestedLoopJoinEmbeddingNode->nodeId(),
                                                             _state,
-                                                            true /* shouldProdueBson */);
+                                                            true /* shouldProduceBson */);
 
     PlanStageSlots outputs;
     outputs.setResultObj(resultSlot);
     return {std::move(embedStage), std::move(outputs)};
 }
+
+/**
+ * Build an equijoin operation according to the input STAGE_HASH_JOIN_EMBEDDING_NODE plan.
+ * This style of join is simpler than general-purpose $lookup joins, because it only supports
+ * equality predicates with path operands that never implicitly traverse an array.
+ */
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbeddingNode(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    tassert(
+        11122101, "buildHashJoinEmbeddingNode() does not support kSortKey", !reqs.hasSortKeys());
+
+    SbBuilder b(_state, root->nodeId());
+
+    auto hashJoinEmbeddingNode = static_cast<const HashJoinEmbeddingNode*>(root);
+
+    // Collect the top-level fields needed from each side of the join to evaluate the join
+    // predicates.
+    StringDataSet leftTopLevelFields;
+    StringDataSet rightTopLevelFields;
+    for (const auto& predicate : hashJoinEmbeddingNode->joinPredicates) {
+        tassert(11122102, "Empty path in join predicate", predicate.leftField.getPathLength() > 0);
+        leftTopLevelFields.insert(predicate.leftField.front());
+
+        tassert(11122103, "Empty path in join predicate", predicate.rightField.getPathLength() > 0);
+        rightTopLevelFields.insert(predicate.rightField.front());
+    }
+
+    // Recursively build the executable plan for each side of the join.
+    PlanStageReqs leftChildReqs = reqs.copyForChild().clearAllFields().setResultObj().setFields(
+        std::vector<std::string>{leftTopLevelFields.begin(), leftTopLevelFields.end()});
+    auto [leftStage, leftOutputs] = build(hashJoinEmbeddingNode->children[0].get(), leftChildReqs);
+
+    PlanStageReqs rightChildReqs = makeReqsForRightSideOfNestedLoopJoin(
+        hashJoinEmbeddingNode->children[1].get(), rightTopLevelFields);
+    auto [rightStage, rightOutputs] =
+        build(hashJoinEmbeddingNode->children[1].get(), rightChildReqs);
+
+    // Build the equality predicates for the join condition and the 'outerProjects' list of slots
+    // from the outer side of the join that must be available to join predicate and/or the parent
+    // stage. All slots from the inner side of the join are automatically available.
+    SbExpr::Vector equalityPredicates;
+    SbSlotVector outerProjects = {leftOutputs.getResultObj()};
+    sbe::value::SlotSet outerProjectsSet = {
+        leftOutputs.getResultObj()
+            .getId()};  // Used to avoid duplicates in the 'outerProjections' list.
+
+    SbExprOptSlotVector leftPrj, rightPrj;
+
+    equalityPredicates.reserve(hashJoinEmbeddingNode->joinPredicates.size());
+    for (const auto& predicate : hashJoinEmbeddingNode->joinPredicates) {
+        SbExpr leftFirstPathComponentExpr(
+            leftOutputs.get(std::make_pair(PlanStageSlots::kField, predicate.leftField.front())));
+
+        // Make sure that the join predicate has access to any slot needed to evaluate the left
+        // path.
+        // NOTE: This assumes that calling PlanStageSlots::get() for a top-level field will always
+        // return either an SbSlot or an expression that depends on only the ResultObj slot.
+        if (leftFirstPathComponentExpr.isSlotExpr()) {
+            if (auto [_, inserted] =
+                    outerProjectsSet.insert(leftFirstPathComponentExpr.toSlot().getId());
+                inserted) {
+                outerProjects.emplace_back(leftFirstPathComponentExpr.toSlot());
+            }
+        }
+
+        SbExpr rightFirstPathComponentExpr(
+            rightOutputs.get(std::make_pair(PlanStageSlots::kField, predicate.rightField.front())));
+
+        tassert(11122104,
+                "Unknown operation in join predicate",
+                predicate.op == QSNJoinPredicate::ComparisonOp::Eq);
+
+
+        // Create an expression for each side of the predicate, and add it to a $project stage to be
+        // placed on top of the source stages. Any path that fails to evaluate, because of a missing
+        // or non-object path component, gets treated as if it evaluated to a null value for the
+        // purposes of this comparison. This behavior matches MQL localField/foreignField $lookup
+        // semantics.
+        leftPrj.emplace_back(b.makeFillEmptyNull(generateArrayObliviousPathEvaluation(
+                                 b, predicate.leftField, std::move(leftFirstPathComponentExpr))),
+                             boost::none);
+        rightPrj.emplace_back(b.makeFillEmptyNull(generateArrayObliviousPathEvaluation(
+                                  b, predicate.rightField, std::move(rightFirstPathComponentExpr))),
+                              boost::none);
+    }
+    auto [leftPrjStage, leftPrjOutputs] = b.makeProject(std::move(leftStage), std::move(leftPrj));
+    auto [rightPrjStage, rightPrjOutputs] =
+        b.makeProject(std::move(rightStage), std::move(rightPrj));
+
+    // Build the LoopJoin stage that implements the nested loop join, including the equality test.
+    SbSlotVector rightProjectSlots = {rightOutputs.getResultObj()};
+    SbSlotVector leftProjectSlots = {leftOutputs.getResultObj()};
+    auto hashJoinStage = b.makeHashJoin(std::move(rightPrjStage),
+                                        std::move(leftPrjStage),
+                                        rightPrjOutputs,
+                                        rightProjectSlots,
+                                        leftPrjOutputs,
+                                        leftProjectSlots,
+                                        boost::none);
+
+    // Finally, build the projection that constructs a single join result from a pair of documents
+    // by embedded one into the other.
+    auto [rootDocumentSlot, embeddedDocumentSlot, embeddingFieldName] = [&]() {
+        if (hashJoinEmbeddingNode->leftEmbeddingField &&
+            !hashJoinEmbeddingNode->rightEmbeddingField) {
+            return std::make_tuple(rightOutputs.getResultObj(),
+                                   leftOutputs.getResultObj(),
+                                   *hashJoinEmbeddingNode->leftEmbeddingField);
+        } else if (!hashJoinEmbeddingNode->leftEmbeddingField &&
+                   hashJoinEmbeddingNode->rightEmbeddingField) {
+            return std::make_tuple(leftOutputs.getResultObj(),
+                                   rightOutputs.getResultObj(),
+                                   *hashJoinEmbeddingNode->rightEmbeddingField);
+        } else {
+            tasserted(
+                11122105,
+                "Exactly one of 'leftEmbeddingField' and 'rightEmbeddingField' must be present.");
+        }
+    }();
+
+    auto [resultSlot, embedStage] = buildLookupResultObject(std::move(hashJoinStage),
+                                                            rootDocumentSlot,
+                                                            embeddedDocumentSlot,
+                                                            std::move(embeddingFieldName),
+                                                            hashJoinEmbeddingNode->nodeId(),
+                                                            _state,
+                                                            true /* shouldProduceBson */);
+
+    PlanStageSlots outputs;
+    outputs.setResultObj(resultSlot);
+    return {std::move(embedStage), std::move(outputs)};
+}
+
 }  // namespace mongo::stage_builder
