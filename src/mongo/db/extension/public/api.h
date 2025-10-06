@@ -165,6 +165,14 @@ typedef struct MongoHostQueryShapeOptsVTable {
     MongoExtensionStatus* (*serialize_identifier)(const MongoHostQueryShapeOpts* ctx,
                                                   const MongoExtensionByteView* ident,
                                                   MongoExtensionByteBuf** output);
+
+    /**
+     * Populates the ByteBuf with the serialized version of the field path. Ownership is
+     * transferred to the caller.
+     */
+    MongoExtensionStatus* (*serialize_field_path)(const MongoHostQueryShapeOpts* ctx,
+                                                  const MongoExtensionByteView* fieldPath,
+                                                  MongoExtensionByteBuf** output);
 } MongoHostQueryShapeOptsVTable;
 
 /**

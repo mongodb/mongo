@@ -42,18 +42,21 @@ public:
     QueryShapeOptsAdapter(const SerializationOptions* opts)
         : ::MongoHostQueryShapeOpts{&VTABLE}, _opts(opts) {}
 
-    const SerializationOptions* getImpl() const {
+    const SerializationOptions* getOptsImpl() const {
         return _opts;
     }
 
-    std::string serializeIdentifier(const std::string& ident);
-
 private:
     static MongoExtensionStatus* _extSerializeIdentifier(const ::MongoHostQueryShapeOpts* ctx,
-                                                         const ::MongoExtensionByteView* ident,
+                                                         const ::MongoExtensionByteView* identifier,
                                                          ::MongoExtensionByteBuf** output) noexcept;
 
-    static constexpr ::MongoHostQueryShapeOptsVTable VTABLE{&_extSerializeIdentifier};
+    static MongoExtensionStatus* _extSerializeFieldPath(const ::MongoHostQueryShapeOpts* ctx,
+                                                        const ::MongoExtensionByteView* fieldPath,
+                                                        ::MongoExtensionByteBuf** output) noexcept;
+
+    static constexpr ::MongoHostQueryShapeOptsVTable VTABLE{&_extSerializeIdentifier,
+                                                            &_extSerializeFieldPath};
     const SerializationOptions* _opts;
 };
 }  // namespace mongo::extension::host

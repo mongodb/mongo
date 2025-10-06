@@ -36,24 +36,36 @@ namespace mongo::extension::host {
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
     const ::MongoHostQueryShapeOpts* ctx,
-    const ::MongoExtensionByteView* ident,
+    const ::MongoExtensionByteView* identifier,
     ::MongoExtensionByteBuf** output) noexcept {
     return sdk::enterCXX([&]() {
         *output = nullptr;
 
-        const auto& impl = static_cast<const QueryShapeOptsAdapter*>(ctx)->getImpl();
-        auto transformedIdent =
-            impl->serializeIdentifier(std::string(sdk::byteViewAsStringView(*ident)));
+        const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
+        auto transformedIdentifier =
+            opts->serializeIdentifier(std::string(sdk::byteViewAsStringView(*identifier)));
 
         // Allocate a buffer on the heap. Ownership is transferred to the caller.
-        *output = new sdk::VecByteBuf(reinterpret_cast<uint8_t*>(transformedIdent.data()),
-                                      transformedIdent.length());
+        *output = new sdk::VecByteBuf(reinterpret_cast<uint8_t*>(transformedIdentifier.data()),
+                                      transformedIdentifier.length());
     });
 }
 
+MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
+    const ::MongoHostQueryShapeOpts* ctx,
+    const ::MongoExtensionByteView* fieldPath,
+    ::MongoExtensionByteBuf** output) noexcept {
+    return sdk::enterCXX([&]() {
+        *output = nullptr;
 
-std::string QueryShapeOptsAdapter::serializeIdentifier(const std::string& ident) {
-    return _opts->serializeIdentifier(ident);
+        const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
+        auto transformedFieldPath =
+            opts->serializeFieldPath(std::string(sdk::byteViewAsStringView(*fieldPath)));
+
+        // Allocate a buffer on the heap. Ownership is transferred to the caller.
+        *output = new sdk::VecByteBuf(reinterpret_cast<uint8_t*>(transformedFieldPath.data()),
+                                      transformedFieldPath.length());
+    });
 }
 
 }  // namespace mongo::extension::host

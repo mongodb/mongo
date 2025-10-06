@@ -533,9 +533,10 @@ public:
 };
 
 TEST(AggregationStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation) {
-    auto parseNode = std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+    auto parseNode = new extension::sdk::ExtensionAggregationStageParseNode(
         IdentifierQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode.release()};
+
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
     auto queryShape = handle.getQueryShape(opts);
@@ -546,9 +547,9 @@ TEST(AggregationStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransfor
 }
 
 TEST(AggregationStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) {
-    auto parseNode = std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+    auto parseNode = new extension::sdk::ExtensionAggregationStageParseNode(
         IdentifierQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode.release()};
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
     opts.transformIdentifiers = true;
@@ -560,6 +561,85 @@ TEST(AggregationStageTest, SerializingIdentifierQueryShapeSucceedsWithTransforma
                                    << IdentifierQueryShapeParseNode::applyHmacForTest(
                                           IdentifierQueryShapeParseNode::kIndexValue))),
                       queryShape);
+}
+
+class FieldPathQueryShapeParseNode : public extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr StringData kStageName = "$fieldPathQueryShape";
+    static constexpr StringData kSingleFieldPath = "simpleField";
+    static constexpr StringData kNestedFieldPath = "nested.Field.Path";
+
+    size_t getExpandedSize() const override {
+        return 0;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        return {};
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        extension::sdk::QueryShapeOptsHandle ctxHandle(ctx);
+        BSONObjBuilder builder;
+
+        builder.append(kSingleFieldPath,
+                       ctxHandle.serializeFieldPath(std::string(kSingleFieldPath)));
+        builder.append(kNestedFieldPath,
+                       ctxHandle.serializeFieldPath(std::string(kNestedFieldPath)));
+
+        return BSON(kStageName << builder.obj());
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
+        return std::make_unique<FieldPathQueryShapeParseNode>();
+    }
+
+    static std::string applyHmacForTest(StringData sd) {
+        return "REDACT_" + std::string{sd};
+    }
+};
+
+TEST(AggregationStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation) {
+    auto parseNode = new extension::sdk::ExtensionAggregationStageParseNode(
+        FieldPathQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts{};
+    auto queryShape = handle.getQueryShape(opts);
+
+    ASSERT_BSONOBJ_EQ(BSON(FieldPathQueryShapeParseNode::kStageName
+                           << BSON(FieldPathQueryShapeParseNode::kSingleFieldPath
+                                   << FieldPathQueryShapeParseNode::kSingleFieldPath
+                                   << FieldPathQueryShapeParseNode::kNestedFieldPath
+                                   << FieldPathQueryShapeParseNode::kNestedFieldPath)),
+                      queryShape);
+}
+
+TEST(AggregationStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
+    auto parseNode = new extension::sdk::ExtensionAggregationStageParseNode(
+        FieldPathQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts{};
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = FieldPathQueryShapeParseNode::applyHmacForTest;
+
+    auto queryShape = handle.getQueryShape(opts);
+
+    auto transformedSingleField =
+        opts.transformIdentifiersCallback(FieldPathQueryShapeParseNode::kSingleFieldPath);
+
+    std::stringstream ss;
+    ss << opts.transformIdentifiersCallback("nested") << "."
+       << opts.transformIdentifiersCallback("Field") << "."
+       << opts.transformIdentifiersCallback("Path");
+    auto transformedNestedField = ss.str();
+
+    ASSERT_BSONOBJ_EQ(
+        BSON(FieldPathQueryShapeParseNode::kStageName
+             << BSON(FieldPathQueryShapeParseNode::kSingleFieldPath
+                     << transformedSingleField << FieldPathQueryShapeParseNode::kNestedFieldPath
+                     << transformedNestedField)),
+        queryShape);
 }
 
 }  // namespace

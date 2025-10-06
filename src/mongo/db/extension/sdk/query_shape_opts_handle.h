@@ -52,35 +52,25 @@ public:
     QueryShapeOptsHandle(const ::MongoHostQueryShapeOpts* ctx)
         : sdk::UnownedHandle<const ::MongoHostQueryShapeOpts>(ctx) {}
 
-    std::string serializeIdentifier(const std::string& ident) const {
-        assertValid();
+    std::string serializeIdentifier(const std::string& identifier) const;
 
-        ::MongoExtensionByteBuf* buf;
-        const auto& vtbl = vtable();
-        auto* ptr = get();
-        auto identView = sdk::stringViewAsByteView(ident);
-
-        extension::sdk::enterC([&]() { return vtbl.serialize_identifier(ptr, &identView, &buf); });
-
-        if (!buf) {
-            // TODO SERVER-111882 tassert here instead of returning empty string, since this would
-            // indicate programmer error. The implementation of serialize_identifier cannot return
-            // nullptr.
-            return "";
-        }
-
-        // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
-        // into a string to be returned.
-        sdk::VecByteBufHandle ownedBuf{static_cast<sdk::VecByteBuf*>(buf)};
-        return std::string(sdk::byteViewAsStringView(ownedBuf.getByteView()));
-    }
+    std::string serializeFieldPath(const std::string& fieldPath) const;
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(11136800,
                 "HostQueryShapeOpts' 'serializeIdentifier' is null",
                 vtable.serialize_identifier != nullptr);
+        tassert(11173400,
+                "HostQueryShapeOpts' 'serializeFieldPath' is null",
+                vtable.serialize_field_path != nullptr);
     };
+
+    std::string serializeUsingOptsHelper(
+        const std::function<MongoExtensionByteView()>& getByteViewToSerialize,
+        const std::function<MongoExtensionStatus*(const MongoHostQueryShapeOpts*,
+                                                  const MongoExtensionByteView*,
+                                                  ::MongoExtensionByteBuf**)>& apiFunc) const;
 };
 
 }  // namespace mongo::extension::sdk
