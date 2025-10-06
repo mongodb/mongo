@@ -6,6 +6,7 @@ mongo_cc_library(
     name = "aggregation_stage",
     srcs = [],
     hdrs = [
+        "ast_node.h",
         "parse_node.h",
     ],
     visibility = ["//visibility:public"],

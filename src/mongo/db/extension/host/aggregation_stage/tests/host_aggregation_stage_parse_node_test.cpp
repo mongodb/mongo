@@ -27,16 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host_adapter/aggregation_stage.h"
-#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-
-#include <memory>
 
 namespace mongo::extension {
 

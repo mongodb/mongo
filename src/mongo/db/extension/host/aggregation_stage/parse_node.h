@@ -36,6 +36,10 @@
 
 #include <memory>
 
+/**
+ * A host `AggregationStageParseNode` should be allocated for server stages that can be written in a
+ * user pipeline and can participate in query shape.
+ */
 namespace mongo::extension::host {
 
 /**

@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 mongo_cc_unit_test(
     name = "host_aggregation_stage_test",
     srcs = [
+        "host_aggregation_stage_ast_node_test.cpp",
         "host_aggregation_stage_parse_node_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
