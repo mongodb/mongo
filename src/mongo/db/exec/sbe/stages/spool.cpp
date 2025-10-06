@@ -193,6 +193,7 @@ SpoolLazyProducerStage::SpoolLazyProducerStage(std::unique_ptr<PlanStage> input,
 }
 
 std::unique_ptr<PlanStage> SpoolLazyProducerStage::clone() const {
+    tassert(1112540, "predicate pointer must not be null", _predicate);
     return std::make_unique<SpoolLazyProducerStage>(_children[0]->clone(),
                                                     _spoolId,
                                                     _vals,
