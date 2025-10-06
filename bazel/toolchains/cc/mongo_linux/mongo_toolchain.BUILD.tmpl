@@ -189,7 +189,7 @@ mongo_linux_cc_toolchain_config(
         # files. Switch these to the {version}/bin/* paths once EngFlow fixes the issue where symlinks are fully resolved
         # when copied to the remote execution system.
         "gcc": "{version}/bin/clang",
-        "g++": "{version}/bin/clang++",
+        "g++": "stow/llvm-{version}/bin/clang++",
         "cpp": "{version}/bin/cpp",
         "ar": "{version}/bin/ar",
         "nm": "{version}/bin/nm",
@@ -264,8 +264,18 @@ filegroup(
 filegroup(
     name = "llvm_symbolizer",
     srcs = [
-        "{version}/bin/llvm-symbolizer",
+        "stow/llvm-{version}/bin/llvm-symbolizer",
     ],
+)
+
+# Since the symbolizer may pull in pretty much anything as a dynamic library, include everything in the toolchain.
+# Some extensions (ex. libLLVM.so.19.1) don't end in .so, so we just have to grab everything.
+filegroup(
+    name = "llvm_symbolizer_libs",
+    srcs = glob([
+        "stow/**/*",
+        "{version}/**/*",
+    ]),
 )
 
 filegroup(

@@ -167,6 +167,18 @@ variables:
     multiversion_platform: rhel8
     multiversion_edition: enterprise
 
+  - &aubsan-lite-required-expansions-m8g
+    compile_variant: *linux_debug_aubsan_compile_variant_name
+    lang_environment: LANG=C
+    san_options: *aubsan_options
+    resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
+    hang_analyzer_dump_core: false
+    max_sub_suites: 3
+    large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+    xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+    multiversion_platform: amazon2023
+    multiversion_edition: enterprise
+
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
@@ -249,9 +261,9 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8g-8xlarge
 
-  - <<: *generic_linux_compile_params
+  - <<: *generic_linux_compile_params_m8g
     name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
-    display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
+    display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Enterprise Compile"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     expansions:
       <<: *generic_linux_compile_expansions
@@ -271,22 +283,22 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       - name: compile_test_parallel_core_stream_TG
-      - name: run_unit_tests_8_way_split_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
         distros:
-          - rhel8.8-xlarge
+          - amazon2023-arm64-latest-m8g-8xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
         distros:
-          - rhel8.8-xlarge
+          - amazon2023-arm64-latest-m8g-8xlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
         distros:
-          - rhel8.8-xlarge
+          - amazon2023-arm64-latest-m8g-8xlarge
 
   - <<: *linux_arm64_debug_compile_variant_dependency
     name: linux-64-debug-required
@@ -317,14 +329,14 @@ buildvariants:
           - amazon2023-arm64-latest-medium-m8g
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: rhel8-debug-aubsan-lite-all-feature-flags-required
-    display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
+    name: linux-debug-aubsan-lite-all-feature-flags-required
+    display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Enterprise DEBUG (all feature flags)"
     tags: ["required"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-large
+      - amazon2023-arm64-latest-m8g-4xlarge
     expansions:
-      <<: *aubsan-lite-required-expansions
+      <<: *aubsan-lite-required-expansions-m8g
       # To force disable feature flags even on the all feature flags variant, please use this file:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       # The '{maxRoundsWithoutProgressParameter: 20}' is needed here to work around failures in

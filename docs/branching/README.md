@@ -120,7 +120,7 @@ For the build variant names:
   - `enterprise-windows-all-feature-flags-non-essential`
 - in [`etc/evergreen_yml_components/variants/sanitizer/test_dev.yml`](../../etc/evergreen_yml_components/variants/sanitizer/test_dev.yml):
 
-  - `rhel8-debug-aubsan-lite-all-feature-flags-required`
+  - `linux-debug-aubsan-lite-all-feature-flags-required`
 
 - It should:
   - Remove `all-feature-flags` from their names and display names

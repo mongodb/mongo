@@ -161,6 +161,7 @@ TSAN_DATA = select({
 ANY_SAN_DATA = select({
     "//bazel/config:any_sanitizer_clang": [
         "//:llvm_symbolizer",
+        "//:llvm_symbolizer_libs",
     ],
     "//conditions:default": [],
 })
