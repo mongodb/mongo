@@ -155,6 +155,7 @@ class ProjFileGenerator(object):
         self.common_defines.add("_DEBUG")
 
         self.includes = set()
+        self.includes.add("src")
         self.target = target
         self.compiles = []
         self.files = set()
@@ -319,11 +320,13 @@ class ProjFileGenerator(object):
                     self.files.add(directory + "\\" + file_name)
 
             # Make sure the set also includes the base directories
-            # (i.e. src/mongo and src as examples)
+            # (i.e. src/mongo and src as examples). Break loop at
+            # directory root to handle absolute paths.
             base_name = os.path.dirname(directory)
-            while base_name:
+            while base_name != directory:
                 base_dirs.add(base_name)
-                base_name = os.path.dirname(base_name)
+                directory = base_name
+                base_name = os.path.dirname(directory)
 
         dirs = dirs.union(base_dirs)
 
