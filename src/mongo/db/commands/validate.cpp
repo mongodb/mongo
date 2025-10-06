@@ -374,7 +374,6 @@ public:
         // collHash parameter.
         const bool collHash = cmdObj["collHash"].trueValue();
 
-        // TODO (SERVER-110841): Sanitize the parameters passed as hashPrefixes.
         // hashPrefixes parameter.
         const auto rawHashPrefixes = cmdObj["hashPrefixes"];
         boost::optional<std::vector<std::string>> hashPrefixes = boost::none;
@@ -383,6 +382,7 @@ public:
             for (const auto& e : rawHashPrefixes.Array()) {
                 hashPrefixes->push_back(e.String());
             }
+            CollectionValidation::validateHashes(*hashPrefixes, /*equalLength=*/true);
             if (!hashPrefixes->size()) {
                 hashPrefixes->push_back(std::string(""));
             }
@@ -399,7 +399,6 @@ public:
                                     << " requires {collHash: true}.");
         }
 
-        // TODO (SERVER-110841): Sanitize prefixes in the revealHashedIds field.
         // revealHashedIds parameter.
         const auto rawRevealHashedIds = cmdObj["revealHashedIds"];
         boost::optional<std::vector<std::string>> revealHashedIds = boost::none;
@@ -433,6 +432,7 @@ public:
             for (const auto& e : rawRevealHashedIdsArr) {
                 revealHashedIds->push_back(e.String());
             }
+            CollectionValidation::validateHashes(*revealHashedIds, /*equalLength=*/false);
         }
 
         auto validateMode = [&] {

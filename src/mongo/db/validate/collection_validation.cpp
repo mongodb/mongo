@@ -502,6 +502,53 @@ void _validateCatalogEntry(OperationContext* opCtx,
 
 }  // namespace
 
+void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLength) {
+    if (hashPrefixes.empty()) {
+        return;
+    }
+
+    const size_t kHashStringMaxLen = SHA256Block().toHexString().size();
+    auto hashPrefixLength = hashPrefixes[0].length();
+    std::vector<std::string> normalizedHashPrefixes;
+    for (const auto& hashPrefix : hashPrefixes) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Hash prefixes should not be empty strings.",
+                !hashPrefix.empty());
+
+        uassert(ErrorCodes::InvalidOptions,
+                fmt::format("Hash prefixes too long. Received: {}", hashPrefix),
+                hashPrefix.length() <= kHashStringMaxLen);
+
+        uassert(ErrorCodes::InvalidOptions,
+                "Hash prefixes should not have different lengths.",
+                !equalLength || hashPrefix.length() == hashPrefixLength);
+
+        std::string normalizedHashPrefix;
+        for (char c : hashPrefix) {
+            uassert(ErrorCodes::InvalidOptions,
+                    fmt::format("Hash prefixes should only contain hex strings. Received: {}.",
+                                hashPrefix),
+                    ctype::isXdigit(c));
+            normalizedHashPrefix.push_back(ctype::toLower(c));
+        }
+        normalizedHashPrefixes.push_back(std::move(normalizedHashPrefix));
+    }
+
+    std::sort(normalizedHashPrefixes.begin(), normalizedHashPrefixes.end());
+    for (size_t i = 0; i < normalizedHashPrefixes.size() - 1; ++i) {
+        const auto& currentHashPrefix = normalizedHashPrefixes[i];
+        const auto& nextHashPrefix = normalizedHashPrefixes[i + 1];
+
+        if (currentHashPrefix.length() <= nextHashPrefix.length()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    fmt::format("Provided hash prefixes should not duplicate: {}, {}",
+                                currentHashPrefix,
+                                nextHashPrefix),
+                    !nextHashPrefix.starts_with(currentHashPrefix));
+        }
+    }
+}
+
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidationOptions options,

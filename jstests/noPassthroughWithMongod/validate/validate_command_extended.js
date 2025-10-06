@@ -49,11 +49,31 @@ testValidate({collHash: true, hashPrefixes: []});
 
 assert.commandFailed(t.validate({hashPrefixes: ["aaa"]}));
 
+assert.commandFailed(t.validate({collHash: true, hashPrefixes: [""]}));
+
+assert.commandFailed(t.validate({collHash: true, hashPrefixes: ["x".repeat(100)]}));
+
+assert.commandFailed(t.validate({collHash: true, hashPrefixes: ["random string"]}));
+
+assert.commandFailed(t.validate({collHash: true, hashPrefixes: ["aaa", "bb"]}));
+
+assert.commandFailed(t.validate({collHash: true, hashPrefixes: ["aaa", "bbb", "aaa"]}));
+
 // Test revealHashedIds
 testValidate({collHash: true, revealHashedIds: ["aaa"]});
+
+testValidate({collHash: true, revealHashedIds: ["aaa", "bb"]});
 
 assert.commandFailed(t.validate({collHash: true, revealHashedIds: []}));
 
 assert.commandFailed(t.validate({revealHashedIds: ["aaa"]}));
 
 assert.commandFailed(t.validate({collHash: true, revealHashedIds: ["aaa"], hashPrefixes: ["aaa"]}));
+
+assert.commandFailed(t.validate({collHash: true, revealHashedIds: [""]}));
+
+assert.commandFailed(t.validate({collHash: true, revealHashedIds: ["x".repeat(100)]}));
+
+assert.commandFailed(t.validate({collHash: true, revealHashedIds: ["random string"]}));
+
+assert.commandFailed(t.validate({collHash: true, revealHashedIds: ["aaa", "a", "aaa"]}));

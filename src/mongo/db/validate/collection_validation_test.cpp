@@ -431,5 +431,79 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
     }
 }
 
+TEST_F(CollectionValidationTest, HashPrefixesEmptyString) {
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({""}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({""}, /*equalLength=*/false),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CollectionValidationTest, HashPrefixesTooLong) {
+    constexpr int kHashStringMaxLen = 64;
+    ASSERT_DOES_NOT_THROW(CollectionValidation::validateHashes(
+        {std::string(kHashStringMaxLen, 'A')}, /*equalLength=*/true));
+
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes(
+                           {std::string(kHashStringMaxLen + 1, 'A')}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes(
+                           {std::string(kHashStringMaxLen + 1, 'A')}, /*equalLength=*/false),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CollectionValidationTest, HashPrefixesDifferentLengths) {
+    ASSERT_DOES_NOT_THROW(
+        CollectionValidation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/false));
+
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CollectionValidationTest, HashPrefixesHexString) {
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"NOTHEX"}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"NOTHEX"}, /*equalLength=*/false),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CollectionValidationTest, HashPrefixesDuplicates) {
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"ABC", "ABC"}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        CollectionValidation::validateHashes({"ABC", "ABCD", "A"}, /*equalLength=*/false),
+        DBException,
+        ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CollectionValidationTest, HashPrefixesCases) {
+    constexpr int kHashStringMaxLen = 64;
+    ASSERT_DOES_NOT_THROW(
+        CollectionValidation::validateHashes({"aaa", "BBB", "cCc"}, /*equalLength=*/true));
+    ASSERT_DOES_NOT_THROW(CollectionValidation::validateHashes(
+        {std::string(kHashStringMaxLen, 'a')}, /*equalLength=*/true));
+
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"aaa", "BBBB"}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"nothex"}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"aaa", "AAA"}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        CollectionValidation::validateHashes({"abcd", "a", "ABCDEF"}, /*equalLength=*/true),
+        DBException,
+        ErrorCodes::InvalidOptions);
+}
+
 }  // namespace
 }  // namespace mongo

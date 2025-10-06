@@ -26,12 +26,12 @@ assert.commandWorked(db2.coll.update({_id: differingDocId}, {$set: {a: "hello"}}
 function hashDrillDown(db1, db2) {
     // We start off by providing an empty string prefix, and from there we drill down
     // into each bucket.
-    let prefix = "";
+    let prefix = [];
     let count = 2; // Start off with any value > 1.
     while (count > 1) {
-        jsTest.log.info(`Drilling down with prefix: '${prefix}'`);
-        let partial1 = assert.commandWorked(db1.coll.validate({collHash: true, hashPrefixes: [prefix]})).partial;
-        let partial2 = assert.commandWorked(db2.coll.validate({collHash: true, hashPrefixes: [prefix]})).partial;
+        jsTest.log.info(`Drilling down with prefix: [${prefix}]`);
+        let partial1 = assert.commandWorked(db1.coll.validate({collHash: true, hashPrefixes: prefix})).partial;
+        let partial2 = assert.commandWorked(db2.coll.validate({collHash: true, hashPrefixes: prefix})).partial;
         jsTest.log.info("Partial1: " + tojson(partial1));
         jsTest.log.info("Partial2: " + tojson(partial2));
         assert.eq(Object.keys(partial1).length, Object.keys(partial2).length);
@@ -42,16 +42,16 @@ function hashDrillDown(db1, db2) {
             }
         }
         assert.eq(differingBuckets.length, 1, tojson(differingBuckets));
-        prefix = differingBuckets[0];
+        prefix = differingBuckets;
         count = partial1[differingBuckets[0]].count;
     }
 
-    jsTest.log.info("Prefix of differing bucket: " + tojson(prefix));
+    jsTest.log.info("Prefix of differing bucket: " + prefix);
 
     // revealHashedIds with 'prefix' should return 'differingDocId'.
-    const res = assert.commandWorked(db1.coll.validate({collHash: true, revealHashedIds: [prefix]}));
-    assert.eq(res.revealedIds[prefix].length, 1, res);
-    assert.eq(res.revealedIds[prefix][0], {_id: differingDocId}, res);
+    const res = assert.commandWorked(db1.coll.validate({collHash: true, revealHashedIds: prefix}));
+    assert.eq(res.revealedIds[prefix[0]].length, 1, res);
+    assert.eq(res.revealedIds[prefix[0]][0], {_id: differingDocId}, res);
 }
 
 hashDrillDown(db1, db2);
