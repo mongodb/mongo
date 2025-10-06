@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <iterator>

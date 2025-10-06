@@ -38,6 +38,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/spill_table.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

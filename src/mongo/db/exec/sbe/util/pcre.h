@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 std::pair<value::TypeTags, value::Value> makeNewPcreRegex(StringData pattern, StringData options);
