@@ -14,7 +14,7 @@ import {
     getMovieVectorSearchIndexSpec
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 
-const collName = "search_score_fusion";
+const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 

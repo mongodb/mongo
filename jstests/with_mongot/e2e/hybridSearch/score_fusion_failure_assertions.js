@@ -13,7 +13,7 @@
  * ]
  */
 
-const collName = "search_score_fusion";
+const collName = jsTestName();
 const coll = db[collName];
 
 const vectorSearchClauseAndSearchClause = {

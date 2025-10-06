@@ -15,7 +15,7 @@ import {
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 
-const collName = "search_rank_fusion";
+const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 
@@ -559,4 +559,6 @@ dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
 
         assert.eq(score, geoNearScore + searchScore);
     }
+
+    dropSearchIndex(coll, {name: getRentalSearchIndexSpec().name});
 })();
