@@ -129,6 +129,12 @@ public:
 
     void waitForRecovery(OperationContext* opCtx) const override;
 
+    /**
+     * Waits for the primary only service's recovery and then checks if there are any coordinators
+     * of the given type that have not yet completed. There is no guarantee that new coordinators
+     * do not start during (or immediately after) this call and it is up to the caller to provide
+     * that stability if needed.
+     */
     bool areAllCoordinatorsOfTypeFinished(OperationContext* opCtx,
                                           DDLCoordinatorTypeEnum coordinatorType);
 

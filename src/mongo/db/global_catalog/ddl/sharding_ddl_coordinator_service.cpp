@@ -327,16 +327,19 @@ void ShardingDDLCoordinatorService::waitForRecovery(OperationContext* opCtx) con
 
 bool ShardingDDLCoordinatorService::areAllCoordinatorsOfTypeFinished(
     OperationContext* opCtx, DDLCoordinatorTypeEnum coordinatorType) {
-    stdx::unique_lock lk(_mutex);
+    // getAllInstances on the PrimaryOnlyServices will wait for recovery, so all coordinators should
+    // have been loaded into memory by this point.
+    const auto& instances = getAllInstances(opCtx);
+    for (const auto& instance : instances) {
+        auto typedInstance = checked_pointer_cast<ShardingDDLCoordinator>(instance);
+        if (typedInstance->operationType() == coordinatorType) {
+            if (!typedInstance->getCompletionFuture().isReady()) {
+                return false;
+            }
+        }
+    }
 
-    _waitForRecovery(opCtx, lk);
-
-    const auto numActiveCoords = _countActiveCoordinators(
-        [coordinatorType](DDLCoordinatorTypeEnum activeCoordType, boost::optional<FCV>) {
-            return coordinatorType == activeCoordType;
-        });
-
-    return numActiveCoords == 0;
+    return true;
 }
 
 ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
