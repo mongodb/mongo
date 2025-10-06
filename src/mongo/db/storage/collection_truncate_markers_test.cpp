@@ -176,8 +176,6 @@ public:
 class TestCollectionMarkersWithPartialExpiration final
     : public CollectionTruncateMarkersWithPartialExpiration {
 public:
-    MONGO_COMPILER_DIAGNOSTIC_PUSH
-    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     TestCollectionMarkersWithPartialExpiration(int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
               {},
@@ -188,7 +186,6 @@ public:
               minBytesPerMarker,
               Microseconds(0),
               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {};
-    MONGO_COMPILER_DIAGNOSTIC_POP
 
     void setExpirePartialMarker(bool value) {
         _expirePartialMarker = value;

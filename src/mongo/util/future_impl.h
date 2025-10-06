@@ -1337,8 +1337,6 @@ private:
         using Base::Base;
         using Base::operator=;
 
-        MONGO_COMPILER_DIAGNOSTIC_PUSH
-        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
         ResetOnMoveOptional(ResetOnMoveOptional&& other) noexcept(
             std::is_nothrow_move_constructible_v<Base>)
             : Base(std::exchange(other._base(), {})) {}
@@ -1349,7 +1347,6 @@ private:
                 _base() = std::exchange(other._base(), {});
             return *this;
         }
-        MONGO_COMPILER_DIAGNOSTIC_POP
 
     private:
         Base& _base() {

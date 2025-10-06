@@ -735,8 +735,6 @@ TEST(Future, Success_onCompletionFutureImmediate) {
 TEST(Future, Success_onCompletionFutureReady) {
     FUTURE_SUCCESS_TEST([] { return 1; },
                         [](auto&& fut) {
-                            MONGO_COMPILER_DIAGNOSTIC_PUSH
-                            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
                             ASSERT_EQ(
                                 std::move(fut)
                                     .onCompletion([](StatusWith<int> i) FTU_LAMBDA_R(Future<int>) {
@@ -746,7 +744,6 @@ TEST(Future, Success_onCompletionFutureReady) {
                                     })
                                     .get(),
                                 3);
-                            MONGO_COMPILER_DIAGNOSTIC_POP
                         });
 }
 
