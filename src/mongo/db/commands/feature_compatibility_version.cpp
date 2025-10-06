@@ -494,14 +494,14 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     runUpdateCommand(opCtx, newFCVDoc);
 }
 
-void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
-                                                    repl::StorageInterface* storageInterface) {
+repl::OpTime FeatureCompatibilityVersion::setIfCleanStartup(
+    OperationContext* opCtx, repl::StorageInterface* storageInterface, long long term) {
     if (!hasNoReplicatedCollections(opCtx)) {
         if (!gDefaultStartupFCV.empty()) {
             LOGV2(7557701,
                   "Ignoring the provided defaultStartupFCV parameter since the FCV already exists");
         }
-        return;
+        return {};
     }
 
     // If the server was not started with --shardsvr, the default featureCompatibilityVersion on
@@ -510,15 +510,6 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
     // downgrade version cluster. The config server will run setFeatureCompatibilityVersion as
     // part of addShard.
     const bool storeUpgradeVersion = !serverGlobalParams.clusterRole.isShardOnly();
-
-    UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-    NamespaceString nss(NamespaceString::kServerConfigurationNamespace);
-
-    {
-        CollectionOptions options;
-        options.uuid = UUID::gen();
-        uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
-    }
 
     // Set FCV to lastLTS for nodes started with --shardsvr. If an FCV was specified at startup
     // through a startup parameter, set it to that FCV. Otherwise, set it to latest.
@@ -550,14 +541,36 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         fcvDoc.setVersion(GenericFCV::kLatest);
     }
 
-    // We then insert the featureCompatibilityVersion document into the server configuration
-    // collection. The server parameter will be updated on commit by the op observer.
-    uassertStatusOK(storageInterface->insertDocument(
-        opCtx,
-        nss,
-        repl::TimestampedBSONObj{fcvDoc.toBSON(), Timestamp()},
-        repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
-                                             // replicated.
+    repl::OpTime opTime;
+    auto action = [&]() {
+        NamespaceString nss(NamespaceString::kServerConfigurationNamespace);
+        CollectionOptions options;
+        options.uuid = UUID::gen();
+        uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
+
+        // We then insert the featureCompatibilityVersion document into the server configuration
+        // collection. The server parameter will be updated on commit by the op observer.
+        if (term != repl::OpTime::kUninitializedTerm) {
+            WriteUnitOfWork wuow(opCtx);
+            auto slots = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1);
+            wuow.commit();
+            opTime = slots.front();
+            invariant(term == opTime.getTerm());
+        }
+        uassertStatusOK(storageInterface->insertDocument(
+            opCtx, nss, repl::TimestampedBSONObj{fcvDoc.toBSON(), opTime.getTimestamp()}, term));
+        return opTime;
+    };
+
+    if (term == repl::OpTime::kUninitializedTerm) {
+        // If the persistence layer supports untimestamped writes, it can choose to not provide a
+        // term. Doing so will skip writing to the oplog, but FCV will still be propagated via
+        // initial sync.
+        UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
+        return action();
+    } else {
+        return action();
+    }
 }
 
 bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* opCtx) {
