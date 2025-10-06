@@ -33,12 +33,6 @@
 
 namespace mongo::extension::sdk {
 
-const ::MongoExtensionStatusVTable extension::sdk::ExtensionStatus::VTABLE = {
-    &ExtensionStatus::_extDestroy,
-    &ExtensionStatus::_extGetCode,
-    &ExtensionStatus::_extGetReason,
-};
-
 size_t ExtensionStatusOK::sInstanceCount = 0;
 
 size_t ExtensionStatusOK::getInstanceCount() {

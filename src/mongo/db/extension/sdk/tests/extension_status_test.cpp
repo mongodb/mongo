@@ -38,52 +38,6 @@
 namespace mongo {
 namespace {
 
-TEST(ExtensionStatusTest, extensionStatusTest) {
-    // Test default constructor of ExtensionStatus
-    {
-        mongo::extension::sdk::ExtensionStatus status;
-        ASSERT_EQUALS(status.getCode(), 0);
-        ASSERT_EQUALS(status.getReason().size(), 0);
-    }
-
-    // Test constructing an ExtensionStatus with an error code.
-    {
-        mongo::extension::sdk::ExtensionStatus status(20);
-        ASSERT_EQUALS(status.getCode(), 20);
-        ASSERT_EQUALS(status.getReason().size(), 0);
-    }
-
-    auto status = mongo::error_details::makeStatus(
-        10596410, std::string("Assertion Exception in extension_status_test.cpp"));
-
-    // Test constructing an ExtensionStatus with an exception.
-    {
-        mongo::extension::sdk::HostStatusHandle handle(nullptr);
-        try {
-            error_details::throwExceptionForStatus(status);
-        } catch (const std::exception& exc) {
-            handle = mongo::extension::sdk::HostStatusHandle(
-                std::make_unique<mongo::extension::sdk::ExtensionStatus>(exc, status.code())
-                    .release());
-        }
-        handle.assertValid();
-        ASSERT_EQUALS(handle.getCode(), status.code());
-        ASSERT_EQUALS(std::string(handle.getReason()), status.reason());
-    }
-    // Test setting an ExtensionStatus with an exception.
-    {
-        mongo::extension::sdk::ExtensionStatus extensionStatus;
-        ASSERT_EQUALS(extensionStatus.getCode(), 0);
-        try {
-            error_details::throwExceptionForStatus(status);
-        } catch (const std::exception& exc) {
-            extensionStatus.setException(exc, -1);
-        }
-        ASSERT_EQUALS(extensionStatus.getCode(), -1);
-        ASSERT_EQUALS(std::string(extensionStatus.getReason()), status.reason());
-    }
-}
-
 TEST(ExtensionStatusTest, extensionStatusOKTest) {
     // HostStatusHandle going out of scope should call destroy, but not destroy our singleton.
     auto* const statusOKSingleton = &mongo::extension::sdk::ExtensionStatusOK::getInstance();
@@ -150,7 +104,7 @@ TEST(ExtensionStatusTest, extensionStatusEnterC_enterCXX_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
     auto extensionStatusPtr =
-        std::make_unique<extension::sdk::ExtensionStatus>(10596412, kErrorString);
+        std::make_unique<extension::sdk::ExtensionStatusException>(nullptr, 10596412, kErrorString);
     const auto* extensionStatusOriginalPtr = extensionStatusPtr.get();
 
     extension::sdk::HostStatusHandle propagatedStatus(extension::sdk::enterCXX(
@@ -164,14 +118,15 @@ TEST(ExtensionStatusTest, extensionStatusEnterC_enterCXX_ExtensionDBException) {
 TEST(ExtensionStatusTest, extensionStatusEnterC_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
-    ASSERT_THROWS_CODE_AND_WHAT(extension::sdk::enterC([&]() {
-                                    return std::make_unique<extension::sdk::ExtensionStatus>(
-                                               10596412, kErrorString)
-                                        .release();
-                                }),
-                                extension::sdk::ExtensionDBException,
-                                10596412,
-                                kErrorString);
+    ASSERT_THROWS_CODE_AND_WHAT(
+        extension::sdk::enterC([&]() {
+            return std::make_unique<extension::sdk::ExtensionStatusException>(
+                       nullptr, 10596412, kErrorString)
+                .release();
+        }),
+        extension::sdk::ExtensionDBException,
+        10596412,
+        kErrorString);
 }
 
 }  // namespace

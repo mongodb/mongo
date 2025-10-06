@@ -44,66 +44,10 @@
 namespace mongo::extension::sdk {
 
 /**
- * ExtensionStatus is an abstraction for extensions to provide the status of API calls made
- * into the extension by the host.
- */
-class ExtensionStatus final : public ::MongoExtensionStatus {
-public:
-    explicit ExtensionStatus() : ExtensionStatus(MONGO_EXTENSION_STATUS_OK) {}
-
-    ExtensionStatus(int32_t code, const std::string& reason = std::string(""))
-        : ::MongoExtensionStatus{&VTABLE}, _code(code), _reason(reason) {}
-
-    ExtensionStatus(const std::exception& e, int32_t code) : ::MongoExtensionStatus{&VTABLE} {
-        setException(e, code);
-    }
-
-    ~ExtensionStatus() = default;
-
-    /**
-     * Return a utf-8 string associated with `error`. May be empty.
-     */
-    std::string_view getReason() const {
-        return _reason;
-    }
-
-    int32_t getCode() const {
-        return _code;
-    }
-
-    /**
-     * Populate the code and reason using an exception. Does not store or propagate the exception.
-     */
-    void setException(const std::exception& e, int32_t code) {
-        _code = code;
-        _reason = e.what();
-    }
-
-private:
-    static const ::MongoExtensionStatusVTable VTABLE;
-
-    static void _extDestroy(::MongoExtensionStatus* status) noexcept {
-        delete static_cast<mongo::extension::sdk::ExtensionStatus*>(status);
-    }
-
-    static int32_t _extGetCode(const ::MongoExtensionStatus* status) noexcept {
-        return static_cast<const mongo::extension::sdk::ExtensionStatus*>(status)->getCode();
-    }
-
-    static MongoExtensionByteView _extGetReason(const ::MongoExtensionStatus* status) noexcept {
-        return stringViewAsByteView(
-            static_cast<const mongo::extension::sdk::ExtensionStatus*>(status)->getReason());
-    }
-    /**
-     * _code may be MONGO_EXTENSION_STATUS_RUNTIME_ERROR if there was no error code associated
-     * with the exception.
-     */
-    int32_t _code;
-    std::string _reason;
-};
-
-/**
- * ExtensionStatusOK is an ExtensionStatus that is always OK.
+ * ExtensionStatusOK is an implementation of ::MongoExtensionStatus that is always OK.
+ *
+ * We use a singleton instance to avoid having to allocate a status every time we need to return
+ * success across the API boundary.
  */
 class ExtensionStatusOK final : public ::MongoExtensionStatus {
 public:
