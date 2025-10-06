@@ -415,6 +415,7 @@ void MozJSProxyScope::implThread(MozJSProxyScope* proxy) {
         Status capturedStatus = Status::OK();
         bool hadException = false;
         try {
+            stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
             proxy->_function();
         } catch (...) {
             capturedStatus = exceptionToStatus();
