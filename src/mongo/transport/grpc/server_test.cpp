@@ -256,7 +256,8 @@ TEST_F(ServerTest, MultipleAddresses) {
         HostAndPort("localhost", test::kLetKernelChoosePort),
         HostAndPort("127.0.0.1", test::kLetKernelChoosePort),
         HostAndPort("::1", test::kLetKernelChoosePort),
-        HostAndPort(makeUnixSockPath(test::kLetKernelChoosePort, "grpc-multiple-addresses-test"))};
+        HostAndPort(
+            makeGRPCUnixSockPath(test::kLetKernelChoosePort, "grpc-multiple-addresses-test"))};
 
     Server::Options options = CommandServiceTestFixtures::makeServerOptions();
     options.addresses = addresses;

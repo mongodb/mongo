@@ -49,10 +49,6 @@ namespace mongo::transport::grpc {
 namespace {
 const Seconds kSessionManagerShutdownTimeout{10};
 
-inline std::string makeGRPCUnixSockPath(int port) {
-    return makeUnixSockPath(port, "grpc");
-}
-
 class GRPCSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
@@ -172,7 +168,9 @@ Status GRPCTransportLayerImpl::setup() {
                 addresses.push_back(HostAndPort(ip, _options.bindPort));
             }
             if (_options.useUnixDomainSockets) {
-                addresses.push_back(HostAndPort(makeGRPCUnixSockPath(_options.bindPort)));
+                int sockVal = _options.bindPort ? _options.bindPort : SecureRandom().nextUInt64();
+                _unixSockPath = makeUnixSockPath(sockVal, "grpc");
+                addresses.push_back(HostAndPort(_unixSockPath));
             }
             serverOptions.addresses = std::move(addresses);
             serverOptions.maxThreads = _options.maxServerThreads;
@@ -261,8 +259,7 @@ Status GRPCTransportLayerImpl::start() {
             invariant(_sessionManager);
             _server->start();
             if (_options.useUnixDomainSockets) {
-                setUnixDomainSocketPermissions(makeGRPCUnixSockPath(_options.bindPort),
-                                               _options.unixDomainSocketPermissions);
+                setUnixDomainSocketPermissions(_unixSockPath, _options.unixDomainSocketPermissions);
             }
         }
         if (_defaultClient) {

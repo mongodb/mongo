@@ -173,6 +173,12 @@ private:
 
     GRPCClient::Options _clientOptions;
 
+    /**
+     * The filepath for the grpc unix domain socket. This value gets populated after a call to
+     * setup() only when _options.useUnixDomainSockets is true.
+     */
+    std::string _unixSockPath;
+
     // Invalidated after setup().
     std::vector<std::unique_ptr<Service>> _services;
     Options _options;

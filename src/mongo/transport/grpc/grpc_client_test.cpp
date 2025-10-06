@@ -199,9 +199,10 @@ private:
 };
 
 TEST_F(GRPCClientTest, GRPCClientConnect) {
-    std::vector<HostAndPort> addresses = {HostAndPort("localhost", test::kLetKernelChoosePort),
-                                          HostAndPort("localhost", test::kLetKernelChoosePort),
-                                          HostAndPort(makeUnixSockPath(1234))};
+    std::vector<HostAndPort> addresses = {
+        HostAndPort("localhost", test::kLetKernelChoosePort),
+        HostAndPort("localhost", test::kLetKernelChoosePort),
+        HostAndPort(makeGRPCUnixSockPath(test::kLetKernelChoosePort))};
 
     std::vector<Server::Options> serverOptions;
     for (auto& addr : addresses) {

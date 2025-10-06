@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg.h"
@@ -479,6 +480,13 @@ inline void assertEchoSucceeds(Session& session) {
     auto swResponse = session.sourceMessage();
     ASSERT_OK(swResponse);
     ASSERT_EQ_MSG(swResponse.getValue(), msg);
+}
+
+inline std::string makeGRPCUnixSockPath(int port, StringData label = "grpc") {
+    if (port == 0) {
+        port = SecureRandom().nextUInt64();
+    }
+    return makeUnixSockPath(port, label);
 }
 
 }  // namespace mongo::transport::grpc
