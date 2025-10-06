@@ -9,6 +9,7 @@ mongo_cc_unit_test(
         "byte_buf_utils_test.cpp",
         "extension_status_test.cpp",
         "handle_test.cpp",
+        "host_services_test.cpp",
         "vec_byte_buf_test.cpp",
         "versioned_extension_test.cpp",
     ],

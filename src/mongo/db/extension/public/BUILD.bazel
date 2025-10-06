@@ -1,8 +1,30 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
 mongo_cc_library(
+    name = "extensions_api_public",
+    srcs = [
+        ":extension_log_gen",
+    ],
+    hdrs = [],
+    deps = [
+        ":api",
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
     name = "api",
     hdrs = ["api.h"],
+)
+
+idl_generator(
+    name = "extension_log_gen",
+    src = "extension_log.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

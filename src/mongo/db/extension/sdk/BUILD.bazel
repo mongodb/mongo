@@ -26,7 +26,7 @@ mongo_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/extension/public:api",
+        "//src/mongo/db/extension/public:extensions_api_public",
         "//src/third_party/yaml-cpp:yaml",
     ],
 )

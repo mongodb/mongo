@@ -29,19 +29,34 @@
 
 #include "mongo/db/extension/sdk/host_services.h"
 
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/unittest/unittest.h"
 
-namespace mongo::extension::sdk {
+#include <string>
 
-// The static instance of HostServicesHandle is initially set to nullptr. It will be set "for real"
-// at the very start of extension initialization, before any extension should attempt to access it.
-HostServicesHandle HostServicesHandle::_hostServices(nullptr);
+namespace mongo::extension {
+namespace {
+/**
+ * Tests that the ExtensionLog created by HostServicesHandle::createExtensionLogMessage can be
+ * round-tripped through MongoExtensionByteView serialization and deserialization.
+ */
+TEST(HostServicesTest, ExtensionLogIDLRoundTrip) {
+    std::string logMessage = "Test log message";
+    std::int32_t logCode = 12345;
+    MongoExtensionLogSeverityEnum logSeverity = MongoExtensionLogSeverityEnum::kInfo;
 
-BSONObj HostServicesHandle::createExtensionLogMessage(
-    std::string message,
-    std::int32_t code,
-    mongo::extension::MongoExtensionLogSeverityEnum severity) {
-    mongo::extension::MongoExtensionLog log(std::move(message), code, severity);
-    return log.toBSON();
+    BSONObj structuredLog =
+        sdk::HostServicesHandle::createExtensionLogMessage(logMessage, logCode, logSeverity);
+    ::MongoExtensionByteView byteView = sdk::objAsByteView(structuredLog);
+
+    ASSERT(byteView.data != nullptr);
+    ASSERT(byteView.len > 0);
+
+    auto bsonObj = sdk::bsonObjFromByteView(byteView);
+    auto log = MongoExtensionLog::parse(bsonObj);
+
+    ASSERT_EQUALS(log.getMessage(), logMessage);
+    ASSERT_EQUALS(log.getCode(), logCode);
+    ASSERT_EQUALS(log.getSeverity(), logSeverity);
 }
-}  // namespace mongo::extension::sdk
+}  // namespace
+}  // namespace mongo::extension

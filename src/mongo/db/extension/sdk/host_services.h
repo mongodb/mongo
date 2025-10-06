@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/public/extension_log_gen.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/handle.h"
 #include "mongo/util/modules.h"
@@ -54,6 +55,11 @@ public:
         sdk::enterC([&]() { return vtable().alwaysOK_TEMPORARY(); });
         return true;
     }
+
+    static BSONObj createExtensionLogMessage(
+        std::string message,
+        std::int32_t code,
+        mongo::extension::MongoExtensionLogSeverityEnum severity);
 
     static HostServicesHandle* getHostServices() {
         return &_hostServices;

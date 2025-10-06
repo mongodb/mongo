@@ -22,7 +22,7 @@ mongo_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//src/mongo/db/extension/public:api",
+        "//src/mongo/db/extension/public:extensions_api_public",
         # Note, for the time being we are linking in the C++ SDK here to reduce code duplication.
         # Eventually, we may decouple the C++ SDK from the server and remove this dependency.
         "//src/mongo/db/extension/sdk:sdk_cpp",
