@@ -27,6 +27,7 @@
 #
 """Calibration configuration."""
 
+import os
 import random
 from typing import Any
 
@@ -126,7 +127,7 @@ distributions["array_small"] = ArrayRandomDistribution(lengths_distr, distributi
 
 # Database settings
 database = config.DatabaseConfig(
-    connection_string="mongodb://localhost",
+    connection_string=os.getenv("MONGODB_URI", "mongodb://localhost"),
     database_name="qsn_calibration",
     dump_path="~/mongo/buildscripts/cost_model",
     restore_from_dump=config.RestoreMode.NEVER,

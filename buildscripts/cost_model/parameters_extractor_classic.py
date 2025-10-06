@@ -81,9 +81,11 @@ def get_execution_stats(
 ) -> Mapping[str, Sequence[ExecutionStats]]:
     if len(qsn_types) == 0:
         qsn_types = get_qsn_types(qt)
+    qt_preorder, et_preorder = preorder(qt), preorder(et)
+    assert len(qt_preorder) == len(et_preorder)
 
     result: Mapping[str, ExecutionStats] = defaultdict(list)
-    for qnode, enode in zip(preorder(qt), preorder(et), strict=True):
+    for qnode, enode in zip(qt_preorder, et_preorder):
         if qnode.node_type not in qsn_types:
             print(
                 "Encountered unexpected node type during execution stats extraction: "
