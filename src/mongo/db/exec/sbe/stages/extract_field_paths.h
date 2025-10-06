@@ -93,7 +93,7 @@ private:
     const value::SlotVector _outputSlotIds;
 
     value::SlotAccessor* _inputAccessor = nullptr;
-    std::unique_ptr<value::BsonWalkNode<value::ScalarProjectionPositionInfoRecorder>> _root =
+    std::unique_ptr<value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>> _root =
         nullptr;
     std::vector<value::OwnedValueAccessor> _outputAccessors;
     value::SlotMap<size_t> _outputAccessorsIdxForSlotId;

@@ -28,8 +28,8 @@
  */
 
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/exec/sbe/values/object_walk_node.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 
@@ -55,7 +55,7 @@ using Get = value::CellBlock::Get;
 using Traverse = value::CellBlock::Traverse;
 using Id = value::CellBlock::Id;
 
-void callback(value::BsonWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
+void callback(value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
               value::TypeTags eltTag,
               value::Value eltVal,
               const char* bson) {
@@ -108,7 +108,7 @@ void ExtractFieldPathsFixture::perfectTree(benchmark::State& state,
         i++;
     }
 
-    value::BsonWalkNode<value::ScalarProjectionPositionInfoRecorder> tree;
+    value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder> tree;
     // Construct extractor.
     std::vector<value::ScalarProjectionPositionInfoRecorder> recorders;
     recorders.reserve(tests.size());

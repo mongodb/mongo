@@ -46,7 +46,7 @@ struct PathTestCase {
     BSONObj projectValue;
 };
 
-void dummyCallBack(value::BsonWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
+void dummyCallBack(value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
                    value::TypeTags eltTag,
                    value::Value eltVal,
                    const char*) {
@@ -113,10 +113,10 @@ value::Object convertToObject(value::TypeTags inputTag, value::Value inputVal) {
     return ret;
 }
 
-class BsonWalkNodeScalarTest : public mongo::unittest::Test {
+class ObjectWalkNodeScalarTest : public mongo::unittest::Test {
 public:
     void testPaths(const std::vector<PathTestCase>& testCases, const BSONObj& data) {
-        value::BsonWalkNode<value::ScalarProjectionPositionInfoRecorder> root;
+        value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder> root;
         // Construct extractor.
         std::vector<value::ScalarProjectionPositionInfoRecorder> recorders;
         recorders.reserve(testCases.size());
@@ -163,7 +163,7 @@ public:
     }
 };
 
-TEST_F(BsonWalkNodeScalarTest, Sanity) {
+TEST_F(ObjectWalkNodeScalarTest, Sanity) {
     {
         BSONObj inputObj = fromjson("{a: [{b: 1}, {b: [{c: 3}]}]}");
         std::vector<PathTestCase> tests{
@@ -285,7 +285,7 @@ TEST_F(BsonWalkNodeScalarTest, Sanity) {
     }
 }
 
-TEST_F(BsonWalkNodeScalarTest, NestedArrays) {
+TEST_F(ObjectWalkNodeScalarTest, NestedArrays) {
     {
         BSONObj inputObj = fromjson("{a: [[{b: 1}], {b: 2}]}");
         std::vector<PathTestCase> tests{PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Id{}},
@@ -309,7 +309,7 @@ TEST_F(BsonWalkNodeScalarTest, NestedArrays) {
     }
 }
 
-TEST_F(BsonWalkNodeScalarTest, DottedFieldNames) {
+TEST_F(ObjectWalkNodeScalarTest, DottedFieldNames) {
     {
         // Dotted toplevel field name.
         BSONObj inputObj = BSON("a.b" << 1);
@@ -337,7 +337,7 @@ TEST_F(BsonWalkNodeScalarTest, DottedFieldNames) {
     }
 }
 
-TEST_F(BsonWalkNodeScalarTest, RandomlyGenerated) {
+TEST_F(ObjectWalkNodeScalarTest, RandomlyGenerated) {
     {
         BSONObj inputObj = fromjson(
             "{ f0 : [ 1, { f0 : 2, f1 : [ [ 3, 4 ] ] }, [ [ 5, [ 6, 7 ] ] ] ], f1 : [ { f0 : [ [ "
@@ -409,7 +409,7 @@ TEST_F(BsonWalkNodeScalarTest, RandomlyGenerated) {
     }
 }
 
-TEST_F(BsonWalkNodeScalarTest, DuplicateFields) {
+TEST_F(ObjectWalkNodeScalarTest, DuplicateFields) {
     {
         // Duplicate toplevel field names
         BSONObj inputObj = BSON("a" << 1 << "a" << 2);
@@ -478,7 +478,7 @@ TEST_F(BsonWalkNodeScalarTest, DuplicateFields) {
 }
 
 // Test accessing every field from a single level document with many fields.
-TEST_F(BsonWalkNodeScalarTest, BigFlat) {
+TEST_F(ObjectWalkNodeScalarTest, BigFlat) {
     int n = 1000;
     BSONObjBuilder bob;
     std::vector<PathTestCase> tests;
@@ -495,7 +495,7 @@ TEST_F(BsonWalkNodeScalarTest, BigFlat) {
 }
 
 // Project every leaf node of a perfect N-ary tree document.
-TEST_F(BsonWalkNodeScalarTest, PerfectTree) {
+TEST_F(ObjectWalkNodeScalarTest, PerfectTree) {
     BSONObjBuilder bob;
     int curIdx = 0;
     int depth = 4;
