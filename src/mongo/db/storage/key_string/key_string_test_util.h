@@ -31,10 +31,10 @@
 
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
-#include <random>
-
-namespace mongo::key_string_test {
+namespace MONGO_MOD_PRIVATE mongo {
+namespace key_string_test {
 class KeyStringBuilderTest : public unittest::Test {
 public:
     void run();
@@ -164,4 +164,5 @@ void perfTest(key_string::Version version, const Numbers& numbers);
 
 #define COMPARE_HELPER(LHS, RHS) (((LHS) < (RHS)) ? -1 : (((LHS) == (RHS)) ? 0 : 1))
 
-}  // namespace mongo::key_string_test
+}  // namespace key_string_test
+}  // namespace MONGO_MOD_PRIVATE mongo

@@ -717,6 +717,12 @@ void BuilderBase<BufferT>::_appendRecordIdLong(int64_t val) {
     _append(lastByte, false);
 }
 
+// Encode the size of a RecordId binary string using up to 4 bytes, 7 bits per byte.
+// This supports encoding sizes that fit into 28 bits, which largely covers the
+// maximum BSON size.
+static constexpr int kRecordIdStrEncodedSizeMaxBytes = 4;
+MONGO_STATIC_ASSERT(RecordId::kBigStrMaxSize < 1 << (7 * kRecordIdStrEncodedSizeMaxBytes));
+
 template <class BufferT>
 void BuilderBase<BufferT>::_appendRecordIdStr(const char* str, int size) {
     // Append the RecordId binary string as-is, then append the encoded binary string size.

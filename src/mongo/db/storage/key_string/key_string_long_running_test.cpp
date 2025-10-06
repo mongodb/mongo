@@ -31,6 +31,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 
+#include <random>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 namespace mongo::key_string_test {
 

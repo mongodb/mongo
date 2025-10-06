@@ -47,6 +47,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -65,9 +66,9 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace key_string {
-class BuilderInterface {
+class MONGO_MOD_OPEN BuilderInterface {
 public:
     virtual ~BuilderInterface() = default;
 
@@ -109,12 +110,6 @@ inline StringData keyStringVersionToString(Version version) {
 }
 
 inline const Ordering ALL_ASCENDING = Ordering::allAscending();
-
-// Encode the size of a RecordId binary string using up to 4 bytes, 7 bits per byte.
-// This supports encoding sizes that fit into 28 bits, which largely covers the
-// maximum BSON size.
-inline constexpr int kRecordIdStrEncodedSizeMaxBytes = 4;
-MONGO_STATIC_ASSERT(RecordId::kBigStrMaxSize < 1 << (7 * kRecordIdStrEncodedSizeMaxBytes));
 
 /**
  * Encodes info needed to restore the original BSONTypes from a KeyString. They cannot be
@@ -442,7 +437,7 @@ private:
 /**
  * A compact type which fits a keystring version and a record id size into four bytes.
  */
-class VersionAndSize {
+class MONGO_MOD_FILE_PRIVATE VersionAndSize {
 public:
     constexpr VersionAndSize() = default;
     constexpr VersionAndSize(Version version, int32_t size) : _value(_encode(version, size)) {}
@@ -794,7 +789,7 @@ enum class Discriminator {
     kExclusiveAfter,
 };
 
-enum class BuildState {
+enum class MONGO_MOD_FILE_PRIVATE BuildState {
     kEmpty,                  // Buffer is empty.
     kAppendingBSONElements,  // In the process of appending BSON Elements
     kEndAdded,               // Finished appedning BSON Elements.
@@ -806,7 +801,7 @@ enum class BuildState {
 /**
  * Encodes the kind of NumberDecimal that is stored.
  */
-enum DecimalContinuationMarker {
+enum MONGO_MOD_FILE_PRIVATE DecimalContinuationMarker {
     kDCMEqualToDouble = 0x0,
     kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits = 0x1,
     kDCMEqualToDoubleRoundedUpTo15Digits = 0x2,
@@ -1159,7 +1154,7 @@ protected:
 // Helper class to hold a buffer builder. This class needs to be before BuilderBase when inheriting
 // to ensure the buffer is constructed first
 template <typename BufferBuilderT>
-class BufferHolder {
+class MONGO_MOD_FILE_PRIVATE BufferHolder {
 protected:
     template <typename... Args>
     BufferHolder(Args&&... args) : _bufferBuilder(std::forward<Args>(args)...) {}
@@ -1263,7 +1258,7 @@ public:
  * on are KeyStrings.
  */
 template <class T>
-struct isKeyString : public std::false_type {};
+struct MONGO_MOD_FILE_PRIVATE isKeyString : public std::false_type {};
 
 template <>
 struct isKeyString<Builder> : public std::true_type {};
@@ -1274,15 +1269,14 @@ struct isKeyString<PooledBuilder> : public std::true_type {};
 template <>
 struct isKeyString<Value> : public std::true_type {};
 
-// clang-format off
 template <typename T, typename U>
-    requires(!!isKeyString<T>())
+requires(!!isKeyString<T>())
 std::strong_ordering operator<=>(const T& lhs, const U& rhs) {
     return lhs.compare(rhs) <=> 0;
 }
 
 template <typename T, typename U>
-    requires(!!isKeyString<T>())
+requires(!!isKeyString<T>())
 bool operator==(const T& lhs, const U& rhs) {
     return lhs.compare(rhs) == 0;
 }
@@ -1292,7 +1286,6 @@ requires(!!isKeyString<T>())
 std::ostream& operator<<(std::ostream& stream, const T& value) {
     return stream << value.toString();
 }
-// clang-format on
 
 /**
  * Given a KeyString which may or may not have a RecordId, returns the length of the section without
@@ -1487,4 +1480,4 @@ std::string explain(std::span<const char> buffer,
 
 using KeyStringSet = boost::container::flat_set<key_string::Value>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

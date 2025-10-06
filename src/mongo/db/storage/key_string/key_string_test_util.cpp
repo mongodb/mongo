@@ -34,6 +34,8 @@
 #include "mongo/stdx/future.h"
 #include "mongo/util/timer.h"
 
+#include <random>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::key_string_test {
@@ -42,8 +44,8 @@ Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 Ordering ONE_ASCENDING = Ordering::make(BSON("a" << 1));
 Ordering ONE_DESCENDING = Ordering::make(BSON("a" << -1));
 
-std::random_device rd;
-std::mt19937_64 seedGen(rd());
+static std::random_device rd;
+static std::mt19937_64 seedGen(rd());
 
 unsigned newSeed() {
     unsigned int seed = seedGen();  // Replace by the reported number to repeat test execution.
