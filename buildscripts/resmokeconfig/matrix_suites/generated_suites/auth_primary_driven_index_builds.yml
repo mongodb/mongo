@@ -13,13 +13,12 @@ executor:
         TestData:
           roleGraphInvalidationIsFatal: true
           setParameters:
+            failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
             featureFlagPrimaryDrivenIndexBuilds: true
-            featureFlagRecordIdsReplicated: 1
+            featureFlagRecordIdsReplicated: true
           setParametersMongos:
             featureFlagPrimaryDrivenIndexBuilds: true
-            featureFlagRecordIdsReplicated: 1
-          skipCheckDBHashes: true
-          skipCollectionAndIndexValidation: true
+            featureFlagRecordIdsReplicated: true
       nodb: ""
 matrix_suite: true
 selector:

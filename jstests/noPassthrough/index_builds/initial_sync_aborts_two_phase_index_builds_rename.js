@@ -3,6 +3,8 @@
  * when an index build is active on the target collection namespace (nss).
  *
  * @tags: [
+ *   # TODO(SERVER-109667): Primary-driven index builds don't support draining side writes yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

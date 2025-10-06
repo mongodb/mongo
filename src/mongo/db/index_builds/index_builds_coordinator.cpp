@@ -3233,6 +3233,12 @@ void IndexBuildsCoordinator::_buildPrimaryDrivenIndex(
     bool isPrimary{false};
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().isReplSet()) {
+        // Wait until the node becomes a primary or a secondary.
+        while (!replCoord->getMemberState().primary() && !replCoord->getMemberState().secondary()) {
+            opCtx->sleepFor(Milliseconds(100));
+            opCtx->checkForInterrupt();
+        }
+
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             // We do not hold a collection lock here, but we are protected against the collection
             // being dropped while the index build is still registered for the collection -- until

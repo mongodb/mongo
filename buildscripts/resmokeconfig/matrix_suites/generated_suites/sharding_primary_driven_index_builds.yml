@@ -15,13 +15,12 @@ executor:
       global_vars:
         TestData:
           setParameters:
+            failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
             featureFlagPrimaryDrivenIndexBuilds: true
-            featureFlagRecordIdsReplicated: 1
+            featureFlagRecordIdsReplicated: true
           setParametersMongos:
             featureFlagPrimaryDrivenIndexBuilds: true
-            featureFlagRecordIdsReplicated: 1
-          skipCheckDBHashes: true
-          skipCollectionAndIndexValidation: true
+            featureFlagRecordIdsReplicated: true
       nodb: ""
 matrix_suite: true
 selector:
@@ -30,6 +29,7 @@ selector:
     - rolling_index_builds
     - requires_commit_quorum
     - requires_capped
+    - exclude_when_record_ids_replicated
   roots:
     - jstests/sharding/*index_build*.js
 test_kind: js_test

@@ -6,13 +6,7 @@
           set_parameters:
             featureFlagPrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              # TODO(SERVER-110172): Re-enable these checks.
-              skipCheckDBHashes: true
-              skipCollectionAndIndexValidation: true
+            failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
 - name: enable_primary_driven_index_builds_feature_flag_mongos
   value:
     executor:
@@ -30,10 +24,8 @@
             TestData:
               setParameters:
                 featureFlagPrimaryDrivenIndexBuilds: true
-                featureFlagRecordIdsReplicated: 1
-              # TODO(SERVER-110172): Re-enable these checks.
-              skipCheckDBHashes: true
-              skipCollectionAndIndexValidation: true
+                featureFlagRecordIdsReplicated: true
+                failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongos
   value:
     executor:
@@ -43,7 +35,7 @@
             TestData:
               setParametersMongos:
                 featureFlagPrimaryDrivenIndexBuilds: true
-                featureFlagRecordIdsReplicated: 1
+                featureFlagRecordIdsReplicated: true
 - name: exclude_primary_driven_index_builds_incompatible_tag
   value:
     exclude_with_any_tags:
@@ -51,6 +43,13 @@
       - rolling_index_builds
       - requires_commit_quorum
       - requires_capped
+      - exclude_when_record_ids_replicated
+- name: exclude_jscore_multikey_index_tests
+  value:
+    exclude_files:
+      # TODO(SERVER-110846): Index on the secondary is not marked multikey.
+      - jstests/core/query/**/*.js
+      - jstests/core/index/**/*.js
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:

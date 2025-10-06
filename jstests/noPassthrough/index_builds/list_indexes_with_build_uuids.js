@@ -6,6 +6,7 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const dbName = "test";
@@ -81,7 +82,7 @@ assert.soon(
     },
 );
 
-jsTest.log(indexes);
+jsTest.log("indexes: " + JSON.stringify(indexes));
 
 assert.eq(indexes[0].name, "_id_");
 assert.eq(indexes[1].name, "first");
@@ -92,5 +93,7 @@ assert(indexes[2].hasOwnProperty("buildUUID"));
 // Allow the replica set to finish the index build.
 IndexBuildTest.resumeIndexBuilds(secondary);
 createIdx();
+
+replSet.awaitReplication();
 
 replSet.stopSet();

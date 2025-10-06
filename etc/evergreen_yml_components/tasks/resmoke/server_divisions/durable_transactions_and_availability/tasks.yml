@@ -356,6 +356,27 @@ tasks:
         vars:
           resmoke_jobs_max: 1
 
+  # TODO(SERVER-108818): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: concurrency_replication_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "primary_driven_index_builds",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "common",
+        "repl",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_jobs_max: 1
+          suite: concurrency_replication_primary_driven_index_builds
+
   # TODO (SERVER-101590): Remove this temporary suite.
   - <<: *gen_task_template
     name: concurrency_replication_viewless_timeseries_gen
@@ -558,6 +579,31 @@ tasks:
         vars:
           use_large_distro: "true"
           resmoke_jobs_max: 1
+
+  # TODO(SERVER-108818): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: concurrency_sharded_replication_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "primary_driven_index_builds",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+          suite: concurrency_sharded_replication_primary_driven_index_builds
 
   - <<: *gen_task_template
     name: concurrency_sharded_replication_multiversion_gen

@@ -2,6 +2,8 @@
  * Confirms that aborting a background index builds on a secondary does not leave node in an
  * inconsistent state.
  * @tags: [
+ *   # TODO(SERVER-111661): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

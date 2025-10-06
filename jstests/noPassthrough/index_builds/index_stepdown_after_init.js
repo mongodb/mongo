@@ -2,6 +2,8 @@
  * Confirms that background index builds on a primary are aborted when the node steps down between
  * the initialization and collection scan phases.
  * @tags: [
+ *   # TODO(SERVER-111661): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

@@ -3,16 +3,18 @@
  * results to be created. This test is focused on negative scenarios when the rewrite doesn't occur.
  *
  * @tags: [
- *     # Explain of a resolved view must be executed by mongos.
- *     directly_against_shardsvrs_incompatible,
- *     # This complicates aggregation extraction.
- *     do_not_wrap_aggregations_in_facets,
- *     # Refusing to run a test that issues an aggregation command with explain because it may
- *     # return incomplete results if interrupted by a stepdown.
- *     does_not_support_stepdowns,
- *     # We need a timeseries collection.
- *     requires_timeseries,
- *     requires_getmore,
+ * # TODO(SERVER-110846): Index on the secondary is not marked multikey.
+ * primary_driven_index_builds_incompatible,
+ * # Explain of a resolved view must be executed by mongos.
+ * directly_against_shardsvrs_incompatible,
+ * # This complicates aggregation extraction.
+ * do_not_wrap_aggregations_in_facets,
+ * # Refusing to run a test that issues an aggregation command with explain because it may
+ * # return incomplete results if interrupted by a stepdown.
+ * does_not_support_stepdowns,
+ * # We need a timeseries collection.
+ * requires_timeseries,
+ * requires_getmore,
  * ]
  */
 import {

@@ -3,6 +3,8 @@
  * node starts back up.
  *
  * @tags: [
+ *   # TODO(SERVER-111661): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_persistence,
  *   requires_replication,
  * ]

@@ -2338,6 +2338,19 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
+  # TODO(SERVER-108818): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: replica_sets_jscore_passthrough_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "jscore",
+        "primary_driven_index_builds",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
   - <<: *gen_task_template
     name: replica_sets_jscore_passthrough_viewless_timeseries_gen
     # TODO (SERVER-101590): Remove this temporary suite.

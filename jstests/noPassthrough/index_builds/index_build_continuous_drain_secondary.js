@@ -6,6 +6,8 @@
  * to complete the index builds. The expectation is that these values are close to each other.
  *
  * @tags: [
+ *   # TODO(SERVER-109667): Primary-driven index builds don't support draining side writes yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  *

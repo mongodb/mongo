@@ -3,8 +3,10 @@
  * ident, the node can be started as a standalone and the index can be dropped.
  *
  * @tags: [
- *     requires_persistence,
- *     requires_replication,
+ *   # TODO(SERVER-109667): Primary-driven index builds don't support draining side writes yet.
+ *   primary_driven_index_builds_incompatible,
+ *   requires_persistence,
+ *   requires_replication,
  * ]
  */
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
