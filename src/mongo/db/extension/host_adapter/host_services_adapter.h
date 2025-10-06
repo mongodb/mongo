@@ -28,15 +28,35 @@
  */
 #pragma once
 
-#include "mongo/util/modules.h"
+#include "mongo/db/extension/public/api.h"
 
-namespace mongo::extension::host {
-
+#include <memory>
+namespace mongo::extension::host_adapter {
 /**
- * HostServices provides the core implementation of host services functionality for extensions.
+ * HostServicesAdapter is an implementation of ::MongoExtensionHostServices, providing host
+ * services to extensions.
+ *
+ * For each function in the MongoExtensionHostServicesVTable, this adapter has a corresponding
+ * function that translates between the C API and the core implementation of the host services
+ * provided primarily through mongo::extension::host::HostServices.
+ *
+ * The HostServicesAdapter instance is a singleton, and is accessible via
+ * HostServicesAdapter::get(). The pointer to the singleton instance is passed to extensions during
+ * initialization, and is expected to be valid for the lifetime of the extension.
  */
-class HostServices {
+class HostServicesAdapter final : public ::MongoExtensionHostServices {
 public:
-    static bool alwaysTrue_TEMPORARY();
+    HostServicesAdapter() : ::MongoExtensionHostServices{&VTABLE} {}
+
+    static HostServicesAdapter* get() {
+        return &_hostServicesAdapter;
+    }
+
+private:
+    static HostServicesAdapter _hostServicesAdapter;
+
+    static MongoExtensionStatus* _extAlwaysOK_TEMPORARY() noexcept;
+
+    static constexpr ::MongoExtensionHostServicesVTable VTABLE{&_extAlwaysOK_TEMPORARY};
 };
-}  // namespace mongo::extension::host
+}  // namespace mongo::extension::host_adapter

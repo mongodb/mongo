@@ -29,9 +29,9 @@
 #pragma once
 
 #include "mongo/db/extension/host/host_portal.h"
-#include "mongo/db/extension/host/host_services.h"
 #include "mongo/db/extension/host_adapter/extension_status.h"
 #include "mongo/db/extension/host_adapter/handle.h"
+#include "mongo/db/extension/host_adapter/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/util/modules.h"
 
@@ -58,7 +58,7 @@ public:
      * reference.
      */
     void initialize(const extension::host::HostPortal& portal,
-                    const extension::host::HostServices* hostServices) const {
+                    const extension::host_adapter::HostServicesAdapter* hostServices) const {
         sdk::enterC([&] {
             assertValid();
             return vtable().initialize(get(), &portal, hostServices);

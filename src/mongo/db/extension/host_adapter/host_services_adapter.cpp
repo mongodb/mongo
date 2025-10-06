@@ -26,17 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
+#include "mongo/db/extension/host_adapter/host_services_adapter.h"
 
-#include "mongo/util/modules.h"
+#include "mongo/db/extension/host/host_services.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::host_adapter {
 
-/**
- * HostServices provides the core implementation of host services functionality for extensions.
- */
-class HostServices {
-public:
-    static bool alwaysTrue_TEMPORARY();
-};
-}  // namespace mongo::extension::host
+// Initialize the static instance of HostServicesAdapter.
+HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
+
+MongoExtensionStatus* HostServicesAdapter::_extAlwaysOK_TEMPORARY() noexcept {
+    return sdk::enterCXX([&]() { return host::HostServices::alwaysTrue_TEMPORARY(); });
+}
+}  // namespace mongo::extension::host_adapter

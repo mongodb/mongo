@@ -30,10 +30,7 @@
 
 namespace mongo::extension::host {
 
-// Initialize the static instance of HostServices.
-HostServices HostServices::_hostServices;
-
-bool HostServices::_extAlwaysTrue_TEMPORARY() noexcept {
+bool HostServices::alwaysTrue_TEMPORARY() {
     return true;
 }
 

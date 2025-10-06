@@ -33,6 +33,7 @@
 #include "mongo/db/extension/host/host_services.h"
 #include "mongo/db/extension/host/load_stub_parsers.h"
 #include "mongo/db/extension/host_adapter/extension_handle.h"
+#include "mongo/db/extension/host_adapter/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -236,7 +237,7 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
                .maxWireVersion);
 
     HostPortal portal{extHandle.getVersion(), maxWireVersion, YAML::Dump(config.extOptions)};
-    extHandle.initialize(portal, HostServices::get());
+    extHandle.initialize(portal, host_adapter::HostServicesAdapter::get());
 }
 
 stdx::unordered_map<std::string, ExtensionConfig> ExtensionLoader::getLoadedExtensions() {

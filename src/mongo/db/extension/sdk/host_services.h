@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/handle.h"
 #include "mongo/util/modules.h"
 
@@ -50,7 +51,8 @@ public:
 
     bool alwaysTrue_TEMPORARY() const {
         assertValid();
-        return vtable().alwaysTrue_TEMPORARY();
+        sdk::enterC([&]() { return vtable().alwaysOK_TEMPORARY(); });
+        return true;
     }
 
     static HostServicesHandle* getHostServices() {
@@ -70,8 +72,8 @@ private:
 
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(11097600,
-                "Host services' 'alwaysTrue_TEMPORARY' is null",
-                vtable.alwaysTrue_TEMPORARY != nullptr);
+                "Host services' 'alwaysOK_TEMPORARY' is null",
+                vtable.alwaysOK_TEMPORARY != nullptr);
     };
 };
 

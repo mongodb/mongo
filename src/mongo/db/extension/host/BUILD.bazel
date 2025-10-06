@@ -23,6 +23,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
+        "//src/mongo/db/extension/host_adapter:host_services_adapter",
         "//src/mongo/db/pipeline",
     ],
 )
@@ -33,7 +34,6 @@ mongo_cc_library(
     hdrs = ["host_services.h"],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/extension/public:api",
     ],
 )
 
@@ -50,7 +50,6 @@ mongo_cc_library(
     ],
     deps = [
         ":extension_host",
-        ":host_services",
         "//src/mongo:base",
         "//src/mongo:core_headers_library",
         "//src/mongo/db/query:query_knobs",

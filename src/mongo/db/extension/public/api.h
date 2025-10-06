@@ -384,13 +384,13 @@ typedef struct MongoExtensionHostPortalVTable {
  *
  * Currently, the VTable struct is a placeholder for future services.
  * TODO SERVER-110982 (or whichever ticket adds the first function to this struct): Remove
- * alwaysTrue_TEMPORARY().
+ * alwaysOK_TEMPORARY().
  */
 typedef struct MongoExtensionHostServices {
     const struct MongoExtensionHostServicesVTable* vtable;
 } MongoExtensionHostServices;
 typedef struct MongoExtensionHostServicesVTable {
-    bool (*alwaysTrue_TEMPORARY)();
+    MongoExtensionStatus* (*alwaysOK_TEMPORARY)();
 } MongoExtensionHostServicesVTable;
 
 /**
