@@ -29,19 +29,15 @@
 
 #pragma once
 
-#include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
-#include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/db/exec/sbe/vm/vm_memory.h"
 #include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
@@ -52,18 +48,16 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/modules.h"
 
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <limits>
-#include <memory>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -86,7 +80,7 @@ namespace vm {
  * - The element at index `kMaxSize` is the maximum number entries the data structure holds.
  * - The element at index `kMemUsage` holds the current memory usage
  * - The element at index `kMemLimit` holds the max memory limit allowed
- * - The element at index `kIsGroupAccum` specifices if the accumulator belongs to group-by stage
+ * - The element at index `kIsGroupAccum` specifies if the accumulator belongs to group-by stage
  */
 enum class AggMultiElems {
     kInternalArr,
@@ -205,7 +199,7 @@ enum class AggPartialSumElems { kTotal, kError, kSizeOfArray };
  * This enum defines indices into an 'Array' that accumulates $stdDevPop and $stdDevSamp results.
  *
  * The array contains 3 elements:
- * - The element at index `kCount` keeps track of the total number of values processd
+ * - The element at index `kCount` keeps track of the total number of values processed
  * - The elements at index `kRunningMean` keeps track of the mean of all the values that have been
  * processed.
  * - The elements at index `kRunningM2` keeps track of running M2 value (defined within:

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
 #include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/db/exec/sbe/vm/vm_types.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include <cstddef>  // size_t
+#include "mongo/util/modules.h"
+
 #include <cstdint>  // uint8_t, etc.
 
 namespace mongo::sbe::vm {

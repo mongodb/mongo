@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/vm/makeobj_writers.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <cstdlib>

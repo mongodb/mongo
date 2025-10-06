@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #if defined(_MSC_VER)
 #define MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC MONGO_COMPILER_ALWAYS_INLINE

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/util/modules.h"
 
 #include <ostream>
 

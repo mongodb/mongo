@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #ifndef MONGO_SBE_VM_MAKEOBJ_H_WHITELIST
 // This file contains a usage of anonymous namespaces which are very bad to have in headers since
 // they can lead to ODR violations. Unfortunately when removed, it leads to a significant
@@ -40,7 +42,7 @@
 //  * This must be the last header included
 //  * The #define MONGO_SBE_VM_MAKEOBJ_H_WHITELIST must be after all other headers
 //
-// Using #warning rather than #error to play nicely with opening this header in  clangd.
+// Using #warning rather than #error to play nicely with opening this header in clangd.
 #warning "vm_makeobj.h is only allowed to be included in whitelisted cpp files. See above comment"
 #endif
 
