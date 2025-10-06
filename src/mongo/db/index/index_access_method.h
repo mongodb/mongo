@@ -672,10 +672,6 @@ protected:
                            const boost::optional<RecordId>& id) const = 0;
 
 private:
-    class BaseBulkBuilder;
-    class PrimaryDrivenBulkBuilder;
-    class HybridBulkBuilder;
-
     /**
      * Removes a single key from the index.
      *
