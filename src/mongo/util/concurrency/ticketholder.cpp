@@ -113,13 +113,13 @@ void TicketHolder::_immediateResize(WithLock, int32_t newSize) {
 
 void TicketHolder::_releaseTicketUpdateStats(Ticket& ticket) {
     if (ticket._priority == AdmissionContext::Priority::kExempt) {
-        _updateQueueStatsOnRelease(_exemptQueueStats, ticket);
+        _updateQueueStatsOnRelease(_exemptStats, ticket);
         return;
     }
 
     ticket._admissionContext->markTicketReleased();
 
-    _updateQueueStatsOnRelease(_normalPriorityQueueStats, ticket);
+    _updateQueueStatsOnRelease(_holderStats, ticket);
     _releaseNormalPriorityTicket(ticket._admissionContext);
 }
 
@@ -148,16 +148,16 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
     }
 
     auto tickSource = _serviceContext->getTickSource();
-    _normalPriorityQueueStats.totalAddedQueue.fetchAndAddRelaxed(1);
+    _holderStats.totalAddedQueue.fetchAndAddRelaxed(1);
     ON_BLOCK_EXIT([&, startWaitTime = tickSource->getTicks()] {
         auto waitDelta = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startWaitTime);
-        _normalPriorityQueueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
-        _normalPriorityQueueStats.totalRemovedQueue.fetchAndAddRelaxed(1);
+        _holderStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
+        _holderStats.totalRemovedQueue.fetchAndAddRelaxed(1);
     });
 
     ScopeGuard cancelWait([&] {
         // Update statistics.
-        _normalPriorityQueueStats.totalCanceled.fetchAndAddRelaxed(1);
+        _holderStats.totalCanceled.fetchAndAddRelaxed(1);
     });
 
     WaitingForAdmissionGuard waitForAdmission(admCtx, _serviceContext->getTickSource());
@@ -165,8 +165,7 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
 
     if (ticket) {
         cancelWait.dismiss();
-        _updateQueueStatsOnTicketAcquisition(
-            admCtx, _normalPriorityQueueStats, admCtx->getPriority());
+        _updateQueueStatsOnTicketAcquisition(admCtx, _holderStats, admCtx->getPriority());
         _updatePeakUsed();
         return ticket;
     } else {
@@ -232,13 +231,13 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
 boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
     const auto currentPriority = admCtx->getPriority();
     if (currentPriority == AdmissionContext::Priority::kExempt) {
-        _updateQueueStatsOnTicketAcquisition(admCtx, _exemptQueueStats, currentPriority);
+        _updateQueueStatsOnTicketAcquisition(admCtx, _exemptStats, currentPriority);
         return Ticket{this, admCtx};
     }
 
     auto ticket = _tryAcquireNormalPriorityTicket(admCtx);
     if (ticket) {
-        _updateQueueStatsOnTicketAcquisition(admCtx, _normalPriorityQueueStats, currentPriority);
+        _updateQueueStatsOnTicketAcquisition(admCtx, _holderStats, currentPriority);
         _updatePeakUsed();
     }
 
@@ -275,29 +274,28 @@ void TicketHolder::_updatePeakUsed() {
     }
 }
 
-void TicketHolder::appendStats(BSONObjBuilder& b) const {
+void TicketHolder::appendExemptStats(BSONObjBuilder& b, StringData fieldName) const {
+    BSONObjBuilder bb(b.subobjStart(fieldName));
+    _appendQueueStats(bb, _exemptStats);
+    bb.done();
+}
+
+void TicketHolder::appendHolderdStats(BSONObjBuilder& b, StringData fieldName) const {
     b.append("out", used());
     b.append("available", available());
     b.append("totalTickets", outof());
-    {
-        BSONObjBuilder bb(b.subobjStart("exempt"));
-        _appendQueueStats(bb, _exemptQueueStats);
-        bb.done();
-    }
 
-    {
-        BSONObjBuilder bb(b.subobjStart("normalPriority"));
-        _appendQueueStats(bb, _normalPriorityQueueStats);
+    BSONObjBuilder bb(b.subobjStart(fieldName));
+    _appendQueueStats(bb, _holderStats);
 
-        b.append("totalDelinquentAcquisitions",
-                 _delinquencyStats.totalDelinquentAcquisitions.loadRelaxed());
-        b.append("totalAcquisitionDelinquencyMillis",
-                 _delinquencyStats.totalAcquisitionDelinquencyMillis.loadRelaxed());
-        b.append("maxAcquisitionDelinquencyMillis",
-                 _delinquencyStats.maxAcquisitionDelinquencyMillis.loadRelaxed());
+    b.append("totalDelinquentAcquisitions",
+             _delinquencyStats.totalDelinquentAcquisitions.loadRelaxed());
+    b.append("totalAcquisitionDelinquencyMillis",
+             _delinquencyStats.totalAcquisitionDelinquencyMillis.loadRelaxed());
+    b.append("maxAcquisitionDelinquencyMillis",
+             _delinquencyStats.maxAcquisitionDelinquencyMillis.loadRelaxed());
 
-        bb.done();
-    }
+    bb.done();
 }
 
 void TicketHolder::_appendQueueStats(BSONObjBuilder& b, const QueueStats& stats) const {
@@ -353,12 +351,12 @@ void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx
 }
 
 int64_t TicketHolder::numFinishedProcessing() const {
-    return _normalPriorityQueueStats.totalFinishedProcessing.load();
+    return _holderStats.totalFinishedProcessing.load();
 }
 
 int64_t TicketHolder::queued() const {
-    auto removed = _normalPriorityQueueStats.totalRemovedQueue.loadRelaxed();
-    auto added = _normalPriorityQueueStats.totalAddedQueue.loadRelaxed();
+    auto removed = _holderStats.totalRemovedQueue.loadRelaxed();
+    auto added = _holderStats.totalAddedQueue.loadRelaxed();
     return std::max(added - removed, (int64_t)0);
 };
 
@@ -377,7 +375,7 @@ void TicketHolder::_releaseNormalPriorityTicket(AdmissionContext* admCtx) {
 }
 
 void TicketHolder::setNumFinishedProcessing_forTest(int32_t numFinishedProcessing) {
-    _normalPriorityQueueStats.totalFinishedProcessing.store(numFinishedProcessing);
+    _holderStats.totalFinishedProcessing.store(numFinishedProcessing);
 }
 
 void TicketHolder::setPeakUsed_forTest(int32_t used) {

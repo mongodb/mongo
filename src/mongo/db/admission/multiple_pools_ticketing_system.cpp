@@ -60,6 +60,9 @@ void MultiplePoolsTicketingSystem::setConcurrentTransactions(OperationContext* o
 }
 
 void MultiplePoolsTicketingSystem::appendStats(BSONObjBuilder& b) const {
+    boost::optional<BSONObjBuilder> readStats;
+    boost::optional<BSONObjBuilder> writeStats;
+
     for (size_t i = 0; i < _holders.size(); ++i) {
         const auto priority = static_cast<AdmissionContext::Priority>(i);
 
@@ -70,21 +73,35 @@ void MultiplePoolsTicketingSystem::appendStats(BSONObjBuilder& b) const {
 
         const auto& rw = _holders[i];
 
-        const char* priorityName =
-            (priority == AdmissionContext::Priority::kNormal) ? "normal" : "low";
-
-        BSONObjBuilder sub(b.subobjStart(priorityName));
+        const auto& fieldName = priority == AdmissionContext::Priority::kNormal
+            ? kNormalPriorityName
+            : kLowPriorityName;
         if (rw.read) {
-            BSONObjBuilder readStats(sub.subobjStart("read"));
-            rw.read->appendStats(readStats);
-            readStats.done();
+            if (!readStats.is_initialized()) {
+                readStats.emplace();
+            }
+            rw.read->appendHolderdStats(readStats.value(), fieldName);
+            if (priority == AdmissionContext::Priority::kNormal) {
+                rw.read->appendExemptStats(readStats.value(), kExemptPriorityName);
+            }
         }
         if (rw.write) {
-            BSONObjBuilder writeStats(sub.subobjStart("write"));
-            rw.write->appendStats(writeStats);
-            writeStats.done();
+            if (!writeStats.is_initialized()) {
+                writeStats.emplace();
+            }
+            rw.write->appendHolderdStats(writeStats.value(), fieldName);
+            if (priority == AdmissionContext::Priority::kNormal) {
+                rw.write->appendExemptStats(writeStats.value(), kExemptPriorityName);
+            }
         }
-        sub.done();
+    }
+    if (readStats.is_initialized()) {
+        readStats->done();
+        b.append("read", readStats->obj());
+    }
+    if (writeStats.is_initialized()) {
+        writeStats->done();
+        b.append("write", writeStats->obj());
     }
 }
 

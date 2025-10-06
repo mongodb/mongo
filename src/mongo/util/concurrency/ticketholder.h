@@ -184,9 +184,14 @@ public:
     void setPeakUsed_forTest(int32_t used);
 
     /**
-     * Append TicketHolder statistics to the provided builder.
+     * Append TicketHolder statistics to the provided builder at the specified field.
      */
-    void appendStats(BSONObjBuilder& b) const;
+    void appendHolderdStats(BSONObjBuilder& b, StringData fieldName) const;
+
+    /**
+     * Append TicketHolder exempt statistics.
+     */
+    void appendExemptStats(BSONObjBuilder& b, StringData fieldName) const;
 
     /**
      * Bumps the delinquency counters associated with this queue. This intended to be called when
@@ -268,8 +273,8 @@ private:
      */
     Ticket _makeTicket(AdmissionContext* admCtx);
 
-    QueueStats _normalPriorityQueueStats;
-    QueueStats _exemptQueueStats;
+    QueueStats _holderStats;
+    QueueStats _exemptStats;
     ResizePolicy _resizePolicy;
     ServiceContext* _serviceContext;
 

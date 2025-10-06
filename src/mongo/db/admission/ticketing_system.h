@@ -57,6 +57,9 @@ class TicketingSystem {
 public:
     static constexpr auto kDefaultConcurrentTransactions = 128;
     static constexpr auto kDefaultLowPriorityConcurrentTransactions = 5;
+    static constexpr auto kExemptPriorityName = "exempt"_sd;
+    static constexpr auto kLowPriorityName = "lowPriority"_sd;
+    static constexpr auto kNormalPriorityName = "normalPriority"_sd;
 
     enum class Operation { kRead = 0, kWrite };
 

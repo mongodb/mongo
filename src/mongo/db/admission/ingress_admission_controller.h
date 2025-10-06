@@ -40,6 +40,8 @@ namespace mongo {
 
 class IngressAdmissionController {
 public:
+    static constexpr auto kNormalPriorityName = "normalPriority"_sd;
+    static constexpr auto kExemptPriorityName = "exempt"_sd;
     /**
      * Returns the reference to IngressAdmissionController associated with the operation's service
      * context.

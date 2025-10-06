@@ -144,18 +144,22 @@ private:
  */
 class TicketHolderTest::Stats {
 public:
+    static constexpr auto kNormalPriorityName = "normalPriority"_sd;
+    static constexpr auto kExemptPriorityName = "exempt"_sd;
     Stats(TicketHolder* holder) : _holder(holder) {};
 
     long long operator[](StringData field) const {
         BSONObjBuilder bob;
-        _holder->appendStats(bob);
+        _holder->appendHolderdStats(bob, kNormalPriorityName);
+        _holder->appendExemptStats(bob, kExemptPriorityName);
         auto stats = bob.obj();
         return stats[field].numberLong();
     }
 
     BSONObj getStats() const {
         BSONObjBuilder bob;
-        _holder->appendStats(bob);
+        _holder->appendHolderdStats(bob, kNormalPriorityName);
+        _holder->appendExemptStats(bob, kExemptPriorityName);
         return bob.obj();
     }
 

@@ -64,12 +64,14 @@ void SinglePoolTicketingSystem::appendStats(BSONObjBuilder& b) const {
     invariant(_readTicketHolder, "Reader TicketHolder is not present in the TicketingSystem");
     {
         BSONObjBuilder bbb(b.subobjStart("write"));
-        _writeTicketHolder->appendStats(bbb);
+        _writeTicketHolder->appendHolderdStats(bbb, kNormalPriorityName);
+        _writeTicketHolder->appendExemptStats(bbb, kExemptPriorityName);
         bbb.done();
     }
     {
         BSONObjBuilder bbb(b.subobjStart("read"));
-        _readTicketHolder->appendStats(bbb);
+        _readTicketHolder->appendHolderdStats(bbb, kNormalPriorityName);
+        _readTicketHolder->appendExemptStats(bbb, kExemptPriorityName);
         bbb.done();
     }
 }

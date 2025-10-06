@@ -47,7 +47,7 @@ assert.eq(numDocs, coll.countDocuments({}));
  */
 const numLowPriorityWrites = function () {
     const status = primary.adminCommand({serverStatus: 1});
-    return status.queues.execution.low.write.normalPriority.finishedProcessing;
+    return status.queues.execution.write.lowPriority.finishedProcessing;
 };
 
 const lowPriorityBefore = numLowPriorityWrites();
