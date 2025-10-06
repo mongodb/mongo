@@ -42,8 +42,18 @@ class OperationContext;
 class ClientLock;
 
 /**
- * The VersionContext holds metadata related to snapshots of the system state
- * taken by OFCV-aware operations.
+ * The VersionContext holds metadata related to snapshots of the system state taken by Operation
+ * Feature Compatibility Version (OFCV)-aware operations.
+ *
+ * This will help ensure that an operation contacting many nodes will always have the same FCV
+ * snapshot. It is stored on the OperationContext and serialized across the network for outgoing
+ * requests, ensuring those requests inherit the same FCV snapshot. The VersionContext is also
+ * written into any oplog entries to ensure secondaries also see the same snapshot as the original
+ * operation.
+ *
+ * Please note that this is not yet available for all operations - its use is limited to DDL
+ * operations for now. Our plans are to expand this to more operations in a future project
+ * (SPM-4227).
  */
 class VersionContext {
 public:

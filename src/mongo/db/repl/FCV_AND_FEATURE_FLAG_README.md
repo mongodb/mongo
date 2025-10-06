@@ -664,17 +664,39 @@ respectively.
 Usually a feature will need to use an FCV-gated feature flag when the feature's behavior has a
 meaningful effect outside of a single process. Specifically,
 
-- the feature changes the on-disk format of some data or
-- the feature changes the way nodes in a cluster communicate with each other.
+1. the feature changes the on-disk format of some data or
+1. the feature changes the way nodes in a cluster communicate with each other.
 
-In the former case, FCV gating is needed to ensure that a binary-upgraded cluster can still be
+### On-disk Format Risk
+
+In the first case, FCV gating is needed to ensure that a binary-upgraded cluster can still be
 restored to its previous binary version until the upgrade is finalized via the FCV upgrade process.
 Before the FCV transition completes, the feature remains disabled so that it will not write data
 that is incompatible with the previous binary version.
 
-In the latter case, FCV gating allows an enabled feature to assume that no nodes with an older
+### Wire Protocol Risk
+
+In the second case, FCV gating allows an enabled feature to assume that no nodes with an older
 binary version remain in the cluster, so it can send commands and write oplog entries that older
 versions would not be able to interpret.
+
+Please note that this includes:
+
+- additions and changes to the query language and
+- changes to the serialization format of query operators.
+
+Not only are these operators serialized across the wire between nodes, they also can be written to
+oplog entries as part of non-materialized views or collection validators. If you are on the query
+team, please read more at
+[README_query_feature_flags.md](/src/mongo/db/query/README_query_feature_flags.md).
+
+> 🚧 Caution
+>
+> Just because a feature only executes as part of shard routing does not mean it only executes on
+> mongos. A mongod instance can act as the router for a query that originates from a data-bearing
+> node.
+
+### Incremental Feature Rollout Flags
 
 Features that do not need an FCV gate may be suited to deployment via IFR feature flag. Examples
 include
@@ -682,12 +704,6 @@ include
 - features targeting query performance or plan selection that do not affect query semantics,
 - features that add node-level diagnostics or validation,
 - features that only execute on mongos, which does not have an FCV.
-
-> 🚧 Caution
->
-> Just because a feature only executes as part of shard routing does not mean it only executes on
-> mongos. A mongod instance can act as the router for a query that originates from a data-bearing
-> node.
 
 An FCV-independent feature can use an IFR feature flag so long as it is written to tolerate runtime
 changes to the flag state that can occur at any time as [described above](#dynamically-toggling-features).
@@ -950,9 +966,11 @@ This is because otherwise, if you use two different snapshots, the in-memory FCV
 This same principle applies in general. If you want to check multiple properties of the FCV/feature flag at a specific point in time (i.e. you are expecting the FCV value to be the same in all of your function calls), you must do the checks on the SAME `FCVSnapshot`.
 See the [section about checking the in-memory FCV for more information](#checking-the-in-memory-FCV)
 
-Furthermore, FCV-gated feature flag checks _must_ pass the `VersionContext` decoration associated with the `OperationContext`.
+Furthermore, FCV-gated feature flag checks _must_ pass the [`VersionContext`](/src/mongo/db/version_context.h) decoration associated with the `OperationContext`.
 This requires propagating the `OperationContext`/`VersionContext` all the way from the beginning of the operation to the point of the feature flag check.
 In the unusual case where a feature flag is checked outside of an operation (e.g. during startup), the `kNoVersionContext` constant should be passed.
+
+See also: [README_version_context.md](/src/mongo/db/README_version_context.md)
 
 This does not apply to feature flags where `fcv_gated` is set to false, since `isEnabled`
 always returns the same value after it is initialized during startup.

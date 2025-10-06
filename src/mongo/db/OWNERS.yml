@@ -222,6 +222,9 @@ filters:
   - "version_context*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_version_context.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "server_lifecycle_monitor*":
     approvers:
       - 10gen/server-programmability
