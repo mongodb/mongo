@@ -367,7 +367,7 @@ tasks:
     name: aggregation_timeseries_fuzzer_gen
     tags:
       [
-        "assigned_to_jira_team_server_query_execution",
+        "assigned_to_jira_team_server_query_integration",
         "release_critical",
         "incompatible_development_variant",
         "incompatible_mac",
@@ -407,7 +407,7 @@ tasks:
     name: aggregation_timeseries_fuzzer_deterministic_gen
     tags:
       [
-        "assigned_to_jira_team_server_query_execution",
+        "assigned_to_jira_team_server_query_integration",
         "auxiliary",
         "fuzzer_deterministic",
         "common",
@@ -435,7 +435,7 @@ tasks:
           suite: generational_fuzzer
           use_large_distro: "true"
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 71acfa2
 
   ## Standalone fuzzer for checking block_processing correctness ##
   - <<: *jstestfuzz_template
@@ -1628,7 +1628,7 @@ tasks:
     name: update_timeseries_fuzzer_gen
     tags:
       [
-        "assigned_to_jira_team_server_query_execution",
+        "assigned_to_jira_team_server_query_integration",
         "non_deterministic",
         "incompatible_debug_mode",
         "updatefuzzer",
