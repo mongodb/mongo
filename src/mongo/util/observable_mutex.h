@@ -185,7 +185,7 @@ public:
         _token->invalidate();
     }
 
-    const auto& token() const {
+    const std::shared_ptr<ObservationToken>& token() const {
         return _token;
     }
 

@@ -37,8 +37,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
-#include <cstdint>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
@@ -166,34 +164,42 @@ public:
         }
     };
 
-    template <typename MutexType>
-    void waitForChange(MutexType& m, const MutexStats& oldStats) {
-        size_t kNumChecks = 50;
-        while (kNumChecks--) {
-            auto currentValue = m.token()->getStats();
-            if (!(currentValue.exclusiveAcquisitions.contentions ==
-                  oldStats.exclusiveAcquisitions.contentions) ||
-                !(currentValue.sharedAcquisitions.contentions ==
-                  oldStats.sharedAcquisitions.contentions)) {
+    /**
+     * Waits for `token.getStats()` to have contention counts different from `old`.
+     * Retries at geometrically increasing intervals until a hard-coded timeout.
+     */
+    void waitForChangeInContentions(ObservationToken& token, const MutexStats& old) {
+        auto now = Date_t::now();
+        const auto timeout = Seconds(10);
+        const auto deadline = now + timeout;
+        auto delay = Milliseconds(1);
+        for (; now < deadline; now = Date_t::now(), delay *= 2) {
+            const MutexStats current = token.getStats();
+            if (current.exclusiveAcquisitions.contentions !=
+                    old.exclusiveAcquisitions.contentions ||
+                current.sharedAcquisitions.contentions != old.sharedAcquisitions.contentions) {
                 return;
             }
-            sleepFor(Milliseconds(1));
+            sleepFor(std::min(delay, deadline - now));
         }
-        ASSERT(false) << "Timed out waiting for lock stats to change.";
+        FAIL("contention stats did not change")
+            << " (timeout=" << timeout
+            << " .exclusiveAcquisitions.contentions=" << old.exclusiveAcquisitions.contentions
+            << " .sharedAcquisitions.contentions=" << old.sharedAcquisitions.contentions << ')';
     }
 
     template <typename MutexType, typename Locker>
     void statsTest(MutexType& m, Locker locker) {
+        ObservationToken& token = *m.token();
         boost::optional<unittest::JoinThread> waiter;
         stdx::lock_guard lk(m);
-        MutexStats expected = MutexStats{{1, 0, 0}, {0, 0, 0}};
-        auto fetchedTokenStats = m.token()->getStats();
-        verifyMutexStats(fetchedTokenStats, expected);
+        const MutexStats expected = MutexStats{{1, 0, 0}, {0, 0, 0}};
+        verifyMutexStats(token.getStats(), expected);
         waiter.emplace([&] {
             locker.lock(m);
             locker.unlock(m);
         });
-        waitForChange(m, expected);
+        waitForChangeInContentions(token, expected);
     }
 
     template <typename MutexType, typename Locker>
