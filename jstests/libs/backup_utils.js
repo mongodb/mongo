@@ -232,6 +232,7 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
         fileSource: absoluteFilePath,
         relativePath: relativePath,
         fileDestination: destination,
+        file: file,
         msg: msg,
     };
 }
