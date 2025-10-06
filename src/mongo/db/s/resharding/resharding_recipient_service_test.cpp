@@ -326,6 +326,10 @@ public:
         bool cloningDone,
         bool storeOplogFetcherProgress,
         bool relaxed) {
+        if (_shouldSkipCloning.is_initialized()) {
+            ASSERT_EQ(cloningDone, *_shouldSkipCloning);
+        }
+
         _maybeThrowErrorForFunction(opCtx, ExternalFunction::kMakeDataReplication);
         setDataReplicationStarted();
         return std::make_unique<DataReplicationForTest>();
@@ -350,6 +354,10 @@ public:
         return _instanceSpecificState->dataReplicationRunning;
     }
 
+    void setShouldSkipCloning(bool shouldSkipCloning) {
+        _shouldSkipCloning.emplace(shouldSkipCloning);
+    }
+
 private:
     struct InstanceSpecificState {
         bool dataReplicationRunning = false;
@@ -364,6 +372,7 @@ private:
     const ShardId _someDonorId{"myDonorId"};
 
     boost::optional<std::tuple<RecipientStateEnum, ExternalFunction>> _errorFunction = boost::none;
+    boost::optional<bool> _shouldSkipCloning = boost::none;
 
     stdx::mutex _instanceStateMutex;
     std::unique_ptr<InstanceSpecificState> _instanceSpecificState =
@@ -397,6 +406,10 @@ public:
     CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
                                                           const NamespaceString& nss) override {
         return _impl->getTrackedCollectionRoutingInfo(opCtx, nss);
+    }
+
+    void setShouldSkipCloning(bool shouldSkipCloning) {
+        _impl->setShouldSkipCloning(shouldSkipCloning);
     }
 
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
@@ -507,6 +520,7 @@ private:
 struct TestOptions {
     bool isAlsoDonor;
     bool skipCloningAndApplying;
+    bool skipCloning;
     bool noChunksToCopy;
     bool storeOplogFetcherProgress = true;
     bool performVerification = true;
@@ -516,6 +530,7 @@ struct TestOptions {
         BSONObjBuilder bob;
         bob.append("isAlsoDonor", isAlsoDonor);
         bob.append("skipCloningAndApplying", skipCloningAndApplying);
+        bob.append("skipCloning", skipCloning);
         bob.append("noChunksToCopy", noChunksToCopy);
         bob.append("storeOplogFetcherProgress", storeOplogFetcherProgress);
         bob.append("performVerification", performVerification);
@@ -536,11 +551,14 @@ std::vector<TestOptions> makeBasicTestOptions() {
     std::vector<TestOptions> testOptions;
     for (bool isAlsoDonor : {false, true}) {
         for (bool skipCloningAndApplying : {false, true}) {
-            for (bool driveCloneNoRefresh : {false, true}) {
-                RAIIServerParameterControllerForTest cloneNoRefreshFeatureFlagController(
-                    "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
+            for (bool skipCloning : {false, true}) {
+                for (bool driveCloneNoRefresh : {false, true}) {
+                    RAIIServerParameterControllerForTest cloneNoRefreshFeatureFlagController(
+                        "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
 
-                testOptions.push_back({isAlsoDonor, skipCloningAndApplying, driveCloneNoRefresh});
+                    testOptions.push_back(
+                        {isAlsoDonor, skipCloningAndApplying, skipCloning, driveCloneNoRefresh});
+                }
             }
         }
     }
@@ -551,25 +569,28 @@ std::vector<TestOptions> makeAllTestOptions() {
     std::vector<TestOptions> testOptions;
     for (bool isAlsoDonor : {false, true}) {
         for (bool skipCloningAndApplying : {false, true}) {
-            for (bool noChunksToCopy : {false, true}) {
-                for (bool storeOplogFetcherProgress : {false, true}) {
-                    for (bool performVerification : {false, true}) {
-                        for (bool driveCloneNoRefresh : {false, true}) {
-                            if (skipCloningAndApplying && !noChunksToCopy) {
-                                // This is an invalid combination.
-                                continue;
+            for (bool skipCloning : {false, true}) {
+                for (bool noChunksToCopy : {false, true}) {
+                    for (bool storeOplogFetcherProgress : {false, true}) {
+                        for (bool performVerification : {false, true}) {
+                            for (bool driveCloneNoRefresh : {false, true}) {
+                                if ((skipCloningAndApplying || skipCloning) && !noChunksToCopy) {
+                                    // This is an invalid combination.
+                                    continue;
+                                }
+
+                                RAIIServerParameterControllerForTest
+                                    cloneNoRefreshFeatureFlagController(
+                                        "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
+
+                                testOptions.push_back({isAlsoDonor,
+                                                       skipCloningAndApplying,
+                                                       skipCloning,
+                                                       noChunksToCopy,
+                                                       storeOplogFetcherProgress,
+                                                       performVerification,
+                                                       driveCloneNoRefresh});
                             }
-
-                            RAIIServerParameterControllerForTest
-                                cloneNoRefreshFeatureFlagController(
-                                    "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
-
-                            testOptions.push_back({isAlsoDonor,
-                                                   skipCloningAndApplying,
-                                                   noChunksToCopy,
-                                                   storeOplogFetcherProgress,
-                                                   performVerification,
-                                                   driveCloneNoRefresh});
                         }
                     }
                 }
@@ -753,6 +774,7 @@ public:
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         doc.setSkipCloningAndApplying(testOptions.skipCloningAndApplying);
+        doc.setSkipCloning(testOptions.skipCloning);
         doc.setStoreOplogFetcherProgress(testOptions.storeOplogFetcherProgress);
         doc.setPerformVerification(testOptions.performVerification);
         return doc;
@@ -1016,7 +1038,7 @@ protected:
             return;
         }
 
-        if (prevState == RecipientStateEnum::kCloning) {
+        if (prevState == RecipientStateEnum::kCloning && !testOptions.skipCloning) {
             for (const auto& testMetricsForDonor : testRecipientMetrics.getMetricsForDonors()) {
                 mockCollectionClonerStateForDonor(
                     opCtx, testOptions, testMetricsForDonor, metadata, metrics);
@@ -1334,6 +1356,8 @@ protected:
             testOptions.skipCloningAndApplying) {
             ASSERT_EQ(persistedDoc.getMutableState().getState(),
                       RecipientStateEnum::kStrictConsistency);
+        } else if (state == RecipientStateEnum::kCloning && testOptions.skipCloning) {
+            ASSERT_NE(persistedDoc.getMutableState().getState(), RecipientStateEnum::kCloning);
         } else {
             ASSERT_EQ(persistedDoc.getMutableState().getState(), RecipientStateEnum::kError);
             auto abortReason = persistedDoc.getMutableState().getAbortReason();
@@ -1379,7 +1403,7 @@ private:
         reshardingFields.setRecipientFields(_makeRecipientFields(recipientDoc));
         reshardingFields.setState(coordinatorState);
         bool noChunksToCopy = recipientDoc.getSkipCloningAndApplying().value_or(false) ||
-            _noChunksToCopy.value_or(false);
+            recipientDoc.getSkipCloning().value_or(false) || _noChunksToCopy.value_or(false);
         recipient.onReshardingFieldsChanges(opCtx, reshardingFields, noChunksToCopy);
     }
 
@@ -1811,59 +1835,64 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
     bool isAlsoDonor = false;
 
     for (bool skipCloningAndApplying : {false, true}) {
-        LOGV2(9297803,
-              "Running case",
-              "test"_attr = unittest::getTestName(),
-              "skipCloningAndApplying"_attr = skipCloningAndApplying);
-        PauseDuringStateTransitions stateTransitionsGuard{
-            controller(), {RecipientStateEnum::kApplying, RecipientStateEnum::kStrictConsistency}};
+        for (bool skipCloning : {false, true}) {
+            LOGV2(9297803,
+                  "Running case",
+                  "test"_attr = unittest::getTestName(),
+                  "skipCloningAndApplying"_attr = skipCloningAndApplying,
+                  "skipCloning"_attr = skipCloning);
+            PauseDuringStateTransitions stateTransitionsGuard{
+                controller(),
+                {RecipientStateEnum::kApplying, RecipientStateEnum::kStrictConsistency}};
 
-        auto doc = makeRecipientDocument({isAlsoDonor, skipCloningAndApplying});
-        auto opCtx = makeOperationContext();
-        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+            auto doc = makeRecipientDocument({isAlsoDonor, skipCloningAndApplying, skipCloning});
+            auto opCtx = makeOperationContext();
+            RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+            auto recipient =
+                RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        notifyToStartCloning(opCtx.get(), *recipient, doc);
+            notifyToStartCloning(opCtx.get(), *recipient, doc);
 
-        // Wait to check the temporary collection has been created.
-        stateTransitionsGuard.wait(RecipientStateEnum::kApplying);
-        {
-            // Check the temporary collection exists but is not yet renamed.
-            auto coll =
-                acquireCollection(opCtx.get(),
-                                  CollectionAcquisitionRequest(
-                                      doc.getTempReshardingNss(),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                      repl::ReadConcernArgs::get(opCtx.get()),
-                                      AcquisitionPrerequisites::kRead),
-                                  MODE_IS);
-            ASSERT_TRUE(coll.exists());
-            ASSERT_EQ(coll.uuid(), doc.getReshardingUUID());
-        }
-        stateTransitionsGuard.unset(RecipientStateEnum::kApplying);
+            // Wait to check the temporary collection has been created.
+            stateTransitionsGuard.wait(RecipientStateEnum::kApplying);
+            {
+                // Check the temporary collection exists but is not yet renamed.
+                auto coll =
+                    acquireCollection(opCtx.get(),
+                                      CollectionAcquisitionRequest(
+                                          doc.getTempReshardingNss(),
+                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          repl::ReadConcernArgs::get(opCtx.get()),
+                                          AcquisitionPrerequisites::kRead),
+                                      MODE_IS);
+                ASSERT_TRUE(coll.exists());
+                ASSERT_EQ(coll.uuid(), doc.getReshardingUUID());
+            }
+            stateTransitionsGuard.unset(RecipientStateEnum::kApplying);
 
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
-        awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
-        stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
+            stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
+            awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+            stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
-        awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
-        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+            awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
+            notifyReshardingCommitting(opCtx.get(), *recipient, doc);
 
-        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
-        checkRecipientDocumentRemoved(opCtx.get());
+            ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+            checkRecipientDocumentRemoved(opCtx.get());
 
-        {
-            // Ensure the temporary collection was renamed.
-            auto coll =
-                acquireCollection(opCtx.get(),
-                                  CollectionAcquisitionRequest(
-                                      doc.getSourceNss(),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                      repl::ReadConcernArgs::get(opCtx.get()),
-                                      AcquisitionPrerequisites::kRead),
-                                  MODE_IS);
-            ASSERT_TRUE(coll.exists());
-            ASSERT_EQ(coll.uuid(), doc.getReshardingUUID());
+            {
+                // Ensure the temporary collection was renamed.
+                auto coll =
+                    acquireCollection(opCtx.get(),
+                                      CollectionAcquisitionRequest(
+                                          doc.getSourceNss(),
+                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          repl::ReadConcernArgs::get(opCtx.get()),
+                                          AcquisitionPrerequisites::kRead),
+                                      MODE_IS);
+                ASSERT_TRUE(coll.exists());
+                ASSERT_EQ(coll.uuid(), doc.getReshardingUUID());
+            }
         }
     }
 }
@@ -2059,6 +2088,26 @@ TEST_F(ReshardingRecipientServiceTest, SkipCloningAndApplying) {
             ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::InternalError);
             continue;
         }
+
+        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, skipCloning) {
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        externalState()->setShouldSkipCloning(testOptions.skipCloning);
+        LOGV2(11192901,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testOptions"_attr = testOptions);
+        auto doc = makeRecipientDocument(testOptions);
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        ASSERT_OK(recipient->awaitInStrictConsistencyOrError().getNoThrow());
 
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());

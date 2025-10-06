@@ -98,6 +98,11 @@ structs:
                     "Whether this recipient can skip cloning documents and
                     fetching/applying oplog entries because it is not going to own any
                     chunks for the collection after resharding."
+            skipCloning:
+                type: optionalBool
+                description:
+                    "Whether this recipient can skip cloning documents because it is not going to
+                    own any chunks for the collection after resharding."
             storeOplogFetcherProgress:
                 type: optionalBool
                 description:

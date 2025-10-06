@@ -113,16 +113,14 @@ function checkOplogBufferAndConflictStashCollections(conn, collUuid, donorShardN
     checkCollectionExistence(conn, conflictStashNs, exists);
 }
 
-function runTest(featureFlagReshardingSkipCloningAndApplying) {
-    jsTest.log("Testing with " + tojson({featureFlagReshardingSkipCloningAndApplying}));
+function runTest(testOptions) {
+    jsTest.log("Testing with " + tojson(testOptions));
     const st = new ShardingTest({
         mongos: 1,
         shards: 2,
         rs: {
             nodes: 2,
-            setParameter: {
-                featureFlagReshardingSkipCloningAndApplyingIfApplicable: featureFlagReshardingSkipCloningAndApplying,
-            },
+            setParameter: testOptions.setParameters,
         },
         // By default, our test infrastructure sets the election timeout to a very high value (24
         // hours). For this test, we need a shorter election timeout because it relies on nodes
@@ -244,7 +242,7 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
         newShard0Primary,
         collUuid,
         st.shard0.shardName,
-        !featureFlagReshardingSkipCloningAndApplying /* exists */,
+        testOptions.shouldBufferCollectionExistsInNoChunkRecipient,
     );
     checkOplogBufferAndConflictStashCollections(newShard1Primary, collUuid, st.shard0.shardName, true /* exists */);
 
@@ -259,6 +257,39 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
     st.stop();
 }
 
-for (let featureFlagReshardingSkipCloningAndApplying of [true, false]) {
-    runTest(featureFlagReshardingSkipCloningAndApplying);
-}
+const testCases = [
+    {
+        // Note: need to specify both all the time in order for all feature flag
+        // suites not to override them.
+        setParameters: {
+            featureFlagReshardingSkipCloningAndApplyingIfApplicable: false,
+            featureFlagReshardingSkipCloningIfApplicable: false,
+        },
+        shouldBufferCollectionExistsInNoChunkRecipient: true,
+    },
+    {
+        setParameters: {
+            featureFlagReshardingSkipCloningAndApplyingIfApplicable: false,
+            featureFlagReshardingSkipCloningIfApplicable: true,
+        },
+        shouldBufferCollectionExistsInNoChunkRecipient: true,
+    },
+    {
+        setParameters: {
+            featureFlagReshardingSkipCloningAndApplyingIfApplicable: true,
+            featureFlagReshardingSkipCloningIfApplicable: false,
+        },
+        shouldBufferCollectionExistsInNoChunkRecipient: false,
+    },
+    {
+        setParameters: {
+            featureFlagReshardingSkipCloningAndApplyingIfApplicable: true,
+            featureFlagReshardingSkipCloningIfApplicable: true,
+        },
+        shouldBufferCollectionExistsInNoChunkRecipient: false,
+    },
+];
+
+testCases.forEach((testCase) => {
+    runTest(testCase);
+});

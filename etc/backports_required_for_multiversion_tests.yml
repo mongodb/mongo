@@ -447,7 +447,7 @@ last-lts:
     - test_file: jstests/core/administrative/connection_status.js
       ticket: SERVER-95952
     - test_file: jstests/sharding/resharding_skip_cloning_and_applying.js
-      ticket: SERVER-91109
+      ticket: SERVER-111929
     - test_file: jstests/sharding/catalog_cache_refresh_with_persisted_collection_cache_corrupted.js
       ticket: SERVER-95807
     - test_file: jstests/core/query/find_all_values_at_path_expression.js

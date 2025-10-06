@@ -71,6 +71,16 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
         default: false
         fcv_gated: true
+    featureFlagReshardingSkipCloningIfApplicable:
+        description:
+            "Feature flag to make recipient shards that are not going to own any chunks for
+            the collection after resharding only clone the options and indexes for the
+            collection (i.e. skip cloning the documents). Currently, only the primary shard
+            can be such a recipient shard. This flag is ignored if
+            featureFlagReshardingSkipCloningAndApplyingIfApplicable is set to true."
+        cpp_varname: gFeatureFlagReshardingSkipCloningIfApplicable
+        default: false
+        fcv_gated: true
     featureFlagReshardingStoreOplogFetcherProgress:
         description:
             "Feature flag to make recipient shards store the count of oplog entries fetched

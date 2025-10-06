@@ -377,6 +377,11 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
         !metadata.currentShardHasAnyChunks()) {
         recipientDoc.setSkipCloningAndApplying(true);
     }
+    if (resharding::gFeatureFlagReshardingSkipCloningIfApplicable.isEnabled(
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !metadata.currentShardHasAnyChunks()) {
+        recipientDoc.setSkipCloning(true);
+    }
     if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
             vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         recipientDoc.setStoreOplogFetcherProgress(true);

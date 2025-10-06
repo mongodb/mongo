@@ -312,6 +312,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _oplogBatchTaskCount{recipientDoc.getOplogBatchTaskCount()},
       _skipCloningAndApplying{recipientDoc.getSkipCloningAndApplying().value_or(false)},
+      _skipCloning{recipientDoc.getSkipCloning().value_or(false)},
       _storeOplogFetcherProgress{recipientDoc.getStoreOplogFetcherProgress().value_or(false)},
       _relaxed{recipientDoc.getRelaxed()},
       _recipientCtx{recipientDoc.getMutableState()},
@@ -755,7 +756,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         invariant(recipientFields.getCloneTimestamp());
         invariant(recipientFields.getApproxDocumentsToCopy());
         invariant(recipientFields.getApproxBytesToCopy());
-        if (_skipCloningAndApplying) {
+        if (_skipCloningAndApplying || _skipCloning) {
             invariant(noChunksToCopy);
         }
 
@@ -945,7 +946,8 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
-    const bool cloningDone = _recipientCtx.getState() > RecipientStateEnum::kCloning;
+    const bool cloningDone =
+        _recipientCtx.getState() > RecipientStateEnum::kCloning || _skipCloning;
 
     if (!_dataReplication) {
         invariant(_cloneTimestamp);
@@ -2078,7 +2080,7 @@ ReshardingRecipientService::RecipientStateMachine::_tryFetchCloningMetrics(
         return boost::none;
     }
 
-    if (_skipCloningAndApplying) {
+    if (_skipCloningAndApplying || _skipCloning) {
         return CloningMetrics{};
     }
 

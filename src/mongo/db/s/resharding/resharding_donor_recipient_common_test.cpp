@@ -375,6 +375,15 @@ struct RecipientFieldsValidator {
             ASSERT_FALSE(doc.getSkipCloningAndApplying().has_value());
             ASSERT_EQ(doc.getSkipCloningAndApplying(), false);
         }
+
+        // 'skipCloning' should only be set if it is true.
+        if (skipCloning) {
+            ASSERT_EQ(doc.getSkipCloning(), skipCloning);
+        } else {
+            ASSERT_FALSE(doc.getSkipCloning().has_value());
+            ASSERT_EQ(doc.getSkipCloning(), false);
+        }
+
         // 'storeOplogFetcherProgress' should only be set if it is true.
         if (storeOplogFetcherProgress) {
             ASSERT_EQ(doc.getStoreOplogFetcherProgress(), storeOplogFetcherProgress);
@@ -391,7 +400,8 @@ struct RecipientFieldsValidator {
         }
     }
 
-    bool skipCloningAndApplying;
+    bool skipCloningAndApplying{false};
+    bool skipCloning{false};
     // featureFlagReshardingStoreOplogFetcherProgress defaults to true.
     bool storeOplogFetcherProgress = true;
     boost::optional<bool> performVerification;
@@ -944,8 +954,9 @@ TEST_F(ReshardingDonorRecipientCommonTest,
                                false /* expectRecipientStateMachine */);
 }
 
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipIfApplicable) {
+TEST_F(
+    ReshardingDonorRecipientCommonTest,
+    ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningAndApplyIfApplicable) {
     RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", true);
 
@@ -956,8 +967,9 @@ TEST_F(ReshardingDonorRecipientCommonTest,
                                RecipientFieldsValidator{.skipCloningAndApplying = true});
 }
 
-TEST_F(ReshardingDonorRecipientCommonTest,
-       ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipIfApplicable) {
+TEST_F(
+    ReshardingDonorRecipientCommonTest,
+    ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningAndApplyIfApplicable) {
     RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
 
@@ -966,6 +978,30 @@ TEST_F(ReshardingDonorRecipientCommonTest,
                                boost::none /* performVerification */,
                                true /* expectRecipientStateMachine */,
                                RecipientFieldsValidator{.skipCloningAndApplying = false});
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningIfApplicable) {
+    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
+        "featureFlagReshardingSkipCloningIfApplicable", true);
+
+    testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
+                               kThisShard.getShardId() /* primaryShard */,
+                               boost::none /* performVerification */,
+                               true /* expectRecipientStateMachine */,
+                               RecipientFieldsValidator{.skipCloning = true});
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningIfApplicable) {
+    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
+        "featureFlagReshardingSkipCloningIfApplicable", false);
+
+    testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
+                               kThisShard.getShardId() /* primaryShard */,
+                               boost::none /* performVerification */,
+                               true /* expectRecipientStateMachine */,
+                               RecipientFieldsValidator{.skipCloning = false});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
