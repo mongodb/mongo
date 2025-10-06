@@ -482,7 +482,6 @@ encrypted_storage_engine:
     slack: server-security
     jira: Server Security
   files:
-    - src/mongo/db/modules/atlas/src/disagg_storage/encryption
     - src/mongo/db/modules/enterprise/src/encryptdb
 
 security:
@@ -808,6 +807,13 @@ disagg_storage:
     jira: RSSD
   files:
     - src/mongo/db/modules/atlas/src/disagg_storage
+
+disagg_storage.encryption:
+  meta:
+    slack: disagg-security-data-encryption
+    jira: Server Security
+  files:
+    - src/mongo/db/modules/atlas/src/disagg_storage/encryption
 
 storage_engine_api:
   meta:
