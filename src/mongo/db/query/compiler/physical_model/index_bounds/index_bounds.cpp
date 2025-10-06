@@ -257,6 +257,15 @@ bool OrderedIntervalList::isFullyOpen() const {
     return intervals.size() == 1 && intervals[0].isFullyOpen();
 }
 
+bool OrderedIntervalList::intersectsInterval(const Interval& interval) const {
+    for (size_t i = 0; i < intervals.size(); i++) {
+        if (interval.within(intervals[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool OrderedIntervalList::isPoint() const {
     return intervals.size() == 1 && intervals[0].isPoint();
 }

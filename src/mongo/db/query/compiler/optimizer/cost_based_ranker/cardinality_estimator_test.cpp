@@ -779,5 +779,307 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanWithFetchNoFil
               getPlanSamplingCE(*collPlan, collCard, &samplingEstimator));
 }
 
+TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
+    // Constant settings
+    size_t collCard = 10000;
+    ce::SamplingEstimatorTest planRankingTest;
+    planRankingTest.setUp();
+
+    const size_t seed_value1_low = 1724178;
+    const size_t seed_value2_low = 8713211;
+    const size_t seed_value3_low = 9247231;
+    const size_t seed_value4_low = 19984748;
+    const size_t seed_value5_low = 584573;
+
+    std::vector<ce::CollectionFieldConfiguration> collectionFieldConfig = {
+        ce::CollectionFieldConfiguration(
+            /*fieldName*/ "a",
+            /*fieldPosition*/ 0,
+            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*ndv*/ 10,
+            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*seed*/ seed_value1_low),
+        ce::CollectionFieldConfiguration(
+            /*fieldName*/ "b",
+            /*fieldPosition*/ 5,
+            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*ndv*/ 10,
+            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*seed*/ seed_value2_low),
+        ce::CollectionFieldConfiguration(
+            /*fieldName*/ "c",
+            /*fieldPosition*/ 20,
+            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*ndv*/ 10,
+            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*seed*/ seed_value3_low),
+        ce::CollectionFieldConfiguration(
+            /*fieldName*/ "e",
+            /*fieldPosition*/ 22,
+            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*ndv*/ 10,
+            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*seed*/ seed_value5_low),
+        ce::CollectionFieldConfiguration(
+            /*fieldName*/ "d",
+            /*fieldPosition*/ 25,
+            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*ndv*/ 10,
+            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*seed*/ seed_value4_low)};
+
+    // Translate the fields and positions configurations based on the defined map.
+    ce::DataConfiguration dataConfig(
+        /*dataSize*/ collCard,
+        /*dataFieldConfig*/ collectionFieldConfig);
+
+    // Generate data and populate source collection
+    std::vector<std::vector<stats::SBEValue>> allData;
+    generateDataBasedOnConfig(dataConfig, allData);
+    auto dataBSON = ce::SamplingEstimatorTest::createDocumentsFromSBEValue(
+        allData, dataConfig.collectionFieldsConfiguration);
+
+    planRankingTest.insertDocuments(planRankingTest._kTestNss, dataBSON);
+
+    size_t sampleSize = 1000;
+    ce::ProjectionParams projectionParams = ce::NoProjection();
+    auto collection = acquireCollectionOrView(
+        planRankingTest.getOperationContext(),
+        CollectionOrViewAcquisitionRequest::fromOpCtx(planRankingTest.getOperationContext(),
+                                                      planRankingTest._kTestNss,
+                                                      AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    auto colls = MultipleCollectionAccessor(
+        collection, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    ce::SamplingEstimatorAssertingKeysScanned samplingEstimator(
+        planRankingTest.getOperationContext(),
+        colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        sampleSize,
+        ce::SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        boost::none,
+        ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard));
+    samplingEstimator.generateSample(projectionParams);
+
+    // Running only on sampling estimator.
+
+    // Residual filter is on nullptr.
+    std::unique_ptr<MatchExpression> residualFilter = nullptr;
+
+    // Point query on one field (InCE == OutCE)
+    {
+        // Query on non multikey field (a).
+        // bounds: ['a']: [88.0, 88.0]
+        std::vector<std::string> indexFields = {"a"};
+        auto bounds = makePointIntervalBounds(88.0, indexFields[0]);
+
+        std::unique_ptr<IndexScanNode> indexScan =
+            makeIndexScan(bounds, indexFields, std::move(residualFilter));
+
+        auto indexPlan = std::make_unique<QuerySolution>();
+        indexPlan->setRoot(std::move(indexScan));
+
+        EstimateMap qsnEstimates;
+        const CollectionInfo collInfo =
+            buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+        CardinalityEstimator ceEstimator{
+            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        auto _ = ceEstimator.estimatePlan(*indexPlan);
+    }
+
+    // Multiple fields only point queries
+    {
+        // Query on multiple fields (a, b, c, d)
+        // bounds: ['a']: [88.0, 88.0], ['b']: [937.0, 937.0], ['c']: [806.0, 806.0], ['d']:
+        // [35.0, 35.0]
+        IndexBounds bounds;
+        std::vector<std::string> indexFields = {"a", "b", "c", "d"};
+        bounds.fields.emplace_back(makePointInterval(88, indexFields[0]));
+        bounds.fields.emplace_back(makePointInterval(937, indexFields[1]));
+        bounds.fields.emplace_back(makePointInterval(806, indexFields[2]));
+        bounds.fields.emplace_back(makePointInterval(35, indexFields[3]));
+
+        std::unique_ptr<IndexScanNode> indexScan =
+            makeIndexScan(bounds, indexFields, std::move(residualFilter));
+
+        auto indexPlan = std::make_unique<QuerySolution>();
+        indexPlan->setRoot(std::move(indexScan));
+
+        EstimateMap qsnEstimates;
+        const CollectionInfo collInfo =
+            buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+        CardinalityEstimator ceEstimator{
+            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        auto _ = ceEstimator.estimatePlan(*indexPlan);
+    }
+
+    // Range query on one field
+    {
+        // Query on non multikey field (a).
+        // bounds = ['a']: [10, 80]
+        std::vector<std::string> indexFields = {"a"};
+        auto bounds = makeRangeIntervalBounds(BSON("" << 10 << " " << 80),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys,
+                                              indexFields[0]);
+
+        std::unique_ptr<IndexScanNode> indexScan =
+            makeIndexScan(bounds, indexFields, std::move(residualFilter));
+
+        auto indexPlan = std::make_unique<QuerySolution>();
+        indexPlan->setRoot(std::move(indexScan));
+
+        EstimateMap qsnEstimates;
+        const CollectionInfo collInfo =
+            buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+        CardinalityEstimator ceEstimator{
+            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        auto _ = ceEstimator.estimatePlan(*indexPlan);
+    }
+
+    // Range and point queries on multiple fields
+    {
+        // Query on multiple fields (a, b, c, d)
+        // bounds: ['a']: [10, 1080], ['b']: [937.0, 937.0], ['c']: [10, 2280], ['d']: [937.0,
+        // 937.0]
+        IndexBounds bounds;
+        std::vector<std::string> indexFields = {"a", "b", "c", "d"};
+        OrderedIntervalList oilRange1(indexFields[0]);
+        oilRange1.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            BSON("" << 10 << " " << 1080), BoundInclusion::kIncludeBothStartAndEndKeys));
+        bounds.fields.push_back(oilRange1);
+
+        bounds.fields.emplace_back(makePointInterval(937, indexFields[1]));
+
+        OrderedIntervalList oilRange3(indexFields[2]);
+        oilRange3.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            BSON("" << 10 << " " << 2280), BoundInclusion::kIncludeBothStartAndEndKeys));
+        bounds.fields.push_back(oilRange3);
+
+        bounds.fields.emplace_back(makePointInterval(937, indexFields[3]));
+
+        std::unique_ptr<IndexScanNode> indexScan =
+            makeIndexScan(bounds, indexFields, std::move(residualFilter));
+
+        auto indexPlan = std::make_unique<QuerySolution>();
+        indexPlan->setRoot(std::move(indexScan));
+
+        EstimateMap qsnEstimates;
+        const CollectionInfo collInfo =
+            buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+        CardinalityEstimator ceEstimator{
+            collInfo, &samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        auto _ = ceEstimator.estimatePlan(*indexPlan);
+    }
+}
+
+TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
+    // Constant settings
+    size_t collCard = 10000;
+    ce::SamplingEstimatorTest planRankingTest;
+    planRankingTest.setUp();
+
+    // Collection containing 3 types of documents
+    // i. documents with fields _id,a,b,c all with non-null values
+    // ii. documents with fields _id,b,c all with non-null values
+    // iii. documents with fields _id,a,b,c with 'a' null value.
+    std::vector<BSONObj> dataBSON;
+    int counter = 0;
+    for (int i = 0; i < 500; i++) {
+        dataBSON.push_back(BSON("_id" << counter++ << "a" << 1 << "b" << 1 << "c" << 1));
+        dataBSON.push_back(BSON("_id" << counter++ << "b" << 2 << "c" << 2));
+        BSONObjBuilder bob;
+        bob.appendNumber("_id", counter++);
+        bob.appendNull("a");
+        bob.appendNumber("b", 3);
+        bob.appendNumber("c", 3);
+        dataBSON.push_back(bob.obj());
+    }
+
+    planRankingTest.insertDocuments(planRankingTest._kTestNss, dataBSON);
+
+    size_t sampleSize = 1000;
+    ce::ProjectionParams projectionParams = ce::NoProjection();
+    auto collection = acquireCollectionOrView(
+        planRankingTest.getOperationContext(),
+        CollectionOrViewAcquisitionRequest::fromOpCtx(planRankingTest.getOperationContext(),
+                                                      planRankingTest._kTestNss,
+                                                      AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    auto colls = MultipleCollectionAccessor(
+        collection, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    ce::SamplingEstimatorForTesting samplingEstimator(
+        planRankingTest.getOperationContext(),
+        colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        sampleSize,
+        ce::SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        boost::none,
+        ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard));
+    samplingEstimator.generateSample(projectionParams);
+
+    // Running only on sampling estimator.
+
+    // Residual filter is on nullptr.
+    std::unique_ptr<MatchExpression> residualFilter = nullptr;
+
+    // Point query null
+    {
+        // Query on non multikey field (a).
+        // bounds: ['a']: [null, null]
+        std::string fieldName = "a";
+
+        // compute based on estimateKeysScanned
+        OrderedIntervalList list(fieldName);
+        list.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
+
+        auto idxBounds = std::make_unique<IndexBounds>();
+        idxBounds->fields.push_back(list);
+
+        // compute based on estimateCardinality
+        BSONObjBuilder builder;
+        stats::addSbeValueToBSONBuilder(stats::makeNullValue(), "$eq", builder);
+        auto operand = builder.obj();
+        const auto matchExpr = std::make_unique<EqualityMatchExpression>(
+            StringData(fieldName), mongo::Value(operand["$eq"]));
+
+        // For point queries, the estimates should be identical.
+        // (estimateKeysScanned: 6800 == estimateCardinality: 6800)
+        ASSERT_EQ(samplingEstimator.estimateKeysScanned(*idxBounds).toDouble(),
+                  samplingEstimator.estimateCardinality(matchExpr.get()).toDouble());
+    }
+
+    // Range query including null ($lte: x)
+    {
+        // Query on non multikey field (a).
+        // bounds: ['a']: [null, 50]
+        std::string fieldName = "a";
+
+        OrderedIntervalList out;
+        BSONObjBuilder bob;
+        bob.appendMinKey(fieldName);
+        bob.appendNumber(fieldName, 50);
+        out.name = fieldName;
+        out.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
+
+        auto idxBounds = std::make_unique<IndexBounds>();
+        idxBounds->fields.push_back(out);
+
+        BSONObjBuilder builder;
+        stats::addSbeValueToBSONBuilder(stats::makeInt32Value(50), "$lte", builder);
+        auto operand = builder.obj();
+
+        const auto matchExpr = std::make_unique<LTEMatchExpression>(StringData(fieldName),
+                                                                    mongo::Value(operand["$lte"]));
+
+        // For range queries, the estimates should be different.
+        // (estimateKeysScanned: 10000 != estimateCardinality: 3200)
+        ASSERT_NE(samplingEstimator.estimateKeysScanned(*idxBounds).toDouble(),
+                  samplingEstimator.estimateCardinality(matchExpr.get()).toDouble());
+    }
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker

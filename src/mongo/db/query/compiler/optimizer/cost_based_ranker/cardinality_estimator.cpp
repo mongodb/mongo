@@ -436,6 +436,59 @@ bool hasOnlyPointPredicates(const IndexBounds* node) {
     return true;
 }
 
+OrderedIntervalList makeOpenOil(std::string fieldName) {
+    OrderedIntervalList out;
+    BSONObjBuilder bob;
+    bob.appendMinKey("");
+    bob.appendMaxKey("");
+    out.name = std::move(fieldName);
+    out.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
+    return out;
+}
+
+/**
+ * Struct modelling the return type of calculating the equality prefix of index bounds.
+ * This stores the pointer to the resulting IndexBounds and whether the bounds contain an equality
+ * prefix.
+ */
+struct EqualityPrefix {
+    std::unique_ptr<IndexBounds> eqPrefixPtr;
+    bool isEqPrefix;
+};
+
+/**
+ * This function computes the IndexBounds prefix that requires one seek by the index.
+ * The resulting bounds could contain a set of point queries followed by a range query, or a single
+ * range query.
+ */
+EqualityPrefix equalityPrefix(const IndexBounds* node) {
+    auto eqPrefix = std::make_unique<IndexBounds>();
+    bool isEqPrefix = true;
+    for (auto&& oil : node->fields) {
+        if (isEqPrefix) {
+            eqPrefix->fields.push_back(oil);
+            isEqPrefix = isEqPrefix && oil.isPoint();
+        } else {
+            eqPrefix->fields.push_back(makeOpenOil(oil.name));
+        }
+    }
+    return EqualityPrefix{std::move(eqPrefix), isEqPrefix};
+}
+
+/**
+ * Given IndexBounds, returns true if the bounds contain a range interval that intersects with the
+ * null point interval.
+ */
+bool boundsRangeIncludingNull(const IndexBounds& bounds) {
+    for (const auto& oil : bounds.fields) {
+        if (!oil.isPoint() && oil.intersectsInterval(IndexBoundsBuilder::kNullPointInterval)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     if (!isIndexScanSupported(*node)) {
         // Fallback to multiplanning
@@ -456,11 +509,31 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // Ignore selectivities pushed by other operators up to this point
     size_t selOffset = _conjSels.size();
 
+    auto ridsEstFunct = [&](const IndexBounds& bounds,
+                            const std::unique_ptr<MatchExpression>& filter) -> CardinalityEstimate {
+        if (!bounds.size() && !filter) {
+            return _collCard;
+        }
+        // Try to estimate using transformation to match expression.
+        auto matchExpr = getMatchExpressionFromBounds(bounds, filter.get());
+        if (matchExpr) {
+            const auto matchExprPtr = matchExpr.get();
+            return _ceCache.getOrCompute(std::move(matchExpr), [&] {
+                return _samplingEstimator->estimateCardinality(matchExprPtr);
+            });
+        }
+        // Rare case, CE not cached.
+        return _samplingEstimator->estimateRIDs(bounds, filter.get());
+    };
+
     // Estimate the number of keys in the index scan interval.
     // We can avoid computing input selectivity for sampling CE on point queries over non-multikey
     // fields without residual filter, as input cardinality is equal to output cardinality.
+    // We exclude from this optimization bounds that include range intervals that include the
+    // null value, due to the mismatch in evaluating null values and missing fields over index and
+    // sample.
     if (_rankerMode != QueryPlanRankerModeEnum::kSamplingCE || node->index.multikey ||
-        !hasOnlyPointPredicates(&node->bounds) || node->filter || !node->bounds.size()) {
+        node->filter || boundsRangeIncludingNull(node->bounds)) {
         auto ceRes1 = estimate(&node->bounds);
         if (!ceRes1.isOK()) {
             return ceRes1;
@@ -473,26 +546,23 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
         // Sampling will attempt to get an estimate for the number of RIDs that the scan returns
         // after deduplication and applying the filter. This approach does not combine selectivity
         // computed from the index scan.
-        auto ridsEst = [&]() -> CardinalityEstimate {
-            // Try to estimate using transformation to match expression.
-            auto matchExpr = getMatchExpressionFromBounds(node->bounds, node->filter.get());
-            if (matchExpr) {
-                const auto matchExprPtr = matchExpr.get();
-                return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                    return _samplingEstimator->estimateCardinality(matchExprPtr);
-                });
-            }
-            // Rare case, CE not cached.
-            return _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
-        }();
+        auto ridsEst = ridsEstFunct(node->bounds, node->filter);
 
         _conjSels.emplace_back(ridsEst / _inputCard);
         est.outCE = ridsEst;
 
         if (!est.inCE.has_value()) {
-            // Special case for sampling CE for point queries over non-multikey fields without
-            // residual filter. The number of keys scanned is equal to the resulting docs.
-            est.inCE = est.outCE;
+            // We can avoid computing input selectivity for sampling CE queries over
+            // non-multikey fields without residual filter.
+            auto prefix = equalityPrefix(&node->bounds);
+            if (prefix.isEqPrefix) {
+                // If the prefix is equal to all the bounds, the number of keys scanned is equal to
+                // the resulting docs.
+                est.inCE = est.outCE;
+            } else {
+                // Evaluate only the equality prefix against the sample.
+                est.inCE = ridsEstFunct(*prefix.eqPrefixPtr, nullptr);
+            }
         }
 
         CardinalityEstimate outCE{est.outCE};
@@ -1132,31 +1202,6 @@ CEResult CardinalityEstimator::estimate(
  * Intervals
  */
 
-OrderedIntervalList openOil(std::string fieldName) {
-    OrderedIntervalList out;
-    BSONObjBuilder bob;
-    bob.appendMinKey("");
-    bob.appendMaxKey("");
-    out.name = std::move(fieldName);
-    out.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
-    return out;
-}
-
-std::unique_ptr<IndexBounds> equalityPrefix(const IndexBounds* node) {
-    auto eqPrefix = std::make_unique<IndexBounds>();
-    bool isEqPrefix = true;
-    for (auto&& oil : node->fields) {
-        if (isEqPrefix) {
-            eqPrefix->fields.push_back(oil);
-            isEqPrefix = isEqPrefix && oil.isPoint();
-        } else {
-            eqPrefix->fields.push_back(openOil(oil.name));
-        }
-    }
-    return eqPrefix;
-}
-
 CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     if (node->isSimpleRange) {
         // TODO SERVER-96816: Implement support for estimation of simple ranges
@@ -1167,8 +1212,8 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
         // TODO: avoid copies to construct the equality prefix. We could do this by teaching
         // SamplingEstimator or IndexBounds about the equality prefix concept.
         auto eqPrefix = equalityPrefix(node);
-        const auto eqPrefixPtr = eqPrefix.get();
-        return _ceCache.getOrCompute(std::move(eqPrefix), [&] {
+        const auto eqPrefixPtr = eqPrefix.eqPrefixPtr.get();
+        return _ceCache.getOrCompute(std::move(eqPrefix.eqPrefixPtr), [&] {
             return _samplingEstimator->estimateKeysScanned(*eqPrefixPtr);
         });
     }

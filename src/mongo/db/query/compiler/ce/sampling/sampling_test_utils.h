@@ -110,6 +110,22 @@ public:
     }
 };
 
+class SamplingEstimatorAssertingKeysScanned : public SamplingEstimatorForTesting {
+public:
+    using SamplingEstimatorForTesting::SamplingEstimatorForTesting;
+
+    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override {
+        tassert(11068100, "This query should not invoke estimateKeysScanned", false);
+        return SamplingEstimatorForTesting::estimateKeysScanned(bounds);
+    }
+
+    std::vector<CardinalityEstimate> estimateKeysScanned(
+        const std::vector<const IndexBounds*>& bounds) const override {
+        tassert(11068101, "This query should not invoke estimateKeysScanned", false);
+        return SamplingEstimatorForTesting::estimateKeysScanned(bounds);
+    }
+};
+
 class SamplingEstimatorTest : public CatalogTestFixture {
 public:
     void setUp() override {

@@ -108,6 +108,11 @@ struct MONGO_MOD_NEEDS_REPLACEMENT OrderedIntervalList {
     bool isFullyOpen() const;
 
     /**
+     * Returns true if any of the intervals in this OIL intersect with the provided interval.
+     */
+    bool intersectsInterval(const Interval& interval) const;
+
+    /**
      * Returns true if this OIL represents a point predicate: [N, N].
      *
      * These predicates are interesting because if you have an index on {a:1, b:1},
