@@ -215,6 +215,16 @@ public:
 
     const NamespaceString& nss() const;
 
+    query_shape::CollectionType getCollectionType() const {
+        if (!exists()) {
+            return query_shape::CollectionType::kNonExistent;
+        }
+        if (getCollectionPtr()->isNewTimeseriesWithoutView()) {
+            return query_shape::CollectionType::kTimeseries;
+        }
+        return query_shape::CollectionType::kCollection;
+    }
+
     /**
      * Returns whether the acquisition found a collection or the collection didn't exist.
      */
@@ -332,14 +342,7 @@ public:
                 return query_shape::CollectionType::kTimeseries;
             return query_shape::CollectionType::kView;
         }
-        const auto& collection = getCollection();
-        if (!collection.exists()) {
-            return query_shape::CollectionType::kNonExistent;
-        }
-        if (collection.getCollectionPtr()->isNewTimeseriesWithoutView()) {
-            return query_shape::CollectionType::kTimeseries;
-        }
-        return query_shape::CollectionType::kCollection;
+        return getCollection().getCollectionType();
     }
 
     bool collectionExists() const {

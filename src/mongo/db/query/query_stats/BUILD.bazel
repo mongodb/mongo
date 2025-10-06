@@ -28,7 +28,6 @@ mongo_cc_library(
     name = "query_stats",
     srcs = [
         "aggregated_metric.cpp",
-        "key.cpp",
         "optimizer_metrics_stats_entry.cpp",
         "query_stats.cpp",
         "query_stats_entry.cpp",
@@ -38,7 +37,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "aggregated_metric.h",
-        "key.h",
         "optimizer_metrics_stats_entry.h",
         "query_stats.h",
         "query_stats_entry.h",
@@ -50,10 +48,44 @@ mongo_cc_library(
         "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
     ],
     deps = [
+        ":key",
         ":rate_limiting",
         "//src/mongo/db:api_parameters",
         "//src/mongo/db:commands",
         "//src/mongo/util:buildinfo",
+    ],
+)
+
+mongo_cc_library(
+    name = "key",
+    srcs = [
+        "key.cpp",
+    ],
+    hdrs = [
+        "key.h",
+    ],
+    header_deps = [
+        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
+    ],
+    deps = [
+        ":rate_limiting",
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:commands",
+        "//src/mongo/util:buildinfo",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_key",
+    srcs = [
+        "update_key.cpp",
+    ],
+    hdrs = [
+        "update_key.h",
+    ],
+    deps = [
+        ":key",
+        "//src/mongo/db/query/query_shape:update_cmd_shape",
     ],
 )
 
@@ -84,6 +116,7 @@ mongo_cc_unit_test(
         "query_stats_test.cpp",
         "rate_limiting_test.cpp",
         "supplemental_metrics_test.cpp",
+        "update_key_test.cpp",
     ],
     header_deps = [
         "//src/mongo/db/pipeline:expression_context_for_test",
@@ -92,6 +125,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":query_stats",
+        ":update_key",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/util:version_impl",

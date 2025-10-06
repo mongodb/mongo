@@ -61,6 +61,24 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "update_cmd_shape",
+    srcs = [
+        "update_cmd_shape.cpp",
+        "//src/mongo/db/query:count_request.h",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_util.h",
+    ],
+    hdrs = [
+        "let_shape_component.h",
+        "update_cmd_shape.h",
+    ],
+    deps = [
+        ":query_shape_common",
+        "//src/mongo:base",
+        "//src/mongo/db/query/write_ops:parsed_update_and_delete",
+    ],
+)
+
 idl_generator(
     name = "query_shape_hash_gen",
     src = "query_shape_hash.idl",
@@ -121,11 +139,13 @@ mongo_cc_unit_test(
         "find_cmd_shape_test.cpp",
         "let_shape_component_test.cpp",
         "serialization_options_test.cpp",
+        "update_cmd_shape_test.cpp",
     ],
     tags = [
         "mongo_unittest_sixth_group",
     ],
     deps = [
+        ":update_cmd_shape",
         "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )

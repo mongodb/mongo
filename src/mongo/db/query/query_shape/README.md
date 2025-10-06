@@ -43,6 +43,7 @@ The structure is as follows:
   - [`DistinctCmdShapeComponents`](distinct_cmd_shape.h)
   - [`FindCmdShapeComponents`](find_cmd_shape.h)
   - [`LetShapeComponent`](let_shape_component.h)
+  - [`UpdateShapeComponent`](update_cmd_shape.h)
 
 See more information for the different shapes in their respective classes, structured as follows:
 
@@ -51,6 +52,7 @@ See more information for the different shapes in their respective classes, struc
   - [`CountCmdShape`](count_cmd_shape.h)
   - [`DistinctCmdShape`](distinct_cmd_shape.h)
   - [`FindCmdShape`](find_cmd_shape.h)
+  - [`UpdateCmdShape`](update_cmd_shape.h)
 
 ## Serialization Options
 

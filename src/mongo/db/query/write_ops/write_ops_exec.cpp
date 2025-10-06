@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -83,6 +84,11 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/query/query_shape/update_cmd_shape.h"
+#include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/update_key.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/insert.h"
@@ -1388,6 +1394,67 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
     return result;
 }
 
+void registerRequestForQueryStats(OperationContext* opCtx,
+                                  const NamespaceString& ns,
+                                  const CollectionAcquisition& collection,
+                                  const write_ops::UpdateCommandRequest& wholeOp,
+                                  const ParsedUpdate& parsedUpdate) {
+    // Skip registering for query stats when the feature flag is disabled.
+    if (!feature_flags::gFeatureFlagQueryStatsWriteCommand.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
+    }
+
+    // TODO(SERVER-111930): Support recording query stats for updates with simple ID query
+    // Skip if the parse query is unavailable. This could happen if the query is a simple Id query:
+    // an exact-match query on _id.
+    if (!parsedUpdate.hasParsedQuery()) {
+        return;
+    }
+
+    // Skip registering the request with encrypted fields as indicated by the inclusion of
+    // encryptionInformation. It is important to do this before canonicalizing and optimizing the
+    // query, each of which would alter the query shape.
+    if (wholeOp.getEncryptionInformation()) {
+        return;
+    }
+
+    // Skip unsupported update types.
+    // TODO(SERVER-110343) and TODO(SERVER-110344) Support pipeline and modifier updates.
+    if (parsedUpdate.getRequest()->getUpdateModification().type() !=
+        write_ops::UpdateModification::Type::kReplacement) {
+        return;
+    }
+
+    // Compute QueryShapeHash and record it in CurOp.
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::UpdateCmdShape>(
+            wholeOp, parsedUpdate, parsedUpdate.expCtx());
+    }};
+
+    // QueryShapeHash(QSH) will be recorded in CurOp, but it is not being used for anything else
+    // downstream yet until we support updates in PQS. Using std::ignore to indicate that discarding
+    // the returned QSH is intended.
+    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
+        return shape_helpers::computeQueryShapeHash(
+            parsedUpdate.expCtx(), deferredShape, wholeOp.getNamespace());
+    });
+
+
+    // Register query stats collection.
+    query_stats::registerRequest(opCtx, ns, [&]() {
+        uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
+        return std::make_unique<query_stats::UpdateKey>(parsedUpdate.expCtx(),
+                                                        wholeOp,
+                                                        parsedUpdate.getRequest()->getHint(),
+                                                        std::move(deferredShape->getValue()),
+                                                        collection.getCollectionType());
+    });
+
+    // TODO(SERVER-110348) Support collecting data-bearing node metrics here.
+}
+
 /**
  * Performs a single update, sometimes retrying failure due to WriteConflictException.
  */
@@ -1395,6 +1462,7 @@ static SingleWriteResult performSingleUpdateOp(
     OperationContext* opCtx,
     const NamespaceString& ns,
     const timeseries::CollectionPreConditions& preConditions,
+    const write_ops::UpdateCommandRequest& wholeOp,
     UpdateRequest* updateRequest,
     OperationSource source,
     bool forgoOpCounterIncrements,
@@ -1478,6 +1546,11 @@ static SingleWriteResult performSingleUpdateOp(
                               updateRequest->source() == OperationSource::kTimeseriesUpdate);
     uassertStatusOK(parsedUpdate.parseRequest());
 
+    // Register query shape here once we obtain the ParsedUpdate, before executing the update
+    // command. After parsedUpdate.parseRequest(), the parsed query and the update driver become
+    // available for computing query shape.
+    registerRequestForQueryStats(opCtx, ns, collection, wholeOp, parsedUpdate);
+
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics(
@@ -1527,6 +1600,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     OperationContext* opCtx,
     const NamespaceString& ns,
     const std::vector<StmtId>& stmtIds,
+    const write_ops::UpdateCommandRequest& wholeOp,
     const write_ops::UpdateOpEntry& op,
     const timeseries::CollectionPreConditions& preConditions,
     LegacyRuntimeConstants runtimeConstants,
@@ -1581,6 +1655,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
             auto ret = performSingleUpdateOp(opCtx,
                                              ns,
                                              preConditions,
+                                             wholeOp,
                                              &request,
                                              source,
                                              forgoOpCounterIncrements,
@@ -1820,6 +1895,7 @@ WriteResult performUpdates(
                 performSingleUpdateOpWithDupKeyRetry(opCtx,
                                                      ns,
                                                      stmtIds,
+                                                     wholeOp,
                                                      singleOp,
                                                      preConditions,
                                                      runtimeConstants,
