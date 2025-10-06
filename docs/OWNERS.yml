@@ -3,6 +3,9 @@ filters:
   - "building.md":
     approvers:
       - 10gen/devprod-build
+  - "change_streams.md":
+    approvers:
+      - 10gen/query-execution-change-streams
   - "cpp_style.md":
     approvers:
       - 10gen/server-programmability
