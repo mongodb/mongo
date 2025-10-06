@@ -2,6 +2,8 @@
 // @tags: [
 //  requires_timeseries,
 //  requires_replication,
+//  # TODO SERVER-111733 remove this tag once change streams properly interact with viewless timeseries
+//  featureFlagCreateViewlessTimeseriesCollections_incompatible,
 // ]
 
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";

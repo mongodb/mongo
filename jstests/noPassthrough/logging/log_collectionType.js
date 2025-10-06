@@ -1,6 +1,9 @@
 /**
  * This test verifies the correctness of the "collectionType" value in the slow query logs.
- * @tags: []
+ * @tags: [
+ *   # TODO SERVER-107538 re-enable this test in viewless timeseries suites
+ *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
+ * ]
  */
 
 import {
