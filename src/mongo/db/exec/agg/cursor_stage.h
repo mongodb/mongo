@@ -58,7 +58,6 @@ class CursorStage : public Stage {
 public:
     using CursorType = DocumentSourceCursor::CursorType;
     using ResumeTrackingType = DocumentSourceCursor::ResumeTrackingType;
-    using CatalogResourceHandle = DocumentSourceCursor::CatalogResourceHandle;
 
     CursorStage(StringData stageName,
                 const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,

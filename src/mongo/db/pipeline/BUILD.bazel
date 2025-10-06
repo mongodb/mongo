@@ -607,6 +607,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "aggregation_hint_translation.h",
+        "catalog_resource_handle.h",
         "document_source.h",
         "document_source_add_fields.h",
         "document_source_bucket.h",

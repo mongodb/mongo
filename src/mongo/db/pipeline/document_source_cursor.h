@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -86,16 +87,6 @@ struct CursorSharedState {
  */
 class DocumentSourceCursor : public DocumentSource {
 public:
-    /**
-     * Interface for acquiring and releasing catalog resources needed for DS Cursor.
-     */
-    class CatalogResourceHandle : public RefCountable {
-    public:
-        virtual void acquire(OperationContext*, const PlanExecutor&) = 0;
-        virtual void release() = 0;
-        virtual void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) = 0;
-    };
-
     static constexpr StringData kStageName = "$cursor"_sd;
 
     /**
@@ -237,24 +228,9 @@ private:
     const std::shared_ptr<CursorSharedState> _sharedState;
 };
 
-class DSCursorCatalogResourceHandle : public DocumentSourceCursor::CatalogResourceHandle {
+class DSCursorCatalogResourceHandle : public DSCatalogResourceHandleBase {
 public:
-    DSCursorCatalogResourceHandle(
-        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher)
-        : _transactionResourcesStasher(std::move(stasher)) {
-        tassert(10096101,
-                "Expected _transactionResourcesStasher to exist",
-                _transactionResourcesStasher);
-    }
-
-    void acquire(OperationContext* opCtx, const PlanExecutor& exec) override {
-        tassert(10271302, "Expected resources to be absent", !_resources);
-        _resources.emplace(opCtx, _transactionResourcesStasher.get());
-    }
-
-    void release() override {
-        _resources.reset();
-    }
+    using DSCatalogResourceHandleBase::DSCatalogResourceHandleBase;
 
     void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override {
         if (!shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
@@ -262,11 +238,6 @@ public:
                 opCtx, exec.nss(), true));
         }
     }
-
-private:
-    boost::optional<HandleTransactionResourcesFromStasher> _resources;
-    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
-        _transactionResourcesStasher;
 };
 
 }  // namespace mongo

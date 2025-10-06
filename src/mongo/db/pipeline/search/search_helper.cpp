@@ -693,7 +693,11 @@ void promoteStoredSourceOrAddIdLookup(
         auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(expCtx);
         // idLookup must always be immediately after the first stage in the desugared pipeline
         auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
-            expCtx, limit, buildExecShardFilterPolicy(shardFilterer), view);
+            expCtx,
+            limit,
+            nullptr /*catalogResourceHandle*/,
+            buildExecShardFilterPolicy(shardFilterer),
+            view);
         desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
         if (shardFilterer) {
             desugaredPipeline.push_back(std::move(shardFilterer));

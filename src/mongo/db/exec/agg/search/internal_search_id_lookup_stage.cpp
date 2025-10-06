@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/pipeline/catalog_resource_handle.h"
 
 namespace mongo {
 
@@ -44,6 +45,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
         documentSource->kStageName,
         documentSource->getExpCtx(),
         documentSource->_limit,
+        documentSource->_catalogResourceHandle,
         documentSource->_shardFilterPolicy,
         documentSource->_searchIdLookupMetrics,
         documentSource->_viewPipeline
@@ -62,12 +64,14 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
     StringData stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     ExecShardFilterPolicy shardFilterPolicy,
     const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
     std::unique_ptr<mongo::Pipeline> viewPipeline)
     : Stage(stageName, expCtx),
       _stageName(stageName),
       _limit(limit),
+      _catalogResourceHandle(catalogResourceHandle),
       _shardFilterPolicy(shardFilterPolicy),
       _searchIdLookupMetrics(searchIdLookupMetrics),
       _viewPipeline(std::move(viewPipeline)) {}
@@ -93,6 +97,14 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
     if (_limit != 0 && _searchIdLookupMetrics->getDocsReturnedByIdLookup() >= _limit) {
         return GetNextResult::makeEOF();
     }
+
+    // Ensure catalog resources are released if they were acquired.
+    bool catalogResourceHandleAcquired = false;
+    ON_BLOCK_EXIT([&]() {
+        if (catalogResourceHandleAcquired) {
+            _catalogResourceHandle->release();
+        }
+    });
     while (!result) {
         auto nextInput = pSource->getNext();
         if (!nextInput.isAdvanced()) {
@@ -123,6 +135,13 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
                 // apply the view's data transforms, and pass said transformed documents
                 // through the rest of the user pipeline.
                 pipeline->appendPipeline(_viewPipeline->clone(pExpCtx));
+            }
+
+            // Acquire catalog resources once per doGetNext() call before preparing the pipeline.
+            // TODO SERVER-111401 We should always have a _catalogResourceHandle.
+            if (_catalogResourceHandle && !catalogResourceHandleAcquired) {
+                _catalogResourceHandle->acquire(pExpCtx->getOperationContext());
+                catalogResourceHandleAcquired = true;
             }
 
             pipeline =

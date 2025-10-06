@@ -36,6 +36,8 @@
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 namespace mongo {
 
 using boost::intrusive_ptr;
@@ -49,10 +51,12 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchIdLookup, DocumentSourceInternalSearc
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     ExecShardFilterPolicy shardFilterPolicy,
     boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
       _limit(limit),
+      _catalogResourceHandle(catalogResourceHandle),
       _shardFilterPolicy(shardFilterPolicy),
       _viewPipeline(view ? Pipeline::parse(view->getEffectivePipeline(), getExpCtx()) : nullptr) {
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state sharedby the

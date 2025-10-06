@@ -206,7 +206,7 @@ void CursorStage::loadBatch() {
             _sharedState->exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
 
     // Acquire catalog resources and ensure they are released at the end of this block.
-    _catalogResourceHandle->acquire(opCtx, *_sharedState->exec);
+    _catalogResourceHandle->acquire(opCtx);
     ON_BLOCK_EXIT([&]() { _catalogResourceHandle->release(); });
 
     _catalogResourceHandle->checkCanServeReads(opCtx, *_sharedState->exec);

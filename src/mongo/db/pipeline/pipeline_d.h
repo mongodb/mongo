@@ -94,11 +94,11 @@ public:
      * creating a specific DocumentSourceCursor stage using the provided PlanExecutor, and adding
      * the new stage to the pipeline.
      */
-    using AttachExecutorCallback = std::function<void(
-        const MultipleCollectionAccessor&,
-        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
-        Pipeline*,
-        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&)>;
+    using AttachExecutorCallback =
+        std::function<void(const MultipleCollectionAccessor&,
+                           std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
+                           Pipeline*,
+                           const boost::intrusive_ptr<CatalogResourceHandle>&)>;
 
     /**
      * A tuple to represent the result of query executors, includes a main executor, its pipeline
@@ -142,7 +142,7 @@ public:
      * 'buildInnerQueryExecutor()' method. If the callback doesn't hold a valid PlanExecutor, the
      * method does nothing. Otherwise, a new $cursor stage is created using the given PlanExecutor,
      * and added to the pipeline. The 'collections' parameter can reference any number of
-     * collections. 'transactionResourcesStasher' must point to a
+     * collections. 'catalogResourceHandle' must store a
      ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
      associated with 'collections' and 'exec'.
 
@@ -152,14 +152,13 @@ public:
         AttachExecutorCallback attachExecutorCallback,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
-            catalogResourceHandle);
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle);
 
     /**
      * This method combines 'buildInnerQueryExecutor()' and 'attachInnerQueryExecutorToPipeline()'
      * into a single call to support auto completion of the cursor stage creation process. Can be
      * used when the executor attachment phase doesn't need to be deferred and the $cursor stage
-     * can be created right after building the executor. 'transactionResourcesStasher' must point to
+     * can be created right after building the executor. 'catalogResourceHandle' must store
      a ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
      associated with 'collections'.
      */
@@ -168,8 +167,7 @@ public:
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
-            transactionResourcesStasher,
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
     static Timestamp getLatestOplogTimestamp(const exec::agg::Pipeline* pipeline);

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/logv2/log.h"
@@ -61,7 +62,7 @@ namespace {
  * holds any storage engine state. If the PlanExecutor holds storage engine state while the catalog
  * resources are released, this class will trigger a test failure.
  */
-class MockDSCursorCatalogResourceHandle : public DocumentSourceCursor::CatalogResourceHandle {
+class MockDSCursorCatalogResourceHandle : public CatalogResourceHandle {
 public:
     MockDSCursorCatalogResourceHandle(std::shared_ptr<bool> executorHoldsStorageEngineState)
         : _executorHoldsStorageEngineState(executorHoldsStorageEngineState) {}
@@ -69,7 +70,7 @@ public:
         ASSERT_EQ(*_executorHoldsStorageEngineState, false);
     }
 
-    void acquire(OperationContext* opCtx, const PlanExecutor& exec) override {
+    void acquire(OperationContext* opCtx) override {
         // No-op.
     }
 

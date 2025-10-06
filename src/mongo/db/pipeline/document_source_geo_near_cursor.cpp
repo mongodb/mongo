@@ -50,7 +50,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(geoNearCursor, DocumentSourceGeoNearCursor::id);
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>& catalogResourceHandle,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,
@@ -67,7 +67,7 @@ boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::c
 DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>& catalogResourceHandle,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,

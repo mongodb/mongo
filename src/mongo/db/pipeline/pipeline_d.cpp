@@ -660,8 +660,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
             [cursorType](const MultipleCollectionAccessor& collections,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          Pipeline* pipeline,
-                         const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
-                             catalogResourceHandle) {
+                         const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
                 auto cursor = DocumentSourceCursor::create(collections,
                                                            std::move(exec),
                                                            catalogResourceHandle,
@@ -732,8 +731,7 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
     PipelineD::AttachExecutorCallback attachExecutorCallback,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     Pipeline* pipeline,
-    const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
-        catalogResourceHandle) {
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
     // If the pipeline doesn't need a $cursor stage, there will be no callback function and
     // PlanExecutor provided in the 'attachExecutorCallback' object, so we don't need to do
     // anything.
@@ -747,7 +745,7 @@ void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
     const NamespaceString& nss,
     const AggregateCommandRequest* aggRequest,
     Pipeline* pipeline,
-    const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>& catalogResourceHandle,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     ExecShardFilterPolicy shardFilterPolicy) {
 
     auto [executor, callback, additionalExec] =
@@ -1853,8 +1851,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
             const MultipleCollectionAccessor& collections,
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
             Pipeline* pipeline,
-            const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
-                catalogResourceHandle) {
+            const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
             auto cursor = DocumentSourceCursor::create(collections,
                                                        std::move(exec),
                                                        catalogResourceHandle,
@@ -1914,8 +1911,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
             const MultipleCollectionAccessor& collections,
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
             Pipeline* pipeline,
-            const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
-                catalogResourceHandle) {
+            const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
             auto cursor = DocumentSourceGeoNearCursor::create(collections,
                                                               std::move(exec),
                                                               catalogResourceHandle,

@@ -48,12 +48,14 @@ class InternalSearchIdLookUpStage final : public Stage {
 public:
     using SearchIdLookupMetrics = DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics;
 
-    InternalSearchIdLookUpStage(StringData stageName,
-                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                long long limit,
-                                ExecShardFilterPolicy shardFilterPolicy,
-                                const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
-                                std::unique_ptr<mongo::Pipeline> viewPipeline);
+    InternalSearchIdLookUpStage(
+        StringData stageName,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        long long limit,
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
+        ExecShardFilterPolicy shardFilterPolicy,
+        const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
+        std::unique_ptr<mongo::Pipeline> viewPipeline);
 
     const SpecificStats* getSpecificStats() const override {
         return &_stats;
@@ -67,6 +69,10 @@ private:
 
     const std::string _stageName;
     const long long _limit;
+
+    // Handle on catalog state that can be acquired and released during doGetNext().
+    boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
+
     ExecShardFilterPolicy _shardFilterPolicy;
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics;

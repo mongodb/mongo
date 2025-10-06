@@ -61,6 +61,28 @@ using MockMongoInterface = StubLookupSingleDocumentProcessInterface;
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("unittests.pipeline_test");
 
+
+class MockDSInternalSearchIdLookUpCatalogResourceHandle : public CatalogResourceHandle {
+public:
+    MockDSInternalSearchIdLookUpCatalogResourceHandle() {}
+    ~MockDSInternalSearchIdLookUpCatalogResourceHandle() override {
+        ASSERT_EQ(acquireCalls, releaseCalls);
+    }
+
+    void acquire(OperationContext* opCtx) override {
+        acquireCalls++;
+    }
+
+    void release() override {
+        releaseCalls++;
+    }
+    void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override {
+        // No-op.
+    }
+
+    int acquireCalls = 0;
+    int releaseCalls = 0;
+};
 class InternalSearchIdLookupTest : public ServiceContextTest {
 public:
     InternalSearchIdLookupTest() : InternalSearchIdLookupTest(NamespaceString(kTestNss)) {}
@@ -84,6 +106,55 @@ private:
     ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
+
+
+TEST_F(InternalSearchIdLookupTest, VerifyCatalogResourceHandleAcquiredAndReleased) {
+    auto expCtx = getExpCtx();
+    expCtx->setUUID(UUID::gen());
+
+    auto catalogResourceHandle =
+        make_intrusive<MockDSInternalSearchIdLookUpCatalogResourceHandle>();
+    // Set up the idLookup stage.
+    auto idLookup = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+        expCtx, 0 /*limit*/, catalogResourceHandle);
+    auto idLookupStage = exec::agg::buildStage(idLookup);
+
+    // Mock its input.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
+    idLookupStage->setSource(mockLocalStage.get());
+
+    // Mock documents for this namespace.
+    deque<DocumentSource::GetNextResult> mockDbContents{Document{{"_id", 0}, {"color", "red"_sd}},
+                                                        Document{{"_id", 1}, {"color", "blue"_sd}}};
+    expCtx->setMongoProcessInterface(
+        std::make_unique<StubLookupSingleDocumentProcessInterface>(mockDbContents));
+
+    // We should find one document here with _id = 0.
+    auto next = idLookupStage->getNext();
+    ASSERT_EQ(catalogResourceHandle->acquireCalls, 1);
+    ASSERT_EQ(catalogResourceHandle->releaseCalls, 1);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 0}, {"color", "red"_sd}}));
+
+
+    // We should find one document here with _id = 1.
+    next = idLookupStage->getNext();
+    ASSERT_EQ(catalogResourceHandle->acquireCalls, 2);
+    ASSERT_EQ(catalogResourceHandle->releaseCalls, 2);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"_id", 1}, {"color", "blue"_sd}}));
+
+    // No documents but we still acquire and release the catalogResourceHandle for _id = 2.
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+    ASSERT_EQ(catalogResourceHandle->acquireCalls, 3);
+    ASSERT_EQ(catalogResourceHandle->releaseCalls, 3);
+
+    // No more documents, and no acquisition/release of catalogResourceHandle.
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+    ASSERT_EQ(catalogResourceHandle->acquireCalls, 3);
+    ASSERT_EQ(catalogResourceHandle->releaseCalls, 3);
+}
 
 TEST_F(InternalSearchIdLookupTest, ShouldSkipResultsWhenIdNotFound) {
     auto expCtx = getExpCtx();

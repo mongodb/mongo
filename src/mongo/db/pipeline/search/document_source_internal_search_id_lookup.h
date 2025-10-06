@@ -30,10 +30,14 @@
 #pragma once
 
 #include "mongo/db/exec/exec_shard_filter_policy.h"
+#include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -57,6 +61,7 @@ public:
     DocumentSourceInternalSearchIdLookUp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long limit = 0,
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle = {},
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{},
         boost::optional<SearchQueryViewSpec> view = boost::none);
 
@@ -190,6 +195,10 @@ private:
         const boost::intrusive_ptr<DocumentSource>&);
 
     long long _limit = 0;
+
+    // Handle to catalog state.
+    boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
+
     // TODO SERVER-109825: Move to InternalSearchIdLookupStage class.
     ExecShardFilterPolicy _shardFilterPolicy = AutomaticShardFiltering{};
 
@@ -198,6 +207,15 @@ private:
 
     // If a search query is run on a view, we store the parsed view pipeline.
     std::unique_ptr<Pipeline> _viewPipeline;
+};
+
+class DSInternalSearchIdLookUpCatalogResourceHandle : public DSCatalogResourceHandleBase {
+public:
+    using DSCatalogResourceHandleBase::DSCatalogResourceHandleBase;
+
+    void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override {
+        MONGO_UNREACHABLE;
+    }
 };
 
 }  // namespace mongo
