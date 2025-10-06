@@ -523,6 +523,13 @@ std::unique_ptr<MatchExpression> notOptimizer(std::unique_ptr<MatchExpression> e
                                                      /* enableSimplification */ false)
                                  .release());
 
+    if (notExpression.getChild(0)->isTriviallyFalse()) {
+        return std::make_unique<AndMatchExpression>();
+    }
+    if (notExpression.getChild(0)->isTriviallyTrue()) {
+        return std::make_unique<AlwaysFalseMatchExpression>();
+    }
+
     return expression;
 }
 

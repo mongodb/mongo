@@ -1328,7 +1328,7 @@
     "keys" :    249,
     "docs" :    249,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :     10},
 
 {">>>pipeline": [{"$match":{"$and":[{"field35_int_idx":{"$ne":7721},"field7_str_idx":{"$gte":"OX"}},{"field27_bool_idx":{"$lte":false},"field35_int_idx":{"$type":"int"}}],"field19_datetime_idx":{"$ne":"2024-02-19T00:00:00.000Z"},"field29_Timestamp_idx":{"$type":"timestamp"},"field31_list_idx":{"$type":"int"},"field14_dict_idx":{"$gt":{"b":1,"g":2}}}},{"$project":{"field24_mixed_idx":1,"field16_str_idx":1,"field34_str_idx":1,"_id":0}}],
@@ -8284,7 +8284,7 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1034, "plans": 7923, "keys": 34463700, "docs": 34663324, "sorts": 7275542, "rows": 10055721, "errors":      0},
+">>>totals": {"pipelines": 1034, "plans": 7925, "keys": 34463700, "docs": 34663324, "sorts": 7275542, "rows": 10055721, "errors":      0},
 ">>>parameters": {"planRankerMode":"multiPlanning","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"random","internalQuerySamplingBySequentialScan":false}}
 
 

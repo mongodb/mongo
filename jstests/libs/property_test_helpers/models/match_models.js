@@ -94,7 +94,6 @@ export function getMatchPredicateSpec({
     return fc.letrec((tie) => {
         const allowedConditions = [
             leafConditionArb,
-            // TODO SERVER-101007
             // TODO SERVER-101260
             // After these tickets are complete, re-enable $elemMatch.
             // tie('elemMatch')

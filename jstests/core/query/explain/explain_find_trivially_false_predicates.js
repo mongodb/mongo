@@ -10,6 +10,7 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     assertNoFetchFilter,
+    getAggPlanStage,
     getPlanStages,
     getWinningPlanFromExplain,
     isEofPlan,

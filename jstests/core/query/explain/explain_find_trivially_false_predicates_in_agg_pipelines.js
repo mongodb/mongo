@@ -1,7 +1,7 @@
 /**
  * Tests for optimizations applied to trivially false predicates in aggregate pipelines.
  * @tags: [
- *   requires_fcv_81,
+ *   requires_fcv_83,
  *   # Tests run here require explaining plans on aggregate commands that could be incomplete
  *   # during stepdown
  *   does_not_support_stepdowns,
@@ -18,7 +18,10 @@
 import {getExplainPipelineFromAggregationResult} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
+    getAllNodeExplains,
+    getEngine,
     aggPlanHasStage,
+    getAggPlanStage,
     getAggPlanStages,
     getWinningPlanFromExplain,
     isEofPlan,
@@ -245,3 +248,54 @@ explain = localColl.explain().aggregate(query);
 let winningPlan = getWinningPlanFromExplain(explain);
 assert(!isEofPlan(db, winningPlan));
 assert(!winningPlan.filter || bsonWoCompare(winningPlan.filter, {}) == 0);
+
+/**
+ * Verify that {$not: some-expression-that-is-always-false-or-true} is optimized
+ */
+
+function getMatchFilter(explain) {
+    const singleShardExplain = getAllNodeExplains(explain)[0];
+    const engine = getEngine(singleShardExplain);
+    const matchStageName = engine == "classic" ? "$match" : "MATCH";
+    const matchStage = getAggPlanStage(singleShardExplain, matchStageName, true);
+    if (engine == "classic") {
+        return matchStage["$match"];
+    } else {
+        return matchStage.filter;
+    }
+}
+
+function getCollScanFilter(explain) {
+    const singleShardExplain = getAllNodeExplains(explain)[0];
+    const collScanStage = getAggPlanStage(singleShardExplain, "COLLSCAN", true);
+    if (collScanStage.hasOwnProperty("filter") && Object.keys(collScanStage.filter).length !== 0) {
+        return collScanStage.filter;
+    } else {
+        return "NoFilter";
+    }
+}
+
+// This query is interesting because $addFields and the structure of the query
+// require unparsing and parsing it back, and since {$in: []} is optimized to
+// $alwaysFalse, this requires parsing {$not: $alwaysFalse}, which fails. If
+// {$not: $alwaysFalse} is rewritten to $alwaysTrue, there is no parsing failure
+// and the query is simpler.
+const q1 = [{$addFields: {t: 0}}, {$match: {$or: [{b: 13, t: 42}], t: {$elemMatch: {$not: {$in: []}}}}}];
+let explainResult = localColl.explain().aggregate(q1);
+let collScanFilter = getCollScanFilter(explainResult);
+assert.docEq(collScanFilter, {b: {$eq: 13}}, "Winning plan filter should match expected filter");
+
+const matchFilter = getMatchFilter(explainResult);
+const expectedMatchCondition = {$and: [{t: {$elemMatch: {}}}, {t: {$eq: 42}}]};
+assert.docEq(matchFilter, expectedMatchCondition, "$match/MATCH stage should have the expected structure");
+
+// Simple cases
+const q2 = [{$match: {t: {$elemMatch: {$not: {$in: []}}}}}];
+explainResult = localColl.explain().aggregate(q2);
+collScanFilter = getCollScanFilter(explainResult);
+assert.docEq(collScanFilter, {t: {"$elemMatch": {}}}, "Winning plan filter should match expected filter");
+
+const q3 = [{$match: {t: {$not: {$in: []}}}}];
+explainResult = localColl.explain().aggregate(q3);
+collScanFilter = getCollScanFilter(explainResult);
+assert.eq(collScanFilter, "NoFilter", "Winning plan should not have a filter property");
