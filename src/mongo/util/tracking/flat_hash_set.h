@@ -29,16 +29,18 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 
-#include <functional>
 #include <scoped_allocator>
 
 #include <absl/container/flat_hash_set.h>
 #include <absl/container/internal/hash_function_defaults.h>
 
-namespace mongo::tracking {
+namespace MONGO_MOD_PUB mongo {
+namespace tracking {
+
 
 template <class Key,
           class Hash = absl::container_internal::hash_default_hash<Key>,
@@ -51,4 +53,5 @@ flat_hash_set<Key> make_flat_hash_set(Context& Context) {
     return flat_hash_set<Key>(Context.makeAllocator<Key>());
 }
 
-}  // namespace mongo::tracking
+}  // namespace tracking
+}  // namespace MONGO_MOD_PUB mongo

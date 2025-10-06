@@ -29,13 +29,15 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 
 #include <scoped_allocator>
 #include <set>
 
-namespace mongo::tracking {
+namespace MONGO_MOD_PUB mongo {
+namespace tracking {
 
 template <class Key>
 using set = std::set<Key, std::less<Key>, std::scoped_allocator_adaptor<Allocator<Key>>>;
@@ -45,4 +47,5 @@ set<Key> make_set(Context& Context) {
     return set<Key>(Context.makeAllocator<Key>());
 }
 
-}  // namespace mongo::tracking
+}  // namespace tracking
+}  // namespace MONGO_MOD_PUB mongo

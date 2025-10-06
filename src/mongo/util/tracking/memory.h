@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 
@@ -36,7 +37,8 @@
 
 #include <boost/smart_ptr/allocate_unique.hpp>
 
-namespace mongo::tracking {
+namespace MONGO_MOD_PUB mongo {
+namespace tracking {
 
 template <class T>
 using shared_ptr = std::shared_ptr<T>;
@@ -117,4 +119,5 @@ unique_ptr<T> make_unique(Context& Context, Args&&... args) {
     return unique_ptr<T>(Context, std::forward<Args>(args)...);
 }
 
-}  // namespace mongo::tracking
+}  // namespace tracking
+}  // namespace MONGO_MOD_PUB mongo

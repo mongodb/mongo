@@ -29,13 +29,15 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 
 #include <scoped_allocator>
 #include <string>
 
-namespace mongo::tracking {
+namespace MONGO_MOD_PUB mongo {
+namespace tracking {
 
 using string = std::basic_string<char, std::char_traits<char>, Allocator<char>>;
 
@@ -44,4 +46,5 @@ string make_string(Context& Context, Args... args) {
     return string(args..., Context.makeAllocator<char>());
 }
 
-}  // namespace mongo::tracking
+}  // namespace tracking
+}  // namespace MONGO_MOD_PUB mongo

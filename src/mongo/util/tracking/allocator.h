@@ -33,12 +33,14 @@
 #include "mongo/stdx/new.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
 
-namespace mongo::tracking {
+namespace MONGO_MOD_PUB mongo {
+namespace tracking {
 
 /**
  * A minimal implementation of a partitioned counter for incrementing and decrementing allocations
@@ -140,4 +142,5 @@ bool operator==(const Allocator<T>& lhs, const Allocator<U>& rhs) {
     return &lhs.stats() == &rhs.stats();
 }
 
-}  // namespace mongo::tracking
+}  // namespace tracking
+}  // namespace MONGO_MOD_PUB mongo

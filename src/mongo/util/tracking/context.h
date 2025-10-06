@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/tracking/allocator.h"
 
-#include <functional>
-
-namespace mongo::tracking {
+namespace MONGO_MOD_PUB mongo {
+namespace tracking {
 
 /**
  * A Context is a factory style class that constructs Allocator objects under a
@@ -62,4 +62,5 @@ private:
     AllocatorStats _stats{ProcessInfo::getNumLogicalCores() * 2};
 };
 
-}  // namespace mongo::tracking
+}  // namespace tracking
+}  // namespace MONGO_MOD_PUB mongo

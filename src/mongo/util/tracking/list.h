@@ -29,13 +29,15 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 
 #include <list>
 #include <scoped_allocator>
 
-namespace mongo::tracking {
+namespace MONGO_MOD_PUB mongo {
+namespace tracking {
 
 template <class T>
 using list = std::list<T, std::scoped_allocator_adaptor<Allocator<T>>>;
@@ -45,4 +47,5 @@ list<T> make_list(Context& Context) {
     return list<T>(Context.makeAllocator<T>());
 }
 
-}  // namespace mongo::tracking
+}  // namespace tracking
+}  // namespace MONGO_MOD_PUB mongo
