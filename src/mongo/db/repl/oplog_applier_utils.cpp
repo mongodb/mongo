@@ -144,6 +144,14 @@ void processCrudOp(OperationContext* opCtx,
     }
 }
 
+void getContainerKeyHash(OperationContext* opCtx,
+                         OplogEntry* op,
+                         boost::optional<size_t>& hashKey) {
+    BSONElement key = op->getObject()["k"];
+    BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
+    hashKey.emplace(elementHasher.hash(key));
+}
+
 /**
  * Returns the ID of the writer thread that this op will be assigned to, determined by the
  * namespace string (and document key if exists) of the op.
@@ -221,15 +229,17 @@ void addTopLevelCommitOrAbort(OperationContext* opCtx,
 uint32_t OplogApplierUtils::getOplogEntryHash(OperationContext* opCtx,
                                               OplogEntry* op,
                                               CachedCollectionProperties* collPropertiesCache) {
-    boost::optional<size_t> idHash;
+    boost::optional<size_t> opHash;
     NamespaceString nss = op->getNss();
 
     if (op->isCrudOpType()) {
         auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, nss);
-        processCrudOp(opCtx, op, collProperties, idHash);
+        processCrudOp(opCtx, op, collProperties, opHash);
+    } else if (op->isContainerOpType()) {
+        getContainerKeyHash(opCtx, op, opHash);
     }
 
-    return idHash ? absl::HashOf(nss, *idHash) : absl::HashOf(nss);
+    return opHash ? absl::HashOf(nss, *opHash) : absl::HashOf(nss);
 }
 
 uint32_t OplogApplierUtils::addToWriterVector(
