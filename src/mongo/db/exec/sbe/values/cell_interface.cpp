@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/path_request.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
 #include <memory>
@@ -46,17 +47,17 @@ std::unique_ptr<CellBlock> MaterializedCellBlock::clone() const {
     return ret;
 }
 
-std::string pathToString(const CellBlock::Path& p) {
+std::string pathToString(const Path& p) {
     std::string out;
     size_t idx = 0;
     for (auto& component : p) {
-        if (holds_alternative<CellBlock::Id>(component)) {
+        if (holds_alternative<Id>(component)) {
             out += "Id";
-        } else if (holds_alternative<CellBlock::Get>(component)) {
+        } else if (holds_alternative<Get>(component)) {
             out += "Get(";
-            out += get<CellBlock::Get>(component).field;
+            out += get<Get>(component).field;
             out += ')';
-        } else if (holds_alternative<CellBlock::Traverse>(component)) {
+        } else if (holds_alternative<Traverse>(component)) {
             out += "Traverse";
         }
         ++idx;
@@ -68,21 +69,21 @@ std::string pathToString(const CellBlock::Path& p) {
     return out;
 }
 
-std::ostream& operator<<(std::ostream& os, const CellBlock::Path& path) {
+std::ostream& operator<<(std::ostream& os, const Path& path) {
     os << pathToString(path);
     return os;
 };
 
-std::string CellBlock::PathRequest::toString() const {
+std::string PathRequest::toString() const {
     return str::stream() << (type == kFilter ? "FilterPath" : "ProjectPath") << "("
                          << pathToString(path) << ")";
 }
 
-StringData CellBlock::PathRequest::getTopLevelField() const {
+StringData PathRequest::getTopLevelField() const {
     return get<Get>(path[0]).field;
 }
 
-std::string CellBlock::PathRequest::getFullPath() const {
+std::string PathRequest::getFullPath() const {
     StringBuilder sb;
     for (const auto& component : path) {
         if (holds_alternative<Get>(component)) {

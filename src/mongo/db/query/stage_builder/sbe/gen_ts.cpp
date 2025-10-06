@@ -49,8 +49,8 @@
 namespace mongo::stage_builder {
 namespace {
 struct CellPathReqsRet {
-    std::vector<sbe::value::CellBlock::PathRequest> topLevelPaths;
-    std::vector<sbe::value::CellBlock::PathRequest> traversePaths;
+    std::vector<sbe::value::PathRequest> topLevelPaths;
+    std::vector<sbe::value::PathRequest> traversePaths;
 };
 
 // The set of fields specified in a bucket spec contains the fields that should be available after
@@ -68,9 +68,8 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
         if (computedFromMeta.find(field) == computedFromMeta.end()) {
             // For each path requested by the query we generate a 'topLevelPath' version, which is
             // just the value of the top level field, with no traversal.
-            ret.topLevelPaths.emplace_back(sbe::value::CellBlock::PathRequest(
-                sbe::value::CellBlock::kProject,
-                {sbe::value::CellBlock::Get{field}, sbe::value::CellBlock::Id{}}));
+            ret.topLevelPaths.emplace_back(sbe::value::PathRequest(
+                sbe::value::kProject, {sbe::value::Get{field}, sbe::value::Id{}}));
         }
     }
 
@@ -88,13 +87,13 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
                 computedFromMeta.find(rootField) == computedFromMeta.end()) {
 
                 FieldPath fp(path);
-                sbe::value::CellBlock::PathRequest pReq(sbe::value::CellBlock::kFilter);
+                sbe::value::PathRequest pReq(sbe::value::kFilter);
                 for (size_t i = 0; i < fp.getPathLength(); i++) {
-                    pReq.path.insert(pReq.path.end(),
-                                     {sbe::value::CellBlock::Get{std::string{fp.getFieldName(i)}},
-                                      sbe::value::CellBlock::Traverse{}});
+                    pReq.path.insert(
+                        pReq.path.end(),
+                        {sbe::value::Get{std::string{fp.getFieldName(i)}}, sbe::value::Traverse{}});
                 }
-                pReq.path.emplace_back(sbe::value::CellBlock::Id{});
+                pReq.path.emplace_back(sbe::value::Id{});
                 ret.traversePaths.emplace_back(std::move(pReq));
             }
         }

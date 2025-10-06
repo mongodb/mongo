@@ -362,7 +362,7 @@ struct SBEPath {
     }
 
     // Path request which consists of a combination of Get{x}, Traverse{}, and ends with Id{}.
-    value::CellBlock::PathRequest _pathRequest;
+    value::PathRequest _pathRequest;
 };
 }  // namespace bsoncolumn
 

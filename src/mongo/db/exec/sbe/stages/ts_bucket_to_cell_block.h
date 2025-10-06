@@ -49,7 +49,7 @@ class TsBucketToCellBlockStage final : public PlanStage {
 public:
     TsBucketToCellBlockStage(std::unique_ptr<PlanStage> input,
                              value::SlotId bucketSlotId,
-                             std::vector<value::CellBlock::PathRequest> pathReqs,
+                             std::vector<value::PathRequest> pathReqs,
                              value::SlotVector blocksOut,
                              boost::optional<value::SlotId> metaOutSlotId,
                              value::SlotId bitmapOutSlotId,
@@ -84,7 +84,7 @@ private:
     void initCellBlocks();
 
     const value::SlotId _bucketSlotId;
-    const std::vector<value::CellBlock::PathRequest> _pathReqs;
+    const std::vector<value::PathRequest> _pathReqs;
     const value::SlotVector _blocksOutSlotId;
     const boost::optional<value::SlotId> _metaOutSlotId;
     const value::SlotId _bitmapOutSlotId;

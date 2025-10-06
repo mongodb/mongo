@@ -37,12 +37,12 @@
 
 namespace mongo::sbe {
 
-using Get = value::CellBlock::Get;
-using Traverse = value::CellBlock::Traverse;
-using Id = value::CellBlock::Id;
+using Get = value::Get;
+using Traverse = value::Traverse;
+using Id = value::Id;
 
 struct PathTestCase {
-    value::CellBlock::Path path;
+    value::Path path;
     BSONObj projectValue;
 };
 
@@ -500,8 +500,8 @@ TEST_F(ObjectWalkNodeScalarTest, PerfectTree) {
     int curIdx = 0;
     int depth = 4;
     int branchingFactor = 3;
-    std::vector<value::CellBlock::Path> paths;
-    value::CellBlock::Path curPath;
+    std::vector<value::Path> paths;
+    value::Path curPath;
     std::function<void(BSONObjBuilder&, int)> rec = [&](BSONObjBuilder& curBob, int curDepth) {
         if (curDepth == depth) {
             curPath.push_back(Id{});

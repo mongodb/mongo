@@ -43,10 +43,10 @@
 namespace mongo::sbe {
 
 namespace {
-using Path = value::CellBlock::Path;
-using Get = value::CellBlock::Get;
-using Traverse = value::CellBlock::Traverse;
-using Id = value::CellBlock::Id;
+using Path = value::Path;
+using Get = value::Get;
+using Traverse = value::Traverse;
+using Id = value::Id;
 }  // namespace
 
 class ExtractFieldPathsStageTest : public PlanStageTestFixture {

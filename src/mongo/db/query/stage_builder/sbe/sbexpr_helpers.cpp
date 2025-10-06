@@ -914,8 +914,8 @@ std::tuple<SbStage, SbSlot, SbSlot> SbBuilder::makeUnwind(SbStage stage,
 std::tuple<SbStage, SbSlot, SbSlotVector, SbSlotVector> SbBuilder::makeTsBucketToCellBlock(
     SbStage stage,
     SbSlot bucketSlot,
-    const std::vector<sbe::value::CellBlock::PathRequest>& topLevelReqs,
-    const std::vector<sbe::value::CellBlock::PathRequest>& traverseReqs,
+    const std::vector<sbe::value::PathRequest>& topLevelReqs,
+    const std::vector<sbe::value::PathRequest>& traverseReqs,
     const std::string& timeField) {
     const auto bitmapSlot = SbSlot{_state.slotId()};
 

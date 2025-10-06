@@ -83,7 +83,7 @@ TEST(SbeBlockTest, SbeCellBlockTypeIsCopyable) {
 namespace {
 // Other types and helpers for testing.
 struct PathTestCase {
-    value::CellBlock::Path path;
+    value::Path path;
     BSONObj filterValues;
     std::vector<int32_t> filterPosInfo;
 
@@ -252,7 +252,7 @@ public:
 
     std::pair<std::vector<std::unique_ptr<value::TsBlock>>,
               std::vector<std::unique_ptr<value::CellBlock>>>
-    extractCellBlocks(const std::vector<value::CellBlock::PathRequest>& paths,
+    extractCellBlocks(const std::vector<value::PathRequest>& paths,
                       const std::variant<std::vector<BSONObj>, BSONObj>& data) {
         // Get the de-blocked collection of BSON documents for the bucket.
         std::vector<BSONObj> bsons;
@@ -313,14 +313,12 @@ private:
 void BsonBlockDecodingTest::testPaths(const std::vector<PathTestCase>& testCases,
                                       const std::variant<std::vector<BSONObj>, BSONObj>& data,
                                       bool skipProjectPath) {
-    std::vector<value::CellBlock::PathRequest> pathReqs;
+    std::vector<value::PathRequest> pathReqs;
     for (auto& tc : testCases) {
-        pathReqs.push_back(
-            value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter, tc.path));
+        pathReqs.push_back(value::PathRequest(value::PathRequestType::kFilter, tc.path));
 
         if (!skipProjectPath) {
-            pathReqs.push_back(value::CellBlock::PathRequest(
-                value::CellBlock::PathRequestType::kProject, tc.path));
+            pathReqs.push_back(value::PathRequest(value::PathRequestType::kProject, tc.path));
         }
     }
 
@@ -358,9 +356,9 @@ void BsonBlockDecodingTest::testPaths(const std::vector<PathTestCase>& testCases
 }
 
 
-using Get = value::CellBlock::Get;
-using Traverse = value::CellBlock::Traverse;
-using Id = value::CellBlock::Id;
+using Get = value::Get;
+using Traverse = value::Traverse;
+using Id = value::Id;
 
 TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSimple) {
     std::vector<BSONObj> bsons{

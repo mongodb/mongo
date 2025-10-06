@@ -36,7 +36,7 @@
 namespace mongo::sbe {
 ExtractFieldPathsStage::ExtractFieldPathsStage(std::unique_ptr<PlanStage> input,
                                                value::SlotId inputSlotId,
-                                               std::vector<value::CellBlock::Path> pathReqs,
+                                               std::vector<value::Path> pathReqs,
                                                value::SlotVector outputSlotIds,
                                                PlanNodeId planNodeId,
                                                bool participateInTrialRunTracking)

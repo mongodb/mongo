@@ -46,16 +46,15 @@
 #include <string>
 
 namespace mongo::sbe {
-TsBucketToCellBlockStage::TsBucketToCellBlockStage(
-    std::unique_ptr<PlanStage> input,
-    value::SlotId bucketSlot,
-    std::vector<value::CellBlock::PathRequest> pathReqs,
-    value::SlotVector blocksOut,
-    boost::optional<value::SlotId> metaOut,
-    value::SlotId bitmapOutSlotId,
-    const std::string& timeField,
-    PlanNodeId nodeId,
-    bool participateInTrialRunTracking)
+TsBucketToCellBlockStage::TsBucketToCellBlockStage(std::unique_ptr<PlanStage> input,
+                                                   value::SlotId bucketSlot,
+                                                   std::vector<value::PathRequest> pathReqs,
+                                                   value::SlotVector blocksOut,
+                                                   boost::optional<value::SlotId> metaOut,
+                                                   value::SlotId bitmapOutSlotId,
+                                                   const std::string& timeField,
+                                                   PlanNodeId nodeId,
+                                                   bool participateInTrialRunTracking)
     : PlanStage("ts_bucket_to_cellblock"_sd,
                 nullptr /* yieldPolicy */,
                 nodeId,

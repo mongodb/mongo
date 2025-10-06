@@ -60,7 +60,7 @@ public:
         std::vector<std::unique_ptr<CellBlock>> cellBlocks;
     };
 
-    TsBucketPathExtractor(std::vector<CellBlock::PathRequest> reqs, StringData timeField);
+    TsBucketPathExtractor(std::vector<PathRequest> reqs, StringData timeField);
 
     /*
      * Returns one CellBlock per path given in the constructor. A CellBlock represents all of the
@@ -83,7 +83,7 @@ private:
                                    const std::vector<size_t>& nonTopLevelIdxesForCurrentField,
                                    std::vector<std::unique_ptr<CellBlock>>& outCells) const;
 
-    std::vector<CellBlock::PathRequest> _pathReqs;
+    std::vector<PathRequest> _pathReqs;
 
     // Set of indexes in _pathReqs which are paths NOT of the form [Get <field> Id]. This includes
     // paths like [Get <field> Traverse Id] as well as access to nested paths. Paths of the form

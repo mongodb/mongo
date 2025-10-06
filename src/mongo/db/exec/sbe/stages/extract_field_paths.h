@@ -57,7 +57,7 @@ class ExtractFieldPathsStage final : public PlanStage {
 public:
     ExtractFieldPathsStage(std::unique_ptr<PlanStage> input,
                            value::SlotId inputSlotId,
-                           std::vector<value::CellBlock::Path> pathReqs,
+                           std::vector<value::Path> pathReqs,
                            value::SlotVector outputSlotIds,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking = true);
@@ -89,7 +89,7 @@ private:
     void constructRoot();
 
     const value::SlotId _inputSlotId;
-    const std::vector<value::CellBlock::Path> _pathReqs;
+    const std::vector<value::Path> _pathReqs;
     const value::SlotVector _outputSlotIds;
 
     value::SlotAccessor* _inputAccessor = nullptr;

@@ -167,29 +167,29 @@ struct ObjectWalkNode {
     // Child which is a Traverse node.
     std::unique_ptr<ObjectWalkNode> traverseChild;
 
-    void add(const CellBlock::Path& path,
+    void add(const Path& path,
              FilterPositionInfoRecorder* filterRecorder,
              ProjectionRecorder* outProjBlockRecorder,
              size_t pathIdx = 0);
 };
 
 template <class ProjectionRecorder>
-void ObjectWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
+void ObjectWalkNode<ProjectionRecorder>::add(const Path& path,
                                              FilterPositionInfoRecorder* outFilterRecorder,
                                              ProjectionRecorder* outProjRecorder,
                                              size_t pathIdx /*= 0*/) {
     if (pathIdx == 0) {
         // Check some invariants about the path.
         tassert(7953501, "Cannot be given empty path", !path.empty());
-        tassert(7953502, "Path must end with Id", holds_alternative<CellBlock::Id>(path.back()));
+        tassert(7953502, "Path must end with Id", holds_alternative<Id>(path.back()));
     }
 
-    if (holds_alternative<CellBlock::Get>(path[pathIdx])) {
-        auto& get = std::get<CellBlock::Get>(path[pathIdx]);
+    if (holds_alternative<Get>(path[pathIdx])) {
+        auto& get = std::get<Get>(path[pathIdx]);
         auto [it, inserted] = getChildren.insert(
             std::pair(get.field, std::make_unique<ObjectWalkNode<ProjectionRecorder>>()));
         it->second->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
-    } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
+    } else if (holds_alternative<Traverse>(path[pathIdx])) {
         tassert(11089614, "Unexpected pathIdx", pathIdx != 0);
         if (!traverseChild) {
             traverseChild = std::make_unique<ObjectWalkNode<ProjectionRecorder>>();
@@ -201,7 +201,7 @@ void ObjectWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
         }
 
         traverseChild->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
-    } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
+    } else if (holds_alternative<Id>(path[pathIdx])) {
         tassert(11089610, "Unexpected pathIdx", pathIdx != 0);
         if (outFilterRecorder) {
             filterRecorder = outFilterRecorder;

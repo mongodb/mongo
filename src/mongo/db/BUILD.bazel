@@ -2299,6 +2299,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/values:generic_compare.h",
         "//src/mongo/db/exec/sbe/values:key_string_entry.h",
         "//src/mongo/db/exec/sbe/values:object_walk_node.h",
+        "//src/mongo/db/exec/sbe/values:path_request.h",
         "//src/mongo/db/exec/sbe/values:row.h",
         "//src/mongo/db/exec/sbe/values:scalar_mono_cell_block.h",
         "//src/mongo/db/exec/sbe/values:slot.h",

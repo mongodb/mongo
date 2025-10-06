@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/object_walk_node.h"
+#include "mongo/db/exec/sbe/values/path_request.h"
 
 namespace mongo::sbe::value {
 /**
@@ -41,8 +42,7 @@ public:
     /*
      * Creates a BSON extractor which will collect the given path requests.
      */
-    static std::unique_ptr<BSONCellExtractor> make(
-        const std::vector<CellBlock::PathRequest>& pathReqs);
+    static std::unique_ptr<BSONCellExtractor> make(const std::vector<PathRequest>& pathReqs);
 
 
     virtual ~BSONCellExtractor() = default;
@@ -71,11 +71,10 @@ public:
  * All returned data is fully owned by the CellBlocks.
  */
 std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
-    const std::vector<CellBlock::PathRequest>& pathReqs, const std::vector<BSONObj>& bsons);
+    const std::vector<PathRequest>& pathReqs, const std::vector<BSONObj>& bsons);
 
 /**
  * Given a BSONObj and PathRequest, return a vector of the value pointers requested by the path.
  */
-std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
-                                                      CellBlock::PathRequest pathReqs);
+std::vector<const char*> extractValuePointersFromBson(BSONObj& obj, PathRequest pathReqs);
 }  // namespace mongo::sbe::value

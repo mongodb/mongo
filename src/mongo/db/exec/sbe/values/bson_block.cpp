@@ -32,7 +32,7 @@
 namespace mongo::sbe::value {
 class BSONExtractorImpl : public BSONCellExtractor {
 public:
-    BSONExtractorImpl(std::vector<CellBlock::PathRequest> pathReqs);
+    BSONExtractorImpl(std::vector<PathRequest> pathReqs);
 
     std::vector<std::unique_ptr<CellBlock>> extractFromBsons(
         const std::vector<BSONObj>& bsons) override;
@@ -49,13 +49,13 @@ public:
 private:
     std::vector<std::unique_ptr<CellBlock>> constructOutputFromRecorders();
 
-    std::vector<CellBlock::PathRequest> _pathReqs;
+    std::vector<PathRequest> _pathReqs;
     std::vector<FilterPositionInfoRecorder> _filterPositionInfoRecorders;
     std::vector<BlockProjectionPositionInfoRecorder> _projPositionInfoRecorders;
     ObjectWalkNode<BlockProjectionPositionInfoRecorder> _root;
 };
 
-BSONExtractorImpl::BSONExtractorImpl(std::vector<CellBlock::PathRequest> pathReqsIn)
+BSONExtractorImpl::BSONExtractorImpl(std::vector<PathRequest> pathReqsIn)
     : _pathReqs(std::move(pathReqsIn)) {
     // Ensure we don't reallocate and move the address of these objects, since the path tree
     // contains pointers to them.
@@ -63,7 +63,7 @@ BSONExtractorImpl::BSONExtractorImpl(std::vector<CellBlock::PathRequest> pathReq
     _projPositionInfoRecorders.reserve(_pathReqs.size());
     {
         for (auto& pathReq : _pathReqs) {
-            if (pathReq.type == CellBlock::PathRequestType::kFilter) {
+            if (pathReq.type == PathRequestType::kFilter) {
                 _filterPositionInfoRecorders.emplace_back();
                 _root.add(pathReq.path, &_filterPositionInfoRecorders.back(), nullptr);
             } else {
@@ -164,12 +164,12 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::constructOutputFromRe
 
     for (auto&& path : _pathReqs) {
         auto matBlock = std::make_unique<MaterializedCellBlock>();
-        if (path.type == CellBlock::PathRequestType::kFilter) {
+        if (path.type == PathRequestType::kFilter) {
             auto& recorder = _filterPositionInfoRecorders[filterRecorderIdx];
             matBlock->_deblocked = recorder.extractValues();
             matBlock->_filterPosInfo = std::move(recorder.posInfo);
             ++filterRecorderIdx;
-        } else if (path.type == CellBlock::PathRequestType::kProject) {
+        } else if (path.type == PathRequestType::kProject) {
             auto& recorder = _projPositionInfoRecorders[projRecorderIdx];
             matBlock->_deblocked = recorder.extractValues();
             // No associated position info since we already have one value per document.
@@ -187,20 +187,20 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::constructOutputFromRe
 }
 
 std::unique_ptr<BSONCellExtractor> BSONCellExtractor::make(
-    const std::vector<CellBlock::PathRequest>& pathReqs) {
+    const std::vector<PathRequest>& pathReqs) {
     return std::make_unique<BSONExtractorImpl>(pathReqs);
 }
 
 std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
-    const std::vector<CellBlock::PathRequest>& pathReqs, const std::vector<BSONObj>& bsons) {
+    const std::vector<PathRequest>& pathReqs, const std::vector<BSONObj>& bsons) {
 
     auto extractor = BSONCellExtractor::make(pathReqs);
     return extractor->extractFromBsons(bsons);
 }
 
 std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
-                                                      value::CellBlock::PathRequest pathRequest) {
-    std::vector<value::CellBlock::PathRequest> pathrequests{pathRequest};
+                                                      value::PathRequest pathRequest) {
+    std::vector<value::PathRequest> pathrequests{pathRequest};
     auto extractor = BSONExtractorImpl(pathrequests);
 
     std::vector<const char*> bsonPointers;

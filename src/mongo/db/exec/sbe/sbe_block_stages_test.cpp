@@ -88,11 +88,10 @@ protected:
 
         auto bitmapSlot = generateSlotId();
 
-        std::vector<value::CellBlock::PathRequest> pathRequests;
+        std::vector<value::PathRequest> pathRequests;
         for (const auto& cellPath : cellPaths) {
-            pathRequests.emplace_back(value::CellBlock::PathRequest(
-                value::CellBlock::PathRequestType::kFilter,
-                {value::CellBlock::Get{cellPath}, value::CellBlock::Id{}}));
+            pathRequests.emplace_back(value::PathRequest(value::PathRequestType::kFilter,
+                                                         {value::Get{cellPath}, value::Id{}}));
         }
 
         auto tsBucketStage = makeS<TsBucketToCellBlockStage>(std::move(input),

@@ -575,8 +575,8 @@ public:
     std::tuple<SbStage, SbSlot, SbSlotVector, SbSlotVector> makeTsBucketToCellBlock(
         SbStage stage,
         SbSlot bucketSlot,
-        const std::vector<sbe::value::CellBlock::PathRequest>& topLevelReqs,
-        const std::vector<sbe::value::CellBlock::PathRequest>& traverseReqs,
+        const std::vector<sbe::value::PathRequest>& topLevelReqs,
+        const std::vector<sbe::value::PathRequest>& traverseReqs,
         const std::string& timeField);
 
     std::pair<SbStage, SbSlotVector> makeBlockToRow(SbStage stage,

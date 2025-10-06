@@ -139,9 +139,8 @@ public:
         boost::intrusive_ptr allocator{new BSONElementStorage()};
         PositionInfoTestContainer positionInfoTestContainer;
         std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
-            {SBEPath{value::CellBlock::PathRequest(
-                 value::CellBlock::PathRequestType::kFilter,
-                 {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})},
+            {SBEPath{value::PathRequest(value::PathRequestType::kFilter,
+                                        {value::Get{"a"}, value::Id{}})},
              positionInfoTestContainer}};
 
         // Decompress only the values of "a" to the vector.
@@ -429,8 +428,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressSimpleSBEPath) {
     // The requested path is Get(a) / Id.
     {
         SBEPath path{
-            value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                          {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+            value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
         setExpectedElements({{value::TypeTags::NumberInt32, 10},
                              {value::TypeTags::NumberInt32, 11},
                              {value::TypeTags::NumberInt32, 12},
@@ -440,8 +438,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressSimpleSBEPath) {
     // The requested path is Get(b) / Id.
     {
         SBEPath path{
-            value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                          {value::CellBlock::Get{"b"}, value::CellBlock::Id{}})};
+            value::PathRequest(value::PathRequestType::kFilter, {value::Get{"b"}, value::Id{}})};
         auto mockRefObj = fromjson("{a: 10, b: 20}");
         ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
 
@@ -460,8 +457,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressArrayWithSBEPathNoTraverse) {
                                   BSON("a" << BSON_ARRAY(30 << 40))};
 
     SBEPath path{
-        value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                      {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+        value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: [0, 10]}");
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
 
@@ -478,9 +474,8 @@ TEST_F(BSONColumnMaterializerTest, DecompressArrayWithSBEPathWithTraverse) {
                                   BSON("a" << BSON_ARRAY(20 << 30)),
                                   BSON("a" << BSON_ARRAY(40 << 50)),
                                   BSON("a" << BSON_ARRAY(60 << 70))};
-    SBEPath path{value::CellBlock::PathRequest(
-        value::CellBlock::PathRequestType::kFilter,
-        {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+    SBEPath path{value::PathRequest(value::PathRequestType::kFilter,
+                                    {value::Get{"a"}, value::Traverse{}, value::Id{}})};
     auto mockRefObj = fromjson("{a: [0, 10]}");
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
 
@@ -497,9 +492,8 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedArrayWithSBEPath) {
                                   BSON("a" << BSON_ARRAY(BSON_ARRAY(10 << 20))),
                                   BSON("a" << BSON_ARRAY(BSON_ARRAY(20 << 30))),
                                   BSON("a" << BSON_ARRAY(BSON_ARRAY(30 << 40)))};
-    SBEPath path{value::CellBlock::PathRequest(
-        value::CellBlock::PathRequestType::kFilter,
-        {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+    SBEPath path{value::PathRequest(value::PathRequestType::kFilter,
+                                    {value::Get{"a"}, value::Traverse{}, value::Id{}})};
     auto mockRefObj = fromjson("{a: [[0, 10]]}");
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
 
@@ -517,8 +511,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectWithSBEPath) {
                                   BSON("a" << BSON("b" << 20)),
                                   BSON("a" << BSON("b" << 30))};
     SBEPath path{
-        value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                      {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+        value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: {b: 0}}");
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
 
@@ -536,11 +529,9 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectGetWithSBEPath) {
                                   BSON("a" << BSON("b" << 20)),
                                   BSON("a" << BSON("b" << 30))};
 
-    SBEPath path{value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                               {value::CellBlock::Get{"a"},
-                                                value::CellBlock::Traverse{},
-                                                value::CellBlock::Get{"b"},
-                                                value::CellBlock::Id{}})};
+    SBEPath path{
+        value::PathRequest(value::PathRequestType::kFilter,
+                           {value::Get{"a"}, value::Traverse{}, value::Get{"b"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: {b: 0}}");
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
 
@@ -557,11 +548,9 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectInArrayWithSBEPath) {
                                   BSON("a" << BSON_ARRAY(BSON("b" << 20))),
                                   BSON("a" << BSON_ARRAY(BSON("b" << 30)))};
 
-    SBEPath path{value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                               {value::CellBlock::Get{"a"},
-                                                value::CellBlock::Traverse{},
-                                                value::CellBlock::Get{"b"},
-                                                value::CellBlock::Id{}})};
+    SBEPath path{
+        value::PathRequest(value::PathRequestType::kFilter,
+                           {value::Get{"a"}, value::Traverse{}, value::Get{"b"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: {b: 0}}");
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
 
@@ -580,11 +569,9 @@ TEST_F(BSONColumnMaterializerTest, DecompressArrayWithScalarsAndObjects) {
         BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(3 << 4 << 5)))),
         BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(9 << 9 << 9)))),
     };
-    SBEPath path{value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                               {value::CellBlock::Get{"a"},
-                                                value::CellBlock::Traverse{},
-                                                value::CellBlock::Get{"b"},
-                                                value::CellBlock::Id{}})};
+    SBEPath path{
+        value::PathRequest(value::PathRequestType::kFilter,
+                           {value::Get{"a"}, value::Traverse{}, value::Get{"b"}, value::Id{}})};
     addExpectedElement({value::TypeTags::NumberInt32, 1});
     addExpectedArray(BSON_ARRAY(1 << 2 << 3));
     addExpectedElement({value::TypeTags::NumberInt32, 10});
@@ -609,8 +596,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressObjsWithNestedArrays) {
     // The requested path is Get(a) / Id.
     {
         SBEPath path{
-            value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                          {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+            value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
         addExpectedElement({value::TypeTags::NumberInt32, 1});
         addExpectedElement({value::TypeTags::NumberInt32, 2});
         addExpectedArray(BSON_ARRAY(3 << 4 << BSON_ARRAY(40)));
@@ -623,9 +609,8 @@ TEST_F(BSONColumnMaterializerTest, DecompressObjsWithNestedArrays) {
 
     // The requested path is Get(a) / Traverse / Id.
     {
-        SBEPath path{value::CellBlock::PathRequest(
-            value::CellBlock::PathRequestType::kFilter,
-            {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+        SBEPath path{value::PathRequest(value::PathRequestType::kFilter,
+                                        {value::Get{"a"}, value::Traverse{}, value::Id{}})};
 
         for (int i = 0; i < 8; ++i) {
             // Indexes 4 and 7 are arrays.
@@ -650,9 +635,8 @@ TEST_F(BSONColumnMaterializerTest, DecompressDoublyNestedArrays) {
         fromjson("{a: [{b: [[8,8]]}, {b: [8, 8]}, {b:8}]}"),
     };
 
-    SBEPath path{value::CellBlock::PathRequest(
-        value::CellBlock::PathRequestType::kFilter,
-        {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+    SBEPath path{value::PathRequest(value::PathRequestType::kFilter,
+                                    {value::Get{"a"}, value::Traverse{}, value::Id{}})};
 
     addExpectedArray(BSON_ARRAY(BSON("b" << 1)));
     addExpectedObj(BSON("b" << 2));
@@ -672,8 +656,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressDoublyNestedArrays) {
 TEST_F(BSONColumnMaterializerTest, DecompressAllUnmatchedPath) {
     std::vector<BSONObj> input = {BSON("b" << 1), BSON("b" << 2), BSON("b" << 3)};
     SBEPath path{
-        value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                      {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+        value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
     setExpectedElements({{value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
                          {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
                          {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)}});
@@ -690,8 +673,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressSomeUnmatchedPath) {
     };
 
     SBEPath path{
-        value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                      {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+        value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
     setExpectedElements({{value::TypeTags::NumberInt32, 1},
                          {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
                          {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
@@ -710,12 +692,9 @@ TEST_F(BSONColumnMaterializerTest, DecompressUnmatchedPathInObject) {
         fromjson("{b: [7, 8]}"),  // doesn't match the first path, but will be traversed by
                                   // 2nd and should return EOO.
     };
-    SBEPath path{value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                               {value::CellBlock::Get{"a"},
-                                                value::CellBlock::Traverse{},
-                                                value::CellBlock::Get{"b"},
-                                                value::CellBlock::Traverse{},
-                                                value::CellBlock::Id{}})};
+    SBEPath path{value::PathRequest(
+        value::PathRequestType::kFilter,
+        {value::Get{"a"}, value::Traverse{}, value::Get{"b"}, value::Traverse{}, value::Id{}})};
 
     // TODO SERVER-87339 remove the last field. The container should only have 8 elements.
     setExpectedElements({{value::TypeTags::NumberInt32, 1},
@@ -746,13 +725,11 @@ TEST_F(BSONColumnMaterializerTest, DecompressMultipleBuffers) {
     boost::intrusive_ptr allocator{new BSONElementStorage()};
     PositionInfoTestContainer positionInfoTestContainer0, positionInfoTestContainer1;
     std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
-        {SBEPath{value::CellBlock::PathRequest(
-             value::CellBlock::PathRequestType::kFilter,
-             {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})},
+        {SBEPath{value::PathRequest(value::PathRequestType::kFilter,
+                                    {value::Get{"a"}, value::Traverse{}, value::Id{}})},
          positionInfoTestContainer0},
         {SBEPath{
-             value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
-                                           {value::CellBlock::Get{"b"}, value::CellBlock::Id{}})},
+             value::PathRequest(value::PathRequestType::kFilter, {value::Get{"b"}, value::Id{}})},
          positionInfoTestContainer1}};
     col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
 
@@ -785,9 +762,9 @@ TEST_F(BSONColumnMaterializerTest, DecompressMultipleBuffers) {
 //         fromjson("{a: [0]}"),
 //     };
 
-//     SBEPath path{value::CellBlock::PathRequest(
-//         value::CellBlock::PathRequestType::kFilter,
-//         {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+//     SBEPath path{value::PathRequest(
+//         value::PathRequestType::kFilter,
+//         {value::Get{"a"}, value::Traverse{}, value::Id{}})};
 //     setExpectedElements({{value::TypeTags::NumberInt32, 0},
 //                                   {value::TypeTags::NumberInt32, 1},
 //                                   {value::TypeTags::NumberInt32, 0}});
@@ -802,9 +779,9 @@ TEST_F(BSONColumnMaterializerTest, DecompressMultipleBuffers) {
 //         fromjson("{a:[1]}"),
 //         fromjson("{a:[]}"),
 //     };
-//     SBEPath path{value::CellBlock::PathRequest(
-//         value::CellBlock::PathRequestType::kFilter,
-//         {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+//     SBEPath path{value::PathRequest(
+//         value::PathRequestType::kFilter,
+//         {value::Get{"a"}, value::Traverse{}, value::Id{}})};
 //     std::vector<int32_t> expectedPositions{1, 0};
 //     verifyDecompressWithPositions(input, path, expectedPositions);
 // }
@@ -816,10 +793,10 @@ TEST_F(BSONColumnMaterializerTest, DecompressMultipleBuffers) {
 //         fromjson("{a: {b: [2, 3]}}"),
 //     };
 
-//    SBEPath path{value::CellBlock::PathRequest(
-//              value::CellBlock::PathRequestType::kFilter,
-//              {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{},
-//              value::CellBlock::Id{}})};
+//    SBEPath path{value::PathRequest(
+//              value::PathRequestType::kFilter,
+//              {value::Get{"a"}, value::Traverse{},
+//              value::Id{}})};
 //
 //     std::vector<int32_t> expectedPositions{1, 0, 2};
 //     verifyDecompressWithPositions(input, path, expectedPositions);
@@ -832,9 +809,8 @@ TEST_F(BSONColumnMaterializerTest, DecompressFastWithRLEAfterControl) {
     // will have a new control byte, and then another RLE block, but the RLE block will reference
     // the last value from the last block.
 
-    SBEPath path{value::CellBlock::PathRequest(
-        value::CellBlock::PathRequestType::kFilter,
-        {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+    SBEPath path{value::PathRequest(value::PathRequestType::kFilter,
+                                    {value::Get{"a"}, value::Traverse{}, value::Id{}})};
 
     // Test with a primitive type.
     {

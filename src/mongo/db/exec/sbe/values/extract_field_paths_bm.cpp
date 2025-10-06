@@ -39,7 +39,7 @@
 namespace mongo::sbe {
 
 struct PathTestCase {
-    value::CellBlock::Path path;
+    value::Path path;
     BSONObj projectValue;
 };
 
@@ -51,9 +51,9 @@ public:
                      int numPathsToProject = -1);
 };
 
-using Get = value::CellBlock::Get;
-using Traverse = value::CellBlock::Traverse;
-using Id = value::CellBlock::Id;
+using Get = value::Get;
+using Traverse = value::Traverse;
+using Id = value::Id;
 
 void callback(value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
               value::TypeTags eltTag,
@@ -70,8 +70,8 @@ void ExtractFieldPathsFixture::perfectTree(benchmark::State& state,
                                            int numPathsToProject /*=-1*/) {
     BSONObjBuilder bob;
     int curIdx = 0;
-    std::vector<value::CellBlock::Path> paths;
-    value::CellBlock::Path curPath;
+    std::vector<value::Path> paths;
+    value::Path curPath;
     std::function<void(BSONObjBuilder&, int)> rec = [&](BSONObjBuilder& curBob, int curDepth) {
         if (curDepth == depth) {
             curPath.push_back(Id{});

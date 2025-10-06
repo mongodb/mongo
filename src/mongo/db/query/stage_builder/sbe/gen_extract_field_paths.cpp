@@ -116,7 +116,7 @@ std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
                                                           const PlanStageSlots& childStageOutputs,
                                                           PlanStageReqs& extractFieldPathsReqs) {
     sbe::value::SlotVector outSlots;
-    std::vector<sbe::value::CellBlock::Path> pathReqs;
+    std::vector<sbe::value::Path> pathReqs;
     PlanStageSlots extractionOutputs;
     for (const std::string& fullPath : extractFieldPathsReqs.getPathExprs()) {
         FieldPath fieldPath{fullPath};
@@ -124,16 +124,15 @@ std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
                 "extract_field_paths does not extract toplevel fields that already have slots",
                 !childStageOutputs.has({PlanStageSlots::kField, fullPath}));
         // Create path.
-        sbe::value::CellBlock::Path path;
+        sbe::value::Path path;
         for (size_t i = 0; i < fieldPath.getPathLength() - 1; ++i) {
-            path.emplace_back(
-                sbe::value::CellBlock::Get{.field = std::string(fieldPath.getFieldName(i))});
-            path.emplace_back(sbe::value::CellBlock::Traverse{});
+            path.emplace_back(sbe::value::Get{.field = std::string(fieldPath.getFieldName(i))});
+            path.emplace_back(sbe::value::Traverse{});
         }
         // Omit the Traverse for the last path component.
-        path.emplace_back(sbe::value::CellBlock::Get{
+        path.emplace_back(sbe::value::Get{
             .field = std::string(fieldPath.getFieldName(fieldPath.getPathLength() - 1))});
-        path.emplace_back(sbe::value::CellBlock::Id{});
+        path.emplace_back(sbe::value::Id{});
         pathReqs.push_back(std::move(path));
 
         // Create slot id for path.

@@ -161,21 +161,20 @@ void analyzeElement(ElementAnalysis& analysis, BSONElement elem) {
  *   in the column. In practice we probably only check one of the min or max, but both are checked
  *   here out of an abundance of caution.
  */
-boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(
-    const CellBlock::PathRequest& path,
-    const ElementAnalysis& analysis,
-    BSONElement elemMin,
-    BSONElement elemMax) {
+boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(const PathRequest& path,
+                                                                  const ElementAnalysis& analysis,
+                                                                  BSONElement elemMin,
+                                                                  BSONElement elemMax) {
 
     // We can only handle filter paths if there are arrays in the object.
-    if (path.type != CellBlock::kFilter && analysis._containsArrays) {
+    if (path.type != kFilter && analysis._containsArrays) {
         return boost::none;
     }
 
     // Trim the Get in the 0-th element.
-    invariant(holds_alternative<CellBlock::Get>(path.path[0]));
+    invariant(holds_alternative<Get>(path.path[0]));
     size_t offset = 1;
-    if (holds_alternative<CellBlock::Traverse>(path.path[1])) {
+    if (holds_alternative<Traverse>(path.path[1])) {
         // Also skip over a Traverse element if one is there.
         offset = 2;
     }
@@ -183,12 +182,12 @@ boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(
     auto trimmed = std::span{path.path}.subspan(offset);
     invariant(trimmed.size() >= 1);
     if (trimmed.size() == 1) {
-        invariant(holds_alternative<CellBlock::Id>(trimmed[0]));
+        invariant(holds_alternative<Id>(trimmed[0]));
         // This is an object and the path is just "Id", so not a scalar.
         return boost::none;
     }
 
-    CellBlock::PathRequest trimmedPath = CellBlock::PathRequest{path.type};
+    PathRequest trimmedPath = PathRequest{path.type};
     trimmedPath.path.assign(trimmed.begin(), trimmed.end());
     bsoncolumn::SBEPath sbePath{trimmedPath};
 
@@ -212,17 +211,16 @@ boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(
 
 }  // namespace
 
-TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest> pathReqs,
+TsBucketPathExtractor::TsBucketPathExtractor(std::vector<PathRequest> pathReqs,
                                              StringData timeField)
     : _pathReqs(std::move(pathReqs)), _timeField(timeField) {
 
     size_t idx = 0;
     for (auto& req : _pathReqs) {
-        tassert(7796405,
-                "Path must start with a Get operation",
-                holds_alternative<CellBlock::Get>(req.path[0]));
+        tassert(
+            7796405, "Path must start with a Get operation", holds_alternative<Get>(req.path[0]));
 
-        StringData field = get<CellBlock::Get>(req.path[0]).field;
+        StringData field = get<Get>(req.path[0]).field;
         _topLevelFieldToIdxes[field].push_back(idx);
 
         if (req.path.size() > 2) {
@@ -355,9 +353,9 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
                 // we do so once, and via same TsCellBlockForTopLevelField instance.
                 outCells[idx] = std::make_unique<TsCellBlockForTopLevelField>(tsBlock);
             } else if (_pathReqs[idx].path.size() == 3 &&
-                       holds_alternative<CellBlock::Get>(_pathReqs[idx].path[0]) &&
-                       holds_alternative<CellBlock::Traverse>(_pathReqs[idx].path[1]) &&
-                       holds_alternative<CellBlock::Id>(_pathReqs[idx].path[2]) &&
+                       holds_alternative<Get>(_pathReqs[idx].path[0]) &&
+                       holds_alternative<Traverse>(_pathReqs[idx].path[1]) &&
+                       holds_alternative<Id>(_pathReqs[idx].path[2]) &&
                        (tsBlock->hasNoObjsOrArrays())) {
                 // We are traversing a top level field AND there are no arrays. The path must look
                 // like: [Get <field> Traverse Id]. If this is the case, we can take a fast path and
@@ -392,7 +390,7 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
         auto extracted = tsBlock->extract();
         invariant(extracted.count() == noOfMeasurements);
 
-        std::vector<CellBlock::PathRequest> reqs;
+        std::vector<PathRequest> reqs;
         for (auto idx : nonTopLevelIdxesForCurrentField) {
             reqs.push_back(_pathReqs[idx]);
         }
