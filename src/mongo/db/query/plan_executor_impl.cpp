@@ -400,6 +400,9 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
 
         if (PlanStage::ADVANCED == code) {
             WorkingSetMember* member = _workingSet->get(id);
+            if (_cq && _cq->metadataDeps()[DocumentMetadataFields::kRecordId]) {
+                member->metadata().setRecordId(member->recordId);
+            }
             bool hasRequestedData = true;
 
             if (nullptr != objOut) {
