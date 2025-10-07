@@ -6,6 +6,8 @@
  *   # TODO(SERVER-110846): Index on the secondary is not marked multikey.
  *   primary_driven_index_builds_incompatible,
  *   requires_replication,
+ *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+ *   primary_driven_index_builds_incompatible,
  * ]
  */
 import {HybridGeoIndexTest, Operation} from "jstests/noPassthrough/libs/index_builds/hybrid_geo_index.js";

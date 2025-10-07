@@ -1,6 +1,11 @@
 /**
  * Tests that hybrid index builds result in a consistent state and correct multikey behavior across
  * various index types.
+ *
+ * @tags: [
+ *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";

@@ -1,6 +1,11 @@
 /**
  * Tests that write operations are accepted and result in correct indexing behavior for each phase
  * of hybrid index builds.
+ *
+ * @tags: [
+ *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

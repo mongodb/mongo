@@ -2,6 +2,11 @@
  * Tests inserting into collection while a unique index build is in the collection scan phase.
  * Ensures that even though the insert is seen by both the collection scan and the side writes
  * table, the index build does not need to resolve any duplicate keys.
+ *
+ * @tags: [
+ *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";

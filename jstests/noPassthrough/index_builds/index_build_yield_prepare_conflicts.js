@@ -6,6 +6,8 @@
  *   requires_replication,
  *   uses_transactions,
  *   uses_prepare_transaction,
+ *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+ *   primary_driven_index_builds_incompatible,
  * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";

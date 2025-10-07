@@ -221,6 +221,20 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
     return multikeyPaths;
 }
 
+// TODO SERVER-111867: Remove disallowing writes during primary driven index build
+Status allowedToWriteIfIndexBuildInProgress(OperationContext* opCtx,
+                                            const IndexCatalogEntry* entry) {
+    if (entry->indexBuildInterceptor() != nullptr) {
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+            return {ErrorCodes::ConflictingOperationInProgress,
+                    "Cannot write to collection while building primary driven index"};
+        }
+    }
+    return Status::OK();
+}
 struct BtreeExternalSortComparison {
     int operator()(const key_string::Value& l, const key_string::Value& r) const {
         return l.compare(r);
@@ -1606,6 +1620,12 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     const InsertDeleteOptions& options,
     int64_t* keysInsertedOut) {
     Status status = Status::OK();
+
+    // TODO SERVER-111867: Remove disallowing writes during primary driven index build
+    if (status = allowedToWriteIfIndexBuildInProgress(opCtx, entry); !status.isOK()) {
+        return status;
+    }
+
     if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.
@@ -1658,6 +1678,9 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     int64_t* const keysDeletedOut,
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
+
+    // TODO SERVER-111867: Remove disallowing writes during primary driven index build
+    uassertStatusOK(allowedToWriteIfIndexBuildInProgress(opCtx, entry));
 
     if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial

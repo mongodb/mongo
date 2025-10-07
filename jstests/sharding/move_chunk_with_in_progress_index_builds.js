@@ -4,6 +4,8 @@
  *
  * @tags: [
  *   requires_fcv_70,
+ *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+ *   primary_driven_index_builds_incompatible,
  * ]
  */
 

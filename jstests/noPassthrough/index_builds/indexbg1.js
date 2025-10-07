@@ -1,5 +1,9 @@
 // Test background index creation
-// @tags: [SERVER-40561]
+// @tags: [
+//      SERVER-40561,
+//      # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+//      primary_driven_index_builds_incompatible,
+// ]
 
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
