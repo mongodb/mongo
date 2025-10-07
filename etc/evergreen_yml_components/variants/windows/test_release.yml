@@ -43,10 +43,15 @@ buildvariants:
         distros:
           - windows-2022-large
       - name: .windows_release_critical
-      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_windows !publish_packages
-        depends_on: .windows_release_critical
-      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_windows !publish_packages
-        depends_on: .windows_release_critical
+      - name: push
+        depends_on:
+          - .windows_release_critical
+          - name: package
+          - name: jsCore
+          - name: run_dbtest
+          - name: replica_sets_jscore_passthrough_gen
+      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_windows !push !publish_packages
+      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_windows !push !publish_packages
         distros:
           - windows-2022-large
 
@@ -94,10 +99,15 @@ buildvariants:
         distros:
           - windows-2022-large
       - name: .windows_release_critical
-      - name: .release_critical !.requires_large_host !.incompatible_windows !publish_packages
-        depends_on: .windows_release_critical
-      - name: .release_critical .requires_large_host !.incompatible_windows !publish_packages
-        depends_on: .windows_release_critical
+      - name: push
+        depends_on:
+          - .windows_release_critical
+          - name: package
+          - name: jsCore
+          - name: run_dbtest
+          - name: replica_sets_jscore_passthrough_gen
+      - name: .release_critical !.requires_large_host !.incompatible_windows !push !publish_packages
+      - name: .release_critical .requires_large_host !.incompatible_windows !push !publish_packages
         distros:
           - windows-2022-large
 
