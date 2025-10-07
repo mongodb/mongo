@@ -40,7 +40,7 @@ namespace {
 
 auto doInit = [] {
     setThrowHook([](std::type_info* tinfo, void* ex) {
-        if (gThrowLoggingEnabled &&
+        if (gThrowLoggingEnabled.loadRelaxed() &&
             (gThrowLoggingExceptionName == tinfo->name() || !catchCast<DBException>(tinfo, ex))) {
             LOGV2_WARNING(9891800, "Threw exception", "type"_attr = tinfo->name());
             printStackTrace();
