@@ -69,7 +69,8 @@ void doLogImpl(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
                StringData message,
-               TypeErasedAttributeStorage const& attrs);
+               TypeErasedAttributeStorage const& attrs,
+               bool devStacktraces = false);
 
 void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
                            LogOptions const& options,

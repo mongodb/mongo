@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,26 +27,19 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include <boost/log/attributes/attribute_name.hpp>
+#include "mongo/logv2/attribute_storage.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_detail.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_severity.h"
 
-namespace mongo::logv2::attributes {
+namespace mongo::logv2 {
 
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& tenant();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& service();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& id();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
-const boost::log::attribute_name& truncation();
-const boost::log::attribute_name& userassert();
-const boost::log::attribute_name& devStacktrace();
+void plainLogBypass(StringData message) {
+    LogOptions options{LogComponent::kDefault};
+    // Open a record using plain formatting.
+    detail::doLogImpl(0, LogSeverity::Log(), options, message, TypeErasedAttributeStorage(), true);
+}
 
-}  // namespace mongo::logv2::attributes
+}  // namespace mongo::logv2

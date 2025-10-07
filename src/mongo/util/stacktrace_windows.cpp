@@ -301,7 +301,8 @@ StackTrace getStackTraceImpl(CONTEXT& context) {
 }
 }  // namespace
 
-StackTrace getStackTrace() {
+namespace stack_trace_detail {
+StackTrace getStructuredStackTrace() {
     CONTEXT context;
     memset(&context, 0, sizeof(context));
     context.ContextFlags = CONTEXT_CONTROL;
@@ -309,6 +310,7 @@ StackTrace getStackTrace() {
 
     return getStackTraceImpl(context);
 }
+}  // namespace stack_trace_detail
 
 void printWindowsStackTrace(CONTEXT& context, StackTraceSink& sink) {
     getStackTraceImpl(context).sink(&sink);
@@ -323,17 +325,17 @@ void printWindowsStackTrace(CONTEXT& context) {
     getStackTraceImpl(context).log();
 }
 
-void printStackTrace(StackTraceSink& sink) {
-    getStackTrace().sink(&sink);
+void printStructuredStackTrace(StackTraceSink& sink) {
+    stack_trace_detail::getStructuredStackTrace().sink(&sink);
 }
 
-void printStackTrace(std::ostream& os) {
+void printStructuredStackTrace(std::ostream& os) {
     OstreamStackTraceSink sink{os};
     printStackTrace(sink);
 }
 
-void printStackTrace() {
-    getStackTrace().log();
+void printStructuredStackTrace() {
+    stack_trace_detail::getStructuredStackTrace().log();
 }
 
 }  // namespace mongo

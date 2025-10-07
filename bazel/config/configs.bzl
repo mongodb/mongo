@@ -309,6 +309,20 @@ separate_debug = rule(
 )
 
 # =========
+# dev_stacktrace
+# =========
+
+dev_stacktrace_provider = provider(
+    doc = "Enable development-only pretty stacktraces",
+    fields = ["enabled"],
+)
+
+dev_stacktrace = rule(
+    implementation = lambda ctx: dev_stacktrace_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # enable-http-client
 # =========
 

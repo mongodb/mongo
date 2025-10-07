@@ -85,6 +85,12 @@ generate_config_header(
             "MONGO_CONFIG_USE_TRACING_PROFILER": "1",
         },
         "//conditions:default": {},
+    }) | select({
+        "//bazel/config:dev_stacktrace_enabled": {
+            "MONGO_CONFIG_DEV_STACKTRACE": "1",
+        },
+        "//conditions:default": {
+        },
     }),
     logfile = "mongo_config.log",
     output = "config.h",
@@ -190,8 +196,16 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:idle_thread_block.cpp",
         "//src/mongo/util/concurrency:thread_name.cpp",
     ] + select({
-        "//bazel/config:posix": ["//src/mongo/util:stacktrace_posix.cpp"],
+        "//bazel/config:posix": [
+            "//src/mongo/util:stacktrace_posix.cpp",
+        ],
         "@platforms//os:windows": ["//src/mongo/util:stacktrace_windows.cpp"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:dev_stacktrace_enabled": [
+            "//src/mongo/logv2:dev_stacktrace_formatter.cpp",
+            "//src/mongo/logv2:log_plain.cpp",
+        ],
         "//conditions:default": [],
     }) + select({
         "//bazel/config:posix": ["//src/mongo/platform:shared_library_posix.cpp"],
@@ -375,7 +389,13 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:thread_name.h",
         "//src/mongo/util/concurrency:with_lock.h",
         "//src/mongo/util/tracking:allocator.h",
-    ],
+    ] + select({
+        "//bazel/config:dev_stacktrace_enabled": [
+            "//src/mongo/logv2:dev_stacktrace_formatter.h",
+            "//src/mongo/logv2:log_plain.h",
+        ],
+        "//conditions:default": [],
+    }),
     linkopts = select({
         "//bazel/config:ssl_enabled_linux": ["-lcrypto"],
         "//conditions:default": [],
@@ -408,6 +428,9 @@ mongo_cc_library(
         "//src/third_party/pcre2",
     ] + select({
         "@platforms//os:linux": ["//src/mongo/platform:throw_hook"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:dev_stacktrace_enabled": ["//src/third_party/cpptrace"],
         "//conditions:default": [],
     }),
 )

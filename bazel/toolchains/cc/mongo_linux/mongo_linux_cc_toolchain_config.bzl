@@ -1348,6 +1348,17 @@ def _impl(ctx):
         ],
     )
 
+    file_prefix_map = feature(
+        name = "file_prefix_map",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions + all_link_actions + lto_index_actions,
+                flag_groups = [flag_group(flags = ["-ffile-prefix-map=/proc/self/cwd=."])],
+            ),
+        ],
+    )
+
     strip_debug_feature = feature(
         name = "strip_debug",
         enabled = False,
@@ -1430,6 +1441,7 @@ def _impl(ctx):
         thinlto_feature,
         debug_types_section_feature,
         no_debug_types_section_feature,
+        file_prefix_map,
         strip_debug_feature,
         clang_toolchain_resource_dir_feature,
     ] + get_common_features(ctx)

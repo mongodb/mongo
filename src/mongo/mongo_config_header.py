@@ -433,6 +433,7 @@ def get_config_header_substs():
         ("@mongo_config_streams@", "MONGO_CONFIG_STREAMS"),
         ("@mongo_config_otel@", "MONGO_CONFIG_OTEL"),
         ("@mongo_config_disagg_storage@", "MONGO_CONFIG_DISAGG_STORAGE"),
+        ("@mongo_config_dev_stacktrace@", "MONGO_CONFIG_DEV_STACKTRACE"),
     )
     return config_header_substs
 

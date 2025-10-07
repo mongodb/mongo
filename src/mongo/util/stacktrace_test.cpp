@@ -344,7 +344,8 @@ TEST(StackTrace, EarlyTraceSanity) {
 template <int N>
 StackTrace getTrace() {
     boost::optional<StackTrace> trace;
-    stacktrace_test::executeUnderCallstack<N>([&] { trace = getStackTrace(); });
+    stacktrace_test::executeUnderCallstack<N>(
+        [&] { trace = stack_trace_detail::getStructuredStackTrace(); });
     ASSERT_TRUE(trace.has_value());
     ASSERT_EQ(trace->getError(), {});
     return *trace;

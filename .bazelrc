@@ -133,6 +133,7 @@ common --flag_alias=dbg=//bazel/config:dbg
 common --flag_alias=debug_symbols=//bazel/config:debug_symbols
 common --flag_alias=thin_lto=//bazel/config:thin_lto
 common --flag_alias=separate_debug=//bazel/config:separate_debug
+common --flag_alias=dev_stacktrace=//bazel/config:dev_stacktrace
 common --flag_alias=use_wait_for_debugger=//bazel/config:use_wait_for_debugger
 common --flag_alias=use_ocsp_stapling=//bazel/config:use_ocsp_stapling
 common --flag_alias=use_disable_ref_track=//bazel/config:use_disable_ref_track
