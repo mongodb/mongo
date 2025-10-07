@@ -488,20 +488,18 @@ TsBlock::TsBlock(size_t ncells,
                  bool isTimeField,
                  std::pair<TypeTags, Value> controlMin,
                  std::pair<TypeTags, Value> controlMax)
-    : TsBlock(owned, blockTag, blockVal) {
-    _count = ncells;
-    _bucketVersion = bucketVersion;
-    _isTimeField = isTimeField;
-    _controlMin = copyValue(controlMin.first, controlMin.second);
-    _controlMax = copyValue(controlMax.first, controlMax.second);
-
+    : _blockOwned(owned),
+      _blockTag(blockTag),
+      _blockVal(blockVal),
+      _count(ncells),
+      _bucketVersion(bucketVersion),
+      _isTimeField(isTimeField),
+      _controlMin(copyValue(controlMin.first, controlMin.second)),
+      _controlMax(copyValue(controlMax.first, controlMax.second)) {
     tassert(11093604,
             "Expected bsonObject or bsonBinData tag type",
             _blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);
 }
-
-TsBlock::TsBlock(bool owned, TypeTags blockTag, Value blockVal)
-    : _blockOwned(owned), _blockTag(blockTag), _blockVal(blockVal) {}
 
 TsBlock::~TsBlock() {
     if (_blockOwned) {

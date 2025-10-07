@@ -219,8 +219,6 @@ public:
     }
 
 private:
-    TsBlock(bool owned, TypeTags blockTag, Value blockVal);
-
     void ensureDeblocked();
 
     /**
@@ -248,14 +246,14 @@ private:
     const Value _blockVal;
 
     // The number of values in this block.
-    size_t _count;
+    const size_t _count;
 
     // The version of the bucket, which indicates whether the data is compressed and whether the
     // time field is sorted.
-    int _bucketVersion;
+    const int _bucketVersion;
 
     // true if all values in the block are non-nothing. Currently only true for timeField
-    bool _isTimeField;
+    const bool _isTimeField;
 
     // Store the min and max found in the control field of a bucket
     std::pair<TypeTags, Value> _controlMin;
