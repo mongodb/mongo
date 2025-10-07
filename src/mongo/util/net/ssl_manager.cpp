@@ -385,11 +385,16 @@ void SSLManagerCoordinator::rotate() {
     invariant(tl != nullptr);
     uassertStatusOK(tl->rotateCertificates(manager, false));
 
-    std::shared_ptr<SSLManagerInterface> originalManager = *_manager;
-    _manager = manager;
+    std::shared_ptr<SSLManagerInterface> originalManager;
 
-    LOGV2(4913400, "Successfully rotated X509 certificates.");
-    logSSLInfo(_manager->get()->getSSLInformationToLog());
+    {
+        auto synchronizedManager = _manager.synchronize();
+        originalManager = *synchronizedManager;
+        *synchronizedManager = manager;
+
+        LOGV2(4913400, "Successfully rotated X509 certificates.");
+        logSSLInfo(synchronizedManager->get()->getSSLInformationToLog());
+    }
 
     originalManager->stopJobs();
 }
