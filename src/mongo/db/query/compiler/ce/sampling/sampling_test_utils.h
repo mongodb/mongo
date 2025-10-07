@@ -94,7 +94,7 @@ public:
         return std::make_pair(expectedEstimateMin, expectedEstimateMax);
     }
 
-    void assertEstimateInConfidenceInterval(CardinalityEstimate estimate, double expectedCard) {
+    bool assertEstimateInConfidenceInterval(CardinalityEstimate estimate, double expectedCard) {
         auto expectedInterval = confidenceInterval(expectedCard);
         bool estimateInInterval =
             (estimate >= expectedInterval.first && estimate <= expectedInterval.second);
@@ -106,7 +106,9 @@ public:
                       << expectedInterval.first.cardinality().v() << ", "
                       << expectedInterval.second.cardinality().v() << "), Error " << error * 100
                       << "%" << std::endl;
+            return false;
         }
+        return true;
     }
 };
 

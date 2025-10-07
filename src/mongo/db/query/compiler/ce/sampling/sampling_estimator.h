@@ -93,6 +93,12 @@ public:
         const std::vector<const MatchExpression*>& expressions) const = 0;
 
     virtual void generateSample(ce::ProjectionParams projectionParams) = 0;
+
+    /**
+     * Estimates the number of distinct values of tuples of the given field names in the collection.
+     * Does not support estimating NDV over array-valued fields.
+     */
+    virtual CardinalityEstimate estimateNDV(const std::vector<FieldPath>& fieldNames) const = 0;
 };
 
 }  // namespace mongo::ce

@@ -119,6 +119,12 @@ public:
         const std::vector<const IndexBounds*>& bounds,
         const std::vector<const MatchExpression*>& expressions) const override;
 
+    /**
+     * Estimates the number of distinct values of tuples of the given field names in the collection.
+     * Does not support estimating NDV over array-valued fields.
+     */
+    CardinalityEstimate estimateNDV(const std::vector<FieldPath>& fieldNames) const override;
+
     /*
      * Generates a sample using a random cursor. The caller can call this function to draw a sample
      * of 'sampleSize'. If it's a re-sample request, the old sample will be freed and replaced by

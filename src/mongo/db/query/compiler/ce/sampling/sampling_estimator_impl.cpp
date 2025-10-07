@@ -39,6 +39,7 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
@@ -824,5 +825,42 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                             collectionCard) {}
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
+
+CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
+    const std::vector<FieldPath>& fieldNames) const {
+    tassert(11158503, "Only single-field NDV computation is supported", fieldNames.size() == 1);
+    tassert(11158504, "Sample must be generated before calling estimateNDV()", _isSampleGenerated);
+
+    const auto& fieldName = fieldNames[0];
+    if (!_topLevelSampleFieldNames.empty()) {
+        tassert(11158505,
+                "Sample must include the NDV fieldName as a top-level field.",
+                _topLevelSampleFieldNames.contains(fieldName.front()));
+    }
+
+    size_t sampleNDV = countNDV(fieldNames, _sample);
+
+    // TODO SERVER-111585 replace with real implementation.
+    CardinalityEstimate estimate =
+        CardinalityEstimate{CardinalityType{(double)sampleNDV}, EstimationSource::Sampling};
+    LOGV2_DEBUG(11158506,
+                5,
+                "SamplingCE ndv (# unique values) for field",
+                "fieldName"_attr = fieldName.fullPath(),
+                "sampleNDV"_attr = sampleNDV,
+                "estimate"_attr = estimate);
+
+    if (estimate > _collectionCard) {
+        LOGV2_DEBUG(11158507,
+                    5,
+                    "SamplingCE ndv exceeds collection size, rounding down",
+                    "fieldName"_attr = fieldName.fullPath(),
+                    "sampleNDV"_attr = sampleNDV,
+                    "estimate"_attr = estimate,
+                    "collectionCard"_attr = _collectionCard);
+        estimate = _collectionCard;
+    }
+    return estimate;
+}
 
 }  // namespace mongo::ce

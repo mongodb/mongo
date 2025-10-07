@@ -1325,4 +1325,125 @@ DEATH_TEST_F(SamplingEstimatorTest,
     const auto expr = parse(filter);
     samplingEstimator.estimateCardinality(expr.get());
 }
+
+namespace {
+std::vector<BSONObj> createDocumentsForNDVTesting(int num) {
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < num; i++) {
+        // These fields are uniformly distributed.
+        BSONObj obj = BSON("_id" << i << "a" << i % 1000 << "b" << i % 100 << "c" << i % 10 << "d"
+                                 << i % 2 << "e" << 1);
+        docs.push_back(obj);
+    }
+    return docs;
+}
+
+void makeNDVAssertions(SamplingEstimatorForTesting& estimator, const size_t sampleSize) {
+    estimator.generateSample(ce::NoProjection{});
+
+    // TODO SERVER-111585 make meaningful assertions on these tests!
+
+    // We know the true NDV for each of these fields; see 'createDocumentsForNDVTesting' for
+    // details.
+
+    // All unique values.
+    // auto ndvId = estimator.estimateNDV({"_id"});
+
+    // Some unique values.
+    // auto ndvA = estimator.estimateNDV({"a"});
+
+    // auto ndvB = estimator.estimateNDV({"b"});
+
+    auto ndvC = estimator.estimateNDV({"c"});
+    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvC, 10));
+    auto ndvD = estimator.estimateNDV({"d"});
+    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvD, 2));
+
+    // Single unique value.
+    auto ndvE = estimator.estimateNDV({"e"});
+    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvE, 1));
+    auto ndvNonexistent = estimator.estimateNDV({"nonexistent"});
+    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvNonexistent, 1));
+}
+}  // namespace
+
+TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeOnePercent) {
+    const size_t card = 5000;
+    const size_t sampleSize = 50;
+    insertDocuments(kTestNss, createDocumentsForNDVTesting(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          sampleSize,
+                                          SamplingEstimatorForTesting::SamplingStyle::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(card));
+    makeNDVAssertions(estimator, sampleSize);
+}
+
+TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTwoPercent) {
+    const size_t card = 5000;
+    const size_t sampleSize = 100;
+    insertDocuments(kTestNss, createDocumentsForNDVTesting(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          sampleSize,
+                                          SamplingEstimatorForTesting::SamplingStyle::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(card));
+    makeNDVAssertions(estimator, sampleSize);
+}
+
+TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
+    const size_t card = 5000;
+    const size_t sampleSize = 500;
+    insertDocuments(kTestNss, createDocumentsForNDVTesting(card));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          sampleSize,
+                                          SamplingEstimatorForTesting::SamplingStyle::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(card));
+    makeNDVAssertions(estimator, sampleSize);
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             EstimateNDVFailsWhenTopLevelFieldIsExcluded,
+             "Sample must include the NDV fieldName as a top-level field") {
+    const size_t card = 100;
+    insertDocuments(kTestNss, createDocuments(card));
+    const size_t sampleSize = 1;
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        numChunks,
+        makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(StringSet{"a"});
+    samplingEstimator.estimateNDV({"b.c"});
+}
 }  // namespace mongo::ce
