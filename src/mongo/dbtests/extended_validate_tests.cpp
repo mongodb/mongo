@@ -50,6 +50,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/validate/collection_validation.h"
+#include "mongo/db/validate/validate_adaptor.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/storage_debug_util.h"
@@ -59,6 +60,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -276,6 +278,45 @@ public:
               {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3 << "a" << 3)}) {}
 };
 
+class ExtendedValidateGetNumberOfAdditionalCharacters {
+public:
+    void run() {
+        auto maxSize = BSONObjMaxUserSize - 50 * 1024;
+        auto someHash = SHA256Block().toHexString();
+        auto constructPartialObj = [&](size_t numBuckets, size_t bucketKeyLength) {
+            BSONObjBuilder bob;
+            for (size_t i = 0; i < numBuckets; i++) {
+                bob.append(std::string(bucketKeyLength, 'a'),
+                           BSON("hash" << someHash << "count" << 1));
+            }
+            return bob.obj();
+        };
+
+        size_t hashPrefixLengthCases[] = {0, 1, 2, 4, 8, 16, 32, someHash.size()};
+        size_t numPrefixesCases[] = {
+            1, 2, 3, 4, 10, 50, 100, 250, 200, 400, 800, 2000, 4000, 8000, 10000, 20000, 40000};
+        for (auto hashPrefixLength : hashPrefixLengthCases) {
+            for (auto numPrefixes : numPrefixesCases) {
+                size_t N = CollectionValidation::getNumberOfAdditionalCharactersForHashDrillDown(
+                    numPrefixes, hashPrefixLength);
+                size_t numBuckets = numPrefixes * std::pow(16, N);
+                auto bucketKeyLength = std::min(hashPrefixLength + N, someHash.size());
+                auto response = constructPartialObj(numBuckets, bucketKeyLength);
+                auto responseSize = response.objsize();
+                LOGV2(10994400,
+                      "Value of N returned",
+                      "hashPrefixLength"_attr = hashPrefixLength,
+                      "numPrefixes"_attr = numPrefixes,
+                      "N"_attr = N,
+                      "bucketKeyLength"_attr = bucketKeyLength,
+                      "numBuckets"_attr = numBuckets,
+                      "responseSize"_attr = responseSize);
+                ASSERT_LTE(responseSize, maxSize);
+            }
+        }
+    }
+};
+
 class ExtendedValidateTests : public unittest::OldStyleSuiteSpecification {
 public:
     ExtendedValidateTests() : OldStyleSuiteSpecification("extended_validate_tests") {}
@@ -288,6 +329,7 @@ public:
         add<ExtendedValidateDifferentId>();
         add<ExtendedValidateMissingDoc>();
         add<ExtendedValidateExtraField>();
+        add<ExtendedValidateGetNumberOfAdditionalCharacters>();
     }
 };
 

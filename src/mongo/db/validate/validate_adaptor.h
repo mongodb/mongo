@@ -48,6 +48,26 @@
 
 namespace mongo {
 
+namespace CollectionValidation {
+/**
+ * Returns the number of additional characters (N) we are appending to each hashPrefix
+ * that is passed in.
+ *
+ * The value of N is determined by the number of hashPrefixes provided. For each hashPrefix
+ * provided, adding N characters means we will have potentially 16 ^ N buckets being created.
+ * "Potentially" because some buckets may not be created if no documents hash to those buckets.
+ *
+ * Therefore this function ensures that we attach a number of characters so that we don't create
+ * too many buckets, as creating too many buckets would mean exceeding the maximum BSON size
+ * in our final response to the client.
+ *
+ * numHashPrefixes must be greater than 0, and hashPrefixLength must be less than or equal to
+ * the size of a hash.
+ */
+size_t getNumberOfAdditionalCharactersForHashDrillDown(size_t numHashPrefixes,
+                                                       size_t hashPrefixLength);
+}  // namespace CollectionValidation
+
 class IndexDescriptor;
 class OperationContext;
 
