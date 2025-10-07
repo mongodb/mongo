@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo::query_shape"
 
 imports:

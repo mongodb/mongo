@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/commands/query_cmd/map_reduce_out_options.h"
