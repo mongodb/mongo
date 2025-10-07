@@ -25,74 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-"""Experimenation utility functions.
-
-How to use the utility functions.
-
-First of all we need to run Jupiter Notebook:
-sh> python3 -m notebook
-
-Example notebook.
-
-#Imports
-import math
-import seaborn as sns
-import statsmodels.api as sm
-
-import sys
-sys.path.append('/home/ubuntu/mongo/buildscripts/cost_model')
-import experiment as exp
-from config import DatabaseConfig
-from database_instance import DatabaseInstance
-
-# Load data
-database_config = DatabaseConfig(connection_string='mongodb://localhost',
-                                     database_name='abt_calibration', dump_path='',
-                                     restore_from_dump=False, dump_on_exit=False)
-
-database = DatabaseInstance(database_config)
-df = await exp.load_calibration_data(database, 'calibrationData')
-
-# Descriptive functions
-df.describe()
-df.head()
-
-# Clean up loaded data
-noout_df = exp.remove_outliers(df, 0.0, 0.90)
-noout_df.describe()
-
-# Extract ABT nodes
-abt_df = exp.extract_abt_nodes(noout_df)
-abt_df.head()
-
-# Get IndexScan nodes only.
-ixscan_df = abt_df[abt_df['abt_type'] == 'IndexScan']
-ixscan_df.describe()
-
-# Add a new column if required.
-ixscan_df = ixscan_df[ixscan_df['n_processed'] > 0].copy()
-ixscan_df['log_n_processed'] = ixscan_df['n_processed'].apply(math.log)
-ixscan_df.describe()
-
-# Check the correlation.
-ixscan_df.corr()
-
-# Print a scatter plot to see a dependency between e.g. execution_time and n_processed.
-sns.scatterplot(x=ixscan_df['n_processed'], y=ixscan_df['execution_time'])
-
-# Calibrate (train) the cost model for IndexScan
-y = ixscan_df['execution_time']
-X = ixscan_df[['n_processed', 'keys_length_in_bytes', 'average_document_size_in_bytes', 'log_n_processed']]
-X = sm.add_constant(X)
-ixscan_lm = sm.OLS(y, X).fit()
-ixscan_lm.summary()
-
-# Draw the predictions.
-y_pred = ixscan_lm.predict(X)
-sns.scatterplot(x=ixscan_df['n_processed'], y=ixscan_df['execution_time'])
-sns.lineplot(x=ixscan_df['n_processed'],y=y_pred, color='red')
-"""
-
 from __future__ import annotations
 
 import dataclasses
@@ -110,7 +42,7 @@ from sklearn.metrics import r2_score
 
 
 async def load_calibration_data(database: DatabaseInstance, collection_name: str) -> pd.DataFrame:
-    """Load workflow data containing explain output from database and parse it. Retuned calibration DataFrame with parsed SBE and ABT."""
+    """Load workflow data containing explain output from database and parse it. Returns calibration DataFrame."""
 
     data = await database.get_all_documents(collection_name)
     df = pd.DataFrame(data)

@@ -25,7 +25,11 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-"""Configuration of data generation for CE accuracy testing."""
+"""
+Configuration of data generation for CE accuracy testing.
+Note that this file is not currently used, but contains important examples
+of useful data distributions.
+"""
 
 from datetime import datetime
 from pathlib import Path

@@ -25,15 +25,11 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-"""Impements commonly used types."""
-
-import functools
-import time
 
 """
-Returns a preorder traversal (node, child 1...child n) of the QSN/execution tree 
+Returns a preorder traversal (node, child 1...child n) of the QSN/execution tree
 For example, a query with an OR over 3 indices could turn into a tree rooted with a FETCH,
-who has a single OR child, which in turn has 3 index scan children. 
+who has a single OR child, which in turn has 3 index scan children.
 This would return a preorder of [FETCH, OR, IXSCAN1, IXSCAN2, IXSCAN3].
 """
 
@@ -43,17 +39,3 @@ def preorder(node):
     for child in node.children:
         res += preorder(child)
     return res
-
-
-def timer_decorator(func):
-    """Measure and print out execution time of the decorated function."""
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        t0 = time.perf_counter()
-        result = func(*args, **kwargs)
-        t1 = time.perf_counter()
-        print(f"{func.__name__} took {t1-t0}s.")
-        return result
-
-    return wrapper

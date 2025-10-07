@@ -29,7 +29,6 @@
 
 import os
 import random
-from typing import Any
 
 import config
 import numpy as np
@@ -414,14 +413,6 @@ workload_execution = config.WorkloadExecutionConfig(
     warmup_runs=10,
     runs=100,
 )
-
-
-def make_filter_by_note(note_value: Any):
-    def impl(df):
-        return df[df.note == note_value]
-
-    return impl
-
 
 qsn_nodes = [
     config.QsNodeCalibrationConfig(name="COLLSCAN_FORWARD", type="COLLSCAN"),
