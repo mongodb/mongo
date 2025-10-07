@@ -3,6 +3,7 @@
  */
 
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {describe, it} from "jstests/libs/mochalite.js";
 
 const coll = db.not_index_tagging;
@@ -11,6 +12,8 @@ assert.commandWorked(coll.insert({a: [1, 2, 3]}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 assert.commandWorked(coll.createIndex({"a.b": 1}));
+
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 describe("Index-ineligible predicates under $not do not get tagged with an index", function () {
     const assertUsesCollScan = (pred, collation = {}) => {
@@ -64,6 +67,41 @@ describe("Index-ineligible predicates under $not do not get tagged with an index
     it("should not use index with $not under object $elemMatch", function () {
         assertUsesCollScan({a: {$elemMatch: {b: {$not: {$eq: 2}}}}});
     });
+
+    // These hit uassert 40353 with SBE fully enabled.
+    if (!isSbeEnabled) {
+        it("should not use an index with $elemMatch + $not + $_internalExprEq-null", function () {
+            assertUsesCollScan({b: {$elemMatch: {$not: {$_internalExprEq: null}}}});
+        });
+
+        it("should not use an index with $elemMatch + $not + $_internalExprLt-null", function () {
+            assertUsesCollScan({b: {$elemMatch: {$not: {$_internalExprLt: null}}}});
+        });
+
+        it("should not use an index with $elemMatch + $not + $_internalExprGte-null", function () {
+            assertUsesCollScan({b: {$elemMatch: {$not: {$_internalExprGte: null}}}});
+        });
+
+        it("should not use index with $not + $elemMatch + $_internalExprLt-null", function () {
+            assertUsesCollScan({b: {$not: {$elemMatch: {$_internalExprLt: null}}}});
+        });
+    }
+
+    it("should not use index with $nor + $internalExprLt-null and another predicate", function () {
+        assertUsesCollScan({$nor: [{a: {$_internalExprEq: 1}}, {b: {$_internalExprLt: null}}]});
+    });
+
+    it("should not use index with $nor + $internalExprEq-null", function () {
+        assertUsesCollScan({$nor: [{b: {$_internalExprEq: null}}]});
+    });
+
+    it("should not use index with $nor + $internalExprLt-null", function () {
+        assertUsesCollScan({$nor: [{b: {$_internalExprLt: null}}]});
+    });
+
+    it("should not use index with $nor + $internalExprGte-null", function () {
+        assertUsesCollScan({$nor: [{b: {$_internalExprGte: null}}]});
+    });
 });
 
 describe("Index-eligible predicates under $not do get tagged with an index", function () {
@@ -82,4 +120,43 @@ describe("Index-eligible predicates under $not do get tagged with an index", fun
         // Value $elemMatch.
         assertDoesNotUseCollScan({a: {$elemMatch: {$not: {$gt: 1}}}});
     });
+
+    it("should use index with $nor + $internalExprEq-integer", function () {
+        assertDoesNotUseCollScan({$nor: [{b: {$_internalExprEq: 123}}]});
+    });
+
+    it("should use index with $nor + $internalExprLt-integer", function () {
+        assertDoesNotUseCollScan({$nor: [{b: {$_internalExprLt: 123}}]});
+    });
+
+    it("should use index with $nor + $internalExprLte-integer", function () {
+        assertDoesNotUseCollScan({$nor: [{b: {$_internalExprLte: 123}}]});
+    });
+
+    it("should use index with $nor + $internalExprGt-integer", function () {
+        assertDoesNotUseCollScan({$nor: [{b: {$_internalExprGt: 123}}]});
+    });
+
+    it("should use index with $nor + $internalExprGte-integer", function () {
+        assertDoesNotUseCollScan({$nor: [{b: {$_internalExprGte: 123}}]});
+    });
+
+    it("should use index with $nor + $internalExprLte-null", function () {
+        assertDoesNotUseCollScan({$nor: [{b: {$_internalExprLte: null}}]});
+    });
+
+    it("should use index with $nor + $internalExprGt-null", function () {
+        assertDoesNotUseCollScan({$nor: [{b: {$_internalExprGt: null}}]});
+    });
+
+    // These hit uassert 40353 with SBE fully enabled.
+    if (!isSbeEnabled) {
+        it("should use an index with $elemMatch + $not + $_internalExprGt-null", function () {
+            assertDoesNotUseCollScan({b: {$elemMatch: {$not: {$_internalExprGt: null}}}});
+        });
+
+        it("should use an index with $elemMatch + $not + $_internalExprLte-null", function () {
+            assertDoesNotUseCollScan({b: {$elemMatch: {$not: {$_internalExprLte: null}}}});
+        });
+    }
 });
