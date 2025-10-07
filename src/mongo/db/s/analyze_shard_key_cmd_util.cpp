@@ -434,7 +434,7 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
                                                        const BSONObj& shardKey) {
     if (collection->isClustered()) {
-        auto indexSpec = collection->getClusteredInfo()->getIndexSpec();
+        auto& indexSpec = collection->getClusteredInfo()->getIndexSpec();
         auto indexKey = indexSpec.getKey();
         if (shardKey.isFieldNamePrefixOf(indexKey)) {
             tassert(6875201, "Expected clustered index to be unique", indexSpec.getUnique());
