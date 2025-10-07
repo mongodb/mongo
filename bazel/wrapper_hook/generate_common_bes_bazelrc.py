@@ -71,7 +71,7 @@ def write_workstation_bazelrc(args):
 
     filtered_args = args[1:]
     if "--" in filtered_args:
-        filtered_args = filtered_args[:filtered_args.index("--")] + ["--", "(REDACTED)"]
+        filtered_args = filtered_args[: filtered_args.index("--")] + ["--", "(REDACTED)"]
 
     developer_build = os.environ.get("CI") is None
     filtered_command_line = " ".join(filtered_args)

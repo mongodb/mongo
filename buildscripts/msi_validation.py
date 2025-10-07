@@ -105,6 +105,7 @@ def validate_help(exe_path):
         print(f"Error while calling help for {exe_path}: {e}")
         sys.exit(1)
 
+
 # Make sure we have a proper git version in the windows release
 def validate_version(exe_path):
     try:
@@ -123,6 +124,7 @@ def validate_version(exe_path):
     except subprocess.CalledProcessError as e:
         print(f"Error while calling version for {exe_path}: {e}")
         sys.exit(1)
+
 
 def main():
     if len(sys.argv) != 2:

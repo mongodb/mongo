@@ -45,7 +45,6 @@ def run_pty_command(cmd):
 
 
 def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
-
     # compiledb ignores command line args so just make a version rc file in anycase
     write_mongo_variables_bazelrc([])
     if persistent_compdb:

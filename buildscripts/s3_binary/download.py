@@ -23,6 +23,7 @@ def read_sha_file(filename):
         content = f.read()
         return content.strip().split()[0]
 
+
 def _fetch_remote_sha256_hash(s3_path: str):
     downloaded = False
     result = None
@@ -41,7 +42,7 @@ def _fetch_remote_sha256_hash(s3_path: str):
 
     if downloaded:
         result = read_sha_file(tempfile_name)
-    
+
     if tempfile_name and os.path.exists(tempfile_name):
         os.unlink(tempfile_name)
 
@@ -63,13 +64,14 @@ def _verify_s3_hash(s3_path: str, local_path: str, expected_hash: str) -> None:
             f"Hash mismatch for {s3_path}, expected {expected_hash} but got {hash_string}"
         )
 
+
 def validate_file(s3_path, output_path, remote_sha_allowed):
     hexdigest = S3_SHA256_HASHES.get(s3_path)
     if hexdigest:
         print(f"Validating against hard coded sha256: {hexdigest}")
         _verify_s3_hash(s3_path, output_path, hexdigest)
         return True
-    
+
     if not remote_sha_allowed:
         raise ValueError(f"No SHA256 hash available for {s3_path}")
 
@@ -82,13 +84,13 @@ def validate_file(s3_path, output_path, remote_sha_allowed):
             print(f"Validating against remote sha256 {hexdigest}\n({s3_path}.sha256)")
         else:
             print(f"Failed to download remote sha256 at {s3_path}.sha256)")
-            
+
     if hexdigest:
         _verify_s3_hash(s3_path, output_path, hexdigest)
         return True
     else:
         raise ValueError(f"No SHA256 hash available for {s3_path}")
-        
+
 
 def _download_and_verify(s3_path, output_path, remote_sha_allowed):
     for i in range(5):
@@ -98,7 +100,7 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed):
                 download_from_s3_with_boto(s3_path, output_path)
             except Exception:
                 download_from_s3_with_requests(s3_path, output_path)
-                
+
             validate_file(s3_path, output_path, remote_sha_allowed)
             break
 
@@ -155,8 +157,6 @@ def download_s3_binary(
 
 
 if __name__ == "__main__":
-
-
     parser = argparse.ArgumentParser(description="Download and verify S3 binary.")
     parser.add_argument("s3_path", help="S3 URL to download from")
     parser.add_argument("local_path", nargs="?", help="Optional output file path")
