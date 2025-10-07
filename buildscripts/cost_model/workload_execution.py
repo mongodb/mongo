@@ -30,7 +30,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
 import bson.json_util as json
 from bson.objectid import ObjectId
@@ -46,6 +46,13 @@ class Query:
     """Query command and related model input parameters."""
 
     find_cmd: Find
+
+    # If the query expects any stages to be present in the winning plan
+    # for calibration purposes, they can be specified as either a string or a dictionary:
+    # example: "LIMIT"
+    # example: {"FETCH": {"filter": {"a": {"$eq": 1}}}}}
+    # example: {"IXSCAN": {"direction": "forward"}}]
+    expected_stage: Any
     keys_length_in_bytes: int = 0
     number_of_fields: int = 0
     note: any = None
@@ -110,6 +117,38 @@ class WorkloadExecution:
 
         await self.database.insert_many(self.config.output_collection_name, measurements)
 
+    def _check_explain_helper(self, expected_stage: Any, node: dict) -> bool:
+        exp_stage = ""
+        if isinstance(expected_stage, str):
+            exp_stage = expected_stage
+        else:
+            assert isinstance(expected_stage, dict)
+            assert len(list(expected_stage.keys())) == 1
+            exp_stage = list(expected_stage.keys())[0]
+
+        if node["stage"] == exp_stage:
+            if isinstance(expected_stage, dict):
+                expected_conditions = expected_stage[list(expected_stage.keys())[0]]
+                for member in expected_conditions.keys():
+                    if member in node and expected_conditions[member] == node[member]:
+                        continue
+                    return False
+
+            return True
+
+        if "inputStage" in node:
+            return self._check_explain_helper(expected_stage, node["inputStage"])
+        if "inputStages" in node:
+            for stage in node["inputStages"]:
+                if self._check_explain_helper(expected_stage, stage):
+                    return True
+
+        return False
+
+    def _check_explain(self, expected_stage: Any, explain: dict) -> bool:
+        root = explain["queryPlanner"]["winningPlan"]
+        return self._check_explain_helper(expected_stage, root)
+
     async def _run_query(self, coll_info: CollectionInfo, query: Query, result: Sequence):
         # warm up
         for _ in range(self.config.warmup_runs):
@@ -125,6 +164,15 @@ class WorkloadExecution:
         )
         for _ in range(self.config.runs):
             explain = await self.database.explain(coll_info.name, query.find_cmd)
+
+            # Check that the winning plan has the expected stages.
+            assert self._check_explain(query.expected_stage, explain), (
+                "Explain did not contain the expected stage "
+                + str(query.expected_stage)
+                + "\nExplain: "
+                + str(explain)
+            )
+
             if explain["ok"] == 1:
                 result.append(
                     {

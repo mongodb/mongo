@@ -80,6 +80,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                 Query(
                     {"filter": {"a": {"$lt": card}}, "sort": {"a": direction}, "hint": {"a": 1}},
                     note=f"IXSCAN_{note}",
+                    expected_stage={"IXSCAN": {"direction": note.lower()}},
                 )
             )
 
@@ -104,6 +105,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                 Query(
                     {"filter": {"a": {"$in": seeks}}, "sort": {"a": direction}, "hint": {"a": 1}},
                     note=f"IXSCAN_{note}",
+                    expected_stage={"IXSCAN": {"direction": note.lower()}},
                 )
             )
 
@@ -122,6 +124,12 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                             "hint": {"a": 1},
                         },
                         note="IXSCAN_W_FILTER",
+                        expected_stage={
+                            "IXSCAN": {
+                                "direction": note.lower(),
+                                "filter": {"a": {"$mod": [1, 0]}},
+                            }
+                        },
                     )
                 )
                 requests.append(
@@ -132,6 +140,9 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                             "hint": {"a": 1},
                         },
                         note="IXSCAN_W_FILTER",
+                        expected_stage={
+                            "IXSCAN": {"direction": note.lower(), "filter": {"a": {"$mod": [1, 0]}}}
+                        },
                     )
                 )
 
@@ -150,10 +161,16 @@ async def execute_collection_scans(
     # we can use them for calibration based on the assumption that the cost scales linearly.
     limits = [1, 5, 25, 50, 100, 1000, 2000, 3000, 4000, 5000]
     requests = []
-    for direction in [1, -1]:
-        note = f"COLLSCAN_{'FORWARD' if direction == 1 else 'BACKWARD'}"
+    for direction, dir_text in [(1, "FORWARD"), (-1, "BACKWARD")]:
+        note = f"COLLSCAN_{dir_text}"
         for limit in limits:
-            requests.append(Query({"limit": limit, "sort": {"$natural": direction}}, note=note))
+            requests.append(
+                Query(
+                    {"limit": limit, "sort": {"$natural": direction}},
+                    note=note,
+                    expected_stage={"COLLSCAN": {"direction": dir_text.lower()}},
+                )
+            )
 
             if direction == 1:
                 # We expect that the cost of a filter on a collscan should be the same whether
@@ -166,6 +183,12 @@ async def execute_collection_scans(
                             "sort": {"$natural": direction},
                         },
                         note="COLLSCAN_W_FILTER",
+                        expected_stage={
+                            "COLLSCAN": {
+                                "direction": dir_text.lower(),
+                                "filter": {"int_uniform_unindexed": {"$eq": 1}},
+                            }
+                        },
                     )
                 )
     await workload_execution.execute(
@@ -179,7 +202,14 @@ async def execute_limits(database: DatabaseInstance, collections: Sequence[Colle
 
     limits = [1, 2, 5, 10, 15, 20, 25, 50, 100, 250, 500] + list(range(1000, 10001, 1000))
 
-    requests = [Query({"limit": limit}, note="LIMIT") for limit in limits]
+    requests = [
+        Query(
+            {"limit": limit},
+            note="LIMIT",
+            expected_stage="LIMIT",
+        )
+        for limit in limits
+    ]
     await workload_execution.execute(
         database, main_config.workload_execution, collections, requests
     )
@@ -195,7 +225,13 @@ async def execute_skips(database: DatabaseInstance, collections: Sequence[Collec
     # We add a LIMIT on top of the SKIP in order to easily vary the number of processed documents.
     for limit in limits:
         for skip in skips:
-            requests.append(Query(find_cmd={"skip": skip, "limit": limit}, note="SKIP"))
+            requests.append(
+                Query(
+                    find_cmd={"skip": skip, "limit": limit},
+                    note="SKIP",
+                    expected_stage="SKIP",
+                )
+            )
     await workload_execution.execute(
         database, main_config.workload_execution, collections, requests
     )
@@ -214,7 +250,11 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
     # Simple projections, these do not contain any computed fields and are not fully covered by an index.
     for limit in limits:
         requests.append(
-            Query({"limit": limit, "projection": {field.name: 1}}, note="PROJECTION_SIMPLE")
+            Query(
+                {"limit": limit, "projection": {field.name: 1}},
+                note="PROJECTION_SIMPLE",
+                expected_stage="PROJECTION_SIMPLE",
+            )
         )
 
     # Covered projections, these are inclusions that are fully covered by an index.
@@ -224,6 +264,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
             Query(
                 {"limit": limit, "projection": {"_id": 0, field.name: 1}, "hint": {field.name: 1}},
                 note="PROJECTION_COVERED",
+                expected_stage="PROJECTION_COVERED",
             )
         )
 
@@ -236,6 +277,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
             Query(
                 {"limit": limit, "projection": {"out": {"$add": [f"${f.name}" for f in fields]}}},
                 note="PROJECTION_DEFAULT",
+                expected_stage="PROJECTION_DEFAULT",
             )
         )
     await workload_execution.execute(
@@ -251,11 +293,12 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
 
     requests = [
         # A standard sort applies the simple sort algorithm.
-        Query({"sort": {"payload": 1}}, note="SORT_SIMPLE"),
+        Query({"sort": {"payload": 1}}, note="SORT_SIMPLE", expected_stage="SORT"),
         # Including the recordId explicitly forces the use of the default sort algorithm.
         Query(
             {"projection": {"$recordId": {"$meta": "recordId"}}, "sort": {"payload": 1}},
             note="SORT_DEFAULT",
+            expected_stage="SORT",
         ),
     ]
 
@@ -263,7 +306,13 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
     # for both the simple and default sort algorithms.
     limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
     for limit in limits:
-        requests.append(Query({"sort": {"payload": 1}, "limit": limit}, note="SORT_LIMIT_SIMPLE"))
+        requests.append(
+            Query(
+                {"sort": {"payload": 1}, "limit": limit},
+                note="SORT_LIMIT_SIMPLE",
+                expected_stage="SORT",
+            )
+        )
         requests.append(
             Query(
                 {
@@ -272,6 +321,7 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
                     "limit": limit,
                 },
                 note="SORT_LIMIT_DEFAULT",
+                expected_stage="SORT",
             )
         )
 
@@ -295,6 +345,7 @@ async def execute_merge_sorts(database: DatabaseInstance, collections: Sequence[
                     "sort": {"sort_field": 1},
                 },
                 note="SORT_MERGE",
+                expected_stage="SORT_MERGE",
             )
         )
 
@@ -313,6 +364,7 @@ async def execute_ors(database: DatabaseInstance, collections: Sequence[Collecti
         Query(
             find_cmd={"filter": {"$or": [{"a": 1}, {"b": 1}]}},
             note="OR",
+            expected_stage="OR",
         )
     ]
 
@@ -337,6 +389,7 @@ async def execute_sort_intersections(
                 Query(
                     find_cmd={"filter": {"a": i, "b": j}},
                     note="AND_SORTED",
+                    expected_stage="AND_SORTED",
                 )
             )
 
@@ -371,6 +424,7 @@ async def execute_hash_intersections(
                 Query(
                     find_cmd={"filter": {"a": {"$lte": i}, "b": {"$lte": j}}},
                     note="AND_HASH",
+                    expected_stage="AND_HASH",
                 )
             )
 
@@ -401,6 +455,7 @@ async def execute_fetches(database: DatabaseInstance, collections: Sequence[Coll
             Query(
                 {"filter": {"int_uniform": {"$lt": card}}},
                 note="FETCH",
+                expected_stage="FETCH",
             )
         )
 
@@ -409,6 +464,7 @@ async def execute_fetches(database: DatabaseInstance, collections: Sequence[Coll
                 # 'int_uniform_unindexed' is not indexed, so the fetch will have a filter.
                 {"filter": {"int_uniform": {"$lt": card}, "int_uniform_unindexed": 1}},
                 note="FETCH_W_FILTER",
+                expected_stage={"FETCH": {"filter": {"int_uniform_unindexed": {"$eq": 1}}}},
             )
         )
 
@@ -433,6 +489,7 @@ async def execute_index_scans_w_diff_num_fields(
             Query(
                 {"filter": {"a": {"$lt": 10000}}, "hint": hint_obj},
                 note="IXSCANS_W_DIFF_NUM_FIELDS",
+                expected_stage="IXSCAN",
             )
         )
 
