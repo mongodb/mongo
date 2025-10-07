@@ -37,7 +37,9 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::unified_write_executor {
-using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteCommandReply>;
+using WriteCommandResponse = std::variant<BatchedCommandResponse,
+                                          BulkWriteCommandReply,
+                                          StatusWith<write_ops::FindAndModifyCommandReply>>;
 
 /**
  * Handles responses from shards and interactions with the catalog necessary to retry certain
@@ -102,7 +104,10 @@ public:
 
     using ReplyItemsByShard = std::map<ShardId, BulkWriteReplyItem>;
     struct WriteOpResults {
-        std::variant<ReplyItemsByShard, BulkWriteReplyItem> replies;
+        std::variant<ReplyItemsByShard,
+                     BulkWriteReplyItem,
+                     StatusWith<write_ops::FindAndModifyCommandReply>>
+            replies;
         bool hasNonRetryableError = false;
     };
 
@@ -149,6 +154,9 @@ public:
     BatchedCommandResponse generateClientResponseForBatchedCommand();
 
     BulkWriteCommandReply generateClientResponseForBulkWriteCommand(OperationContext* opCtx);
+
+    StatusWith<write_ops::FindAndModifyCommandReply>
+    generateClientResponseForFindAndModifyCommand();
 
     /**
      * This method is called by the scheduler to record a target error that occurred during batch
@@ -199,6 +207,14 @@ private:
                            const ShardResponse& response);
 
     /**
+     * Process findAndModify command reply, handle retryable errors and save the reply.
+     */
+    Result processFindAndModifyReply(OperationContext* opCtx,
+                                     RoutingContext& routingCtx,
+                                     BSONObj replyObj,
+                                     boost::optional<ShardId> shardId = boost::none);
+
+    /**
      * Adds all of the reply items in a shard response to '_results' and handles retryable errors.
      * Also notes the operations that shards succeeded on in the case of a multi-write that need to
      * be retried on specific shards only. Further processing of the replies is done in
@@ -241,14 +257,18 @@ private:
      * Process a single ReplyItem attributed to 'op', adding it to _results and updating
      * _numOkResponses and _nErrors.
      */
-    void processReplyItem(const WriteOp& op,
+    void processReplyItem(OperationContext* opCtx,
+                          const WriteOp& op,
                           BulkWriteReplyItem item,
                           boost::optional<ShardId> shardId);
 
     /**
      * Process an error attributed to 'op', adding it to _results and updating _nErrors.
      */
-    void processError(const WriteOp& op, const Status& status, boost::optional<ShardId> shardId);
+    void processError(OperationContext* opCtx,
+                      const WriteOp& op,
+                      const Status& status,
+                      boost::optional<ShardId> shardId);
 
     /**
      * Process a local or top-level error attributed to an entire batch of WriteOps ('ops'),

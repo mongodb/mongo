@@ -174,6 +174,11 @@ MONGO_MOD_PUB write_ops::UpdateCommandReply processFLEUpdate(
 /**
  * Process a findAndModify request from mongos
  */
+MONGO_MOD_PUB FLEBatchResult
+processFLEFindAndModify(OperationContext* opCtx,
+                        const write_ops::FindAndModifyCommandRequest& request,
+                        write_ops::FindAndModifyCommandReply& reply);
+
 MONGO_MOD_PUB FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
                                                      const BSONObj& cmdObj,
                                                      BSONObjBuilder& result);

@@ -1441,6 +1441,108 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteRetryableNonRetryableAndOK) {
     ASSERT_EQ(batch[0].getStatus(), Status(errorCode, errorMsg));
 }
 
+TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyOKResponse) {
+    write_ops::FindAndModifyCommandRequest request(nss1);
+    request.setQuery(BSON("a" << 1));
+    request.setUpdate(write_ops::UpdateModification(BSON("b" << 1)));
+    WriteOp op(request);
+
+    write_ops::FindAndModifyLastError lastError;
+    lastError.setNumDocs(1);
+    lastError.setUpdatedExisting(true);
+    write_ops::FindAndModifyCommandReply reply;
+    reply.setLastErrorObject(std::move(lastError));
+    reply.setValue(BSON("a" << 1));
+
+    ShardId shard1 = ShardId("shard1");
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1, Response{rcr1, {op}}}});
+    ASSERT_EQ(result.successfulShardSet.size(), 1);
+    ASSERT_EQ(result.opsToRetry.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    ASSERT_EQ(processor.getNumOkResponsesProcessed(), 1);
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
+
+    auto swClientReply = processor.generateClientResponseForFindAndModifyCommand();
+    ASSERT(swClientReply.isOK());
+    auto clientReply = swClientReply.getValue();
+    ASSERT_BSONOBJ_EQ(clientReply.toBSON(), reply.toBSON());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyErrorResponse) {
+    write_ops::FindAndModifyCommandRequest request(nss1);
+    request.setQuery(BSON("a" << 1));
+    request.setUpdate(write_ops::UpdateModification(BSON("b" << 1)));
+    WriteOp op(request);
+
+    ErrorReply reply(0 /* ok */,
+                     ErrorCodes::BadValue,
+                     "Bad Value" /* codeName */,
+                     "Wrong argument" /* errmsg */);
+
+    ShardId shard1 = ShardId("shard1");
+    RemoteCommandResponse rcr1(host1, reply.toBSON(), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1, Response{rcr1, {op}}}});
+    ASSERT_EQ(result.successfulShardSet.size(), 0);
+    ASSERT_EQ(result.opsToRetry.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    ASSERT_EQ(processor.getNumOkResponsesProcessed(), 0);
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
+
+    auto swClientReply = processor.generateClientResponseForFindAndModifyCommand();
+    ASSERT(!swClientReply.isOK());
+    auto status = swClientReply.getStatus();
+    ASSERT_EQ(status.code(), reply.getCode());
+    ASSERT_EQ(status.reason(), reply.getErrmsg());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyRetryResponse) {
+    write_ops::FindAndModifyCommandRequest request(nss1);
+    request.setQuery(BSON("a" << 1));
+    request.setUpdate(write_ops::UpdateModification(BSON("b" << 1)));
+    WriteOp op(request);
+
+    ShardId shard1 = ShardId("shard1");
+    ErrorReply errorReply(0 /* ok */,
+                          ErrorCodes::StaleConfig,
+                          "StaleConfig" /* codeName */,
+                          "Shard stale error, please retry" /* errmsg */);
+    StaleConfigInfo staleInfo(nss1, *shard1Endpoint.shardVersion, boost::none /* wanted */, shard1);
+    BSONObjBuilder builder;
+    errorReply.serialize(&builder);
+    staleInfo.serialize(&builder);
+    auto reply = builder.obj();
+
+    RemoteCommandResponse rcr1(host1, reply, Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1, Response{rcr1, {op}}}});
+    ASSERT_EQ(result.successfulShardSet.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+    ASSERT_EQ(result.opsToRetry.size(), 1);
+    ASSERT_EQ(result.opsToRetry[0].getId(), op.getId());
+
+    ASSERT_EQ(processor.getNumOkResponsesProcessed(), 0);
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
+}
 
 class WriteBatchResponseProcessorTxnTest : public WriteBatchResponseProcessorTest {
 public:

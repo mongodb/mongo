@@ -435,11 +435,22 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     auto updateOp = itemRef.getUpdateOp();
     const bool isMulti = updateOp.getMulti();
 
+    bool isFindAndModify = updateOp.getCommand().isFindAndModifyCommand();
+    auto& updateOneUnshardedCount = isFindAndModify
+        ? getQueryCounters(opCtx).findAndModifyUnshardedCount
+        : getQueryCounters(opCtx).updateOneUnshardedCount;
+    auto& updateOneTargetedShardedCount = isFindAndModify
+        ? getQueryCounters(opCtx).findAndModifyTargetedShardedCount
+        : getQueryCounters(opCtx).updateOneTargetedShardedCount;
+    auto& updateOneNonTargetedShardedCount = isFindAndModify
+        ? getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount
+        : getQueryCounters(opCtx).updateOneNonTargetedShardedCount;
+
     if (!_cri.isSharded()) {
         if (isMulti) {
             getQueryCounters(opCtx).updateManyCount.increment(1);
         } else {
-            getQueryCounters(opCtx).updateOneUnshardedCount.increment(1);
+            updateOneUnshardedCount.increment(1);
         }
 
         result.endpoints.emplace_back(targetUnshardedCollection(_nss, _cri));
@@ -534,9 +545,9 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
 
     // Increment query counters as appropriate.
     if (!multipleEndpoints) {
-        getQueryCounters(opCtx).updateOneTargetedShardedCount.increment(1);
+        updateOneTargetedShardedCount.increment(1);
     } else {
-        getQueryCounters(opCtx).updateOneNonTargetedShardedCount.increment(1);
+        updateOneNonTargetedShardedCount.increment(1);
 
         if (isExactId) {
             getQueryCounters(opCtx).updateOneOpStyleBroadcastWithExactIDCount.increment(1);
@@ -564,11 +575,22 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
     const bool isMulti = deleteOp.getMulti();
     const auto collation = write_ops::collationOf(deleteOp);
 
+    bool isFindAndModify = deleteOp.getCommand().isFindAndModifyCommand();
+    auto& deleteOneUnshardedCount = isFindAndModify
+        ? getQueryCounters(opCtx).findAndModifyUnshardedCount
+        : getQueryCounters(opCtx).deleteOneUnshardedCount;
+    auto& deleteOneTargetedShardedCount = isFindAndModify
+        ? getQueryCounters(opCtx).findAndModifyTargetedShardedCount
+        : getQueryCounters(opCtx).deleteOneTargetedShardedCount;
+    auto& deleteOneNonTargetedShardedCount = isFindAndModify
+        ? getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount
+        : getQueryCounters(opCtx).deleteOneNonTargetedShardedCount;
+
     if (!_cri.isSharded()) {
         if (isMulti) {
             getQueryCounters(opCtx).deleteManyCount.increment(1);
         } else {
-            getQueryCounters(opCtx).deleteOneUnshardedCount.increment(1);
+            deleteOneUnshardedCount.increment(1);
         }
 
         result.endpoints.emplace_back(targetUnshardedCollection(_nss, _cri));
@@ -641,9 +663,9 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
 
     // Increment query counters as appropriate.
     if (!multipleEndpoints) {
-        getQueryCounters(opCtx).deleteOneTargetedShardedCount.increment(1);
+        deleteOneTargetedShardedCount.increment(1);
     } else {
-        getQueryCounters(opCtx).deleteOneNonTargetedShardedCount.increment(1);
+        deleteOneNonTargetedShardedCount.increment(1);
 
         if (isExactId) {
             if (isRetryableWrite(opCtx)) {

@@ -61,17 +61,13 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         case WriteType::kDelete: {
             tr = targeter.targetDelete(opCtx, op.getItemRef());
         } break;
-        case WriteType::kFindAndMod: {
-            MONGO_UNIMPLEMENTED;
-        } break;
         default: {
             MONGO_UNREACHABLE;
         } break;
     }
 
-    size_t nsIdx = BulkWriteCRUDOp(op.getBulkWriteOp()).getNsInfoIdx();
     _stats.recordTargetingStats(tr.endpoints,
-                                nsIdx,
+                                op.getId(),
                                 targeter.isTargetedCollectionSharded(),
                                 targeter.getAproxNShardsOwningChunks(),
                                 op.getType());

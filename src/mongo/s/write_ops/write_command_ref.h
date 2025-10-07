@@ -236,7 +236,7 @@ public:
     /**
      * Returns the "stmtIds" parameter if present, otherwise returns boost::none.
      */
-    const boost::optional<std::vector<std::int32_t>>& getStmtIds() const;
+    boost::optional<std::vector<std::int32_t>> getStmtIds() const;
 
     /**
      * Returns an estimate of how much space, in bytes, the specified write op would add to a
@@ -258,7 +258,7 @@ public:
     /**
      * Returns the specified write op's "c" field if present, otherwise returns boost::none.
      */
-    const boost::optional<BSONObj>& getConstants(int index) const;
+    boost::optional<BSONObj> getConstants(int index) const;
 
     /**
      * If the specified write op is an insert op, returns the document to be inserted. Otherwise,
@@ -285,7 +285,7 @@ public:
     /**
      * Returns the collection UUID targeted by the specified write op.
      */
-    const boost::optional<UUID>& getCollectionUUID(int index) const;
+    boost::optional<UUID> getCollectionUUID(int index) const;
 
     /**
      * Returns the type (insert, update, delete) of the specified write op.
@@ -511,7 +511,7 @@ public:
     /**
      * Returns the "stmtIds" parameter if present, otherwise returns boost::none.
      */
-    const boost::optional<std::vector<std::int32_t>>& getStmtIds() const;
+    boost::optional<std::vector<std::int32_t>> getStmtIds() const;
 
     /**
      * Returns an estimate of how much space, in bytes, the referred-to write op would add to a
@@ -533,7 +533,7 @@ public:
     /**
      * Returns the specified write op's "constants" field if present, otherwise returns boost::none.
      */
-    const boost::optional<BSONObj>& getConstants(int index) const;
+    boost::optional<BSONObj> getConstants(int index) const;
 
     /**
      * If the specified write op is an insert op, returns the document to be inserted. Otherwise,
@@ -561,7 +561,7 @@ public:
     /**
      * Returns the collection UUID targeted by the specified write op.
      */
-    const boost::optional<UUID>& getCollectionUUID(int index) const;
+    boost::optional<UUID> getCollectionUUID(int index) const;
 
     /**
      * Returns the type (insert, update, delete) of the specified write op.
@@ -603,13 +603,254 @@ private:
 };
 
 /**
- * This is a wrapper class that holds a BatchWriteCommandRefImpl or BulkWriteCommandRefImpl, which
- * in turn holds a const reference to a BatchedCommandRequest or a BatchedCommandRequest object.
- * This class provides a set of APIs for accessing the contents of the BatchedCommandRequest or
- * BulkWriteCommandRequest.
+ * This is a wrapper class that holds a const reference to a FindAndModifyCommandRequest and
+ * provides a a set of APIs for accessing the contents of the FindAndModifyCommandRequest.
+ *
+ * Code that uses the FindAndModifyCommandRefImpl class must ensure that a
+ * FindAndModifyCommandRefImpl does not outlive the referred-to FindAndModifyCommandRequest.
+ *
+ * This class is designed to be used by WriteCommandRef. In general, code outside this file should
+ * not use this class directly and instead should prefer to use WriteCommandRef.
+ */
+class FindAndModifyCommandRefImpl {
+public:
+    explicit FindAndModifyCommandRefImpl(const write_ops::FindAndModifyCommandRequest& request)
+        : _ref(std::cref(request)) {}
+
+    /**
+     * Returns the referred-to 'const FindAndModifyCommandRequest&'.
+     */
+    const write_ops::FindAndModifyCommandRequest& getRequest() const {
+        return _ref.get();
+    }
+
+    /**
+     * Returns the number of write ops in the FindAndModifyCommandRequest. FindAndModify always has
+     * a single op.
+     */
+    size_t getNumOps() const {
+        return 1;
+    }
+
+    /**
+     * Visits the referred-to FindAndModifyCommandRequest object.
+     */
+    template <class Visitor>
+    decltype(auto) visitRequest(Visitor&& v) const {
+        return std::invoke(std::forward<Visitor>(v), getRequest());
+    }
+
+    /**
+     * Visit the "data" for the specified insert write op with the specified visitor. 'v' must
+     * provide an overload of operator() that supports taking 'const FindAndModifyRequest&' as its
+     * input type.
+     *
+     * This method always throw an assertion since a findAndModify command does not hold an insert
+     * op.
+     */
+    template <class Visitor>
+    decltype(auto) visitInsertOpData(int index, Visitor&& v) const {
+        tasserted(10394908, "Unexpected insert op");
+    }
+
+    /**
+     * Visit the "data" for the specified update write op with the specified visitor. 'v' must
+     * provide an overload of operator() that supports taking 'const FindAndModifyCommandRequest&'
+     * as its input type.
+     *
+     * This method will always work since a findAndModify command is also an update op.
+     */
+    template <class Visitor>
+    decltype(auto) visitUpdateOpData(int index, Visitor&& v) const {
+        return std::forward<Visitor>(v)(getRequest());
+    }
+
+    /**
+     * Visit the "data" for the specified update write op with the specified visitor. 'v' must
+     * provide an overload of operator() that supports taking 'const FindAndModifyCommandRequest&'
+     * as its input type.
+     *
+     * This method will always work since a findAndModify command is also a delete op.
+     */
+    template <class Visitor>
+    decltype(auto) visitDeleteOpData(int index, Visitor&& v) const {
+        return std::forward<Visitor>(v)(getRequest());
+    }
+
+    /**
+     * Visit the "data" for the specified update/delete write op with the specified visitor.
+     * 'v' must provide overloads of operator() that support the following input types:
+     *     const FindAndModifyCommandRequest&
+     *
+     * This method will always work since a findAndModify command is also an update/delete op.
+     */
+    template <class Visitor>
+    decltype(auto) visitUpdateOrDeleteOpData(int index, Visitor&& v) const {
+        return std::forward<Visitor>(v)(getRequest());
+    }
+
+    /**
+     * Visit the "data" for the specified write op with the specified visitor. 'v' must provide
+     * overloads of operator() that support the following input types:
+     *     const FindAndModifyCommandRequest&
+     */
+    template <class Visitor>
+    decltype(auto) visitOpData(int index, Visitor&& v) const {
+        return std::forward<Visitor>(v)(getRequest());
+    }
+
+    /**
+     * Returns true if the "bypassDocumentValidation" parameter is true, otherwise returns false.
+     */
+    bool getBypassDocumentValidation() const;
+
+    /**
+     * Returns the "bypassEmptyTsReplacement" parameter if present, otherwise returns boost::none.
+     */
+    const OptionalBool& getBypassEmptyTsReplacement() const;
+
+    /**
+     * Returns the "comment" parameter if present, otherwise returns boost::none.
+     */
+    const boost::optional<IDLAnyTypeOwned>& getComment() const;
+
+    /**
+     * Returns false always for a findAndModify command.
+     */
+    boost::optional<bool> getErrorsOnly() const;
+
+    /**
+     * BulkWriteCommandRequest does not allow the "runtimeConstants" parameter to be specified, so
+     * BulkWriteCommandRefImpl::getLegacyRuntimeConstants() will always return boost::none.
+     */
+    const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
+
+    /**
+     * Returns the "let" parameter if present, otherwise returns boost::none.
+     */
+    const boost::optional<BSONObj>& getLet() const;
+
+    /**
+     * Returns the "maxTimeMS" parameter if present, otherwise returns boost::none.
+     */
+    boost::optional<std::int64_t> getMaxTimeMS() const;
+
+    /**
+     * Returns the set of all collection namespaces targeted by one or more write ops in the
+     * BulkWriteCommandRequest.
+     */
+    std::set<NamespaceString> getNssSet() const;
+
+    /**
+     * Returns true always for a findAndModifyCommand.
+     */
+    bool getOrdered() const;
+
+    /**
+     * Returns the "stmtId" parameter if present, otherwise returns boost::none.
+     */
+    boost::optional<std::int32_t> getStmtId() const;
+
+    /**
+     * Returns the "stmtIds" parameter if present, otherwise returns boost::none.
+     */
+    boost::optional<std::vector<std::int32_t>> getStmtIds() const;
+
+    /**
+     * Returns an estimate of how much space, in bytes, the referred-to write op would add to a
+     * BulkWriteCommandRequest.
+     *
+     * This method will always return 0 since a findAndModify command will not be added to a bulk
+     * write command.
+     */
+    int estimateOpSizeInBytes(int index) const;
+
+    /**
+     * Returns the specified write op's "arrayFilters" field if present, otherwise returns
+     * boost::none.
+     */
+    const boost::optional<std::vector<BSONObj>>& getArrayFilters(int index) const;
+
+    /**
+     * Returns the specified write op's "collation" field if present, otherwise returns boost::none.
+     */
+    const boost::optional<BSONObj>& getCollation(int index) const;
+
+    /**
+     * This method will always return boost::none since a findAndModify command does not have a
+     * "constants" field.
+     */
+    boost::optional<BSONObj> getConstants(int index) const;
+
+    /**
+     * If the specified write op is an insert op, returns the document to be inserted. Otherwise,
+     * returns an empty object.
+     */
+    const BSONObj& getDocument(int index) const;
+
+    /**
+     * Returns the specified write op's "filter" field if present, otherwise returns an empty
+     * object.
+     */
+    const BSONObj& getFilter(int index) const;
+
+    /**
+     * If the specified write op is an update or delete and the "multi" field is set to true,
+     * returns true. Otherwise, returns false.
+     */
+    bool getMulti(int index) const;
+
+    /**
+     * Returns the collection namespace targeted by the specified write op.
+     */
+    const NamespaceString& getNss(int index) const;
+
+    /**
+     * This method will always return boost::none since a findAndModify command does not have
+     * attached collection UUIDs.
+     */
+    boost::optional<UUID> getCollectionUUID(int index) const;
+
+    /**
+     * Returns the type (insert, update, delete) of the specified write op.
+     */
+    BatchedCommandRequest::BatchType getOpType(int index) const;
+
+    /**
+     * Returns the specified write op's "updateMods" field if present, otherwise returns a default
+     * constructed UpdateModification object.
+     */
+    const write_ops::UpdateModification& getUpdateMods(int index) const;
+
+    /**
+     * If the specified write op is an update op with the "upsert" field set to true, returns true.
+     * Otherwise, returns false.
+     */
+    bool getUpsert(int index) const;
+
+    /**
+     * Returns the encryption information of the specified write op.
+     */
+    const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
+
+    /**
+     * Returns a BSON representation of the specified write op. Note that this representation may
+     * be specific to BulkWriteCommandRequest and may differ from the representation used by other
+     * write commands.
+     */
+    BSONObj toBSON(int index) const;
+
+private:
+    std::reference_wrapper<const write_ops::FindAndModifyCommandRequest> _ref;
+};
+
+/**
+ * This is a wrapper class that holds a CommandRefImpl for a type of write command, which in turn
+ * holds a const reference to a the underlying CommandRequest object. This class provides a set of
+ * APIs for accessing the contents of the CommandRequest.
  *
  * Code that uses the WriteCommandRef class must ensure that a WriteCommandRef does not outlive the
- * referred-to BatchedCommandRequest or BulkWriteCommandRequest.
+ * referred-to CommandRequest object.
  */
 class WriteCommandRef {
 public:
@@ -622,11 +863,16 @@ public:
 
     explicit WriteCommandRef(BulkWriteCommandRefImpl impl) : _impl(std::move(impl)) {}
 
+    explicit WriteCommandRef(FindAndModifyCommandRefImpl impl) : _impl(std::move(impl)) {}
+
     explicit WriteCommandRef(const BatchedCommandRequest& request)
         : _impl(BatchWriteCommandRefImpl{request}) {}
 
     explicit WriteCommandRef(const BulkWriteCommandRequest& request)
         : _impl(BulkWriteCommandRefImpl{request}) {}
+
+    explicit WriteCommandRef(const write_ops::FindAndModifyCommandRequest& request)
+        : _impl(FindAndModifyCommandRefImpl{request}) {}
 
 private:
     /**
@@ -643,6 +889,7 @@ public:
      * of operator() that support the following input types:
      *     const BatchedCommandRequest&
      *     const BulkWriteCommandRequest&
+     *     const FindAndModifyCommandRequest&
      */
     template <class Visitor>
     decltype(auto) visitRequest(Visitor&& v) const {
@@ -685,6 +932,14 @@ public:
     }
 
     /**
+     * Returns true if this WriteCommandRef holds a FindAndModifyCommandRefImpl, otherwise returns
+     * false.
+     */
+    bool isFindAndModifyCommand() const {
+        return holds_alternative<FindAndModifyCommandRefImpl>(_impl);
+    }
+
+    /**
      * Returns the BatchWriteCommandRefImpl that this WriteCommandRef refers to. This method will
      * throw an assertion failure if isBatchWriteCommand() is false.
      */
@@ -700,6 +955,15 @@ public:
     const BulkWriteCommandRequest& getBulkWriteCommandRequest() const {
         tassert(10778511, "Expected BulkWriteCommandRefImpl", isBulkWriteCommand());
         return get<BulkWriteCommandRefImpl>(_impl).getRequest();
+    }
+
+    /**
+     * Returns the FindAndModifyCommandRequest that this WriteCommandRef refers to. This method will
+     * throw an assertion failure if isFindAndModifyCommand() is false.
+     */
+    const write_ops::FindAndModifyCommandRequest& getFindAndModifyCommandRequest() const {
+        tassert(10394909, "Expected FindAndModifyCommandRefImpl", isFindAndModifyCommand());
+        return get<FindAndModifyCommandRefImpl>(_impl).getRequest();
     }
 
     /**
@@ -777,7 +1041,8 @@ public:
     }
 
 private:
-    using VariantType = std::variant<BatchWriteCommandRefImpl, BulkWriteCommandRefImpl>;
+    using VariantType = std::
+        variant<BatchWriteCommandRefImpl, BulkWriteCommandRefImpl, FindAndModifyCommandRefImpl>;
 
     VariantType _impl;
 };
@@ -807,6 +1072,9 @@ public:
 
     explicit OpRef(const BulkWriteCommandRequest& request, int index)
         : OpRef(WriteCommandRef{request}, index) {}
+
+    explicit OpRef(const write_ops::FindAndModifyCommandRequest& request)
+        : OpRef(WriteCommandRef{request}, 0) {}
 
     /**
      * Legacy constructors.

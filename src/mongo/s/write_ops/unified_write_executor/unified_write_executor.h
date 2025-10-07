@@ -40,7 +40,9 @@
 namespace mongo {
 namespace unified_write_executor {
 
-using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteCommandReply>;
+using WriteCommandResponse = std::variant<BatchedCommandResponse,
+                                          BulkWriteCommandReply,
+                                          StatusWith<write_ops::FindAndModifyCommandReply>>;
 
 /**
  * This function will execute the specified write command and return a response.
@@ -60,6 +62,12 @@ BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandReques
 BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
                                 const BulkWriteCommandRequest& request,
                                 BSONObj originalCommand = BSONObj());
+
+/**
+ * Helper function for executing findAndModify commands.
+ */
+StatusWith<write_ops::FindAndModifyCommandReply> findAndModify(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& request);
 
 /**
  * Unified write executor feature flag check. Also ensures we only have viewless timeseries

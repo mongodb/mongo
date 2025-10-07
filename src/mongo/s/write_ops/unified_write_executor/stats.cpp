@@ -36,7 +36,7 @@ namespace mongo {
 namespace unified_write_executor {
 
 void Stats::recordTargetingStats(const std::vector<ShardEndpoint>& targetedShardEndpoints,
-                                 size_t nsIdx,
+                                 WriteOpId opId,
                                  bool isNsSharded,
                                  int numShardsOwningChunks,
                                  WriteType writeType) {
@@ -45,10 +45,10 @@ void Stats::recordTargetingStats(const std::vector<ShardEndpoint>& targetedShard
         shards.insert(endpoint.shardName);
     }
 
-    if (!_targetingStatsMap.contains(nsIdx)) {
-        _targetingStatsMap[nsIdx] = TargetingStats();
+    if (!_targetingStatsMap.contains(opId)) {
+        _targetingStatsMap[opId] = TargetingStats();
     }
-    TargetingStats& targetingStats = _targetingStatsMap.at(nsIdx);
+    TargetingStats& targetingStats = _targetingStatsMap.at(opId);
     targetingStats.numShardsOwningChunks = numShardsOwningChunks;
     targetingStats.isSharded = isNsSharded;
     auto& nsWriteTypeShardSet = targetingStats.targetedShardsByWriteType[writeType];
@@ -64,7 +64,7 @@ void Stats::updateMetrics(OperationContext* opCtx) {
     // key.
     CurOp::get(opCtx)->debug().nShards = _targetedShards.size();
 
-    for (const auto& [nsIdx, targetingStats] : _targetingStatsMap) {
+    for (const auto& [opId, targetingStats] : _targetingStatsMap) {
         const bool isSharded = targetingStats.isSharded;
         const int nShardsOwningChunks = targetingStats.numShardsOwningChunks;
 
@@ -83,8 +83,6 @@ void Stats::updateMetrics(OperationContext* opCtx) {
                 case WriteType::kDelete:
                     metricsWriteType = NumHostsTargetedMetrics::QueryType::kDeleteCmd;
                     break;
-                case WriteType::kFindAndMod:
-                    MONGO_UNIMPLEMENTED_TASSERT(10413602);
                 default:
                     MONGO_UNREACHABLE;
             }
