@@ -57,15 +57,35 @@ TEST(IndexBoundsTest, ValidBasic) {
     bounds.fields.push_back(list);
 
     // Go forwards with data indexed forwards.
-    ASSERT(bounds.isValidFor(BSON("foo" << 1), 1));
+    ASSERT(bounds.isValidFor(BSON("foo" << 1), 1, false));
     // Go backwards with data indexed backwards.
-    ASSERT(bounds.isValidFor(BSON("foo" << -1), -1));
+    ASSERT(bounds.isValidFor(BSON("foo" << -1), -1, false));
     // Bounds are not oriented along the direction of traversal.
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), -1));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), -1, false));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1), 1, false));
 
     // Bounds must match the index exactly.
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1 << "bar" << 1), 1));
-    ASSERT_FALSE(bounds.isValidFor(BSON("bar" << 1), 1));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1 << "bar" << 1), 1, false));
+    ASSERT_FALSE(bounds.isValidFor(BSON("bar" << 1), 1, false));
+}
+
+TEST(IndexBoundsTest, ValidBasicWithNonSimpleCollation) {
+    OrderedIntervalList list("foo");
+    list.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
+    IndexBounds bounds;
+    bounds.fields.push_back(list);
+
+    // Go forwards with data indexed forwards.
+    ASSERT(bounds.isValidFor(BSON("foo" << 1), 1, true));
+    // Go backwards with data indexed backwards.
+    ASSERT(bounds.isValidFor(BSON("foo" << -1), -1, true));
+    // Bounds are not oriented along the direction of traversal.
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), -1, true));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1), 1, true));
+
+    // Bounds must match the index exactly.
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1 << "bar" << 1), 1, true));
+    ASSERT_FALSE(bounds.isValidFor(BSON("bar" << 1), 1, true));
 }
 
 TEST(IndexBoundsTest, ValidTwoFields) {
@@ -80,29 +100,30 @@ TEST(IndexBoundsTest, ValidTwoFields) {
     bounds.fields.push_back(otherList);
 
     // These are OK.
-    ASSERT(bounds.isValidFor(BSON("foo" << 1 << "bar" << 1), 1));
-    ASSERT(bounds.isValidFor(BSON("foo" << -1 << "bar" << -1), -1));
+    ASSERT(bounds.isValidFor(BSON("foo" << 1 << "bar" << 1), 1, false));
+    ASSERT(bounds.isValidFor(BSON("foo" << -1 << "bar" << -1), -1, false));
 
     // Direction(s) don't match.
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1 << "bar" << 1), -1));
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1 << "bar" << -1), -1));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1 << "bar" << 1), -1, false));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1 << "bar" << -1), -1, false));
 
     // Index doesn't match.
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1));
-    ASSERT_FALSE(bounds.isValidFor(BSON("bar" << 1 << "foo" << 1), 1));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1, false));
+    ASSERT_FALSE(bounds.isValidFor(BSON("bar" << 1 << "foo" << 1), 1, false));
 }
 
-TEST(IndexBoundsTest, ValidIntervalsInOrder) {
+TEST(IndexBoundsTest, ValidIntervalsOutOfOrder) {
     OrderedIntervalList list("foo");
-    // Whether navigated forward or backward, there's no valid ordering for these two intervals.
+    // Whether navigated forward or backward, there's no valid ordering for these two intervals
+    // since they are not sorted [7, 20] [0, 5].
     list.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
     list.intervals.push_back(Interval(BSON("" << 0 << "" << 5), true, true));
     IndexBounds bounds;
     bounds.fields.push_back(list);
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1));
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1), 1));
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), -1));
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1), -1));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1, false));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1), 1, false));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), -1, false));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << -1), -1, false));
 }
 
 TEST(IndexBoundsTest, ValidNoOverlappingIntervals) {
@@ -112,7 +133,7 @@ TEST(IndexBoundsTest, ValidNoOverlappingIntervals) {
     list.intervals.push_back(Interval(BSON("" << 19 << "" << 25), true, true));
     IndexBounds bounds;
     bounds.fields.push_back(list);
-    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1));
+    ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1, false));
 }
 
 TEST(IndexBoundsTest, ValidOverlapOnlyWhenBothOpen) {
@@ -121,7 +142,22 @@ TEST(IndexBoundsTest, ValidOverlapOnlyWhenBothOpen) {
     list.intervals.push_back(Interval(BSON("" << 20 << "" << 25), false, true));
     IndexBounds bounds;
     bounds.fields.push_back(list);
-    ASSERT(bounds.isValidFor(BSON("foo" << 1), 1));
+    ASSERT(bounds.isValidFor(BSON("foo" << 1), 1, false));
+}
+
+// TODO SERVER-109285: Add tests for the rest of special indexes
+TEST(IndexBoundsTest, HashedIndexes) {
+    OrderedIntervalList list("foo");
+    // Hashed indexes are always open on both ends.
+    // Use ULL suffix to ensure the literals are treated as unsigned long long.
+    list.intervals.push_back(
+        Interval(BSON("" << "14010330891073291257" << "" << "14010330891073291257"), true, true));
+    IndexBounds bounds;
+    bounds.fields.push_back(list);
+
+    // Hashed indexes can be traversed in either direction.
+    ASSERT(bounds.isValidFor(BSON("foo" << "hashed"), 1, false));
+    ASSERT(bounds.isValidFor(BSON("foo" << "hashed"), -1, false));
 }
 
 TEST(IndexBoundsCheckerTest, CheckOILReverse) {
@@ -889,7 +925,7 @@ TEST(IndexBoundsCheckerTest, SecondIntervalMustRewind) {
     bounds.fields.push_back(second);
 
     BSONObj idx = BSON("first" << 1 << "second" << 1);
-    ASSERT(bounds.isValidFor(idx, 1));
+    ASSERT(bounds.isValidFor(idx, 1, false));
     IndexBoundsChecker it(&bounds, idx, 1);
 
     IndexSeekPoint seekPoint;
@@ -925,7 +961,7 @@ TEST(IndexBoundsCheckerTest, SimpleCheckKeyBackwards) {
     bounds.fields.push_back(barList);
 
     BSONObj idx = BSON("foo" << -1 << "bar" << -1);
-    ASSERT(bounds.isValidFor(idx, 1));
+    ASSERT(bounds.isValidFor(idx, 1, false));
     IndexBoundsChecker it(&bounds, idx, 1);
 
     IndexSeekPoint seekPoint;
@@ -971,7 +1007,7 @@ TEST(IndexBoundsCheckerTest, CheckEndBackwards) {
     bounds.fields.push_back(barList);
 
     BSONObj idx = BSON("foo" << 1 << "bar" << -1);
-    ASSERT(bounds.isValidFor(idx, -1));
+    ASSERT(bounds.isValidFor(idx, -1, false));
     IndexBoundsChecker it(&bounds, idx, -1);
 
     IndexSeekPoint seekPoint;

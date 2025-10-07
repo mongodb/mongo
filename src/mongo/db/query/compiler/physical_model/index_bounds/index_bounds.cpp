@@ -510,9 +510,21 @@ bool OrderedIntervalList::isValidFor(int expectedOrientation) const {
     return true;
 }
 
-bool IndexBounds::isValidFor(const BSONObj& keyPattern, int direction) {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+bool IndexBounds::isValidFor(const BSONObj& keyPattern, int direction, bool hasNonSimpleCollation) {
     if (isSimpleRange) {
-        return direction == sgn(endKey.woCompare(startKey, keyPattern, false));
+        bool valid = direction == sgn(endKey.woCompare(startKey, keyPattern, false));
+        if (!valid) {
+            LOGV2_OPTIONS(10921300,
+                          {logv2::LogTruncation::Disabled},
+                          "Index bounds are not valid for key pattern and direction",
+                          "bounds"_attr = redact(toString(hasNonSimpleCollation)),
+                          "keyPattern"_attr = keyPattern.toString(true /* redact values */),
+                          "direction"_attr = direction,
+                          "reason"_attr = "Simple range bounds are not in the right direction");
+        }
+        return valid;
     }
 
     BSONObjIterator it(keyPattern);
@@ -520,6 +532,14 @@ bool IndexBounds::isValidFor(const BSONObj& keyPattern, int direction) {
     for (size_t i = 0; i < fields.size(); ++i) {
         // We expect a bound for each field in the index.
         if (!it.more()) {
+            LOGV2_OPTIONS(10921301,
+                          {logv2::LogTruncation::Disabled},
+                          "Index bounds are not valid for key pattern and direction",
+                          "bounds"_attr = redact(toString(hasNonSimpleCollation)),
+                          "keyPattern"_attr = keyPattern.toString(true /* redact values */),
+                          "direction"_attr = direction,
+                          "reason"_attr = "Not enough fields in key pattern");
+
             return false;
         }
         BSONElement elt = it.next();
@@ -528,6 +548,16 @@ bool IndexBounds::isValidFor(const BSONObj& keyPattern, int direction) {
 
         // Make sure the names match up.
         if (field.name != elt.fieldName()) {
+            LOGV2_OPTIONS(10921302,
+                          {logv2::LogTruncation::Disabled},
+                          "Index bounds are not valid for key pattern and direction",
+                          "bounds"_attr = redact(toString(hasNonSimpleCollation)),
+                          "keyPattern"_attr = keyPattern.toString(true /* redact values */),
+                          "direction"_attr = direction,
+                          "fieldName"_attr = field.name,
+                          "eltFieldName"_attr = elt.fieldName(),
+                          "reason"_attr = "Field name does not match key pattern's");
+
             return false;
         }
 
@@ -536,12 +566,34 @@ bool IndexBounds::isValidFor(const BSONObj& keyPattern, int direction) {
         int expectedOrientation = direction * ((elt.number() >= 0) ? 1 : -1);
 
         if (!field.isValidFor(expectedOrientation)) {
+            LOGV2_OPTIONS(10921303,
+                          {logv2::LogTruncation::Disabled},
+                          "Index bounds are not valid for key pattern and direction",
+                          "bounds"_attr = redact(toString(hasNonSimpleCollation)),
+                          "keyPattern"_attr = keyPattern.toString(true /* redact values */),
+                          "direction"_attr = direction,
+                          "fieldName"_attr = field.name,
+                          "expectedOrientation"_attr = expectedOrientation,
+                          "reason"_attr = "Field is not valid for expected orientation");
+
             return false;
         }
     }
 
-    return !it.more();
+    if (it.more()) {
+        LOGV2_OPTIONS(10921304,
+                      {logv2::LogTruncation::Disabled},
+                      "Index bounds are not valid for key pattern and direction",
+                      "bounds"_attr = redact(toString(hasNonSimpleCollation)),
+                      "keyPattern"_attr = keyPattern.toString(true /* redact values */),
+                      "direction"_attr = direction,
+                      "reason"_attr = "Too many fields in key pattern");
+        return false;
+    }
+    return true;
 }
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
 
 //
 // Iteration over index bounds
