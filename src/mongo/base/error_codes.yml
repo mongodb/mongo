@@ -953,6 +953,11 @@ error_codes:
       categories: [StreamProcessorUserError],
     }
   - {
+      code: 467,
+      name: StreamProcessorRetryableIcebergError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+  - {
       code: 468,
       name: StreamProcessorStartupRetryableError,
       categories: [StreamProcessorRetryableError],
