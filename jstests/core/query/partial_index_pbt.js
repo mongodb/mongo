@@ -55,7 +55,7 @@ const workloadModel =
           // This filter will be used for the partial index filter, and to prefix queries with
           // {$match: filter} so that every query is eligible to use the partial indexes.
           partialFilterPredShape: getPartialFilterPredicateArb(),
-          docs: getDocsModel(false /* isTS */),
+          docs: getDocsModel(),
           indexes: fc.array(getIndexModel({allowPartialIndexes: false, allowSparse: false}),
                             {minLength: 0, maxLength: 15, size: '+2'}),
           pipelines: fc.array(getAggPipelineModel(),

@@ -16,15 +16,13 @@
  * multiversion_incompatible
  * ]
  */
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
+import {
+    createQueriesWithKnobsSetAreSameAsControlCollScanProperty
+} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {queryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
-import {
-    runDeoptimized,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -39,78 +37,6 @@ const numQueriesPerRun = 50;
 const controlColl = db.query_knob_correctness_pbt_control;
 const experimentColl = db.query_knob_correctness_pbt_experiment;
 
-function runSetParamCommand(cmd) {
-    FixtureHelpers.runCommandOnAllShards({db: db.getSiblingDB("admin"), cmdObj: cmd});
-}
-
-/*
- * Runs the given function with the query knobs set, then sets the query knobs back to their
- * original state.
- * It's important that each run of the property is independent from one another, so we'll always
- * reset the knobs to their original state even if the function throws an exception.
- */
-function runWithKnobs(knobToVal, fn) {
-    const knobNames = Object.keys(knobToVal);
-    // If there are no knobs to change, return the result of the function since there's no other
-    // work to do.
-    if (knobNames.length === 0) {
-        return fn();
-    }
-
-    // Get the previous knob settings, so we can undo our changes after setting the knobs from
-    // `knobToVal`.
-    const getParamObj = {getParameter: 1};
-    for (const key of knobNames) {
-        getParamObj[key] = 1;
-    }
-    const getParamResult = assert.commandWorked(db.adminCommand(getParamObj));
-    // Copy only the knob key/vals into the new object.
-    const priorSettings = {};
-    for (const key of knobNames) {
-        priorSettings[key] = getParamResult[key];
-    }
-
-    // Set the requested knobs.
-    runSetParamCommand({setParameter: 1, ...knobToVal});
-
-    // With the finally block, we'll always revert the parameters back to their original settings,
-    // even if an exception is thrown.
-    try {
-        return fn();
-    } finally {
-        // Reset to the original settings.
-        runSetParamCommand({setParameter: 1, ...priorSettings});
-    }
-}
-
-function queriesWithKnobsSetAreSameAsControlCollScan(getQuery, testHelpers, knobToVal) {
-    const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
-
-    // Compute the control results all at once.
-    const resultMap = runDeoptimized(controlColl, queries);
-
-    return runWithKnobs(knobToVal, () => {
-        for (let i = 0; i < queries.length; i++) {
-            const query = queries[i];
-            const controlResults = resultMap[i];
-            const experimentResults = experimentColl.aggregate(query).toArray();
-            if (!testHelpers.comp(controlResults, experimentResults)) {
-                return {
-                    passed: false,
-                    message:
-                        'A query with different knobs set has returned incorrect results compared to a collection scan query with no knobs set.',
-                    query,
-                    explain: experimentColl.explain().aggregate(query),
-                    controlResults,
-                    experimentResults,
-                    knobToVal
-                };
-            }
-        }
-        return {passed: true};
-    });
-}
-
 function getWorkloadModel(isTS, aggModel) {
     return fc
         .record({
@@ -119,15 +45,20 @@ function getWorkloadModel(isTS, aggModel) {
             knobToVal: queryKnobsModel
         })
         .map(({collSpec, queries, knobToVal}) => {
-            return {collSpec, queries, extraParams: [knobToVal]};
+            return {collSpec, queries, extraParams: {knobToVal}};
         });
 }
 
+const knobCorrectnessProperty =
+    createQueriesWithKnobsSetAreSameAsControlCollScanProperty(controlColl, experimentColl);
+
 // Test with a regular collection.
-testProperty(queriesWithKnobsSetAreSameAsControlCollScan,
-             {controlColl, experimentColl},
-             getWorkloadModel(false /* isTS */, getAggPipelineModel()),
-             numRuns);
+testProperty(
+    knobCorrectnessProperty,
+    {controlColl, experimentColl},
+    getWorkloadModel(false /* isTS */, getAggPipelineModel()),
+    numRuns,
+);
 
 // TODO SERVER-103381 re-enable timeseries PBT testing.
 // Test with a TS collection.

@@ -58,7 +58,7 @@ A workload consists of a collection model and an aggregation model, in the follo
        indexes:   a list of indexes
    },
    queries:  a list of aggregation pipelines,
-   extraParams: an optional list of extra values to be passed to the property function
+   extraParams: an optional object of extra values to be passed to the property function
 }
 ```
 

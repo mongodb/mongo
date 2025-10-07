@@ -1743,6 +1743,21 @@ server_parameters:
         redact: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+    internalQueryPermitMatchSwappingForComplexRenames:
+        description:
+            "When enabled, the system assumes that a projection like a:'$b.c' is a renaming
+            operation. In the absence of this flag, it is possible for 'b' to be an array -- in
+            which case this projection does not just rename the field but reshapes the structure
+            of the document. This should be used with caution, as it will cause an incorrect rewrite
+            for queries that actually wish to perform this reshaping operation. The rewrite is
+            limited to field paths of length 2; a projection like a:'$b.c.d' is always treated as a
+            reshaping operation."
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryPermitMatchSwappingForComplexRenames"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+
     # TODO SERVER-85426 Remove this knob.
     bypassRankFusionFCVGate:
         description: "If enabled, bypasses FCV-gating for featureFlagRankFusionBasic and featureFlagRankFusionFull."
