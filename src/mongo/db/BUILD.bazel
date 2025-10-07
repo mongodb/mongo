@@ -611,6 +611,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "local_executor",
+    srcs = [
+        "local_executor.cpp",
+    ],
+    hdrs = [
+        "local_executor.h",
+    ],
+    deps = [
+        ":service_context",
+        "//src/mongo:base",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/executor:thread_pool_task_executor",
+    ],
+)
+
+mongo_cc_library(
     name = "not_primary_error_tracker",
     srcs = [
         "not_primary_error_tracker.cpp",
@@ -3624,6 +3641,7 @@ mongo_cc_library(
         "//src/mongo/db/ttl:ttl_d",
         "vector_clock",
         "server_lifecycle_monitor",
+        ":local_executor",
     ] + select({
         "//bazel/config:enterprise_feature_audit_enabled": [
             "//src/mongo/db/modules/enterprise/src/audit:audit_enterprise",
@@ -3797,6 +3815,21 @@ mongo_cc_unit_test(
         ":client_out_of_line_executor",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "local_executor_test",
+    srcs = [
+        "local_executor_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":local_executor",
+        ":service_context_test_fixture",
     ],
 )
 

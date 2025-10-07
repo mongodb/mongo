@@ -332,3 +332,6 @@ filters:
   - "find_one_bm*":
     approvers:
       - 10gen/performance
+  - "local_executor*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

@@ -68,13 +68,13 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/initialize_operation_session_info.h"
+#include "mongo/db/local_executor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
@@ -1614,10 +1614,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         if (isTimeseriesViewRequest && opCtx->isRetryableWrite() &&
             !opCtx->inMultiDocumentTransaction()) {
             write_ops_exec::WriteResult out;
-            auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
-                ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
-                      opCtx->getServiceContext())
-                : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+            auto executor = getLocalExecutor(opCtx);
             auto updateRequest = bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
                 opCtx, op, req, currentOpIdx);
 

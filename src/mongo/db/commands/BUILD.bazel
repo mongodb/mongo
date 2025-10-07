@@ -1635,6 +1635,7 @@ mongo_cc_library(
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:fle_crud_mongod",
         "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:local_executor",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:profile_collection",
         "//src/mongo/db:rw_concern_d",
