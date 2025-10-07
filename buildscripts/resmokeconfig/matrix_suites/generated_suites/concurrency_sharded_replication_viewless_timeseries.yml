@@ -60,8 +60,6 @@ selector:
     - assumes_balancer_on
     - requires_profiling
     - assumes_unsharded_collection
-    - viewless_timeseries_incompatible
-    - does_not_support_viewless_timeseries_yet
     - featureFlagCreateViewlessTimeseriesCollections_incompatible
   roots:
     - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js

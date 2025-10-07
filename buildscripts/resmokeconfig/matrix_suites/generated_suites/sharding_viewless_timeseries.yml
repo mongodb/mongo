@@ -22,8 +22,6 @@ executor:
 matrix_suite: true
 selector:
   exclude_with_any_tags:
-    - viewless_timeseries_incompatible
-    - does_not_support_viewless_timeseries_yet
     - featureFlagCreateViewlessTimeseriesCollections_incompatible
   roots:
     - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js

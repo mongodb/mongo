@@ -50,8 +50,6 @@ selector:
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling
-    - viewless_timeseries_incompatible
-    - does_not_support_viewless_timeseries_yet
     - featureFlagCreateViewlessTimeseriesCollections_incompatible
   roots:
     - jstests/core/**/*.js
