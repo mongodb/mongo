@@ -80,4 +80,18 @@ inline bool reversedInterval(sbe::value::TypeTags tagLow,
     uassert(8870501, "Unable to compare bounds", cmpTag == sbe::value::TypeTags::NumberInt32);
     return false;
 }
+
+/**
+ * Returns the number of distinct values of tuples of the given field names in the input documents.
+ * Null and missing are treated as distinct. When values are objects, field order matters. That is,
+ * {a: 1, b: 1} and {b: 1, a: 1} are considered distinct.
+ *
+ * Does not support counting NDV over array-valued fields; tasserts if any of 'fieldNames' are
+ * array-valued in 'docs'.
+ *
+ * For example, given documents [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 2, b: 2}], the NDV of
+ * ["a","b"] is 3.
+ */
+size_t countNDV(const std::vector<FieldPath>& fieldNames, const std::vector<BSONObj>& docs);
+
 }  // namespace mongo::ce

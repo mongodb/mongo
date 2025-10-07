@@ -12,6 +12,7 @@ exports_files(
 mongo_cc_library(
     name = "ce_common",
     srcs = [
+        "ce_common.cpp",
     ],
     hdrs = [
         "ce_common.h",
@@ -37,5 +38,16 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/stats:stats_gen",
         "//src/mongo/db/query/compiler/stats:stats_test_utils",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ce_common_test",
+    srcs = [
+        "ce_common_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":ce_common",
     ],
 )
