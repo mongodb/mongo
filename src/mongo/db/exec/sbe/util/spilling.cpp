@@ -188,10 +188,7 @@ int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
         }
     });
 
-    if (!result.isOK()) {
-        tasserted(5843600, str::stream() << "Failed to write to disk because " << result.reason());
-        return 0;
-    }
+    uassertStatusOK(result);
     return buf.len();
 }
 
