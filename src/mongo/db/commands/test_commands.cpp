@@ -317,10 +317,12 @@ public:
 
 MONGO_REGISTER_COMMAND(TimeseriesCatalogBucketParamsChangedTestCmd).testOnly().forShard();
 
-class CommandFeatureFlaggedOnLatestFCVTestCmd : public BasicCommand {
+// TODO SERVER-110189: Make testing this command resilient to releases or update the name of this
+// command.
+class CommandFeatureFlaggedOnLatestFCVTestCmd82 : public BasicCommand {
 public:
-    CommandFeatureFlaggedOnLatestFCVTestCmd()
-        : BasicCommand("testCommandFeatureFlaggedOnLatestFCV") {}
+    CommandFeatureFlaggedOnLatestFCVTestCmd82()
+        : BasicCommand("testCommandFeatureFlaggedOnLatestFCV82") {}
 
     bool adminOnly() const override {
         return false;
@@ -349,12 +351,12 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        LOGV2(10044800, "Test-only command 'testCommandFeatureFlaggedOnLatestFCV' invoked");
+        LOGV2(10044800, "Test-only command 'testCommandFeatureFlaggedOnLatestFCV82' invoked");
         return true;
     }
 };
 
-MONGO_REGISTER_COMMAND(CommandFeatureFlaggedOnLatestFCVTestCmd)
+MONGO_REGISTER_COMMAND(CommandFeatureFlaggedOnLatestFCVTestCmd82)
     .testOnly()
     .requiresFeatureFlag(feature_flags::gFeatureFlagBlender)
     .forShard();

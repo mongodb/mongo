@@ -1587,7 +1587,7 @@ const allCommands = {
         skip: "requires an actual file path to record traffic to",
     },
     sysprofile: {skip: isAnInternalCommand},
-    testCommandFeatureFlaggedOnLatestFCV: {skip: isAnInternalCommand},
+    testCommandFeatureFlaggedOnLatestFCV82: {skip: isAnInternalCommand},
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
     testInternalTransactions: {skip: isAnInternalCommand},

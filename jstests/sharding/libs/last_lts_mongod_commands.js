@@ -15,6 +15,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "_shardsvrUnregisterIndex",
     "_configsvrCommitIndex",
     "_configsvrDropIndexCatalogEntry",
+    "testCommandFeatureFlaggedOnLatestFCV",
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the
@@ -24,4 +25,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "releaseMemory",
     "_configsvrStartShardDraining",
     "_configsvrShardDrainingStatus",
+    "testCommandFeatureFlaggedOnLatestFCV82",
 ];
