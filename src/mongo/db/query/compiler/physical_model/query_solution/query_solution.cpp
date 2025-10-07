@@ -2020,13 +2020,16 @@ void BinaryJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const 
         *ss << joinPred.leftField.fullPath() << " " << op << " " << joinPred.rightField.fullPath()
             << "\n";
     }
+    addIndent(ss, indent + 1);
     *ss << "Outer:\n";
     children[0]->appendToString(ss, indent + 2);
+    addIndent(ss, indent + 1);
     *ss << "Inner:\n";
     children[1]->appendToString(ss, indent + 2);
 }
 
 void HashJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
     *ss << "HASH_JOIN\n";
     BinaryJoinEmbeddingNode::appendToString(ss, indent);
 }
@@ -2040,6 +2043,7 @@ std::unique_ptr<QuerySolutionNode> HashJoinEmbeddingNode::clone() const {
 }
 
 void NestedLoopJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
     *ss << "NESTED_LOOP_JOIN\n";
     BinaryJoinEmbeddingNode::appendToString(ss, indent);
 }
@@ -2053,6 +2057,7 @@ std::unique_ptr<QuerySolutionNode> NestedLoopJoinEmbeddingNode::clone() const {
 }
 
 void IndexedNestedLoopJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
     *ss << "INDEXED_NESTED_LOOP_JOIN\n";
     BinaryJoinEmbeddingNode::appendToString(ss, indent);
 }

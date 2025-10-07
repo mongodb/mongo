@@ -1,0 +1,22 @@
+Graph:
+A -- B
+NESTED_LOOP_JOIN
+---leftEmbeddingField: (none)
+---rightEmbeddingField: b
+---joinPredicates:
+------a = b
+---Outer:
+------COLLSCAN
+---------ns = test.a
+---------nodeId = 1
+---------fetched = 1
+---------sortedByDiskLoc = 0
+---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Inner:
+------COLLSCAN
+---------ns = test.b
+---------nodeId = 2
+---------fetched = 1
+---------sortedByDiskLoc = 0
+---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
+

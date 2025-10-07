@@ -97,9 +97,9 @@ std::vector<EdgeId> JoinGraph::getJoinEdges(NodeSet left, NodeSet right) const {
 NodeSet JoinGraph::getNeighbors(NodeId nodeIndex) const {
     NodeSet neighbors;
     for (const JoinEdge& edge : _edges) {
-        if (edge.left == nodeIndex) {
+        if (edge.left.test(nodeIndex)) {
             neighbors |= edge.right;
-        } else if (edge.right == nodeIndex) {
+        } else if (edge.right.test(nodeIndex)) {
             neighbors |= edge.left;
         }
     }

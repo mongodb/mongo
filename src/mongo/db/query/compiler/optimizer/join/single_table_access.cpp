@@ -40,7 +40,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     const MultipleCollectionAccessor& collections,
     const std::vector<std::unique_ptr<CanonicalQuery>>& queries,
     const SamplingEstimatorMap& samplingEstimators) {
-    QuerySolutionMap solns;
+    join_ordering::QuerySolutionMap solns;
     cost_based_ranker::EstimateMap estimates;
 
     for (auto&& query : queries) {

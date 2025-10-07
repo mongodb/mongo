@@ -27,35 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
-#include "mongo/db/query/compiler/optimizer/join/solution_storage.h"
-#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 
-namespace mongo::optimizer {
+namespace mongo::join_ordering {
 
-using SamplingEstimatorMap =
-    stdx::unordered_map<NamespaceString, std::unique_ptr<ce::SamplingEstimator>>;
+// Alias for container maintaining association between a CanonicalQuery and its corresponding
+// solution.
+using QuerySolutionMap = stdx::unordered_map<CanonicalQuery*, std::unique_ptr<QuerySolution>>;
 
-/**
- * Struct containing results from 'singleTableAccessPlans()' function.
- */
-struct SingleTableAccessPlansResult {
-    join_ordering::QuerySolutionMap solns;
-    cost_based_ranker::EstimateMap estimate;
-};
-
-/**
- * Given a set of 'CanonicalQueries' over potentially different namespaces and a map of
- * 'SamplingEstimators' keyed by namespace, for each query, this function invokes the plan
- * enumerator and uses cost-based ranking (CBR) with sampling-based cardinality estimation. This
- * function returns a QuerySolution representing the best plan for each query along with an
- * 'EstimateMap' which contains cardinality and cost estimates for every QSN.
- */
-StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    const std::vector<std::unique_ptr<CanonicalQuery>>& queries,
-    const SamplingEstimatorMap& samplingEstimators);
-
-}  // namespace mongo::optimizer
+}  // namespace mongo::join_ordering

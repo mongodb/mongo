@@ -27,35 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/solution_storage.h"
-#include "mongo/db/query/multiple_collection_accessor.h"
 
-namespace mongo::optimizer {
-
-using SamplingEstimatorMap =
-    stdx::unordered_map<NamespaceString, std::unique_ptr<ce::SamplingEstimator>>;
+namespace mongo::join_ordering {
 
 /**
- * Struct containing results from 'singleTableAccessPlans()' function.
+ * Construct a 'QuerySolution' with a pseudo-random join ordering based on the given seed. Performs
+ * a random walk of the join graph to determine the join order and uses the given 'QuerySolutionMap'
+ * to lookup the corresponding single-table access plan for each node.
  */
-struct SingleTableAccessPlansResult {
-    join_ordering::QuerySolutionMap solns;
-    cost_based_ranker::EstimateMap estimate;
-};
+std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
+    QuerySolutionMap solns,
+    const join_ordering::JoinGraph& joinGraph,
+    const std::vector<ResolvedPath>& resolvedPaths,
+    int seed);
 
-/**
- * Given a set of 'CanonicalQueries' over potentially different namespaces and a map of
- * 'SamplingEstimators' keyed by namespace, for each query, this function invokes the plan
- * enumerator and uses cost-based ranking (CBR) with sampling-based cardinality estimation. This
- * function returns a QuerySolution representing the best plan for each query along with an
- * 'EstimateMap' which contains cardinality and cost estimates for every QSN.
- */
-StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    const std::vector<std::unique_ptr<CanonicalQuery>>& queries,
-    const SamplingEstimatorMap& samplingEstimators);
-
-}  // namespace mongo::optimizer
+}  // namespace mongo::join_ordering

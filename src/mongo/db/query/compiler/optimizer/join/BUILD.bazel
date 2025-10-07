@@ -32,10 +32,15 @@ mongo_cc_unit_test(
         "agg_join_model_test.cpp",
         "join_graph_test.cpp",
         "path_resolver_test.cpp",
+        "reorder_joins_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/test_output/query/join/reorder_graph_test:test_data",
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":join_ordering",
+        ":reorder_joins",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
     ],
@@ -80,7 +85,32 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [
+        ":solution_storage",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "reorder_joins",
+    srcs = [
+        "reorder_joins.cpp",
+    ],
+    hdrs = [
+        "reorder_joins.h",
+    ],
+    deps = [
+        ":join_ordering",
+        ":solution_storage",
+    ],
+)
+
+mongo_cc_library(
+    name = "solution_storage",
+    hdrs = [
+        "solution_storage.h",
+    ],
+    deps = [
+        "//src/mongo/db/query:canonical_query_base",
     ],
 )
