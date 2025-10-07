@@ -54,6 +54,7 @@ function testWriteConcernBasic(st) {
     const dbName = "testDbBasic";
     const collName = "testColl";
     const ns = dbName + "." + collName;
+    const testDB = st.s.getDB(dbName);
     const testColl = st.s.getCollection(ns);
 
     // This test verifies moveCollection is resilient against WriteConcernTimeout errors. It works
@@ -97,7 +98,7 @@ function testWriteConcernBasic(st) {
     // The find command triggers a catalog cache refresh which could throw a WriteConcernTimeout.
     // Using assert.soon so that find eventually works.
     assert.soon(() => {
-        let res = testColl.find().explain();
+        const res = testDB.runCommand({find: collName, filter: {}});
         return res.ok === 1;
     });
 
