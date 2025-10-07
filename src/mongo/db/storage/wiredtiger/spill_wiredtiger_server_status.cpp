@@ -74,6 +74,7 @@ const std::vector<std::string>& fieldsToInclude = {
     "cache: pages queued for eviction",
     "cache: pages queued for urgent eviction",
     "cache: tracked dirty bytes in the cache",
+    "session: open session count",
 };
 }
 
