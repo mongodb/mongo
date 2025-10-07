@@ -16,9 +16,9 @@ set -o verbose
 
 activate_venv
 
-source ./evergreen/bazel_utility_functions.sh
+source ./evergreen/bazel_evergreen_shutils.sh
 
-BAZEL_BINARY=$(bazel_get_binary_path)
+BAZEL_BINARY=$(bazel_evergreen_shutils::bazel_get_binary_path)
 
 # Timeout is set here to avoid the build hanging indefinitely, still allowing
 # for retries.

@@ -17,11 +17,6 @@ sh_binary(
 )
 
 sh_binary(
-    name = "bazel_RBE_supported",
-    srcs = ["bazel_RBE_supported.sh"],
-)
-
-sh_binary(
     name = "bazel_compile",
     srcs = ["bazel_compile.sh"],
 )
@@ -32,23 +27,18 @@ sh_binary(
 )
 
 sh_binary(
-    name = "bazel_get_binary_path",
-    srcs = ["bazel_get_binary_path.sh"],
-)
-
-sh_binary(
     name = "bazel_run",
     srcs = ["bazel_run.sh"],
 )
 
 sh_binary(
-    name = "bazel_scons_diff",
-    srcs = ["bazel_scons_diff.sh"],
+    name = "bazel_test",
+    srcs = ["bazel_test.sh"],
 )
 
 sh_binary(
-    name = "bazel_utility_functions",
-    srcs = ["bazel_utility_functions.sh"],
+    name = "bazel_evergreen_shutils",
+    srcs = ["bazel_evergreen_shutils.sh"],
 )
 
 sh_binary(
@@ -74,11 +64,6 @@ sh_binary(
 sh_binary(
     name = "cleanup_environment",
     srcs = ["cleanup_environment.sh"],
-)
-
-sh_binary(
-    name = "compile_ninja",
-    srcs = ["compile_ninja.sh"],
 )
 
 sh_binary(

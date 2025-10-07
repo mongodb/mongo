@@ -14,8 +14,8 @@ cd src
 set -o errexit
 set -o verbose
 
-source ./evergreen/bazel_utility_functions.sh
-BAZEL_BINARY=$(bazel_get_binary_path)
+source ./evergreen/bazel_evergreen_shutils.sh
+BAZEL_BINARY=$(bazel_evergreen_shutils::bazel_get_binary_path)
 
 echo "suite_config: $(${BAZEL_BINARY} cquery ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} \
     --define=MONGO_VERSION=${version} ${patch_compile_flags} ${suite}_config --output files)" >suite_config_expansion.yml

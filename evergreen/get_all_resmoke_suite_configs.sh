@@ -12,8 +12,8 @@ cd src
 set -o errexit
 set -o verbose
 
-source ./evergreen/bazel_utility_functions.sh
-BAZEL_BINARY=$(bazel_get_binary_path)
+source ./evergreen/bazel_evergreen_shutils.sh
+BAZEL_BINARY=$(bazel_evergreen_shutils::bazel_get_binary_path)
 
 # Queries all resmoke_config targets: kind(resmoke_config, //...)
 # and outputs YAML key-value pair created by the starlark expression for each target.
