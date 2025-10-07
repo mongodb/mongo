@@ -10,8 +10,9 @@
  * incompatible_aubsan,
  * tsan_incompatible,
  * requires_persistence,
+ * # TODO SERVER-110187 enable this test for viewless timeseres collection
+ * featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
- *
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
