@@ -952,6 +952,11 @@ error_codes:
       name: SchemaRegistryNonRetryableError,
       categories: [StreamProcessorUserError],
     }
+  - {
+      code: 468,
+      name: StreamProcessorStartupRetryableError,
+      categories: [StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
