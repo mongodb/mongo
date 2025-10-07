@@ -97,7 +97,15 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
     // The rate limiter applies only requests when the client is authenticated to prevent DoS
     // attacks caused by many unauthenticated requests. In the case auth is disabled, all
     // requests will be subject to rate limiting.
-    const auto authorizationSession = AuthorizationSession::get(client);
+    const auto isAuthorizationExempt = [&] {
+        if (!AuthorizationSession::exists(client)) {
+            return true;
+        }
+
+        const auto authorizationSession = AuthorizationSession::get(client);
+        return !authorizationSession->shouldIgnoreAuthChecks() &&
+            !authorizationSession->isAuthenticated();
+    };
 
     const auto isConnectionExempt = [&] {
         ingressRequestRateLimiterExemptions.refreshSnapshot(_ingressRequestRateLimiterExemptions);
@@ -106,9 +114,7 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
             client->session()->isExemptedByCIDRList(*_ingressRequestRateLimiterExemptions);
     };
 
-    if ((!authorizationSession->shouldIgnoreAuthChecks() &&
-         !authorizationSession->isAuthenticated()) ||
-        isConnectionExempt()) {
+    if (isAuthorizationExempt() || isConnectionExempt()) {
         _rateLimiter.recordExemption();
         return Status::OK();
     }
