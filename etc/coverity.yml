@@ -20,6 +20,8 @@ analyze:
         enabled: false
       GLOBAL_INIT_ORDER:
         enabled: false
+      UNCAUGHT_EXCEPT:
+        enabled: false
       # Explicitly enabled checkers
       # Add any checker that needs to be explicitly enabled below
       REVERSE_OVERRUN:
