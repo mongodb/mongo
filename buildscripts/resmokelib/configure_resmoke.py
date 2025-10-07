@@ -850,7 +850,7 @@ flags in common: {common_set}
             # If there is some problem setting up metrics we don't want resmoke to fail
             # We would rather just swallow the error
             traceback.print_exc()
-            print("Failed to set up otel metrics. Continuing.")
+            print("Failed to set up otel metrics. Continuing.", file=sys.stderr)
 
     # Force invalid suite config
     _config.FORCE_EXCLUDED_TESTS = config.pop("force_excluded_tests")

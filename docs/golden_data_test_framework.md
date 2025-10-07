@@ -293,6 +293,24 @@ Get all available commands and options:
 $> buildscripts/golden_test.py --help
 ```
 
+### Update multiple expected files at once
+
+Some tests will run in multiple passthroughs or build variants, so they have multiple expected files.
+
+Whenever the test is updated, all the expected files should be updated together as well.
+
+```bash
+buildscripts/golden_test.py --verbose clean-run-accept jstests/query_golden/NAME_OF_TEST.js
+```
+
+This option uses `resmoke.py find-suites` to determine the passthrough suites a test belongs to and
+runs them.
+
+If the test is found to only belong to the `query_golden_classic` passthrough, it is assumed that
+it can have multiple expected results due to being run under multiple build variants with a different
+`internalQueryFrameworkControl` settings. So the test will be run with various values for
+`internalQueryFrameworkControl`.
+
 # How to diff test results from a non-workstation test run
 
 ## Bulk folder diff the results:
