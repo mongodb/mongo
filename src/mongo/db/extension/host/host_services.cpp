@@ -28,10 +28,42 @@
  */
 #include "mongo/db/extension/host/host_services.h"
 
+#include "mongo/db/extension/public/extension_log_gen.h"
+#include "mongo/logv2/attribute_storage.h"
+#include "mongo/logv2/log_detail.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
+
 namespace mongo::extension::host {
 
 bool HostServices::alwaysTrue_TEMPORARY() {
     return true;
 }
 
+void HostServices::log(const mongo::extension::MongoExtensionLog& log) {
+    // For now we always log extension messages under the EXTENSION-MONGOT component. Someday we'd
+    // like to dynamically create EXTENSION sub-components per extension.
+    logv2::LogOptions options(logv2::LogComponent::kExtensionMongot);
+
+    logv2::LogSeverity severity = [&]() {
+        switch (log.getSeverity()) {
+            case mongo::extension::MongoExtensionLogSeverityEnum::kWarning:
+                return logv2::LogSeverity::Warning();
+            case mongo::extension::MongoExtensionLogSeverityEnum::kError:
+                return logv2::LogSeverity::Error();
+            default:
+                return logv2::LogSeverity::Info();
+        }
+    }();
+
+    // TODO SERVER-111339 Populate attributes.
+    logv2::TypeErasedAttributeStorage attrs;
+
+    // We must go through logv2::detail::doLogImpl since the LOGV2 macros expect a static string
+    // literal for the message, but we have to log the message received at runtime from the
+    // extension.
+    logv2::detail::doLogImpl(log.getCode(), severity, options, log.getMessage(), attrs);
+}
 }  // namespace mongo::extension::host

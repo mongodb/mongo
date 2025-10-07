@@ -48,6 +48,17 @@ package(default_visibility = ["//visibility:public"])
     ]
 ]
 
+# Extensions under test_examples/host_services/
+[
+    mongo_cc_extension_shared_library(
+        name = extension_name + "_mongo_extension",
+        srcs = ["host_services/" + extension_name + ".cpp"],
+    )
+    for extension_name in [
+        "logging",
+    ]
+]
+
 ######################### EXTENSIONS FOR NO PASSTHROUGH OR UNIT TESTS #########################
 ### To be manually loaded in a no-passthrough e2e test, the extension must also be added to
 ### "dist_test_extensions" in mongo/BUILD.bazel.

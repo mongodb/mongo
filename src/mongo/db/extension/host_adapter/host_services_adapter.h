@@ -57,6 +57,8 @@ private:
 
     static MongoExtensionStatus* _extAlwaysOK_TEMPORARY() noexcept;
 
-    static constexpr ::MongoExtensionHostServicesVTable VTABLE{&_extAlwaysOK_TEMPORARY};
+    static MongoExtensionStatus* _extLog(::MongoExtensionByteView logMessage) noexcept;
+
+    static constexpr ::MongoExtensionHostServicesVTable VTABLE{&_extAlwaysOK_TEMPORARY, &_extLog};
 };
 }  // namespace mongo::extension::host_adapter

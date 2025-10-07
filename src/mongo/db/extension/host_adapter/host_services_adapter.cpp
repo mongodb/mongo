@@ -29,6 +29,7 @@
 #include "mongo/db/extension/host_adapter/host_services_adapter.h"
 
 #include "mongo/db/extension/host/host_services.h"
+#include "mongo/db/extension/public/extension_log_gen.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
 namespace mongo::extension::host_adapter {
@@ -38,5 +39,16 @@ HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
 
 MongoExtensionStatus* HostServicesAdapter::_extAlwaysOK_TEMPORARY() noexcept {
     return sdk::enterCXX([&]() { return host::HostServices::alwaysTrue_TEMPORARY(); });
+}
+
+MongoExtensionStatus* HostServicesAdapter::_extLog(::MongoExtensionByteView logMessage) noexcept {
+    return sdk::enterCXX([&]() {
+        BSONObj obj = sdk::bsonObjFromByteView(logMessage);
+
+        mongo::extension::MongoExtensionLog extensionLog =
+            mongo::extension::MongoExtensionLog::parse(std::move(obj));
+
+        return host::HostServices::log(extensionLog);
+    });
 }
 }  // namespace mongo::extension::host_adapter

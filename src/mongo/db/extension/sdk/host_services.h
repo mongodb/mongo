@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/public/extension_log_gen.h"
+#include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/handle.h"
 #include "mongo/util/modules.h"
@@ -67,6 +68,16 @@ public:
 
     static HostServicesHandle* getHostServices() {
         return &_hostServices;
+    }
+
+    void log(std::string message,
+             std::int32_t code,
+             mongo::extension::MongoExtensionLogSeverityEnum severity =
+                 mongo::extension::MongoExtensionLogSeverityEnum::kInfo) const {
+        assertValid();
+
+        BSONObj obj = createExtensionLogMessage(std::move(message), code, severity);
+        sdk::enterC([&]() { return vtable().log(sdk::objAsByteView(obj)); });
     }
 
     /**

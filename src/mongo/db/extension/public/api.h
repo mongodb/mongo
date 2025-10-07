@@ -399,6 +399,14 @@ typedef struct MongoExtensionHostServices {
 } MongoExtensionHostServices;
 typedef struct MongoExtensionHostServicesVTable {
     MongoExtensionStatus* (*alwaysOK_TEMPORARY)();
+
+    /**
+     * Logs a message from the extension with severity INFO, WARNING, or ERROR.
+     *
+     * The rawLog parameter is expected to be a BSON document with the structure defined by
+     * the MongoExtensionLog struct in extension_log.idl.
+     */
+    MongoExtensionStatus* (*log)(MongoExtensionByteView rawLog);
 } MongoExtensionHostServicesVTable;
 
 /**

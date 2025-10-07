@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/extension/public/extension_log_gen.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::host {
@@ -38,5 +39,10 @@ namespace mongo::extension::host {
 class HostServices {
 public:
     static bool alwaysTrue_TEMPORARY();
+
+    /**
+     * Logs a message from the extension with severity INFO, WARNING, or ERROR.
+     */
+    static void log(const mongo::extension::MongoExtensionLog& log);
 };
 }  // namespace mongo::extension::host
