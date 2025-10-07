@@ -47,6 +47,15 @@ echo "common --bes_keywords=engflow:CiCdPipelineName=${build_variant:?}" >>.baze
 echo "common --bes_keywords=engflow:CiCdJobName=${task_name:?}" >>.bazelrc.evergreen
 echo "common --bes_keywords=engflow:CiCdUri=${uri:?}" >>.bazelrc.evergreen
 echo "common --bes_keywords=evg:project=${project:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:version_id=${version_id:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:trace_id=${otel_trace_id:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:requester=${requester:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:distro_id=${distro_id:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:build_id=${build_id:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:build_variant=${build_variant:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:task_id=${task_id:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:task_name=${task_name:?}" >>.bazelrc.evergreen
+echo "common --bes_keywords=evg:execution=${execution:?}" >>.bazelrc.evergreen
 echo "common --remote_upload_local_results=True" >>.bazelrc.evergreen
 echo "common --test_output=summary" >>.bazelrc.evergreen
 
