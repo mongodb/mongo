@@ -65,10 +65,17 @@ void FaultFacetImpl::update(HealthCheckStatus status) {
 }
 
 void FaultFacetImpl::appendDescription(BSONObjBuilder* builder) const {
+    decltype(_severity) severity;
+    decltype(_description) description;
+    {
+        stdx::lock_guard lk(_mutex);
+        severity = _severity;
+        description = _description;
+    }
     builder->append("type", FaultFacetType_serializer(getType()));
-    builder->append("severity", _severity);
+    builder->append("severity", severity);
     builder->append("duration", getDuration().toBSON());
-    builder->append("description", _description);
+    builder->append("description", description);
 };
 
 }  // namespace process_health
