@@ -1,0 +1,31 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "pipeline_rewriter",
+    srcs = [
+        "rule_based_rewriter.cpp",
+    ],
+    hdrs = [
+        "rule_based_rewriter.h",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:pipeline_visitor",
+        "//src/mongo/db/query/compiler/rewrites:rule_based_rewriter",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipeline_rewriter_test",
+    srcs = [
+        "pipeline_rewriter_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":pipeline_rewriter",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)
