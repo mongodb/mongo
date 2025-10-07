@@ -48,8 +48,7 @@ public:
     RetryStrategyTest()
         : ServiceContextTest{std::make_unique<ScopedGlobalServiceContextForTest>(
               ServiceContext::make(std::make_unique<ClockSourceMock>()))},
-          _retryBudget{
-              std::make_shared<AdaptiveRetryStrategy::RetryBudget>(kReturnRate, kBudgetCapacity)},
+          _retryBudget{kReturnRate, kBudgetCapacity},
           _opCtx{makeOperationContext()} {}
 
     ClockSourceMock* getClockSource() {
@@ -168,7 +167,7 @@ public:
     static constexpr auto kExampleResultValue = "result"_sd;
 
 protected:
-    std::shared_ptr<AdaptiveRetryStrategy::RetryBudget> _retryBudget;
+    AdaptiveRetryStrategy::RetryBudget _retryBudget;
 
 private:
     AdaptiveRetryStrategy _makeRetryStrategyNoIncrement() {
@@ -330,7 +329,7 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyCallbackCalled) {
 
     // Validate that each of the failures recorded have called the callback and depleted the budget.
     ASSERT_EQ(retryCriteriaCallCount(), kBudgetCapacity);
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), 0);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), 0);
 }
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyNoBudget) {
@@ -351,7 +350,7 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyFailNoReturnToken) {
     // returnRate. We do not return a whole token because no system overloaded failure were
     // recorded.
     ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), kReturnRate);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), kReturnRate);
 }
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyReturnWholeToken) {
@@ -365,7 +364,7 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyReturnWholeToken) {
     // Since we failed with the system overloaded error label before exhausting the budget, a whole
     // token will be returned in addition of the return rate.
     ASSERT(strategy.recordFailureAndEvaluateShouldRetry(statusRetriableErrorCategory, target1, {}));
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), kReturnRate + 1);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), kReturnRate + 1);
 }
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyReplenishBudgetBySuccess) {
@@ -377,7 +376,7 @@ TEST_F(RetryStrategyTest, AdaptiveRetryStrategyReplenishBudgetBySuccess) {
         strategy.recordSuccess(target1);
     }
 
-    ASSERT_APPROX_EQUAL(_retryBudget->getBalance_forTest(), 1, kMaxTokenError);
+    ASSERT_APPROX_EQUAL(_retryBudget.getBalance_forTest(), 1, kMaxTokenError);
 }
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyReplenishBudgetByError) {
@@ -411,7 +410,7 @@ TEST_F(RetryStrategyTest, RetryBudgetHighlyConcurrentAcquire) {
     }
 
     // Ensure the count is right since the retry budget should be thread safe.
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), kBudgetCapacity - kNumThreads);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), kBudgetCapacity - kNumThreads);
 }
 
 TEST_F(RetryStrategyTest, RetryBudgetHighlyConcurrentAcquireAndReleaseInBound) {
@@ -443,7 +442,7 @@ TEST_F(RetryStrategyTest, RetryBudgetHighlyConcurrentAcquireAndReleaseInBound) {
     }
 
     // Here we should see no change in balance since half the threads are returning tokens.
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), kNumThreads / 2);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), kNumThreads / 2);
 }
 
 TEST_F(RetryStrategyTest, RetryBudgetHighlyConcurrentAcquireWithFailures) {
@@ -451,8 +450,8 @@ TEST_F(RetryStrategyTest, RetryBudgetHighlyConcurrentAcquireWithFailures) {
 
     // Deplete most of the capacity so that some threads won't be able to acquire tokens.
     depleteBudget(kBudgetCapacity - kNumThreads / 2);
-    ASSERT_LT(_retryBudget->getBalance_forTest(), kNumThreads);
-    const auto expectedAmountOfFailures = kNumThreads - _retryBudget->getBalance_forTest();
+    ASSERT_LT(_retryBudget.getBalance_forTest(), kNumThreads);
+    const auto expectedAmountOfFailures = kNumThreads - _retryBudget.getBalance_forTest();
     Atomic<std::int32_t> failures{0};
 
     {
@@ -492,20 +491,20 @@ TEST_F(RetryStrategyTest, RetryBudgetHighlyConcurrentReleaseMaxCapacity) {
         }
     }
 
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), kBudgetCapacity);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), kBudgetCapacity);
 }
 
 TEST_F(RetryStrategyTest, RetryBudgetSetCapacitySmaller) {
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), kBudgetCapacity);
-    _retryBudget->updateRateParameters(kReturnRate, kBudgetCapacity / 2.);
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), kBudgetCapacity / 2.);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), kBudgetCapacity);
+    _retryBudget.updateRateParameters(kReturnRate, kBudgetCapacity / 2.);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), kBudgetCapacity / 2.);
 }
 
 TEST_F(RetryStrategyTest, RetryBudgetSetCapacityBigger) {
     depleteBudget(kBudgetCapacity - 2);
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), 2);
-    _retryBudget->updateRateParameters(kReturnRate, kBudgetCapacity / 2.);
-    ASSERT_EQ(_retryBudget->getBalance_forTest(), 2);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), 2);
+    _retryBudget.updateRateParameters(kReturnRate, kBudgetCapacity / 2.);
+    ASSERT_EQ(_retryBudget.getBalance_forTest(), 2);
 }
 
 TEST_F(RetryStrategyTest, RunWithRetryStrategySuccessOnly) {

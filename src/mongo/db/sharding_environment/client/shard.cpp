@@ -34,6 +34,8 @@
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
@@ -49,9 +51,6 @@
 
 namespace mongo {
 namespace {
-
-Atomic<double>* gRetryBudgetReturnRateServerParameter;
-Atomic<std::int32_t>* gRetryBudgetCapacityServerParameter;
 
 auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolicy) {
     return [retryPolicy, shard = &shard](Status s, std::span<const std::string> errorLabels) {
@@ -122,16 +121,9 @@ Shard::RetryStrategy::RetryStrategy(const Shard& shard,
 Shard::RetryStrategy::RetryStrategy(const Shard& shard,
                                     Shard::RetryPolicy retryPolicy,
                                     AdaptiveRetryStrategy::RetryParameters parameters)
-    : _underlyingStrategy{
-          shard._retryBudget, makeRetryCriteriaForShard(shard, retryPolicy), parameters} {}
-
-void Shard::initServerParameterPointersToAvoidLinking(Atomic<double>* returnRate,
-                                                      Atomic<std::int32_t>* capacity) {
-    invariant(returnRate);
-    invariant(capacity);
-    gRetryBudgetReturnRateServerParameter = returnRate;
-    gRetryBudgetCapacityServerParameter = capacity;
-}
+    : _underlyingStrategy{shard._sharedState->retryBudget,
+                          makeRetryCriteriaForShard(shard, retryPolicy),
+                          parameters} {}
 
 Status Shard::CommandResponse::getEffectiveStatus(
     const StatusWith<Shard::CommandResponse>& swResponse) {
@@ -210,20 +202,15 @@ bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return !isMongosRetriableError(code) && (code != ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
-Shard::Shard(const ShardId& id) : _id(id) {
-    invariant(gRetryBudgetReturnRateServerParameter);
-    invariant(gRetryBudgetCapacityServerParameter);
-    _retryBudget = std::make_shared<AdaptiveRetryStrategy::RetryBudget>(
-        gRetryBudgetReturnRateServerParameter->loadRelaxed(),
-        gRetryBudgetCapacityServerParameter->loadRelaxed());
+Shard::Shard(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState)
+    : _id(id), _sharedState{std::move(sharedState)} {}
+
+std::shared_ptr<ShardSharedStateCache::State> Shard::getSharedState() const {
+    return _sharedState;
 }
 
-void Shard::updateRetryBudgetRateParameters(double returnRate, double capacity) {
-    _retryBudget->updateRateParameters(returnRate, capacity);
-}
-
-std::shared_ptr<AdaptiveRetryStrategy::RetryBudget> Shard::getRetryBudget_forTest() const {
-    return _retryBudget;
+AdaptiveRetryStrategy::RetryBudget& Shard::getRetryBudget_forTest() const {
+    return _sharedState->retryBudget;
 }
 
 bool Shard::isConfig() const {

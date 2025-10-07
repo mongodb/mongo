@@ -65,7 +65,7 @@ public:
     // local process, so it uses the hardcoded local connection string. Only used in tests.
     static const ConnectionString kLocalConnectionString;
 
-    explicit ShardLocal(const ShardId& id);
+    ShardLocal(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState);
 
     ~ShardLocal() override = default;
 

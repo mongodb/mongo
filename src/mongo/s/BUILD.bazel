@@ -168,6 +168,21 @@ idl_generator(
     src = "sharding_task_executor_pool.idl",
 )
 
+mongo_cc_library(
+    name = "shard_shared_state_cache",
+    srcs = [
+        "//src/mongo/db/sharding_environment:shard_retry_server_parameters_gen",
+        "//src/mongo/db/sharding_environment:shard_shared_state_cache.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/sharding_environment:shard_shared_state_cache.h",
+    ],
+    deps = [
+        "//src/mongo/client:retry_strategy",
+        "//src/mongo/db:server_base",
+    ],
+)
+
 # This library contains sharding functionality used by both mongod and mongos
 mongo_cc_library(
     name = "grid",
@@ -181,7 +196,6 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment:cluster_identity_loader.cpp",
         "//src/mongo/db/sharding_environment:grid.cpp",
         "//src/mongo/db/sharding_environment:router_uptime_reporter.cpp",
-        "//src/mongo/db/sharding_environment:shard_retry_server_parameters_gen",
         "//src/mongo/db/sharding_environment/client:config_shard_wrapper.cpp",
         "//src/mongo/db/sharding_environment/client:shard_factory.cpp",
         "//src/mongo/db/topology:shard_registry.cpp",
@@ -439,6 +453,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/catalog_cache:catalog_cache_loader.h",
         "//src/mongo/db/global_catalog/catalog_cache:config_server_catalog_cache_loader.h",
         "//src/mongo/db/sharding_environment:grid.h",
+        "//src/mongo/db/sharding_environment:shard_shared_state_cache.h",
         "//src/mongo/s:transaction_router.h",
         "//src/mongo/db/stats:single_transaction_stats.h",
         "//src/mongo/util/concurrency:ticketholder_queue_stats.h",

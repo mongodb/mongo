@@ -79,9 +79,6 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
     invariant(!_executorPool);
     invariant(!_network);
 
-    Shard::initServerParameterPointersToAvoidLinking(&gShardRetryTokenReturnRate,
-                                                     &gShardRetryTokenBucketCapacity);
-
     _catalogClient = std::move(catalogClient);
     _catalogCache = std::move(catalogCache);
     _shardRegistry = std::move(shardRegistry);
@@ -123,37 +120,6 @@ void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
     stdx::lock_guard lk(_mutex);
     invariant(!_customConnectionPoolStatsFn || !statsFn);
     _customConnectionPoolStatsFn = std::move(statsFn);
-}
-
-Status Grid::updateRetryBudgetReturnRate(double returnRate) {
-    const auto capacity = gShardRetryTokenBucketCapacity.load();
-    return _updateRetryBudgetRateParameters(returnRate, capacity);
-}
-
-Status Grid::updateRetryBudgetCapacity(std::int32_t capacity) {
-    const auto returnRate = gShardRetryTokenReturnRate.load();
-    return _updateRetryBudgetRateParameters(returnRate, capacity);
-}
-
-Status Grid::_updateRetryBudgetRateParameters(double returnRate, double capacity) {
-    auto* client = Client::getCurrent();
-    auto* opCtx = client->getOperationContext();
-    auto* grid = get(client->getServiceContext());
-
-    const auto allShardIds = grid->_shardRegistry->getAllShardIds(client->getOperationContext());
-
-    // Here we only care about updating existing instances of Shard, because new instances of Shard
-    // will use the up-to-date values for the server parameters, and deleted shards can be ignored
-    // since setting the retry budget on deleted shards would have no effects.
-    for (const auto& shardId : allShardIds) {
-        if (const auto statusWithShard = grid->shardRegistry()->getShard(opCtx, shardId);
-            statusWithShard.isOK()) {
-            auto shard = statusWithShard.getValue();
-            shard->updateRetryBudgetRateParameters(returnRate, capacity);
-        }
-    }
-
-    return Status::OK();
 }
 
 // TODO (SERVER-104701): Unify mongoS and mongoD implementations and get rid of `isMongos` parameter

@@ -146,18 +146,25 @@ std::unique_ptr<ShardRegistry> ShardingMongoDTestFixture::makeShardRegistry(
     auto targeterFactory(std::make_unique<RemoteCommandTargeterFactoryMock>());
     auto targeterFactoryPtr = targeterFactory.get();
     _targeterFactory = targeterFactoryPtr;
+    auto service = getServiceContext();
 
-    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
-                                                   const ShardId& shardId,
-                                                   const ConnectionString& connStr) {
-        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
-    };
+    ShardFactory::BuilderCallable setBuilder =
+        [targeterFactoryPtr, service](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(service);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
-    ShardFactory::BuilderCallable standaloneBuilder = [targeterFactoryPtr](
-                                                          const ShardId& shardId,
-                                                          const ConnectionString& connStr) {
-        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
-    };
+    ShardFactory::BuilderCallable standaloneBuilder =
+        [targeterFactoryPtr, service](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(service);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::ConnectionType::kReplicaSet, std::move(setBuilder)},
@@ -165,9 +172,11 @@ std::unique_ptr<ShardRegistry> ShardingMongoDTestFixture::makeShardRegistry(
 
     // Only config servers use ShardLocal for now.
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        ShardFactory::BuilderCallable localBuilder = [](const ShardId& shardId,
-                                                        const ConnectionString& connStr) {
-            return std::make_unique<ShardLocal>(shardId);
+        ShardFactory::BuilderCallable localBuilder = [service](const ShardId& shardId,
+                                                               const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(service);
+            return std::make_unique<ShardLocal>(shardId,
+                                                shardSharedStateCache.getShardState(shardId));
         };
         buildersMap.insert(
             std::pair<ConnectionString::ConnectionType, ShardFactory::BuilderCallable>(
@@ -177,8 +186,14 @@ std::unique_ptr<ShardRegistry> ShardingMongoDTestFixture::makeShardRegistry(
     auto shardFactory =
         std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
+    auto shardRemovalHooks = std::vector<ShardRegistry::ShardRemovalHook>{
+        [&shardSharedStateCache =
+             ShardSharedStateCache::get(service)](const ShardId& removedShard) {
+            shardSharedStateCache.forgetShardState(removedShard);
+        }};
+
     return std::make_unique<ShardRegistry>(
-        getServiceContext(), std::move(shardFactory), configConnStr);
+        getServiceContext(), std::move(shardFactory), configConnStr, std::move(shardRemovalHooks));
 }
 
 std::unique_ptr<ClusterCursorManager> ShardingMongoDTestFixture::makeClusterCursorManager() {

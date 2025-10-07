@@ -47,6 +47,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/client/shard_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -127,7 +128,7 @@ public:
      * Shard specific retry strategy. An instance of this class cannot outlive the shard passed in
      * as it internally holds a pointer to the shard.
      */
-    class RetryStrategy : public mongo::RetryStrategy {
+    class RetryStrategy final : public mongo::RetryStrategy {
     public:
         RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy);
         RetryStrategy(const Shard& shard,
@@ -161,23 +162,52 @@ public:
         AdaptiveRetryStrategy _underlyingStrategy;
     };
 
+    /**
+     * A thin wrapper around Shard::RetryStrategy that keeps a shared pointer to the shard.
+     *
+     * Use when keeping a shared pointer is needed during an async operation, otherwise prefer
+     * Shard::RetryStrategy
+     */
+    class OwnerRetryStrategy final : public mongo::RetryStrategy {
+    public:
+        OwnerRetryStrategy(std::shared_ptr<Shard> shard, Shard::RetryPolicy retryPolicy)
+            : _underlyingStrategy{*shard, retryPolicy}, _owner{std::move(shard)} {}
+
+        OwnerRetryStrategy(std::shared_ptr<Shard> shard,
+                           Shard::RetryPolicy retryPolicy,
+                           std::int32_t maxRetryAttempts)
+            : _underlyingStrategy{*shard, retryPolicy, maxRetryAttempts},
+              _owner{std::move(shard)} {}
+
+        bool recordFailureAndEvaluateShouldRetry(
+            Status s,
+            const boost::optional<HostAndPort>& target,
+            std::span<const std::string> errorLabels) override {
+            return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+        }
+
+        void recordSuccess(const boost::optional<HostAndPort>& target) override {
+            _underlyingStrategy.recordSuccess(target);
+        }
+
+        Milliseconds getNextRetryDelay() const override {
+            return _underlyingStrategy.getNextRetryDelay();
+        }
+
+        const TargetingMetadata& getTargetingMetadata() const override {
+            return _underlyingStrategy.getTargetingMetadata();
+        }
+
+    private:
+        Shard::RetryStrategy _underlyingStrategy;
+        std::shared_ptr<Shard> _owner;
+    };
+
     virtual ~Shard() = default;
 
     const ShardId& getId() const {
         return _id;
     }
-
-    /**
-     * This function is called by Grid during initialization and must be invoked before creating an
-     * instance of Shard. This was introduced to work around a linking issue between grid and shard.
-     *
-     * The parameters returnRate and capacity are expected to be pointers to the server parameters
-     * gShardRetryTokenReturnRate and gShardRetryTokenBucketCapacity respectively.
-     *
-     * To determine if the server parameters have been initialized, use Grid::isInitialized.
-     */
-    static void initServerParameterPointersToAvoidLinking(Atomic<double>* returnRate,
-                                                          Atomic<std::int32_t>* capacity);
 
     /**
      * Returns true if this shard object represents the config server.
@@ -371,10 +401,12 @@ public:
     /**
      * Returns the retry budget instance for testing purposes.
      */
-    std::shared_ptr<AdaptiveRetryStrategy::RetryBudget> getRetryBudget_forTest() const;
+    AdaptiveRetryStrategy::RetryBudget& getRetryBudget_forTest() const;
 
 protected:
-    Shard(const ShardId& id);
+    Shard(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState);
+
+    std::shared_ptr<ShardSharedStateCache::State> getSharedState() const;
 
     /**
      * Submits the batch request applying the specified retry policy and timeout and using the
@@ -438,11 +470,7 @@ private:
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
      */
     const ShardId _id;
-
-    // TODO: SERVER-109573 Consider changing this shared pointer by a value, since the lifetime
-    // relationships are already well established. A Shard::RetryStrategy already cannot outlive the
-    // shard it was created for.
-    std::shared_ptr<AdaptiveRetryStrategy::RetryBudget> _retryBudget;
+    std::shared_ptr<ShardSharedStateCache::State> _sharedState;
 
     friend class ConfigShardWrapper;
 };

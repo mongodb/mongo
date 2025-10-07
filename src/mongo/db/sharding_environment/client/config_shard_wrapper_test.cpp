@@ -39,6 +39,8 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_retry_server_parameters_gen.h"
+#include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -62,7 +64,10 @@ class MockShard : public Shard {
     MockShard& operator=(const MockShard&) = delete;
 
 public:
-    explicit MockShard(const ShardId& id) : Shard(id) {}
+    explicit MockShard(const ShardId& id)
+        : Shard(id,
+                std::make_shared<ShardSharedStateCache::State>(
+                    kShardRetryTokenBucketCapacityDefault, kShardRetryTokenReturnRateDefault)) {}
     ~MockShard() override = default;
 
     const ConnectionString& getConnString() const override {

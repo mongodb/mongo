@@ -28,8 +28,7 @@
 global:
     cpp_namespace: mongo
     cpp_includes:
-        - "mongo/db/sharding_environment/grid.h"
-        - "mongo/db/sharding_environment/client/shard.h"
+        - "mongo/db/sharding_environment/shard_shared_state_cache.h"
 
 server_parameters:
     shardRetryTokenBucketCapacity:
@@ -41,7 +40,7 @@ server_parameters:
         validator:
             gt: 0
         redact: false
-        on_update: Grid::updateRetryBudgetCapacity
+        on_update: ShardSharedStateCache::updateRetryBudgetCapacity
 
     shardRetryTokenReturnRate:
         description: >-
@@ -55,4 +54,4 @@ server_parameters:
         validator:
             gt: 0
         redact: false
-        on_update: Grid::updateRetryBudgetReturnRate
+        on_update: ShardSharedStateCache::updateRetryBudgetReturnRate

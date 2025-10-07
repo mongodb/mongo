@@ -509,22 +509,18 @@ public:
         return DefaultRetryStrategy::defaultRetryCriteria(s, errorLabels);
     }
 
-    AdaptiveRetryStrategy(std::shared_ptr<RetryBudget> budget,
-                          std::unique_ptr<RetryStrategy> underlyingStrategy)
-        : _underlyingStrategy{std::move(underlyingStrategy)}, _budget{std::move(budget)} {
-        invariant(_budget);
+    AdaptiveRetryStrategy(RetryBudget& budget, std::unique_ptr<RetryStrategy> underlyingStrategy)
+        : _underlyingStrategy{std::move(underlyingStrategy)}, _budget{&budget} {
         invariant(_underlyingStrategy);
     }
 
     explicit AdaptiveRetryStrategy(
-        std::shared_ptr<RetryBudget> budget,
+        RetryBudget& budget,
         RetryCriteria retryCriteria = defaultRetryCriteria,
         RetryParameters parameters = DefaultRetryStrategy::getRetryParametersFromServerParameters())
         : _underlyingStrategy{std::make_unique<DefaultRetryStrategy>(std::move(retryCriteria),
                                                                      parameters)},
-          _budget{std::move(budget)} {
-        invariant(_budget);
-    }
+          _budget{&budget} {}
 
     /**
      * Determines whether the operation should be retried based on the retry budget.
@@ -556,7 +552,7 @@ public:
 
 private:
     std::unique_ptr<RetryStrategy> _underlyingStrategy;
-    std::shared_ptr<RetryBudget> _budget;
+    RetryBudget* _budget;
     bool _previousAttemptOverloaded = false;
 };
 

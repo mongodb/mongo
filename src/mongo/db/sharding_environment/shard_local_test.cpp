@@ -73,7 +73,10 @@ protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
-        _shardLocal = std::make_unique<ShardLocal>(ShardId::kConfigServerId);
+        auto& shardSharedStateCache = ShardSharedStateCache::get(_opCtx.get());
+        _shardLocal = std::make_unique<ShardLocal>(
+            ShardId::kConfigServerId,
+            shardSharedStateCache.getShardState(ShardId::kConfigServerId));
         const repl::ReplSettings replSettings = {};
         repl::ReplicationCoordinator::set(
             getGlobalServiceContext(),

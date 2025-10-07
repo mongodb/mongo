@@ -539,17 +539,23 @@ Status initializeSharding(
     auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
-    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
-                                                   const ShardId& shardId,
-                                                   const ConnectionString& connStr) {
-        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
-    };
+    ShardFactory::BuilderCallable setBuilder =
+        [targeterFactoryPtr, opCtx](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
-    ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
-                                                      const ShardId& shardId,
-                                                      const ConnectionString& connStr) {
-        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
-    };
+    ShardFactory::BuilderCallable masterBuilder =
+        [targeterFactoryPtr, opCtx](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::ConnectionType::kReplicaSet, std::move(setBuilder)},
@@ -567,8 +573,11 @@ Status initializeSharding(
     std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
         // It's safe to capture the CatalogCache pointer since the Grid (and therefore CatalogCache
         // and ShardRegistry) are never destroyed.
-        [catCache = catalogCache.get()](const ShardId& removedShard) {
+        [catCache = catalogCache.get(),
+         serviceContext = opCtx->getServiceContext()](const ShardId& removedShard) {
             catCache->advanceTimeInStoreForEntriesThatReferenceShard(removedShard);
+            auto& shardSharedStateCache = ShardSharedStateCache::get(serviceContext);
+            shardSharedStateCache.forgetShardState(removedShard);
         }};
 
     if (!mongosGlobalParams.configdbs) {

@@ -70,7 +70,8 @@ public:
      */
     ShardRemote(const ShardId& id,
                 const ConnectionString& connString,
-                std::unique_ptr<RemoteCommandTargeter> targeter);
+                std::unique_ptr<RemoteCommandTargeter> targeter,
+                std::shared_ptr<ShardSharedStateCache::State> sharedState);
 
     ~ShardRemote() override;
 

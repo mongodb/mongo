@@ -340,21 +340,32 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
 
     auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
+    auto serviceContext = opCtx->getServiceContext();
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::ConnectionType::kReplicaSet,
-         [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-             return std::make_unique<ShardRemote>(
-                 shardId, connStr, targeterFactoryPtr->create(connStr));
+         [targeterFactoryPtr, serviceContext](const ShardId& shardId,
+                                              const ConnectionString& connStr) {
+             auto& shardSharedStateCache = ShardSharedStateCache::get(serviceContext);
+             return std::make_unique<ShardRemote>(shardId,
+                                                  connStr,
+                                                  targeterFactoryPtr->create(connStr),
+                                                  shardSharedStateCache.getShardState(shardId));
          }},
         {ConnectionString::ConnectionType::kLocal,
-         [](const ShardId& shardId, const ConnectionString& connStr) {
-             return std::make_unique<ShardLocal>(shardId);
+         [serviceContext](const ShardId& shardId, const ConnectionString& connStr) {
+             auto& shardSharedStateCache = ShardSharedStateCache::get(serviceContext);
+             return std::make_unique<ShardLocal>(shardId,
+                                                 shardSharedStateCache.getShardState(shardId));
          }},
         {ConnectionString::ConnectionType::kStandalone,
-         [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-             return std::make_unique<ShardRemote>(
-                 shardId, connStr, targeterFactoryPtr->create(connStr));
+         [targeterFactoryPtr, serviceContext](const ShardId& shardId,
+                                              const ConnectionString& connStr) {
+             auto& shardSharedStateCache = ShardSharedStateCache::get(serviceContext);
+             return std::make_unique<ShardRemote>(shardId,
+                                                  connStr,
+                                                  targeterFactoryPtr->create(connStr),
+                                                  shardSharedStateCache.getShardState(shardId));
          }},
     };
 
@@ -426,8 +437,11 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
     std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
         // It's safe to capture the CatalogCache pointer since the Grid (and therefore CatalogCache
         // and ShardRegistry) are never destroyed.
-        [catCache = catalogCache.get()](const ShardId& removedShard) {
+        [catCache = catalogCache.get(),
+         &shardSharedStateCache =
+             ShardSharedStateCache::get(service)](const ShardId& removedShard) {
             catCache->advanceTimeInStoreForEntriesThatReferenceShard(removedShard);
+            shardSharedStateCache.forgetShardState(removedShard);
         }};
 
     auto shardRegistry = std::make_unique<ShardRegistry>(
