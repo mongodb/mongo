@@ -913,6 +913,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
 
+    // Place an empty hash in the results to override later. This result will only be used
+    // for empty collections.
+    if (_validateState->isCollHashValidation()) {
+        results->setCollectionHash(SHA256Block::computeHash({}).toHexString());
+    }
+
     if (_validateState->getFirstRecordId().isNull()) {
         // The record store is empty if the first RecordId isn't initialized.
         return;
