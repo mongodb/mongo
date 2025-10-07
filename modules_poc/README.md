@@ -92,11 +92,11 @@ To make an API or class available for use by other modules, add a
 tag to its header declaration.
 
 ```
-class MONGO_MOD_PUB Foo {
+class MONGO_MOD_PUBLIC Foo {
 
 };
 
-MONGO_MOD_PUB int foo();
+MONGO_MOD_PUBLIC int foo();
 ```
 
 Availability specification can also be done at the namespace level.

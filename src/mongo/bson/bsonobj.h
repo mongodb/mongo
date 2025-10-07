@@ -119,7 +119,7 @@ class LegacyStrictGenerator;
  Code With Scope: <total size><String><Object>
  \endcode
  */
-class MONGO_MOD_PUB BSONObj {
+class MONGO_MOD_PUBLIC BSONObj {
 public:
     struct DefaultSizeTrait {
         constexpr static int MaxSize = BSONObjMaxInternalSize;

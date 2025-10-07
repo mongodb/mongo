@@ -52,7 +52,10 @@
  * default all hierarchies are closed within their module unless explicitly marked as open.
  * See MONGO_MOD_OPEN below.
  */
-#define MONGO_MOD_PUB MONGO_MOD_ATTR_(public)
+#define MONGO_MOD_PUBLIC MONGO_MOD_ATTR_(public)
+
+/// Deprecated alias for MONGO_MOD_PUBLIC. TODO: All usages will be converted soon.
+#define MONGO_MOD_PUB MONGO_MOD_PUBLIC
 
 /**
  * Marks a class as open and everything inside as public to other modules.
@@ -61,8 +64,8 @@
  * levels.
  *
  * If we later decide we do not like this distinction, we can easily just sed this macro away
- * and use MONGO_MOD_PUB everywhere. But it will be easier to start with the distinction than to add
- * it later.
+ * and use MONGO_MOD_PUBLIC everywhere. But it will be easier to start with the distinction than to
+ * add it later.
  *
  * NOTE: unlike other markers openness is *not* applied recursively, so each type that should
  * support external subclasses must be separately marked as open.
@@ -72,7 +75,7 @@
 /**
  * Marks a declaration which the module owner would prefer to be
  * private, but for which there is currently no good alternative
- * for out-of-module usage. Allows external usage like MONGO_MOD_PUB,
+ * for out-of-module usage. Allows external usage like MONGO_MOD_PUBLIC,
  * but gives a warning to the module owner.
  */
 #define MONGO_MOD_NEEDS_REPLACEMENT MONGO_MOD_ATTR_(needs_replacement)
@@ -80,7 +83,7 @@
  * Marks a declaration which the module owner would prefer to be
  * private, but for which there are historical uses outside the
  * module which haven't been cleaned up yet. Allows external usage
- * like MONGO_MOD_PUB, but gives a warning to each caller for usage
+ * like MONGO_MOD_PUBLIC, but gives a warning to each caller for usage
  * outside the module.
  */
 #define MONGO_MOD_USE_REPLACEMENT(replacement) MONGO_MOD_ATTR_(use_replacement::replacement)
@@ -92,7 +95,7 @@
  * currently need to be public, even if they aren't directly used externally.
  * In almost all cases, MONGO_MOD_NEEDS_REPLACEMENT should be used instead.
  */
-#define MONGO_MOD_PUB_FOR_TECHNICAL_REASONS MONGO_MOD_ATTR_(public)
+#define MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_MOD_ATTR_(public)
 
 /** Marks a declaration and everything inside as private from other modules */
 #define MONGO_MOD_PRIVATE MONGO_MOD_ATTR_(private)

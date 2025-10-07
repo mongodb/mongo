@@ -108,8 +108,9 @@ description: Schema for IDL files in the mongo codebase.
     oneOf:
       - type: string
         enum:
-          - pub
-          - pub_for_technical_reasons
+          - pub # deprecated alias for public
+          - public
+          - public_for_technical_reasons
           - private
           - file_private
           - needs_replacement
