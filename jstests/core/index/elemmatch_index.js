@@ -80,8 +80,19 @@ assertIndexResults(coll, {a: {$all: [{$elemMatch: {"b.c": "x"}}]}}, true, 1);
 // Tests that $elemMatch with path components that are empty strings are correctly handled in the
 // plan enumerator in case if an index is used on another predicate of the query.
 assertIndexResults(coll, {$and: [{"a.b.c": "x"}, {"": {$elemMatch: {"a.b.c": "x"}}}]}, true, 0);
-
 assertIndexResults(coll, {$and: [{"a.b.c": "x"}, {"a.b.c": {$elemMatch: {"": "x"}}}]}, true, 0);
+
+// Similar to the above but with the $elemMatch placed under a contained $or.
+assertIndexResults(
+    coll,
+    {$and: [{"a.b.c": "x"}, {$or: [{"a.b.c": "y"}, {"": {$elemMatch: {"a.b.c": "x"}}}]}]},
+    true,
+    0);
+assertIndexResults(
+    coll,
+    {$and: [{"a.b.c": "x"}, {$or: [{"a.b.c": "y"}, {"a.b.c": {$elemMatch: {"": "x"}}}]}]},
+    true,
+    0);
 })();
 
 (function() {
