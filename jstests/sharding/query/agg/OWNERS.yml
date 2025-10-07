@@ -21,3 +21,6 @@ filters:
   - "*targeting*":
     approvers:
       - 10gen/query-optimization
+  - "*orphan_filtering*":
+    approvers:
+      - 10gen/query-optimization
