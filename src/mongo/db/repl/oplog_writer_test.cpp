@@ -99,8 +99,7 @@ DEATH_TEST_F(OplogWriterTest, ThrowingInRunLoopLogsUsefulError, "OplogWriter thr
     auto& executor = executorFixture.getExecutor();
     executor.startup();
 
-    OplogWriter::Options options(false /* skipWritesToOplogColl */,
-                                 false /* skipWritesToChangeColl */);
+    OplogWriter::Options options(false /* skipWritesToOplogColl */);
 
     FailingOplogWriter oplogWriter(&executor, options);
 

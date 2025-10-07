@@ -53,7 +53,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_pre_image_util.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
@@ -414,78 +413,6 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
             LOGV2(5071101, "Failed to clear temp directory", "error"_attr = ec.message());
         }
     }
-}
-
-void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
-                                                 const TenantId& tenantId) {
-    auto currentTime =
-        change_stream_serverless_helpers::getCurrentTimeForChangeCollectionRemoval(opCtx);
-    auto expireAfterSeconds =
-        Seconds{change_stream_serverless_helpers::getExpireAfterSeconds(tenantId)};
-
-    // Change collection entries monotonically increase according to the 'ts' field of each entry's
-    // corresponding oplog entry. However, the expiration is determined by the 'wall' time
-    // reserved for each oplog entry. Since writes can commit out of order with respect to their
-    // reserved 'wall' time (e.g. oplog holes), the change collection may not be strictly
-    // monotonically increasing with respect to the 'wall' time.
-    //
-    // After unclean shutdown, initial truncate markers for the change collection don't exist yet.
-    // Without truncate markers, truncation must be based on RecordId, which requires converting the
-    // would-be 'wall' time expiry date into a Timestamp.
-    //
-    // To account for oplog holes, and a loss of precision converting Date_t to Timestamp,
-    // truncate up to a few seconds past the expiration date to guarantee only consistent
-    // data survives post crash.
-    auto baseExpirationTime = currentTime - expireAfterSeconds;
-    auto adjustedExpirationTime = baseExpirationTime +
-        Seconds(startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds);
-    auto expirationTSEstimate = Timestamp(adjustedExpirationTime.toMillisSinceEpoch() / 1000.0,
-                                          std::numeric_limits<unsigned>::max());
-    RecordId maxExpiredRecordIdEstimate =
-        record_id_helpers::keyForOptime(expirationTSEstimate, KeyFormat::String).getValue();
-
-    writeConflictRetry(
-        opCtx,
-        "truncate change collection by approximate timestamp expiration",
-        NamespaceString::makeChangeCollectionNSS(tenantId),
-        [&] {
-            AutoGetChangeCollection tenantChangeCollection{
-                opCtx, AutoGetChangeCollection::AccessMode::kUnreplicatedWrite, tenantId};
-
-            if (!tenantChangeCollection) {
-                return;
-            }
-
-            LOGV2_DEBUG(
-                8148800,
-                0,
-                "About to truncate change collection entries for tenant after unclean shutdown",
-                "originalExpirationDate"_attr = baseExpirationTime,
-                "newExpirationDate"_attr = adjustedExpirationTime,
-                "expiryRangeExtensionSeconds"_attr =
-                    startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds,
-                "truncateAtTimestamp"_attr = expirationTSEstimate,
-                "tenantId"_attr = tenantId);
-
-            // Exclusively truncate based on the most recent WT snapshot.
-            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-            shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
-
-            WriteUnitOfWork wuow(opCtx);
-
-            // Truncation is based on Timestamp expiration approximation -
-            // meaning there isn't a good estimate of the number of bytes and
-            // documents to be truncated, so default to 0.
-            auto rs = tenantChangeCollection->getRecordStore();
-            auto status = rs->rangeTruncate(opCtx,
-                                            *shard_role_details::getRecoveryUnit(opCtx),
-                                            RecordId(),
-                                            maxExpiredRecordIdEstimate,
-                                            0,
-                                            0);
-            invariantStatusOK(status);
-            wuow.commit();
-        });
 }
 
 // Returns the timestamp at which pre-images should be truncated for recovery.
@@ -1008,17 +935,8 @@ void recoverChangeStreamCollections(OperationContext* opCtx,
         return;
     }
 
-    const auto tenantIds = change_stream_serverless_helpers::getConfigDbTenants(opCtx);
-    if (tenantIds.empty()) {
-        // Change stream pre-images collections are exclusive to dedicated environments.
-        cleanupPreImagesCollectionAfterUncleanShutdown(opCtx);
-        return;
-    }
-
-    for (const auto& tenantId : tenantIds) {
-        // Change collections are exclusive to multi-tenant environments.
-        cleanupChangeCollectionAfterUncleanShutdown(opCtx, tenantId);
-    }
+    // Clean up change stream pre-images collection.
+    cleanupPreImagesCollectionAfterUncleanShutdown(opCtx);
 }
 }  // namespace startup_recovery
 }  // namespace mongo

@@ -398,18 +398,9 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_collectAllOpTim
 
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedNamespaces(
     const Document& doc) {
-    // TODO SERVER-78670:  move namespace extraction to change_stream_helpers.cpp and make generic
-    const auto tid = [&]() -> boost::optional<TenantId> {
-        if (!gMultitenancySupport) {
-            return boost::none;
-        }
-        const auto tidField = doc["tid"];
-        return !tidField.missing() ? boost::make_optional(TenantId(tidField.getOid()))
-                                   : boost::none;
-    }();
-
-    const auto dbCmdNs = NamespaceStringUtil::deserialize(
-        tid, doc["ns"].getStringData(), SerializationContext::stateDefault());
+    const auto dbCmdNs = NamespaceStringUtil::deserialize(boost::none /* tenantId */,
+                                                          doc["ns"].getStringData(),
+                                                          SerializationContext::stateDefault());
     if (doc["op"].getStringData() != "c") {
         _affectedNamespaces.insert(dbCmdNs);
         return;

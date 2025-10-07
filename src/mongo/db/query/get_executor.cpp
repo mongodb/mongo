@@ -1297,10 +1297,10 @@ bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery&
         return false;
     }
 
-    // Queries against the oplog or a change collection are not supported. Also queries on the inner
-    // side of a $lookup are not considered for SBE except search queries.
+    // Queries against the oplog are not supported. Also queries on the inner side of a $lookup are
+    // not considered for SBE except search queries.
     if ((expCtx->getInLookup() && !cq.isSearchQuery()) || nss.isOplog() ||
-        nss.isChangeCollection() || !cq.metadataDeps().none()) {
+        !cq.metadataDeps().none()) {
         return false;
     }
 

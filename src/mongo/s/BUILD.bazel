@@ -855,7 +855,6 @@ mongo_cc_library(
         "//src/mongo/db:audit",
         "//src/mongo/db/auth:authserver",
         "//src/mongo/db:change_stream_options_manager",
-        "//src/mongo/db:change_streams_cluster_parameter",
         "//src/mongo/db/commands:profile_common",
         "//src/mongo/db/commands:rwc_defaults_commands",
         "//src/mongo/db/exec:scoped_timer",

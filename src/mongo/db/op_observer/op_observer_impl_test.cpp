@@ -376,22 +376,6 @@ protected:
         return !imageEntry.isEmpty();
     }
 
-    bool didWriteDeletedDocToPreImagesCollection(OperationContext* opCtx,
-                                                 const ChangeStreamPreImageId preImageId) {
-        auto coll = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest(NamespaceString::makeChangeCollectionNSS(boost::none),
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                         repl::ReadConcernArgs::get(opCtx),
-                                         AcquisitionPrerequisites::kRead),
-            MODE_IS);
-        const auto preImage = Helpers::findOneForTesting(opCtx,
-                                                         coll,
-                                                         BSON("_id" << preImageId.toBSON()),
-                                                         /*invariantOnError=*/false);
-        return !preImage.isEmpty();
-    }
-
     repl::ImageEntry getImageEntryFromSideCollection(OperationContext* opCtx,
                                                      const LogicalSessionId& sessionId) {
         auto sideCollection = acquireCollection(
@@ -4365,8 +4349,6 @@ protected:
             ChangeStreamPreImage preImage = getChangeStreamPreImage(opCtx, preImageId, &container);
             ASSERT_BSONOBJ_EQ(_deletedDoc, preImage.getPreImage());
             ASSERT_EQ(deleteOplogEntry.getWallClockTime(), preImage.getOperationTime());
-        } else {
-            ASSERT_FALSE(didWriteDeletedDocToPreImagesCollection(opCtx, preImageId));
         }
     }
 

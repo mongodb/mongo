@@ -217,8 +217,7 @@ public:
             _storageInterface,
             &_consistencyMarkers,
             &repl::noopOplogWriterObserver,
-            repl::OplogWriter::Options(false /* skipWritesToOplogColl */,
-                                       true /* skipWritesToChangeColl */));
+            repl::OplogWriter::Options(false /* skipWritesToOplogColl */));
 
         _svcCtx->notifyStorageStartupRecoveryComplete();
     }

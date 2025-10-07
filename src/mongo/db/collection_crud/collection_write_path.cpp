@@ -238,10 +238,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     const auto& nss = collection->ns();
 
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX) ||
-            (nss.isOplog() && shard_role_details::getLocker(opCtx)->isWriteLocked()) ||
-            (nss.isChangeCollection() && nss.tenantId() &&
-             shard_role_details::getLocker(opCtx)->isLockHeldForMode(
-                 {ResourceType::RESOURCE_TENANT, *nss.tenantId()}, MODE_IX)));
+            (nss.isOplog() && shard_role_details::getLocker(opCtx)->isWriteLocked()));
 
     const size_t count = std::distance(begin, end);
 

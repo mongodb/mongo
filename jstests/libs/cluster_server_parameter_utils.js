@@ -32,10 +32,6 @@ export const kNonTestOnlyClusterParameters = {
         testValues: [{preAndPostImages: {expireAfterSeconds: 30}}, {preAndPostImages: {expireAfterSeconds: 20}}],
         setParameters: {"multitenancySupport": false},
     },
-    changeStreams: {
-        default: {expireAfterSeconds: NumberLong(3600)},
-        testValues: [{expireAfterSeconds: 30}, {expireAfterSeconds: 10}],
-    },
     defaultMaxTimeMS: {
         default: {readOperations: 0},
         testValues: [{readOperations: 42}, {readOperations: 60000}],

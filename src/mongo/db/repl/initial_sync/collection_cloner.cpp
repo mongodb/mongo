@@ -164,9 +164,9 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
 }
 
 BaseCloner::ClonerStages CollectionCloner::getStages() {
-    if (_sourceNss.isChangeStreamPreImagesCollection() || _sourceNss.isChangeCollection()) {
-        // The change stream pre-images collection and the change collection only need to be created
-        // - their documents should not be copied.
+    if (_sourceNss.isChangeStreamPreImagesCollection()) {
+        // The change stream pre-images collection only needs to be created - their documents should
+        // not be copied.
         return {&_collStatsStage,
                 &_listIndexesStage,
                 &_createCollectionStage,

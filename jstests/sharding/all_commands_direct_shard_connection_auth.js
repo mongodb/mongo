@@ -669,7 +669,7 @@ const allCommands = {
         command: {getAuditConfig: 1},
         shouldFail: false,
     },
-    getChangeStreamState: {skip: "Only supported on serverless"},
+    getChangeStreamState: {skip: isDeprecated}, // Removed in v8.3
     getClusterParameter: {
         isAdminCommand: true,
         command: {getClusterParameter: "changeStreamOptions"},
@@ -1138,7 +1138,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, quiet: 0}));
         },
     },
-    setChangeStreamState: {skip: "requires serverless"},
+    setChangeStreamState: {skip: isDeprecated}, // Removed in v8.3
     setClusterParameter: {skip: requiresMongoS},
     setQuerySettings: {skip: requiresMongoS},
     removeQuerySettings: {skip: requiresMongoS},

@@ -553,7 +553,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // The following are expensive to look up, so only do it once for each.
     const NamespaceString& nss = query.nss();
     const bool isOplog = nss.isOplog();
-    const bool isChangeCollection = nss.isChangeCollection();
 
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
@@ -576,7 +575,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // the collection scan to return timestamp-based tokens. Otherwise, we should
     // return generic RecordId-based tokens.
     if (query.getFindCommandRequest().getRequestResumeToken()) {
-        csn->shouldTrackLatestOplogTimestamp = (isOplog || isChangeCollection);
+        csn->shouldTrackLatestOplogTimestamp = isOplog;
         csn->requestResumeToken = !csn->shouldTrackLatestOplogTimestamp;
     }
 
@@ -586,13 +585,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     const bool assertMinTsHasNotFallenOffOplog = params.mainCollectionInfo.options &
         QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
-    if ((isOplog || isChangeCollection) && csn->direction == 1) {
+    if (isOplog && csn->direction == 1) {
         // Takes Timestamp 'ts' as input, transforms it to the RecordIdBound and assigns it to the
         // output parameter 'recordId'. The RecordId format for the change collection is a string,
         // where as the RecordId format for the oplog is a long integer. The timestamp should be
         // converted to the required format before assigning it to the 'recordId'.
         auto assignRecordIdFromTimestamp = [&](auto& ts, auto* recordId) {
-            auto keyFormat = isChangeCollection ? KeyFormat::String : KeyFormat::Long;
+            auto keyFormat = KeyFormat::Long;
             auto status = record_id_helpers::keyForOptime(ts, keyFormat);
             if (status.isOK()) {
                 *recordId = RecordIdBound(status.getValue());

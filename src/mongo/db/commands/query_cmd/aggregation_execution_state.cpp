@@ -29,7 +29,6 @@
 
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_uuid_mismatch.h"
@@ -566,22 +565,6 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
 
         // Replace the execution namespace with the oplog.
         setExecutionNss(NamespaceString::kRsOplogNamespace);
-
-        // In case of serverless the change stream will be opened on the change collection.
-        const bool isServerless = change_stream_serverless_helpers::isServerlessEnvironment();
-        if (isServerless) {
-            const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
-                VersionContext::getDecoration(getOpCtx()), getOriginalNss().tenantId());
-
-            uassert(
-                ErrorCodes::BadValue, "Change streams cannot be used without tenant id", tenantId);
-            setExecutionNss(NamespaceString::makeChangeCollectionNSS(tenantId));
-
-            uassert(ErrorCodes::ChangeStreamNotEnabled,
-                    "Change streams must be enabled before being used",
-                    change_stream_serverless_helpers::isChangeStreamEnabled(
-                        getOpCtx(), *getExecutionNss().tenantId()));
-        }
 
         // Assert that a change stream on the config server is always opened on the oplog.
         tassert(6763400,

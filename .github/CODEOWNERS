@@ -235,7 +235,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/analyze_shard_key.py @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/queryable_server_hook.py @10gen/server-backup-restore @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/change_streams.py @10gen/query-execution-change-streams @svc-auto-approve-bot
-/buildscripts/resmokelib/testing/hooks/**/enable_change_stream.py @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/run_query_stats.py @10gen/query-integration-observability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/fcv_upgrade_downgrade.py @10gen/server-fcv @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/initialsync.py @10gen/server-initial-sync @svc-auto-approve-bot
@@ -866,7 +865,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/hooks/OWNERS.yml
 /jstests/hooks/**/run_analyze_shard_key_background.js @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/hooks/**/run_enable_change_stream.js @10gen/query-execution-change-streams @svc-auto-approve-bot
 /jstests/hooks/**/run_fcv_upgrade_downgrade_background.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/hooks/**/run_fuzzer_restore_settings.js @10gen/server-jstest-infra @svc-auto-approve-bot
 /jstests/hooks/**/run_initial_sync_node_validation.js @10gen/server-initial-sync @svc-auto-approve-bot
@@ -1769,7 +1767,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/dbhelpers* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/dbcommands.idl @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/bulk_write_shard_test.cpp @10gen/query-execution-write-exec @svc-auto-approve-bot
-/src/mongo/db/**/change_collection_expired* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /src/mongo/db/**/multi_key_path_tracker* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/**/yieldable.h @10gen/query-execution-yielding @svc-auto-approve-bot
 /src/mongo/db/**/mirror* @10gen/server-networking-and-observability @svc-auto-approve-bot
@@ -1864,7 +1861,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/commands/query_cmd/OWNERS.yml
 /src/mongo/db/commands/query_cmd/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-/src/mongo/db/commands/query_cmd/**/change_stream_state_command.cpp @10gen/query-execution-change-streams @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/current_op* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/index_filter_commands.* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/query_settings_cmds.* @10gen/query-execution-query-settings @svc-auto-approve-bot
@@ -2723,7 +2719,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/stats/**/server_read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/stats/**/server_write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/stats/**/api_version_metrics* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/stats/**/change_collection_server_status.cpp @10gen/query-execution-change-streams @svc-auto-approve-bot
+/src/mongo/db/stats/**/change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/storage/OWNERS.yml
 /src/mongo/db/storage/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

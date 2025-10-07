@@ -19,8 +19,6 @@
 ##
 global:
   cpp_namespace: "mongo::feature_flags"
-  cpp_includes:
-  - "mongo/db/change_streams_cluster_parameter.h"
 
 imports:
     - "mongo/db/basic_types.idl"

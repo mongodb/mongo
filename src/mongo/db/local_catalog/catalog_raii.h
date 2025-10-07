@@ -499,38 +499,4 @@ private:
     std::shared_ptr<const CollectionCatalog> _stashedCatalog;
 };
 
-/**
- * A RAII-style class to acquire lock to a particular tenant's change collection.
- *
- * A change collection can be accessed in the following modes:
- *   kWriteInOplogContext - assumes that the tenant IX lock has been pre-acquired. The user can
- *                          perform reads and writes to the change collection.
- *   kWrite - behaves the same as 'AutoGetCollection::AutoGetCollection()' with lock mode MODE_IX.
- *   kUnreplicatedWrite - behaves the same as 'AutoGetCollection::AutoGetCollection()' with lock
- * mode MODE_IX and with explicit LocalWrite intent. kRead - behaves the same as
- * 'AutoGetCollection::AutoGetCollection()' with lock mode MODE_IS.
- */
-class AutoGetChangeCollection {
-public:
-    enum class AccessMode { kWriteInOplogContext, kWrite, kUnreplicatedWrite, kRead };
-
-    AutoGetChangeCollection(OperationContext* opCtx,
-                            AccessMode mode,
-                            const TenantId& tenantId,
-                            Date_t deadline = Date_t::max());
-
-    AutoGetChangeCollection(const AutoGetChangeCollection&) = delete;
-    AutoGetChangeCollection& operator=(const AutoGetChangeCollection&) = delete;
-
-    const Collection* operator->() const;
-    const CollectionPtr& operator*() const;
-    explicit operator bool() const;
-
-private:
-    // Used when the 'kWrite' or 'kRead' access mode is used.
-    boost::optional<AutoGetCollection> _coll;
-    // Used when the 'kWriteInOplogContext' access mode is used.
-    CollectionPtr _changeCollection;
-};
-
 }  // namespace mongo

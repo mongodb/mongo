@@ -352,9 +352,6 @@ mongo_cc_library(
         "//src/mongo/db/auth:privilege_format.h",
         "//src/mongo/db/query:explain_verbosity_gen",
     ],
-    header_deps = [
-        "//src/mongo/db:change_stream_state",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:common",

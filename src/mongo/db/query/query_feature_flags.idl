@@ -30,12 +30,6 @@ global:
     cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
-    featureFlagServerlessChangeStreams:
-        description: "Feature flag to enable reading change events from the change collection rather than the oplog"
-        cpp_varname: gFeatureFlagServerlessChangeStreams
-        default: false
-        fcv_gated: true
-
     featureFlagChangeStreamPreciseShardTargeting:
         description: "Feature flag to enable improved handling of cluster topology changes in change streams"
         cpp_varname: gFeatureFlagChangeStreamPreciseShardTargeting

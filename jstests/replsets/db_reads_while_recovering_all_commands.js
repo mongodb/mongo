@@ -290,7 +290,7 @@ const allCommands = {
     fsync: {skip: isNotAUserDataRead},
     fsyncUnlock: {skip: isNotAUserDataRead},
     getAuditConfig: {skip: isNotAUserDataRead},
-    getChangeStreamState: {skip: isNotAUserDataRead},
+    getChangeStreamState: {skip: isDeprecated}, // Removed in v8.3
     getClusterParameter: {skip: isNotAUserDataRead},
     getCmdLineOpts: {skip: isNotAUserDataRead},
     getDatabaseVersion: {skip: isNotAUserDataRead},
@@ -424,7 +424,7 @@ const allCommands = {
     setProfilingFilterGlobally: {skip: isNotAUserDataRead},
     setParameter: {skip: isNotAUserDataRead},
     setShardVersion: {skip: isNotAUserDataRead},
-    setChangeStreamState: {skip: isNotAUserDataRead},
+    setChangeStreamState: {skip: isDeprecated}, // Removed in v8.3
     setClusterParameter: {skip: isNotAUserDataRead},
     setQuerySettings: {skip: isPrimaryOnly},
     removeQuerySettings: {skip: isPrimaryOnly},

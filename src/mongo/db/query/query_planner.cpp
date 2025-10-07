@@ -497,10 +497,9 @@ std::unique_ptr<QuerySolution> tryEofSoln(const CanonicalQuery& query) {
     const auto& nss = query.nss();
 
     // Return EOF solution for trivially false expressions.
-    // Unless the query is against Oplog (change streams) or change collections (serverless
-    // change streams) because in such cases we still need the scan to happen to advance the
-    // visibility timestamp and resume token.
-    if (nss.isOplog() || nss.isChangeCollection()) {
+    // Unless the query is against Oplog (change streams) because in such cases we still need the
+    // scan to happen to advance the visibility timestamp and resume token.
+    if (nss.isOplog()) {
         return nullptr;
     }
     auto soln = std::make_unique<QuerySolution>();

@@ -101,8 +101,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
 bool ValidateState::shouldEnforceFastCount() const {
     if (enforceFastCountRequested()) {
-        if (_nss.isOplog() || _nss.isChangeCollection() ||
-            _nss.isChangeStreamPreImagesCollection()) {
+        if (_nss.isOplog() || _nss.isChangeStreamPreImagesCollection()) {
             // Oplog writers only take a global IX lock, so the oplog can still be written to even
             // during full validation despite its collection X lock. This can cause validate to
             // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount

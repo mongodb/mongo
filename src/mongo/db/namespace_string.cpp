@@ -125,10 +125,6 @@ bool NamespaceString::isLegalClientSystemNS() const {
         return true;
     }
 
-    if (isChangeCollection()) {
-        return true;
-    }
-
     if (isSystemStatsCollection()) {
         return true;
     }
@@ -202,11 +198,6 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseNa
     dassert(nss.isValid());
     dassert(nss.isCollectionlessAggregateNS());
     return nss;
-}
-
-NamespaceString NamespaceString::makeChangeCollectionNSS(
-    const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{tenantId, DatabaseName::kConfig.db(omitTenant), kChangeCollectionName};
 }
 
 NamespaceString NamespaceString::makeReshardingLocalOplogBufferNSS(
@@ -317,10 +308,6 @@ bool NamespaceString::isChangeStreamPreImagesCollection() const {
     return ns() == kChangeStreamPreImagesNamespace.ns();
 }
 
-bool NamespaceString::isChangeCollection() const {
-    return isConfigDB() && coll() == kChangeCollectionName;
-}
-
 bool NamespaceString::isConfigImagesCollection() const {
     return ns() == kConfigImagesNamespace.ns();
 }
@@ -338,10 +325,6 @@ bool NamespaceString::isFLE2StateCollection() const {
 bool NamespaceString::isFLE2StateCollection(StringData coll) {
     return coll.starts_with(fle2Prefix) &&
         (coll.ends_with(fle2EscSuffix) || coll.ends_with(fle2EcocSuffix));
-}
-
-bool NamespaceString::isOplogOrChangeCollection() const {
-    return isOplog() || isChangeCollection();
 }
 
 bool NamespaceString::isSystemStatsCollection() const {
@@ -368,8 +351,7 @@ NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
 
 bool NamespaceString::isImplicitlyReplicated() const {
     if (db_deprecated() == DatabaseName::kConfig.db(omitTenant)) {
-        if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() ||
-            isChangeCollection()) {
+        if (isChangeStreamPreImagesCollection() || isConfigImagesCollection()) {
             // Implicitly replicated namespaces are replicated, although they only replicate a
             // subset of writes.
             invariant(isReplicated());

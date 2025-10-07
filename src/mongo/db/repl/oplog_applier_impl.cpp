@@ -473,16 +473,16 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
     // writing oplog entries. This is because the OplogWriter thread can be ahead of
     // oplog application, but DDL ops on change collections (e.g. create/drop) must be
     // first applied before we can perform writes on those collections.
-    _oplogWriter = std::make_unique<OplogWriterImpl>(
-        nullptr /* executor */,
-        nullptr /* writeBuffer */,
-        nullptr /* applyBuffer */,
-        workerPool,
-        replCoord,
-        storageInterface,
-        consistencyMarkers,
-        &noopOplogWriterObserver,
-        OplogWriter::Options(options.skipWritesToOplog, false /* skipWritesToChangeColl */));
+    _oplogWriter =
+        std::make_unique<OplogWriterImpl>(nullptr /* executor */,
+                                          nullptr /* writeBuffer */,
+                                          nullptr /* applyBuffer */,
+                                          workerPool,
+                                          replCoord,
+                                          storageInterface,
+                                          consistencyMarkers,
+                                          &noopOplogWriterObserver,
+                                          OplogWriter::Options(options.skipWritesToOplog));
 }
 
 void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {

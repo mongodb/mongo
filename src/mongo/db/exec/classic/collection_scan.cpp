@@ -108,7 +108,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                 "Cannot resume using '$_resumeAfter'/ '$_startAt' if 'minRecord' or 'maxRecord' is "
                 "used",
                 !params.resumeScanPoint);
-        if (collPtr->ns().isOplogOrChangeCollection()) {
+        if (collPtr->ns().isOplog()) {
             invariant(params.direction == CollectionScanParams::FORWARD);
         } else {
             invariant(collPtr->isClustered());
@@ -139,7 +139,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                 "max"_attr = (!_params.maxRecord) ? "none" : redact(_params.maxRecord->toString()));
     tassert(6521000,
             "Expected an oplog or a change collection with 'shouldTrackLatestOplogTimestamp'",
-            !_params.shouldTrackLatestOplogTimestamp || collPtr->ns().isOplogOrChangeCollection());
+            !_params.shouldTrackLatestOplogTimestamp || collPtr->ns().isOplog());
 
     if (params.assertTsHasNotFallenOff) {
         tassert(6521001,
@@ -389,11 +389,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
             _commonStats.isEOF = true;
         }
 
-        // For change collections, advance '_latestOplogEntryTimestamp' to the current snapshot
-        // timestamp, i.e. the latest available timestamp in the global oplog.
-        if (_params.shouldTrackLatestOplogTimestamp && collPtr->ns().isChangeCollection()) {
-            setLatestOplogEntryTimestampToReadTimestamp();
-        }
         _priority.reset();
         return PlanStage::IS_EOF;
     }
@@ -414,12 +409,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 }
 
 void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
-    // Since this method is only ever called when iterating a change collection, the following check
-    // effectively disables optime advancement in Serverless, for reasons outlined in SERVER-76288.
-    if (collectionPtr()->ns().isChangeCollection()) {
-        return;
-    }
-
     const auto readTimestamp =
         shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp();
 

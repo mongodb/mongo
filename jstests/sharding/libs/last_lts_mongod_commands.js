@@ -32,6 +32,8 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "configureBackgroundTask",
     "mergeChunks",
     "testCommandFeatureFlaggedOnLatestFCV",
+    "getChangeStreamState", // Removed in v8.3
+    "setChangeStreamState", // Removed in v8.3
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the

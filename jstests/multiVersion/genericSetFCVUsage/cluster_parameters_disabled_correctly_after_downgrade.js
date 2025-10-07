@@ -89,6 +89,9 @@ function runTest(fcvVersion, binaryVersion) {
     newCPs.sort(bsonWoCompare);
     oldCPs.sort(bsonWoCompare);
 
+    // Filter out "changeStreams" server parameter from old version, as it got removed in v8.3.
+    oldCPs = oldCPs.filter((cp) => cp._id !== "changeStreams");
+
     assert.eq(
         bsonWoCompare(newCPs, oldCPs),
         0,

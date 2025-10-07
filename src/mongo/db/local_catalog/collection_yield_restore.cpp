@@ -51,11 +51,6 @@ bool locked(OperationContext* opCtx, const NamespaceString& ns) {
         return locker->isReadLocked();
     }
 
-    if (ns.isChangeCollection() && ns.tenantId()) {
-        return locker->isR() || locker->isW() ||
-            locker->isLockHeldForMode({ResourceType::RESOURCE_TENANT, *ns.tenantId()}, MODE_IS);
-    }
-
     return locker->isCollectionLockedForMode(ns, MODE_IS);
 }
 

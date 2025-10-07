@@ -139,12 +139,9 @@ private:
     void _writeOplogBatchForRange(OperationContext* opCtx,
                                   const std::vector<T>& ops,
                                   size_t begin,
-                                  size_t end,
-                                  bool writeOplogColl,
-                                  bool writeChangeColl);
+                                  size_t end);
 
-
-    std::pair<bool, bool> _checkWriteOptions(const VersionContext& vCtx);
+    bool _checkWriteOptions(const VersionContext& vCtx);
 
     // Not owned by us.
     OplogBuffer* const _applyBuffer;

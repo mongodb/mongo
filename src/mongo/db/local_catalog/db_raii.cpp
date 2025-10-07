@@ -601,11 +601,7 @@ void assertReadConcernSupported(const CollectionPtr& coll,
             "not supported",
             !ns.isChangeStreamPreImagesCollection() ||
                 readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
-    uassert(7829601,
-            "Reading with readConcern snapshot from change collection is "
-            "not supported",
-            !ns.isChangeCollection() ||
-                readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+
     // Ban snapshot reads on capped collections.
     uassert(
         ErrorCodes::SnapshotUnavailable,

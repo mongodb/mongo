@@ -366,8 +366,6 @@ roles:
           - setFeatureCompatibilityVersion
           - setClusterParameter
           - getClusterParameter
-          - setChangeStreamState
-          - getChangeStreamState
           - querySettings
           - checkMetadataConsistency
           - transitionFromDedicatedConfigServer

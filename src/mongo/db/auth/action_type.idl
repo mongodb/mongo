@@ -211,8 +211,6 @@ enums:
             viewRole: "viewRole"
             viewUser: "viewUser"
             applyOps: "applyOps"
-            setChangeStreamState: "setChangeStreamState"
-            getChangeStreamState: "getChangeStreamState"
             containerInsert: "containerInsert" # run "ci" ops in the applyOps command
             containerDelete: "containerDelete" # run "cd" ops in the applyOps command
 

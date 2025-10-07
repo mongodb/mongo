@@ -1524,49 +1524,5 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsHa
     }
 }
 
-// Tests behavior of getLatestOplogTimestamp() method when the scanned collection is the change
-// collection.
-TEST_F(QueryStageCollectionScanTest, QueryTestCollscanChangeCollectionLatestTimestampIsNotGlobal) {
-    // This test exercises the temporary behaviour introduced in SERVER-76288.
-    // Setup the change collection.
-    auto collectionName = NamespaceString::makeChangeCollectionNSS(boost::none);
-    auto scopedCollectionDeleter =
-        createClusteredCollection(collectionName, false /* prePopulate */);
-    insertDocument(collectionName, BSON("_id" << Timestamp(15, 5) << "ts" << Timestamp(15, 5)));
-
-    // Set the read timestamp.
-    shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
-        RecoveryUnit::ReadSource::kProvided, Timestamp(16, 1));
-
-    // Build the collection scan stage.
-    const auto coll = acquireCollectionMaybeLockFree(
-        &_opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            &_opCtx, collectionName, AcquisitionPrerequisites::OperationType::kRead));
-    CollectionScanParams params;
-    params.tailable = true;
-    params.direction = CollectionScanParams::FORWARD;
-    params.shouldTrackLatestOplogTimestamp = true;
-    WorkingSet ws;
-    auto scanStage = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
-    WorkingSetID id = WorkingSet::INVALID_ID;
-    auto advance = [&]() {
-        PlanStage::StageState state;
-        while ((state = scanStage->work(&id)) == PlanStage::NEED_TIME) {
-        };
-        return state;
-    };
-
-    // Verify that the latest oplog timestamp is equal to the 'ts' field of the retrieved document.
-    auto state = advance();
-    ASSERT_EQUALS(PlanStage::ADVANCED, state) << " state: " << PlanStage::stateStr(state);
-    ASSERT_EQUALS(Timestamp(15, 5), scanStage->getLatestOplogTimestamp());
-
-    // Verify that on EOF, the latest oplog timestamp is still equal to the ts of the last document
-    // retrieved, and has NOT advanced to the read timestamp.
-    state = advance();
-    ASSERT_EQUALS(PlanStage::IS_EOF, state) << " state: " << PlanStage::stateStr(state);
-    ASSERT_EQUALS(Timestamp(15, 5), scanStage->getLatestOplogTimestamp());
-}
 }  // namespace query_stage_collection_scan
 }  // namespace mongo

@@ -28,6 +28,6 @@ filters:
   - "api_version_metrics*":
     approvers:
       - 10gen/query-optimization
-  - "change_collection_server_status.cpp":
+  - "change_stream*":
     approvers:
       - 10gen/query-execution-change-streams

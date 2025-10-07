@@ -259,7 +259,6 @@ mongo_cc_library(
         ":batched_write_context",
         ":op_observer",
         ":op_observer_util",
-        "//src/mongo/db:change_stream_serverless_helpers",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:read_write_concern_defaults",

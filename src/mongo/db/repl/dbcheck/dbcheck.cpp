@@ -261,7 +261,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchHealthLogEntry(
         // preimages collection can be inconsistent during logical initial sync, all of which is
         // harmless.
         if (nss.isChangeStreamPreImagesCollection() || nss.isConfigImagesCollection() ||
-            nss.isChangeCollection() || (options && options->capped)) {
+            (options && options->capped)) {
             return SeverityEnum::Warning;
         }
 

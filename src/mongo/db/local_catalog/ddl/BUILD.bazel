@@ -61,6 +61,9 @@ idl_generator(
 idl_generator(
     name = "list_databases_for_all_tenants_gen",
     src = "list_databases_for_all_tenants.idl",
+    hdrs = [
+        "//src/mongo/db/auth:authorization_contract.h",
+    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/auth:access_checks_gen",

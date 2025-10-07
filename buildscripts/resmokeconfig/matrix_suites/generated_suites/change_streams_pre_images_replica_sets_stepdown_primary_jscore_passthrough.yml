@@ -12,7 +12,6 @@ executor:
       - CheckReplDBHash
       - CheckReplOplogs
       - CheckReplPreImagesConsistency
-      - CheckReplChangeCollectionConsistency
       - ValidateCollections
     tests: true
   config:
@@ -73,7 +72,6 @@ executor:
       terminate: false
     - class: CheckReplOplogs
     - class: CheckReplPreImagesConsistency
-    - class: CheckReplChangeCollectionConsistency
     - class: CheckReplDBHash
     - class: ValidateCollections
       shell_options:

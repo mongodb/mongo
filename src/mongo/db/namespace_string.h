@@ -76,9 +76,6 @@ public:
     // Prefix for the collection storing collection statistics.
     static constexpr StringData kStatisticsCollectionPrefix = "system.statistics."_sd;
 
-    // Name for the change stream change collection.
-    static constexpr StringData kChangeCollectionName = "system.change_collection"_sd;
-
     // Name for the profile collection
     static constexpr StringData kSystemDotProfileCollectionName = "system.profile"_sd;
 
@@ -205,11 +202,6 @@ public:
      * aggregation commands with the format {aggregate: 1}.
      */
     static NamespaceString makeCollectionlessAggregateNSS(const DatabaseName& dbName);
-
-    /**
-     * Constructs the change collection namespace for the specified tenant.
-     */
-    static NamespaceString makeChangeCollectionNSS(const boost::optional<TenantId>& tenantId);
 
     /**
      * Constructs a NamespaceString representing a listCollections namespace. The format for this
@@ -527,11 +519,6 @@ public:
     bool isChangeStreamPreImagesCollection() const;
 
     /**
-     * Returns whether the specified namespace is config.system.changeCollection.
-     */
-    bool isChangeCollection() const;
-
-    /**
      * Returns whether the specified namespace is config.image_collection.
      */
     bool isConfigImagesCollection() const;
@@ -547,11 +534,6 @@ public:
     bool isFLE2StateCollection() const;
 
     static bool isFLE2StateCollection(StringData coll);
-
-    /**
-     * Returns true if the namespace is an oplog or a change collection, false otherwise.
-     */
-    bool isOplogOrChangeCollection() const;
 
     /**
      * Returns true if the namespace is a system.statistics collection, false otherwise.

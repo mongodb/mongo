@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/agg/change_stream_add_pre_image_stage.h"
 
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
@@ -120,16 +119,6 @@ std::string ChangeStreamAddPreImageStage::makePreImageNotFoundErrorMsg(const Doc
 boost::optional<Document> ChangeStreamAddPreImageStage::lookupPreImage(
     boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
     // Look up the pre-image document on the local node by id.
-    const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
-        VersionContext::getDecoration(pExpCtx->getOperationContext()),
-        pExpCtx->getNamespaceString().tenantId());
-
-    // Pre-images are only supported in single-tenant environments.
-    tassert(10915400,
-            "Failed to lookup pre-image given change stream pre-images aren't supported in "
-            "multi-tenant environments",
-            tenantId == boost::none);
-
     auto lookedUpDoc = pExpCtx->getMongoProcessInterface()->lookupSingleDocumentLocally(
         pExpCtx,
         NamespaceString::kChangeStreamPreImagesNamespace,

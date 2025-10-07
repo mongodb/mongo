@@ -18,7 +18,6 @@
         # validating the entire contents of the collection.
         - class: CheckReplOplogs
         - class: CheckReplPreImagesConsistency
-        - class: CheckReplChangeCollectionConsistency
         - class: CheckReplDBHash
         - class: ValidateCollections
           shell_options:
@@ -43,7 +42,6 @@
         # validating the entire contents of the collection.
         - class: CheckReplOplogs
         - class: CheckReplPreImagesConsistency
-        - class: CheckReplChangeCollectionConsistency
         - class: CheckReplDBHash
         - class: ValidateCollections
           use_legacy_validate: true
@@ -67,5 +65,4 @@
           - CheckReplDBHash
           - CheckReplOplogs
           - CheckReplPreImagesConsistency
-          - CheckReplChangeCollectionConsistency
           - ValidateCollections

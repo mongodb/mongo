@@ -53,12 +53,10 @@ public:
     class Options {
     public:
         Options() = delete;
-        explicit Options(bool skipWritesToOplogColl, bool skipWritesToChangeColl)
-            : skipWritesToOplogColl(skipWritesToOplogColl),
-              skipWritesToChangeColl(skipWritesToChangeColl) {}
+        explicit Options(bool skipWritesToOplogColl)
+            : skipWritesToOplogColl(skipWritesToOplogColl) {}
 
         const bool skipWritesToOplogColl;
-        const bool skipWritesToChangeColl;
     };
 
     // Used to report oplog write progress.
@@ -178,8 +176,6 @@ public:
 
     virtual void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
                                         std::vector<InsertStatement>::const_iterator end) = 0;
-    virtual void onWriteChangeCollections(std::vector<InsertStatement>::const_iterator begin,
-                                          std::vector<InsertStatement>::const_iterator end) = 0;
 };
 
 /**
@@ -189,8 +185,6 @@ class MONGO_MOD_PRIVATE NoopOplogWriterObserver : public OplogWriter::Observer {
 public:
     void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
                                 std::vector<InsertStatement>::const_iterator end) final {}
-    void onWriteChangeCollections(std::vector<InsertStatement>::const_iterator begin,
-                                  std::vector<InsertStatement>::const_iterator end) final {}
 };
 
 extern NoopOplogWriterObserver noopOplogWriterObserver;

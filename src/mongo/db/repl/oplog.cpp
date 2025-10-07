@@ -38,9 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands.h"
@@ -492,13 +490,6 @@ void logOplogRecords(OperationContext* opCtx,
         LOGV2_FATAL(17322, "Write to oplog failed", "error"_attr = result.toString());
     }
 
-    // Insert the oplog records to the respective tenants change collections.
-    if (change_stream_serverless_helpers::isChangeCollectionsModeActive(
-            VersionContext::getDecoration(opCtx))) {
-        ChangeStreamChangeCollectionManager::get(opCtx).insertDocumentsToChangeCollection(
-            opCtx, *records, timestamps);
-    }
-
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [replCoord, finalOpTime, wallTime](OperationContext* opCtx,
@@ -860,12 +851,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
           // If a change collection is to be created, that is, the change streams are being enabled
           // for a tenant, acquire exclusive tenant lock.
-          Lock::DBLock dbLock(
-              opCtx,
-              nss.dbName(),
-              MODE_IX,
-              Date_t::max(),
-              boost::make_optional(nss.tenantId() && nss.isChangeCollection(), MODE_X));
+          Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX, Date_t::max(), boost::none);
 
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
@@ -2112,7 +2098,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // in a missing document, which may be later deleted.
                     if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary &&
                         !requestNss.isChangeStreamPreImagesCollection() &&
-                        !requestNss.isChangeCollection() &&
                         !requestNss.isConfigImagesCollection()) {
                         // In FCV 4.4, each node is responsible for deleting the excess documents in
                         // capped collections. This implies that capped deletes may not be

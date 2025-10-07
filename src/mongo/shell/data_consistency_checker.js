@@ -285,14 +285,6 @@ class DataConsistencyChecker {
             );
             return true;
         }
-        if (collName === "system.change_collection") {
-            print(
-                `Ignoring hash inconsistencies for 'system.change_collection' as those can be ` +
-                    `expected with independent truncates. Content is checked separately by ` +
-                    `ReplSetTest.checkChangeCollection`,
-            );
-            return true;
-        }
         if (collName !== "image_collection") {
             return false;
         }

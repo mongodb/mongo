@@ -1116,7 +1116,7 @@ const allTestCases = {
         fsync: {skip: "TODO"},
         fsyncUnlock: {skip: "TODO"},
         getAuditConfig: {skip: "TODO", conditional: true},
-        getChangeStreamState: {skip: "TODO"},
+        getChangeStreamState: {skip: "TODO"}, // Removed in v8.3
         getClusterParameter: {skip: "TODO"},
         getCmdLineOpts: {skip: "TODO"},
         getDatabaseVersion: {skip: "TODO"},
@@ -1204,7 +1204,7 @@ const allTestCases = {
         saslStart: {skip: "TODO"},
         serverStatus: {skip: "TODO"},
         setAuditConfig: {skip: "TODO", conditional: true},
-        setChangeStreamState: {skip: "TODO"},
+        setChangeStreamState: {skip: "TODO"}, // Removed in v8.3
         setClusterParameter: {skip: "TODO"},
         setCommittedSnapshot: {skip: "TODO"},
         setDefaultRWConcern: {skip: "TODO"},

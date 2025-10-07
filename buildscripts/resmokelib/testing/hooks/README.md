@@ -15,7 +15,6 @@ Specify any of the following as the `hooks` in your [Suite](../../../../buildscr
 - [`CheckClusterIndexConsistency`](./cluster_index_consistency.py) - Checks that indexes are the same across chunks for the same collections.
 - [`CheckMetadataConsistencyInBackground`](./metadata_consistency) - Check the metadata consistency of a sharded cluster.
 - [`CheckOrphansDeleted`](./orphans.py) - Check if the range deleter failed to delete any orphan documents.
-- [`CheckReplChangeCollectionConsistency`](./change_collection_consistency.py) - Check that config.system.change_collection is consistent between the primary and secondaries for all tenants.
 - [`CheckReplDBHashInBackground`](./dbhash_background.py) - A hook for comparing the dbhashes of all replica set members while a test is running.
 - [`CheckReplDBHash`](./dbhash.py) - Check if the dbhashes match.
 - [`CheckReplOplogs`](./oplog.py) - Check that `local.oplog.rs` matches on the primary and secondaries.
@@ -34,9 +33,6 @@ Specify any of the following as the `hooks` in your [Suite](../../../../buildscr
 - [`DoReconfigInBackground`](./reconfig_background.py) - A hook for running a safe reconfig against a replica set while a test is running.
 - [`DropSessionsCollection`](./drop_sessions_collection.py) - A hook for dropping and recreating config.system.sessions while tests are running.
 - [`DropUserCollections`](./drop_user_collections.py) - Drops all user collections.
-- [`EnableChangeStream`](./enable_change_stream.py) - Enable change stream hook class.
-  - Enables change stream in the multi-tenant environment for the replica set and the sharded
-    cluster.
 - [`EnableSpuriousWriteConflicts`](./enable_spurious_write_conflicts.py) - Toggles write conflicts.
 - [`FCVUpgradeDowngradeInBackground`](./fcv_upgrade_downgrade.py) - A hook to run background FCV upgrade and downgrade against test servers while a test is running.
 - [`FuzzRuntimeParameters`](./fuzz_runtime_parameters.py) - Regularly connect to nodes and sends them a `setParameter` command; uses the [Config Fuzzer](../../../../buildscripts/resmokelib/generate_fuzz_config/README.md).

@@ -338,7 +338,6 @@ mongo_cc_library(
     hdrs = [
         "async_rpc_error_info.h",
         "//src/mongo:core_headers",
-        "//src/mongo/db:change_stream_state_gen",
         "//src/mongo/db/auth:parsed_privilege_gen",
         "//src/mongo/db/commands/query_cmd:explain_gen",
         "//src/mongo/db/global_catalog/router_role_api:gossiped_routing_cache_gen",
@@ -368,7 +367,6 @@ mongo_cc_library(
         "//src/mongo/client:mongo_uri.h",
         "//src/mongo/client:read_preference_gen",
         "//src/mongo/client:sasl_client_session.h",
-        "//src/mongo/db:set_change_stream_state_coordinator_gen",
         "//src/mongo/db:write_concern_gen",
         "//src/mongo/db/commands/query_cmd:explain_gen",
         "//src/mongo/db/global_catalog/router_role_api:gossiped_routing_cache_gen",

@@ -790,13 +790,6 @@ const allCommands = {
         isAdminCommand: true,
         command: {getAuditConfig: 1},
     },
-    getChangeStreamState: {
-        isAdminCommand: true,
-        doesNotRunOnMongos: true,
-        command: {getChangeStreamState: 1},
-        expectFailure: true,
-        expectedErrorCode: ErrorCodes.CommandNotSupported, // only supported on serverless.
-    },
     getClusterParameter: {
         isAdminCommand: true,
         command: {getClusterParameter: "changeStreamOptions"},
@@ -1467,13 +1460,6 @@ const allCommands = {
                 conn.getDB("admin").runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}),
             );
         },
-    },
-    setChangeStreamState: {
-        isAdminCommand: true,
-        command: {setChangeStreamState: 1, enabled: true},
-        doesNotRunOnMongos: true,
-        expectFailure: true,
-        expectedErrorCode: ErrorCodes.CommandNotSupported, // only supported on serverless.
     },
     setClusterParameter: {
         isAdminCommand: true,

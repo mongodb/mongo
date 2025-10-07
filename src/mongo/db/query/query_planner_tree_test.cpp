@@ -3284,19 +3284,6 @@ TEST_F(QueryPlannerTest, NotEOFForChangeStreamsEvenIfAlwaysFalsePredicateIsGiven
     assertSolutionExists("{cscan: {filter: {$alwaysFalse: 1}, collation: {}, dir: 1}}");
 }
 
-TEST_F(QueryPlannerTest, NotEOFForChangeCollectionsEvenIfAlwaysFalsePredicateIsGiven) {
-    // Here we simulate a change collection (serverless change stream) by requesting a tailable
-    // cursor on the config.system.change_collection collection. See
-    // NamespaceString::isChangeCollection() method.
-    nss = NamespaceString::createNamespaceString_forTest("config.system");
-    auto cmdObj =
-        fromjson("{find: 'system.change_collection', filter: {$alwaysFalse: 1}, tailable: true}");
-    runQueryAsCommand(cmdObj);
-
-    assertNumSolutions(1);
-    assertSolutionExists("{cscan: {filter: {$alwaysFalse: 1}, collation: {}, dir: 1}}");
-}
-
 TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicatesInTailableCursors) {
     runQueryAsCommand(fromjson("{find: 'testColl', filter: {$alwaysFalse: 1}, tailable: true}"));
     assertNumSolutions(1);

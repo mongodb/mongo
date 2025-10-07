@@ -53,11 +53,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
-#include "mongo/db/change_collection_expired_documents_remover.h"
-#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
-#include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_parameters/cluster_server_parameter_initializer.h"
 #include "mongo/db/cluster_parameters/cluster_server_parameter_op_observer.h"
@@ -184,7 +180,6 @@
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/db/set_change_stream_state_coordinator.h"
 #include "mongo/db/sharding_environment/config_server_op_observer.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
@@ -491,11 +486,6 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
         services.push_back(std::make_unique<MultiUpdateCoordinatorService>(serviceContext));
-    }
-
-    if (change_stream_serverless_helpers::canInitializeServices()) {
-        services.push_back(
-            std::make_unique<SetChangeStreamStateCoordinatorService>(serviceContext));
     }
 
     for (auto& service : services) {
@@ -1109,9 +1099,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     // If not in standalone mode, start background tasks to:
     //  * Periodically remove expired documents from change collections
     if (!isStandalone) {
-        if (!gChangeCollectionRemoverDisabled) {
-            startChangeCollectionExpiredDocumentsRemover(serviceContext);
-        }
         if (serverGlobalParams.replicaSetConfigShardMaintenanceMode) {
             PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(serviceContext)->start();
         }
@@ -1880,13 +1867,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         checker->stop();
     }
 
-    {
-        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                       TimedSectionId::shutDownExpiredDocumentRemover,
-                                       &shutdownTimeElapsedBuilder);
-        shutdownChangeCollectionExpiredDocumentsRemover(serviceContext);
-    }
-
     // We should always be able to acquire the global lock at shutdown.
     //
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
@@ -2080,10 +2060,6 @@ int mongod_main(int argc, char* argv[]) {
     ReadWriteConcernDefaults::create(shardService, readWriteConcernDefaultsCacheLookupMongoD);
 
     ChangeStreamOptionsManager::create(service);
-
-    if (change_stream_serverless_helpers::canInitializeServices()) {
-        ChangeStreamChangeCollectionManager::create(service);
-    }
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

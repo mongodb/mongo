@@ -34,7 +34,6 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
@@ -123,14 +122,8 @@ public:
             ChangeStreamPreImagesCollectionManager::get(opCtx).getPurgingJobStats();
         builder.append("purgingJob", jobStats.toBSON());
 
-        if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
-                VersionContext::getDecoration(opCtx))) {
-            // Only report pre-images collection specific metrics in single tenant environments.
-            // Multi-tenant environments would have the aggregate result of all the tenants (one
-            // pre-images collection per tenant), making it difficult to pinpoint where the metrics
-            // values come from.
-            appendPreImagesCollectionStats(opCtx, &builder);
-        }
+        // Report pre-images collection specific metrics.
+        appendPreImagesCollectionStats(opCtx, &builder);
 
         return builder.obj();
     }

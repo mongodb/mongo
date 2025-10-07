@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"

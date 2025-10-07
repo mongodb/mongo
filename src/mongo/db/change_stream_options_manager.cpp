@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_options_parameter_gen.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -153,14 +152,6 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
                       }
                   },
                   [&](const std::int64_t& expireAfterSeconds) {
-                      if (change_stream_serverless_helpers::isServerlessEnvironment()) {
-                          validateStatus = {
-                              ErrorCodes::CommandNotSupported,
-                              "The 'changeStreamOptions.preAndPostImages.expireAfterSeconds' is "
-                              "unsupported in serverless, consider using "
-                              "'changeStreams.expireAfterSeconds' instead."};
-                          return;
-                      }
                       if (expireAfterSeconds <= 0) {
                           validateStatus = {
                               ErrorCodes::BadValue,

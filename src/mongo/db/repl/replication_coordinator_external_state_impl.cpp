@@ -45,7 +45,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
@@ -299,8 +298,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
             _storageInterface,
             _replicationProcess->getConsistencyMarkers(),
             &noopOplogWriterObserver,
-            OplogWriter::Options(false /* skipWritesToOplogColl */,
-                                 true /* skipWritesToChangeColl */));
+            OplogWriter::Options(false /* skipWritesToOplogColl */));
     }
 
     _oplogApplier = std::make_unique<OplogApplierImpl>(
@@ -692,15 +690,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         }
     });
 
-    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
-            VersionContext::getDecoration(opCtx))) {
-        // TODO(SERVER-111008): The change collection feature is deprecated.
-        // We should remove this code.
-
-        // Create the pre-images collection if it doesn't exist yet. Pre-images are not supported in
-        // serverless environments.
-        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);
-    }
+    // Create the pre-images collection if it doesn't exist yet.
+    ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);
 
     // Ensure that 'queryShapeRepresentativeQueries' collection exists only:
     // - in plain replica sets or
