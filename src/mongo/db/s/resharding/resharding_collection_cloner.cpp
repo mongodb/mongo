@@ -714,7 +714,6 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     CancellationToken cancelToken,
     CancelableOperationContextFactory factory) {
     struct ChainContext {
-        std::unique_ptr<Pipeline> pipeline;
         bool moreToCome = true;
         TxnNumber batchTxnNumber = TxnNumber(0);
     };
@@ -751,37 +750,9 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                         "error"_attr = redact(status));
         })
         .until<Status>([chainCtx, factory](const Status& status) {
-            if (!status.isOK() && chainCtx->pipeline) {
-                auto opCtx = factory.makeOperationContext(&cc());
-                chainCtx->pipeline.reset();
-            }
-
             return status.isOK() && !chainCtx->moreToCome;
         })
         .on(std::move(executor), cancelToken)
-        .thenRunOn(std::move(cleanupExecutor))
-        // It is unsafe to capture `this` once the task is running on the cleanupExecutor because
-        // RecipientStateMachine, along with its ReshardingCollectionCloner member, may have already
-        // been destructed.
-        .onCompletion([chainCtx](Status status) {
-            if (chainCtx->pipeline) {
-                // TODO(SERVER-111752): Please revisit if this thread could be made killable.
-                auto client = cc().getServiceContext()
-                                  ->getService(ClusterRole::ShardServer)
-                                  ->makeClient("ReshardingCollectionClonerCleanupClient",
-                                               Client::noSession(),
-                                               ClientOperationKillableByStepdown{false});
-
-                AlternativeClientRegion acr(client);
-                auto opCtx = cc().makeOperationContext();
-
-                // Guarantee the pipeline is always cleaned up - even upon cancellation.
-                chainCtx->pipeline.reset();
-            }
-
-            // Propagate the result of the AsyncTry.
-            return status;
-        })
         .semi();
 }
 

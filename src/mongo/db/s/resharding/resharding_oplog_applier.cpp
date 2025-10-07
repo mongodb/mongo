@@ -238,13 +238,10 @@ SemiFuture<void> ReshardingOplogApplier::run(
             if (chainCtx->oplogIter) {
                 // Use a separate Client to make a better effort of calling dispose() even when the
                 // CancellationToken has been canceled.
-                //
-                // TODO(SERVER-111752): Please revisit if this thread could be made killable.
-                auto client = cc().getServiceContext()
-                                  ->getService(ClusterRole::ShardServer)
-                                  ->makeClient("ReshardingOplogApplierCleanupClient",
-                                               Client::noSession(),
-                                               ClientOperationKillableByStepdown{false});
+                auto client =
+                    cc().getServiceContext()
+                        ->getService(ClusterRole::ShardServer)
+                        ->makeClient("ReshardingOplogApplierCleanupClient", Client::noSession());
 
                 AlternativeClientRegion acr(client);
                 auto opCtx = cc().makeOperationContext();

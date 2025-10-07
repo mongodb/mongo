@@ -346,7 +346,7 @@ private:
  *   If the thread has to be unkillable, a comment must be left explaining the reason. This will
  *   help future diagnosability.
  *
- * TODO(SERVER-111752 SERVER-111753 SERVER-111754 SERVER-111755): Remove this type if all theads are
+ * TODO(SERVER-111753 SERVER-111754 SERVER-111755): Remove this type if all theads are
  * found to be killable.
  */
 enum class ClientOperationKillableByStepdown : bool {};

@@ -352,12 +352,10 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                        return false;
                    }
 
-                   // TODO(SERVER-111752): Please revisit if this thread could be made killable.
                    ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                                    _reshardingUUID.toString(),
                                                    _donorShard.toString()),
-                                       _service()->getService(ClusterRole::ShardServer),
-                                       ClientOperationKillableByStepdown{false});
+                                       _service()->getService(ClusterRole::ShardServer));
 
                    boost::optional<CancelableOperationContextFactory> aggOpCtxFactory;
                    {
@@ -631,12 +629,10 @@ bool ReshardingOplogFetcher::consume(Client* client,
             const boost::optional<BSONObj>& postBatchResumeToken) {
             _env->metrics()->onBatchRetrievedDuringOplogFetching(Milliseconds(batchTimer.millis()));
 
-            // TODO(SERVER-111752): Please revisit if this thread could be made killable.
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
-                                _service()->getService(ClusterRole::ShardServer),
-                                ClientOperationKillableByStepdown{false});
+                                _service()->getService(ClusterRole::ShardServer));
             auto opCtxRaii = factory.makeOperationContext(client.get());
             auto opCtx = opCtxRaii.get();
 
