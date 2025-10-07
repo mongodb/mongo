@@ -653,17 +653,17 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatc
 
     std::vector<std::pair<BSONObj, Milliseconds>> timedBatch0{
         {BSON("_id" << 1 << "a" << 1), Milliseconds(1)},
-        {BSON("_id" << 2 << "a" << 2), Milliseconds(0)},
-        {BSON("_id" << 3 << "a" << 3), Milliseconds(0)},
+        {BSON("_id" << 2 << "a" << 2), Milliseconds(1)},
+    };
+
+    std::vector<std::pair<BSONObj, Milliseconds>> timedBatch1{
+        {BSON("_id" << 3 << "a" << 3), Milliseconds(4)},
         {BSON("_id" << 4 << "a" << 4), Milliseconds(0)},
         {BSON("_id" << 5 << "a" << 5), Milliseconds(0)},
         {BSON("_id" << 6 << "a" << 6), Milliseconds(0)},
         {BSON("_id" << 7 << "a" << 7), Milliseconds(0)},
-        {BSON("_id" << 8 << "a" << 8), Milliseconds(4)},
-    };
-
-    std::vector<std::pair<BSONObj, Milliseconds>> timedBatch1{
-        {BSON("_id" << 9 << "a" << 9), Milliseconds(1)},
+        {BSON("_id" << 8 << "a" << 8), Milliseconds(0)},
+        {BSON("_id" << 9 << "a" << 9), Milliseconds(0)},
         {BSON("_id" << 10 << "a" << 10), Milliseconds(1)},
     };
 
@@ -706,16 +706,16 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetBatchTimeMSWithTargetBatc
         }
     }
 
-    // Batch0 deletions.
+    // Batch1 deletions.
     {
         Timer timer(tickSource());
         state = deleteStage->work(&id);
-        ASSERT_EQ(stats->docsDeleted, batchSize0);
+        ASSERT_EQ(stats->docsDeleted, batchSize1);
         ASSERT_EQ(state, PlanStage::NEED_TIME);
         ASSERT_GTE(Milliseconds(timer.millis()), targetBatchTimeMS);
     }
 
-    // Batch1 deletions.
+    // Batch0 deletions.
     {
         Timer timer(tickSource());
 
@@ -994,23 +994,23 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
     auto targetBatchTimeMS = Milliseconds(5);
     auto targetPassTimeMS = Milliseconds(10);
 
-    // Reaches 'targetBatchDocs'.
+    // Reaches 'targetBatchDocs'. First delete batch.
     std::vector<std::pair<BSONObj, Milliseconds>> batch0{
         {BSON("_id" << 1 << "a" << 1), Milliseconds(1)},
         {BSON("_id" << 2 << "a" << 2), Milliseconds(0)},
         {BSON("_id" << 3 << "a" << 3), Milliseconds(0)},
     };
 
-    // Reaches 'targetBatchTimeMS'.
+    // 'targetPassTimeMS' is met, the buffer is partially drained, this is the last batch to commit
+    // before pass completion. Third delete batch.
     std::vector<std::pair<BSONObj, Milliseconds>> batch1{
-        {BSON("_id" << 4 << "a" << 4), Milliseconds(4)},
-        {BSON("_id" << 5 << "a" << 5), Milliseconds(6)},
+        {BSON("_id" << 6 << "a" << 6), Milliseconds(0)},
     };
 
-    // 'targetPassTimeMS' is met, the buffer is partilly drained, this is the last batch to commit
-    // before pass completion.
+    // Reaches 'targetBatchTimeMS'. Second delete batch.
     std::vector<std::pair<BSONObj, Milliseconds>> batch2{
-        {BSON("_id" << 6 << "a" << 6), Milliseconds(0)},
+        {BSON("_id" << 5 << "a" << 5), Milliseconds(6)},
+        {BSON("_id" << 4 << "a" << 4), Milliseconds(4)},
     };
 
     // Populate the collection before executing the BatchedDeleteStage.
@@ -1084,10 +1084,10 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassTimeMSReachedBeforeTa
         }
     }
 
-    // Batch1 deletions.
+    // Batch2 deletions.
     {
         state = deleteStage->work(&id);
-        ASSERT_EQ(stats->docsDeleted, batch0.size() + batch1.size());
+        ASSERT_EQ(stats->docsDeleted, batch0.size() + batch2.size());
 
         ASSERT_TRUE(stats->passTargetMet);
         // Despite reaching the 'targetPassTimeMS', the remaining deletes staged in the buffer still
