@@ -104,12 +104,16 @@ void translateElement(StringData fieldName,
             return;
         }
         case BSONType::object: {
-            invariant(ctxStack);
+            tassert(11177300,
+                    "translateElement() cannot be called with an object if ctxStack is null",
+                    ctxStack);
             ctxStack->emplace(BSONObjIterator(element.Obj()), &out->subobjStart(fieldName));
             return;
         }
         case BSONType::array: {
-            invariant(ctxStack);
+            tassert(11177301,
+                    "translateElement() cannot be called with an array if ctxStack is null",
+                    ctxStack);
             ctxStack->emplace(BSONObjIterator(element.Obj()), &out->subarrayStart(fieldName));
             return;
         }
@@ -127,7 +131,7 @@ void translateElement(StringData fieldName,
 // Translate all strings in 'obj' into comparison keys using 'collator'. The result is
 // appended to 'out'.
 void translate(BSONObj obj, const CollatorInterface* collator, BufBuilder* out) {
-    invariant(collator);
+    tassert(11177302, "collator cannot be null", collator);
 
     TranslateStack ctxStack;
     ctxStack.emplace(BSONObjIterator(obj), out);
@@ -150,7 +154,7 @@ void translate(BSONObj obj, const CollatorInterface* collator, BufBuilder* out) 
 void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,
                                                      const CollatorInterface* collator,
                                                      BSONObjBuilder* out) {
-    invariant(out);
+    tassert(11177303, "out cannot be null", out);
     if (!collator) {
         out->appendAs(elt, "");
         return;

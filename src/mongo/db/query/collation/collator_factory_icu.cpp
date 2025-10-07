@@ -406,8 +406,10 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
         collation->setBackwards(attributeToBool(backwardsAttribute));
     } else {
         UErrorCode status = U_ZERO_ERROR;
-        // collation->getBackwards should be engaged if spec has a "backwards" field.
-        invariant(collation->getBackwards().has_value());
+        tassert(
+            11177304,
+            "collation->getBackwards() must not be none if the spec contains a 'backwards' field",
+            collation->getBackwards().has_value());
         icuCollator->setAttribute(
             UCOL_FRENCH_COLLATION, boolToAttribute(collation->getBackwards()), status);
         if (U_FAILURE(status)) {
