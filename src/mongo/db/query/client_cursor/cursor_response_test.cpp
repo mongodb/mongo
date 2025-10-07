@@ -63,7 +63,8 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     cpuNanos: {"$numberLong": "18"},
     delinquentAcquisitions: {"$numberLong": "0"},
     totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
-    maxAcquisitionDelinquencyMillis: {"$numberLong": "0"}
+    maxAcquisitionDelinquencyMillis: {"$numberLong": "0"},
+    numInterruptChecks: {"$numberLong": "0"}
 })");
 
 static const std::string defaultNssStr = "db.coll";
@@ -317,6 +318,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
     ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(metrics.getMaxAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(metrics.getNumInterruptChecks(), 0);
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorMetricsWrongType) {
@@ -966,6 +968,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_EQ(parsedMetrics->getDelinquentAcquisitions(), 0);
     ASSERT_EQ(parsedMetrics->getTotalAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(parsedMetrics->getMaxAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(parsedMetrics->getNumInterruptChecks(), 0);
 
     ASSERT_TRUE(response.getPartialResultsReturned());
     ASSERT_TRUE(response.getInvalidated());

@@ -743,6 +743,13 @@ public:
     }
 
     /**
+     * Returns number of checkForInterrupts() done on this OperationContext.
+     */
+    int64_t numInterruptChecks() const {
+        return _numInterruptChecks.loadRelaxed();
+    }
+
+    /**
      * Set to prevent killOps from killing this opCtx even when an LSID is set.
      * You may only call this method prior to setting an LSID on this opCtx.
      * Calls to resetMultiDocumentTransactionState will reset _killOpsExempt to false.
@@ -949,6 +956,9 @@ private:
 
     // When the operation was marked as killed.
     AtomicWord<TickSource::Tick> _killTime{0};
+
+    // Tracks total number of interrupt checks.
+    Atomic<int64_t> _numInterruptChecks{0};
 
     // Used to cancel all tokens obtained via getCancellationToken() when this OperationContext is
     // killed.

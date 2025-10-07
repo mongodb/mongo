@@ -245,6 +245,8 @@ following way:
   acquisition overdue by a query operation, including getMores.
 - `metrics.maxAcquisitionDelinquencyMillis`: Maximum time in milliseconds that an execution ticket
   acquisition overdue by a query operation, including getMores.
+- `metrics.numInterruptChecksPerSec`: Number of times checkForInterrupt is called per second by a
+  query operation, including getMores.
 
 #### Permissions
 

@@ -106,6 +106,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.totalAcquisitionDelinquencyMillis = Milliseconds{200};
     currentAdditiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds{300};
     additiveMetricsToAdd.maxAcquisitionDelinquencyMillis = Milliseconds{100};
+    currentAdditiveMetrics.numInterruptChecks = 1;
+    additiveMetricsToAdd.numInterruptChecks = 2;
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -151,6 +153,9 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquencyMillis,
               std::max(*additiveMetricsBeforeAdd.maxAcquisitionDelinquencyMillis,
                        *additiveMetricsToAdd.maxAcquisitionDelinquencyMillis));
+    ASSERT_EQ(*currentAdditiveMetrics.numInterruptChecks,
+              *additiveMetricsBeforeAdd.numInterruptChecks +
+                  *additiveMetricsToAdd.numInterruptChecks);
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -264,6 +269,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.delinquentAcquisitions = 2;
     additiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(400);
     additiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(300);
+    additiveMetrics.numInterruptChecks = 2;
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -278,6 +284,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     cursorMetrics.setDelinquentAcquisitions(3);
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
     cursorMetrics.setMaxAcquisitionDelinquencyMillis(200);
+    cursorMetrics.setNumInterruptChecks(3);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -292,6 +299,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.delinquentAcquisitions, 5);
     ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(800));
     ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 5);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
@@ -333,11 +341,13 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
                                 false /* fromPlanCache */,
                                 10 /* cpuNanos */);
 
+    cursorMetrics.setNumInterruptChecks(3);
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
     ASSERT_EQ(*additiveMetrics.keysExamined, 1);
     ASSERT_EQ(*additiveMetrics.docsExamined, 2);
     ASSERT_EQ(*additiveMetrics.bytesRead, 3);
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
@@ -352,6 +362,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.delinquentAcquisitions = 2;
     additiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(400);
     additiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(200);
+    additiveMetrics.numInterruptChecks = 2;
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
@@ -363,6 +374,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.delinquentAcquisitions = 1;
     remoteMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(300);
     remoteMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(300);
+    remoteMetrics.numInterruptChecks = 1;
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
 
@@ -375,6 +387,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(*additiveMetrics.delinquentAcquisitions, 3);
     ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(700));
     ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {
@@ -583,6 +596,8 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();
         ASSERT_FALSE(state.hasField("delinquencyInfo"));
+        // Field numInterruptChecks should be always shown.
+        ASSERT_TRUE(state.hasField("numInterruptChecks"));
     }
 
     // If the delinquent stats are not zero, they *are* included in the state.
@@ -596,6 +611,17 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
         ASSERT_EQ(state["delinquencyInfo"]["totalDelinquentAcquisitions"].Int(), 2);
         ASSERT_EQ(state["delinquencyInfo"]["totalAcquisitionDelinquencyMillis"].Long(), 30);
         ASSERT_EQ(state["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
+    }
+
+    // If the delinquent stats are not zero, they *are* included in the state.
+    {
+        opCtx->checkForInterrupt();
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+
+        ASSERT_TRUE(state.hasField("numInterruptChecks")) << state.toString();
+        ASSERT_EQ(state["numInterruptChecks"].Number(), 1);
     }
 }
 

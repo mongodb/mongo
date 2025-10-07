@@ -421,6 +421,10 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
                          admCtx.getMaxAcquisitionDelinquencyMillis())};
         }
 
+        if (!parent()) {
+            metrics.numInterruptChecks = opCtx()->numInterruptChecks();
+        }
+
         try {
             // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
             // but the lock acquisition could still be interrupted, which we catch and log.
@@ -982,6 +986,9 @@ void CurOp::reportState(BSONObjBuilder* builder,
         OpDebug::appendDelinquentInfo(opCtx, sub);
     }
 
+    if (!parent()) {
+        builder->append("numInterruptChecks", opCtx->numInterruptChecks());
+    }
 
     populateCurrentOpQueueStats(opCtx, _tickSource, builder);
 }

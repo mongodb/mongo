@@ -151,6 +151,7 @@ function testDelinquencyOnShard(routerDb, shardDb) {
             curOp.inprog.length === 1,
             "Expected to find exactly one active find() command with the comment " + findComment);
         assertDelinquentStats(curOp.inprog[0].delinquencyInfo, 2, curOp.inprog[0]);
+        assert.gte(curOp.inprog[0].numInterruptChecks, 2, curOp.inprog[0]);
     }
 
     // After the find() command, we check that the serverStatus has the delinquent stats
@@ -176,6 +177,7 @@ function testDelinquencyOnShard(routerDb, shardDb) {
             const parsedLine = JSON.parse(line);
             const delinquencyInfo = parsedLine.attr.delinquencyInfo;
             assertDelinquentStats(delinquencyInfo, count, line);
+            assert.gte(parsedLine.attr.numInterruptChecks, count, parsedLine.attr);
         };
 
         const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
@@ -199,6 +201,9 @@ function testDelinquencyOnShard(routerDb, shardDb) {
         assert.gte(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max,
                    waitPerIterationMs,
                    tojson(queryStats));
+        // For first batch, numInterruptChecks >=4, time ~=600ms
+        // For second batch, numInterruptChecks >=3, time~=400ms
+        assert.gte(queryStats[0].metrics.numInterruptChecksPerSec.sum, 7, tojson(queryStats));
     }
 
     {

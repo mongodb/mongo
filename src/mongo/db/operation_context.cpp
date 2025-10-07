@@ -214,6 +214,8 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
+    _numInterruptChecks.fetchAndAddRelaxed(1);
+
     if (getClient()->getKilled() && !_isExecutingShutdown) {
         return Status(ErrorCodes::ClientMarkedKilled, "client has been killed");
     }

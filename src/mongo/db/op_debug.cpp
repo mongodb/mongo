@@ -457,6 +457,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("delinquencyInfo", sub.obj());
     }
 
+    if (!curop.parent()) {
+        pAttrs->add("numInterruptChecks", opCtx->numInterruptChecks());
+    }
+
     // Extract admission and execution control queueing stats from AdmissionContext stored on opCtx
     TicketHolderQueueStats queueingStats(opCtx);
     pAttrs->add("queues", queueingStats.toBson());
@@ -1249,6 +1253,8 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setMaxAcquisitionDelinquencyMillis(
         additiveMetrics.maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count());
 
+    metrics.setNumInterruptChecks(additiveMetrics.numInterruptChecks.value_or(0));
+
     metrics.setHasSortStage(additiveMetrics.hasSortStage);
     metrics.setUsedDisk(additiveMetrics.usedDisk);
     metrics.setFromMultiPlanner(additiveMetrics.fromMultiPlanner);
@@ -1355,6 +1361,8 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
                                   otherMetrics.maxAcquisitionDelinquencyMillis->count())};
     }
 
+    numInterruptChecks = addOptionals(numInterruptChecks, otherMetrics.numInterruptChecks);
+
     hasSortStage = hasSortStage || otherMetrics.hasSortStage;
     usedDisk = usedDisk || otherMetrics.usedDisk;
     fromMultiPlanner = fromMultiPlanner || otherMetrics.fromMultiPlanner;
@@ -1383,6 +1391,8 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     maxAcquisitionDelinquencyMillis =
         Milliseconds{std::max(maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
                               metrics.maxAcquisitionDelinquencyMillis.count())};
+
+    numInterruptChecks = numInterruptChecks.value_or(0) + metrics.numInterruptChecks;
 
     hasSortStage = hasSortStage || metrics.hasSortStage;
     usedDisk = usedDisk || metrics.usedDisk;
@@ -1414,6 +1424,7 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         static_cast<uint64_t>(metrics.getDelinquentAcquisitions()),
         Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis()),
         Milliseconds(metrics.getMaxAcquisitionDelinquencyMillis()),
+        static_cast<uint64_t>(metrics.getNumInterruptChecks()),
         metrics.getHasSortStage(),
         metrics.getUsedDisk(),
         metrics.getFromMultiPlanner(),

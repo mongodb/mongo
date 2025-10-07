@@ -210,6 +210,9 @@ public:
         // set) to make the "sticky towards false" logic work.
         boost::optional<bool> fromPlanCache;
 
+        // Total number of checkForInterrupt() calls by an operation.
+        boost::optional<uint64_t> numInterruptChecks;
+
         // If query stats are being collected for this operation, stores the estimated cpu time
         // across the cluster. In a mongod, this is the local cpu time and in mongos this track the
         // total cpu time across the cluster.

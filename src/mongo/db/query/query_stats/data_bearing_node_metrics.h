@@ -53,6 +53,7 @@ struct DataBearingNodeMetrics {
     uint64_t delinquentAcquisitions{0};
     Milliseconds totalAcquisitionDelinquencyMillis{0};
     Milliseconds maxAcquisitionDelinquencyMillis{0};
+    uint64_t numInterruptChecks = 0;
 
     bool hasSortStage : 1 = false;
     bool usedDisk : 1 = false;
@@ -75,6 +76,7 @@ struct DataBearingNodeMetrics {
         maxAcquisitionDelinquencyMillis =
             Milliseconds{std::max(maxAcquisitionDelinquencyMillis.count(),
                                   other.maxAcquisitionDelinquencyMillis.count())};
+        numInterruptChecks += other.numInterruptChecks;
         hasSortStage = hasSortStage || other.hasSortStage;
         usedDisk = usedDisk || other.usedDisk;
         fromMultiPlanner = fromMultiPlanner || other.fromMultiPlanner;
@@ -103,6 +105,7 @@ struct DataBearingNodeMetrics {
             Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis());
         maxAcquisitionDelinquencyMillis = Milliseconds(std::max(
             maxAcquisitionDelinquencyMillis.count(), metrics.getMaxAcquisitionDelinquencyMillis()));
+        numInterruptChecks += metrics.getNumInterruptChecks();
         hasSortStage = hasSortStage || metrics.getHasSortStage();
         usedDisk = usedDisk || metrics.getUsedDisk();
         fromMultiPlanner = fromMultiPlanner || metrics.getFromMultiPlanner();

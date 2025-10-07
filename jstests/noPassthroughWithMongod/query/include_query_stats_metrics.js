@@ -51,6 +51,7 @@ function assertMetricsEqual(cursor, {
     assertMetricEqual(metrics, "usedDisk", usedDisk);
     assertMetricEqual(metrics, "fromMultiPlanner", fromMultiPlanner);
     assertMetricEqual(metrics, "fromPlanCache", fromPlanCache);
+    assertMetricEqual(metrics, "numInterruptChecks", undefined);
     // The following metrics exist but are 0 by default.
     assertMetricEqual(metrics, "delinquentAcquisitions", 0);
     assertMetricEqual(metrics, "totalAcquisitionDelinquencyMillis", 0);
