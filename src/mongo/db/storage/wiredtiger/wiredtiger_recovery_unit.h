@@ -128,6 +128,12 @@ public:
 
     void allowOneUntimestampedWrite() override {
         invariant(!_isActive());
+        // In the case we're already allowing all timestamp writes we do not make the assertions
+        // stricter. This would otherwise break the relaxed assumptions being set at layers above.
+        if (_untimestampedWriteAssertionLevel ==
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways) {
+            return;
+        }
         _untimestampedWriteAssertionLevel =
             RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressOnce;
     }
