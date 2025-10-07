@@ -68,6 +68,8 @@ public:
         return _maxOpenSessions;
     }
 
+    std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override;
+
 protected:
     /** Generate a unique thread name for this session. */
     virtual std::string getClientThreadName(const Session&) const = 0;

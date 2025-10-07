@@ -327,7 +327,10 @@ std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_makeRecording(
     return std::make_shared<Recording>(options, tickSource);
 }
 
-void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
+void TrafficRecorder::start(
+    const StartTrafficRecording& options,
+    ServiceContext* svcCtx,
+    const std::vector<std::pair<transport::SessionId, std::string>>& sessions) {
     invariant(!shouldAlwaysRecordTraffic);
 
     uassert(ErrorCodes::BadValue,
@@ -344,42 +347,19 @@ void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext
     _shouldRecord.store(true);
     {
         // Record SessionStart events if exists any active session.
-        stdx::lock_guard<stdx::recursive_mutex> sessionLk(_openSessionsLk);
-        for (const auto& [id, session] : _openSessions) {
+        for (const auto& [id, session] : sessions) {
             observe(id, session, Message(), svcCtx, EventType::kSessionStart);
         }
     }
 }
 
-void TrafficRecorder::updateOpenSessions(uint64_t id,
-                                         const std::string& session,
-                                         EventType eventType) {
-    if (eventType == EventType::kSessionEnd) {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
-        auto sessionItr = _openSessions.find(id);
-        if (sessionItr != _openSessions.end()) {
-            _openSessions.erase(sessionItr);
-        }
-    }
-
-    if (eventType == EventType::kSessionStart) {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
-        _openSessions.emplace(id, session);
-    }
-}
-
-void TrafficRecorder::stop(ServiceContext* svcCtx) {
+void TrafficRecorder::stop(
+    ServiceContext* svcCtx,
+    const std::vector<std::pair<transport::SessionId, std::string>>& sessions) {
     invariant(!shouldAlwaysRecordTraffic);
     // Record SessionEnd events if exists any active session.
-    {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
-        // A copy of open sessions to remove from '_openSessionsLk' while observing a SessionEnd
-        // event for each open session. 'observe()' will modify '_openSessions'.
-        stdx::unordered_map<uint64_t, std::string> sessions(_openSessions);
-
-        for (const auto& [id, session] : sessions) {
-            observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
-        }
+    for (const auto& [id, session] : sessions) {
+        observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
     }
 
     _shouldRecord.store(false);
@@ -406,11 +386,6 @@ void TrafficRecorder::observe(uint64_t id,
                               const Message& message,
                               ServiceContext* svcCtx,
                               EventType eventType) {
-    // Keep track of active sessions not recording anything. Session start/end events will be
-    // recorded on the start/stop of the traffic recording.
-    if (eventType == EventType::kSessionEnd || eventType == EventType::kSessionStart) {
-        updateOpenSessions(id, session, eventType);
-    }
     auto* tickSource = svcCtx->getTickSource();
     if (shouldAlwaysRecordTraffic) {
         auto rec = _recording.synchronize();

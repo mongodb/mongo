@@ -1123,6 +1123,10 @@ public:
             _allowMultipleSessions = true;
         }
 
+        std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override {
+            return {};
+        }
+
     private:
         void _join() {
             stdx::lock_guard lk{_mutex};

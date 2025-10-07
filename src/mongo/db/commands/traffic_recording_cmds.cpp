@@ -42,6 +42,9 @@
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
@@ -61,8 +64,21 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            auto tlManager = opCtx->getServiceContext()->getTransportLayerManager();
+            std::vector<std::pair<transport::SessionId, std::string>> openSessions;
+            auto getOpenSessions = [&openSessions](transport::TransportLayer* tl) {
+                auto sessionManager = tl->getSessionManager();
+                if (sessionManager) {
+                    auto sessionIds = sessionManager->getOpenSessionIDs();
+                    openSessions.insert(openSessions.end(), sessionIds.begin(), sessionIds.end());
+                }
+            };
+            // TODO SERVER-111903: Start recording session events before getting all open sessions.
+            if (tlManager) {
+                tlManager->forEach(getOpenSessions);
+            }
             TrafficRecorder::get(opCtx->getServiceContext())
-                .start(request(), opCtx->getServiceContext());
+                .start(request(), opCtx->getServiceContext(), openSessions);
             LOGV2(20506,
                   "** Warning: The recording file contains unencrypted user traffic. We recommend "
                   "that you limit retention of this file and store it on an encrypted filesystem "
@@ -103,7 +119,21 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            TrafficRecorder::get(opCtx->getServiceContext()).stop(opCtx->getServiceContext());
+            auto tlManager = opCtx->getServiceContext()->getTransportLayerManager();
+            std::vector<std::pair<transport::SessionId, std::string>> openSessions;
+            auto getOpenSessions = [&openSessions](transport::TransportLayer* tl) {
+                auto sessionManager = tl->getSessionManager();
+                if (sessionManager) {
+                    auto sessionIds = sessionManager->getOpenSessionIDs();
+                    openSessions.insert(openSessions.end(), sessionIds.begin(), sessionIds.end());
+                }
+            };
+            // TODO SERVER-111903: Stop recording regular sessions before getting all open sessions.
+            if (tlManager) {
+                tlManager->forEach(getOpenSessions);
+            }
+            TrafficRecorder::get(opCtx->getServiceContext())
+                .stop(opCtx->getServiceContext(), openSessions);
         }
 
     private:

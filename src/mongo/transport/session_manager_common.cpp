@@ -378,6 +378,19 @@ std::size_t SessionManagerCommon::numOpenSessions() const {
     return sync.size();
 }
 
+std::vector<std::pair<SessionId, std::string>> SessionManagerCommon::getOpenSessionIDs() const {
+    std::vector<std::pair<SessionId, std::string>> sessions;
+
+    _sessions->sync().forEach([&](auto&& workflow) {
+        if (workflow.client()->session()) {
+            sessions.push_back({workflow.client()->session()->id(),
+                                workflow.client()->session()->toBSON().toString()});
+        }
+    });
+
+    return sessions;
+}
+
 std::size_t SessionManagerCommon::numCreatedSessions() const {
     return _sessions->created();
 }

@@ -124,6 +124,10 @@ public:
         _cv.wait(lock, [&] { return !_sessions.empty(); });
     }
 
+    std::vector<std::pair<transport::SessionId, std::string>> getOpenSessionIDs() const override {
+        return {};
+    }
+
 private:
     mutable stdx::mutex _mutex;
     stdx::condition_variable _cv;

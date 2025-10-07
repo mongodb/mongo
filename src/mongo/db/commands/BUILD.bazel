@@ -884,6 +884,7 @@ mongo_cc_library(
         "//src/mongo/executor:task_executor_pool",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/scripting:scripting_common",
+        "//src/mongo/transport:session_manager",
         "//src/mongo/util:ntservice",
         "//src/mongo/util/net:ssl_manager",
     ],

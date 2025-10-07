@@ -89,8 +89,11 @@ public:
     // Start and stop block until the associate operation has succeeded or failed
     //
     // On failure these methods throw
-    void start(const StartTrafficRecording& options, ServiceContext* svcCtx);
-    void stop(ServiceContext* svcCtx);
+    void start(const StartTrafficRecording& options,
+               ServiceContext* svcCtx,
+               const std::vector<std::pair<transport::SessionId, std::string>>& sessions);
+    void stop(ServiceContext* svcCtx,
+              const std::vector<std::pair<transport::SessionId, std::string>>& sessions);
 
     void observe(uint64_t id,
                  const std::string& session,
@@ -168,14 +171,10 @@ protected:
     virtual std::shared_ptr<Recording> _makeRecording(const StartTrafficRecording& options,
                                                       TickSource* tickSource) const;
 
-    void updateOpenSessions(uint64_t id, const std::string& session, EventType eventType);
-
     std::shared_ptr<Recording> _getCurrentRecording() const;
 
     AtomicWord<bool> _shouldRecord;
 
-    mutable stdx::recursive_mutex _openSessionsLk;
-    stdx::unordered_map<uint64_t, std::string> _openSessions;
     mongo::synchronized_value<std::shared_ptr<Recording>> _recording;
 };
 

@@ -515,6 +515,15 @@ TEST_F(SessionWorkflowTest, MoreToComeDisconnectAtSource3) {
     joinSessions();
 }
 
+TEST_F(SessionWorkflowTest, GetOpenSession) {
+    startSession();
+    auto sessionIds = sessionManager()->getOpenSessionIDs();
+    ASSERT_EQ(sessionIds.size(), 1);
+    expect<Event::sessionSourceMessage>(kShutdownError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+}
+
 /**
  * Check the behavior of an interrupted "getMore" exhaust command.
  * SessionWorkflow looks specifically for the "getMore" command name to trigger

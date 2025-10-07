@@ -105,7 +105,7 @@ TEST(TrafficRecorderTest, CorrectOffsets) {
     mockClock.reset(0);
 
 
-    trafficRecorder.start(recordingOptions, ctx.get());
+    trafficRecorder.start(recordingOptions, ctx.get(), {});
 
 
     auto mockSession =
@@ -135,7 +135,7 @@ TEST(TrafficRecorderTest, CorrectOffsets) {
     TrafficRecorderTestUtil::verifyRecordedOffsets(trafficRecorder,
                                                    {0, 500, 10500, 10501, 1'000'000'000'010'501});
 
-    trafficRecorder.stop(ctx.get());
+    trafficRecorder.stop(ctx.get(), {});
 }
 
 }  // namespace

@@ -50,5 +50,8 @@ public:
     std::size_t maxOpenSessions() const override {
         return 0;
     }
+    std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override {
+        return {};
+    }
 };
 }  // namespace mongo::transport

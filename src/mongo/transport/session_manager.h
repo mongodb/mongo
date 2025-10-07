@@ -88,6 +88,8 @@ public:
      */
     virtual std::size_t numOpenSessions() const = 0;
 
+    virtual std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const = 0;
+
     /**
      * Returns the maximum number of sessions that can be open.
      */

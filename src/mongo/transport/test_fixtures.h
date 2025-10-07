@@ -218,6 +218,10 @@ public:
         return _sessions->size();
     }
 
+    std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override {
+        return {};
+    }
+
     void setOnStartSession(std::function<void(SessionThread&)> cb) {
         _onStartSession = std::move(cb);
     }
