@@ -248,6 +248,8 @@ public:
 
     struct DeadlineState {
         Date_t deadline;
+        // The duration from begin to deadline in fine precision.
+        Microseconds maxTime;
         ErrorCodes::Error error;
         bool hasArtificialDeadline;
     };

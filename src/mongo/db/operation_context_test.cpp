@@ -751,6 +751,24 @@ TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpirati
     ASSERT_TRUE(opCtx->getCancellationToken().isCanceled());
 }
 
+TEST_F(OperationDeadlineTests, MaxTimeRestoredAfterDeadlineGuard) {
+    auto tickSource = checked_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
+    auto opCtx = client->makeOperationContext();
+    auto originDeadline = mockClock->now() + Seconds{1};
+    opCtx->setDeadlineByDate(originDeadline, ErrorCodes::MaxTimeMSExpired);
+
+    ASSERT_EQ(Seconds{1}, opCtx->getRemainingMaxTimeMicros());
+
+    auto newDeadline = mockClock->now() + Milliseconds{500};
+    opCtx->runWithDeadline(newDeadline, ErrorCodes::MaxTimeMSExpired, [&]() -> void {
+        tickSource->advance(Milliseconds(300));
+        mockClock->advance(Milliseconds(300));
+    });
+
+    ASSERT_EQ(originDeadline, opCtx->getDeadline());
+    ASSERT_EQ(Milliseconds{700}, opCtx->getRemainingMaxTimeMicros());
+}
+
 class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
 public:
     using CvPred = std::function<bool()>;
