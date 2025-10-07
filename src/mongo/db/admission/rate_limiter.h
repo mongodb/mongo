@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/moving_average.h"
+#include "mongo/util/system_tick_source.h"
 
 namespace mongo::admission {
 
@@ -95,7 +96,8 @@ public:
     RateLimiter(double refreshRatePerSec,
                 double burstCapacitySecs,
                 int64_t maxQueueDepth,
-                std::string name);
+                std::string name,
+                TickSource* tickSource = globalSystemTickSource());
 
     ~RateLimiter();
 

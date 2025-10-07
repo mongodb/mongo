@@ -54,7 +54,7 @@ double calculateBurstSize(double refreshRate, double burstCapacitySecs) {
 }  // namespace
 
 struct RateLimiter::RateLimiterPrivate {
-    RateLimiterPrivate(double r, double b, int64_t m, std::string n)
+    RateLimiterPrivate(double r, double b, int64_t m, TickSource* clock, std::string n)
         // Initialize the token bucket with one "burst" of tokens. The third parameter to
         // tokenBucket's constructor ("zeroTime") is interpreted as a number of seconds from the
         // epoch of the clock used by the token bucket. The clock is
@@ -62,13 +62,11 @@ struct RateLimiter::RateLimiterPrivate {
         // of the machine. Rather than have an initial accumulation of tokens based on some
         // unknown point in the past, set the zero time to a known time in the past: enough time
         // for burst size (b) tokens to have accumulated.
-        : tokenBucket{r, b, folly::TokenBucket::defaultClockNow() - b / r},
-          maxQueueDepth(m),
+        : maxQueueDepth(m),
           queued(0),
-          name(std::move(n)) {}
-
-    WriteRarelyRWMutex rwMutex;
-    folly::TokenBucket tokenBucket;
+          name(std::move(n)),
+          tickSource(clock),
+          tokenBucket{r, b, nowInSeconds() - b / r} {}
 
     Stats stats;
 
@@ -76,6 +74,10 @@ struct RateLimiter::RateLimiterPrivate {
     Atomic<int64_t> queued;
 
     std::string name;
+
+    TickSource* tickSource;
+    WriteRarelyRWMutex rwMutex;
+    folly::TokenBucket tokenBucket;
 
     Status enqueue() {
         const auto maxDepth = maxQueueDepth.loadRelaxed();
@@ -91,12 +93,19 @@ struct RateLimiter::RateLimiterPrivate {
 
         return Status::OK();
     }
+
+    double nowInSeconds() {
+        return std::chrono::duration<double>(
+                   std::chrono::nanoseconds(tickSource->getTicks()))  // NOLINT
+            .count();
+    }
 };
 
 RateLimiter::RateLimiter(double refreshRatePerSec,
                          double burstCapacitySecs,
                          int64_t maxQueueDepth,
-                         std::string name) {
+                         std::string name,
+                         TickSource* tickSource) {
     uassert(ErrorCodes::InvalidOptions,
             fmt::format("burstCapacitySecs cannot be less than or equal to 0.0. "
                         "burstCapacitySecs={}; rateLimiterName={}",
@@ -105,7 +114,7 @@ RateLimiter::RateLimiter(double refreshRatePerSec,
             burstCapacitySecs > 0.0);
     auto burstSize = calculateBurstSize(refreshRatePerSec, burstCapacitySecs);
     _impl = std::make_unique<RateLimiterPrivate>(
-        refreshRatePerSec, burstSize, maxQueueDepth, std::move(name));
+        refreshRatePerSec, burstSize, maxQueueDepth, tickSource, std::move(name));
 }
 
 RateLimiter::~RateLimiter() = default;
@@ -121,7 +130,8 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
         waitForTokenSecs = 60 * 60;  // 1 hour
     } else {
         auto lk = _impl->rwMutex.readLock();
-        waitForTokenSecs = _impl->tokenBucket.consumeWithBorrowNonBlocking(1.0).value_or(0);
+        waitForTokenSecs =
+            _impl->tokenBucket.consumeWithBorrowNonBlocking(1.0, _impl->nowInSeconds()).value_or(0);
     }
 
     if (auto napTime = doubleToMillis(waitForTokenSecs); napTime > Milliseconds{0}) {
@@ -174,7 +184,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
 Status RateLimiter::tryAcquireToken() {
     _impl->stats.attemptedAdmissions.incrementRelaxed();
 
-    if (!_impl->tokenBucket.consume(1.0)) {
+    if (!_impl->tokenBucket.consume(1.0, _impl->nowInSeconds())) {
         _impl->stats.rejectedAdmissions.incrementRelaxed();
         return Status{kRejectedErrorCode,
                       fmt::format("Rate limiter '{}' rate exceeded", _impl->name)};
@@ -229,12 +239,12 @@ void RateLimiter::appendStats(BSONObjBuilder* bob) const {
 
 double RateLimiter::tokensAvailable() const {
     auto lk = _impl->rwMutex.readLock();
-    return _impl->tokenBucket.available();
+    return _impl->tokenBucket.available(_impl->nowInSeconds());
 }
 
 double RateLimiter::tokenBalance() const {
     auto lk = _impl->rwMutex.readLock();
-    return _impl->tokenBucket.balance();
+    return _impl->tokenBucket.balance(_impl->nowInSeconds());
 }
 
 int64_t RateLimiter::queued() const {
