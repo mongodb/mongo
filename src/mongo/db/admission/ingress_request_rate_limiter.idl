@@ -38,7 +38,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: gIngressRequestRateLimiterEnabled
         cpp_vartype: AtomicWord<bool>
-        default: false
+        default: true
         redact: false
 
     ingressRequestAdmissionRatePerSec:
