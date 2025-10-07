@@ -167,10 +167,20 @@ protected:
 
 class RollbackTest::StorageInterfaceRollback : public StorageInterfaceImpl {
 public:
+    // Tests can call this function to exercise the unmocked version of setStableTimestamp() and
+    // recoverToStableTimestamp().
+    void unmockStableTimestamp() {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _mockStableTimestamp = false;
+    }
+
     void setStableTimestamp(ServiceContext* serviceCtx,
                             Timestamp snapshotName,
                             bool force = false) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (!_mockStableTimestamp) {
+            StorageInterfaceImpl::setStableTimestamp(serviceCtx, snapshotName, force);
+        }
         _stableTimestamp = snapshotName;
     }
 
@@ -181,6 +191,11 @@ public:
      */
     Timestamp recoverToStableTimestamp(OperationContext* opCtx) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (!_mockStableTimestamp) {
+            StorageInterfaceImpl::setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                          _stableTimestamp);
+            StorageInterfaceImpl::recoverToStableTimestamp(opCtx);
+        }
         if (_recoverToTimestampStatus) {
             fassert(4584700, _recoverToTimestampStatus.get());
         }
@@ -262,6 +277,8 @@ private:
 
     boost::optional<Status> _setCollectionCountStatus = boost::none;
     boost::optional<UUID> _setCollectionCountStatusUUID = boost::none;
+
+    bool _mockStableTimestamp = true;
 };
 
 /**

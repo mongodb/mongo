@@ -87,6 +87,7 @@
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -1494,6 +1495,7 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
     }
     fassert(31049, swStableTimestamp);
     catalog::openCatalog(opCtx, state, swStableTimestamp.getValue());
+    DurableHistoryRegistry::get(opCtx)->reconcilePins(opCtx);
     serviceContext->getStorageEngine()->restartTimestampMonitor();
 
     StorageControl::startStorageControls(serviceContext);

@@ -40,7 +40,6 @@
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/deferred_drop_record_store.h"
 #include "mongo/db/storage/disk_space_monitor.h"
-#include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -751,8 +750,6 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
     if (!swTimestamp.isOK()) {
         return swTimestamp;
     }
-
-    DurableHistoryRegistry::get(opCtx)->reconcilePins(opCtx);
 
     LOGV2(22259,
           "recoverToStableTimestamp successful",

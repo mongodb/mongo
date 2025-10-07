@@ -85,6 +85,10 @@ ReplSettings createReplSettings() {
     return settings;
 }
 
+StorageEngine::TimestampMonitor::TimestampListener mockTimestampListener(
+    StorageEngine::TimestampMonitor::TimestampType::kOldest,
+    [](OperationContext* opCtx, Timestamp timestamp) {});
+
 class RollbackTestOpObserver : public OpObserverNoop {
 public:
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -111,6 +115,7 @@ void RollbackTest::setUp() {
 
     _storageInterface = new StorageInterfaceRollback();
     auto serviceContext = getServiceContext();
+    serviceContext->getStorageEngine()->startTimestampMonitor({&mockTimestampListener});
     auto consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();
     auto recovery =
         std::make_unique<ReplicationRecoveryImpl>(_storageInterface, consistencyMarkers.get());
