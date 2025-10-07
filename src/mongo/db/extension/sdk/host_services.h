@@ -61,6 +61,10 @@ public:
         std::int32_t code,
         mongo::extension::MongoExtensionLogSeverityEnum severity);
 
+    static BSONObj createExtensionDebugLogMessage(std::string message,
+                                                  std::int32_t code,
+                                                  std::int32_t level);
+
     static HostServicesHandle* getHostServices() {
         return &_hostServices;
     }

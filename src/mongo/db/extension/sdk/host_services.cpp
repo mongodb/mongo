@@ -44,4 +44,11 @@ BSONObj HostServicesHandle::createExtensionLogMessage(
     mongo::extension::MongoExtensionLog log(std::move(message), code, severity);
     return log.toBSON();
 }
+
+BSONObj HostServicesHandle::createExtensionDebugLogMessage(std::string message,
+                                                           std::int32_t code,
+                                                           std::int32_t level) {
+    mongo::extension::MongoExtensionDebugLog debugLog(std::move(message), code, level);
+    return debugLog.toBSON();
+}
 }  // namespace mongo::extension::sdk

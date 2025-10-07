@@ -58,5 +58,25 @@ TEST(HostServicesTest, ExtensionLogIDLRoundTrip) {
     ASSERT_EQUALS(log.getCode(), logCode);
     ASSERT_EQUALS(log.getSeverity(), logSeverity);
 }
+
+TEST(HostServicesTest, ExtensionDebugLogIDLRoundTrip) {
+    std::string logMessage = "Test debug log message";
+    std::int32_t logCode = 12345;
+    std::int32_t logLevel = 1;
+
+    BSONObj structuredDebugLog =
+        sdk::HostServicesHandle::createExtensionDebugLogMessage(logMessage, logCode, logLevel);
+    ::MongoExtensionByteView byteView = sdk::objAsByteView(structuredDebugLog);
+
+    ASSERT(byteView.data != nullptr);
+    ASSERT(byteView.len > 0);
+
+    auto bsonObj = sdk::bsonObjFromByteView(byteView);
+    auto debugLog = MongoExtensionDebugLog::parse(bsonObj);
+
+    ASSERT_EQUALS(debugLog.getMessage(), logMessage);
+    ASSERT_EQUALS(debugLog.getCode(), logCode);
+    ASSERT_EQUALS(debugLog.getLevel(), logLevel);
+}
 }  // namespace
 }  // namespace mongo::extension

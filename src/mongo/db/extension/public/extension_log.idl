@@ -68,3 +68,26 @@ structs:
                 optional: false
             # TODO SERVER-111339 Add attributes field
             # TODO SERVER-111333 Add extension name
+    MongoExtensionDebugLog:
+        description: >-
+            Structured debug log message passed from extension to host in the HostServices::log() 
+            API function. Only logs if the server is set to debug and has at least the corresponding
+            log level for the desired message.
+        # It's important to mark the struct as strict so that new fields purposefully break API
+        # compatibility and a version bump is needed.
+        strict: true
+        fields:
+            message:
+                description: The log message.
+                type: string
+                optional: false
+            code:
+                description: Numeric location code.
+                type: int
+                optional: false
+            level:
+                description: Log level in the range 1-5; values >5 are clamped to 5.
+                type: int
+                optional: false
+            # TODO SERVER-111339 Add 'attributes' field.
+            # TODO SERVER-111333 Add 'extensionName' field.
