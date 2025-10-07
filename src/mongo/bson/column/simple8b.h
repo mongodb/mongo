@@ -33,16 +33,14 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/column/simple8b_helpers.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -347,10 +345,10 @@ typename Simple8b<T>::Iterator Simple8b<T>::end() const {
 
 namespace simple8b {
 // Constant for a simple8b block containing a single 'missing' value.
-static constexpr uint64_t kSingleSkip = 0xFFFFFFFFFFFFFFFE;
+inline constexpr uint64_t kSingleSkip = 0xFFFFFFFFFFFFFFFE;
 
 // Constant for a simple8b block containing a single zero value.
-static constexpr uint64_t kSingleZero = 0xE;
+inline constexpr uint64_t kSingleZero = 0xE;
 
 /**
  * Visits all values in sequence with provided callbacks
@@ -404,10 +402,10 @@ T prefixSum(const char* buffer, size_t size, T& prefix, uint64_t& prevNonRLE);
  * Helper that performs signed addition as unsigned to get the defined wrap-around overflow behavior
  * rather than overflow, which is undefined behavior.
  */
-static constexpr int64_t add(int64_t lhs, int64_t rhs) {
+inline constexpr int64_t add(int64_t lhs, int64_t rhs) {
     return static_cast<int64_t>(static_cast<uint64_t>(lhs) + static_cast<uint64_t>(rhs));
 }
-static constexpr int128_t add(int128_t lhs, int128_t rhs) {
+inline constexpr int128_t add(int128_t lhs, int128_t rhs) {
     return static_cast<int128_t>(static_cast<uint128_t>(lhs) + static_cast<uint128_t>(rhs));
 }
 

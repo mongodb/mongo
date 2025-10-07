@@ -28,14 +28,13 @@
  */
 
 #include "mongo/bson/column/simple8b_type_util.h"
+#include "mongo/util/modules.h"
 
 #include <limits>
 
 namespace mongo::simple8b {
-namespace {
-
 // Sentinel to represent missing, this value is not encodable in simple8b
-static constexpr int64_t kMissing = std::numeric_limits<int64_t>::max();
+inline constexpr int64_t kMissing = std::numeric_limits<int64_t>::max();
 
 // Simple Simple8b decoder for decoding any basic simple8b block where all bits are used for the
 // value, decodes signed integer at runtime. Suitable for selectors with many bits per slot. Encoded
@@ -528,47 +527,47 @@ struct ExtendedDecoder {
 };
 
 // Storage for all decoders that we need for our various selector types
-static constexpr ParallelTableDecoder<2> decoderParallel2;
-static constexpr ParallelTableDecoder<3> decoderParallel3;
-static constexpr ParallelTableDecoder<4> decoderParallel4;
-static constexpr ParallelTableDecoder<5> decoderParallel5;
-static constexpr ParallelTableDecoder<6> decoderParallel6;
-static constexpr OneDecoder decoder1;
-static constexpr TableDecoder<2> decoder2;
-static constexpr TableDecoder<3> decoder3;
-static constexpr TableDecoder<4> decoder4;
-static constexpr TableDecoder<5> decoder5;
-static constexpr TableDecoder<6> decoder6;
-static constexpr TableDecoder<7> decoder7;
-static constexpr TableDecoder<8> decoder8;
-static constexpr TableDecoder<10> decoder10;
-static constexpr SimpleDecoder<12> decoder12;
-static constexpr SimpleDecoder<15> decoder15;
-static constexpr SimpleDecoder<20> decoder20;
-static constexpr SimpleDecoder<30> decoder30;
-static constexpr SimpleDecoder<60> decoder60;
-static constexpr ExtendedDecoder<2, 4, 1> decoderExtended7_1;
-static constexpr ExtendedDecoder<3, 4, 1> decoderExtended7_2;
-static constexpr ExtendedDecoder<4, 4, 1> decoderExtended7_3;
-static constexpr ExtendedDecoder<5, 4, 1> decoderExtended7_4;
-static constexpr ExtendedDecoder<7, 4, 1> decoderExtended7_5;
-static constexpr ExtendedDecoder<10, 4, 1> decoderExtended7_6;
-static constexpr ExtendedDecoder<14, 4, 1> decoderExtended7_7;
-static constexpr ExtendedDecoder<24, 4, 1> decoderExtended7_8;
-static constexpr ExtendedDecoder<52, 4, 1> decoderExtended7_9;
-static constexpr ExtendedDecoder<4, 4, 4> decoderExtended8_1;
-static constexpr ExtendedDecoder<5, 4, 4> decoderExtended8_2;
-static constexpr ExtendedDecoder<7, 4, 4> decoderExtended8_3;
-static constexpr ExtendedDecoder<10, 4, 4> decoderExtended8_4;
-static constexpr ExtendedDecoder<14, 4, 4> decoderExtended8_5;
-static constexpr ExtendedDecoder<24, 4, 4> decoderExtended8_6;
-static constexpr ExtendedDecoder<52, 4, 4> decoderExtended8_7;
-static constexpr ExtendedDecoder<4, 5, 4> decoderExtended8_8;
-static constexpr ExtendedDecoder<6, 5, 4> decoderExtended8_9;
-static constexpr ExtendedDecoder<9, 5, 4> decoderExtended8_10;
-static constexpr ExtendedDecoder<13, 5, 4> decoderExtended8_11;
-static constexpr ExtendedDecoder<23, 5, 4> decoderExtended8_12;
-static constexpr ExtendedDecoder<51, 5, 4> decoderExtended8_13;
+inline constexpr ParallelTableDecoder<2> decoderParallel2;
+inline constexpr ParallelTableDecoder<3> decoderParallel3;
+inline constexpr ParallelTableDecoder<4> decoderParallel4;
+inline constexpr ParallelTableDecoder<5> decoderParallel5;
+inline constexpr ParallelTableDecoder<6> decoderParallel6;
+inline constexpr OneDecoder decoder1;
+inline constexpr TableDecoder<2> decoder2;
+inline constexpr TableDecoder<3> decoder3;
+inline constexpr TableDecoder<4> decoder4;
+inline constexpr TableDecoder<5> decoder5;
+inline constexpr TableDecoder<6> decoder6;
+inline constexpr TableDecoder<7> decoder7;
+inline constexpr TableDecoder<8> decoder8;
+inline constexpr TableDecoder<10> decoder10;
+inline constexpr SimpleDecoder<12> decoder12;
+inline constexpr SimpleDecoder<15> decoder15;
+inline constexpr SimpleDecoder<20> decoder20;
+inline constexpr SimpleDecoder<30> decoder30;
+inline constexpr SimpleDecoder<60> decoder60;
+inline constexpr ExtendedDecoder<2, 4, 1> decoderExtended7_1;
+inline constexpr ExtendedDecoder<3, 4, 1> decoderExtended7_2;
+inline constexpr ExtendedDecoder<4, 4, 1> decoderExtended7_3;
+inline constexpr ExtendedDecoder<5, 4, 1> decoderExtended7_4;
+inline constexpr ExtendedDecoder<7, 4, 1> decoderExtended7_5;
+inline constexpr ExtendedDecoder<10, 4, 1> decoderExtended7_6;
+inline constexpr ExtendedDecoder<14, 4, 1> decoderExtended7_7;
+inline constexpr ExtendedDecoder<24, 4, 1> decoderExtended7_8;
+inline constexpr ExtendedDecoder<52, 4, 1> decoderExtended7_9;
+inline constexpr ExtendedDecoder<4, 4, 4> decoderExtended8_1;
+inline constexpr ExtendedDecoder<5, 4, 4> decoderExtended8_2;
+inline constexpr ExtendedDecoder<7, 4, 4> decoderExtended8_3;
+inline constexpr ExtendedDecoder<10, 4, 4> decoderExtended8_4;
+inline constexpr ExtendedDecoder<14, 4, 4> decoderExtended8_5;
+inline constexpr ExtendedDecoder<24, 4, 4> decoderExtended8_6;
+inline constexpr ExtendedDecoder<52, 4, 4> decoderExtended8_7;
+inline constexpr ExtendedDecoder<4, 5, 4> decoderExtended8_8;
+inline constexpr ExtendedDecoder<6, 5, 4> decoderExtended8_9;
+inline constexpr ExtendedDecoder<9, 5, 4> decoderExtended8_10;
+inline constexpr ExtendedDecoder<13, 5, 4> decoderExtended8_11;
+inline constexpr ExtendedDecoder<23, 5, 4> decoderExtended8_12;
+inline constexpr ExtendedDecoder<51, 5, 4> decoderExtended8_13;
 
 // Decodes last slot for simple8b block. Treats missing as 0.
 template <typename T>
@@ -1196,8 +1195,6 @@ T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
     uasserted(8297300, "Bad selector");
     return 0;
 }
-
-}  // namespace
 
 template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
 MONGO_COMPILER_ALWAYS_INLINE_GCC14 size_t visitAll(const char* buffer,

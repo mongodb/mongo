@@ -35,11 +35,11 @@
 #include "mongo/stdx/utility.h"
 
 namespace mongo::bsoncolumn {
-static constexpr char kInterleavedStartControlByteLegacy = (char)0xF0;
-static constexpr char kInterleavedStartControlByte = (char)0xF1;
-static constexpr char kInterleavedStartArrayRootControlByte = (char)0xF2;
-static constexpr uint8_t kInvalidScaleIndex = 0xFF;
-static constexpr uint8_t kInvalidControlByte = 0xFE;
+inline constexpr char kInterleavedStartControlByteLegacy = (char)0xF0;
+inline constexpr char kInterleavedStartControlByte = (char)0xF1;
+inline constexpr char kInterleavedStartArrayRootControlByte = (char)0xF2;
+inline constexpr uint8_t kInvalidScaleIndex = 0xFF;
+inline constexpr uint8_t kInvalidControlByte = 0xFE;
 
 inline bool isUncompressedLiteralControlByte(uint8_t control) {
     return (control & 0xE0) == 0 || control == (uint8_t)stdx::to_underlying(BSONType::minKey) ||
