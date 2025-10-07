@@ -9,6 +9,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const testDB = db.getSiblingDB("timeseries_system_views_drop");
 
@@ -19,10 +20,15 @@ TimeseriesTest.run((insert) => {
     tsColl.drop();
     assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
 
-    assert.eq(testDB.system.views.find().toArray().length, 1);
-    assert.throws(() => {
-        testDB.system.views.drop();
-    });
+    if (areViewlessTimeseriesEnabled(db)) {
+        assert.eq(testDB.system.views.find().toArray().length, 0);
+        assert(testDB.system.views.drop());
+    } else {
+        assert.eq(testDB.system.views.find().toArray().length, 1);
+        assert.throws(() => {
+            testDB.system.views.drop();
+        });
+    }
 
     assert(tsColl.drop());
     assert.eq(testDB.system.views.find().toArray().length, 0);

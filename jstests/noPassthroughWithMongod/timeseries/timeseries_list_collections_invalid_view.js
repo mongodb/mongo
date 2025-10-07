@@ -8,6 +8,13 @@
  *   requires_getmore,
  * ]
  */
+
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesCollForDDLOps,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -15,6 +22,14 @@ const timeFieldName = "time";
 const coll = testDB.getCollection("t");
 
 assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+if (areViewlessTimeseriesEnabled(db)) {
+    assert.commandWorked(
+        testDB.createCollection("my_view", {
+            viewOn: "non_existing_coll",
+            pipeline: [{$match: {}}],
+        }),
+    );
+}
 assert.commandWorked(
     testDB.adminCommand({
         applyOps: [{op: "i", ns: testDB.getName() + ".system.views", o: {_id: "invalid", pipeline: "invalid"}}],
@@ -23,22 +38,34 @@ assert.commandWorked(
 
 assert.commandFailedWithCode(testDB.runCommand({listCollections: 1}), ErrorCodes.InvalidViewDefinition);
 assert.commandFailedWithCode(
+    testDB.runCommand({listCollections: 1, ...kRawOperationSpec}),
+    ErrorCodes.InvalidViewDefinition,
+);
+assert.commandFailedWithCode(
     testDB.runCommand({listCollections: 1, filter: {type: "timeseries"}}),
     ErrorCodes.InvalidViewDefinition,
 );
 assert.commandFailedWithCode(
-    testDB.runCommand({listCollections: 1, filter: {name: coll.getName()}}),
+    testDB.runCommand({listCollections: 1, filter: {type: "timeseries"}, ...kRawOperationSpec}),
+    ErrorCodes.InvalidViewDefinition,
+);
+assert.commandFailedWithCode(
+    testDB.runCommand({listCollections: 1, filter: {name: coll.getName()}, ...kRawOperationSpec}),
     ErrorCodes.InvalidViewDefinition,
 );
 
 // TODO (SERVER-25493): Change filter to {type: 'collection'}.
 const collections = assert.commandWorked(
-    testDB.runCommand({listCollections: 1, filter: {$or: [{type: "collection"}, {type: {$exists: false}}]}}),
+    testDB.runCommand({
+        listCollections: 1,
+        filter: {$or: [{type: "collection"}, {type: {$exists: false}}]},
+        ...kRawOperationSpec,
+    }),
 ).cursor.firstBatch;
 jsTestLog("Checking listCollections result: " + tojson(collections));
 assert.eq(collections.length, 2);
 assert(collections.find((entry) => entry.name === "system.views"));
-assert(collections.find((entry) => entry.name === "system.buckets." + coll.getName()));
+assert(collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db, coll).getName()));
 
 // Users are prohibited from dropping system.views when there are time-series collections present.
 // However, this restriction isn't in place on earlier versions and its possible for users to

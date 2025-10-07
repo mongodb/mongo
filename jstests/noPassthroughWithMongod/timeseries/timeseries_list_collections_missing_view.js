@@ -7,6 +7,8 @@
  *   requires_getmore,
  * ]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -26,4 +28,4 @@ assert.commandWorked(testDB.adminCommand({configureFailPoint: "allowSystemViewsD
 const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 jsTestLog("Checking listCollections result: " + tojson(collections));
 assert.eq(collections.length, 1);
-assert(collections.find((entry) => entry.name === "system.buckets." + coll.getName()));
+assert(collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db, coll).getName()));
