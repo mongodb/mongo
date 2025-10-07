@@ -860,6 +860,14 @@ def parseTU(args: list[str] | str):
         if "src/mongo" not in include.include.name:
             continue
 
+        # Treat protobuf generated headers as completely marked. These headers cannot be
+        # modified to include modules.h, and for now they should be assumed to be private
+        # to the module they are a part of since we don't use protobuf for inter-module
+        # communication.
+        if include.include.name.endswith(".pb.h"):
+            complete_headers.add(normpath_for_file(include.include))
+            continue
+
         # Note: using bytes to avoid unicode handling overhead since the
         # needles we are looking for are ascii-only.
         content = Path(include.include.name).read_bytes()
