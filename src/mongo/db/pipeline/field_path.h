@@ -126,10 +126,13 @@ public:
 
     /**
      * Return the ith field name from this path using zero-based indexes, with pre-computed hash.
+     * Tasserts when trying to access a field name hash for a position for which no hashes were
+     * calculated.
      */
     HashedFieldName getFieldNameHashed(size_t i) const {
         dassert(i < getPathLength());
-        invariant(_fieldHash[i] != kHashUninitialized);
+        tassert(
+            11212700, "cannot access a not-calculated field hash position", i < _fieldHash.size());
         return HashedFieldName{getFieldName(i), _fieldHash[i]};
     }
 
@@ -193,7 +196,7 @@ private:
                 _fieldPathDotPosition.size() <= BSONDepth::getMaxAllowableDepth());
     }
 
-    static const char prefix = '$';
+    static constexpr char prefix = '$';
 
     // Contains the full field path, with each field delimited by a '.' character.
     std::string _fieldPath;
@@ -203,10 +206,12 @@ private:
     // lookup.
     std::vector<size_t> _fieldPathDotPosition;
 
-    // Contains the hash value for the field names if it was requested when creating this path.
-    // Otherwise all elements are set to 'kHashUninitialized'.
+    // Contains the hash values for the field names, if it was requested when creating this path.
+    // The hashes can be accessed via 'getFieldNameHashed(i)'.
+    // Can be empty if precomputing hashes was not requested.
+    // Can also be partially empty, with slots at the end not being fully filled, after
+    // concatenating two field paths of which the second did not have precomputed hashes.
     std::vector<uint32_t> _fieldHash;
-    static constexpr uint32_t kHashUninitialized = std::numeric_limits<uint32_t>::max();
 };
 
 inline bool operator<(const FieldPath& lhs, const FieldPath& rhs) {

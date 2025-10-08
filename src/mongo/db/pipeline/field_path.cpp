@@ -88,15 +88,22 @@ FieldPath::FieldPath(std::string inputPath, bool precomputeHashes, bool validate
     uassert(ErrorCodes::Overflow,
             "FieldPath is too long",
             pathLength <= BSONDepth::getMaxAllowableDepth());
-    _fieldHash.reserve(pathLength);
+
+    // Only allocate heap storage space for the vector of precomputed hashes if it is actually
+    // needed.
+    if (precomputeHashes) {
+        _fieldHash.reserve(pathLength);
+    }
     for (size_t i = 0; i < pathLength; ++i) {
-        const auto& fieldName = getFieldName(i);
+        auto fieldName = getFieldName(i);
         if (validateFieldNames) {
             uassertStatusOKWithContext(
                 validateFieldName(fieldName),
                 "Consider using $getField or $setField for a field path with '.' or '$'.");
         }
-        _fieldHash.push_back(precomputeHashes ? FieldNameHasher()(fieldName) : kHashUninitialized);
+        if (precomputeHashes) {
+            _fieldHash.push_back(FieldNameHasher()(fieldName));
+        }
     }
 }
 
@@ -147,25 +154,41 @@ FieldPath FieldPath::concat(const FieldPath& tail) const {
         head._fieldPathDotPosition.size() + tail._fieldPathDotPosition.size() - 2 + 1;
     newDots.reserve(expectedDotSize);
 
-    std::vector<uint32_t> newHashes;
-    // We don't need the extra entry in hashes.
-    newHashes.reserve(expectedDotSize - 1);
-
     // The first one in head._fieldPathDotPosition is npos. The last one, is, conveniently, the
     // size of head fieldPath, which also happens to be the index at which we added a new dot.
     newDots.insert(
         newDots.begin(), head._fieldPathDotPosition.begin(), head._fieldPathDotPosition.end());
-    newHashes.insert(newHashes.begin(), head._fieldHash.begin(), head._fieldHash.end());
 
     invariant(tail._fieldPathDotPosition.size() >= 2);
     for (size_t i = 1; i < tail._fieldPathDotPosition.size(); ++i) {
         // Move each index back by size of the first field path, plus one, for the newly added dot.
         newDots.push_back(tail._fieldPathDotPosition[i] + head._fieldPath.size() + 1);
-        newHashes.push_back(tail._fieldHash[i - 1]);
     }
     invariant(newDots.back() == concat.size());
     invariant(newDots.size() == expectedDotSize);
-    invariant(newHashes.size() == expectedDotSize - 1);
+
+    // Re-use/compute the field hashes.
+    // Field hashes are only needed if either 'head' or 'tail' has computed hashes. If neither have
+    // computed hashes, we can skip copying them entirely.
+    std::vector<uint32_t> newHashes;
+    if (!head._fieldHash.empty() || !tail._fieldHash.empty()) {
+        newHashes.reserve(head.getPathLength() + tail._fieldHash.size());
+
+        // Insert all hashes from 'head' first. These may be zero hashes if hash computation hasn't
+        // happened for 'head' yet.
+        newHashes.insert(newHashes.end(), head._fieldHash.begin(), head._fieldHash.end());
+
+        // Fill up any potential gap in the hashes for 'head'.
+        for (size_t i = head._fieldHash.size(); i < head.getPathLength(); ++i) {
+            newHashes.push_back(FieldNameHasher()(head.getFieldName(i)));
+        }
+
+        dassert(newHashes.size() == head.getPathLength());
+
+        // Now append all hashes from 'tail'. These may be empty, so the hash values may only be
+        // partially filled.
+        newHashes.insert(newHashes.end(), tail._fieldHash.begin(), tail._fieldHash.end());
+    }
 
     return FieldPath(std::move(concat), std::move(newDots), std::move(newHashes));
 }
