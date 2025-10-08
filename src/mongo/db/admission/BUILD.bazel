@@ -67,11 +67,14 @@ mongo_cc_library(
     name = "ticketing_system",
     srcs = [
         "admission_feature_flags_gen",
+        "concurrency_adjustment_validator.cpp",
+        "execution_control_parameters_gen",
         "multiple_pools_ticketing_system.cpp",
         "single_pool_ticketing_system.cpp",
         "ticketing_system.cpp",
     ],
     hdrs = [
+        "concurrency_adjustment_validator.h",
         "multiple_pools_ticketing_system.h",
         "single_pool_ticketing_system.h",
         "ticketing_system.h",
@@ -103,14 +106,11 @@ mongo_cc_library(
 mongo_cc_library(
     name = "execution_control",
     srcs = [
-        "concurrency_adjustment_validator.cpp",
         "execution_control_init.cpp",
-        "execution_control_parameters_gen",
         "throughput_probing.cpp",
         "throughput_probing_gen",
     ],
     hdrs = [
-        "concurrency_adjustment_validator.h",
         "execution_control_init.h",
         "throughput_probing.h",
     ],

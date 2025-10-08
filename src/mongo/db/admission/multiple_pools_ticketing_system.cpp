@@ -30,9 +30,37 @@
 #include "mongo/db/admission/multiple_pools_ticketing_system.h"
 
 #include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control_parameters_gen.h"
 
 namespace mongo {
 namespace admission {
+
+namespace {
+
+bool isOperationDegradedAsLowPriority(OperationContext* opCtx, ExecutionAdmissionContext* admCtx) {
+    if (!gStorageEngineHeuristicDeprioritizationEnabled.load()) {
+        // If the heuristic is not enabled, we do not de-prioritize based on the number of yields.
+        return false;
+    }
+
+    if (admCtx->getPriority() == AdmissionContext::Priority::kExempt) {
+        // It is illegal to demote a high-priority (exempt) operation to a low-priority operation.
+        return false;
+    }
+
+    if (admCtx->getPriority() == AdmissionContext::Priority::kLow) {
+        // Fast exit for those operations that are manually marked as low-priority.
+        return false;
+    }
+
+    if (admCtx->getAdmissions() >= gStorageEngineHeuristicNumYieldsDeprioritizeThreshold.load()) {
+        return true;
+    }
+
+    return false;
+}
+
+}  // namespace
 
 bool MultiplePoolsTicketingSystem::isRuntimeResizable() const {
     return true;
@@ -144,6 +172,11 @@ boost::optional<Ticket> MultiplePoolsTicketingSystem::waitForTicketUntil(Operati
                                                                          Operation o,
                                                                          Date_t until) const {
     ExecutionAdmissionContext* admCtx = &ExecutionAdmissionContext::get(opCtx);
+
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> executionPriority;
+    if (isOperationDegradedAsLowPriority(opCtx, admCtx)) {
+        executionPriority.emplace(opCtx, AdmissionContext::Priority::kLow);
+    }
 
     auto* holder = _getHolder(admCtx->getPriority(), o);
     invariant(holder);
