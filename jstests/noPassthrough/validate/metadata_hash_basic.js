@@ -73,7 +73,7 @@ assert.eq(
     `Collection2 before insert result: ${tojson(res2)}\nCollection2 after insert result: ${tojson(res2_diff_doc)}`,
 );
 
-jsTest.log.info("Testing nodes with 'revealHashedIds'");
+jsTest.log.info("Testing with 'revealHashedIds'");
 res1_diff_doc = assert.commandWorked(coll1.validate({collHash: true, hashPrefixes: []}));
 res2_diff_doc = assert.commandWorked(coll2.validate({collHash: true, hashPrefixes: []}));
 const partial1Keys = Object.keys(res1_diff_doc.partial);
@@ -95,6 +95,17 @@ assert.eq(
     res2_reveal.metadata,
     res2.metadata,
     `Collection2 before insert result: ${tojson(res2)}\nCollection2 after insert result: ${tojson(res2_reveal)}`,
+);
+
+jsTest.log.info("Testing when index catalog entries are in different orders");
+assert.commandWorked(coll1.createIndexes([{first: 1}, {second: 1}]));
+assert.commandWorked(coll2.createIndexes([{second: 1}, {first: 1}]));
+const res1_order = assert.commandWorked(coll1.validate({collHash: true}));
+const res2_order = assert.commandWorked(coll2.validate({collHash: true}));
+assert.eq(
+    res1_order.metadata,
+    res2_order.metadata,
+    `Collection1 result: ${tojson(res1_order)}\nCollection2 result: ${tojson(res2_order)}`,
 );
 
 jsTest.log.info("Testing when catalog entries diverge");

@@ -717,6 +717,22 @@ Status _validateTimeSeriesBucketRecord(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+// Computes the hash of 'md' field by XORing the hash of subfields with 'metadataHash'. For
+// 'indexes' subfield, uses the hash of each entries without the array index.
+void computeMDHash(const BSONObj& mdField, SHA256Block& metadataHash) {
+    for (const auto& field : mdField) {
+        if (field.fieldNameStringData() == "indexes") {
+            for (const auto& indexField : field.Obj()) {
+                metadataHash.xorInline(SHA256Block::computeHash(
+                    {ConstDataRange(indexField.value(), indexField.valuesize())}));
+            }
+        } else {
+            metadataHash.xorInline(
+                SHA256Block::computeHash({ConstDataRange(field.rawdata(), field.size())}));
+        }
+    }
+}
 }  // namespace
 
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -823,9 +839,21 @@ void ValidateAdaptor::computeMetadataHash(OperationContext* opCtx,
                                           ValidateResults* results) {
     const auto& catalogEntry =
         MDBCatalog::get(opCtx)->getRawCatalogEntry(opCtx, coll->getCatalogId());
-    auto catalogEntryNoIdents = catalogEntry.removeFields(StringDataSet{"ident", "idxIdent"});
-    SHA256Block metadataHash = SHA256Block::computeHash(
-        {ConstDataRange(catalogEntryNoIdents.objdata(), catalogEntryNoIdents.objsize())});
+    // Zero out the initial hash.
+    SHA256Block metadataHash;
+    metadataHash.xorInline(metadataHash);
+    for (const auto& field : catalogEntry) {
+        auto fieldName = field.fieldNameStringData();
+        if (fieldName == "ident" || fieldName == "idxIdent") {
+            continue;
+        }
+        if (fieldName == "md") {
+            computeMDHash(field.Obj(), metadataHash);
+        } else {
+            metadataHash.xorInline(
+                SHA256Block::computeHash({ConstDataRange(field.rawdata(), field.size())}));
+        }
+    }
     results->setMetadataHash(metadataHash.toHexString());
 }
 
