@@ -65,9 +65,6 @@ buildvariants:
       --linkstatic=False
     compile_variant: enterprise-rhel-81-ppc64le-shared
   tasks:
-  - name: compile_test_serial_TG
-    distros:
-    - rhel81-power8-large
   - name: run_unit_tests_TG
     distros:
     - rhel81-power8-large
@@ -132,9 +129,6 @@ buildvariants:
       --linkstatic=False
     compile_variant: enterprise-rhel-9-ppc64le-shared
   tasks:
-  - name: compile_test_serial_TG
-    distros:
-    - rhel9-power-large
   - name: run_unit_tests_TG
     distros:
     - rhel9-power-large
@@ -198,9 +192,6 @@ buildvariants:
       --linker=gold
     compile_variant: enterprise-rhel-83-s390x-shared
   tasks:
-  - name: compile_test_serial_TG
-    distros:
-    - rhel83-zseries-large
   - name: run_unit_tests_TG
     distros:
     - rhel83-zseries-large
@@ -264,17 +255,6 @@ buildvariants:
       --linker=gold
     compile_variant: enterprise-rhel-9-s390x-shared
   tasks:
-  - name: compile_test_serial_TG
-    distros:
-    - rhel9-zseries-large
   - name: run_unit_tests_TG
     distros:
     - rhel9-zseries-large
-  - name: .development_critical !.requires_large_host !.incompatible_s390x
-  - name: .development_critical .requires_large_host !.incompatible_s390x
-    distros:
-      - rhel9-zseries-large
-  - name: .release_critical !.requires_large_host !.incompatible_s390x
-  - name: .release_critical .requires_large_host !.incompatible_s390x
-    distros:
-      - rhel9-zseries-large
