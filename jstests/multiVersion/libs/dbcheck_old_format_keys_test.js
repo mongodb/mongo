@@ -20,11 +20,6 @@ function loadDummyData() {
 
 // TODO (SERVER-66611): Automatically modify this list.
 const upgradeVersions = {
-    "3.6": {"fcv": "4.0", "nextVersion": "4.0"},
-    "4.0": {"fcv": "4.2", "nextVersion": "4.2"},
-    "4.2": {"fcv": "4.4", "nextVersion": "4.4"},
-    "4.4": {"fcv": "5.0", "nextVersion": "5.0"},
-    "5.0": {"fcv": "6.0", "nextVersion": "6.0"},
     "6.0": {"fcv": "7.0", "nextVersion": "7.0"},
     "7.0": {"fcv": "8.0", "nextVersion": "latest"},
     // TODO (SERVER-66611): Automate modifying this list.

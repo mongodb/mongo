@@ -64,4 +64,4 @@ eolVersions:
 # lastLTS. This is intended to ease the transition to a new lastLTS by extending the lifetime
 # of those older constants, so that they can be removed at a more convenient time.
 # For example, we can set this to "5.0" when releasing "6.0".
-generateFCVLowerBoundOverride: "5.0"
+generateFCVLowerBoundOverride: "6.0"

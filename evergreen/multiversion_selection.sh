@@ -34,21 +34,6 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
 fi
 
 base_command="db-contrib-tool setup-repro-env"
-evergreen_args=" -sb \
-  --platform $platform \
-  --architecture $architecture \
-  --evgVersionsFile multiversion-downloads.json"
-local_args="--edition $edition \
-  --debug \
-  --fallbackToMaster \
-  --resmokeCmd \"python buildscripts/resmoke.py\" \
-  4.2 4.4 5.0.28"
-
-remote_invocation="${base_command} ${evergreen_args} ${local_args}"
-eval "${remote_invocation}"
-echo "Verbatim db-contrib-tool invocation: ${remote_invocation}"
-
-local_invocation="${base_command} ${local_args}"
 
 if [ ! -z "${multiversion_platform_50_or_later}" ]; then
   platform="${multiversion_platform_50_or_later}"
@@ -61,7 +46,7 @@ evergreen_args=" -sb \
 local_args="--edition $edition \
   --debug \
   ${last_lts_arg} \
-  ${last_continuous_arg} 5.0 6.0"
+  ${last_continuous_arg} 6.0"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"
