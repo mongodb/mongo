@@ -278,9 +278,9 @@ feature_flags:
         default: true
         fcv_gated: false
 
-    featureFlagQueryStatsWriteCommand:
+    featureFlagQueryStatsUpdateCommand:
         description: "Feature flag to enable query stats for the write commands."
-        cpp_varname: gFeatureFlagQueryStatsWriteCommand
+        cpp_varname: gFeatureFlagQueryStatsUpdateCommand
         default: false
         fcv_gated: true
 

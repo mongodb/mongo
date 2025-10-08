@@ -1400,7 +1400,7 @@ void registerRequestForQueryStats(OperationContext* opCtx,
                                   const write_ops::UpdateCommandRequest& wholeOp,
                                   const ParsedUpdate& parsedUpdate) {
     // Skip registering for query stats when the feature flag is disabled.
-    if (!feature_flags::gFeatureFlagQueryStatsWriteCommand.isEnabledUseLastLTSFCVWhenUninitialized(
+    if (!feature_flags::gFeatureFlagQueryStatsUpdateCommand.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;
