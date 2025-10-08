@@ -321,6 +321,7 @@ buildvariants:
     run_on:
       - amazon2023-arm64-atlas-latest-small
     expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
       large_distro_name: amazon2023-arm64-atlas-latest-large
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
     tasks: &fuzzers-task-list
