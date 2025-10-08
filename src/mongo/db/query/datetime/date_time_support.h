@@ -274,8 +274,10 @@ public:
                 continue;
             }
 
-            ++it;                           // next character is format modifier
-            invariant(it != format.end());  // checked in validateFormat
+            ++it;  // next character is format modifier
+            tassert(11177400,
+                    fmt::format("Invalid format '{}', expected format specifier after %", format),
+                    it != format.end());  // checked in validateFormat
 
             switch (*it) {
                 case '%':  // Escaped literal %
@@ -365,7 +367,7 @@ public:
                     break;
                 default:
                     // Should never happen as format is pre-validated
-                    MONGO_UNREACHABLE;
+                    MONGO_UNREACHABLE_TASSERT(11177401);
             }
         }
         return Status::OK();
@@ -399,9 +401,9 @@ private:
      */
     template <typename OutputStream>
     static auto insertPadded(OutputStream& os, int number, int width) {
-        invariant(width >= 1);
-        invariant(width <= 4);
-
+        tassert(11177402,
+                fmt::format("Expected width to be in the [1, 4] range, but found {}", width),
+                1 <= width && width <= 4);
         if ((number < 0) || (number > 9999))
             return Status{ErrorCodes::Error{18537},
                           "Could not convert date to string: date component was outside "
