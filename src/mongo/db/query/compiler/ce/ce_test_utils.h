@@ -189,8 +189,6 @@ struct CollectionFieldConfiguration : public DataFieldDefinition {
         : DataFieldDefinition(
               fieldName, fieldDataType, ndv, dataDistribution, seed, nanProb, arrayTypeLength),
           fieldPositionInCollection(fieldPositionInCollection) {}
-
-    void addToBSONObjBuilder(BSONObjBuilder& builder) const;
 };
 
 /**

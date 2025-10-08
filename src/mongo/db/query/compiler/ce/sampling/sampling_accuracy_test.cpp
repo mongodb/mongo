@@ -52,10 +52,11 @@ const std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optiona
                           {SamplingEstimatorImpl::SamplingStyle::kChunk, 10},
                           {SamplingEstimatorImpl::SamplingStyle::kChunk, 20}};
 
-TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataUniformInt64) {
-    // Initialize data configuration.
-    std::vector<stats::DistrType> dataDistributions = {stats::DistrType::kUniform};
-    std::vector<sbe::value::TypeTags> fieldDataTypes = {TypeTags::NumberInt64};
+namespace {
+std::pair<DataConfiguration, WorkloadConfiguration> buildConfigs(
+    std::vector<stats::DistrType> dataDistributions,
+    std::vector<sbe::value::TypeTags> fieldDataTypes,
+    std::vector<sbe::value::TypeTags> queryFieldDataTypes) {
     std::vector<CollectionFieldConfiguration> dataFieldConfiguration;
     for (size_t fieldIdx = 0; fieldIdx < fieldNamesAndPos.size(); fieldIdx++) {
         dataFieldConfiguration.push_back(
@@ -69,8 +70,6 @@ TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataUniformInt64) {
     DataConfiguration dataConfig(size, dataFieldConfiguration);
 
     // Initialize query configuration.
-    std::vector<sbe::value::TypeTags> queryFieldDataTypes = {TypeTags::NumberInt64,
-                                                             TypeTags::NumberInt64};
     std::vector<DataFieldDefinition> queryFieldDefinitions;
     for (size_t fieldIdx = 0; fieldIdx < queryFields.size(); fieldIdx++) {
         queryFieldDefinitions.push_back(DataFieldDefinition(
@@ -82,176 +81,72 @@ TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataUniformInt64) {
     }
     WorkloadConfiguration queryConfig(numberOfQueries,
                                       QueryConfiguration(queryFieldDefinitions, queryTypes));
+    return {dataConfig, queryConfig};
+}
+}  // namespace
+
+TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataUniformInt64) {
+    std::vector<stats::DistrType> dataDistributions = {stats::DistrType::kUniform};
+    std::vector<sbe::value::TypeTags> fieldDataTypes = {TypeTags::NumberInt64};
+    std::vector<sbe::value::TypeTags> queryFieldDataTypes = {TypeTags::NumberInt64,
+                                                             TypeTags::NumberInt64};
+    auto [dataConfig, queryConfig] =
+        buildConfigs(dataDistributions, fieldDataTypes, queryFieldDataTypes);
     runSamplingEstimatorTestConfiguration(
         dataConfig, queryConfig, sampleSizes, samplingAlgoAndChunks);
 }
 
 TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataUniformDouble) {
-    // Initialize data configuration.
     std::vector<stats::DistrType> dataDistributions = {stats::DistrType::kUniform};
     std::vector<sbe::value::TypeTags> fieldDataTypes = {TypeTags::NumberDouble};
-    std::vector<CollectionFieldConfiguration> dataFieldConfiguration;
-    for (size_t fieldIdx = 0; fieldIdx < fieldNamesAndPos.size(); fieldIdx++) {
-        dataFieldConfiguration.push_back(
-            CollectionFieldConfiguration(fieldNamesAndPos[fieldIdx].first,
-                                         fieldNamesAndPos[fieldIdx].second,
-                                         fieldDataTypes[fieldIdx],
-                                         ndvs[fieldIdx],
-                                         dataDistributions[fieldIdx],
-                                         seedData[fieldIdx]));
-    }
-    DataConfiguration dataConfig(size, dataFieldConfiguration);
-
-    // Initialize query configuration.
     std::vector<sbe::value::TypeTags> queryFieldDataTypes = {TypeTags::NumberDouble,
                                                              TypeTags::NumberDouble};
-    std::vector<DataFieldDefinition> queryFieldDefinitions;
-    for (size_t fieldIdx = 0; fieldIdx < queryFields.size(); fieldIdx++) {
-        queryFieldDefinitions.push_back(DataFieldDefinition(
-            /*fieldName*/ queryFields[fieldIdx],
-            /*fieldType*/ queryFieldDataTypes[fieldIdx],
-            /*ndv*/ queryndvs[fieldIdx],
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed (optional)*/ seed_queries[fieldIdx]));
-    }
-    WorkloadConfiguration queryConfig(numberOfQueries,
-                                      QueryConfiguration(queryFieldDefinitions, queryTypes));
+    auto [dataConfig, queryConfig] =
+        buildConfigs(dataDistributions, fieldDataTypes, queryFieldDataTypes);
     runSamplingEstimatorTestConfiguration(
         dataConfig, queryConfig, sampleSizes, samplingAlgoAndChunks);
 }
 
 TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataNormalInt64) {
-    // Initialize data configuration.
     std::vector<stats::DistrType> dataDistributions = {stats::DistrType::kNormal};
     std::vector<sbe::value::TypeTags> fieldDataTypes = {TypeTags::NumberInt64};
-    std::vector<CollectionFieldConfiguration> dataFieldConfiguration;
-    for (size_t fieldIdx = 0; fieldIdx < fieldNamesAndPos.size(); fieldIdx++) {
-        dataFieldConfiguration.push_back(
-            CollectionFieldConfiguration(fieldNamesAndPos[fieldIdx].first,
-                                         fieldNamesAndPos[fieldIdx].second,
-                                         fieldDataTypes[fieldIdx],
-                                         ndvs[fieldIdx],
-                                         dataDistributions[fieldIdx],
-                                         seedData[fieldIdx]));
-    }
-    DataConfiguration dataConfig(size, dataFieldConfiguration);
-
-    // Initialize query configuration.
     std::vector<sbe::value::TypeTags> queryFieldDataTypes = {TypeTags::NumberInt64,
                                                              TypeTags::NumberInt64};
-    std::vector<DataFieldDefinition> queryFieldDefinitions;
-    for (size_t fieldIdx = 0; fieldIdx < queryFields.size(); fieldIdx++) {
-        queryFieldDefinitions.push_back(DataFieldDefinition(
-            /*fieldName*/ queryFields[fieldIdx],
-            /*fieldType*/ queryFieldDataTypes[fieldIdx],
-            /*ndv*/ queryndvs[fieldIdx],
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed (optional)*/ seed_queries[fieldIdx]));
-    }
-    WorkloadConfiguration queryConfig(numberOfQueries,
-                                      QueryConfiguration(queryFieldDefinitions, queryTypes));
+    auto [dataConfig, queryConfig] =
+        buildConfigs(dataDistributions, fieldDataTypes, queryFieldDataTypes);
     runSamplingEstimatorTestConfiguration(
         dataConfig, queryConfig, sampleSizes, samplingAlgoAndChunks);
 }
 
 TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataNormalDouble) {
-    // Initialize data configuration.
     std::vector<stats::DistrType> dataDistributions = {stats::DistrType::kNormal};
     std::vector<sbe::value::TypeTags> fieldDataTypes = {TypeTags::NumberDouble};
-    std::vector<CollectionFieldConfiguration> dataFieldConfiguration;
-    for (size_t fieldIdx = 0; fieldIdx < fieldNamesAndPos.size(); fieldIdx++) {
-        dataFieldConfiguration.push_back(
-            CollectionFieldConfiguration(fieldNamesAndPos[fieldIdx].first,
-                                         fieldNamesAndPos[fieldIdx].second,
-                                         fieldDataTypes[fieldIdx],
-                                         ndvs[fieldIdx],
-                                         dataDistributions[fieldIdx],
-                                         seedData[fieldIdx]));
-    }
-    DataConfiguration dataConfig(size, dataFieldConfiguration);
-
-    // Initialize query configuration.
     std::vector<sbe::value::TypeTags> queryFieldDataTypes = {TypeTags::NumberDouble,
                                                              TypeTags::NumberDouble};
-    std::vector<DataFieldDefinition> queryFieldDefinitions;
-    for (size_t fieldIdx = 0; fieldIdx < queryFields.size(); fieldIdx++) {
-        queryFieldDefinitions.push_back(DataFieldDefinition(
-            /*fieldName*/ queryFields[fieldIdx],
-            /*fieldType*/ queryFieldDataTypes[fieldIdx],
-            /*ndv*/ queryndvs[fieldIdx],
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed (optional)*/ seed_queries[fieldIdx]));
-    }
-    WorkloadConfiguration queryConfig(numberOfQueries,
-                                      QueryConfiguration(queryFieldDefinitions, queryTypes));
+    auto [dataConfig, queryConfig] =
+        buildConfigs(dataDistributions, fieldDataTypes, queryFieldDataTypes);
     runSamplingEstimatorTestConfiguration(
         dataConfig, queryConfig, sampleSizes, samplingAlgoAndChunks);
 }
 
 TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataZipfianInt64) {
-    // Initialize data configuration.
     std::vector<stats::DistrType> dataDistributions = {stats::DistrType::kZipfian};
     std::vector<sbe::value::TypeTags> fieldDataTypes = {TypeTags::NumberInt64};
-    std::vector<CollectionFieldConfiguration> dataFieldConfiguration;
-    for (size_t fieldIdx = 0; fieldIdx < fieldNamesAndPos.size(); fieldIdx++) {
-        dataFieldConfiguration.push_back(
-            CollectionFieldConfiguration(fieldNamesAndPos[fieldIdx].first,
-                                         fieldNamesAndPos[fieldIdx].second,
-                                         fieldDataTypes[fieldIdx],
-                                         ndvs[fieldIdx],
-                                         dataDistributions[fieldIdx],
-                                         seedData[fieldIdx]));
-    }
-    DataConfiguration dataConfig(size, dataFieldConfiguration);
-
-    // Initialize query configuration.
     std::vector<sbe::value::TypeTags> queryFieldDataTypes = {TypeTags::NumberInt64,
                                                              TypeTags::NumberInt64};
-    std::vector<DataFieldDefinition> queryFieldDefinitions;
-    for (size_t fieldIdx = 0; fieldIdx < queryFields.size(); fieldIdx++) {
-        queryFieldDefinitions.push_back(DataFieldDefinition(
-            /*fieldName*/ queryFields[fieldIdx],
-            /*fieldType*/ queryFieldDataTypes[fieldIdx],
-            /*ndv*/ queryndvs[fieldIdx],
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed (optional)*/ seed_queries[fieldIdx]));
-    }
-    WorkloadConfiguration queryConfig(numberOfQueries,
-                                      QueryConfiguration(queryFieldDefinitions, queryTypes));
+    auto [dataConfig, queryConfig] =
+        buildConfigs(dataDistributions, fieldDataTypes, queryFieldDataTypes);
     runSamplingEstimatorTestConfiguration(
         dataConfig, queryConfig, sampleSizes, samplingAlgoAndChunks);
 }
 
 TEST_F(SamplingAccuracyTest, CalculateAccuracyOnDataZipfianDouble) {
-    // Initialize data configuration.
     std::vector<stats::DistrType> dataDistributions = {stats::DistrType::kZipfian};
     std::vector<sbe::value::TypeTags> fieldDataTypes = {TypeTags::NumberDouble};
-    std::vector<CollectionFieldConfiguration> dataFieldConfiguration;
-    for (size_t fieldIdx = 0; fieldIdx < fieldNamesAndPos.size(); fieldIdx++) {
-        dataFieldConfiguration.push_back(
-            CollectionFieldConfiguration(fieldNamesAndPos[fieldIdx].first,
-                                         fieldNamesAndPos[fieldIdx].second,
-                                         fieldDataTypes[fieldIdx],
-                                         ndvs[fieldIdx],
-                                         dataDistributions[fieldIdx],
-                                         seedData[fieldIdx]));
-    }
-    DataConfiguration dataConfig(size, dataFieldConfiguration);
-
-    // Initialize query configuration.
     std::vector<sbe::value::TypeTags> queryFieldDataTypes = {TypeTags::NumberDouble,
                                                              TypeTags::NumberDouble};
-    std::vector<DataFieldDefinition> queryFieldDefinitions;
-    for (size_t fieldIdx = 0; fieldIdx < queryFields.size(); fieldIdx++) {
-        queryFieldDefinitions.push_back(DataFieldDefinition(
-            /*fieldName*/ queryFields[fieldIdx],
-            /*fieldType*/ queryFieldDataTypes[fieldIdx],
-            /*ndv*/ queryndvs[fieldIdx],
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed (optional)*/ seed_queries[fieldIdx]));
-    }
-    WorkloadConfiguration queryConfig(numberOfQueries,
-                                      QueryConfiguration(queryFieldDefinitions, queryTypes));
+    auto [dataConfig, queryConfig] =
+        buildConfigs(dataDistributions, fieldDataTypes, queryFieldDataTypes);
     runSamplingEstimatorTestConfiguration(
         dataConfig, queryConfig, sampleSizes, samplingAlgoAndChunks);
 }

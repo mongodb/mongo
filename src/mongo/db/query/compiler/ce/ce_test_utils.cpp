@@ -84,25 +84,25 @@ std::pair<size_t, size_t> parseDataTypeToInterval(sbe::value::TypeTags dataType)
 void DataFieldDefinition::addToBSONObjBuilder(BSONObjBuilder& builder) const {
     builder << "fieldName" << fieldName;
 
-    builder << "DataDistribution";
-    switch (dataDistribution) {
-        case stats::DistrType::kUniform:
-            builder << "Uniform";
-            break;
-        case stats::DistrType::kNormal:
-            builder << "Normal";
-            break;
-        case stats::DistrType::kZipfian:
-            builder << "Zipfian";
-            break;
-    }
+    const auto dataDistrStr = [&]() {
+        switch (dataDistribution) {
+            case stats::DistrType::kUniform:
+                return "Uniform";
+            case stats::DistrType::kNormal:
+                return "Normal";
+            case stats::DistrType::kZipfian:
+                return "Zipfian";
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+    builder << "DataDistribution" << dataDistrStr;
 
-    builder << "TypeCombinationData";
     std::stringstream stringCombinationData;
     for (const auto& typeCombination : typeCombinationData) {
         stringCombinationData << typeCombination << ",";
     }
-    builder << stringCombinationData.str();
+    builder << "TypeCombinationData" << stringCombinationData.str();
 
     std::stringstream ndvstring;
     ndvstring << ndv;
@@ -129,29 +129,25 @@ void DataFieldDefinition::addToBSONObjBuilder(BSONObjBuilder& builder) const {
     builder << "Seed2" << stringSeed2.str();
 }
 
-void CollectionFieldConfiguration::addToBSONObjBuilder(BSONObjBuilder& builder) const {
-    builder << "fieldName" << fieldName;
-
-    // Re-use parent builder.
-    auto dataFieldDef = (DataFieldDefinition)(*this);
-    dataFieldDef.addToBSONObjBuilder(builder);
-}
-
 void DataConfiguration::addToBSONObjBuilder(BSONObjBuilder& builder) const {
     std::stringstream stringSize;
     stringSize << size;
     builder << "Size" << stringSize.str();
-    builder << "Fields";
 
-    for (const auto& dataFieldConfig : collectionFieldsConfiguration) {
-        dataFieldConfig.addToBSONObjBuilder(builder);
+    {
+        auto subObjBuilder = BSONObjBuilder(builder.subobjStart("Fields"));
+        for (const auto& dataFieldConfig : collectionFieldsConfiguration) {
+            dataFieldConfig.addToBSONObjBuilder(subObjBuilder);
+        }
     }
 }
 
 void QueryConfiguration::addToBSONObjBuilder(BSONObjBuilder& builder) const {
-    builder << "QueryFields";
-    for (const auto& queryT : queryFields) {
-        queryT.addToBSONObjBuilder(builder);
+    {
+        auto subObjBuilder = BSONObjBuilder(builder.subobjStart("QueryFields"));
+        for (const auto& queryT : queryFields) {
+            queryT.addToBSONObjBuilder(subObjBuilder);
+        }
     }
 
     std::stringstream stringQueryTypes;
