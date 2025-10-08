@@ -95,16 +95,23 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # Specifies the read concern for the operation.
             readConcern:
                 type: ReadConcern
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # Specifies the write concern for the operation. Operations received by shard and config servers should
+            # always have write concern explicitly specified.
+            # 'j' option can only be used when the host has journaling enabled.
+            # w: 1 and w: "majority" are the only write concerns supported on a standalone node.
             writeConcern:
                 type: WriteConcern
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # Unique id of the session to attach this operation to. It is invalid to set this in a direct client. If
+            # the uid is included, then the hash must match that of the logged-in user.
             lsid:
                 type: LogicalSessionFromClient
                 forward_to_shards: true
@@ -116,21 +123,36 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # Strictly-increasing counter set by the transaction API to match the txnNumber of the corresponding
+            # retryable write or transaction. Only allowed on a replica set member or mongos. Must be nonnegative.
+            # If txnNumber is provided, lsid must also be provided.
             txnNumber:
                 type: TxnNumber
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # Retryable writes and transactions share many of the same parameters (lsid, txnNumber, stmtId).
+            # The `autocommit` field is used to differentiate between transactions and retryable writes, in
+            # order to determine how those parameters should be interpreted.
+            # `autocommit: false` indicates that the operation is part of a transaction.
+            # No `autocommit` field indicates that the operation is part of a retryable write (if retryable
+            # writes are enabled).
+            # `autocommit: true` is invalid.
             autocommit:
                 type: bool
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # When set to true, identifies this operation as the first operation in a transaction.
+            # `startTransaction: false` is invalid, the startTransaction field must be unset or set to true.
+            # Requires `autocommit: false`. It is invalid to set this in a direct client.
             startTransaction:
                 type: bool
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # Uniquely identifies an individually retryable operation within a retryable write or transaction.
+            # Should be nonnegative or -1. A value of -1 indicates an uninitialized/unassigned stmtId.
             stmtId:
                 type: StmtId
                 forward_to_shards: true
@@ -185,6 +207,7 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # See: src/mongo/rpc/metadata/oplog_query_metadata.h.
             $oplogQueryData:
                 type: IDLAnyTypeOwned
                 cpp_name: "dollarOplogQueryData"
@@ -199,6 +222,7 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "internal"
+            # See: src/mongo/rpc/metadata/repl_set_metadata.h.
             $replData:
                 type: IDLAnyTypeOwned
                 cpp_name: "dollarReplData"
@@ -236,6 +260,8 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Used by mongos to select the current shard as the coordinator for a cross-shard transaction. The coordinator
+            # will coordinate between all shards to ultimately commit or abort the transaction.
             coordinator:
                 type: bool
                 forward_to_shards: true
@@ -279,6 +305,7 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Retry counter for transactions. Must be nonnegative.
             txnRetryCounter:
                 type: TxnRetryCounter
                 forward_to_shards: true
@@ -312,6 +339,8 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Used to add a shard as a participant to a transaction. The originating participant attaches
+            # `startOrContinueTransaction: true` on the request it is sending to the targeted shard.
             startOrContinueTransaction:
                 type: bool
                 forward_to_shards: true
