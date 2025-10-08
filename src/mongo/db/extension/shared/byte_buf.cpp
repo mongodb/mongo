@@ -27,26 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/shared/byte_buf.h"
 
-namespace sdk = mongo::extension::sdk;
+namespace mongo::extension {
 
-class MyExtension : public sdk::Extension {
-public:
-    // The initialization function is empty since the test should never reach initialization.
-    void initialize(const sdk::HostPortalHandle& portal) override {}
-};
+VecByteBuf::VecByteBuf() : ::MongoExtensionByteBuf{&VTABLE} {}
 
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtension** extension) {
-
-    return mongo::extension::enterCXX([&]() {
-        static auto ext = std::make_unique<sdk::ExtensionAdapter>(
-            std::make_unique<MyExtension>(),
-            // Minor version is one greater than the currently-supported version.
-            ::MongoExtensionAPIVersion{0, MONGODB_EXTENSION_API_VERSION.minor + 1, 0});
-        *extension = reinterpret_cast<const ::MongoExtension*>(ext.get());
-    });
+VecByteBuf::VecByteBuf(const uint8_t* data, size_t len) : ::MongoExtensionByteBuf{&VTABLE} {
+    assign(data, len);
 }
+
+VecByteBuf::VecByteBuf(const BSONObj& obj) : ::MongoExtensionByteBuf{&VTABLE} {
+    assign(reinterpret_cast<const uint8_t*>(obj.objdata()), static_cast<size_t>(obj.objsize()));
 }
+
+void VecByteBuf::assign(const uint8_t* data, size_t len) {
+    if (len == 0) {
+        _buffer.clear();
+        return;
+    }
+    tassert(10806300, "Data pointer cannot be null when length is non-zero", data != nullptr);
+    _buffer.assign(data, data + len);
+}
+
+void VecByteBuf::_extDestroy(::MongoExtensionByteBuf* buf) noexcept {
+    delete static_cast<VecByteBuf*>(buf);
+}
+
+MongoExtensionByteView VecByteBuf::_extGetView(const ::MongoExtensionByteBuf* byteBufPtr) noexcept {
+    const auto* vecByteBuf = static_cast<const VecByteBuf*>(byteBufPtr);
+    const auto vecSize = vecByteBuf->_buffer.size();
+    const auto* data =
+        (vecSize == 0) ? nullptr : reinterpret_cast<const uint8_t*>(vecByteBuf->_buffer.data());
+    return MongoExtensionByteView{data, vecByteBuf->_buffer.size()};
+}
+
+const ::MongoExtensionByteBufVTable VecByteBuf::VTABLE = {&VecByteBuf::_extDestroy,
+                                                          &VecByteBuf::_extGetView};
+
+}  // namespace mongo::extension

@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
 extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
                                               const ::MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() {});
+    return mongo::extension::enterCXX([&]() {});
 }
 }

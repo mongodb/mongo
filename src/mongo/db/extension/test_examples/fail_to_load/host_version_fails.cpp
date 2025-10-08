@@ -30,7 +30,7 @@
 
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/extension_helper.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -53,7 +53,7 @@ extern "C" {
                                               const ::MongoExtension** extension) {
     // We expect to fail to initialize extension. extensionA's major version is higher than
     // host's and extensionB's minor version is higher than host's.
-    return sdk::enterCXX([&] {
+    return mongo::extension::enterCXX([&] {
         const ::MongoExtensionAPIVersion verA{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
                                               MONGODB_EXTENSION_API_MINOR_VERSION,
                                               MONGODB_EXTENSION_API_PATCH_VERSION};

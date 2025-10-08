@@ -3,21 +3,15 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 mongo_cc_library(
     name = "sdk_cpp",
     srcs = [
-        "byte_buf.cpp",
         "extension_helper.cpp",
-        "extension_status.cpp",
         "host_services.cpp",
         "query_shape_opts_handle.cpp",
     ],
     hdrs = [
         "aggregation_stage.h",
-        "byte_buf.h",
-        "byte_buf_utils.h",
         "extension.h",
         "extension_factory.h",
         "extension_helper.h",
-        "extension_status.h",
-        "handle.h",
         "host_portal.h",
         "host_services.h",
         "query_shape_opts_handle.h",
@@ -27,6 +21,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/public:extensions_api_public",
+        "//src/mongo/db/extension/shared",
         "//src/third_party/yaml-cpp:yaml",
     ],
 )

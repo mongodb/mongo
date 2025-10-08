@@ -30,7 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -132,7 +132,7 @@ private:
     static ::MongoExtensionStatus* _hostBind(
         const ::MongoExtensionAggregationStageAstNode* astNode,
         ::MongoExtensionLogicalAggregationStage** logicalStage) noexcept {
-        return sdk::enterCXX([]() {
+        return enterCXX([]() {
             tasserted(11133600,
                       "_hostBind should not be called. Ensure that astNode is "
                       "extension-allocated, not host-allocated.");

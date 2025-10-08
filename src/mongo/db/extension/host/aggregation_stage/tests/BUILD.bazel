@@ -13,5 +13,6 @@ mongo_cc_unit_test(
         "//src/mongo:base",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
+        "//src/mongo/db/extension/host_adapter/handle/aggregation_stage",
     ],
 )

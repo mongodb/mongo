@@ -29,6 +29,9 @@
 
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 
+#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
+
 namespace mongo::extension::sdk {
 
 std::string QueryShapeOptsHandle::serializeUsingOptsHelper(
@@ -42,7 +45,7 @@ std::string QueryShapeOptsHandle::serializeUsingOptsHelper(
     auto* ptr = get();
     auto byteView = getByteViewToSerialize();
 
-    extension::sdk::enterC([&]() { return apiFunc(ptr, &byteView, &buf); });
+    enterC([&]() { return apiFunc(ptr, &byteView, &buf); });
 
     if (!buf) {
         // TODO SERVER-111882 tassert here instead of returning empty string, since this would
@@ -52,14 +55,14 @@ std::string QueryShapeOptsHandle::serializeUsingOptsHelper(
 
     // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
     // into a string to be returned.
-    sdk::VecByteBufHandle ownedBuf{static_cast<sdk::VecByteBuf*>(buf)};
-    return std::string(sdk::byteViewAsStringView(ownedBuf.getByteView()));
+    VecByteBufHandle ownedBuf{static_cast<VecByteBuf*>(buf)};
+    return std::string(byteViewAsStringView(ownedBuf.getByteView()));
 }
 
 
 std::string QueryShapeOptsHandle::serializeIdentifier(const std::string& identifier) const {
     auto getByteView = [&identifier]() {
-        return sdk::stringViewAsByteView(identifier);
+        return stringViewAsByteView(identifier);
     };
 
     return serializeUsingOptsHelper(getByteView, vtable().serialize_identifier);
@@ -67,7 +70,7 @@ std::string QueryShapeOptsHandle::serializeIdentifier(const std::string& identif
 
 std::string QueryShapeOptsHandle::serializeFieldPath(const std::string& fieldPath) const {
     auto getByteView = [&fieldPath]() {
-        return sdk::stringViewAsByteView(fieldPath);
+        return stringViewAsByteView(fieldPath);
     };
 
     return serializeUsingOptsHelper(getByteView, vtable().serialize_field_path);

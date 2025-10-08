@@ -41,7 +41,7 @@ extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
                                               const ::MongoExtension** extension) {
 
-    return sdk::enterCXX([&]() {
+    return mongo::extension::enterCXX([&]() {
         static auto ext = std::make_unique<sdk::ExtensionAdapter>(
             std::make_unique<MyExtension>(),
             // Major version is one less than the currently-supported version.

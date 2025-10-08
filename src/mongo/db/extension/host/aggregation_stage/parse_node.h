@@ -30,7 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -134,7 +134,7 @@ private:
         const ::MongoExtensionAggregationStageParseNode* parseNode,
         const ::MongoHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
-        return sdk::enterCXX([]() {
+        return enterCXX([]() {
             tasserted(10977800,
                       "_hostGetQueryShape should not be called. Ensure that parseNode is "
                       "extension-allocated, not host-allocated.");
@@ -153,7 +153,7 @@ private:
     static ::MongoExtensionStatus* _hostExpand(
         const ::MongoExtensionAggregationStageParseNode* parseNode,
         ::MongoExtensionExpandedArray* outExpanded) noexcept {
-        return sdk::enterCXX([]() {
+        return enterCXX([]() {
             tasserted(10977801,
                       "_hostExpand should not be called. Ensure that parseNode is "
                       "extension-allocated, not host-allocated.");

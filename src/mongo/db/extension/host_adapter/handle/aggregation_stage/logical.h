@@ -26,45 +26,26 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/util/modules.h"
 
-#include "mongo/db/extension/sdk/byte_buf.h"
+namespace mongo::extension::host_adapter {
 
-namespace mongo::extension::sdk {
-
-size_t ExtensionStatusOK::sInstanceCount = 0;
-
-size_t ExtensionStatusOK::getInstanceCount() {
-    return sInstanceCount;
-}
-
-const ::MongoExtensionStatusVTable extension::sdk::ExtensionStatusOK::VTABLE = {
-    &ExtensionStatusOK::_extDestroy,
-    &ExtensionStatusOK::_extGetCode,
-    &ExtensionStatusOK::_extGetReason,
-};
-
-const ::MongoExtensionStatusVTable extension::sdk::ExtensionStatusException::VTABLE = {
-    &ExtensionStatusException::_extDestroy,
-    &ExtensionStatusException::_extGetCode,
-    &ExtensionStatusException::_extGetReason,
-};
-
-void enterC_ErrorHandler(HostStatusHandle status) {
-    /**
-     * If we can extract an exception pointer from the received status from the C API call, it means
-     * that this was originally a C++ exception. In that case, we can go ahead and rethrow that
-     * exception here.
-     *
-     * Otherwise, we received an error from the extension that was not originally from this
-     * execution context, so we throw our ExtensionDBException which will allow us to rethrow this
-     * exception later if we happen to cross the API boundary again.
-     */
-    if (auto exceptionPtr = ExtensionStatusException::extractException(*status.get());
-        exceptionPtr) {
-        std::rethrow_exception(std::move(exceptionPtr));
+/**
+ * LogicalAggregationStageHandle is an owned handle wrapper around a
+ * MongoExtensionLogicalAggregationStage.
+ */
+class LogicalAggregationStageHandle : public OwnedHandle<::MongoExtensionLogicalAggregationStage> {
+public:
+    LogicalAggregationStageHandle(::MongoExtensionLogicalAggregationStage* ptr)
+        : OwnedHandle<::MongoExtensionLogicalAggregationStage>(ptr) {
+        _assertValidVTable();
     }
-    throw ExtensionDBException(std::move(status));
-}
-}  // namespace mongo::extension::sdk
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {}
+};
+}  // namespace mongo::extension::host_adapter

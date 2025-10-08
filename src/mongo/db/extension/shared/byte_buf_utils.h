@@ -27,33 +27,42 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/db/extension/sdk/handle.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::host_adapter {
-/**
- * OwnedHandle is a move-only wrapper around a raw pointer allocated by the extension, whose
- * ownership has been transferred to the host. OwnedHandle acts as a wrapper that
- * abstracts the vtable and underlying pointer, and makes sure to destroy the associated pointer
- * when it goes out of scope.
- *
- * Note, for the time being, we are building and linking the C++ SDK into the host API to minimize
- * code duplication. Once we are ready to decouple the C++ SDK from the server, we will need to
- * provide a copy of the implementation of these classes within the host API.
- */
-template <typename T>
-using OwnedHandle = sdk::OwnedHandle<T>;
+#include <string_view>
 
-/**
- * UnownedHandle is a wrapper around a raw pointer allocated by the extension, whose
- * ownership has not been transferred to the host. UnownedHandle acts as a wrapper that
- * abstracts the vtable and underlying pointer, but does not destroy the pointer when it goes out of
- * scope.
- *
- * Note, for the time being, we are building and linking the C++ SDK into the host API to minimize
- * code duplication. Once we are ready to decouple the C++ SDK from the server, we will need to
- * provide a copy of the implementation of these classes within the host API.
- */
-template <typename T>
-using UnownedHandle = sdk::UnownedHandle<T>;
-}  // namespace mongo::extension::host_adapter
+namespace mongo::extension {
+
+inline std::string_view byteViewAsStringView(const MongoExtensionByteView& view) {
+    return std::string_view(reinterpret_cast<const char*>(view.data), view.len);
+}
+
+inline BSONObj bsonObjFromByteView(const MongoExtensionByteView& view) {
+    auto isValidObj = [](const MongoExtensionByteView& view) -> bool {
+        if (view.len < BSONObj::kMinBSONLength) {
+            return false;
+        }
+
+        // Decode the value in little-endian order.
+        int32_t docLength = static_cast<int32_t>(view.data[0]) |
+            (static_cast<int32_t>(view.data[1]) << 8) | (static_cast<int32_t>(view.data[2]) << 16) |
+            (static_cast<int32_t>(view.data[3]) << 24);
+        return docLength >= 0 && static_cast<size_t>(docLength) <= view.len;
+    };
+    tassert(10596405, "Extension returned invalid bson obj", isValidObj(view));
+    return BSONObj(reinterpret_cast<const char*>(view.data));
+}
+
+inline MongoExtensionByteView objAsByteView(const BSONObj& obj) {
+    return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(obj.objdata()),
+                                  static_cast<size_t>(obj.objsize())};
+}
+
+inline MongoExtensionByteView stringViewAsByteView(std::string_view str) {
+    return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(str.data()), str.size()};
+}
+}  // namespace mongo::extension

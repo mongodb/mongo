@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/unittest/death_test.h"
@@ -35,7 +35,7 @@
 #include <memory>
 #include <vector>
 
-namespace mongo::extension::sdk {
+namespace mongo::extension {
 namespace {
 
 std::vector<char> generateBuffer(int32_t size) {
@@ -65,7 +65,10 @@ DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_InsufficientLength
 
 DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_MalformedLength, "10596405") {
     const uint8_t malformedBsonData[] = {
-        0xFF, 0xFF, 0xFF, 0xFF,  // Invalid length (negative or oversized)
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,  // Invalid length (negative or oversized)
     };
     MongoExtensionByteView view{malformedBsonData, 4};
     [[maybe_unused]] auto bsonObj = bsonObjFromByteView(view);
@@ -112,4 +115,4 @@ TEST(ByteBufUtilsTest, BsonObjFromByteView_ValidInput_LargeDocument) {
 }
 
 }  // namespace
-}  // namespace mongo::extension::sdk
+}  // namespace mongo::extension

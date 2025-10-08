@@ -1,0 +1,19 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_unit_test(
+    name = "extension_shared_test",
+    srcs = [
+        "byte_buf_utils_test.cpp",
+        "extension_status_test.cpp",
+        "handle_test.cpp",
+        "vec_byte_buf_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/extension/shared",
+        "//src/mongo/db/extension/shared/handle",
+    ],
+)

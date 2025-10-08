@@ -26,27 +26,18 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/ast_node.h"
 
-#include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
-namespace sdk = mongo::extension::sdk;
+namespace mongo::extension::host_adapter {
 
-class MyExtension : public sdk::Extension {
-public:
-    // The initialization function is empty since the test should never reach initialization.
-    void initialize(const sdk::HostPortalHandle& portal) override {}
-};
+LogicalAggregationStageHandle AggregationStageAstNodeHandle::bind() const {
+    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
 
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtension** extension) {
+    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
+    enterC([&]() { return vtable().bind(get(), &logicalStagePtr); });
 
-    return mongo::extension::enterCXX([&]() {
-        static auto ext = std::make_unique<sdk::ExtensionAdapter>(
-            std::make_unique<MyExtension>(),
-            // Minor version is one greater than the currently-supported version.
-            ::MongoExtensionAPIVersion{0, MONGODB_EXTENSION_API_VERSION.minor + 1, 0});
-        *extension = reinterpret_cast<const ::MongoExtension*>(ext.get());
-    });
+    return LogicalAggregationStageHandle(logicalStagePtr);
 }
-}
+}  // namespace mongo::extension::host_adapter

@@ -28,9 +28,9 @@
  */
 #include "mongo/db/extension/host_adapter/query_shape_opts_adapter.h"
 
-#include "mongo/db/extension/sdk/byte_buf.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
 namespace mongo::extension::host {
 
@@ -38,16 +38,16 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
     const ::MongoHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* identifier,
     ::MongoExtensionByteBuf** output) noexcept {
-    return sdk::enterCXX([&]() {
+    return enterCXX([&]() {
         *output = nullptr;
 
         const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
         auto transformedIdentifier =
-            opts->serializeIdentifier(std::string(sdk::byteViewAsStringView(*identifier)));
+            opts->serializeIdentifier(std::string(byteViewAsStringView(*identifier)));
 
         // Allocate a buffer on the heap. Ownership is transferred to the caller.
-        *output = new sdk::VecByteBuf(reinterpret_cast<uint8_t*>(transformedIdentifier.data()),
-                                      transformedIdentifier.length());
+        *output = new VecByteBuf(reinterpret_cast<uint8_t*>(transformedIdentifier.data()),
+                                 transformedIdentifier.length());
     });
 }
 
@@ -55,16 +55,16 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
     const ::MongoHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* fieldPath,
     ::MongoExtensionByteBuf** output) noexcept {
-    return sdk::enterCXX([&]() {
+    return enterCXX([&]() {
         *output = nullptr;
 
         const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
         auto transformedFieldPath =
-            opts->serializeFieldPath(std::string(sdk::byteViewAsStringView(*fieldPath)));
+            opts->serializeFieldPath(std::string(byteViewAsStringView(*fieldPath)));
 
         // Allocate a buffer on the heap. Ownership is transferred to the caller.
-        *output = new sdk::VecByteBuf(reinterpret_cast<uint8_t*>(transformedFieldPath.data()),
-                                      transformedFieldPath.length());
+        *output = new VecByteBuf(reinterpret_cast<uint8_t*>(transformedFieldPath.data()),
+                                 transformedFieldPath.length());
     });
 }
 

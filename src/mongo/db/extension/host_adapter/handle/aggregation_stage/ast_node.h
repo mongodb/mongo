@@ -26,43 +26,42 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/extension/sdk/byte_buf.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::extension::sdk {
+#include <absl/base/nullability.h>
 
-VecByteBuf::VecByteBuf() : ::MongoExtensionByteBuf{&VTABLE} {}
+namespace mongo::extension::host_adapter {
 
-VecByteBuf::VecByteBuf(const uint8_t* data, size_t len) : ::MongoExtensionByteBuf{&VTABLE} {
-    assign(data, len);
-}
-
-VecByteBuf::VecByteBuf(const BSONObj& obj) : ::MongoExtensionByteBuf{&VTABLE} {
-    assign(reinterpret_cast<const uint8_t*>(obj.objdata()), static_cast<size_t>(obj.objsize()));
-}
-
-void VecByteBuf::assign(const uint8_t* data, size_t len) {
-    if (len == 0) {
-        _buffer.clear();
-        return;
+/**
+ * AggregationStageAstNodeHandle is an owned handle wrapper around a
+ * MongoExtensionAggregationStageAstNode.
+ */
+class AggregationStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggregationStageAstNode> {
+public:
+    AggregationStageAstNodeHandle(::MongoExtensionAggregationStageAstNode* ptr)
+        : OwnedHandle<::MongoExtensionAggregationStageAstNode>(ptr) {
+        _assertValidVTable();
     }
-    tassert(10806300, "Data pointer cannot be null when length is non-zero", data != nullptr);
-    _buffer.assign(data, data + len);
-}
 
-void VecByteBuf::_extDestroy(::MongoExtensionByteBuf* buf) noexcept {
-    delete static_cast<VecByteBuf*>(buf);
-}
+    /**
+     * Returns a logical stage with the stage's runtime implementation of the optimization
+     * interface.
+     *
+     * On success, the logical stage is returned and belongs to the caller.
+     * On failure, the error triggers an assertion.
+     *
+     */
+    LogicalAggregationStageHandle bind() const;
 
-MongoExtensionByteView VecByteBuf::_extGetView(const ::MongoExtensionByteBuf* byteBufPtr) noexcept {
-    const auto* vecByteBuf = static_cast<const VecByteBuf*>(byteBufPtr);
-    const auto vecSize = vecByteBuf->_buffer.size();
-    const auto* data =
-        (vecSize == 0) ? nullptr : reinterpret_cast<const uint8_t*>(vecByteBuf->_buffer.data());
-    return MongoExtensionByteView{data, vecByteBuf->_buffer.size()};
-}
-
-const ::MongoExtensionByteBufVTable VecByteBuf::VTABLE = {&VecByteBuf::_extDestroy,
-                                                          &VecByteBuf::_extGetView};
-
-}  // namespace mongo::extension::sdk
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            11113700, "ExtensionAggregationStageAstNode 'bind' is null", vtable.bind != nullptr);
+    }
+};
+}  // namespace mongo::extension::host_adapter

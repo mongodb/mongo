@@ -4,14 +4,23 @@ package(default_visibility = ["//visibility:public"])
 
 mongo_cc_library(
     name = "aggregation_stage",
-    srcs = [],
+    srcs = [
+        "ast_node.cpp",
+        "parse_node.cpp",
+        "stage_descriptor.cpp",
+    ],
     hdrs = [
         "ast_node.h",
+        "logical.h",
         "parse_node.h",
+        "stage_descriptor.h",
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/shared",
+        "//src/mongo/db/extension/shared/handle",
     ],
 )

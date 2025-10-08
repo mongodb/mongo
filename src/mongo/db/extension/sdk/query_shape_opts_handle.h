@@ -29,9 +29,9 @@
 #pragma once
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/byte_buf.h"
-#include "mongo/db/extension/sdk/extension_status.h"
-#include "mongo/db/extension/sdk/handle.h"
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -47,10 +47,10 @@ namespace mongo::extension::sdk {
  * This is an unowned handle, meaning the object is fully owned by the host, and
  * ownership is never transferred to the extension.
  */
-class QueryShapeOptsHandle : public sdk::UnownedHandle<const ::MongoHostQueryShapeOpts> {
+class QueryShapeOptsHandle : public UnownedHandle<const ::MongoHostQueryShapeOpts> {
 public:
     QueryShapeOptsHandle(const ::MongoHostQueryShapeOpts* ctx)
-        : sdk::UnownedHandle<const ::MongoHostQueryShapeOpts>(ctx) {}
+        : UnownedHandle<const ::MongoHostQueryShapeOpts>(ctx) {}
 
     std::string serializeIdentifier(const std::string& identifier) const;
 

@@ -29,8 +29,8 @@
 #pragma once
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
-#include "mongo/db/extension/sdk/handle.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
+#include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
@@ -41,7 +41,7 @@
 #include <string>
 #include <string_view>
 
-namespace mongo::extension::sdk {
+namespace mongo::extension {
 
 /**
  * ExtensionStatusOK is an implementation of ::MongoExtensionStatus that is always OK.
@@ -85,12 +85,11 @@ private:
          */
     }
     static int32_t _extGetCode(const ::MongoExtensionStatus* status) noexcept {
-        return static_cast<const mongo::extension::sdk::ExtensionStatusOK*>(status)->getCode();
+        return static_cast<const ExtensionStatusOK*>(status)->getCode();
     }
 
     static MongoExtensionByteView _extGetReason(const ::MongoExtensionStatus* status) noexcept {
-        return stringViewAsByteView(
-            static_cast<const mongo::extension::sdk::ExtensionStatusOK*>(status)->getReason());
+        return stringViewAsByteView(static_cast<const ExtensionStatusOK*>(status)->getReason());
     }
 
     static const ::MongoExtensionStatusVTable VTABLE;
@@ -131,18 +130,16 @@ public:
 
 private:
     static void _extDestroy(::MongoExtensionStatus* status) noexcept {
-        delete static_cast<mongo::extension::sdk::ExtensionStatusException*>(status);
+        delete static_cast<ExtensionStatusException*>(status);
     }
 
     static int32_t _extGetCode(const ::MongoExtensionStatus* status) noexcept {
-        return static_cast<const mongo::extension::sdk::ExtensionStatusException*>(status)
-            ->getCode();
+        return static_cast<const ExtensionStatusException*>(status)->getCode();
     }
 
     static MongoExtensionByteView _extGetReason(const ::MongoExtensionStatus* status) noexcept {
         return stringViewAsByteView(
-            static_cast<const mongo::extension::sdk::ExtensionStatusException*>(status)
-                ->getReason());
+            static_cast<const ExtensionStatusException*>(status)->getReason());
     }
 
     static const ::MongoExtensionStatusVTable VTABLE;
@@ -259,4 +256,4 @@ void enterC(Fn&& fn) {
         return enterC_ErrorHandler(std::move(status));
     }
 }
-}  // namespace mongo::extension::sdk
+}  // namespace mongo::extension

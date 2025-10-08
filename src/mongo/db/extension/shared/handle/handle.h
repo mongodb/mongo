@@ -32,7 +32,7 @@
 
 #include <memory>
 
-namespace mongo::extension::sdk {
+namespace mongo::extension {
 /**
  * Handle is a wrapper around a pointer allocated by the host, whose ownership
  * can be transferred to the extension. Whether or not Handle assumes ownership of the
@@ -167,4 +167,4 @@ using OwnedHandle = Handle<T, true>;
  */
 template <typename T>
 using UnownedHandle = Handle<T, false>;
-}  // namespace mongo::extension::sdk
+}  // namespace mongo::extension

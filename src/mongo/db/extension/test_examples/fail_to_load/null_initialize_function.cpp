@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
 // This extension is implemented without the SDK-provided ExtensionAdapter in order to simulate a
 // scenario in which the initialize function has a null pointer in the vtable. This is an unlikely
@@ -45,6 +45,6 @@ static const ::MongoExtension my_extension = {
 extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
                                               const ::MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
+    return mongo::extension::enterCXX([&]() { *extension = &my_extension; });
 }
 }

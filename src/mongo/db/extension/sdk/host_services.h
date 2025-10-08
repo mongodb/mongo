@@ -30,12 +30,13 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/public/extension_log_gen.h"
-#include "mongo/db/extension/sdk/byte_buf.h"
-#include "mongo/db/extension/sdk/extension_status.h"
-#include "mongo/db/extension/sdk/handle.h"
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
+
 /**
  * Wrapper for ::MongoExtensionHostServices, providing safe access to its public API through the
  * underlying vtable.
@@ -46,14 +47,14 @@ namespace mongo::extension::sdk {
  * This is an unowned handle, meaning the host services remain fully owned by the host, and
  * ownership is never transferred to the extension.
  */
-class HostServicesHandle : public sdk::UnownedHandle<const ::MongoExtensionHostServices> {
+class HostServicesHandle : public UnownedHandle<const ::MongoExtensionHostServices> {
 public:
     HostServicesHandle(const ::MongoExtensionHostServices* services)
-        : sdk::UnownedHandle<const ::MongoExtensionHostServices>(services) {}
+        : UnownedHandle<const ::MongoExtensionHostServices>(services) {}
 
     bool alwaysTrue_TEMPORARY() const {
         assertValid();
-        sdk::enterC([&]() { return vtable().alwaysOK_TEMPORARY(); });
+        enterC([&]() { return vtable().alwaysOK_TEMPORARY(); });
         return true;
     }
 
@@ -77,7 +78,7 @@ public:
         assertValid();
 
         BSONObj obj = createExtensionLogMessage(std::move(message), code, severity);
-        sdk::enterC([&]() { return vtable().log(sdk::objAsByteView(obj)); });
+        enterC([&]() { return vtable().log(objAsByteView(obj)); });
     }
 
     /**

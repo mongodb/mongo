@@ -30,6 +30,7 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
 
@@ -78,7 +79,7 @@ void DocumentSourceExtension::registerStage(
 void DocumentSourceExtension::registerStage(
     const std::string& name,
     DocumentSource::Id id,
-    extension::host_adapter::AggregationStageDescriptorHandle descriptor) {
+    host_adapter::AggregationStageDescriptorHandle descriptor) {
     DocumentSource::registerParser(
         name,
         [id, descriptor](BSONElement specElem,
@@ -98,7 +99,7 @@ DocumentSourceExtension::DocumentSourceExtension(
     boost::intrusive_ptr<ExpressionContext> exprCtx,
     Id id,
     BSONObj rawStage,
-    extension::host_adapter::AggregationStageDescriptorHandle staticDescriptor)
+    host_adapter::AggregationStageDescriptorHandle staticDescriptor)
     : DocumentSource(name, exprCtx),
       _stageName(std::string(name)),
       _id(id),

@@ -29,7 +29,7 @@
 
 #include "mongo/db/extension/sdk/host_services.h"
 
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 
 namespace mongo::extension::sdk {
 

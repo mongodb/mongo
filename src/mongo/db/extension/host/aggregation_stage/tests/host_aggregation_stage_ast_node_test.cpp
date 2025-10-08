@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
-#include "mongo/db/extension/host_adapter/aggregation_stage.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

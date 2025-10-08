@@ -7,20 +7,14 @@ package(default_visibility = ["//visibility:public"])
 mongo_cc_library(
     name = "extensions_host_adapter",
     srcs = [
-        "aggregation_stage.cpp",
         "query_shape_opts_adapter.cpp",
     ],
     hdrs = [
-        "aggregation_stage.h",
-        "byte_buf.h",
         "extension_handle.h",
-        "extension_status.h",
-        "handle.h",
         "host_services_adapter.h",
         "query_shape_opts_adapter.h",
         "//src/mongo/db/extension/host:host_portal.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//src/mongo/db/extension/public:extensions_api_public",
         # Note, for the time being we are linking in the C++ SDK here to reduce code duplication.

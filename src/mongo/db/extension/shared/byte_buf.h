@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 #pragma once
+
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
-#include "mongo/db/extension/sdk/handle.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string_view>
 #include <vector>
 
-namespace mongo::extension::sdk {
+namespace mongo::extension {
 
 class VecByteBuf final : public ::MongoExtensionByteBuf {
 public:
@@ -62,47 +62,4 @@ private:
 
     std::vector<uint8_t> _buffer;
 };
-
-/**
- * VecByteBufHandle is an owned handle wrapper around a VecByteBuf.
- * Typically this is a handle around a VecByteBuf allocated by the host whose ownership
- * has been transferred to the extension.
- */
-class VecByteBufHandle : public OwnedHandle<VecByteBuf> {
-public:
-    VecByteBufHandle(VecByteBuf* buf) : OwnedHandle<VecByteBuf>(buf) {
-        _assertValidVTable();
-    }
-
-    /**
-     * Get a read-only byte view of the contents of VecByteBuf.
-     */
-    MongoExtensionByteView getByteView() const {
-        assertValid();
-        return vtable().get_view(get());
-    }
-
-    /**
-     * Get a read-only string view of the contents of VecByteBuf.
-     */
-    std::string_view getStringView() const {
-        assertValid();
-        return byteViewAsStringView(vtable().get_view(get()));
-    }
-
-    /**
-     * Destroy VecByteBuf and free all associated resources.
-     */
-    void destroy() const {
-        assertValid();
-        vtable().destroy(get());
-    }
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10806301, "VecByteBuf 'get_view' is null", vtable.get_view != nullptr);
-        tassert(10806302, "VecByteBuf 'destroy' is null", vtable.destroy != nullptr);
-    };
-};
-
-}  // namespace mongo::extension::sdk
+}  // namespace mongo::extension

@@ -26,24 +26,18 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_adapter/aggregation_stage.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/parse_node.h"
 
 #include "mongo/db/extension/host_adapter/query_shape_opts_adapter.h"
-#include "mongo/db/extension/sdk/byte_buf.h"
-#include "mongo/db/extension/sdk/extension_status.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo::extension::host_adapter {
-MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 
-LogicalAggregationStageHandle AggregationStageDescriptorHandle::parse(BSONObj stageBson) const {
-    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
-    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
-    sdk::enterC(
-        [&]() { return vtable().parse(get(), sdk::objAsByteView(stageBson), &logicalStagePtr); });
-    return LogicalAggregationStageHandle(logicalStagePtr);
-}
+MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 
 BSONObj AggregationStageParseNodeHandle::getQueryShape(const SerializationOptions& opts) const {
     ::MongoExtensionByteBuf* buf;
@@ -51,7 +45,7 @@ BSONObj AggregationStageParseNodeHandle::getQueryShape(const SerializationOption
     auto* ptr = get();
     host::QueryShapeOptsAdapter optsCtx(&opts);
 
-    sdk::enterC([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
+    enterC([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
 
     if (!buf) {
         // TODO SERVER-111882 tassert here instead of returning empty string, since this would
@@ -61,8 +55,8 @@ BSONObj AggregationStageParseNodeHandle::getQueryShape(const SerializationOption
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
-    sdk::VecByteBufHandle ownedBuf{static_cast<sdk::VecByteBuf*>(buf)};
-    return sdk::bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+    VecByteBufHandle ownedBuf{static_cast<VecByteBuf*>(buf)};
+    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
 }
 
 std::vector<VariantNodeHandle> AggregationStageParseNodeHandle::expand() const {
@@ -73,7 +67,7 @@ std::vector<VariantNodeHandle> AggregationStageParseNodeHandle::expand() const {
     std::vector<::MongoExtensionExpandedArrayElement> buf{expandedSize};
     ::MongoExtensionExpandedArray expandedArray{expandedSize, buf.data()};
 
-    sdk::enterC([&] { return vtable().expand(get(), &expandedArray); });
+    enterC([&] { return vtable().expand(get(), &expandedArray); });
 
     // This guard provides a best-effort cleanup in the case of an exception.
     //
@@ -135,14 +129,5 @@ std::vector<VariantNodeHandle> AggregationStageParseNodeHandle::expand() const {
 
     guard.dismiss();
     return expandedVec;
-}
-
-LogicalAggregationStageHandle AggregationStageAstNodeHandle::bind() const {
-    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
-
-    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
-    sdk::enterC([&]() { return vtable().bind(get(), &logicalStagePtr); });
-
-    return LogicalAggregationStageHandle(logicalStagePtr);
 }
 }  // namespace mongo::extension::host_adapter

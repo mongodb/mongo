@@ -30,7 +30,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/host_adapter/aggregation_stage.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
@@ -149,7 +149,7 @@ public:
 private:
     static void registerStage(const std::string& name,
                               DocumentSource::Id id,
-                              extension::host_adapter::AggregationStageDescriptorHandle descriptor);
+                              host_adapter::AggregationStageDescriptorHandle descriptor);
 
     /**
      * Give access to DocumentSourceExtensionTest to unregister parser.

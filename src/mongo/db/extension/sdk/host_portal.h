@@ -30,7 +30,7 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/modules.h"
 
 #include <yaml-cpp/yaml.h>
@@ -46,13 +46,13 @@ namespace mongo::extension::sdk {
  * Note that the host portal pointer is only valid during initialization and should not be retained
  * by the extension.
  */
-class HostPortalHandle : public sdk::UnownedHandle<const ::MongoExtensionHostPortal> {
+class HostPortalHandle : public UnownedHandle<const ::MongoExtensionHostPortal> {
 public:
     HostPortalHandle(const ::MongoExtensionHostPortal* portal)
-        : sdk::UnownedHandle<const ::MongoExtensionHostPortal>(portal) {}
+        : UnownedHandle<const ::MongoExtensionHostPortal>(portal) {}
 
-    void registerStageDescriptor(const sdk::ExtensionAggregationStageDescriptor* stageDesc) const {
-        sdk::enterC([&] {
+    void registerStageDescriptor(const ExtensionAggregationStageDescriptor* stageDesc) const {
+        enterC([&] {
             assertValid();
             return vtable().registerStageDescriptor(
                 reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(stageDesc));

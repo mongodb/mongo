@@ -35,7 +35,7 @@
 #include "mongo/db/extension/host_adapter/extension_handle.h"
 #include "mongo/db/extension/host_adapter/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -105,7 +105,7 @@ host_adapter::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
             swGetExtensionFunction.isOK());
 
     const ::MongoExtension* extension = nullptr;
-    sdk::enterC([&]() {
+    enterC([&]() {
         return swGetExtensionFunction.getValue()(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED,
                                                  &extension);
     });

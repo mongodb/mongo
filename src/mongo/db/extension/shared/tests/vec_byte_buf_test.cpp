@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/sdk/byte_buf.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
+#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
 #include <vector>
 
-namespace mongo::extension::sdk {
+namespace mongo::extension {
 namespace {
 
 TEST(VecByteBufTest, EmptyCtorHasEmptyView) {
@@ -117,4 +118,4 @@ DEATH_TEST(VecByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
 }
 
 }  // namespace
-}  // namespace mongo::extension::sdk
+}  // namespace mongo::extension

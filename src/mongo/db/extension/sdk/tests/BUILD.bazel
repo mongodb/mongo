@@ -6,17 +6,15 @@ mongo_cc_unit_test(
     name = "extension_sdk_test",
     srcs = [
         "aggregation_stage_test.cpp",
-        "byte_buf_utils_test.cpp",
-        "extension_status_test.cpp",
-        "handle_test.cpp",
         "host_services_test.cpp",
-        "vec_byte_buf_test.cpp",
         "versioned_extension_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
+        "//src/mongo/db/extension/host_adapter/handle/aggregation_stage",
         "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/extension/shared/handle",
     ],
 )

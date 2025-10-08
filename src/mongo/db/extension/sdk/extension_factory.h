@@ -30,10 +30,10 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/versioned_extension.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -135,7 +135,7 @@ private:
     ::MongoExtensionStatus* get_mongodb_extension(                                           \
         const ::MongoExtensionAPIVersionVector* hostVersions,                                \
         const ::MongoExtension** extension) {                                                \
-        return mongo::extension::sdk::enterCXX([&] {                                         \
+        return mongo::extension::enterCXX([&] {                                              \
             const auto& versionedExtensionContainer =                                        \
                 mongo::extension::sdk::VersionedExtensionContainer::getInstance();           \
             static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>( \

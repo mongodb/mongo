@@ -19,11 +19,11 @@ mongo_cc_library(
         "extension_stage.h",
         "host_portal.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
         "//src/mongo/db/extension/host_adapter:host_services_adapter",
+        "//src/mongo/db/extension/host_adapter/handle/aggregation_stage",
         "//src/mongo/db/pipeline",
     ],
 )

@@ -26,38 +26,36 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
-#include "mongo/base/status.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
 #include <string>
 
-namespace mongo {
+namespace mongo::extension {
 namespace {
 
 TEST(ExtensionStatusTest, extensionStatusOKTest) {
     // HostStatusHandle going out of scope should call destroy, but not destroy our singleton.
-    auto* const statusOKSingleton = &mongo::extension::sdk::ExtensionStatusOK::getInstance();
+    auto* const statusOKSingleton = &ExtensionStatusOK::getInstance();
     {
-        mongo::extension::sdk::HostStatusHandle statusHandle(statusOKSingleton);
+        HostStatusHandle statusHandle(statusOKSingleton);
         ASSERT_EQUALS(statusHandle.getCode(), 0);
         ASSERT_EQUALS(statusHandle.getReason().size(), 0);
     }
 
-    ASSERT_TRUE(statusOKSingleton == &mongo::extension::sdk::ExtensionStatusOK::getInstance());
+    ASSERT_TRUE(statusOKSingleton == &ExtensionStatusOK::getInstance());
 
-    ASSERT_EQUALS(mongo::extension::sdk::ExtensionStatusOK::getInstance().getCode(), 0);
-    ASSERT_EQUALS(mongo::extension::sdk::ExtensionStatusOK::getInstance().getReason().size(), 0);
-    ASSERT_EQUALS(mongo::extension::sdk::ExtensionStatusOK::getInstanceCount(), 1);
+    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getCode(), 0);
+    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getReason().size(), 0);
+    ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
 }
 
 // Test that a std::exception correctly returns MONGO_EXTENSION_STATUS_RUNTIME_ERROR when called via
 // enterCXX.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_stdException) {
-    mongo::extension::sdk::HostStatusHandle status(extension::sdk::enterCXX(
+    HostStatusHandle status(enterCXX(
         [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
 }
@@ -65,8 +63,8 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_stdException) {
 // Test that a std::exception can be rethrown when it crosses from a C++ context through the C API
 // boundary and back to a C++ context.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_stdException) {
-    ASSERT_THROWS(extension::sdk::enterC([&]() {
-                      return extension::sdk::enterCXX([&]() {
+    ASSERT_THROWS(enterC([&]() {
+                      return enterCXX([&]() {
                           throw std::runtime_error("Runtime exception in $noOpExtension parse.");
                       });
                   }),
@@ -76,16 +74,16 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_stdException) {
 // Test that enterCXX correctly wraps a DBException (uassert) and returns the correct code when a
 // call is made at the C API boundary.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_AssertionException) {
-    mongo::extension::sdk::HostStatusHandle status(extension::sdk::enterCXX(
-        [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
+    HostStatusHandle status(
+        enterCXX([&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == 10596408);
 }
 
 // Test that a DBException (uassert) can be rethrown when it crosses from a C++ context through the
 // C API boundary and back to a C++ context.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_AssertionException) {
-    ASSERT_THROWS_CODE(extension::sdk::enterC([&]() {
-                           return extension::sdk::enterCXX([&]() {
+    ASSERT_THROWS_CODE(enterC([&]() {
+                           return enterCXX([&]() {
                                uasserted(10596409, "Failed with uassert in $noOpExtension parse.");
                            });
                        }),
@@ -94,9 +92,9 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_AssertionExcept
 }
 
 /*
- * Verify that an ExtensionDBException, propagates the underlying extension::sdk::ExtensionStatus
+ * Verify that an ExtensionDBException, propagates the underlying extension::ExtensionStatus
  * when it crosses the API boundary. An ExtensionDBException is typically thrown when we receive an
- * extension::sdk::ExtensionStatus that was not from the host's C++ context. In this case, there is
+ * extension::ExtensionStatus that was not from the host's C++ context. In this case, there is
  * no underlying exception that can be rethrown. Instead, we throw a ExtensionDBException that wraps
  * the underlying MongoExtensinStatus.
  */
@@ -104,11 +102,11 @@ TEST(ExtensionStatusTest, extensionStatusEnterC_enterCXX_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
     auto extensionStatusPtr =
-        std::make_unique<extension::sdk::ExtensionStatusException>(nullptr, 10596412, kErrorString);
+        std::make_unique<ExtensionStatusException>(nullptr, 10596412, kErrorString);
     const auto* extensionStatusOriginalPtr = extensionStatusPtr.get();
 
-    extension::sdk::HostStatusHandle propagatedStatus(extension::sdk::enterCXX(
-        [&]() { extension::sdk::enterC([&]() { return extensionStatusPtr.release(); }); }));
+    HostStatusHandle propagatedStatus(
+        enterCXX([&]() { enterC([&]() { return extensionStatusPtr.release(); }); }));
 
     // Verify that the MongoExtensionStatus* we propagated through enterCXX(enterC(..)) is the same
     // one we originally allocated.
@@ -118,16 +116,15 @@ TEST(ExtensionStatusTest, extensionStatusEnterC_enterCXX_ExtensionDBException) {
 TEST(ExtensionStatusTest, extensionStatusEnterC_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
-    ASSERT_THROWS_CODE_AND_WHAT(
-        extension::sdk::enterC([&]() {
-            return std::make_unique<extension::sdk::ExtensionStatusException>(
-                       nullptr, 10596412, kErrorString)
-                .release();
-        }),
-        extension::sdk::ExtensionDBException,
-        10596412,
-        kErrorString);
+    ASSERT_THROWS_CODE_AND_WHAT(enterC([&]() {
+                                    return std::make_unique<ExtensionStatusException>(
+                                               nullptr, 10596412, kErrorString)
+                                        .release();
+                                }),
+                                ExtensionDBException,
+                                10596412,
+                                kErrorString);
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::extension

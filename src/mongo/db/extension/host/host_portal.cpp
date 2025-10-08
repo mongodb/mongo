@@ -29,8 +29,8 @@
 #include "mongo/db/extension/host/host_portal.h"
 
 #include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/host_adapter/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
 namespace mongo::extension::host {
 
@@ -44,12 +44,12 @@ void HostPortal::registerStageDescriptor(
 
 ::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(
     const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept {
-    return sdk::enterCXX([&]() { return registerStageDescriptor(stageDesc); });
+    return enterCXX([&]() { return registerStageDescriptor(stageDesc); });
 }
 
 ::MongoExtensionByteView HostPortal::_extGetOptions(
     const ::MongoExtensionHostPortal* portal) noexcept {
-    return sdk::stringViewAsByteView(static_cast<const HostPortal*>(portal)->_extensionOpts);
+    return stringViewAsByteView(static_cast<const HostPortal*>(portal)->_extensionOpts);
 }
 
 }  // namespace mongo::extension::host

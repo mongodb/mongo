@@ -3,15 +3,19 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 package(default_visibility = ["//visibility:public"])
 
 mongo_cc_library(
-    name = "aggregation_stage",
-    srcs = [],
+    name = "shared",
+    srcs = [
+        "byte_buf.cpp",
+        "extension_status.cpp",
+    ],
     hdrs = [
-        "ast_node.h",
-        "parse_node.h",
+        "byte_buf.h",
+        "byte_buf_utils.h",
+        "extension_status.h",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",
-        "//src/mongo/db/extension/shared",
+        "//src/mongo/db/extension/shared/handle",
     ],
 )

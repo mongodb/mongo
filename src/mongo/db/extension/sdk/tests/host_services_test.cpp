@@ -46,12 +46,12 @@ TEST(HostServicesTest, ExtensionLogIDLRoundTrip) {
 
     BSONObj structuredLog =
         sdk::HostServicesHandle::createExtensionLogMessage(logMessage, logCode, logSeverity);
-    ::MongoExtensionByteView byteView = sdk::objAsByteView(structuredLog);
+    ::MongoExtensionByteView byteView = objAsByteView(structuredLog);
 
     ASSERT(byteView.data != nullptr);
     ASSERT(byteView.len > 0);
 
-    auto bsonObj = sdk::bsonObjFromByteView(byteView);
+    auto bsonObj = bsonObjFromByteView(byteView);
     auto log = MongoExtensionLog::parse(bsonObj);
 
     ASSERT_EQUALS(log.getMessage(), logMessage);
@@ -66,12 +66,12 @@ TEST(HostServicesTest, ExtensionDebugLogIDLRoundTrip) {
 
     BSONObj structuredDebugLog =
         sdk::HostServicesHandle::createExtensionDebugLogMessage(logMessage, logCode, logLevel);
-    ::MongoExtensionByteView byteView = sdk::objAsByteView(structuredDebugLog);
+    ::MongoExtensionByteView byteView = objAsByteView(structuredDebugLog);
 
     ASSERT(byteView.data != nullptr);
     ASSERT(byteView.len > 0);
 
-    auto bsonObj = sdk::bsonObjFromByteView(byteView);
+    auto bsonObj = bsonObjFromByteView(byteView);
     auto debugLog = MongoExtensionDebugLog::parse(bsonObj);
 
     ASSERT_EQUALS(debugLog.getMessage(), logMessage);

@@ -27,41 +27,56 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/bson/bsonobj.h"
+
 #include "mongo/db/extension/public/api.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
+#include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
-#include <string_view>
+#include <absl/base/nullability.h>
 
+namespace mongo::extension {
 
-namespace mongo::extension::sdk {
-inline std::string_view byteViewAsStringView(const MongoExtensionByteView& view) {
-    return std::string_view(reinterpret_cast<const char*>(view.data), view.len);
-}
+/**
+ * VecByteBufHandle is an owned handle wrapper around a VecByteBuf.
+ * Typically this is a handle around a VecByteBuf allocated by the host whose ownership
+ * has been transferred to the extension.
+ */
+class VecByteBufHandle : public OwnedHandle<VecByteBuf> {
+public:
+    VecByteBufHandle(VecByteBuf* buf) : OwnedHandle<VecByteBuf>(buf) {
+        _assertValidVTable();
+    }
 
-inline BSONObj bsonObjFromByteView(const MongoExtensionByteView& view) {
-    auto isValidObj = [](const MongoExtensionByteView& view) -> bool {
-        if (view.len < BSONObj::kMinBSONLength) {
-            return false;
-        }
+    /**
+     * Get a read-only byte view of the contents of VecByteBuf.
+     */
+    MongoExtensionByteView getByteView() const {
+        assertValid();
+        return vtable().get_view(get());
+    }
 
-        // Decode the value in little-endian order.
-        int32_t docLength = static_cast<int32_t>(view.data[0]) |
-            (static_cast<int32_t>(view.data[1]) << 8) | (static_cast<int32_t>(view.data[2]) << 16) |
-            (static_cast<int32_t>(view.data[3]) << 24);
-        return docLength >= 0 && static_cast<size_t>(docLength) <= view.len;
+    /**
+     * Get a read-only string view of the contents of VecByteBuf.
+     */
+    std::string_view getStringView() const {
+        assertValid();
+        return byteViewAsStringView(vtable().get_view(get()));
+    }
+
+    /**
+     * Destroy VecByteBuf and free all associated resources.
+     */
+    void destroy() const {
+        assertValid();
+        vtable().destroy(get());
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10806301, "VecByteBuf 'get_view' is null", vtable.get_view != nullptr);
+        tassert(10806302, "VecByteBuf 'destroy' is null", vtable.destroy != nullptr);
     };
-    tassert(10596405, "Extension returned invalid bson obj", isValidObj(view));
-    return BSONObj(reinterpret_cast<const char*>(view.data));
-}
-
-inline MongoExtensionByteView objAsByteView(const BSONObj& obj) {
-    return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(obj.objdata()),
-                                  static_cast<size_t>(obj.objsize())};
-}
-
-inline MongoExtensionByteView stringViewAsByteView(std::string_view str) {
-    return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(str.data()), str.size()};
-}
-}  // namespace mongo::extension::sdk
+};
+}  // namespace mongo::extension

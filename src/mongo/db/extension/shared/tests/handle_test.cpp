@@ -26,14 +26,14 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/sdk/handle.h"
+#include "mongo/db/extension/shared/handle/handle.h"
 
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
 
-namespace mongo {
+namespace mongo::extension {
 namespace {
 
 /**
@@ -85,10 +85,9 @@ private:
 const DestroyableVTable DestroyableImpl::VTABLE =
     DestroyableVTable{.destroy = &DestroyableImpl::destroy};
 
-class OwnedDestroyableHandle : public mongo::extension::sdk::OwnedHandle<DestroyableAPI> {
+class OwnedDestroyableHandle : public OwnedHandle<DestroyableAPI> {
 public:
-    explicit OwnedDestroyableHandle(DestroyableAPI* ptr)
-        : mongo::extension::sdk::OwnedHandle<DestroyableAPI>(ptr) {
+    explicit OwnedDestroyableHandle(DestroyableAPI* ptr) : OwnedHandle<DestroyableAPI>(ptr) {
         _assertValidVTable();
     }
 
@@ -96,10 +95,9 @@ protected:
     void _assertVTableConstraints(const VTable_t&) const override {}
 };
 
-class UnownedDestroyableHandle : public mongo::extension::sdk::UnownedHandle<DestroyableAPI> {
+class UnownedDestroyableHandle : public UnownedHandle<DestroyableAPI> {
 public:
-    explicit UnownedDestroyableHandle(DestroyableAPI* ptr)
-        : mongo::extension::sdk::UnownedHandle<DestroyableAPI>(ptr) {
+    explicit UnownedDestroyableHandle(DestroyableAPI* ptr) : UnownedHandle<DestroyableAPI>(ptr) {
         _assertValidVTable();
     }
 
@@ -241,4 +239,4 @@ DEATH_TEST(HandleTest, ownedHandleConstructorRejectsNullDestroyPointer, "1093010
     OwnedDestroyableHandle handle(&obj);
 }
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::extension

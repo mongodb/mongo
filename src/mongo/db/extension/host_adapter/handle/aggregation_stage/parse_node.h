@@ -28,117 +28,15 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/host_adapter/handle.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/scopeguard.h"
 
 #include <vector>
 
-#include <absl/base/nullability.h>
-
 namespace mongo::extension::host_adapter {
-
-/**
- * LogicalAggregationStageHandle is an owned handle wrapper around a
- * MongoExtensionLogicalAggregationStage.
- */
-class LogicalAggregationStageHandle : public OwnedHandle<::MongoExtensionLogicalAggregationStage> {
-public:
-    LogicalAggregationStageHandle(::MongoExtensionLogicalAggregationStage* ptr)
-        : OwnedHandle<::MongoExtensionLogicalAggregationStage>(ptr) {
-        _assertValidVTable();
-    }
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {}
-};
-
-/**
- * AggregationStageDescriptorHandle is a wrapper around a
- * MongoExtensionAggregationStageDescriptor.
- */
-class AggregationStageDescriptorHandle
-    : public UnownedHandle<const ::MongoExtensionAggregationStageDescriptor> {
-public:
-    AggregationStageDescriptorHandle(
-        absl::Nonnull<const ::MongoExtensionAggregationStageDescriptor*> descriptor)
-        : UnownedHandle<const ::MongoExtensionAggregationStageDescriptor>(descriptor) {
-        _assertValidVTable();
-    }
-
-    /**
-     * Returns a StringData containing the name of this aggregation stage.
-     */
-    StringData getName() const {
-        auto stringView = sdk::byteViewAsStringView(vtable().get_name(get()));
-        return StringData{stringView.data(), stringView.size()};
-    }
-
-    /**
-     * Return the type for this stage.
-     */
-    MongoExtensionAggregationStageType getType() const {
-        return vtable().get_type(get());
-    }
-
-    /**
-     * Parse the user provided stage definition for this stage descriptor.
-     *
-     * stageBson contains a BSON document with a single (stageName, stageDefinition) element
-     * tuple.
-     *
-     * On success, the logical stage is returned and belongs to the caller.
-     * On failure, the error triggers an assertion.
-     *
-     */
-    LogicalAggregationStageHandle parse(BSONObj stageBson) const;
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10930102,
-                "ExtensionAggregationStageDescriptor 'get_name' is null",
-                vtable.get_name != nullptr);
-        tassert(10930103,
-                "ExtensionAggregationStageDescriptor 'get_type' is null",
-                vtable.get_type != nullptr);
-        tassert(10930104,
-                "ExtensionAggregationStageDescriptor 'parse' is null",
-                vtable.parse != nullptr);
-    }
-};
-
-/**
- * AggregationStageAstNodeHandle is an owned handle wrapper around a
- * MongoExtensionAggregationStageAstNode.
- */
-class AggregationStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggregationStageAstNode> {
-public:
-    AggregationStageAstNodeHandle(::MongoExtensionAggregationStageAstNode* ptr)
-        : OwnedHandle<::MongoExtensionAggregationStageAstNode>(ptr) {
-        _assertValidVTable();
-    }
-
-    /**
-     * Returns a logical stage with the stage's runtime implementation of the optimization
-     * interface.
-     *
-     * On success, the logical stage is returned and belongs to the caller.
-     * On failure, the error triggers an assertion.
-     *
-     */
-    LogicalAggregationStageHandle bind() const;
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(
-            11113700, "ExtensionAggregationStageAstNode 'bind' is null", vtable.bind != nullptr);
-    }
-};
 
 class AggregationStageParseNodeHandle;
 using VariantNodeHandle =
