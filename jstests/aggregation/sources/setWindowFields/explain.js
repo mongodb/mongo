@@ -4,10 +4,20 @@
  * includes a metric for peak memory usage across the entire stage, including each individual
  * function as well as any other internal state.
  *
- * @tags: [assumes_against_mongod_not_mongos]
+ * TODO: Once SERVER-111899 is done and feature flag QueryMemoryTracking is removed, the
+ * "multiversion_incompatible" tag can be removed, assuming that there is no further explain
+ * output changes based on feature flags in the future.
+ *
+ * @tags: [
+ *    multiversion_incompatible,
+ *    assumes_against_mongod_not_mongos
+ * ]
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {getTotalMemoryUsageFromStageExplainOutput} from "jstests/aggregation/extras/window_function_helpers.js";
+import {
+    getTotalMemoryUsageFromStageExplainOutput,
+    assertExplainMemoryTracking,
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -57,6 +67,9 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
                     );
                 }
             }
+
+            // TODO: Once SERVER-111899 is done and feature flag QueryMemoryTracking is removed, remove this assertion.
+            assertExplainMemoryTracking(stage);
 
             const totalMemoryUsage = getTotalMemoryUsageFromStageExplainOutput(stage);
             assert.gt(totalMemoryUsage, expectedTotalMemUsage * 0.9, "Incorrect total mem usage: " + tojson(stage));
