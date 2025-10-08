@@ -285,6 +285,15 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
                 shard.setTopologyTime(newTopologyTime.asTimestamp());
 
+                bool generatePlacementHistoryInitMetadata = [&] {
+                    if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        return _isFirstShard(opCtx);
+                    }
+                    return false;
+                }();
+
                 {
                     const auto originalWC = opCtx->getWriteConcern();
                     ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
@@ -292,7 +301,11 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     opCtx->setWriteConcern(defaultMajorityWriteConcernDoNotUse());
                     try {
                         topology_change_helpers::addShardInTransaction(
-                            opCtx, shard, std::move(dbList), **executor);
+                            opCtx,
+                            shard,
+                            std::move(dbList),
+                            generatePlacementHistoryInitMetadata,
+                            **executor);
                     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
                         // If this happens, it means something happened in the previous try after
                         // doing the transaction, so it's okay to swallow the duplicate key

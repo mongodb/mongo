@@ -274,58 +274,29 @@ void setInitializationTimeOnPlacementHistory(
     OperationContext* opCtx,
     Timestamp initializationTime,
     std::vector<ShardId> placementResponseForPreInitQueries) {
-    /*
-     * The initialization metadata of config.placementHistory is composed by two special docs,
-     * identified by kConfigPlacementHistoryInitializationMarker:
-     * - initializationTimeInfo: contains the time of the initialization and an empty set of shards.
-     *   It will allow getHistoricalPlacement() to serve accurate responses to queries concerning
-     *   the [initializationTime, +inf) range.
-     * - approximatedPlacementForPreInitQueries:  contains the cluster topology at the time of the
-     *   initialization and is marked with Timestamp(0,1).
-     *   It will allow getHistoricalPlacement() to serve approximated responses to queries
-     *   concerning the [-inf, initializationTime) range.
-     */
-    NamespacePlacementType initializationTimeInfo;
-    initializationTimeInfo.setNss(
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
-    initializationTimeInfo.setTimestamp(initializationTime);
-    initializationTimeInfo.setShards({});
-
-    NamespacePlacementType approximatedPlacementForPreInitQueries;
-    approximatedPlacementForPreInitQueries.setNss(
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
-    approximatedPlacementForPreInitQueries.setTimestamp(Timestamp(0, 1));
-    approximatedPlacementForPreInitQueries.setShards(placementResponseForPreInitQueries);
-
-    auto transactionChain = [initializationTimeInfo = std::move(initializationTimeInfo),
-                             approximatedPlacementForPreInitQueries =
-                                 std::move(approximatedPlacementForPreInitQueries)](
-                                const txn_api::TransactionClient& txnClient,
+    auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
                                 ExecutorPtr txnExec) -> SemiFuture<void> {
-        // Delete the current initialization metadata
-        write_ops::DeleteCommandRequest deleteRequest(
+        write_ops::DeleteCommandRequest deleteOldMetadata(
             NamespaceString::kConfigsvrPlacementHistoryNamespace);
-        write_ops::DeleteOpEntry entryDelMarker;
-        entryDelMarker.setQ(
+        write_ops::DeleteOpEntry deleteStmt;
+        deleteStmt.setQ(
             BSON(NamespacePlacementType::kNssFieldName << NamespaceStringUtil::serialize(
                      ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
                      SerializationContext::stateDefault())));
-        entryDelMarker.setMulti(true);
-        deleteRequest.setDeletes({entryDelMarker});
+        deleteStmt.setMulti(true);
+        deleteOldMetadata.setDeletes({std::move(deleteStmt)});
 
-        return txnClient.runCRUDOp(deleteRequest, {})
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& _) {
-                // Insert the new initialization metadata
-                write_ops::InsertCommandRequest insertMarkerRequest(
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace);
-                insertMarkerRequest.setDocuments({initializationTimeInfo.toBSON(),
-                                                  approximatedPlacementForPreInitQueries.toBSON()});
-                return txnClient.runCRUDOp(insertMarkerRequest, {});
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& _) { return; })
-            .semi();
+        auto deleteResponse = txnClient.runCRUDOpSync(deleteOldMetadata, {});
+        uassertStatusOK(deleteResponse.toStatus());
+
+        write_ops::InsertCommandRequest insertNewMetadata =
+            ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
+                initializationTime, placementResponseForPreInitQueries);
+
+        auto insertResponse = txnClient.runCRUDOpSync(insertNewMetadata, {});
+        uassertStatusOK(insertResponse.toStatus());
+
+        return SemiFuture<void>::makeReady();
     };
 
     WriteConcernOptions originalWC = opCtx->getWriteConcern();
@@ -356,6 +327,40 @@ Status ShardingCatalogManager::createIndexForConfigPlacementHistory(OperationCon
                                               << -1),
                                          true /*unique*/);
 }
+
+write_ops::InsertCommandRequest
+ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
+    const Timestamp& initializationTime, const std::vector<ShardId>& defaultPlacement) {
+    /*
+     * The 'operational boundaries' of config.placementHistory are described through two 'metadata'
+     * documents, both identified by the kConfigPlacementHistoryInitializationMarker namespace:
+     * - initializationTimeInfo: contains the time of the initialization and an empty set of shards.
+     *   It will allow getHistoricalPlacement() to serve accurate responses to queries targeting a
+     * PIT within the [initializationTime, +inf) range.
+     * - approximatedPlacementForPreInitQueries:  contains the cluster topology at the time of the
+     *   initialization and it associated with the 'Dawn of Time' Timestamp(0,1).
+     *   It will allow getHistoricalPlacement() to serve approximated responses to queries
+     *   concerning the [-inf, initializationTime) range.
+     */
+    NamespacePlacementType initializationTimeInfo;
+    initializationTimeInfo.setNss(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
+    initializationTimeInfo.setTimestamp(initializationTime);
+    initializationTimeInfo.setShards({});
+
+    NamespacePlacementType approximatedPlacementForPreInitQueries;
+    approximatedPlacementForPreInitQueries.setNss(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
+    approximatedPlacementForPreInitQueries.setTimestamp(Timestamp(0, 1));
+    approximatedPlacementForPreInitQueries.setShards(defaultPlacement);
+
+    write_ops::InsertCommandRequest insertMarkerRequest(
+        NamespaceString::kConfigsvrPlacementHistoryNamespace);
+    insertMarkerRequest.setDocuments(
+        {initializationTimeInfo.toBSON(), approximatedPlacementForPreInitQueries.toBSON()});
+    return insertMarkerRequest;
+}
+
 
 HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
     OperationContext* opCtx,

@@ -724,6 +724,12 @@ public:
                                                const Timestamp& atClusterTime,
                                                bool checkIfPointInTimeIsInFuture = true);
 
+    /**
+     * Helper function to compose a command request to insert new initialization metadata documents
+     * into config.placementHistory, given the passed in initialization time and default placement.
+     */
+    static write_ops::InsertCommandRequest buildInsertReqForPlacementHistoryOperationalBoundaries(
+        const Timestamp& initializationTime, const std::vector<ShardId>& defaultPlacement);
 
     /**
      * Schedules an asynchronous unset of the addOrRemoveShardInProgress cluster parameter, in case

@@ -322,6 +322,7 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
 void addShardInTransaction(OperationContext* opCtx,
                            const ShardType& newShard,
                            std::vector<DatabaseName>&& databasesInNewShard,
+                           bool insertPlacementHistoryInitMetadata,
                            std::shared_ptr<executor::TaskExecutor> executor);
 
 /**

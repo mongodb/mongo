@@ -1596,72 +1596,67 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
 void addShardInTransaction(OperationContext* opCtx,
                            const ShardType& newShard,
                            std::vector<DatabaseName>&& databasesInNewShard,
+                           bool insertPlacementHistoryInitMetadata,
                            std::shared_ptr<executor::TaskExecutor> executor) {
 
     // Set up and run the commit statements
     // TODO SERVER-81582: generate batches of transactions to insert the database/placementHistory
     // before adding the shard in config.shards.
-    auto transactionChain = [opCtx, &newShard, &databasesInNewShard](
-                                const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+    auto transactionChain = [&, opCtx](const txn_api::TransactionClient& txnClient,
+                                       ExecutorPtr txnExec) {
         write_ops::InsertCommandRequest insertShardEntry(NamespaceString::kConfigsvrShardsNamespace,
                                                          {newShard.toBSON()});
-        return txnClient.runCRUDOp(insertShardEntry, {})
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertShardEntryResponse) {
-                uassertStatusOK(insertShardEntryResponse.toStatus());
-                if (databasesInNewShard.empty()) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
+        const auto insertShardEntryResponse = txnClient.runCRUDOpSync(insertShardEntry, {});
+        uassertStatusOK(insertShardEntryResponse.toStatus());
+        if (insertShardEntryResponse.getN() == 0) {
+            // If no insertion happened, this must be a retry of an already committed
+            // transaction.
+            return SemiFuture<void>::makeReady();
+        }
 
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
+        if (!databasesInNewShard.empty()) {
+            std::vector<BSONObj> databaseEntries;
+            std::transform(databasesInNewShard.begin(),
+                           databasesInNewShard.end(),
+                           std::back_inserter(databaseEntries),
+                           [&](const DatabaseName& dbName) {
+                               return DatabaseType(
+                                          dbName,
+                                          newShard.getName(),
+                                          DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
+                                   .toBSON();
+                           });
+            write_ops::InsertCommandRequest insertDatabaseEntries(
+                NamespaceString::kConfigDatabasesNamespace, std::move(databaseEntries));
+            auto dbMetadataInsertionResponse = txnClient.runCRUDOpSync(insertDatabaseEntries, {});
+            uassertStatusOK(dbMetadataInsertionResponse.toStatus());
 
-                std::vector<BSONObj> databaseEntries;
-                std::transform(databasesInNewShard.begin(),
-                               databasesInNewShard.end(),
-                               std::back_inserter(databaseEntries),
-                               [&](const DatabaseName& dbName) {
-                                   return DatabaseType(dbName,
-                                                       newShard.getName(),
-                                                       DatabaseVersion(UUID::gen(),
-                                                                       newShard.getTopologyTime()))
-                                       .toBSON();
-                               });
-                write_ops::InsertCommandRequest insertDatabaseEntries(
-                    NamespaceString::kConfigDatabasesNamespace, std::move(databaseEntries));
-                return txnClient.runCRUDOp(insertDatabaseEntries, {});
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertDatabaseEntriesResponse) {
-                uassertStatusOK(insertDatabaseEntriesResponse.toStatus());
-                if (databasesInNewShard.empty()) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
 
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
-                std::vector<BSONObj> placementEntries;
-                std::transform(databasesInNewShard.begin(),
-                               databasesInNewShard.end(),
-                               std::back_inserter(placementEntries),
-                               [&](const DatabaseName& dbName) {
-                                   return NamespacePlacementType(NamespaceString(dbName),
-                                                                 newShard.getTopologyTime(),
-                                                                 {ShardId(newShard.getName())})
-                                       .toBSON();
-                               });
-                write_ops::InsertCommandRequest insertPlacementEntries(
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                    std::move(placementEntries));
-                return txnClient.runCRUDOp(insertPlacementEntries, {});
-            })
-            .thenRunOn(txnExec)
-            .then([](auto insertPlacementEntriesResponse) {
-                uassertStatusOK(insertPlacementEntriesResponse.toStatus());
-            })
-            .semi();
+            std::vector<BSONObj> placementEntries;
+            std::transform(databasesInNewShard.begin(),
+                           databasesInNewShard.end(),
+                           std::back_inserter(placementEntries),
+                           [&](const DatabaseName& dbName) {
+                               return NamespacePlacementType(NamespaceString(dbName),
+                                                             newShard.getTopologyTime(),
+                                                             {ShardId(newShard.getName())})
+                                   .toBSON();
+                           });
+            write_ops::InsertCommandRequest insertPlacementEntries(
+                NamespaceString::kConfigsvrPlacementHistoryNamespace, std::move(placementEntries));
+            auto initialDBPlacementResponse = txnClient.runCRUDOpSync(insertPlacementEntries, {});
+            uassertStatusOK(initialDBPlacementResponse.toStatus());
+        }
+
+        if (insertPlacementHistoryInitMetadata) {
+            auto insertRequest =
+                ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
+                    newShard.getTopologyTime(), {newShard.getName()});
+            auto insertResponse = txnClient.runCRUDOpSync(insertRequest, {});
+            uassertStatusOK(insertResponse.toStatus());
+        }
+
+        return SemiFuture<void>::makeReady();
     };
 
     {

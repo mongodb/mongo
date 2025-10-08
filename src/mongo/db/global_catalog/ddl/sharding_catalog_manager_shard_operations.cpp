@@ -636,14 +636,21 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     {
         // Execute the transaction with a local write concern to make sure `stopMonitorGuard` is
-        // dimissed only when the transaction really fails.
+        // dismissed only when the transaction really fails.
         const auto originalWC = opCtx->getWriteConcern();
         ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
         opCtx->setWriteConcern(ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
         auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-        topology_change_helpers::addShardInTransaction(
-            opCtx, shardType, std::move(dbNamesStatus.getValue()), executor);
+        // Unconditionally skip the initialization of config.placementHistory (this action is bound
+        // to featureFlagChangeStreamPreciseShardTargeting, which is always false when the legacy
+        // addShard path is running).
+        const auto insertPlacementHistoryInitMetadata = false;
+        topology_change_helpers::addShardInTransaction(opCtx,
+                                                       shardType,
+                                                       std::move(dbNamesStatus.getValue()),
+                                                       insertPlacementHistoryInitMetadata,
+                                                       executor);
     }
     // Once the transaction has committed, we must immediately dismiss the guard to avoid
     // incorrectly removing the RSM after persisting the shard addition.
