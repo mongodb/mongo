@@ -13,6 +13,7 @@ mongo_cc_unit_test(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
+        "//src/mongo/db/extension/host_adapter:host_services_adapter",
         "//src/mongo/db/extension/host_adapter/handle/aggregation_stage",
         "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/extension/shared/handle",

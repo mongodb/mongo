@@ -29,6 +29,7 @@
 #include "mongo/db/extension/host_adapter/host_services_adapter.h"
 
 #include "mongo/db/extension/host/host_services.h"
+#include "mongo/db/extension/public/extension_error_types_gen.h"
 #include "mongo/db/extension/public/extension_log_gen.h"
 #include "mongo/db/extension/shared/extension_status.h"
 
@@ -49,6 +50,39 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(::MongoExtensionByteView logM
             mongo::extension::MongoExtensionLog::parse(std::move(obj));
 
         return host::HostServices::log(extensionLog);
+    });
+}
+
+::MongoExtensionStatus* HostServicesAdapter::_extUserAsserted(
+    ::MongoExtensionByteView structuredErrorMessage) {
+    // We throw the exception here so that we get a stack trace that looks like a host exception but
+    // originates from within the extension, so that we have a complete stack trace for diagnostic
+    // information. At the same time, we are not allowed to throw an exception across the API
+    // boundary, so we immediately convert this to a MongoExtensionStatus. It will be rethrown after
+    // being passed through the boundary.
+    return extension::enterCXX([&]() {
+        BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
+        auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
+            errorBson, IDLParserContext("extUassert"));
+
+        // Call the host's uassert implementation.
+        uasserted(exceptionInfo.getErrorCode(),
+                  "Extension encountered error: " + exceptionInfo.getMessage());
+    });
+}
+
+::MongoExtensionStatus* HostServicesAdapter::_extTripwireAsserted(
+    ::MongoExtensionByteView structuredErrorMessage) {
+    // We follow the same throw-then-catch pattern here as in _extUserAsserted, for the same
+    // reasons.
+    return extension::enterCXX([&]() {
+        BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
+        auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
+            errorBson, IDLParserContext("extTassert"));
+
+        // Call the host's tassert implementation.
+        tasserted(exceptionInfo.getErrorCode(),
+                  "Extension encountered error: " + exceptionInfo.getMessage());
     });
 }
 }  // namespace mongo::extension::host_adapter

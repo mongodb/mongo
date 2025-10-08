@@ -9,6 +9,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "aggregation_stage.h",
+        "assert_util.h",
         "extension.h",
         "extension_factory.h",
         "extension_helper.h",

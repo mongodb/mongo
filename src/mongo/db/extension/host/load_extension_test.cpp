@@ -389,4 +389,47 @@ TEST_F(LoadExtensionsTest, LoadStubParserSilentlySkipsIfExists) {
     std::vector<BSONObj> pipeline = {BSON("$match" << BSON("x" << 1))};
     ASSERT_DOES_NOT_THROW(Pipeline::parse(pipeline, expCtx));
 }
+
+/*
+ * Test fixture that loads the "extension_errors" test extension so that tests can be run against
+ * it.
+ *
+ * Note that this testing really would be better suited to an integration test, but we can't test
+ * tasserts in a jstest without failing the suite, so we cover that here in a death test.
+ */
+class ExtensionErrorsTest : public LoadExtensionsTest {
+public:
+    ExtensionErrorsTest() : expCtx(make_intrusive<ExpressionContextForTest>()) {}
+
+    void setUp() override {
+        if (ExtensionLoader::getLoadedExtensions().contains("extension_errors")) {
+            return;
+        }
+        const auto config = makeEmptyExtensionConfig(kTestExtensionErrorsLibExtensionPath);
+        ExtensionLoader::load("extension_errors", config);
+    }
+
+protected:
+    static inline const std::string kTestExtensionErrorsLibExtensionPath =
+        "libextension_errors_mongo_extension.so";
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+};
+
+TEST_F(ExtensionErrorsTest, ExtensionUasserts) {
+    std::vector<BSONObj> pipeline = {
+        BSON("$assert" << BSON("errmsg" << "a new error" << "code" << 54321 << "assertionType"
+                                        << "uassert"))};
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 54321);
+    ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx),
+                       AssertionException,
+                       "Extension encountered error: a new error");
+}
+
+DEATH_TEST_REGEX_F(ExtensionErrorsTest, ExtensionTasserts, "98765.*another new error") {
+    std::vector<BSONObj> pipeline = {
+        BSON("$assert" << BSON("errmsg" << "another new error" << "code" << 98765 << "assertionType"
+                                        << "tassert"))};
+    [[maybe_unused]] auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+}
 }  // namespace mongo::extension::host

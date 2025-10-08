@@ -452,6 +452,7 @@ extensions_with_config(
         "//src/mongo/db/extension/test_examples:logging_mongo_extension",
         "//src/mongo/db/extension/test_examples:parse_options_mongo_extension",
         "//src/mongo/db/extension/test_examples:test_options_mongo_extension",
+        "//src/mongo/db/extension/test_examples:extension_errors_mongo_extension",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the

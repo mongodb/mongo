@@ -67,6 +67,15 @@ public:
                                                   std::int32_t code,
                                                   std::int32_t level);
 
+    ::MongoExtensionStatus* userAsserted(::MongoExtensionByteView structuredErrorMessage) {
+        assertValid();
+        return vtable().user_asserted(structuredErrorMessage);
+    }
+    ::MongoExtensionStatus* tripwireAsserted(::MongoExtensionByteView structuredErrorMessage) {
+        assertValid();
+        return vtable().tripwire_asserted(structuredErrorMessage);
+    }
+
     static HostServicesHandle* getHostServices() {
         return &_hostServices;
     }
@@ -96,6 +105,11 @@ private:
         tassert(11097600,
                 "Host services' 'alwaysOK_TEMPORARY' is null",
                 vtable.alwaysOK_TEMPORARY != nullptr);
+        tassert(11097800,
+                "Host services' 'tripwire_asserted' is null",
+                vtable.tripwire_asserted != nullptr);
+        tassert(
+            11097801, "Host services' 'user_asserted' is null", vtable.user_asserted != nullptr);
     };
 };
 

@@ -29,17 +29,27 @@
 
 #include "mongo/db/extension/sdk/host_services.h"
 
+#include "mongo/db/extension/host_adapter/host_services_adapter.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
 
 namespace mongo::extension {
 namespace {
+
+class HostServicesTest : public unittest::Test {
+public:
+    void setUp() override {
+        sdk::HostServicesHandle::setHostServices(host_adapter::HostServicesAdapter::get());
+    }
+};
+
 /**
  * Tests that the ExtensionLog created by HostServicesHandle::createExtensionLogMessage can be
  * round-tripped through MongoExtensionByteView serialization and deserialization.
  */
-TEST(HostServicesTest, ExtensionLogIDLRoundTrip) {
+TEST_F(HostServicesTest, ExtensionLogIDLRoundTrip) {
     std::string logMessage = "Test log message";
     std::int32_t logCode = 12345;
     MongoExtensionLogSeverityEnum logSeverity = MongoExtensionLogSeverityEnum::kInfo;
@@ -59,7 +69,7 @@ TEST(HostServicesTest, ExtensionLogIDLRoundTrip) {
     ASSERT_EQUALS(log.getSeverity(), logSeverity);
 }
 
-TEST(HostServicesTest, ExtensionDebugLogIDLRoundTrip) {
+TEST_F(HostServicesTest, ExtensionDebugLogIDLRoundTrip) {
     std::string logMessage = "Test debug log message";
     std::int32_t logCode = 12345;
     std::int32_t logLevel = 1;
@@ -77,6 +87,30 @@ TEST(HostServicesTest, ExtensionDebugLogIDLRoundTrip) {
     ASSERT_EQUALS(debugLog.getMessage(), logMessage);
     ASSERT_EQUALS(debugLog.getCode(), logCode);
     ASSERT_EQUALS(debugLog.getLevel(), logLevel);
+}
+
+TEST_F(HostServicesTest, uasserted) {
+    auto errmsg = "an error";
+    int errorCode = 11111;
+    BSONObj errInfo = BSON("message" << errmsg << "errorCode" << errorCode);
+    ::MongoExtensionByteView errInfoByteView = objAsByteView(errInfo);
+
+    HostStatusHandle status(
+        sdk::HostServicesHandle::getHostServices()->userAsserted(errInfoByteView));
+
+    ASSERT_EQ(status.getCode(), errorCode);
+    // Reason is not populated on the status for re-throwable exceptions.
+    ASSERT_EQ(status.getReason(), "");
+}
+
+DEATH_TEST_REGEX_F(HostServicesTest, tasserted, "22222") {
+    auto errmsg = "fatal error";
+    int errorCode = 22222;
+    BSONObj errInfo = BSON("message" << errmsg << "errorCode" << errorCode);
+    ::MongoExtensionByteView errInfoByteView = objAsByteView(errInfo);
+
+    [[maybe_unused]] auto status =
+        sdk::HostServicesHandle::getHostServices()->tripwireAsserted(errInfoByteView);
 }
 }  // namespace
 }  // namespace mongo::extension

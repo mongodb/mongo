@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 mongo_cc_library(
     name = "extensions_api_public",
     srcs = [
+        ":extension_error_types_gen",
         ":extension_log_gen",
     ],
     hdrs = [],
@@ -24,6 +25,14 @@ mongo_cc_library(
 idl_generator(
     name = "extension_log_gen",
     src = "extension_log.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "extension_error_types_gen",
+    src = "extension_error_types.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],

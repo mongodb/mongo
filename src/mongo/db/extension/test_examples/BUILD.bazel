@@ -56,6 +56,7 @@ package(default_visibility = ["//visibility:public"])
     )
     for extension_name in [
         "logging",
+        "extension_errors",
     ]
 ]
 

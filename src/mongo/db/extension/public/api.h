@@ -422,6 +422,18 @@ typedef struct MongoExtensionHostServicesVTable {
      * the MongoExtensionLog struct in extension_log.idl.
      */
     MongoExtensionStatus* (*log)(MongoExtensionByteView rawLog);
+
+    /**
+     * Throws a non-fatal exception to end the current operation with an error. This should be
+     * called when the user made an error.
+     */
+    MongoExtensionStatus* (*user_asserted)(MongoExtensionByteView structuredErrorMessage);
+    /**
+     * Like userAssert, but with a deferred-fatality tripwire that gets checked prior to normal
+     * shutdown. Used to ensure that this assertion will both fail the operation and also cause a
+     * test suite failure.
+     */
+    MongoExtensionStatus* (*tripwire_asserted)(MongoExtensionByteView structuredErrorMessage);
 } MongoExtensionHostServicesVTable;
 
 /**

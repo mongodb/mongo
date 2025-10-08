@@ -90,6 +90,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:load_highest_compatible_version_mongo_extension",
         "//src/mongo/db/extension/test_examples:test_options_mongo_extension",
         "//src/mongo/db/extension/test_examples:parse_options_mongo_extension",
+        "//src/mongo/db/extension/test_examples:extension_errors_mongo_extension",
     ],
     tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({
