@@ -45,7 +45,6 @@ selector:
     - jstests/sharding/retryable_upsert_single_write_shard.js
     # TODO SERVER-105303 handle interruption/shutown
     # - jstests/sharding/retryable_write_error_labels.js
-    - jstests/sharding/query/find_and_modify/*.js
 
     # No passthrough tests.
     - jstests/noPassthrough/timeseries/**/*.js

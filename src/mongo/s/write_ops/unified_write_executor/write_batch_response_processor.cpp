@@ -52,35 +52,18 @@ static ErrorCodes::Error getStatusCode(const BulkWriteReplyItem& item) {
 }
 
 namespace {
-void handleTransientTxnError(OperationContext* opCtx,
-                             const Status& status,
-                             BSONObj response = BSONObj(),
-                             boost::optional<HostAndPort> target = boost::none) {
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-    if (!inTransaction) {
-        return;
-    }
+bool isTransientTxnError(const Status& status, bool inTransaction) {
+    return (!status.isOK() && inTransaction &&
+            isTransientTransactionError(
+                status.code(), false /*hasWriteConcernError*/, false /*isCommitOrAbort*/));
+}
 
-    if (status.isOK()) {
-        return;
-    }
-
-    bool isTransientTxnError = isTransientTransactionError(
-        status.code(), false /*hasWriteConcernError*/, false /*isCommitOrAbort*/);
-    if (!response.isEmpty()) {
-        isTransientTxnError |= hasTransientTransactionErrorLabel(
-            ErrorReply::parse(response, IDLParserContext("ErrorReply")));
-    }
-
-    // If the write command is running in a transaction and there was a transient transaction
-    // error, uassert so that the error is returned directly as a top level error, to allow the
-    // client to retry.
-    if (isTransientTxnError) {
-        uassertStatusOK(status.withContext(str::stream()
-                                           << "Encountered error from "
-                                           << (target ? target->toString() : "<unknown>")
-                                           << " during a transaction"));
-    }
+bool isTransientTxnError(const Status& status,
+                         bool inTransaction,
+                         const executor::RemoteCommandResponse& response) {
+    return (!status.isOK() && inTransaction &&
+            hasTransientTransactionErrorLabel(
+                ErrorReply::parse(response.data, IDLParserContext("ErrorReply"))));
 }
 }  // namespace
 
@@ -142,7 +125,12 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
         // Process the local or top-level error for the batch.
         processErrorForBatch(opCtx, std::vector{op}, swRes.getStatus(), boost::none);
 
-        handleTransientTxnError(opCtx, swRes.getStatus());
+        // If the write command is running in a transaction and there was a transient transaction
+        // error, uassert so that the error is returned directly as a top level error, to allow the
+        // client to retry.
+        if (isTransientTxnError(swRes.getStatus(), inTransaction)) {
+            uassertStatusOK(swRes.getStatus());
+        }
 
         if (inTransaction) {
             LOGV2_DEBUG(10413100,
@@ -154,34 +142,7 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
         return Result{};
     }
 
-    // Handle findAndModify command.
-    if (_cmdRef.isFindAndModifyCommand()) {
-        return processFindAndModifyReply(opCtx, routingCtx, swRes.getValue());
-    }
-
-    const auto& parsedReply = [&]() {
-        // If 'swRes' is OK but the response is empty, that means the two-phase write completed
-        // successfully without updating or deleting anything (because nothing matched the filter).
-        //
-        // In this case, we create a BulkWriteCommandReply containing a single reply item with an OK
-        // status and with n=0 (and with nModified=0 if 'op' is an update).
-        if (swRes.getValue().isEmpty()) {
-            BulkWriteReplyItem replyItem(0, swRes.getStatus());
-            replyItem.setN(0);
-            if (op.getType() == WriteType::kUpdate) {
-                replyItem.setNModified(0);
-            }
-
-            auto cursor = BulkWriteCommandResponseCursor(
-                0 /*cursorId*/,
-                std::vector<BulkWriteReplyItem>{std::move(replyItem)},
-                NamespaceString::makeBulkWriteNSS(boost::none));
-            return BulkWriteCommandReply(std::move(cursor), 0, 0, 0, 0, 0, 0);
-        }
-
-        return BulkWriteCommandReply::parse(
-            swRes.getValue(), IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
-    }();
+    const BulkWriteCommandReply& parsedReply = swRes.getValue();
 
     // Process write concern error (if any).
     if (response.wce) {
@@ -217,7 +178,7 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
             replyItem.getStatus().isOK());
 
     // Process the reply item.
-    processReplyItem(opCtx, op, std::move(replyItem), boost::none);
+    processReplyItem(op, std::move(replyItem), boost::none);
 
     // Batch types that produce NoRetryWriteBatchResponse are executed using a mechanism that deals
     // with stale errors and retrying internally, so 'opsToRetry' will always be empty.
@@ -259,6 +220,7 @@ Result WriteBatchResponseProcessor::handleRetryableError(OperationContext* opCtx
 }
 
 void WriteBatchResponseProcessor::removeFailedOpsFromOpsToRetry(Result& result) {
+
     // Remove ops with non-retryable errors from the retry list. Ops with non-retryable errors are
     // considered complete.
     for (auto& [opId, opResult] : _results) {
@@ -294,7 +256,12 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         // Process the local error for the batch.
         processErrorForBatch(opCtx, ops, status, shardId);
 
-        handleTransientTxnError(opCtx, status);
+        // If the write command is running in a transaction and there was a transient transaction
+        // error, uassert so that the error is returned directly as a top level error, to allow the
+        // client to retry.
+        if (isTransientTxnError(status, inTransaction)) {
+            uassertStatusOK(status);
+        }
 
         if (inTransaction) {
             LOGV2_DEBUG(10896502,
@@ -314,11 +281,6 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
                 "Processing cluster write shard response",
                 "response"_attr = shardResponse.data,
                 "host"_attr = shardResponse.target);
-
-    // Handle findAndModify command.
-    if (_cmdRef.isFindAndModifyCommand()) {
-        return processFindAndModifyReply(opCtx, routingCtx, shardResponse.data, shardId);
-    }
 
     // Handle any top level errors.
     auto shardResponseStatus = getStatusFromCommandResult(shardResponse.data);
@@ -340,7 +302,14 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         // Process the top-level error for the batch.
         processErrorForBatch(opCtx, ops, status, shardId);
 
-        handleTransientTxnError(opCtx, status, shardResponse.data, shardResponse.target);
+        // If the write command is running in a transaction and there was a transient transaction
+        // error, uassert so that the error is returned directly as a top level error, to allow the
+        // client to retry.
+        if (isTransientTxnError(status, inTransaction, shardResponse)) {
+            uassertStatusOK(status.withContext(str::stream()
+                                               << "Encountered error from " << shardResponse.target
+                                               << " during a transaction"));
+        }
 
         if (inTransaction) {
             LOGV2_DEBUG(10413101,
@@ -379,7 +348,7 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         }
     }
 
-    auto replyItems = exhaustCursorForReplyItems(opCtx, shardId, parsedReply);
+    const auto replyItems = exhaustCursorForReplyItems(opCtx, shardId, parsedReply);
 
     auto result = processOpsInReplyItems(opCtx, routingCtx, shardId, ops, replyItems);
 
@@ -391,44 +360,6 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
     return result;
 }
 
-Result WriteBatchResponseProcessor::processFindAndModifyReply(OperationContext* opCtx,
-                                                              RoutingContext& routingCtx,
-                                                              BSONObj replyObj,
-                                                              boost::optional<ShardId> shardId) {
-    Result result{};
-    const WriteOpId opId = 0;
-    auto status = getStatusFromCommandResult(replyObj);
-    if (status.isOK()) {
-        replyObj = CommandHelpers::filterCommandReplyForPassthrough(replyObj);
-        auto reply = write_ops::FindAndModifyCommandReply::parse(
-            replyObj, IDLParserContext("FindAndModifyCommandReply_UnifiedWriteExec"));
-
-        tassert(10394904, "Expected no previous findAndModify result", _results.empty());
-        _results.emplace(opId,
-                         WriteOpResults{
-                             reply, false /* hasNonRetryableError */
-                         });
-        _numOkResponses++;
-
-        if (shardId) {
-            result.successfulShardSet[opId].insert(*shardId);
-        }
-    } else {
-        handleTransientTxnError(opCtx, status, replyObj);
-
-        if (write_op_helpers::isRetryErrCode(status.code())) {
-            return handleRetryableError(opCtx, routingCtx, _cmdRef.getOp(opId), status);
-        }
-
-        tassert(10394905, "Expected no previous findAndModify result", _results.empty());
-        _results.emplace(opId,
-                         WriteOpResults{
-                             status, true /* hasNonRetryableError */
-                         });
-        _nErrors++;
-    }
-    return result;
-}
 
 void WriteBatchResponseProcessor::addReplyToResults(WriteOpId opId,
                                                     BulkWriteReplyItem reply,
@@ -470,13 +401,13 @@ void WriteBatchResponseProcessor::addReplyToResults(WriteOpId opId,
         repliesMap[*shardId] = reply;
         repliesMap[*shardId].setIdx(opId);
     }
+    return;
 }
 
-void WriteBatchResponseProcessor::processReplyItem(OperationContext* opCtx,
-                                                   const WriteOp& op,
+void WriteBatchResponseProcessor::processReplyItem(const WriteOp& op,
                                                    BulkWriteReplyItem item,
                                                    boost::optional<ShardId> shardId) {
-    const auto& status = item.getStatus();
+    const bool isOK = item.getStatus().isOK();
 
     // Set the "idx" field to the ID of 'op'.
     item.setIdx(op.getId());
@@ -486,27 +417,20 @@ void WriteBatchResponseProcessor::processReplyItem(OperationContext* opCtx,
         item.setNModified(0);
     }
 
-    // Attempts to populate the actualCollection field of a CollectionUUIDMismatch>
-    // if not already present before saving the result.
-    if (status.code() == ErrorCodes::CollectionUUIDMismatch) {
-        item.setStatus(populateCollectionUUIDMismatch(opCtx, status));
-    }
-
     addReplyToResults(op.getId(), item, shardId);
 
-    if (status.isOK()) {
+    if (isOK) {
         _numOkResponses++;
     } else if (!write_op_helpers::isRetryErrCode(item.getStatus().code())) {
         _nErrors++;
     }
 }
 
-void WriteBatchResponseProcessor::processError(OperationContext* opCtx,
-                                               const WriteOp& op,
+void WriteBatchResponseProcessor::processError(const WriteOp& op,
                                                const Status& status,
                                                boost::optional<ShardId> shardId) {
     tassert(10896503, "Unexpectedly got an OK status", !status.isOK());
-    processReplyItem(opCtx, op, BulkWriteReplyItem(0, status), shardId);
+    processReplyItem(op, BulkWriteReplyItem(0, status), shardId);
 }
 
 void WriteBatchResponseProcessor::processErrorForBatch(OperationContext* opCtx,
@@ -518,13 +442,13 @@ void WriteBatchResponseProcessor::processErrorForBatch(OperationContext* opCtx,
         // recorded yet, then record an error for the op with the lowest ID only.
         if (_nErrors == 0 && !ops.empty()) {
             const auto& firstOp = *std::min_element(ops.begin(), ops.end());
-            processError(opCtx, firstOp, status, shardId);
+            processError(firstOp, status, shardId);
         }
     } else {
         // If the write command is unordered and not in a transaction, record an error for each
         // op in 'ops'.
         for (const auto& op : ops) {
-            processError(opCtx, op, status, shardId);
+            processError(op, status, shardId);
         }
     }
 }
@@ -606,8 +530,7 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     Result result;
 
-    // Create a copy of the reply item so modify the
-    for (auto item : replyItems) {
+    for (const auto& item : replyItems) {
         // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes. if in transaction, return
         // an insert+delete to retry. if not in a transaction, return update to retry in
         // transaction.
@@ -630,7 +553,13 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
             continue;
         }
 
-        processReplyItem(opCtx, op, item, shardId);
+        processReplyItem(op, item, shardId);
+
+        // Attempts to populate the actualCollection field of a CollectionUUIDMismatch>
+        // if not already present.
+        if (status.code() == ErrorCodes::CollectionUUIDMismatch) {
+            status = populateCollectionUUIDMismatch(opCtx, status);
+        }
 
         // If an error occurred and we are in a transaction, we stop processing and return the
         // first error.
@@ -677,11 +606,17 @@ std::vector<WriteOp> WriteBatchResponseProcessor::processOpsNotInReplyItems(
 void WriteBatchResponseProcessor::recordTargetError(OperationContext* opCtx,
                                                     const WriteOp& op,
                                                     const Status& status) {
-    handleTransientTxnError(opCtx, status);
-
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     if (_nErrors == 0 || (!_cmdRef.getOrdered() && !inTransaction)) {
-        processError(opCtx, op, status, boost::none);
+        processError(op, status, boost::none);
+    }
+
+    // If the write command is running in a transaction and there was a transient transaction
+    // error, uassert so that the error is returned directly as a top level error, to allow the
+    // client to retry.
+    if (isTransientTxnError(status, inTransaction)) {
+        uassertStatusOK(status);
     }
 }
 
@@ -696,14 +631,16 @@ void WriteBatchResponseProcessor::recordErrorForRemainingOps(OperationContext* o
         }
 
         WriteOp op{WriteOpRef{_cmdRef, static_cast<int>(i)}};
-        processError(opCtx, op, status, boost::none);
+        processError(op, status, boost::none);
     }
 }
 
 std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRepliesForOps() {
+
     std::map<WriteOpId, BulkWriteReplyItem> aggregatedReplies;
 
     for (auto& [opId, opResult] : _results) {
+
         // If we have a single BulkWriteReplyItem with no attached shardId then there is no work to
         // do.
         if (std::holds_alternative<BulkWriteReplyItem>(opResult.replies)) {
@@ -772,9 +709,6 @@ WriteCommandResponse WriteBatchResponseProcessor::generateClientResponse(Operati
         },
         [&](const BulkWriteCommandRequest&) {
             return WriteCommandResponse{generateClientResponseForBulkWriteCommand(opCtx)};
-        },
-        [&](const write_ops::FindAndModifyCommandRequest&) {
-            return WriteCommandResponse{generateClientResponseForFindAndModifyCommand()};
         }});
 }
 
@@ -873,17 +807,6 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
     }
 
     return resp;
-}
-
-StatusWith<write_ops::FindAndModifyCommandReply>
-WriteBatchResponseProcessor::generateClientResponseForFindAndModifyCommand() {
-    tassert(10394906,
-            "Expected a populated findAndModify reply",
-            _results.size() == 1 &&
-                std::holds_alternative<StatusWith<write_ops::FindAndModifyCommandReply>>(
-                    _results.begin()->second.replies));
-    return std::get<StatusWith<write_ops::FindAndModifyCommandReply>>(
-        _results.begin()->second.replies);
 }
 
 }  // namespace mongo::unified_write_executor

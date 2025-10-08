@@ -92,7 +92,6 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -783,33 +782,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     const NamespaceString originalNss(
         CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj));
 
+    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
+        return true;
+    }
+
     if (OptionalBool::parseFromBSON(originalCmdObj[kRawDataFieldName]) ||
         originalNss.isTimeseriesBucketsCollection()) {
         isRawDataOperation(opCtx) = true;
-    }
-
-    // Collect metrics.
-    _updateMetrics->collectMetrics(originalCmdObj);
-
-    if (unified_write_executor::isEnabled(opCtx)) {
-        auto request = write_ops::FindAndModifyCommandRequest::parse(
-            originalCmdObj, IDLParserContext("ClusterFindAndModify"));
-        request.setNamespace(originalNss);
-
-        auto swReply = unified_write_executor::findAndModify(opCtx, request);
-        if (!swReply.isOK()) {
-            // Throw if a non-OK status is not because of any of the above errors.
-            uassertStatusOK(swReply.getStatus());
-        }
-
-        const auto& reply = swReply.getValue();
-        reply.serialize(&result);
-
-        return true;
-    }
-
-    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
-        return true;
     }
 
     auto findAndModifyBody = [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
@@ -843,6 +822,9 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         }
         // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
         // writing to a sharded timeseries collection.
+
+        // Collect metrics.
+        _updateMetrics->collectMetrics(cmdObj);
 
         // Create an RAII object that prints the collection's shard key in the case of a tassert
         // or crash.

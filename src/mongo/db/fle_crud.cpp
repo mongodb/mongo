@@ -1656,8 +1656,13 @@ write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
 }
 
 FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                       const write_ops::FindAndModifyCommandRequest& request,
-                                       write_ops::FindAndModifyCommandReply& reply) {
+                                       const BSONObj& cmdObj,
+                                       BSONObjBuilder& result) {
+    // There is no findAndModify parsing in mongos so we need to first parse to decide if it is for
+    // FLE2
+    auto request =
+        write_ops::FindAndModifyCommandRequest::parse(cmdObj, IDLParserContext("findAndModify"));
+
     if (!request.getEncryptionInformation().has_value()) {
         return FLEBatchResult::kNotProcessed;
     }
@@ -1676,38 +1681,20 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 
     // This callback ensures that any write concern errors are set in the reply in the event
     // that processFindAndModifyRequest returned a non-OK status, which is then thrown.
-    BSONObj wceObj;
-    auto onErrorWithWCE = [&wceObj](const WriteConcernErrorDetail& wce) {
-        wceObj = wce.toBSON();
+    auto onErrorWithWCE = [&result](const WriteConcernErrorDetail& wce) {
+        if (!result.hasField("writeConcernError")) {
+            result.append("writeConcernError", wce.toBSON());
+        }
     };
 
     auto swReply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
         opCtx, request, &getTransactionWithRetriesForMongoS, processFindAndModify, onErrorWithWCE);
 
-    reply = uassertStatusOK(swReply).first;
-    if (!wceObj.isEmpty()) {
-        reply.setWriteConcernError(wceObj);
-    }
+    auto reply = uassertStatusOK(swReply).first;
+
+    reply.serialize(&result);
 
     return FLEBatchResult::kProcessed;
-}
-
-FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                       const BSONObj& cmdObj,
-                                       BSONObjBuilder& result) {
-    // There is no findAndModify parsing in mongos so we need to first parse to decide if it is for
-    // FLE2
-    auto request =
-        write_ops::FindAndModifyCommandRequest::parse(cmdObj, IDLParserContext("findAndModify"));
-
-    write_ops::FindAndModifyCommandReply reply;
-    auto isProcessed = processFLEFindAndModify(opCtx, request, reply);
-
-    if (isProcessed == FLEBatchResult::kProcessed) {
-        reply.serialize(&result);
-    }
-
-    return isProcessed;
 }
 
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>

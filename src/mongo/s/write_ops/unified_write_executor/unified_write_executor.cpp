@@ -46,10 +46,9 @@ namespace unified_write_executor {
 namespace {
 bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
     // When determining if a write command is non-verbose, we follow slightly different rules
-    // for different write commands. For batch write commands, we match the existing behavior
-    // of BatchWriteOp::buildClientResponse(). For bulk write commands, we match the existing
-    // behavior of ClusterBulkWriteCmd::Invocation::_populateCursorReply(). For findAndModify
-    // commands, it is always "verbose" regardless of the write concern settings.
+    // for batch write commands vs. bulk write commands. For batch write commands, we match the
+    // existing behavior of BatchWriteOp::buildClientResponse(). For bulk write commands, we
+    // match the existing behavior of ClusterBulkWriteCmd::Invocation::_populateCursorReply().
     const auto& wc = opCtx->getWriteConcern();
     return cmdRef.visitRequest(OverloadedVisitor{
         [&](const BatchedCommandRequest&) { return !wc.requiresWriteAcknowledgement(); },
@@ -57,9 +56,7 @@ bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
             return !wc.requiresWriteAcknowledgement() &&
                 (wc.syncMode == WriteConcernOptions::SyncMode::NONE ||
                  wc.syncMode == WriteConcernOptions::SyncMode::UNSET);
-        },
-        [&](const write_ops::FindAndModifyCommandRequest&) { return false; },
-    });
+        }});
 }
 }  // namespace
 
@@ -121,22 +118,6 @@ BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
 
     return std::get<BulkWriteCommandReply>(
         executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
-}
-
-StatusWith<write_ops::FindAndModifyCommandReply> findAndModify(
-    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& request) {
-    if (request.getEncryptionInformation()) {
-        write_ops::FindAndModifyCommandReply reply;
-        FLEBatchResult result = processFLEFindAndModify(opCtx, request, reply);
-        if (result == FLEBatchResult::kProcessed) {
-            return reply;
-        }
-        // When FLE logic determines there is no need of processing, we fall through to the normal
-        // case.
-    }
-
-    return std::get<StatusWith<write_ops::FindAndModifyCommandReply>>(
-        executeWriteCommand(opCtx, WriteCommandRef{request}));
 }
 
 bool isEnabled(OperationContext* opCtx) {

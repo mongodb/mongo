@@ -58,7 +58,7 @@ public:
      * Method to record targeting stats.
      */
     void recordTargetingStats(const std::vector<ShardEndpoint>& targetedShardEndpoints,
-                              WriteOpId opId,
+                              size_t nsIdx,
                               bool isNsSharded,
                               int numShardsOwningChunks,
                               WriteType writeType);
