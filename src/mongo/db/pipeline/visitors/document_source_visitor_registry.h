@@ -92,6 +92,8 @@ struct DocumentSourceVisitorRegistryKey {
 
 using ConstVisitFunc = void (*)(DocumentSourceVisitorContextBase*, const DocumentSource&);
 
+inline void noop(DocumentSourceVisitorContextBase*, const DocumentSource&) {}
+
 /**
  * A structure representing a virtual function table capable of resolving function calls based on
  * the runtime types of DocumentSourceVisitorContextBase and DocumentSource (typically solved by
@@ -121,12 +123,16 @@ public:
      * Resolve a function based on the runtime types of the given a visitor context and document
      * source. Throws on missing entry.
      */
+    template <bool AllowMissing = false>
     ConstVisitFunc getConstVisitorFunc(DocumentSourceVisitorContextBase& visitorCtx,
                                        const DocumentSource& ds) const {
         DocumentSourceVisitorRegistryKey key{std::type_index(typeid(visitorCtx)),
                                              std::type_index(typeid(ds))};
         if (auto it = _constVisitorRegistry.find(key); it != _constVisitorRegistry.end()) {
             return it->second;
+        }
+        if constexpr (AllowMissing) {
+            return noop;
         }
         tasserted(6202701,
                   fmt::format("missing entry in const visitor registry: ({}, {})",
