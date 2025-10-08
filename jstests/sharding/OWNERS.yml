@@ -100,12 +100,30 @@ filters:
   - "direct_shard_connection_ddls_on_replicaset.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "transition_to_dedicated_config_server.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "direct_shard_connection_ddls_during_promotion_to_*.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
   - "incompatible_shard_key_indexes.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "all_commands_direct_shard_connection_auth.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "database_versioning_all_commands.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "read_write_concern_defaults_application.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "safe_secondary_reads_drop_recreate.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "safe_secondary_reads_single_migration_waitForDelete.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "sharding_ready.js":
     approvers:
       - 10gen/server-cluster-scalability

@@ -103,6 +103,14 @@ public:
             const auto shard = uassertStatusOK(swShard);
             shardId.emplace(shard->getId());
 
+            bool isTransitionToDedicatedCS =
+                request().getIsTransitionToDedicatedCS().value_or(false);
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot stop the transition to dedicated config server using stopShardDraining "
+                    "when transitioning to a dedicated config server. Please, use "
+                    "stopTransitionToDedicatedConfigServer.",
+                    isTransitionToDedicatedCS || *shardId != ShardId::kConfigServerId);
+
             topology_change_helpers::stopShardDraining(opCtx, *shardId);
         }
 

@@ -102,6 +102,15 @@ public:
                     fmt::format("The shard {} isn't draining", shardId->toString()),
                     isShardDraining);
 
+            bool isTransitionToDedicatedCS =
+                request().getIsTransitionToDedicatedCS().value_or(false);
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot get the draining status for the config server using "
+                    "shardDrainingStatus when "
+                    "transitioning to a dedicated config server. Please, use "
+                    "getTransitionToDedicatedConfigServerStatus.",
+                    (isTransitionToDedicatedCS || *shardId != ShardId::kConfigServerId));
+
             const auto shardDrainingState =
                 shardingCatalogManager->checkDrainingProgress(opCtx, *shardId);
 

@@ -51,3 +51,35 @@ commands:
         namespace: ignored
         api_version: ""
         reply_type: RemoveShardResponse
+
+    startTransitionToDedicatedConfigServer:
+        command_name: startTransitionToDedicatedConfigServer
+        description: "The public startTransitionToDedicatedConfigServer command on mongos"
+        cpp_name: StartTransitionToDedicatedConfigServer
+        strict: false
+        namespace: ignored
+        api_version: ""
+
+    getTransitionToDedicatedConfigServerStatus:
+        command_name: getTransitionToDedicatedConfigServerStatus
+        description: "The public getTransitionToDedicatedConfigServerStatus command on mongos"
+        cpp_name: GetTransitionToDedicatedConfigServerStatus
+        strict: false
+        namespace: ignored
+        api_version: ""
+
+    commitTransitionToDedicatedConfigServer:
+        command_name: commitTransitionToDedicatedConfigServer
+        description: "The public commitTransitionToDedicatedConfigServer command on mongos"
+        cpp_name: CommitTransitionToDedicatedConfigServer
+        strict: false
+        namespace: ignored
+        api_version: ""
+
+    stopTransitionToDedicatedConfigServer:
+        command_name: stopTransitionToDedicatedConfigServer
+        description: "The public stopTransitionToDedicatedConfigServer command on mongos"
+        cpp_name: StopTransitionToDedicatedConfigServer
+        strict: false
+        namespace: ignored
+        api_version: ""

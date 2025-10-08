@@ -519,6 +519,11 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    commitTransitionToDedicatedConfigServer: {
+        // We cannot test commitTransitionToDedicatedConfigServer because the fixture is not a
+        // sharded cluster with embedded config server.
+        skip: "requires a sharded cluster with embedded config server",
+    },
     compact: {
         setUp: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
@@ -852,6 +857,11 @@ const allCommands = {
         isAdminCommand: true,
     },
     getTrafficRecordingStatus: {skip: isAnInternalCommand},
+    getTransitionToDedicatedConfigServerStatus: {
+        // We cannot test getTransitionToDedicatedConfigServerStatus because the fixture is not a sharded
+        // cluster with embedded config server.
+        skip: "requires a sharded cluster with embedded config server",
+    },
     godinsert: {
         setUp: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
@@ -1502,11 +1512,21 @@ const allCommands = {
         },
     },
     shardDrainingStatus: {
-        // We cannot test shardDrainingStatus because we need to be able to run addShard during set
-        // up.
-        // This will be tested in FCV upgrade/downgrade passthroughs in the sharding
-        // directory.
-        skip: "cannot add shard while in downgrading FCV state",
+        fullScenario: function (conn, fixture) {
+            // Add unsharded collection and start draining
+            assert.commandWorked(conn.adminCommand({enableSharding: "testDB", primaryShard: fixture.shard1.shardName}));
+            assert.commandWorked(conn.getDB("testDB").CollUnsharded.insert({_id: 1}));
+            assert.commandWorked(conn.adminCommand({startShardDraining: fixture.shard1.shardName}));
+            // Check draining status is ongoing
+            const drainingStatus = conn.adminCommand({shardDrainingStatus: fixture.shard1.shardName});
+            assert.commandWorked(drainingStatus);
+            assert.eq("ongoing", drainingStatus.state);
+            // Stop draining
+            assert.commandWorked(conn.adminCommand({stopShardDraining: fixture.shard1.shardName}));
+            // Drop testDB to leave the status clean
+            assert.commandWorked(conn.getDB("testDB").dropDatabase());
+        },
+        isShardedOnly: true,
     },
     shardingState: {
         isAdminCommand: true,
@@ -1539,15 +1559,25 @@ const allCommands = {
         skip: "Renamed to stopTrafficRecording",
     },
     startShardDraining: {
-        // We cannot test startShardDraining because we need to be able to run addShard during set
-        // up.
-        // This will be tested in FCV upgrade/downgrade passthroughs in the sharding
-        // directory.
-        skip: "cannot add shard while in downgrading FCV state",
+        fullScenario: function (conn, fixture) {
+            assert.commandWorked(conn.adminCommand({startShardDraining: fixture.shard1.shardName}));
+            // Check that draining has started successfully
+            const drainingShards = conn.getDB("config").shards.find({"draining": true}).toArray();
+            assert.eq(1, drainingShards.length);
+            assert.eq(fixture.shard1.shardName, drainingShards[0]._id);
+            assert.commandWorked(conn.adminCommand({stopShardDraining: fixture.shard1.shardName}));
+        },
+        isShardedOnly: true,
     },
     startTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
+    },
+    startTransitionToDedicatedConfigServer: {
+        // We cannot test startTransitionToDedicatedConfigServer because the fixture is not a
+        // sharded
+        // cluster with embedded config server.
+        skip: "requires a sharded cluster with embedded config server",
     },
     startSession: {
         fullScenario: function (conn, fixture) {
@@ -1557,15 +1587,20 @@ const allCommands = {
         },
     },
     stopShardDraining: {
-        // We cannot test stopShardDraining because we need to be able to run addShard during set
-        // up.
-        // This will be tested in FCV upgrade/downgrade passthroughs in the sharding
-        // directory.
-        skip: "cannot add shard while in downgrading FCV state",
+        fullScenario: function (conn, fixture) {
+            assert.commandWorked(conn.adminCommand({startShardDraining: fixture.shard1.shardName}));
+            assert.commandWorked(conn.adminCommand({stopShardDraining: fixture.shard1.shardName}));
+        },
+        isShardedOnly: true,
     },
     stopTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
+    },
+    stopTransitionToDedicatedConfigServer: {
+        // We cannot test stopTransitionToDedicatedConfigServer because the fixture is not a sharded
+        // cluster with embedded config server.
+        skip: "requires a sharded cluster with embedded config server",
     },
     sysprofile: {skip: isAnInternalCommand},
     testCommandFeatureFlaggedOnLatestFCV83: {skip: isAnInternalCommand},

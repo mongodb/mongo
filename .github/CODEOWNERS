@@ -1525,8 +1525,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/validate_collection*.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /jstests/sharding/**/add_and_remove_shard_serializes_with_ddl.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/direct_shard_connection_ddls_on_replicaset.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+/jstests/sharding/**/transition_to_dedicated_config_server.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/direct_shard_connection_ddls_during_promotion_to_*.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/incompatible_shard_key_indexes.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/jstests/sharding/**/all_commands_direct_shard_connection_auth.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/database_versioning_all_commands.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/read_write_concern_defaults_application.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/safe_secondary_reads_drop_recreate.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/safe_secondary_reads_single_migration_waitForDelete.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/sharding_ready.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
@@ -1552,6 +1558,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/libs/**/mongos_api_params_util.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/sharding/libs/**/create_sharded_collection_util.js @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/sharding/libs/**/remove_shard_util.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+/jstests/sharding/libs/**/last_lts_mongos_commands.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/load_balancer_support/OWNERS.yml
 /jstests/sharding/load_balancer_support/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot

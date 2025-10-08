@@ -899,6 +899,17 @@ RemoveShardProgress ShardingCatalogManager::checkDrainingProgress(OperationConte
         progress.setRemaining(drainingProgress.removeShardCounts);
         return progress;
     }
+
+    if (shardId == ShardId::kConfigServerId) {
+        // Wait for range deletions to complete
+        auto pendingRangeDeletions = topology_change_helpers::getRangeDeletionCount(opCtx);
+        if (pendingRangeDeletions > 0) {
+            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+            progress.setPendingRangeDeletions(pendingRangeDeletions);
+            return progress;
+        }
+    }
+
     RemoveShardProgress progress(ShardDrainingStateEnum::kDrainingComplete);
     return progress;
 }

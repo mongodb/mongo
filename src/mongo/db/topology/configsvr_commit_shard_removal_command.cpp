@@ -45,6 +45,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/remove_shard_command_helpers.h"
 #include "mongo/db/topology/remove_shard_gen.h"
@@ -126,20 +127,31 @@ public:
             const auto shard = uassertStatusOK(swShard);
             shardId.emplace(shard->getId());
 
+            bool isTransitionToDedicatedCS =
+                request().getIsTransitionToDedicatedCS().value_or(false);
             uassert(ErrorCodes::IllegalOperation,
-                    "Cannot remove the config server as a shard using commitShardRemoval. To "
-                    "transition the config shard to a dedicated config server use the "
-                    "transitionToDedicatedConfigServer command.",
-                    *shardId != ShardId::kConfigServerId);
+                    "Cannot remove the config server as a shard using commitShardRemoval when "
+                    "transitioning to a dedicated config server. Please, use "
+                    "commitTransitionToDedicatedConfigServer to complete the transition to "
+                    "dedicated config server.",
+                    (isTransitionToDedicatedCS || *shardId != ShardId::kConfigServerId));
 
             const auto removeShardResult = topology_change_helpers::runCoordinatorRemoveShard(
                 opCtx, ddlLock, fixedFCV, *shardId);
 
             uassert(ErrorCodes::IllegalOperation,
-                    fmt::format("The shard {} isn't completely drained. Please use the "
-                                "shardDrainingStatus command to check the draining status",
-                                shardId->toString()),
+                    fmt::format("The shard {} isn't completely drained. Please use the {} command "
+                                "to check the draining status.",
+                                shardId->toString(),
+                                isTransitionToDedicatedCS
+                                    ? "getTransitionToDedicatedConfigServerStatus"
+                                    : "shardDrainingStatus"),
                     removeShardResult.getState() == ShardDrainingStateEnum::kCompleted);
+
+            if (isTransitionToDedicatedCS) {
+                ShardingStatistics::get(opCtx)
+                    .countTransitionToDedicatedConfigServerCompleted.addAndFetch(1);
+            }
         }
 
     private:

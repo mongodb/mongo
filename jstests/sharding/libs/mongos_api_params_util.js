@@ -171,6 +171,7 @@ export let MongosAPIParametersUtil = (function () {
             },
         },
         {commandName: "commitShardRemoval", skip: "TODO(SERVER-108802)"},
+        {commandName: "commitTransitionToDedicatedConfigServer", skip: "TODO(SERVER-108802)"},
         {commandName: "getAuditConfig", skip: "TODO(SERVER-108802)", conditional: true},
         {
             commandName: "releaseMemory",
@@ -197,7 +198,9 @@ export let MongosAPIParametersUtil = (function () {
         {commandName: "replicateSearchIndexCommand", skip: "TODO(SERVER-108802)"},
         {commandName: "shardDrainingStatus", skip: "TODO(SERVER-108802)"},
         {commandName: "startShardDraining", skip: "TODO(SERVER-108802)"},
+        {commandName: "startTransitionToDedicatedConfigServer", skip: "TODO(SERVER-108802)"},
         {commandName: "stopShardDraining", skip: "TODO(SERVER-108802)"},
+        {commandName: "stopTransitionToDedicatedConfigServer", skip: "TODO(SERVER-108802)"},
         {commandName: "untrackUnshardedCollection", skip: "TODO(SERVER-108802)"},
         {
             commandName: "changePrimary",
@@ -275,6 +278,7 @@ export let MongosAPIParametersUtil = (function () {
             commandName: "getDatabaseVersion",
             skip: "executes locally on mongos (not sent to any remote node)",
         },
+        {commandName: "getTransitionToDedicatedConfigServerStatus", skip: "TODO(SERVER-108802)"},
         {
             commandName: "getQueryableEncryptionCountInfo",
             run: {

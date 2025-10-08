@@ -122,6 +122,10 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+        fields:
+            isTransitionToDedicatedCS:
+                type: optionalBool
+
     shardDrainingStatus:
         command_name: shardDrainingStatus
         description: "The public shardDrainingStatus command on mongos"
@@ -143,6 +147,9 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+        fields:
+            isTransitionToDedicatedCS:
+                type: optionalBool
 
     stopShardDraining:
         command_name: stopShardDraining
@@ -165,6 +172,9 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+        fields:
+            isTransitionToDedicatedCS:
+                type: optionalBool
 
     commitShardRemoval:
         command_name: commitShardRemoval
@@ -187,3 +197,6 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+        fields:
+            isTransitionToDedicatedCS:
+                type: optionalBool

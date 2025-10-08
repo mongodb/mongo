@@ -43,6 +43,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/remove_shard_command_helpers.h"
 #include "mongo/db/topology/remove_shard_gen.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -104,14 +105,23 @@ public:
             auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, requestShardId);
             const auto shard = uassertStatusOK(swShard);
             shardId.emplace(shard->getId());
+            bool isTransitionToDedicatedCS =
+                request().getIsTransitionToDedicatedCS().value_or(false);
+            uassert(
+                ErrorCodes::IllegalOperation,
+                "Cannot start the transition to dedicated config server using "
+                "startShardDraining when transitioning to a dedicated config server. Please, use "
+                "startTransitionToDedicatedConfigServer.",
+                (isTransitionToDedicatedCS || *shardId != ShardId::kConfigServerId));
 
-            uassert(ErrorCodes::IllegalOperation,
-                    "Cannot drain the config server as a shard using startShardDraining. To "
-                    "transition the config shard to a dedicated config server use the "
-                    "transitionToDedicatedConfigServer command.",
-                    *shardId != ShardId::kConfigServerId);
+            const auto& progress =
+                topology_change_helpers::startShardDraining(opCtx, *shardId, ddlLock);
 
-            topology_change_helpers::startShardDraining(opCtx, *shardId, ddlLock);
+            if (isTransitionToDedicatedCS &&
+                progress->getState() == ShardDrainingStateEnum::kStarted) {
+                ShardingStatistics::get(opCtx)
+                    .countTransitionToDedicatedConfigServerStarted.addAndFetch(1);
+            }
         }
 
     private:

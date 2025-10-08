@@ -361,6 +361,7 @@ let testCases = {
         checkWriteConcern: true,
         useLogs: true,
     },
+    commitTransitionToDedicatedConfigServer: {skip: "does not accept read or write concern"},
     compact: {skip: "does not accept read or write concern"},
     compactStructuredEncryptionData: {skip: "does not accept read or write concern"},
     configureCollectionBalancing: {skip: "does not accept read or write concern"},
@@ -559,6 +560,7 @@ let testCases = {
     getShardMap: {skip: "internal command"},
     getShardVersion: {skip: "internal command"},
     getTrafficRecordingStatus: {skip: "does not accept read or write concern"},
+    getTransitionToDedicatedConfigServerStatus: {skip: "does not accept read or write concern"},
     godinsert: {skip: "for testing only"},
     grantPrivilegesToRole: {
         setUp: function (conn) {
@@ -802,8 +804,10 @@ let testCases = {
     startShardDraining: {skip: "does not accept read or write concern"},
     stopShardDraining: {skip: "does not accept read or write concern"},
     startTrafficRecording: {skip: "does not accept read or write concern"},
+    startTransitionToDedicatedConfigServer: {skip: "does not accept read or write concern"},
     startSession: {skip: "does not accept read or write concern"},
     stopTrafficRecording: {skip: "does not accept read or write concern"},
+    stopTransitionToDedicatedConfigServer: {skip: "does not accept read or write concern"},
     sysprofile: {skip: "internal command"},
     testCommandFeatureFlaggedOnLatestFCV83: {skip: "internal command"},
     testDeprecation: {skip: "does not accept read or write concern"},
