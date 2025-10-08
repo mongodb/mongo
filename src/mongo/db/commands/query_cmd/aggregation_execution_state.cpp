@@ -124,6 +124,15 @@ public:
         if (!lockAcquired()) {
             return false;
         }
+
+        // If the collection is timeseries, enabling 'rawData' will treat the aggregation as
+        // happening directly on the underlying bucket formatted documents, without any timeseries
+        // translation, and is thus not considered a timeseries query. If the collection is not
+        // timeseries, we would return false anyway.
+        if (isRawDataOperation(_aggExState.getOpCtx())) {
+            return false;
+        }
+
         if (_mainAcq->isView() && _mainAcq->getView().getViewDefinition().timeseries()) {
             return true;
         }
@@ -690,8 +699,7 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
             OperationShardingState::get(_opCtx).getShardVersion(getOriginalNss());
 
         // Since for requests on timeseries namespaces the ServiceEntryPoint installs shard
-        // version
-        // on the buckets collection instead of the viewNss.
+        // version on the buckets collection instead of the viewNss.
         // TODO: SERVER-80719 Remove this.
         if (!originalShardVersion && underlyingNss.isTimeseriesBucketsCollection()) {
             originalShardVersion =
@@ -783,8 +791,23 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
 }
 
 void AggCatalogState::validate() const {
+    uassert(10557301,
+            "$rankFusion and $scoreFusion are unsupported on timeseries collections",
+            !(_aggExState.isHybridSearchPipeline() && isTimeseries()));
+
     if (_aggExState.getRequest().getResumeAfter() || _aggExState.getRequest().getStartAt()) {
         const auto& collectionOrView = getMainCollectionOrView();
+        uassert(ErrorCodes::InvalidPipelineOperator,
+                "$_resumeAfter is not supported on timeseries collections",
+                !isTimeseries()
+                    // Consider special case where user queries directly on underlying bucket ns
+                    // for a view-ful timeseries. The $_resumeAfter token should still be allowed
+                    // here. This is equivalent to querying on a timeseries coll with 'rawData'
+                    // true. Even though in a normal view-ful timeseries query we will end up here
+                    // after view resolution with the execution nss being the ts bucket collection,
+                    // this assertion will have tripped on the first round before view resolution.
+                    // TODO SERVER-111172: Remove this clause when 9.0 is LTS.
+                    || _aggExState.getExecutionNss().isTimeseriesBucketsCollection());
         uassert(ErrorCodes::InvalidPipelineOperator,
                 "$_resumeAfter is not supported on view",
                 !collectionOrView.isView());
@@ -832,7 +855,21 @@ query_shape::CollectionType AggCatalogState::determineCollectionType() const {
     if (_aggExState.hasChangeStream()) {
         return query_shape::CollectionType::kChangeStream;
     }
-    return lockAcquired() ? getMainCollectionType() : query_shape::CollectionType::kUnknown;
+
+    query_shape::CollectionType type = query_shape::CollectionType::kUnknown;
+    if (lockAcquired()) {
+        type = getMainCollectionType();
+        // In the case that the collection type is timeseries,
+        // and 'rawData' has been specified, the collection type is considered to be 'kCollection'.
+        // Even though previously we checked if 'isTimeseries()', this will return false
+        // in the case that 'rawData' was specified.
+        if (type == query_shape::CollectionType::kTimeseries &&
+            isRawDataOperation(_aggExState.getOpCtx())) {
+            type = query_shape::CollectionType::kCollection;
+        }
+    }
+
+    return type;
 }
 
 std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createDefaultAggCatalogState(

@@ -15,8 +15,6 @@
  *   requires_fcv_81,
  *   # cannot be run if fuzzer config is set
  *   does_not_support_config_fuzzer,
- *   # TODO SERVER-105617 remove tag once test works with viewless timeseries collection
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";

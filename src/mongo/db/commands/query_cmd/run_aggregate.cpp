@@ -894,19 +894,14 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // if none is found, will then check for the view using the expCtx. As such, it's necessary to
     // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
     auto* opCtx = expCtx->getOperationContext();
-    const bool isHybridSearchPipeline = aggExState.isHybridSearchPipeline();
-    if (isHybridSearchPipeline) {
-        uassert(10557301,
-                "$rankFusion and $scoreFusion are unsupported on timeseries collections",
-                !aggCatalogState.isTimeseries());
-    }
+
     if (aggExState.isView()) {
         search_helpers::checkAndSetViewOnExpCtx(expCtx,
                                                 aggExState.getOriginalRequest().getPipeline(),
                                                 aggExState.getResolvedView(),
                                                 aggExState.getOriginalNss());
 
-        if (isHybridSearchPipeline) {
+        if (aggExState.isHybridSearchPipeline()) {
             uassert(ErrorCodes::OptionNotSupportedOnView,
                     "$rankFusion and $scoreFusion are currently unsupported on views",
                     feature_flags::gFeatureFlagSearchHybridScoringFull

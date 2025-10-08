@@ -37,6 +37,7 @@
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 #include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -172,22 +173,29 @@ protected:
     NamespaceString createTimeseriesCollection(StringData coll,
                                                bool sharded,
                                                bool requiresExtendedRangeSupport) {
-        auto nss = NamespaceString::createNamespaceString_forTest(_dbName, coll);
-        auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+        auto tsNss = NamespaceString::createNamespaceString_forTest(_dbName, coll);
         auto opCtx = operationContext();
 
         auto timeseriesOptions = BSON("timeField" << "timestamp");
         createTestCollection(
-            opCtx, nss, BSON("create" << coll << "timeseries" << timeseriesOptions));
+            opCtx, tsNss, BSON("create" << coll << "timeseries" << timeseriesOptions));
+
+        // In the case that the timeseries collection is implemented as a view,
+        // get the underlying system buckets namespace.
+        NamespaceString underlyingNss = tsNss;
+        auto viewDefinition = CollectionCatalog::get(opCtx)->lookupView(opCtx, tsNss);
+        if (viewDefinition) {
+            underlyingNss = viewDefinition->viewOn();
+        }
 
         if (sharded) {
             installShardedCollectionMetadata(
-                opCtx, bucketsNss, kMyShardName, requiresExtendedRangeSupport);
+                opCtx, underlyingNss, kMyShardName, requiresExtendedRangeSupport);
         } else {
-            installUnshardedCollectionMetadata(opCtx, bucketsNss, requiresExtendedRangeSupport);
+            installUnshardedCollectionMetadata(opCtx, underlyingNss, requiresExtendedRangeSupport);
         }
 
-        return nss;
+        return tsNss;
     }
 
     std::pair<NamespaceString, std::vector<BSONObj>> createTestViewWithMetadata(
@@ -207,8 +215,11 @@ protected:
     /**
      * Create an AggExState instance that one might see for a typical query.
      */
-    std::unique_ptr<AggExState> createDefaultAggExState(StringData coll) {
+    std::unique_ptr<AggExState> createDefaultAggExState(StringData coll, bool rawData = false) {
         auto opCtx = operationContext();
+        if (rawData) {
+            isRawDataOperation(opCtx) = true;
+        }
 
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", coll);
 
@@ -512,6 +523,36 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
+TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewfulTimeseries) {
+    // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+    std::unique_ptr<AggExState> aggExState = createDefaultAggExState(timeseriesColl);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
+
+    ASSERT_TRUE(aggCatalogState->getMainCollectionOrView().isView());
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
+
+    boost::optional<AutoStatsTracker> tracker;
+    aggCatalogState->getStatsTrackerIfNeeded(tracker);
+    ASSERT_FALSE(tracker.has_value());
+
+    auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
+    ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
+    ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
+
+    ASSERT_TRUE(aggCatalogState->isTimeseries());
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kTimeseries);
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
+}
+
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewlessTimeseries) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
@@ -545,7 +586,50 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewlessTimese
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
-TEST_F(AggregationExecutionStateTest, UnshardedSecondaryNssRequiresExtendedRangeSupport) {
+TEST_F(AggregationExecutionStateTest,
+       CheckViewfulTimeseriesCollWithRawDataIsNotConsideredTimeseries) {
+    // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+
+    std::unique_ptr<AggExState> aggExState =
+        createDefaultAggExState(timeseriesColl, true /*rawData*/);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kCollection);
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
+}
+
+TEST_F(AggregationExecutionStateTest,
+       CheckViewlessTimeseriesCollWithRawDataIsNotConsideredTimeseries) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+
+    std::unique_ptr<AggExState> aggExState =
+        createDefaultAggExState(timeseriesColl, true /*rawData*/);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kCollection);
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
+}
+
+TEST_F(AggregationExecutionStateTest, UnshardedSecondaryViewfulTsNssRequiresExtendedRangeSupport) {
+    // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
 
@@ -555,12 +639,39 @@ TEST_F(AggregationExecutionStateTest, UnshardedSecondaryNssRequiresExtendedRange
 
     auto aggExState = createDefaultAggExStateWithSecondaryCollections(main, timeseriesColl);
     auto aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
     auto expCtx = aggCatalogState->createExpressionContext();
 
     ASSERT_TRUE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
 }
 
-TEST_F(AggregationExecutionStateTest, ShardedSecondaryNssRequiresExtendedRangeSupport) {
+TEST_F(AggregationExecutionStateTest, UnshardedSecondaryViewlessTsNssRequiresExtendedRangeSupport) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    StringData main{"coll"};
+    StringData timeseriesColl{"timeseries"};
+
+    createTestCollectionWithMetadata(main, false /*sharded*/);
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, true /*requiresExtendedRangeSupport*/);
+
+    auto aggExState = createDefaultAggExStateWithSecondaryCollections(main, timeseriesColl);
+    auto aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
+    auto expCtx = aggCatalogState->createExpressionContext();
+
+    ASSERT_TRUE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
+}
+
+TEST_F(AggregationExecutionStateTest, ShardedSecondaryViewfulTsNssRequiresExtendedRangeSupport) {
+    // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
 
@@ -570,12 +681,38 @@ TEST_F(AggregationExecutionStateTest, ShardedSecondaryNssRequiresExtendedRangeSu
 
     auto aggExState = createDefaultAggExStateWithSecondaryCollections(main, timeseriesColl);
     auto aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
     auto expCtx = aggCatalogState->createExpressionContext();
 
     ASSERT_TRUE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
 }
 
-TEST_F(AggregationExecutionStateTest, SecondaryNssNoExtendedRangeSupport) {
+TEST_F(AggregationExecutionStateTest, ShardedSecondaryViewlessTsNssRequiresExtendedRangeSupport) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    StringData main{"coll"};
+    StringData timeseriesColl{"timeseries"};
+
+    createTestCollectionWithMetadata(main, true /*sharded*/);
+    createTimeseriesCollection(
+        timeseriesColl, true /*sharded*/, true /*requiresExtendedRangeSupport*/);
+
+    auto aggExState = createDefaultAggExStateWithSecondaryCollections(main, timeseriesColl);
+    auto aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
+    auto expCtx = aggCatalogState->createExpressionContext();
+
+    ASSERT_TRUE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
+}
+
+TEST_F(AggregationExecutionStateTest, SecondaryViewfulTsNssNoExtendedRangeSupport) {
+    // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
 
@@ -585,9 +722,97 @@ TEST_F(AggregationExecutionStateTest, SecondaryNssNoExtendedRangeSupport) {
 
     auto aggExState = createDefaultAggExStateWithSecondaryCollections(main, timeseriesColl);
     auto aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
     auto expCtx = aggCatalogState->createExpressionContext();
 
     ASSERT_FALSE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
+}
+
+TEST_F(AggregationExecutionStateTest, SecondaryViewlessTsNssNoExtendedRangeSupport) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    StringData main{"coll"};
+    StringData timeseriesColl{"timeseries"};
+
+    createTestCollectionWithMetadata(main, false /*sharded*/);
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+
+    auto aggExState = createDefaultAggExStateWithSecondaryCollections(main, timeseriesColl);
+    auto aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
+    auto expCtx = aggCatalogState->createExpressionContext();
+
+    ASSERT_FALSE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
+}
+
+TEST_F(AggregationExecutionStateTest, ViewOnViewfulTsUsingExtendRangeAsSecondaryColl) {
+    // In this test we validate a specific case where we:
+    // - Have a view on top of viewful ts collection
+    // - Running as the secondary collection (i.e. running inside $lookup/$unionWith)
+    // - That has extended range data
+    // and confirm that AggCatalogState reports that the aggregation uses extended range data.
+    //
+    // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
+    StringData main{"main"};
+    auto mainNss = createTestCollectionWithMetadata(main, false /*sharded*/);
+
+    StringData timeseriesColl{"timeseries"};
+    auto secondaryTsNss = createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, true /*requiresExtendedRangeSupport*/);
+
+    StringData viewOnTs{"view_on_ts"};
+    auto [secondaryTsViewNss, _] = createTestViewWithMetadata(viewOnTs, timeseriesColl);
+
+    std::unique_ptr<AggExState> aggExState =
+        createDefaultAggExStateWithSecondaryCollections(main, viewOnTs);
+
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
+    auto expCtx = aggCatalogState->createExpressionContext();
+
+    ASSERT_TRUE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
+}
+
+TEST_F(AggregationExecutionStateTest, ViewOnViewlessTsUsingExtendRangeAsSecondaryColl) {
+    // In this test we validate a specific case where we:
+    // - Have a view on top of viewless ts collection
+    // - Running as the secondary collection (i.e. running inside $lookup/$unionWith)
+    // - That has extended range data
+    // and confirm that AggCatalogState reports that the aggregation uses extended range data.
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    StringData main{"main"};
+    auto mainNss = createTestCollectionWithMetadata(main, false /*sharded*/);
+
+    StringData timeseriesColl{"timeseries"};
+    auto secondaryTsNss = createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, true /*requiresExtendedRangeSupport*/);
+
+    StringData viewOnTs{"view_on_ts"};
+    auto [secondaryTsViewNss, _] = createTestViewWithMetadata(viewOnTs, timeseriesColl);
+
+    std::unique_ptr<AggExState> aggExState =
+        createDefaultAggExStateWithSecondaryCollections(main, viewOnTs);
+
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
+    auto expCtx = aggCatalogState->createExpressionContext();
+
+    ASSERT_TRUE(expCtx->getRequiresTimeseriesExtendedRangeSupport());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogState) {
@@ -633,7 +858,11 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnView) {
         aggExState->createAggCatalogState(), DBException, ErrorCodes::CommandNotSupportedOnView);
 }
 
-TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnTimeseriesCollection) {
+TEST_F(AggregationExecutionStateTest,
+       CreateOplogAggCatalogStateFailsOnViewfulTimeseriesCollection) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
     StringData timeseriesColl{"timeseries"};
 
     createTimeseriesCollection(
