@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
+#include "mongo/db/query/compiler/ce/sampling/math.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
@@ -840,9 +841,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
 
     size_t sampleNDV = countNDV(fieldNames, _sample);
 
-    // TODO SERVER-111585 replace with real implementation.
-    CardinalityEstimate estimate =
-        CardinalityEstimate{CardinalityType{(double)sampleNDV}, EstimationSource::Sampling};
+    CardinalityEstimate estimate = newtonRaphsonNDV(sampleNDV, _sampleSize);
     LOGV2_DEBUG(11158506,
                 5,
                 "SamplingCE ndv (# unique values) for field",

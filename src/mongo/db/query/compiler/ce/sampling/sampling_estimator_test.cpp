@@ -1341,19 +1341,31 @@ std::vector<BSONObj> createDocumentsForNDVTesting(int num) {
 void makeNDVAssertions(SamplingEstimatorForTesting& estimator, const size_t sampleSize) {
     estimator.generateSample(ce::NoProjection{});
 
-    // TODO SERVER-111585 make meaningful assertions on these tests!
-
     // We know the true NDV for each of these fields; see 'createDocumentsForNDVTesting' for
     // details.
 
-    // All unique values.
-    // auto ndvId = estimator.estimateNDV({"_id"});
+    // All unique values. The estimator result for this one can vary a lot based on how many
+    // duplicate documents there are in the sample. The problem is worse when the sample is too
+    // small (here, 1 or 2%). TODO SERVER-111585: Should we try to account for this in
+    // NDV estimates?
+    auto ndvId = estimator.estimateNDV({"_id"});
+    if (sampleSize > 100) {
+        ASSERT_GT(ndvId.toDouble(), 2500);  // true value is 5,000.
+    } else {
+        ASSERT_GT(ndvId.toDouble(), 1000);
+    }
 
-    // Some unique values.
-    // auto ndvA = estimator.estimateNDV({"a"});
+    // Some unique values. Again, the estimator results can vary a lot for fields with many unique
+    // values.
+    auto ndvA = estimator.estimateNDV({"a"});
+    if (sampleSize > 100) {
+        ASSERT_GT(ndvA.toDouble(), 500);  // true value is 1,000.
+    } else {
+        ASSERT_GT(ndvA.toDouble(), 200);
+    }
 
-    // auto ndvB = estimator.estimateNDV({"b"});
-
+    auto ndvB = estimator.estimateNDV({"b"});
+    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvB, 100));
     auto ndvC = estimator.estimateNDV({"c"});
     ASSERT(estimator.assertEstimateInConfidenceInterval(ndvC, 10));
     auto ndvD = estimator.estimateNDV({"d"});

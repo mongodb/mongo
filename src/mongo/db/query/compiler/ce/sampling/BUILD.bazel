@@ -29,6 +29,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "sampling_math",
+    srcs = [
+        "math.cpp",
+    ],
+    hdrs = [
+        "math.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/compiler/ce:ce_common",
+    ],
+)
+
+mongo_cc_library(
     name = "sampling_estimator",
     srcs = [
         "sampling_estimator_impl.cpp",
@@ -38,6 +51,7 @@ mongo_cc_library(
         "sampling_estimator_impl.h",
     ],
     deps = [
+        ":sampling_math",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
     ],
@@ -63,6 +77,17 @@ mongo_cc_unit_test(
         ":sampling_test_utils",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cbr_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sampling_math_test",
+    srcs = [
+        "math_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":sampling_math",
     ],
 )
 
