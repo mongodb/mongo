@@ -85,6 +85,11 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
         return false;
     }
 
+    // Find queries with the $_startAt parameter are not supported in SBE.
+    if (!cq->getFindCommandRequest().getStartAt().isEmpty()) {
+        return false;
+    }
+
     const auto& sortPattern = cq->getSortPattern();
     // If the sort has meta or numeric path components, we cannot use SBE.
     return !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {

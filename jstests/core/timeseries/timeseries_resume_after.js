@@ -1,6 +1,6 @@
 /**
- * Test that time-series bucket collections support $_requestResumeToken and a subsequent
- * $_resumeAfter.
+ * Test that time-series bucket collections support $_requestResumeToken with both
+ * $_resumeAfter and $_startAt tokens.
  *
  * The test runs commands that are not allowed with security token: killCursors.
  * @tags: [
@@ -11,6 +11,7 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   requires_fcv_70,
  * ]
  */
 (function() {
@@ -45,74 +46,56 @@ TimeseriesTest.run((insert) => {
             tags: host.tags,
         }));
     }
+    assert.eq(1, bucketsColl.count(), "The following tests rely on having a single bucket");
 
-    // Run the initial query and request to return a resume token. We're interested only in a single
-    // document, so 'batchSize' is set to 1.
-    let res = assert.commandWorked(db.runCommand({
-        find: bucketsColl.getName(),
-        hint: {$natural: 1},
-        batchSize: 1,
-        $_requestResumeToken: true
-    }));
+    function testResumeToken(tokenType) {
+        // Run the initial query and request to return a resume token.
+        let res = assert.commandWorked(db.runCommand({
+            find: bucketsColl.getName(),
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true
+        }));
+        assert.neq([], res.cursor.firstBatch, "Expect some data to be returned");
 
-    // Make sure the query returned a resume token which will be used to resume the query from.
-    assert.hasFields(res.cursor, ["postBatchResumeToken"]);
-    let resumeToken = res.cursor.postBatchResumeToken;
+        // Make sure the query returned a resume token.
+        assert.hasFields(res.cursor, ["postBatchResumeToken"]);
+        let resumeToken = res.cursor.postBatchResumeToken;
+        assert.neq(null, resumeToken.$recordId, "Got resume token " + tojson(resumeToken));
 
-    jsTestLog("Got resume token " + tojson(resumeToken));
-    assert.neq(null, resumeToken.$recordId);
+        // Kill the cursor before attempting to resume.
+        assert.commandWorked(
+            db.runCommand({killCursors: bucketsColl.getName(), cursors: [res.cursor.id]}));
 
-    // Kill the cursor before attempting to resume.
-    assert.commandWorked(
-        db.runCommand({killCursors: bucketsColl.getName(), cursors: [res.cursor.id]}));
+        // Try to resume the query from the saved resume token.
+        let resumeCmd = {
+            find: bucketsColl.getName(),
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true
+        };
+        resumeCmd[tokenType] = resumeToken;
 
-    // Try to resume the query from the saved resume token.
-    res = assert.commandWorked(db.runCommand({
-        find: bucketsColl.getName(),
-        hint: {$natural: 1},
-        batchSize: 1,
-        $_requestResumeToken: true,
-        $_resumeAfter: resumeToken
-    }));
+        res = assert.commandWorked(db.runCommand(resumeCmd));
+        assert.eq([], res.cursor.firstBatch, "Expect no more data returned");
+        assert.hasFields(res.cursor, ["postBatchResumeToken"]);
+        resumeToken = res.cursor.postBatchResumeToken;
 
-    assert.hasFields(res.cursor, ["postBatchResumeToken"]);
-    resumeToken = res.cursor.postBatchResumeToken;
+        // After a collection is exhausted, the record id in the resume token is set to null.
+        assert.eq(null, resumeToken.$recordId, "Got resume token " + tojson(resumeToken));
 
-    jsTestLog("Got resume token " + tojson(resumeToken));
-    assert.eq(null, resumeToken.$recordId);
+        // Test that resuming fails if the recordId is Long.
+        resumeCmd[tokenType] = {'$recordId': NumberLong(10)};
+        assert.commandFailedWithCode(db.runCommand(resumeCmd), 7738600);
 
-    // Try to resume from a null '$recordId'.
-    res = assert.commandWorked(db.runCommand({
-        find: bucketsColl.getName(),
-        hint: {$natural: 1},
-        batchSize: 1,
-        $_requestResumeToken: true,
-        $_resumeAfter: resumeToken
-    }));
+        // Test that resuming fails if querying the time-series view.
+        let viewCmd =
+            {find: coll.getName(), filter: {}, $_requestResumeToken: true, hint: {$natural: 1}};
+        viewCmd[tokenType] = {'$recordId': BinData(5, '1234')};
+        assert.commandFailedWithCode(db.runCommand(viewCmd), ErrorCodes.InvalidPipelineOperator);
+    }
 
-    assert.hasFields(res.cursor, ["postBatchResumeToken"]);
-    resumeToken = res.cursor.postBatchResumeToken;
-
-    jsTestLog("Got resume token " + tojson(resumeToken));
-
-    // Test that '$_resumeAfter' fails if the recordId is Long.
-    assert.commandFailedWithCode(db.runCommand({
-        find: bucketsColl.getName(),
-        filter: {},
-        $_requestResumeToken: true,
-        $_resumeAfter: {'$recordId': NumberLong(10)},
-        hint: {$natural: 1}
-    }),
-                                 7738600);
-
-    // Test that '$_resumeAfter' fails if querying the time-series view.
-    assert.commandFailedWithCode(db.runCommand({
-        find: coll.getName(),
-        filter: {},
-        $_requestResumeToken: true,
-        $_resumeAfter: {'$recordId': BinData(5, '1234')},
-        hint: {$natural: 1}
-    }),
-                                 ErrorCodes.InvalidPipelineOperator);
+    testResumeToken('$_resumeAfter');
+    testResumeToken('$_startAt');
 });
 })();

@@ -471,6 +471,22 @@ void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
 
 }  // namespace
 
+boost::optional<ResumeScanPoint> getResumePoint(const BSONObj& resumeAfterObj,
+                                                const BSONObj& startAtObj) {
+    tassert(9049501,
+            "Cannot set both $_startAt and $_resumeAfter",
+            resumeAfterObj.isEmpty() || startAtObj.isEmpty());
+    if (!resumeAfterObj.isEmpty()) {
+        BSONElement recordIdElem = resumeAfterObj["$recordId"];
+        return ResumeScanPoint{RecordId::deserializeToken(recordIdElem),
+                               false /* tolerateKeyNotFound */};
+    } else if (!startAtObj.isEmpty()) {
+        BSONElement recordIdElem = startAtObj["$recordId"];
+        return ResumeScanPoint{RecordId::deserializeToken(recordIdElem), true /*  */};
+    }
+    return boost::none;
+}
+
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
 
@@ -513,12 +529,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         csn->requestResumeToken = !query.nss().isOplogOrChangeCollection();
     }
 
-    // Extract and assign the RecordId from the 'resumeAfter' token, if present.
-    const BSONObj& resumeAfterObj = query.getFindCommandRequest().getResumeAfter();
-    if (!resumeAfterObj.isEmpty()) {
-        BSONElement recordIdElem = resumeAfterObj["$recordId"];
-        csn->resumeAfterRecordId = RecordId::deserializeToken(recordIdElem);
-    }
+    // Extract and set the resumeScanPoint from the 'resumeAfter' or 'startAt' token, if present.
+    csn->resumeScanPoint = getResumePoint(query.getFindCommandRequest().getResumeAfter(),
+                                          query.getFindCommandRequest().getStartAt());
 
     const bool assertMinTsHasNotFallenOffOplog =
         params.options & QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
@@ -536,8 +549,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         };
 
         // Optimizes the start and end location parameters for a collection scan for an oplog
-        // collection. Not compatible with $_resumeAfter so we do not optimize in that case.
-        if (resumeAfterObj.isEmpty()) {
+        // collection. Not compatible with resumeScanPoint, so we do not optimize in that case.
+        if (!csn->resumeScanPoint) {
             auto [minTs, maxTs] = extractTsRange(query.root());
             if (minTs) {
                 assignRecordIdFromTimestamp(*minTs, &csn->minRecord);
@@ -572,7 +585,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     auto collCollator = params.clusteredCollectionCollator;
     csn->hasCompatibleCollation = CollatorInterface::collatorsMatch(queryCollator, collCollator);
 
-    if (params.clusteredInfo && !csn->resumeAfterRecordId) {
+    if (params.clusteredInfo && !csn->resumeScanPoint) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
         // via minRecord and maxRecord if applicable. During this process, we will check if the
         // query is guaranteed to exclude values of the cluster key which are affected by collation.

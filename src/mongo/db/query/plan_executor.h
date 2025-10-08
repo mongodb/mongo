@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_result.h"
@@ -38,12 +39,11 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/restore_context.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
-class BSONObj;
 class PlanStage;
-class RecordId;
 
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop

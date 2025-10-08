@@ -432,6 +432,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto fields = reqs.getFields();
     auto csn = static_cast<const CollectionScanNode*>(root);
+
+    tassert(9049502,
+            "Resuming from a deleted record id is not supported in SBE",
+            !csn->resumeScanPoint || !csn->resumeScanPoint->tolerateKeyNotFound);
+
     auto [stage, outputs] = generateCollScan(_state,
                                              getCurrentCollection(reqs),
                                              csn,

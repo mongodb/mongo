@@ -198,7 +198,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
         return {ErrorCodes::ErrorCodes::KeyNotFound,
                 str::stream() << "Failed to resume collection scan the recordId from which we are "
                                  "attempting to resume no longer exists in the collection: "
-                              << csn->resumeAfterRecordId};
+                              << csn->resumeScanPoint->recordId};
     }();
     auto failBranch = sbe::makeProjectStage(sbe::makeS<sbe::CoScanStage>(csn->nodeId()),
                                             csn->nodeId(),
@@ -256,12 +256,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch) {
     invariant(collection->ns().isOplog());
-    // We can apply oplog scan optimizations only when at least one of the following was specified.
-    invariant(csn->resumeAfterRecordId || csn->minRecord || csn->maxRecord);
-    // The minRecord and maxRecord optimizations are not compatible with resumeAfterRecordId.
-    invariant(!(csn->resumeAfterRecordId && (csn->minRecord || csn->maxRecord)));
-    // Oplog scan optimizations can only be done for a forward scan.
-    invariant(csn->direction == CollectionScanParams::FORWARD);
+
+    tassert(9884900,
+            "Oplog scan optimizations require at least one of resumeScanPoint, minRecord, or "
+            "maxRecord to be set",
+            csn->resumeScanPoint || csn->minRecord || csn->maxRecord);
+
+    tassert(9884901,
+            "The minRecord and maxRecord optimizations are not compatible with resumeScanPoint",
+            !(csn->resumeScanPoint && (csn->minRecord || csn->maxRecord)));
+
+    tassert(9884902,
+            "Oplog scan optimizations can only be done for a forward scan",
+            csn->direction == CollectionScanParams::FORWARD);
 
     auto fieldSlots = state.slotIdGenerator->generateMultiple(fields.size());
 
@@ -277,8 +284,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         if (isTailableResumeBranch) {
             auto resumeRecordIdSlot = state.data->env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
-        } else if (csn->resumeAfterRecordId) {
-            auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
+        } else if (csn->resumeScanPoint) {
+            auto [tag, val] = sbe::value::makeCopyRecordId(csn->resumeScanPoint->recordId);
             return {state.slotId(), makeConstant(tag, val)};
         } else if (csn->minRecord) {
             auto cursor = collection->getRecordStore()->getCursor(state.opCtx);
@@ -335,7 +342,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
                                                isTailableResumeBranch,
-                                               csn->resumeAfterRecordId.has_value());
+                                               csn->resumeScanPoint.has_value());
     }
 
     // Create a filter which checks the first document to ensure either that its 'ts' is less than
@@ -576,9 +583,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     bool isTailableResumeBranch) {
     const auto forward = csn->direction == CollectionScanParams::FORWARD;
 
-    invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
-    invariant(!csn->resumeAfterRecordId || forward);
-    invariant(!csn->resumeAfterRecordId || !csn->tailable);
+    tassert(9884903,
+            "'shouldTrackLatestOplogTimestamp' can only be used with oplog collections",
+            !csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
+
+    tassert(9884904,
+            "Expected forward collection scan with 'resumeScanPoint'",
+            !csn->resumeScanPoint || forward);
+
+    tassert(9884905,
+            "Cannot use resume token with a tailable cursor",
+            !csn->resumeScanPoint || !csn->tailable);
 
     if (csn->filter) {
         DepsTracker deps;
@@ -597,8 +612,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     auto recordIdSlot = state.slotId();
     auto [seekRecordIdSlot, seekRecordIdExpression] =
         [&]() -> std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::EExpression>> {
-        if (csn->resumeAfterRecordId) {
-            auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
+        if (csn->resumeScanPoint) {
+            auto [tag, val] = sbe::value::makeCopyRecordId(csn->resumeScanPoint->recordId);
             return {state.slotId(), makeConstant(tag, val)};
         } else if (isTailableResumeBranch) {
             auto resumeRecordIdSlot = state.data->env->getSlot("resumeRecordId"_sd);
@@ -676,6 +691,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     std::vector<std::string> fields,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch) {
+    tassert(9049503,
+            "$_startAt parameter for find is not supported in SBE",
+            !csn->resumeScanPoint || !csn->resumeScanPoint->tolerateKeyNotFound);
     if (csn->minRecord || csn->maxRecord || csn->stopApplyingFilterAfterFirstMatch) {
         return generateOptimizedOplogScan(
             state, collection, csn, std::move(fields), yieldPolicy, isTailableResumeBranch);

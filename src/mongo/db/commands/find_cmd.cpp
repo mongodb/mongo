@@ -152,6 +152,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
     // $$USER_ROLES for the find command.
     expCtx->setUserRoles();
+
     // Register query stats collection. Exclude queries against collections with encrypted fields.
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
@@ -324,8 +325,11 @@ public:
             const auto& collection = ctx->getCollection();
             if (!ctx->getView()) {
                 const bool isClusteredCollection = collection && collection->isClustered();
-                uassertStatusOK(query_request_helper::validateResumeAfter(
-                    findCommand->getResumeAfter(), isClusteredCollection));
+                uassertStatusOK(
+                    query_request_helper::validateResumeInput(opCtx,
+                                                              findCommand->getResumeAfter(),
+                                                              findCommand->getStartAt(),
+                                                              isClusteredCollection));
             }
             auto expCtx = makeExpressionContext(opCtx, *findCommand, collection, verbosity);
             const bool isExplain = true;
@@ -544,12 +548,14 @@ public:
                 }
             }
 
-            // Views use the aggregation system and the $_resumeAfter parameter is not allowed. A
-            // more descriptive error will be raised later, but we want to validate this parameter
-            // before beginning the operation.
+            // Views use the aggregation system and the $_resumeAfter/ $_startAt parameter is not
+            // parameter before beginning the operation.
             if (!ctx->getView()) {
-                uassertStatusOK(query_request_helper::validateResumeAfter(
-                    findCommand->getResumeAfter(), isClusteredCollection));
+                uassertStatusOK(
+                    query_request_helper::validateResumeInput(opCtx,
+                                                              findCommand->getResumeAfter(),
+                                                              findCommand->getStartAt(),
+                                                              isClusteredCollection));
             }
 
             auto cq = parseQueryAndBeginOperation(

@@ -84,7 +84,10 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     if (params.minRecord || params.maxRecord) {
         // The 'minRecord' and 'maxRecord' parameters are used for a special optimization that
         // applies only to forwards scans of the oplog and scans on clustered collections.
-        invariant(!params.resumeAfterRecordId);
+        tassert(9049500,
+                "Cannot resume using '$_resumeAfter'/ '$_startAt' if 'minRecord' or 'maxRecord' is "
+                "used",
+                !params.resumeScanPoint);
         if (collection->ns().isOplogOrChangeCollection()) {
             invariant(params.direction == CollectionScanParams::FORWARD);
         } else {
@@ -128,11 +131,11 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                 params.direction == CollectionScanParams::FORWARD);
     }
 
-    if (params.resumeAfterRecordId) {
-        // The 'resumeAfterRecordId' parameter is used for resumable collection scans, which we
+    if (params.resumeScanPoint) {
+        // The 'resumeScanPoint' parameter is used for resumable collection scans, which we
         // only support in the forward direction.
         tassert(6521003,
-                "Expected forward collection scan with 'resumeAfterRecordId'",
+                "Expected forward collection scan with 'resumeScanPoint'",
                 params.direction == CollectionScanParams::FORWARD);
     }
 }
@@ -203,22 +206,44 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     }
                 }
 
-                if (_params.resumeAfterRecordId && !_params.resumeAfterRecordId->isNull()) {
+                if (_params.resumeScanPoint && !_params.resumeScanPoint->recordId.isNull()) {
                     invariant(!_params.tailable);
                     invariant(_lastSeenId.isNull());
-                    // Seek to where we are trying to resume the scan from. Signal a KeyNotFound
-                    // error if the record no longer exists.
+                    // Seek to where we are trying to resume the scan from.
                     //
                     // Note that we want to return the record *after* this one since we have already
-                    // returned this one prior to the resume.
-                    auto& recordIdToSeek = *_params.resumeAfterRecordId;
-                    if (!_cursor->seekExact(recordIdToSeek)) {
-                        uasserted(ErrorCodes::KeyNotFound,
-                                  str::stream()
-                                      << "Failed to resume collection scan: the recordId from "
-                                         "which we are "
-                                      << "attempting to resume no longer exists in the collection. "
-                                      << "recordId: " << recordIdToSeek);
+                    // returned this one prior to the resume *unless* we are resuming from a deleted
+                    // record id in which case the cursor is already positioned on the next record
+                    // id.
+                    auto& resumeScanPoint = *_params.resumeScanPoint;
+                    auto& recordIdToSeek = resumeScanPoint.recordId;
+
+                    // Attempt to seek to the exact recordId. If it doesn't exist and we're using
+                    // '$_startAt' (tolerateKeyNotFound = true), we'll use seekNear() instead to
+                    // find the next highest recordId and return. In this case the cursor is already
+                    // positioned on the recordId we want to return so we don't always need to
+                    // advance it again below. If tolerateKeyNotFound = false, we throw.
+                    auto testRecord = _cursor->seekExact(recordIdToSeek);
+                    if (!testRecord) {
+                        if (resumeScanPoint.tolerateKeyNotFound) {
+                            // seekNear will by default return the greatest record id that is less
+                            // than or equal to 'recordIdToSeek' if one exists. In this case we're
+                            // interested in the next record id after 'recordIdToSeek' so we advance
+                            // the cursor.
+                            record = _cursor->seekNear(recordIdToSeek);
+                            if (record && record->id < recordIdToSeek) {
+                                record = _cursor->next();
+                            }
+                            return PlanStage::ADVANCED;
+                        } else {
+                            uasserted(
+                                ErrorCodes::KeyNotFound,
+                                str::stream()
+                                    << "Failed to resume collection scan: the recordId from "
+                                       "which we are "
+                                    << "attempting to resume no longer exists in the collection. "
+                                    << "recordId: " << recordIdToSeek);
+                        }
                     }
                 }
             }

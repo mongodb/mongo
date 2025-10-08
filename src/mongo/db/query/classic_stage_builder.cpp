@@ -86,7 +86,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             params.minRecord = csn->minRecord;
             params.maxRecord = csn->maxRecord;
             params.requestResumeToken = csn->requestResumeToken;
-            params.resumeAfterRecordId = csn->resumeAfterRecordId;
+            params.resumeScanPoint = csn->resumeScanPoint;
             params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
             params.boundInclusion = csn->boundInclusion;
             params.lowPriority = csn->lowPriority;

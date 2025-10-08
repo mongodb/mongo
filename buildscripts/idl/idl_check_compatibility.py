@@ -144,6 +144,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'find-param-allowSpeculativeMajorityRead',
     'find-param-$_requestResumeToken',
     'find-param-$_resumeAfter',
+    "find-param-$_startAt",
     'find-param-maxTimeMS',
     'update-param-u',
     'update-param-hint',
@@ -238,6 +239,8 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     'refreshSessions-param-txnUUID',
     # upsertSupplied is an internal implementation detail of $merge
     'update-param-upsertSupplied',
+    # No actual user-facing difference
+    'find-param-$_startAt',
 ]
 
 # Once a field is part of the stable API, either by direct addition or by changing it from unstable

@@ -83,6 +83,11 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
             !findCommand.getReadOnce());
 
     uassert(ErrorCodes::InvalidPipelineOperator,
+            str::stream() << "Option " << FindCommandRequest::kStartAtFieldName
+                          << " not supported in aggregation.",
+            findCommand.getStartAt().isEmpty());
+
+    uassert(ErrorCodes::InvalidPipelineOperator,
             str::stream() << "Option " << FindCommandRequest::kAllowSpeculativeMajorityReadFieldName
                           << " not supported in aggregation.",
             !findCommand.getAllowSpeculativeMajorityRead());
