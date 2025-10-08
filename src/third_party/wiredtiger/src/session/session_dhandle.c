@@ -842,7 +842,7 @@ __session_find_shared_dhandle(WT_SESSION_IMPL *session, const char *uri, const c
       if ((ret = __wt_conn_dhandle_find(session, uri, checkpoint)) == 0)
         WT_DHANDLE_ACQUIRE(session->dhandle));
 
-    if (ret != 0 && ret != WT_NOTFOUND)
+    if (ret != WT_NOTFOUND)
         return (ret);
 
     WT_WITH_HANDLE_LIST_WRITE_LOCK(session,

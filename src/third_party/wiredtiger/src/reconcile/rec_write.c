@@ -208,8 +208,10 @@ __reconcile_post_wrapup(
         WT_STAT_CONN_DSRC_INCR(session, rec_pages_eviction);
     if (r->cache_write_hs)
         WT_STAT_CONN_DSRC_INCR(session, cache_write_hs);
-    if (r->cache_write_restore_invisible || F_ISSET(r, WT_REC_SCRUB))
-        WT_STAT_CONN_DSRC_INCR(session, cache_write_restore);
+    if (r->cache_write_restore_invisible)
+        WT_STAT_CONN_DSRC_INCR(session, cache_write_restore_invisible);
+    else if (F_ISSET(r, WT_REC_SCRUB))
+        WT_STAT_CONN_DSRC_INCR(session, cache_write_restore_scrub);
     if (!WT_IS_HS(btree->dhandle)) {
         if (r->rec_page_cell_with_txn_id)
             WT_STAT_CONN_INCR(session, rec_pages_with_txn);
@@ -2202,7 +2204,6 @@ __wti_rec_pack_delta_internal(
     uint8_t *p;
 
     WT_CLEAR(t_kv_struct);
-    header = (WT_PAGE_HEADER *)r->delta.data;
 
     packed_size = key->len;
     if (value != NULL)
@@ -2211,6 +2212,8 @@ __wti_rec_pack_delta_internal(
     if (r->delta.size + packed_size > r->delta.memsize)
         WT_RET(__wt_buf_grow(session, &r->delta, r->delta.size + packed_size));
 
+    /* Recompute header and p after potential realloc */
+    header = (WT_PAGE_HEADER *)r->delta.data;
     p = (uint8_t *)r->delta.data + r->delta.size;
 
     __wti_rec_kv_copy(session, p, key);
@@ -3122,6 +3125,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
             }
             __wt_free(session, multi->addr.block_cookie);
         }
+        __wt_free(session, multi->block_meta);
     }
     __wt_free(session, mod->mod_multi);
     mod->mod_multi_entries = 0;

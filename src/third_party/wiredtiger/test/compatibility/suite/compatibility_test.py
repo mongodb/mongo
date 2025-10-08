@@ -105,6 +105,8 @@ class CompatibilityTestCase(abstract_test_case.AbstractWiredTigerTestCase):
                     return True
                 if k == 'captureout' or k == 'captureerr':
                     return True
+                if k == 'tee_stdout' or k == 'tee_stderr':
+                    return True
                 return False
 
             def export_class_attributes(cls):

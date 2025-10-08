@@ -1195,7 +1195,8 @@ conn_dsrc_stats = [
     CacheStat('cache_scrub_restore', 'reconciled pages scrubbed and added back to the cache clean'),
     CacheStat('cache_write', 'pages written from cache'),
     CacheStat('cache_write_hs', 'page written requiring history store records'),
-    CacheStat('cache_write_restore', 'pages written requiring in-memory restoration'),
+    CacheStat('cache_write_restore_invisible', 'pages written requiring in-memory restoration due to invisible updates'),
+    CacheStat('cache_write_restore_scrub', 'pages written requiring in-memory restoration due to scrub eviction'),
 
     ##########################################
     # Checkpoint statistics

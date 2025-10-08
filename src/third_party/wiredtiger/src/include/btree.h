@@ -142,12 +142,14 @@ struct __wt_btree {
     /*
      * Reconciliation...
      */
-    u_int dictionary;                         /* Dictionary slots */
-    bool internal_key_truncate;               /* Internal key truncate */
-    bool prefix_compression;                  /* Prefix compression */
-    u_int prefix_compression_min;             /* Prefix compression min */
-    wt_shared wt_timestamp_t prune_timestamp; /* Garbage collection timestamp for the ingest
-                                                 component of layered tables */
+    u_int dictionary;             /* Dictionary slots */
+    bool internal_key_truncate;   /* Internal key truncate */
+    bool prefix_compression;      /* Prefix compression */
+    u_int prefix_compression_min; /* Prefix compression min */
+
+    /* FIXME-WT-15633: Combine `prune_timestamp` and `ckpt_timestamp` into one variable */
+    wt_shared wt_timestamp_t prune_timestamp; /* Ingest table GC collection timestamp */
+    wt_timestamp_t checkpoint_timestamp;      /* Stable table checkpoint timestamp */
 
 #define WT_SPLIT_DEEPEN_MIN_CHILD_DEF (10 * WT_THOUSAND)
     u_int split_deepen_min_child; /* Minimum entries to deepen tree */

@@ -476,7 +476,7 @@ if(NOT ("${WT_OPTIMIZE_FLAGS_SAVED}" STREQUAL "${CC_OPTIMIZE_LEVEL}"))
     separate_arguments(new_opt_flags)
 
     foreach(lang C CXX)
-        foreach(build_type RELEASE RELWITHDEBINFO)
+        foreach(build_type DEBUG RELEASE RELWITHDEBINFO)
             replace_compile_options(CMAKE_${lang}_FLAGS_${build_type}
                 REMOVE ${opt_flags}
                 ADD ${new_opt_flags})

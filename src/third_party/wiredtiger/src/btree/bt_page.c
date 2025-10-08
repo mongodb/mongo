@@ -425,7 +425,8 @@ __page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *de
                 standard_value->prepare_ts = unpack.tw.start_prepare_ts;
                 standard_value->prepare_state = WT_PREPARE_INPROGRESS;
 
-                F_SET(standard_value, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+                F_SET(standard_value,
+                  WT_UPDATE_PREPARE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_DELTA);
             } else
                 F_SET(standard_value, WT_UPDATE_DURABLE | WT_UPDATE_RESTORED_FROM_DELTA);
             size += tmp_size;
@@ -440,15 +441,17 @@ __page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *de
                     tombstone->prepared_id = unpack.tw.stop_prepared_id;
                     tombstone->prepare_ts = unpack.tw.stop_prepare_ts;
                     tombstone->prepare_state = WT_PREPARE_INPROGRESS;
-                    F_SET(
-                      tombstone, WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+                    F_SET(tombstone,
+                      WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS |
+                        WT_UPDATE_RESTORED_FROM_DELTA);
 
                     if (WT_TIME_WINDOW_HAS_START_PREPARE(&unpack.tw)) {
                         standard_value->prepared_id = unpack.tw.start_prepared_id;
                         standard_value->prepare_ts = unpack.tw.start_prepare_ts;
                         standard_value->prepare_state = WT_PREPARE_INPROGRESS;
                         F_SET(standard_value,
-                          WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+                          WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS |
+                            WT_UPDATE_RESTORED_FROM_DELTA);
                     }
                 } else
                     F_SET(tombstone, WT_UPDATE_DURABLE | WT_UPDATE_RESTORED_FROM_DELTA);
@@ -464,7 +467,8 @@ __page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *de
                     standard_value->prepare_ts = unpack.tw.start_prepare_ts;
                     standard_value->prepare_state = WT_PREPARE_INPROGRESS;
                     F_SET(standard_value,
-                      WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+                      WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS |
+                        WT_UPDATE_RESTORED_FROM_DELTA);
                 }
                 upd = standard_value;
             }
@@ -520,7 +524,8 @@ __wti_page_reconstruct_deltas(
          * We may be in a reconciliation already. Don't rewrite in this case as reconciliation is
          * not reentrant.
          *
-         * FIXME-WT-14885: this should go away when we use an algorithm to directly rewrite delta.
+         * FIXME- WT-15619 and WT-15618: this should go away when we use an algorithm to directly
+         * rewrite delta.
          */
         if (F_ISSET(&S2C(session)->page_delta, WT_FLATTEN_LEAF_PAGE_DELTA) &&
           !__wt_rec_in_progress(session)) {
@@ -967,7 +972,8 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
               "Should never read an overflow removed value for a prepared update");
             first_upd = WT_ROW_UPDATE(page, rip);
             /*
-             * FIXME-WT-14885: This key must have been overwritten by a delta. Don't instantiate it.
+             * FIXME- WT-15619 and WT-15618: This key must have been overwritten by a delta. Don't
+             * instantiate it.
              */
             if (first_upd == NULL) {
                 WT_ERR(__page_inmem_update(session, value, &unpack, &upd, &size));

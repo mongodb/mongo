@@ -160,7 +160,7 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
 
         # Read the statistics of pages that have been update restored (to check the mechanism was used).
         stat_cursor = self.session.open_cursor('statistics:')
-        pages_update_restored = stat_cursor[stat.conn.cache_write_restore][2]
+        pages_update_restored = stat_cursor[stat.conn.cache_write_restore_scrub][2]
         stat_cursor.close()
         self.assertGreater(pages_update_restored, 0)
 

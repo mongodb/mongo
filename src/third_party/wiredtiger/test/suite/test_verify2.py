@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import errno, os, wiredtiger, wttest
 class test_verify2(wttest.WiredTigerTestCase):
     tablename = 'test_verify'
     params = 'key_format=S,value_format=S'
@@ -71,3 +71,9 @@ class test_verify2(wttest.WiredTigerTestCase):
         # We don't need to call checkpoint before calling verify as the btree is not marked as
         # modified.
         self.assertEqual(self.session.verify(self.uri, None), 0)
+
+    def test_verify_empty(self):
+        #  Verifying a non-existent table should return ENOENT.
+        self.assertRaisesException(wiredtiger.WiredTigerError,
+                              lambda: self.session.verify(self.uri, None),
+                              os.strerror(errno.ENOENT))

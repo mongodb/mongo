@@ -325,10 +325,10 @@ log(std::source_location loc, Config &config, WT_VERBOSE_LEVEL level,
 #define LOG_DIAG(...) LOG_AT(WT_VERBOSE_DEBUG_2, __VA_ARGS__)
 #define LOG_TRACE(...) LOG_AT(WT_VERBOSE_DEBUG_5, __VA_ARGS__)
 
-#define LOG_SQL_TRACE(trace_str)       \
-    do {                               \
-        if (config.sql_trace)          \
-            LOG_DIAG("{}", trace_str); \
+#define LOG_SQL_TRACE(fmt, ...)         \
+    do {                                \
+        if (config.sql_trace)           \
+            LOG_DIAG(fmt, __VA_ARGS__); \
     } while (0)
 
 // Exception-safe template method that catches C++ exceptions
@@ -472,7 +472,7 @@ public:
     exec(Func &&c_func, Args &&...args)
     {
         auto ret = std::invoke(std::forward<Func>(c_func), std::forward<Args>(args)...);
-        LOG_SQL_TRACE(trace_sqlite3_call(ret, args...));
+        LOG_SQL_TRACE("{}", trace_sqlite3_call(ret, args...));
 
         if (ret != SQLITE_OK && ret != SQLITE_ROW && ret != SQLITE_DONE) {
             std::string error_msg = trace_sqlite3_call(ret, args...);
@@ -585,11 +585,13 @@ class Storage {
         ROLLBACK,
         PUT_CHECKPOINT,
         GET_CHECKPOINT,
+        DELETE_CHECKPOINT,
         PUT_GLOBAL,
         GET_GLOBAL,
         PUT_PAGE,
         GET_PAGE_IDS,
         GET_PAGE,
+        DELETE_PAGE,
         COUNT // must be last
     };
 
@@ -682,10 +684,19 @@ class Storage {
                 a[GET_CHECKPOINT] = R"(
                     SELECT lsn, timestamp, checkpoint_metadata
                     FROM checkpoints
+                    WHERE (?1 = 18446744073709551615 OR lsn = ?1)
                     ORDER BY
                         lsn DESC,
                         timestamp DESC
                     LIMIT 1;)";
+                /* Cannot use stringized WT_PAGE_LOG_LSN_MAX in the statement above
+                 * because it contains the 'ULL' suffix, which is not a valid integer literal
+                 * in SQL queries.
+                 */
+                static_assert(WT_PAGE_LOG_LSN_MAX == 18446744073709551615ULL);
+                a[DELETE_CHECKPOINT] = R"(
+                    DELETE FROM checkpoints
+                    WHERE lsn > ?;)";
                 a[PUT_GLOBAL] = R"(
                     INSERT OR REPLACE INTO globals (key, val)
                     VALUES (?, ?);)";
@@ -731,6 +742,9 @@ class Storage {
                         AND lsn <= ?
                         AND timestamp_materialized_us <= ?
                     ORDER BY lsn DESC;)";
+                a[DELETE_PAGE] = R"(
+                    DELETE FROM pages
+                    WHERE lsn > ?;)";
                 return a;
             }
             ();
@@ -1012,6 +1026,7 @@ public:
     {
         StatementPtr stmt = txn.conn.db_statement(Statement::COMMIT);
         SQL_CALL_CHECK(txn.conn.db_instance(), sqlite3_step, stmt.get());
+        LOG_SQL_TRACE("{} records affected", sqlite3_changes(txn.conn.db_instance()));
         txn.release();
     }
 
@@ -1046,15 +1061,14 @@ public:
     }
 
     int
-    get_last_checkpoint(
-      Connection &conn, uint64_t *lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata)
+    get_checkpoint(
+      Connection &conn, uint64_t &lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata)
     {
         StatementPtr stmt = conn.db_statement(Statement::GET_CHECKPOINT);
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(lsn));
         int ret = SQ_CHECK(sqlite3_step, stmt.get());
         if (ret == SQLITE_DONE) {
             // No checkpoint found
-            if (lsn)
-                *lsn = 0;
             if (timestamp)
                 *timestamp = 0;
             if (checkpoint_metadata) {
@@ -1064,8 +1078,7 @@ public:
             return WT_NOTFOUND;
         }
 
-        if (lsn)
-            *lsn = sqlite3_column_int64(stmt.get(), 0);
+        lsn = sqlite3_column_int64(stmt.get(), 0);
         if (timestamp)
             *timestamp = sqlite3_column_int64(stmt.get(), 1);
         if (checkpoint_metadata) {
@@ -1074,6 +1087,14 @@ public:
             fill_item(checkpoint_metadata, blob, static_cast<size_t>(size));
         }
         return 0;
+    }
+
+    void
+    delete_checkpoint(Connection &conn, uint64_t lsn)
+    {
+        StatementPtr stmt = conn.db_statement(Statement::DELETE_CHECKPOINT);
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(lsn));
+        SQ_CHECK(sqlite3_step, stmt.get());
     }
 
     void
@@ -1253,6 +1274,14 @@ public:
         WT_ITEM dummy_page{};
         put_page(conn, table_id, page_id, lsn, &put_args, &dummy_page);
         args->lsn = put_args.lsn;
+    }
+
+    void
+    delete_page(Connection &conn, uint64_t lsn)
+    {
+        StatementPtr stmt = conn.db_statement(Statement::DELETE_PAGE);
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(lsn));
+        SQ_CHECK(sqlite3_step, stmt.get());
     }
 };
 
@@ -1465,6 +1494,32 @@ public:
         return 0;
     }
 
+    // Abandon (delete) all page log entries and checkpoint records with an LSN
+    // greater than the given LSN.
+    int
+    abandon_checkpoint(uint64_t checkpoint_lsn)
+    {
+        int ret = 0;
+        if (checkpoint_lsn == WT_PAGE_LOG_LSN_MAX) {
+            Storage::Transaction txn = storage.begin_transaction();
+            ret = storage.get_checkpoint(txn.conn, checkpoint_lsn, nullptr, nullptr);
+            storage.commit_transaction(txn);
+        }
+
+        if (ret == WT_NOTFOUND) {
+            LOG_DEBUG("No checkpoint found to abandon; lsn = {}", checkpoint_lsn);
+            return 0;
+        }
+
+        LOG_DEBUG("Deleting pages and checkpoints with lsn > {}", checkpoint_lsn);
+        Storage::Transaction txn = storage.begin_transaction();
+        storage.delete_page(txn.conn, checkpoint_lsn);
+        storage.delete_checkpoint(txn.conn, checkpoint_lsn);
+        // Note: global LSN counter is not decremented
+        storage.commit_transaction(txn);
+        return 0;
+    }
+
     int
     complete_checkpoint_ext(uint64_t checkpoint_id, uint64_t checkpoint_timestamp,
       const WT_ITEM *checkpoint_metadata, uint64_t *lsnp)
@@ -1501,16 +1556,20 @@ public:
         if (checkpoint_metadata)
             memset(checkpoint_metadata, 0, sizeof(WT_ITEM));
 
+        uint64_t query_lsn = WT_PAGE_LOG_LSN_MAX; // most recent checkpoint
         Storage::Transaction txn = storage.begin_transaction();
-        int ret = storage.get_last_checkpoint(
-          txn.conn, checkpoint_lsn, checkpoint_timestamp, checkpoint_metadata);
+        int ret =
+          storage.get_checkpoint(txn.conn, query_lsn, checkpoint_timestamp, checkpoint_metadata);
         storage.commit_transaction(txn);
 
-        LOG_DEBUG("checkpoint_lsn={}, timestamp={}", checkpoint_lsn ? *checkpoint_lsn : 0,
+        LOG_DEBUG("checkpoint_lsn={}, timestamp={}", query_lsn,
           checkpoint_timestamp ? *checkpoint_timestamp : 0);
         LOG_TRACE("checkpoint_metadata (size={}) =====\n{}",
           checkpoint_metadata ? checkpoint_metadata->size : 0,
           palite_verbose_item(checkpoint_metadata));
+
+        if (checkpoint_lsn)
+            *checkpoint_lsn = query_lsn;
 
         return ret;
     }
@@ -1576,6 +1635,12 @@ palite_add_reference(WT_PAGE_LOG *page_log)
 }
 
 static int
+palite_abandon_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *sess, uint64_t last_checkpoint_lsn)
+{
+    return safe_call<Palite>(sess, page_log, &Palite::abandon_checkpoint, last_checkpoint_lsn);
+}
+
+static int
 palite_begin_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *sess, uint64_t checkpoint_id)
 {
     return safe_call<Palite>(sess, page_log, &Palite::begin_checkpoint, checkpoint_id);
@@ -1628,6 +1693,7 @@ void
 Palite::initialize_interface()
 {
     pl_add_reference = palite_add_reference;
+    pl_abandon_checkpoint = palite_abandon_checkpoint;
     pl_begin_checkpoint = palite_begin_checkpoint;
     pl_complete_checkpoint_ext = palite_complete_checkpoint_ext;
     pl_get_complete_checkpoint_ext = palite_get_complete_checkpoint_ext;

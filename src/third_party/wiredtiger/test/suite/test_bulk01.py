@@ -184,6 +184,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
 
     # Test that row-store bulk-load out-of-order can succeed.
     def test_bulk_load_row_order_nocheck(self):
+        self.skipTest('Changed the error return to an assertion')
         # Row-store offers an optional fast-past that skips the relatively
         # expensive key-order checks, used when the input is known to be
         # correct. Column-store comparisons are cheap, so it doesn't have

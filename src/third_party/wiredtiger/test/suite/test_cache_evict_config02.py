@@ -47,7 +47,7 @@ class test_cache_evict_config02(wttest.WiredTigerTestCase):
 
         # Baseline eviction stats before enabling scrub
         stat_cursor = self.session.open_cursor("statistics:")
-        pages_scrubbed_baseline = stat_cursor[stat.conn.cache_write_restore][2]
+        pages_scrubbed_baseline = stat_cursor[stat.conn.cache_write_restore_scrub][2]
         stat_cursor.close()
 
         # Enable scrub_evict_under_target_limit flag
@@ -62,7 +62,7 @@ class test_cache_evict_config02(wttest.WiredTigerTestCase):
 
         # Check eviction stats after enabling scrub
         stat_cursor = self.session.open_cursor("statistics:")
-        pages_scrubbed_with_flag = stat_cursor[stat.conn.cache_write_restore][2]
+        pages_scrubbed_with_flag = stat_cursor[stat.conn.cache_write_restore_scrub][2]
         stat_cursor.close()
 
         # Check that by enabling scrub-under-target flag, more pages were scrub evicted

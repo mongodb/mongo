@@ -1155,6 +1155,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     const char *name;
     bool can_skip, failed, idle, logging, tracking, use_timestamp;
     bool ckpt_crash_before_metadata_sync, ckpt_crash_before_metadata_update;
+    char ts_string[WT_TS_INT_STRING_SIZE];
     void *saved_meta_next;
 
     conn = S2C(session);
@@ -1316,6 +1317,10 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * the checkpoint resolve of the shared metadata table.
      */
     conn->disaggregated_storage.cur_checkpoint_timestamp = ckpt_tmp_ts;
+    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader)
+        __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
+          "Starting disaggregated storage checkpoint with timestamp: %" PRIu64 " %s", ckpt_tmp_ts,
+          __wt_timestamp_to_string(ckpt_tmp_ts, ts_string));
 
     WT_ASSERT(session, txn->isolation == WT_ISO_SNAPSHOT);
 
@@ -1656,9 +1661,13 @@ err:
     WT_ACQUIRE_READ(num_meta_put, conn->disaggregated_storage.num_meta_put);
     if (!failed && __wt_conn_is_disagg(session) && conn->layered_table_manager.leader &&
       conn->disaggregated_storage.num_meta_put_at_ckpt_begin == num_meta_put &&
-      ckpt_tmp_ts != conn->disaggregated_storage.last_checkpoint_timestamp)
+      ckpt_tmp_ts != conn->disaggregated_storage.last_checkpoint_timestamp) {
         WT_TRET(__wt_disagg_put_checkpoint_meta(
           session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_tmp_ts));
+        __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "%s",
+          "Updated disaggregated storage checkpoint metadata because the stable timestamp "
+          "advanced");
+    }
 
     /*
      * Advance to the next checkpoint in disaggregated storage if we updated the checkpoint metadata

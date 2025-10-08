@@ -223,11 +223,6 @@ struct __wt_disaggregated_storage {
     TAILQ_HEAD(__wt_disagg_copy_metadata_qh, __wt_disagg_copy_metadata) copy_metadata_qh;
     WT_SPINLOCK copy_metadata_lock;
 
-    WT_DISAGGREGATED_CHECKPOINT_TRACK *ckpt_track; /* Checkpoint info retained for GC. */
-    size_t ckpt_track_alloc;                       /* Allocated bytes for checkpoint track. */
-    uint32_t ckpt_track_cnt; /* Number of entries in use for checkpoint track. */
-    int64_t ckpt_min_inuse;  /* The minimum checkpoint order in use. */
-
     /*
      * Ideally we'd have flags passed to the IO system, which could make it all the way to the
      * callers of posix_sync. But that's not possible because (1) posix_directory_sync also has no

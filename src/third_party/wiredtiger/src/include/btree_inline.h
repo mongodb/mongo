@@ -251,7 +251,7 @@ __wt_btree_dirty_leaf_inuse(WT_SESSION_IMPL *session)
 
 /*
  * __wt_btree_bytes_updates --
- *     Return the number of bytes in use by dirty leaf pages.
+ *     Return the number of bytes used by updates on pages.
  */
 static WT_INLINE uint64_t
 __wt_btree_bytes_updates(WT_SESSION_IMPL *session)
