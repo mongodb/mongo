@@ -643,5 +643,115 @@ TEST(AggregationStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformat
         queryShape);
 }
 
+class LiteralQueryShapeParseNode : public extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr StringData kStageName = "$literalQueryShape";
+    static constexpr StringData kStringField = "str";
+    static constexpr StringData kStringValue = "mongodb";
+    static constexpr StringData kNumberField = "num";
+    static constexpr int kNumberValue = 5;
+    static constexpr StringData kObjectField = "obj";
+    static const BSONObj kObjectValue;
+    static constexpr StringData kDateField = "date";
+    static const Date_t kDateValue;
+
+    size_t getExpandedSize() const override {
+        return 0;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        return {};
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        extension::sdk::QueryShapeOptsHandle ctxHandle(ctx);
+
+        // Build a BSON object for the spec and keep the memory in scope across the calls to
+        // serialize literal.
+        BSONObjBuilder specBuilder;
+        specBuilder.append(kStringField, kStringValue);
+        specBuilder.append(kNumberField, kNumberValue);
+        specBuilder.append(kObjectField, kObjectValue);
+        specBuilder.append(kDateField, kDateValue);
+        auto spec = specBuilder.obj();
+
+        // Build the query shape.
+        BSONObjBuilder builder;
+        ctxHandle.appendLiteral(builder, kStringField, spec[kStringField]);
+        ctxHandle.appendLiteral(builder, kNumberField, spec[kNumberField]);
+        ctxHandle.appendLiteral(builder, kObjectField, spec[kObjectField]);
+        ctxHandle.appendLiteral(builder, kDateField, spec[kDateField]);
+        return BSON(kStageName << builder.obj());
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
+        return std::make_unique<LiteralQueryShapeParseNode>();
+    }
+
+    static std::string applyHmacForTest(StringData sd) {
+        return "REDACT_" + std::string{sd};
+    }
+};
+const BSONObj LiteralQueryShapeParseNode::kObjectValue = BSON("hi" << "mongodb");
+const Date_t LiteralQueryShapeParseNode::kDateValue = Date_t::fromMillisSinceEpoch(1000);
+
+TEST(AggregationStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
+    auto parseNode =
+        new extension::sdk::ExtensionAggregationStageParseNode(LiteralQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts{};
+    auto queryShape = handle.getQueryShape(opts);
+
+    BSONObjBuilder specBuilder;
+    specBuilder.append(LiteralQueryShapeParseNode::kStringField,
+                       LiteralQueryShapeParseNode::kStringValue);
+    specBuilder.append(LiteralQueryShapeParseNode::kNumberField,
+                       LiteralQueryShapeParseNode::kNumberValue);
+    specBuilder.append(LiteralQueryShapeParseNode::kObjectField,
+                       LiteralQueryShapeParseNode::kObjectValue);
+    specBuilder.append(LiteralQueryShapeParseNode::kDateField,
+                       LiteralQueryShapeParseNode::kDateValue);
+    auto spec = specBuilder.obj();
+
+    ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
+}
+
+TEST(AggregationStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
+    auto parseNode =
+        new extension::sdk::ExtensionAggregationStageParseNode(LiteralQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    auto queryShape = handle.getQueryShape(opts);
+
+    BSONObjBuilder specBuilder;
+    specBuilder.append(LiteralQueryShapeParseNode::kStringField, "?string");
+    specBuilder.append(LiteralQueryShapeParseNode::kNumberField, "?number");
+    specBuilder.append(LiteralQueryShapeParseNode::kObjectField, "?object");
+    specBuilder.append(LiteralQueryShapeParseNode::kDateField, "?date");
+    auto spec = specBuilder.obj();
+
+    ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
+}
+
+TEST(AggregationStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValues) {
+    auto parseNode =
+        new extension::sdk::ExtensionAggregationStageParseNode(LiteralQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    auto queryShape = handle.getQueryShape(opts);
+
+    BSONObjBuilder specBuilder;
+    specBuilder.append(LiteralQueryShapeParseNode::kStringField, "?");
+    specBuilder.append(LiteralQueryShapeParseNode::kNumberField, 1);
+    specBuilder.append(LiteralQueryShapeParseNode::kObjectField, BSON("?" << "?"));
+    specBuilder.append(LiteralQueryShapeParseNode::kDateField, Date_t::fromMillisSinceEpoch(0));
+    auto spec = specBuilder.obj();
+
+    ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -29,51 +29,78 @@
 
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
 namespace mongo::extension::sdk {
 
-std::string QueryShapeOptsHandle::serializeUsingOptsHelper(
-    const std::function<MongoExtensionByteView()>& getByteViewToSerialize,
+template <typename T>
+T QueryShapeOptsHandle::serializeUsingOptsHelper(
+    const MongoExtensionByteView* byteView,
     const std::function<MongoExtensionStatus*(const MongoHostQueryShapeOpts*,
                                               const MongoExtensionByteView*,
-                                              ::MongoExtensionByteBuf**)>& apiFunc) const {
+                                              ::MongoExtensionByteBuf**)>& apiFunc,
+    const std::function<T(const VecByteBufHandle&)>& transformBufferToReturn) const {
     assertValid();
 
     ::MongoExtensionByteBuf* buf;
     auto* ptr = get();
-    auto byteView = getByteViewToSerialize();
 
-    enterC([&]() { return apiFunc(ptr, &byteView, &buf); });
+    enterC([&]() { return apiFunc(ptr, byteView, &buf); });
 
     if (!buf) {
         // TODO SERVER-111882 tassert here instead of returning empty string, since this would
         // indicate programmer error.
-        return "";
+        return T();
     }
 
     // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
     // into a string to be returned.
     VecByteBufHandle ownedBuf{static_cast<VecByteBuf*>(buf)};
-    return std::string(byteViewAsStringView(ownedBuf.getByteView()));
+    return transformBufferToReturn(ownedBuf);
 }
 
 
 std::string QueryShapeOptsHandle::serializeIdentifier(const std::string& identifier) const {
-    auto getByteView = [&identifier]() {
-        return stringViewAsByteView(identifier);
+    auto byteView = stringViewAsByteView(identifier);
+
+    auto transformBufferToReturn = [](const VecByteBufHandle& buf) {
+        return std::string(byteViewAsStringView(buf.getByteView()));
     };
 
-    return serializeUsingOptsHelper(getByteView, vtable().serialize_identifier);
+    return serializeUsingOptsHelper<std::string>(
+        &byteView, vtable().serialize_identifier, transformBufferToReturn);
 }
 
 std::string QueryShapeOptsHandle::serializeFieldPath(const std::string& fieldPath) const {
-    auto getByteView = [&fieldPath]() {
-        return stringViewAsByteView(fieldPath);
+    auto byteView = stringViewAsByteView(fieldPath);
+
+    auto transformBufferToReturn = [](const VecByteBufHandle& buf) {
+        return std::string(byteViewAsStringView(buf.getByteView()));
     };
 
-    return serializeUsingOptsHelper(getByteView, vtable().serialize_field_path);
+    return serializeUsingOptsHelper<std::string>(
+        &byteView, vtable().serialize_field_path, transformBufferToReturn);
+}
+
+void QueryShapeOptsHandle::appendLiteral(BSONObjBuilder& builder,
+                                         StringData fieldName,
+                                         const BSONElement& bsonElement) const {
+    uint64_t bufSize = bsonElement.size();
+    MongoExtensionByteView byteView{reinterpret_cast<const uint8_t*>(bsonElement.rawdata()),
+                                    bufSize};
+
+    // We return a bool from this function to conform to the `serializeUsingOptsHelper` template
+    // structure. It would be ideal to return something like void() or void_t() but that does not
+    // exist.
+    auto transformBufferToReturn = [&](const VecByteBufHandle& buf) {
+        BSONElement element(reinterpret_cast<const char*>(buf.getByteView().data));
+        builder.appendAs(element, fieldName);
+        return true;
+    };
+
+    serializeUsingOptsHelper<bool>(&byteView, vtable().serialize_literal, transformBufferToReturn);
 }
 
 }  // namespace mongo::extension::sdk

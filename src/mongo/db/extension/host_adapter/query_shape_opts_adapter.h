@@ -55,8 +55,14 @@ private:
                                                         const ::MongoExtensionByteView* fieldPath,
                                                         ::MongoExtensionByteBuf** output) noexcept;
 
-    static constexpr ::MongoHostQueryShapeOptsVTable VTABLE{&_extSerializeIdentifier,
-                                                            &_extSerializeFieldPath};
+    static MongoExtensionStatus* _extSerializeLiteral(
+        const ::MongoHostQueryShapeOpts* ctx,
+        const ::MongoExtensionByteView* bsonElementPtr,
+        ::MongoExtensionByteBuf** output) noexcept;
+
+    static constexpr ::MongoHostQueryShapeOptsVTable VTABLE{
+        &_extSerializeIdentifier, &_extSerializeFieldPath, &_extSerializeLiteral};
+
     const SerializationOptions* _opts;
 };
 }  // namespace mongo::extension::host

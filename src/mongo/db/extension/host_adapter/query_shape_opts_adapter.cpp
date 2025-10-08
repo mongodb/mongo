@@ -68,4 +68,35 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
     });
 }
 
+MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
+    const ::MongoHostQueryShapeOpts* ctx,
+    const ::MongoExtensionByteView* bsonElementPtr,
+    ::MongoExtensionByteBuf** output) noexcept {
+    return enterCXX([&]() {
+        *output = nullptr;
+
+        const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
+
+        // Parse a BSONElement out of the ptr passed from the extension. Note that the caller must
+        // ensure that underlying BSONObj remains valid.
+        BSONElement element(reinterpret_cast<const char*>(bsonElementPtr->data));
+
+        // Serialize the literal and then copy it into a BSON object. The BSON serialization is
+        // necessary because the Value returned can be any valid Value type, and the easiest way to
+        // have the extension deduce the return type is to rely on our existing BSON infrastructure.
+        auto val = opts->serializeLiteral(element);
+
+        // Serialize the Value into a BSON document.
+        MutableDocument doc;
+        doc.addField("", std::move(val));
+        auto bson = doc.freeze().toBson();
+
+        // Allocate a buffer on the heap for the output BSONElement with the serialized literal.
+        // Ownership is transferred to the caller.
+        auto bsonElement = bson.firstElement();
+        *output = new VecByteBuf(reinterpret_cast<const uint8_t*>(bsonElement.rawdata()),
+                                 bsonElement.size());
+    });
+}
+
 }  // namespace mongo::extension::host

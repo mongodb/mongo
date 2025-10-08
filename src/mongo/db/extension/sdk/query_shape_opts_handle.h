@@ -31,6 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -56,6 +57,10 @@ public:
 
     std::string serializeFieldPath(const std::string& fieldPath) const;
 
+    void appendLiteral(BSONObjBuilder& builder,
+                       StringData fieldName,
+                       const BSONElement& bsonElement) const;
+
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(11136800,
@@ -64,13 +69,23 @@ private:
         tassert(11173400,
                 "HostQueryShapeOpts' 'serializeFieldPath' is null",
                 vtable.serialize_field_path != nullptr);
+        tassert(11173500,
+                "HostQueryShapeOpts' 'serializeLiteral' is null",
+                vtable.serialize_literal != nullptr);
     };
 
-    std::string serializeUsingOptsHelper(
-        const std::function<MongoExtensionByteView()>& getByteViewToSerialize,
+    /**
+     * A templated helper function for vtable functions that take a byte view and populate a byte
+     * buf output. The `transformBufferToReturn` callback receives the buffer that was populated
+     * through the API boundary and transforms it into an object of type T.
+     */
+    template <typename T>
+    T serializeUsingOptsHelper(
+        const MongoExtensionByteView* byteViewToSerialize,
         const std::function<MongoExtensionStatus*(const MongoHostQueryShapeOpts*,
                                                   const MongoExtensionByteView*,
-                                                  ::MongoExtensionByteBuf**)>& apiFunc) const;
+                                                  ::MongoExtensionByteBuf**)>& apiFunc,
+        const std::function<T(const VecByteBufHandle&)>& transformBufferToReturn) const;
 };
 
 }  // namespace mongo::extension::sdk

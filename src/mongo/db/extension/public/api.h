@@ -173,6 +173,21 @@ typedef struct MongoHostQueryShapeOptsVTable {
     MongoExtensionStatus* (*serialize_field_path)(const MongoHostQueryShapeOpts* ctx,
                                                   const MongoExtensionByteView* fieldPath,
                                                   MongoExtensionByteBuf** output);
+
+    /**
+     * Populates the ByteBuf with a serialized BSON object containing the serialized version of the
+     * literal. Ownership is transferred to the caller.
+     *
+     * Note that this receives a BSONElement as input because literal serialization requires knowing
+     * the type of the underlying value, and the value may be any valid BSONType - not necessarily
+     * a string. The caller of `serialize_literal` must keep the buffer backing the BSONElement
+     * alive across the call to `serialize_literal`.
+     *
+     * Returned BSON format: {"": <serializedLiteral>}
+     */
+    MongoExtensionStatus* (*serialize_literal)(const MongoHostQueryShapeOpts* ctx,
+                                               const MongoExtensionByteView* bsonElementPtr,
+                                               MongoExtensionByteBuf** output);
 } MongoHostQueryShapeOptsVTable;
 
 /**
