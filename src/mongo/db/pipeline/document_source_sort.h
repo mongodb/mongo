@@ -133,11 +133,14 @@ public:
         return create(expCtx, {sortOrder, expCtx}, kDefaultOptions);
     }
 
+    // TODO SERVER-108133 Consider passing in SortStageOptions instead of limit and
+    // outputSortKeyMetadata.
     static boost::intrusive_ptr<DocumentSourceSort> createBoundedSort(
         SortPattern pat,
         StringData boundBase,
         long long boundOffset,
         boost::optional<long long> limit,
+        bool outputSortKeyMetadata,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**

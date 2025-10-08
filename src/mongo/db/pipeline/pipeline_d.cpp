@@ -2035,6 +2035,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
                                                                      : DocumentSourceSort::kMax),
                                               0,
                                               sort->getLimit(),
+                                              sort->shouldSetSortKeyMetadata(),
                                               expCtx));
             } else {
                 // Since the sortPattern and the direction of the index don't agree we must use the
@@ -2050,6 +2051,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
                                                    : -unpack->getBucketMaxSpanSeconds()) *
                             1000,
                         sort->getLimit(),
+                        sort->shouldSetSortKeyMetadata(),
                         expCtx));
 
                 /**

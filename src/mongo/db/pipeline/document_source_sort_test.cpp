@@ -677,8 +677,12 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
     auto expCtx = getExpCtx();
     expCtx->setTempDir(tempDir.path());
     expCtx->setAllowDiskUse(true);
-    auto sort = DocumentSourceSort::createBoundedSort(
-        {BSON("time" << 1), expCtx}, "min", -1, boost::none /*limit*/, expCtx);
+    auto sort = DocumentSourceSort::createBoundedSort({BSON("time" << 1), expCtx},
+                                                      "min",
+                                                      -1,
+                                                      boost::none /*limit*/,
+                                                      false /*outputSortKeyMetadata*/,
+                                                      expCtx);
 
     std::string largeStr(1024, 'x');
 
@@ -720,6 +724,66 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
     ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 4);
     ASSERT_EQ(sortStats->spillingStats.getSpilledBytes(), 4296);
+    ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(), 1024);
+    ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
+}
+
+TEST_F(DocumentSourceSortExecutionTest,
+       ShouldBeAbleToReportSpillingStatsInBoundedSortWithSortKeyMetadata) {
+    RAIIServerParameterControllerForTest sortMemoryLimit{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", 3 * 1024};
+
+    unittest::TempDir tempDir("DocumentSourceSortTest");
+    auto expCtx = getExpCtx();
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
+    auto sort = DocumentSourceSort::createBoundedSort({BSON("time" << 1), expCtx},
+                                                      "min",
+                                                      -1,
+                                                      boost::none /*limit*/,
+                                                      true /*outputSortKeyMetadata*/,
+                                                      expCtx);
+
+    std::string largeStr(1024, 'x');
+
+    std::vector<Document> data = {
+        Document{{"time", Date_t::fromMillisSinceEpoch(1)}, {"largeStr", largeStr}},
+        Document{{"time", Date_t::fromMillisSinceEpoch(0)}, {"largeStr", largeStr}},
+        Document{{"time", Date_t::fromMillisSinceEpoch(2)}, {"largeStr", largeStr}},
+        Document{{"time", Date_t::fromMillisSinceEpoch(3)}, {"largeStr", largeStr}}};
+    for (auto& doc : data) {
+        MutableDocument mdoc{doc};
+        DocumentMetadataFields metadata;
+        metadata.setTimeseriesBucketMinTime(doc.getField("time").getDate());
+        mdoc.setMetadata(std::move(metadata));
+        doc = mdoc.freeze();
+    }
+
+    auto mock = DocumentSourceMock::createForTest(std::move(data), expCtx);
+    sort->setSource(mock.get());
+
+    auto next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(0)));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(1)));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(2)));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(3)));
+
+    ASSERT_TRUE(sort->getNext().isEOF());
+
+    const auto* sortStats = static_cast<const SortStats*>(sort->getSpecificStats());
+    ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
+    ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 4);
+    ASSERT_EQ(sortStats->spillingStats.getSpilledBytes(), 4340);
     ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(), 1024);
     ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
 }
@@ -771,7 +835,83 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
 TEST_F(DocumentSourceSortTest, Redaction) {
     createSort(BSON("a" << 1));
     auto boundedSort = DocumentSourceSort::createBoundedSort(
-        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, getExpCtx());
+        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, false, getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$sort":{"HASH<a>":1}})",
+        redact(*sort(), true));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalBoundedSort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                },
+                "bound": {
+                    "base": "min",
+                    "offsetSeconds": "?number"
+                },
+                "limit": "?number"
+            }
+        })",
+        redact(*boundedSort, true));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$sort":{"sortKey":{"HASH<a>":1}}})",
+        redact(*sort(), true, ExplainOptions::Verbosity::kQueryPlanner));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalBoundedSort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                },
+                "bound": {
+                    "base": "min",
+                    "offsetSeconds": "?number"
+                },
+                "limit": "?number"
+            }
+        })",
+        redact(*boundedSort, true, ExplainOptions::Verbosity::kQueryPlanner));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({
+            "$sort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                }
+            },
+            "totalDataSizeSortedBytesEstimate": "?number",
+            "usedDisk": "?bool",
+            "spills": "?number",
+            "spilledDataStorageSize": "?number"
+        })",
+        redact(*sort(), true, ExplainOptions::Verbosity::kExecStats));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalBoundedSort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                },
+                "bound": {
+                    "base": "min",
+                    "offsetSeconds": "?number"
+                },
+                "limit": "?number"
+            },
+            "totalDataSizeSortedBytesEstimate": "?number",
+            "usedDisk": "?bool",
+            "spills": "?number",
+            "spilledDataStorageSize": "?number"
+        })",
+        redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
+}
+
+TEST_F(DocumentSourceSortTest, RedactionWithSortKeyMetadata) {
+    createSort(BSON("a" << 1));
+    auto boundedSort = DocumentSourceSort::createBoundedSort(
+        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, true, getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  //
         R"({"$sort":{"HASH<a>":1}})",

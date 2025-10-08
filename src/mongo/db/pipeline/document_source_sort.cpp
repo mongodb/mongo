@@ -515,6 +515,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     StringData boundBase,
     long long boundOffset,
     boost::optional<long long> limit,
+    bool outputSortKeyMetadata,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     auto ds = DocumentSourceSort::create(expCtx, pat);
@@ -552,6 +553,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     } else {
         MONGO_UNREACHABLE;
     }
+
+    ds->_outputSortKeyMetadata = outputSortKeyMetadata;
 
     if (pat.size() > 1) {
         SortPattern partitionKey =
