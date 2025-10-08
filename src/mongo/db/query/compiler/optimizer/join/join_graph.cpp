@@ -114,6 +114,13 @@ NodeId JoinGraph::addNode(NamespaceString collectionName,
 }
 
 EdgeId JoinGraph::addEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList predicates) {
+    // Self-edges are not permitted; when joining a collection to itself, we should use a different
+    // node for each instance of the collection.
+    if (const auto common = (left & right); common.any()) {
+        tasserted(11180001,
+                  "Self edges are not permitted, but both sides contain " + common.to_string());
+    }
+
     _edges.emplace_back(std::move(predicates), left, right);
     return static_cast<EdgeId>(_edges.size()) - 1;
 }
