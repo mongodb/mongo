@@ -86,14 +86,14 @@ for (const query of queries) {
               resultsAfterSplitting,
               {resultsBeforeSharding, resultsAfterSplitting});
 
+    // Enable the fail point to cause range deletion to hang indefinitely.
     let suspendRangeDeletionShard0Fp =
         configureFailPoint(st.rs0.getPrimary(), "suspendRangeDeletion");
 
     // shard0 will have shardKey=0 doc and the orphaned shardKey=6 doc, and shard1 will have only
     // the shardKey=6 document.
     assert(st.adminCommand(
-        {moveChunk: coll.getFullName(), find: {shardKey: 6}, to: st.shard1.shardName}));
-    suspendRangeDeletionShard0Fp.wait();
+        {moveChunk: coll.getFullName(), find: {shardKey: 6}, to: st.shard1.shardName, _waitForDelete: false}));
 
     const resultsAfterMovingChunk = coll.aggregate(query).toArray();
 
