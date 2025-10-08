@@ -1,7 +1,12 @@
 /**
  * Test that create collection only takes database IX lock and will not be blocked by transactions.
  *
- * @tags: [uses_transactions, requires_db_locking, assumes_unsharded_collection]
+ * @tags: [
+ *   uses_transactions,
+ *   requires_db_locking,
+ *   # Creating sharded collections is not supported in multi-document transactions.
+ *   assumes_unsharded_collection,
+ * ]
  */
 
 (function() {
