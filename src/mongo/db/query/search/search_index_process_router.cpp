@@ -121,11 +121,6 @@ SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* op
 
             // Search index related commands should fail when attempted on a ts collection.
             // Except '$listSearchIndexes' should return empty results.
-            // TODO SERVER-110353: Investigate why "type" returns "collection" instead of
-            // "timeseries" when:
-            // - Running $listSearchIndexes (but not create/update/dropSearchIndex).
-            // - On a sharded collection (but not an unsharded collection on a sharded cluster).
-            // - Against a viewless timeseries collection (but not a viewfull ts collection).
             uassert(10840700,
                     "search index commands are not allowed on timeseries collections",
                     !(failOnTsColl && bsonDoc["type"].String() == "timeseries"));
