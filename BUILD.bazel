@@ -9,7 +9,7 @@ load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
 load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel/install_rules:bolt.bzl", "bolt_instrument", "bolt_optimize")
-load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "extensions_with_config", "mongo_install")
+load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "mongo_install")
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchain_aliases")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 
@@ -293,7 +293,7 @@ mongo_install(
         "@platforms//os:windows": ["@windows_sasl//:bins"],
         "//conditions:default": [],
     }) + select({
-        "@platforms//os:linux": [":dist_test_extensions"],
+        "@platforms//os:linux": ["//src/mongo/db/extension/test_examples:dist_test_extensions"],
         "//conditions:default": [],
     }) + select({
         "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
@@ -425,50 +425,11 @@ mongo_install(
     ],
 )
 
-# This sets up the valid extension targets to use in dist-test and extensions.
-# Using Bazel's transition system, this rule ensures that the extensions are
-# built with the correct configuration. All extensions that may be loaded in
-# jstests should be included here. Extensions that are built only for unit tests
-# should be omitted.
-extensions_with_config(
-    name = "dist_test_extensions",
-    srcs = [
-        ##################### EXTENSIONS FOR PASSTHROUGH TESTS #####################
-        # Any extension that we intend to load in extensions passthrough tests and in the
-        # extension-enabled variant MUST have the "_mongo_extension" suffix for the resmoke
-        # scripts to recognize it.
-
-        # TODO SERVER-109838: Remove the comment below once extension stages are no longer
-        # listed by $listMqlEntities.
-        # Any extension added here will result in the with-extensions Evergreen variant
-        # automatically loading it into the server for its tasks. This means that
-        # null_chars_string_input.js will break as not all stages from $listMqlEntities
-        # will have a null character test. To resolve this, ensure that these new stages
-        # are added to the "skips" list in that test.
-
-        # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
-        "//src/mongo/db/extension/test_examples:bar_mongo_extension",
-        "//src/mongo/db/extension/test_examples:foo_mongo_extension",
-        "//src/mongo/db/extension/test_examples:logging_mongo_extension",
-        "//src/mongo/db/extension/test_examples:parse_options_mongo_extension",
-        "//src/mongo/db/extension/test_examples:test_options_mongo_extension",
-        "//src/mongo/db/extension/test_examples:extension_errors_mongo_extension",
-
-        #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
-        # Any extension that is just loaded in a no-passthrough test MUST NOT have the
-        # "_mongo_extension" suffix.
-        "//src/mongo/db/extension/test_examples:no_symbol_bad_extension",
-        "//src/mongo/db/extension/test_examples:duplicate_stage_descriptor_bad_extension",
-        "//src/mongo/db/extension/test_examples:foo_extension_v2",
-        "//src/mongo/db/extension/test_examples:vector_search_extension",
-    ],
-)
-
 # This sets up targets for install-extensions and archive-extensions.
 mongo_install(
     name = "extensions",
     srcs = [
-        ":dist_test_extensions",
+        "//src/mongo/db/extension/test_examples:dist_test_extensions",
     ],
     package_extract_name = "/",
 )

@@ -1,6 +1,46 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/install_rules:install_rules.bzl", "extensions_with_config")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
 
 package(default_visibility = ["//visibility:public"])
+
+# This sets up the valid extension targets to use in the top level `dist-test`
+# and `extensions` targets. Using Bazel's transition system, this rule ensures
+# that the extensions are built with the correct configuration. All extensions
+# that may be loaded in jstests should be included here. Extensions that are
+# built only for unit tests should be omitted.
+extensions_with_config(
+    name = "dist_test_extensions",
+    srcs = [
+        ##################### EXTENSIONS FOR PASSTHROUGH TESTS #####################
+        # Any extension that we intend to load in extensions passthrough tests and in the
+        # extension-enabled variant MUST have the "_mongo_extension" suffix for the resmoke
+        # scripts to recognize it.
+
+        # TODO SERVER-109838: Remove the comment below once extension stages are no longer
+        # listed by $listMqlEntities.
+        # Any extension added here will result in the with-extensions Evergreen variant
+        # automatically loading it into the server for its tasks. This means that
+        # null_chars_string_input.js will break as not all stages from $listMqlEntities
+        # will have a null character test. To resolve this, ensure that these new stages
+        # are added to the "skips" list in that test.
+
+        # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
+        ":bar_mongo_extension",
+        ":foo_mongo_extension",
+        ":logging_mongo_extension",
+        ":parse_options_mongo_extension",
+        ":test_options_mongo_extension",
+        ":extension_errors_mongo_extension",
+
+        #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
+        # Any extension that is just loaded in a no-passthrough test MUST NOT have the
+        # "_mongo_extension" suffix.
+        ":no_symbol_bad_extension",
+        ":duplicate_stage_descriptor_bad_extension",
+        ":foo_extension_v2",
+        ":vector_search_extension",
+    ],
+)
 
 ############################## EXTENSIONS FOR PASSTHROUGH TESTS ##############################
 ### Any extension name suffix'ed with "_mongo_extension" with be automatically picked up by
