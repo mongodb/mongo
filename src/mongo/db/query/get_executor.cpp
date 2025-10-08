@@ -267,14 +267,6 @@ public:
         return _cachedPlanHash;
     }
 
-    void setRecoveredFromPlanCache(bool val) {
-        _fromPlanCache = val;
-    }
-
-    bool isRecoveredFromPlanCache() const {
-        return _fromPlanCache;
-    }
-
     PlanCacheInfo& planCacheInfo() {
         return _cacheInfo;
     }
@@ -289,7 +281,6 @@ private:
     boost::optional<size_t> _decisionWorks;
     bool _needSubplanning{false};
     bool _recoveredPinnedCacheEntry{false};
-    bool _fromPlanCache{false};
     PlanCacheInfo _cacheInfo;
     // If there is a matching cache entry, this is the hash of that plan.
     boost::optional<size_t> _cachedPlanHash;

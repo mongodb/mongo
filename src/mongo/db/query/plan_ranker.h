@@ -108,7 +108,7 @@ public:
         const double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
         boost::optional<double> groupByDistinctBonus;
 
-        // Apply a large bonus to DISTINCT_SCAN plans in an aggregaton context, as the
+        // Apply a large bonus to DISTINCT_SCAN plans in an aggregation context, as the
         // $groupByDistinct rewrite can reduce the amount of overall work the query needs to do.
         if (cq.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled() && cq.getDistinct() &&
             !cq.cqPipeline().empty() && hasStage(STAGE_DISTINCT_SCAN, stats)) {
@@ -170,8 +170,8 @@ protected:
     virtual double calculateProductivity(const PlanStageStatsType* stats) const = 0;
 
     /**
-     * Returns a string desribing a formula to calculte plan producivity. It can be used for the log
-     * output, for example.
+     * Returns a string describing a formula to calculate plan productivity. It can be used for the
+     * log output, for example.
      */
     virtual std::string getProductivityFormula(const PlanStageStatsType* stats) const = 0;
 
