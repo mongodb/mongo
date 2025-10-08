@@ -431,69 +431,72 @@ class _AddRemoveShardThread(threading.Thread):
     def _decomission_removed_shard(self, shard_obj):
         start_time = time.time()
 
-        while True:
-            if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
-                msg = "Timed out waiting for removed shard to finish data clean up"
-                self.logger.error(msg)
-                raise errors.ServerFailure(msg)
+        direct_shard_conn = pymongo.MongoClient(shard_obj.get_driver_connection_url())
 
-            direct_shard_conn = pymongo.MongoClient(shard_obj.get_driver_connection_url())
-
-            # Wait until any DDL, resharding, transactions, and migration ops are cleaned up.
-            # TODO SERVER-90782 Change these to be assertions, rather than waiting for the collections
-            # to be empty
-            if len(list(direct_shard_conn.config.system.sharding_ddl_coordinators.find())) != 0:
-                self.logger.info(
-                    "Waiting for config.system.sharding_ddl_coordinators to be empty before decomissioning."
-                )
-                time.sleep(1)
-                continue
-
-            if len(list(direct_shard_conn.config.localReshardingOperations.recipient.find())) != 0:
-                self.logger.info(
-                    "Waiting for config.localReshardingOperations.recipient to be empty before decomissioning."
-                )
-                time.sleep(1)
-                continue
-
-            if len(list(direct_shard_conn.config.transaction_coordinators.find())) != 0:
-                self.logger.info(
-                    "Waiting for config.transaction_coordinators to be empty before decomissioning."
-                )
-                time.sleep(1)
-                continue
-
-            # TODO SERVER-91474 Wait for ongoing transactions to finish on participants
-            if self._get_number_of_ongoing_transactions(direct_shard_conn) != 0:
-                self.logger.info(
-                    "Waiting for ongoing transactions to commit or abort before decomissioning."
-                )
-                time.sleep(1)
-                continue
-
-            # TODO SERVER-50144 Wait for config.rangeDeletions to be empty before decomissioning
-
-            all_dbs = direct_shard_conn.admin.command({"listDatabases": 1})
-            for db in all_dbs["databases"]:
-                if db["name"] not in ["admin", "config", "local"] and db["empty"] is False:
-                    all_collections = direct_shard_conn.db_name.command({"listCollections": 1})
-                    for coll in all_collections:
-                        if len(list(direct_shard_conn.db_name.coll.find())) != 0:
-                            msg = "Found non-empty collection after removing shard: " + coll
-                            self.logger.error(msg)
-                            raise errors.ServerFailure(msg)
-
-            break
-
-        for db_name in direct_shard_conn.list_database_names():
-            if db_name in ["admin", "config", "local"]:
-                continue
-            self.logger.info(f"Dropping database before decommissioning: {db_name}")
-            direct_shard_conn.drop_database(db_name)
-            self.logger.info(f"Successfully dropped database: {db_name}")
-
-        teardown_handler = fixture_interface.FixtureTeardownHandler(self.logger)
         with shard_obj.removeshard_teardown_mutex:
+            while True:
+                if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
+                    msg = "Timed out waiting for removed shard to finish data clean up"
+                    self.logger.error(msg)
+                    raise errors.ServerFailure(msg)
+
+                # Wait until any DDL, resharding, transactions, and migration ops are cleaned up.
+                # TODO SERVER-90782 Change these to be assertions, rather than waiting for the collections
+                # to be empty
+                if len(list(direct_shard_conn.config.system.sharding_ddl_coordinators.find())) != 0:
+                    self.logger.info(
+                        "Waiting for config.system.sharding_ddl_coordinators to be empty before decomissioning."
+                    )
+                    time.sleep(1)
+                    continue
+
+                if (
+                    len(list(direct_shard_conn.config.localReshardingOperations.recipient.find()))
+                    != 0
+                ):
+                    self.logger.info(
+                        "Waiting for config.localReshardingOperations.recipient to be empty before decomissioning."
+                    )
+                    time.sleep(1)
+                    continue
+
+                if len(list(direct_shard_conn.config.transaction_coordinators.find())) != 0:
+                    self.logger.info(
+                        "Waiting for config.transaction_coordinators to be empty before decomissioning."
+                    )
+                    time.sleep(1)
+                    continue
+
+                # TODO SERVER-91474 Wait for ongoing transactions to finish on participants
+                if self._get_number_of_ongoing_transactions(direct_shard_conn) != 0:
+                    self.logger.info(
+                        "Waiting for ongoing transactions to commit or abort before decomissioning."
+                    )
+                    time.sleep(1)
+                    continue
+
+                # TODO SERVER-50144 Wait for config.rangeDeletions to be empty before decomissioning
+
+                all_dbs = direct_shard_conn.admin.command({"listDatabases": 1})
+                for db in all_dbs["databases"]:
+                    if db["name"] not in ["admin", "config", "local"] and db["empty"] is False:
+                        all_collections = direct_shard_conn.db_name.command({"listCollections": 1})
+                        for coll in all_collections:
+                            if len(list(direct_shard_conn.db_name.coll.find())) != 0:
+                                msg = "Found non-empty collection after removing shard: " + coll
+                                self.logger.error(msg)
+                                raise errors.ServerFailure(msg)
+
+                break
+
+            for db_name in direct_shard_conn.list_database_names():
+                if db_name in ["admin", "config", "local"]:
+                    continue
+                self.logger.info(f"Dropping database before decommissioning: {db_name}")
+                direct_shard_conn.drop_database(db_name)
+                self.logger.info(f"Successfully dropped database: {db_name}")
+
+            teardown_handler = fixture_interface.FixtureTeardownHandler(self.logger)
             shard_obj.removeshard_teardown_marker = True
             teardown_handler.teardown(shard_obj, "shard")
             if not teardown_handler.was_successful():
