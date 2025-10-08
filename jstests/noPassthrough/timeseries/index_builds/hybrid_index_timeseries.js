@@ -1,6 +1,11 @@
 /**
  * Tests that hybrid index builds on timeseries collections behave correctly when they
  * receive concurrent writes.
+ *
+ * @tags: [
+ *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
 import {assertCommandWorkedInParallelShell} from "jstests/libs/parallel_shell_helpers.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
