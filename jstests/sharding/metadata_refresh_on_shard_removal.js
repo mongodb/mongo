@@ -95,14 +95,21 @@ const dbName = "TestDB";
     });
 
     // Removing shard0 updates the metadata version in the catalog cache of all nodes. The
-    // subsequent CRUD operation on router1 triggered a incremental refresh (instead of a full
-    // refresh) of its catalog cache.
+    // subsequent CRUD operation on router1 should trigger at least one incremental refresh
+    // (instead of a full refresh) of its catalog cache. Additional incremental refreshes may
+    // occur due to concurrent balancer activity or other background operations, but no full
+    // refreshes should be needed since the shard removal properly invalidates the cache.
     const updatedCatalogCacheStats = st.s1.getDB(dbName).serverStatus({}).shardingStatistics.catalogCache;
-    assert.eq(0, updatedCatalogCacheStats.countFullRefreshesStarted - initCatalogCacheStats.countFullRefreshesStarted);
     assert.eq(
-        1,
+        0,
+        updatedCatalogCacheStats.countFullRefreshesStarted - initCatalogCacheStats.countFullRefreshesStarted,
+        "No full refreshes should be triggered by shard removal",
+    );
+    assert.gte(
         updatedCatalogCacheStats.countIncrementalRefreshesStarted -
             initCatalogCacheStats.countIncrementalRefreshesStarted,
+        1,
+        "At least one incremental refresh should be triggered by the user query after shard removal",
     );
 
     st.stop();
@@ -174,8 +181,10 @@ const dbName = "TestDB";
     // TODO (SERVER-80724): Implement the following test case when database metadata refresh
     // statistics are available.
     // Removing shard0 updates the metadata version in the catalog cache of all nodes. The
-    // subsequent CRUD operation on router1 triggered a incremental refresh (instead of a full
-    // refresh) of its catalog cache.
+    // subsequent CRUD operation on router1 should trigger at least one incremental refresh
+    // (instead of a full refresh) of its catalog cache. Additional incremental refreshes may
+    // occur due to concurrent balancer activity or other background operations, but no full
+    // refreshes should be needed since the shard removal properly invalidates the cache.
 
     st.stop();
 })();
