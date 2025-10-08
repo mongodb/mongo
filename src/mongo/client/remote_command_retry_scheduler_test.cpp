@@ -236,8 +236,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryStrategy) {
     auto strategy = NoRetryStrategy();
     // Doesn't matter what "shouldRetryOnError()" returns since we won't be retrying the remote
     // command.
-    for (int i = 0; i < int(ErrorCodes::MaxError); ++i) {
-        const auto error = ErrorCodes::Error(i);
+    for (auto error : allErrorCodes_forTest()) {
         if (ErrorCodes::mustHaveExtraInfo(error)) {
             continue;
         }
@@ -249,8 +248,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryStrategy) {
 TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryStrategyMaxResponse) {
     auto strategy = DefaultRetryStrategy(15U);
     size_t errorCounter = 0;
-    for (int i = 0; i < int(ErrorCodes::MaxError); ++i) {
-        auto error = ErrorCodes::Error(i);
+    for (auto error : allErrorCodes_forTest()) {
         if (ErrorCodes::mustHaveExtraInfo(error)) {
             continue;
         }
@@ -270,8 +268,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryStrategyMaxResponse) {
 
 TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryStrategy) {
     auto strategy = std::make_unique<DefaultRetryStrategy>(ErrorCodes::MaxError);
-    for (int i = 0; i < int(ErrorCodes::MaxError); ++i) {
-        auto error = ErrorCodes::Error(i);
+    for (auto error : allErrorCodes_forTest()) {
         if (ErrorCodes::mustHaveExtraInfo(error)) {
             continue;
         }

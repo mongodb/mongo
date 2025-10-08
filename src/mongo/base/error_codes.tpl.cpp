@@ -165,4 +165,13 @@ void error_details::throwExceptionForStatus(const Status& status) {
     }
 }
 
+std::span<const ErrorCodes::Error> allErrorCodes_forTest() {
+    static const constexpr std::array<ErrorCodes::Error, ${len($codes)}> arr{
+        //#for $ec in $codes:
+        ErrorCodes::Error{$ec.code},  // $ec.name
+        //#end for
+    };
+    return arr;
+}
+
 }  // namespace mongo
