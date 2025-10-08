@@ -711,6 +711,11 @@ auto isSplitAlreadyDone(const txn_api::TransactionClient& txnClient,
 
 }  // namespace
 
+Lock::ExclusiveLock ShardingCatalogManager::acquireChunkOpLockForSnapshotReadOnCatalog(
+    OperationContext* opCtx) {
+    return Lock::ExclusiveLock(opCtx, _kChunkOpLock);
+}
+
 void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
     OperationContext* opCtx,
     const NamespaceString& nss,

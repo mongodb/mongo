@@ -1,7 +1,5 @@
 /**
- * Test that reset placement history loads the correct snapshot. This is actually a test for
- * ensuring that an aggregation run on a local shard with snapshot read concern will only see the
- * snapshot data.
+ * Test validating the expected behavior of resetPlacementHistory (in particular, its logic performing snapshot reads of the global catalog).
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
  *  ]
@@ -10,70 +8,180 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-(function () {
-    "use strict";
+const st = new ShardingTest({
+    shards: {rs0: {nodes: 1}, rs1: {nodes: 1}},
+    config: {nodes: 1},
+});
 
-    let st = new ShardingTest({shards: 2});
-    let mongos = st.s;
+const configPrimary = st.configRS.getPrimary();
 
-    let dbName = jsTestName();
-    let kNssColl1 = dbName + ".coll1";
-    let kNssColl2 = dbName + ".coll2";
-    let kNssColl3 = dbName + ".coll3";
+// Identifier for the config.placementHistory special documents holding metadata about the operational boundaries set by the initialization.
+const initializationMetadataNssId = "";
 
-    /*The test will attempt to simulate a fresh initialization of the placement history (empty
-     * placement history and a non-empty catalog.collections/databases). While this is ok for the
-     * purpose of the test, it will be caught as a routing table inconsistency and the check should be
-     * disabled*/
-    TestData.skipCheckRoutingTableConsistency = true;
+// Sends resetPlacementHistory through a parallel shell and pauses it after picking the cluster time for snapshotting the global catalog,
+// but before actually performing the read (and materializing the view).
+// Returns a handle to unpause and join the resetPlacementHistory issued in
+function launchAndPauseResetPlacementHistory() {
+    let failPointPausingReset = configureFailPoint(
+        configPrimary,
+        "initializePlacementHistoryHangAfterSettingSnapshotReadConcern",
+        {mode: "alwaysOn"},
+    );
+    let joinParallelResetRequest = startParallelShell(function () {
+        assert.commandWorked(db.getSiblingDB("admin").runCommand({resetPlacementHistory: 1}));
+    }, st.s.port);
+    failPointPausingReset.wait();
 
-    jsTest.log("Running reset placement history should use snapshot read concern");
-    {
-        jsTest.log("configuring failpoint");
-        const failPoint = configureFailPoint(
-            st.configRS.getPrimary(),
-            "initializePlacementHistoryHangAfterSettingSnapshotReadConcern",
-            {mode: "alwaysOn"},
+    return {
+        failPointPausingReset,
+        joinParallelResetRequest,
+        resumeAndJoin: function () {
+            failPointPausingReset.off();
+            joinParallelResetRequest();
+        },
+    };
+}
+
+{
+    jsTest.log.info(
+        "resetPlacementHistory produces a materialized view that is consistent with the state of the global catalog at the chosen point-in-time",
+    );
+    const dbName = "consistentExecutionTestDB";
+    const nssShardedBeforeReset = `${dbName}.collShardedBeforeReset`;
+    const nssShardedAfterReset = `${dbName}.collShardedAfterReset`;
+    const collShardedThenDropped = "collCreatedThenDropped";
+    const nssShardedThenDropped = `${dbName}.${collShardedThenDropped}`;
+    // Setup: shard 2 collections (expected to be captured by the snapshot read).
+    assert.commandWorked(st.s.adminCommand({shardCollection: nssShardedBeforeReset, key: {_id: 1}}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: nssShardedThenDropped, key: {_id: 1}}));
+
+    let resetPlacementHistoryRequest = launchAndPauseResetPlacementHistory();
+
+    // Drop the first sharded collection and shard a new one; each operation is expected to
+    // - be invisible to the snapshot read performed by resetPlacementHistory
+    // - insert a placement change document with a greater timestamp (which won't be removed by the reset)
+    assert.commandWorked(st.s.getDB(dbName).runCommand({drop: collShardedThenDropped}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: nssShardedAfterReset, key: {_id: 1}}));
+
+    // Before resuming the execution, tag each the existing config.placementHistory documents for later inspection.
+    assert.commandWorked(
+        st.config.placementHistory.updateMany({}, {$set: {createdAfterReset: true}}, {writeConcern: {w: "majority"}}),
+    );
+
+    resetPlacementHistoryRequest.resumeAndJoin();
+
+    // Pick the most recent placement history entry for each namespace in config.placementHistory
+    let initializationTime = st.config.placementHistory
+        .find({nss: initializationMetadataNssId})
+        .sort({timestamp: -1})
+        .limit(1)
+        .next().timestamp;
+
+    let placementChangesByNss = st.config.placementHistory
+        .aggregate([
+            {$match: {nss: {$ne: initializationMetadataNssId}}},
+            {$sort: {timestamp: 1}},
+            {$group: {_id: "$nss", placementChanges: {$push: "$$ROOT"}}},
+        ])
+        .toArray();
+
+    function verifyPlacementDocForNamespace(nss, placementDoc, createdByResetCmd) {
+        assert.eq(
+            createdByResetCmd ? undefined : true,
+            placementDoc.createdAfterReset,
+            `The placement doc for ${nss} should ${createdByResetCmd ? "" : "not "}be part of the materialized view created by resetPlacementHistory`,
         );
-
-        // shard 2 collections - part of the snapshot
-        assert.commandWorked(st.s.adminCommand({shardCollection: kNssColl1, key: {_id: 1}}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: kNssColl2, key: {_id: 1}}));
-
-        // Starts parallel shell to run the command that will hang.
-        let awaitShell = startParallelShell(function () {
-            jsTest.log("PARALLEL SHELL: Running reset placement history");
-            assert.commandWorked(db.getSiblingDB("admin").runCommand({resetPlacementHistory: 1}));
-        }, st.s.port);
-
-        jsTest.log("Waiting for reset placement history to hang");
-        failPoint.wait();
-
-        // shard collection - not part of the snapshot
-        assert.commandWorked(st.s.adminCommand({shardCollection: kNssColl3, key: {_id: 1}}));
-
-        // cleanup the placement history (so that it will only contain the documents inserted by the
-        // reset command once the failpont is turned off).
-        st.config.placementHistory.deleteMany({});
-
-        // unhang the reset placement history
-        jsTest.log("Unhanging reset placement history and will wait for it to finish");
-        failPoint.off();
-        awaitShell();
-
-        // reset placement history will register all the data found in the snapshot read of
-        // config.collection. The insertion of the third collection happened
-        // after we read the snapshot so it should not be registered (note: this is only because we
-        // forced a cleanup of the placement history, otherwise the third collection would have been
-        // registered as part of the insertion)
-        let entryColl1 = st.config.placementHistory.findOne({nss: kNssColl1});
-        let entryColl2 = st.config.placementHistory.findOne({nss: kNssColl2});
-        let entryColl3 = st.config.placementHistory.findOne({nss: kNssColl3});
-        assert.neq(entryColl1, null);
-        assert.neq(entryColl2, null);
-        timestampCmp(entryColl1.timestamp, entryColl2.timestamp);
-        assert.eq(entryColl3, null);
-
-        st.stop();
+        if (createdByResetCmd) {
+            assert(timestampCmp(placementDoc.timestamp, initializationTime) <= 0);
+        } else {
+            assert(timestampCmp(placementDoc.timestamp, initializationTime) > 0);
+        }
     }
-})();
+
+    placementChangesByNss.forEach((nssGroup) => {
+        switch (nssGroup._id) {
+            // Namespaces that existed prior to the reset are expected to have a single placement change document,
+            // created by the resetPlacementHistory command...
+            case "config.system.sessions":
+            case dbName:
+            case nssShardedBeforeReset:
+                assert.eq(
+                    1,
+                    nssGroup.placementChanges.length,
+                    `Unexpected number of placement changes for nss ${nssGroup._id}`,
+                );
+                verifyPlacementDocForNamespace(nssGroup._id, nssGroup.placementChanges[0], true);
+                break;
+            // ... Except for the dropped collection, which should have two (the first generated by the reset while still existing, one generated by the dropCollection commit).
+            case nssShardedThenDropped:
+                assert.eq(
+                    2,
+                    nssGroup.placementChanges.length,
+                    `Unexpected number of placement changes for nss ${nssGroup._id}`,
+                );
+                verifyPlacementDocForNamespace(nssGroup._id, nssGroup.placementChanges[0], true);
+                assert.eq(1 /*the primary shard*/, nssGroup.placementChanges[0].shards.length);
+                verifyPlacementDocForNamespace(nssGroup._id, nssGroup.placementChanges[1], false);
+                assert.eq(0 /*no shards*/, nssGroup.placementChanges[1].shards.length);
+                break;
+            // Namespaces created after the reset are expected to have a single placement change document with a timestamp greater than the initialization time.
+            case nssShardedAfterReset:
+                assert.eq(
+                    1,
+                    nssGroup.placementChanges.length,
+                    `Unexpected number of placement changes for nss ${nssGroup._id}`,
+                );
+                verifyPlacementDocForNamespace(nssGroup._id, nssGroup.placementChanges[0], false);
+                break;
+            default:
+                assert(false, `Unexpected nss found in config.placementHistory: ${nssGroup._id}`);
+        }
+    });
+}
+
+{
+    jsTest.log.info(
+        "resetPlacementHistory is resilient to snapshot read errors due to the chosen PIT falling outside the max history window",
+    );
+    const dbName = "resilientExecutionTestDB";
+    const nss = `${dbName}.coll`;
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
+
+    // Set a small 'snapshot history window' on the node that will execute the reset of 'config.placementHistory'
+    // to more easily trigger the error scenario.
+    const snapshotHistoryWindowSecs = 10;
+    const testMarginSecs = 1;
+    assert.commandWorked(
+        configPrimary.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: snapshotHistoryWindowSecs}),
+    );
+
+    let resetPlacementHistoryRequest = launchAndPauseResetPlacementHistory();
+
+    // The operation has already picked up an initialization time for performing the snapshot read: retrieve its value from the recovery document of the supporting coordinator.
+    const chosenInitializationTimeBeforeSnapshotReadError = configPrimary
+        .getDB("config")
+        .system.sharding_ddl_coordinators.findOne({
+            "_id.operationType": "initializePlacementHistory",
+        }).initializationTime;
+
+    sleep((snapshotHistoryWindowSecs + testMarginSecs) * 1000);
+    // Trigger the cleanup of the 'snapshot history' by creating a new database (which inserts a new document in config.databases with WC: majority).
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName + "_support"}));
+
+    resetPlacementHistoryRequest.resumeAndJoin();
+
+    // Pick the initialization time that was eventually set by the resetPlacementHistory operation;
+    // this is expected to be strictly greater than the one picked before the snapshot read error.
+    const finalInitializationTime = st.config.placementHistory
+        .find({nss: initializationMetadataNssId})
+        .sort({timestamp: -1})
+        .limit(1)[0].timestamp;
+
+    assert(
+        timestampCmp(finalInitializationTime, chosenInitializationTimeBeforeSnapshotReadError) > 0,
+        "Could not reproduce the expected error scenario",
+    );
+}
+
+st.stop();

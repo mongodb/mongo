@@ -33,6 +33,8 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
+#include "mongo/db/local_catalog/drop_collection.h"
+#include "mongo/db/vector_clock/vector_clock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -122,22 +124,74 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(Phase::kBlockDDLs,
                                  [](auto* opCtx) { blockAndDrainConflictingDDLs(opCtx); }))
-        .then(_buildPhaseHandler(Phase::kDefineInitializationTime,
-                                 [](auto* opCtx) {
-                                     // TODO SERVER-109002 Block chunk migration commits and set the
-                                     // init time as the current VectorClock::configTime.
-                                 }))
+        .then(_buildPhaseHandler(
+            Phase::kDefineInitializationTime,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                // Block chunk migration commits: this, combined with the preemption of DDLs
+                // (applied in Phase::kBlockDDLs) and topology changes (maintained throughout the
+                // execution of this coordinator, see _getAdditionalLocksToAcquire()), allows to
+                // operate in isolation from any operation that may write placement changes on the
+                // global catalog. Use this section to:
+                // - Delete the existing content of config.placementHistory, which may be
+                // incomplete/inconsistent; a collection drop is performed to reduce execution time.
+                // - Establish the point-in-time for the snapshot read that will support its
+                //   recreation during the kInitialization phase.
+                auto noChunkMigrationCommitsRegion =
+                    ShardingCatalogManager::get(opCtx)->acquireChunkOpLockForSnapshotReadOnCatalog(
+                        opCtx);
+                const auto now = VectorClock::get(opCtx)->getTime();
+                DropReply dropReply;
+                uassertStatusOK(mongo::dropCollection(
+                    opCtx,
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    &dropReply,
+                    DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
+                auto initializationTime = now.configTime().asTimestamp();
+
+                _doc.setInitializationTime(initializationTime);
+            }))
         .then(_buildPhaseHandler(Phase::kUnblockDDLs,
                                  [](auto* opCtx) { unblockConflictingDDLs(opCtx); }))
-        .then(_buildPhaseHandler(Phase::kComputeInitialization,
-                                 [](auto* opCtx) {
-                                     // TODO SERVER-109002
-                                     // - Apply the chosen init time to generate the placement
-                                     // history snapshot;
-                                     // - Handle 'SnapshotTooOld' errors.
-                                     ShardingCatalogManager::get(opCtx)->initializePlacementHistory(
-                                         opCtx);
-                                 }))
+        .then(_buildPhaseHandler(
+            Phase::kComputeInitialization,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                tassert(10900200,
+                        "Cannot initialize config.placementHistory without a PIT",
+                        _doc.getInitializationTime().has_value());
+
+                const auto& initTimeRef = _doc.getInitializationTime().value();
+                LOGV2(10900201,
+                      "Initializing config.placementHistory",
+                      "initializationTime"_attr = initTimeRef);
+                auto* shardingCatalogManager = ShardingCatalogManager::get(opCtx);
+                // Recreate the collection and its supporting index, following the drop performed
+                // within Phase::kDefineInitializationTime.
+                uassertStatusOK(
+                    shardingCatalogManager->createIndexForConfigPlacementHistory(opCtx));
+                try {
+                    shardingCatalogManager->initializePlacementHistory(opCtx, initTimeRef);
+                } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>& e) {
+                    // Spurious failures may arise when the chosen initializationTime falls off the
+                    // snapshot read history window; when this happens, retry the initialization
+                    // with a more recent timestamp (obtained after re-establishing the proper
+                    // isolation constraints).
+                    // This is achieved by resetting the state of the recovery doc and remapping the
+                    // exception to a retryable error.
+                    LOGV2_WARNING(
+                        10900202,
+                        "config.placementHistory initialization failed: snapshot read not "
+                        "available at the requested PIT. If the problem persists, consider raising "
+                        "the value of server parameter minSnapshotHistoryWindowInSeconds.",
+                        "err"_attr = redact(e),
+                        "initializationTime"_attr = initTimeRef);
+                    auto newDoc = _doc;
+                    newDoc.setPhase(Phase::kBlockDDLs);
+                    newDoc.setInitializationTime(boost::none);
+                    _updateStateDocument(opCtx, std::move(newDoc));
+                    uasserted(ErrorCodes::ExceededTimeLimit,
+                              "config.placementHistory initialization failed");
+                }
+            }))
         .then(_buildPhaseHandler(Phase::kFinalize, [](auto* opCtx) {
             PlacementHistoryCleaner::get(opCtx)->resume(opCtx);
         }));

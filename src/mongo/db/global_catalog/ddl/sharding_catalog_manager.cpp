@@ -515,12 +515,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         return result.withContext("couldn't create collUuid_1 index on config.queryAnalyzers");
     }
 
-    auto status = createIndexOnConfigCollection(
-        opCtx,
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON(NamespacePlacementType::kNssFieldName
-             << 1 << NamespacePlacementType::kTimestampFieldName << -1),
-        true /*unique*/);
+    result = createIndexForConfigPlacementHistory(opCtx);
 
     if (!result.isOK()) {
         return result.withContext(

@@ -55,6 +55,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/record_id.h"
@@ -437,133 +438,105 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
     opObserver.onMajorityCommitPointUpdate(getServiceContext(), majorityCommitPoint);
 
     now = VectorClock::get(operationContext())->getTime();
-    const auto timeAtFirstInvocation = now.configTime().asTimestamp();
+    const auto initializationTime = now.configTime().asTimestamp();
 
     // init placement history
-    ShardingCatalogManager::get(operationContext())->initializePlacementHistory(operationContext());
+    ShardingCatalogManager::get(operationContext())
+        ->initializePlacementHistory(operationContext(), initializationTime);
 
-    auto verifyOutcome = [&,
-                          coll1 = coll1,
-                          coll1Chunks = coll1Chunks,
-                          coll2 = coll2,
-                          coll2Chunks = coll2Chunks,
-                          corruptedColl = corruptedColl](const Timestamp& timeAtInitialization) {
-        DBDirectClient dbClient(operationContext());
+    // Verify the outcome of the initialization procedure.
+    DBDirectClient dbClient(operationContext());
 
-        // The expected amount of documents has been generated
-        ASSERT_EQUALS(
-            dbClient.count(NamespaceString::kConfigsvrPlacementHistoryNamespace, BSONObj()),
-            3 /*numDatabases*/ + 3 /*numCollections*/ + 2 /*numMarkers*/);
+    // The expected amount of documents has been generated
+    ASSERT_EQUALS(dbClient.count(NamespaceString::kConfigsvrPlacementHistoryNamespace, BSONObj()),
+                  3 /*numDatabases*/ + 3 /*numCollections*/ + 2 /*numMarkers*/);
 
-        // Each database is correctly described
-        for (const auto& [dbName, primaryShard, timeOfCreation] : databaseInfos) {
-            const NamespacePlacementType expectedEntry(
-                NamespaceString::createNamespaceString_forTest(dbName),
-                timeOfCreation,
-                {primaryShard});
-            const auto generatedEntry = findOneOnConfigCollection<NamespacePlacementType>(
-                operationContext(),
-                NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON("nss" << dbName.toString_forTest()));
-
-            assertSamePlacementInfo(expectedEntry, generatedEntry);
-        }
-
-        // Each collection is properly described:
-        const auto getExpectedTimestampForColl = [](const std::vector<ChunkType>& collChunks) {
-            return std::max_element(collChunks.begin(),
-                                    collChunks.end(),
-                                    [](const ChunkType& lhs, const ChunkType& rhs) {
-                                        return *lhs.getOnCurrentShardSince() <
-                                            *rhs.getOnCurrentShardSince();
-                                    })
-                ->getOnCurrentShardSince()
-                .value();
-        };
-
-        // - coll1
-        NamespacePlacementType expectedEntryForColl1(
-            coll1.getNss(), getExpectedTimestampForColl(coll1Chunks), expectedColl1Placement);
-        expectedEntryForColl1.setUuid(coll1.getUuid());
-        const auto generatedEntryForColl1 = findOneOnConfigCollection<NamespacePlacementType>(
+    // Each database is correctly described
+    for (const auto& [dbName, primaryShard, timeOfCreation] : databaseInfos) {
+        const NamespacePlacementType expectedEntry(
+            NamespaceString::createNamespaceString_forTest(dbName), timeOfCreation, {primaryShard});
+        const auto generatedEntry = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << coll1.getNss().ns_forTest()));
+            BSON("nss" << dbName.toString_forTest() /*filter*/));
 
-        assertSamePlacementInfo(expectedEntryForColl1, generatedEntryForColl1);
+        assertSamePlacementInfo(expectedEntry, generatedEntry);
+    }
 
-        // - coll2
-        NamespacePlacementType expectedEntryForColl2(
-            coll2.getNss(), getExpectedTimestampForColl(coll2Chunks), expectedColl2Placement);
-        expectedEntryForColl2.setUuid(coll2.getUuid());
-        const auto generatedEntryForColl2 = findOneOnConfigCollection<NamespacePlacementType>(
-            operationContext(),
-            NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << coll2.getNss().ns_forTest()));
+    // Each collection is properly described:
+    const auto getExpectedTimestampForColl = [](const std::vector<ChunkType>& collChunks) {
+        return std::max_element(collChunks.begin(),
+                                collChunks.end(),
+                                [](const ChunkType& lhs, const ChunkType& rhs) {
+                                    return *lhs.getOnCurrentShardSince() <
+                                        *rhs.getOnCurrentShardSince();
+                                })
+            ->getOnCurrentShardSince()
+            .value();
+    };
 
-        assertSamePlacementInfo(expectedEntryForColl2, generatedEntryForColl2);
+    // - coll1
+    NamespacePlacementType expectedEntryForColl1(
+        coll1.getNss(), getExpectedTimestampForColl(coll1Chunks), expectedColl1Placement);
+    expectedEntryForColl1.setUuid(coll1.getUuid());
+    const auto generatedEntryForColl1 = findOneOnConfigCollection<NamespacePlacementType>(
+        operationContext(),
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        BSON("nss" << coll1.getNss().ns_forTest()));
 
-        // - corruptedColl
-        NamespacePlacementType expectedEntryForCorruptedColl(
-            corruptedColl.getNss(), timeAtInitialization, expectedCorruptedCollPlacement);
-        expectedEntryForCorruptedColl.setUuid(corruptedColl.getUuid());
-        const auto generatedEntryForCorruptedColl =
-            findOneOnConfigCollection<NamespacePlacementType>(
-                operationContext(),
-                NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON("nss" << corruptedColl.getNss().ns_forTest()));
+    assertSamePlacementInfo(expectedEntryForColl1, generatedEntryForColl1);
 
-        assertSamePlacementInfo(expectedEntryForCorruptedColl, generatedEntryForCorruptedColl);
+    // - coll2
+    NamespacePlacementType expectedEntryForColl2(
+        coll2.getNss(), getExpectedTimestampForColl(coll2Chunks), expectedColl2Placement);
+    expectedEntryForColl2.setUuid(coll2.getUuid());
+    const auto generatedEntryForColl2 = findOneOnConfigCollection<NamespacePlacementType>(
+        operationContext(),
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        BSON("nss" << coll2.getNss().ns_forTest()));
 
-        // Check placement initialization markers:
-        // - one entry at begin-of-time with all the currently existing shards (and no UUID set).
-        const NamespacePlacementType expectedMarkerForDawnOfTime(
-            ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
-            Timestamp(0, 1),
-            allShardIds);
-        const auto generatedMarkerForDawnOfTime = findOneOnConfigCollection<NamespacePlacementType>(
+    assertSamePlacementInfo(expectedEntryForColl2, generatedEntryForColl2);
+
+    // - corruptedColl
+    NamespacePlacementType expectedEntryForCorruptedColl(
+        corruptedColl.getNss(), initializationTime, expectedCorruptedCollPlacement);
+    expectedEntryForCorruptedColl.setUuid(corruptedColl.getUuid());
+    const auto generatedEntryForCorruptedColl = findOneOnConfigCollection<NamespacePlacementType>(
+        operationContext(),
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        BSON("nss" << corruptedColl.getNss().ns_forTest()));
+
+    assertSamePlacementInfo(expectedEntryForCorruptedColl, generatedEntryForCorruptedColl);
+
+    // Check placement initialization markers:
+    // - one entry at begin-of-time with all the currently existing shards (and no UUID set).
+    const NamespacePlacementType expectedMarkerForDawnOfTime(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+        Timestamp(0, 1),
+        allShardIds);
+    const auto generatedMarkerForDawnOfTime = findOneOnConfigCollection<NamespacePlacementType>(
+        operationContext(),
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        BSON(
+            "nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns_forTest()
+                  << "timestamp" << Timestamp(0, 1)));
+
+    assertSamePlacementInfo(expectedMarkerForDawnOfTime, generatedMarkerForDawnOfTime);
+
+    // - one entry at the time the initialization is performed with an empty set of shards
+    // (and no UUID set).
+    const NamespacePlacementType expectedMarkerForInitializationTime(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker, initializationTime, {});
+    const auto generatedMarkerForInitializationTime =
+        findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
             BSON("nss"
                  << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns_forTest()
-                 << "timestamp" << Timestamp(0, 1)));
+                 << "timestamp" << initializationTime));
 
-        assertSamePlacementInfo(expectedMarkerForDawnOfTime, generatedMarkerForDawnOfTime);
-
-        // - one entry at the time the initialization is performed with an empty set of shards
-        // (and no UUID set).
-        const NamespacePlacementType expectedMarkerForInitializationTime(
-            ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
-            timeAtInitialization,
-            {});
-        const auto generatedMarkerForInitializationTime =
-            findOneOnConfigCollection<NamespacePlacementType>(
-                operationContext(),
-                NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON("nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker
-                                  .ns_forTest()
-                           << "timestamp" << timeAtInitialization));
-
-        assertSamePlacementInfo(expectedMarkerForInitializationTime,
-                                generatedMarkerForInitializationTime);
-    };
-
-    verifyOutcome(timeAtFirstInvocation);
-
-    // Perform a second invocation - the content created by the previous invocation should have been
-    // fully replaced by a new full representation with updated initialization markers
-
-    now = VectorClock::get(operationContext())->getTime();
-    majorityCommitPoint = repl::OpTime(now.clusterTime().asTimestamp(), 1);
-    opObserver.onMajorityCommitPointUpdate(getServiceContext(), majorityCommitPoint);
-
-    now = VectorClock::get(operationContext())->getTime();
-    const auto timeAtSecondInvocation = now.configTime().asTimestamp();
-    ASSERT_GT(timeAtSecondInvocation, timeAtFirstInvocation);
-
-    ShardingCatalogManager::get(operationContext())->initializePlacementHistory(operationContext());
-
-    verifyOutcome(timeAtSecondInvocation);
+    assertSamePlacementInfo(expectedMarkerForInitializationTime,
+                            generatedMarkerForInitializationTime);
 }
 
 }  // unnamed namespace

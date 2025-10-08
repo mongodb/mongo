@@ -599,6 +599,14 @@ public:
         OperationContext* opCtx);
 
     /**
+     * Returns a scoped lock object, which holds the _kChunkOpLock in exclusive mode. This
+     * should only be acquired by InitializePlacementHistoryCoordinator when establishing the PIT
+     * for its snaphsot read over the global catalog.
+     */
+    [[nodiscard]] Lock::ExclusiveLock acquireChunkOpLockForSnapshotReadOnCatalog(
+        OperationContext* opCtx);
+
+    /**
      * Updates the "hasTwoOrMoreShard" cluster cardinality parameter based on the number of shards
      * in the shard registry after reloading it. Cannot be called while holding the
      * _kShardMembershipLock in exclusive mode since setting cluster parameters requires taking this
@@ -676,11 +684,22 @@ public:
     const std::shared_ptr<Shard>& localConfigShard();
 
     /**
-     * Initializes the config.placementHistory collection:
-        - one entry per collection and its placement information at the current timestamp
-        - one entry per database with the current primary shard at the current timestamp
+     * Creates the indexes on config.placementHistory supporting the getHistoricalPlacement()
+     * method.
      */
-    void initializePlacementHistory(OperationContext* opCtx);
+    Status createIndexForConfigPlacementHistory(OperationContext* opCtx);
+
+    /**
+     * (Re)builds the content config.placementHistory based on a snapshot read of the global catalog
+     * at the requested initializationTime, including:
+     *  - One document per each database;
+     *  - One document per each tracked collection;
+     *  - Two 'initialization marker' documents with metadata defining the operational boundaries
+     *    supported by the data produced during this request.
+     * Raises a SnapshotTooOld error if no data may be retrieved at the requested
+     * initializationTime.
+     */
+    void initializePlacementHistory(OperationContext* opCtx, const Timestamp& initializationTime);
 
     /**
      * Returns the oldest timestamp that is supported for history preservation.

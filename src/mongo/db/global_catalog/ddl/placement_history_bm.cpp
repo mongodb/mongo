@@ -219,7 +219,11 @@ void BM_initPlacementHistory(benchmark::State& state) {
     }
 
     for (auto _ : state) {
-        ShardingCatalogManager::get(fixture.opCxt())->initializePlacementHistory(fixture.opCxt());
+        auto now = VectorClock::get(fixture.opCxt())->getTime();
+        const auto initTime = now.configTime().asTimestamp();
+
+        ShardingCatalogManager::get(fixture.opCxt())
+            ->initializePlacementHistory(fixture.opCxt(), initTime);
     }
 };
 
