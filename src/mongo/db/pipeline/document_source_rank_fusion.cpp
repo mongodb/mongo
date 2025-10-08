@@ -692,6 +692,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
                           << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
+    uassert(11178500,
+            "$rankFusion is not allowed within a sub-pipeline",
+            !pExpCtx->inUnionWith && !pExpCtx->inLookup);
+
     // It is currently necessary to annotate on the ExpressionContext that this is a $rankFusion
     // query. Once desugaring happens, there's no way to identity from the (desugared) pipeline
     // alone that it came from $rankFusion. We need to know if it came from $rankFusion so we can
