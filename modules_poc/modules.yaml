@@ -15,6 +15,14 @@
 #   jira:
 #     Jira "Assigned Team" that should be used when filing tickets for the module.
 #
+#   fully_marked:
+#     If present and true, behaves as if all headers in the module have been fully
+#     marked, meaning that any unmarked APIs will be treated as private, regardless
+#     of whether they have included modules.h. This lets us lock-in the progress of
+#     marking that module so that it stays fully marked even as new files are added.
+#     Unlike other metadata, this is not inherited by submodules so that it is
+#     possible to have a fully_marked parent module before marking all submodules.
+#
 #   If unsure about these, or if multiple teams are involved, please pick a good place
 #   to send questions/tickets to initially, understanding that we can always send them
 #   somewhere else if needed.
@@ -931,6 +939,7 @@ atlas_streams:
   meta:
     slack: streams-engine
     jira: Atlas Streams
+    fully_marked: true
   files:
     - src/mongo/db/modules/enterprise/src/streams
 

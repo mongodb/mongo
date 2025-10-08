@@ -38,7 +38,7 @@ from cindex import (
     RefQualifierKind,
     TranslationUnit,
 )
-from mod_mapping import mod_for_file, normpath_for_file
+from mod_mapping import is_module_fully_marked, mod_for_file, normpath_for_file
 
 
 def perr(*values):
@@ -865,6 +865,14 @@ def parseTU(args: list[str] | str):
         # to the module they are a part of since we don't use protobuf for inter-module
         # communication.
         if include.include.name.endswith(".pb.h"):
+            complete_headers.add(normpath_for_file(include.include))
+            continue
+
+        # Treat all headers from fully marked modules as complete. This makes newly-added
+        # headers in that module private by default, requiring explicit marking of the public
+        # API.
+        header_mod = mod_for_file(include.include)
+        if is_module_fully_marked(header_mod):
             complete_headers.add(normpath_for_file(include.include))
             continue
 

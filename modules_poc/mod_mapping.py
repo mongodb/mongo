@@ -47,16 +47,20 @@ with open(parent / "modules.yaml") as f:
     def parseModules():
         raw_mods = yaml.load(f, Loader=Loader)
         lines = []
+        fully_marked = set[str]()
         for mod, info in raw_mods.items():
             for glob in info["files"]:
                 lines.append(f"/{glob} @10gen/{mod}")
+            if info.get("meta", {}).get("fully_marked", False):
+                fully_marked.add(mod)
         # If multiple rules match, later wins. So put rules with more
         # specificity later. For all of our current rules, longer means more
         # specific.
         lines.sort(key=lambda l: len(l.split()[0]))
-        return "\n".join(lines)
+        return "\n".join(lines), fully_marked
 
-    modules = CodeOwners(parseModules())
+    modules_text, fully_marked_modules = parseModules()
+    modules = CodeOwners(modules_text)
 
 
 def normpath_for_file(f: Cursor | ClangFile | str | None) -> str | None:
@@ -105,6 +109,10 @@ def mod_for_file(f: ClangFile | str | None) -> str | None:
             )
     file_mod_map[name] = mod
     return mod
+
+
+def is_module_fully_marked(mod: str | None) -> bool:
+    return mod in fully_marked_modules
 
 
 def teams_for_file(f: ClangFile | str | None):
