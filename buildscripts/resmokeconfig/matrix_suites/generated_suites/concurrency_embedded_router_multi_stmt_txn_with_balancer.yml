@@ -81,6 +81,7 @@ selector:
   - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
   - jstests/concurrency/fsm_workloads/update_rename.js
   - jstests/concurrency/fsm_workloads/update_rename_noindex.js
+  - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
   - jstests/concurrency/fsm_workloads/collection_defragmentation.js
   exclude_with_any_tags:
   - assumes_balancer_off

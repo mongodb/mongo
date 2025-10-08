@@ -74,6 +74,7 @@ selector:
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
+  - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_balancer_off

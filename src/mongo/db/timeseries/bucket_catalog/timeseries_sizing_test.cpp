@@ -57,8 +57,7 @@ TEST(TimeseriesSizingConstants, OpenBucket) {
         contexts.global,
         contexts,
         BucketId{UUID::gen(), OID{}, BucketKey::Signature{}},
-        BucketKey{UUID::gen(),
-                  BucketMetadata{contexts.global, BSONElement{}, nullptr, boost::none}},
+        BucketKey{UUID::gen(), BucketMetadata{contexts.global, BSONElement{}, boost::none}},
         ""_sd,
         Date_t{},
         registry);

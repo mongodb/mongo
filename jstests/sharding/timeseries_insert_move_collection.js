@@ -30,7 +30,10 @@ function generateRandomTimestamp() {
                                startTime.getTime()));
 }
 
-function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert) {
+function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert, failpoint) {
+    jsTest.log(
+        `Running testcase: orderedInsert = ${tojson(orderedInsert)}, failpoint = ${failpoint}`);
+
     testDB[collName].drop();
 
     assert.commandWorked(testDB.createCollection(collName, {
@@ -53,8 +56,7 @@ function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert) 
         docs.push({[timeField]: generateRandomTimestamp(), [metaField]: "location"});
     }
 
-    let writeFP = configureFailPoint(
-        st.rs1.getPrimary(), 'hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection');
+    let writeFP = configureFailPoint(st.rs1.getPrimary(), failpoint);
 
     jsTest.log("Begin writes");
     const awaitResult = startParallelShell(
@@ -81,7 +83,13 @@ function runInsertRandomTimeseriesWithIntermittentMoveCollection(orderedInsert) 
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-runInsertRandomTimeseriesWithIntermittentMoveCollection({ordered: false});
-runInsertRandomTimeseriesWithIntermittentMoveCollection({ordered: true});
+runInsertRandomTimeseriesWithIntermittentMoveCollection(
+    {ordered: false}, 'hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection');
+runInsertRandomTimeseriesWithIntermittentMoveCollection(
+    {ordered: true}, 'hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection');
+runInsertRandomTimeseriesWithIntermittentMoveCollection(
+    {ordered: false}, 'hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection');
+runInsertRandomTimeseriesWithIntermittentMoveCollection(
+    {ordered: true}, 'hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection');
 
 st.stop();

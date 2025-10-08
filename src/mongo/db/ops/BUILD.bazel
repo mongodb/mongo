@@ -189,6 +189,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db/timeseries:bucket_compression",
+        "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/transaction",
     ],
 )

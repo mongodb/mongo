@@ -919,7 +919,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const StringDataComparator* comparator) {
     TrackingContext trackingContext;
     auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
-        trackingContext, collectionUUID, comparator, options, measurements[0]));
+        trackingContext, collectionUUID, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
     BucketDocument bucketDoc = makeNewDocumentForWrite(nss,
@@ -1343,8 +1343,10 @@ void commitTimeseriesBucketsAtomically(
         auto& mainBucketCatalog = bucket_catalog::BucketCatalog::get(opCtx);
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(sideBucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus =
-                prepareCommit(sideBucketCatalog, coll->ns().getTimeseriesViewNamespace(), batch);
+            auto prepareCommitStatus = prepareCommit(sideBucketCatalog,
+                                                     coll->ns().getTimeseriesViewNamespace(),
+                                                     batch,
+                                                     coll->getDefaultCollator());
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return;
