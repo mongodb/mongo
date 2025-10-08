@@ -535,11 +535,8 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                                                                 bool allowForeignSharded) {
     // We've already allocated space for the trailing $match stage in '_fromPipeline'.
     _fromPipeline.back() = std::move(match);
-    MakePipelineOptions pipelineOpts;
-    pipelineOpts.optimize = true;
-    pipelineOpts.attachCursorSource = true;
-    // By default, $graphLookup doesn't support a sharded 'from' collection.
-    pipelineOpts.shardTargetingPolicy =
+
+    const ShardTargetingPolicy shardTargetingPolicy =
         allowForeignSharded ? ShardTargetingPolicy::kAllowed : ShardTargetingPolicy::kNotAllowed;
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
 
@@ -548,9 +545,36 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
     // to the '_fromExpCtx' by copying them from the parent query ExpressionContext.
     _fromExpCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
-    std::unique_ptr<mongo::Pipeline> pipeline;
+    std::unique_ptr<mongo::Pipeline> pipeline = mongo::Pipeline::parse(_fromPipeline, _fromExpCtx);
+    _fromExpCtx->initializeReferencedSystemVariables();
+
+    const auto& finalizePipeline = [](const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      mongo::Pipeline* pipeline,
+                                      MongoProcessInterface::CollectionMetadata collData) {
+        tassert(10313400, "Expected pipeline to finalize", pipeline);
+        visit(OverloadedVisitor{
+                  [&](std::monostate) {},
+                  [&](std::reference_wrapper<const CollectionOrViewAcquisition> collOrView) {
+                      pipeline->validateWithCollectionMetadata(collOrView);
+                      pipeline->performPreOptimizationRewrites(expCtx, collOrView);
+                  },
+                  [&](std::reference_wrapper<const CollectionRoutingInfo> cri) {
+                      if (cri.get().hasRoutingTable()) {
+                          pipeline->validateWithCollectionMetadata(cri);
+                          pipeline->performPreOptimizationRewrites(expCtx, cri);
+                      }
+                  }},
+              collData);
+        pipeline->optimizePipeline();
+        pipeline->validateCommon(true /* alreadyOptimized */);
+    };
     try {
-        return mongo::Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
+        return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
+            _fromExpCtx,
+            pipeline.release(),
+            true /* attachCursorAfterOptimizing */,
+            finalizePipeline,
+            shardTargetingPolicy);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         // This exception returns the information we need to resolve a sharded view. Update
         // the pipeline with the resolved view definition, but don't optimize or attach the
@@ -585,7 +609,15 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                     "new_pipe"_attr = mongo::Pipeline::serializePipelineForLogging(_fromPipeline));
 
         // We can now safely optimize and reattempt attaching the cursor source.
-        return mongo::Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
+        pipeline = mongo::Pipeline::parse(_fromPipeline, _fromExpCtx);
+        _fromExpCtx->initializeReferencedSystemVariables();
+
+        return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
+            _fromExpCtx,
+            pipeline.release(),
+            true /* attachCursorAfterOptimizing */,
+            finalizePipeline,
+            shardTargetingPolicy);
     }
 }
 

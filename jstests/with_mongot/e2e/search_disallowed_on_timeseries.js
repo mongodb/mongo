@@ -49,7 +49,6 @@ assert.commandWorked(bulk.execute());
             },
         ],
         // TODO SERVER-103133 Add tests for $search in a $unionWith.
-        // TODO SERVER-103134 Add tests for $search in a $graphLookup.
     ];
 
     // TODO SERVER-108560 remove the legacy timeseries error codes (10623000 and 40602), once 9.0
@@ -74,7 +73,7 @@ assert.commandWorked(bulk.execute());
         );
     });
 
-    // All queries on a timeseries collection on a view with $search in the view definition should
+    // All queries on a view on a timeseries collection with $search in the view definition should
     // fail.
     const searchView = "searchview_" + timeseriesCollName;
     assert.commandWorked(
@@ -87,6 +86,42 @@ assert.commandWorked(bulk.execute());
         [10557302, 10623000, 40602],
         `Expected failure for pipeline: ${tojson([{$match: {}}])}`,
     );
+
+    // We should also fail if we query the 'searchView' inside a subpipeline.
+    // Create a non-timeseries collection for the top-level pipeline.
+    const nonTSColl = db.non_tscoll;
+    assertDropCollection(db, nonTSColl.getName());
+    assert.commandWorked(nonTSColl.insert({key: 0, [metaFieldName]: 0}));
+    const subPipelines = [
+        [
+            {
+                $lookup: {
+                    from: searchView,
+                    let: {lkey: "$key"},
+                    pipeline: [{$match: {$expr: {$eq: [`$${metaFieldName}`, "$$lkey"]}}}],
+                    as: "joined",
+                },
+            },
+        ],
+        [
+            {
+                $graphLookup: {
+                    from: searchView,
+                    startWith: "$key",
+                    connectFromField: `${metaFieldName}`,
+                    connectToField: "fieldName",
+                    as: "graph",
+                },
+            },
+        ],
+    ];
+    subPipelines.forEach((pipeline) => {
+        assert.commandFailedWithCode(
+            nonTSColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
+            [10557302, 10623000, 40602],
+            `Expected failure for pipeline: ${tojson(pipeline)}`,
+        );
+    });
 })();
 
 (function testSearchIndexCommandsDisallowedOnTsCollection() {
@@ -150,7 +185,6 @@ assert.commandWorked(bulk.execute());
             },
         ],
         // TODO SERVER-103133 Add tests for $search in a $unionWith.
-        // TODO SERVER-103134 Add tests for $search in a $graphLookup.
     ];
 
     // TODO SERVER-108560 remove the legacy timeseries error codes (10623000 and 40602), once 9.0

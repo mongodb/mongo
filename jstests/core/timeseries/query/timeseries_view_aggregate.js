@@ -144,7 +144,6 @@ dataset.forEach((doc) => {
 });
 runTest(dataset, pipeline, expectedResults, viewPipeline);
 
-// TODO SERVER-103134 Add tests for pipelines with sub-pipelines, including $graphLookup.
 // TODO SERVER-103133 Add tests for pipelines with sub-pipelines, including $unionWith.
 
 // Test $lookup on a foreign collection that is a view on a timeseries collection.
@@ -177,7 +176,8 @@ runTest(dataset, pipeline, expectedResults, viewPipeline);
     assert.commandWorked(tsColl.insertMany(tsDocs));
     assert.commandWorked(db.createView(viewName, tsColl.getName(), [{$match: {age: {$lte: 30}}}]));
 
-    const pipeline = [
+    // Validate $lookup.
+    let pipeline = [
         {
             $lookup: {
                 from: viewName,
@@ -188,15 +188,41 @@ runTest(dataset, pipeline, expectedResults, viewPipeline);
         },
         {$project: {_id: 0, key: 0, "matched.time": 0}},
     ];
-    const expectedResults = [
+    let expectedResults = [
         {name: "Alice", matched: [{_id: 1, status: "active", age: 25}]},
         {name: "Bob", matched: [{_id: 2, status: "inactive", age: 30}]},
         {name: "Carol", matched: [{_id: 1, status: "active", age: 25}]},
     ];
-    const results = normalColl.aggregate(pipeline).toArray();
+    let results = normalColl.aggregate(pipeline).toArray();
     assertArrayEq({
         actual: results,
         expected: expectedResults,
         extraErrorMsg: "Unexpected results with $lookup on a view on a timeseries collection",
+    });
+
+    // Validate $graphLookup.
+    pipeline = [
+        {
+            $graphLookup: {
+                from: viewName,
+                startWith: "$key",
+                connectFromField: "key",
+                connectToField: "status",
+                as: "matched",
+                maxDepth: 0,
+            },
+        },
+        {$project: {_id: 0, "matched.time": 0}},
+    ];
+    expectedResults = [
+        {name: "Alice", key: "active", matched: [{_id: 1, status: "active", age: 25}]},
+        {name: "Bob", key: "inactive", matched: [{_id: 2, status: "inactive", age: 30}]},
+        {name: "Carol", key: "active", matched: [{_id: 1, status: "active", age: 25}]},
+    ];
+    results = normalColl.aggregate(pipeline).toArray();
+    assertArrayEq({
+        actual: results,
+        expected: expectedResults,
+        extraErrorMsg: "Unexpected results with $graphLookup on a view on a timeseries collection",
     });
 }
