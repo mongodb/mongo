@@ -30,8 +30,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
+
+DEFAULT_LOGICAL_AST_PARSE(TestFoo)
 
 /**
  * $testFoo is a no-op stage.
@@ -39,8 +42,6 @@ namespace sdk = mongo::extension::sdk;
  * This file is identical to foo.cpp except this stage does _not_ fail parsing if the
  * stage definition is empty. This is used for extenison upgrade/downgrade testing.
  */
-class TestFooLogicalStage : public sdk::LogicalAggregationStage {};
-
 class TestFooStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$testFoo";
@@ -48,14 +49,14 @@ public:
     TestFooStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         // Unlike foo.cpp, this will NOT fail to parse if the stage definition is not empty. Any/all
         // fields are just quietly ignored.
         uassert(10624201,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
 
-        return std::make_unique<TestFooLogicalStage>();
+        return std::make_unique<TestFooParseNode>();
     }
 };
 

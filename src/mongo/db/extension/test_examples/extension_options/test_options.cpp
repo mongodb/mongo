@@ -30,9 +30,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
+DEFAULT_LOGICAL_AST_PARSE(OptionA)
+DEFAULT_LOGICAL_AST_PARSE(OptionB)
 struct ExtensionOptions {
     inline static bool optionA = false;
 };
@@ -42,8 +45,6 @@ struct ExtensionOptions {
  *
  * The stage definition must be empty, like {$optionA: {}}, or it will fail to parse.
  */
-class OptionALogicalStage : public sdk::LogicalAggregationStage {};
-
 class OptionAStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$optionA";
@@ -51,13 +52,13 @@ public:
     OptionAStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         uassert(10999101,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
                     stageBson.getField(kStageName).Obj().isEmpty());
 
-        return std::make_unique<OptionALogicalStage>();
+        return std::make_unique<OptionAParseNode>();
     }
 };
 
@@ -66,8 +67,6 @@ public:
  *
  * The stage definition must be empty, like {$optionB: {}}, or it will fail to parse.
  */
-class OptionBLogicalStage : public sdk::LogicalAggregationStage {};
-
 class OptionBStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$optionB";
@@ -75,13 +74,13 @@ public:
     OptionBStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         uassert(10999102,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
                     stageBson.getField(kStageName).Obj().isEmpty());
 
-        return std::make_unique<OptionBLogicalStage>();
+        return std::make_unique<OptionBParseNode>();
     }
 };
 

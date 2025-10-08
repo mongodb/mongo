@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -39,7 +40,7 @@ namespace sdk = mongo::extension::sdk;
  * [0,5]. The stage will never assert on unexpected input but instead will log lines depending on
  * the stage definition provided.
  */
-class LogLogicalStage : public sdk::LogicalAggregationStage {};
+DEFAULT_LOGICAL_AST_PARSE(Log);
 
 class LogStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
@@ -49,7 +50,7 @@ public:
     LogStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         // Log an error log and short-circuit if the spec is empty or not an object.
         if (!stageBson.hasField(kStageName) || !stageBson.getField(kStageName).isABSONObj() ||
             stageBson.getField(kStageName).Obj().isEmpty()) {
@@ -57,7 +58,7 @@ public:
                 kStageName + " stage spec is empty or not an object.",
                 11134000,
                 mongo::extension::MongoExtensionLogSeverityEnum::kError);
-            return std::make_unique<LogLogicalStage>();
+            return std::make_unique<LogParseNode>();
         }
 
         mongo::BSONObj bsonSpec = stageBson.getField(kStageName).Obj();
@@ -97,7 +98,7 @@ public:
                                                             11134004);
         }
 
-        return std::make_unique<LogLogicalStage>();
+        return std::make_unique<LogParseNode>();
     }
 };
 

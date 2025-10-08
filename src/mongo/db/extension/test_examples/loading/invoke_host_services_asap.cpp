@@ -30,10 +30,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
-class TestFooForHostServicesAsapLogicalStage : public sdk::LogicalAggregationStage {};
+DEFAULT_LOGICAL_AST_PARSE(TestFooForHostServicesAsapStage)
 
 class TestFooForHostServicesAsapStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
@@ -42,7 +43,7 @@ public:
     TestFooForHostServicesAsapStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         uassert(11097602,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
@@ -52,7 +53,7 @@ public:
                 "Dummy assertion to test usage of the host services",
                 sdk::HostServicesHandle::getHostServices()->alwaysTrue_TEMPORARY());
 
-        return std::make_unique<TestFooForHostServicesAsapLogicalStage>();
+        return std::make_unique<TestFooForHostServicesAsapStageParseNode>();
     }
 };
 

@@ -105,7 +105,7 @@ DocumentSourceExtension::DocumentSourceExtension(
       _id(id),
       _raw_stage(rawStage.getOwned()),
       _staticDescriptor(staticDescriptor),
-      _logicalStage(staticDescriptor.parse(_raw_stage)) {}
+      _parseNode(staticDescriptor.parse(_raw_stage)) {}
 
 const char* DocumentSourceExtension::getSourceName() const {
     return _stageName.c_str();

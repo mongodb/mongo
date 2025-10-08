@@ -31,15 +31,16 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
+
+DEFAULT_LOGICAL_AST_PARSE(VectorSearch)
 
 /**
  * $vectorSearch is stage used to imitate overriding the existing $vectorSearch implementation
  * with an extension stage.
  */
-class VectorSearchLogicalStage : public sdk::LogicalAggregationStage {};
-
 class VectorSearchStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$vectorSearch";
@@ -47,12 +48,12 @@ public:
     VectorSearchStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         uassert(10938900,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
 
-        return std::make_unique<VectorSearchLogicalStage>();
+        return std::make_unique<VectorSearchParseNode>();
     }
 };
 

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host_adapter/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host_adapter/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -92,22 +93,22 @@ public:
     }
 };
 
-class DesugarToEmptyDescriptor : public extension::sdk::AggregationStageDescriptor {
+class NoOpStageDescriptor : public extension::sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$emptyDesugarExtension";
 
-    DesugarToEmptyDescriptor()
+    NoOpStageDescriptor()
         : extension::sdk::AggregationStageDescriptor(kStageName,
                                                      MongoExtensionAggregationStageType::kDesugar) {
     }
 
-    std::unique_ptr<extension::sdk::LogicalAggregationStage> parse(
+    std::unique_ptr<extension::sdk::AggregationStageParseNode> parse(
         BSONObj stageBson) const override {
-        return std::make_unique<NoOpLogicalAggregationStage>();
+        return std::make_unique<NoOpParseNode>();
     }
 
     static inline std::unique_ptr<extension::sdk::AggregationStageDescriptor> make() {
-        return std::make_unique<DesugarToEmptyDescriptor>();
+        return std::make_unique<NoOpStageDescriptor>();
     }
 };
 
@@ -564,6 +565,21 @@ TEST(AggregationStageTest, SerializingIdentifierQueryShapeSucceedsWithTransforma
                       queryShape);
 }
 
+TEST(AggregationStageTest, DesugarToEmptyDescriptorParseTest) {
+    auto descriptor = std::make_unique<extension::sdk::ExtensionAggregationStageDescriptor>(
+        NoOpStageDescriptor::make());
+    auto handle = extension::host_adapter::AggregationStageDescriptorHandle{descriptor.get()};
+
+    BSONObj stageBson = BSON(NoOpStageDescriptor::kStageName << BSONObj());
+    auto parseNodeHandle = handle.parse(stageBson);
+
+    auto expanded = parseNodeHandle.expand();
+
+    ASSERT_EQUALS(expanded.size(), 1);
+    ASSERT_TRUE(std::holds_alternative<extension::host_adapter::AggregationStageAstNodeHandle>(
+        expanded[0]));
+}
+
 class FieldPathQueryShapeParseNode : public extension::sdk::AggregationStageParseNode {
 public:
     static constexpr StringData kStageName = "$fieldPathQueryShape";
@@ -754,4 +770,5 @@ TEST(AggregationStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativ
 }
 
 }  // namespace
+
 }  // namespace mongo

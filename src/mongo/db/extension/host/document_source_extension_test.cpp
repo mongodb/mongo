@@ -82,9 +82,40 @@ public:
 }  // namespace extension::host
 
 namespace {
-class NoOpLogicalAggregationStage : public mongo::extension::sdk::LogicalAggregationStage {
+class NoOpLogicalAggregationStage : public extension::sdk::LogicalAggregationStage {
 public:
     NoOpLogicalAggregationStage() {}
+};
+
+class NoOpAggregationStageAstNode : public extension::sdk::AggregationStageAstNode {
+public:
+    std::unique_ptr<extension::sdk::LogicalAggregationStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggregationStage>();
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageAstNode> make() {
+        return std::make_unique<NoOpAggregationStageAstNode>();
+    }
+};
+
+class NoOpAggregationStageParseNode : public mongo::extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        std::vector<extension::sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(std::make_unique<NoOpAggregationStageAstNode>());
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
 };
 
 class NoOpAggregationStageDescriptor : public mongo::extension::sdk::AggregationStageDescriptor {
@@ -95,7 +126,7 @@ public:
         : mongo::extension::sdk::AggregationStageDescriptor(
               kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<mongo::extension::sdk::LogicalAggregationStage> parse(
+    std::unique_ptr<mongo::extension::sdk::AggregationStageParseNode> parse(
         BSONObj stageBson) const override {
 
         uassert(10596406,
@@ -105,7 +136,7 @@ public:
         uassert(10596407,
                 "Failed to parse $noOpExtension, missing boolean field \"foo\"",
                 stageDefinition.hasField("foo") && stageDefinition.getField("foo").isBoolean());
-        return std::make_unique<NoOpLogicalAggregationStage>();
+        return std::make_unique<NoOpAggregationStageParseNode>();
     }
 
     static inline std::unique_ptr<mongo::extension::sdk::AggregationStageDescriptor> make() {
@@ -215,5 +246,6 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
         std::vector<BSONObj> testPipeline{kInvalidSpec};
         ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 10596407);
     }
-}  // namespace
+}
+
 }  // namespace mongo

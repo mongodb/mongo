@@ -29,12 +29,13 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
-// Defines a complete extension version (LogicalStage, StageDescriptor, and Extension).
+// Defines a complete extension version (Extension, StageDescriptor, ParseNode, and LogicalStage).
 #define DEFINE_EXTENSION_VERSION(VERSION_NUM)                                                 \
-    class ExtensionV##VERSION_NUM##LogicalStage : public sdk::LogicalAggregationStage {};     \
+    DEFAULT_LOGICAL_AST_PARSE(ExtensionV##VERSION_NUM)                                        \
                                                                                               \
     class ExtensionV##VERSION_NUM##StageDescriptor : public sdk::AggregationStageDescriptor { \
     public:                                                                                   \
@@ -44,7 +45,7 @@ namespace sdk = mongo::extension::sdk;
             : sdk::AggregationStageDescriptor(kStageName,                                     \
                                               MongoExtensionAggregationStageType::kNoOp) {}   \
                                                                                               \
-        std::unique_ptr<sdk::LogicalAggregationStage> parse(                                  \
+        std::unique_ptr<sdk::AggregationStageParseNode> parse(                                \
             mongo::BSONObj stageBson) const override {                                        \
             uassert(10977901,                                                                 \
                     "Failed to parse " + kStageName + ", expected object",                    \
@@ -52,7 +53,7 @@ namespace sdk = mongo::extension::sdk;
                         stageBson.getField(kStageName).isABSONObj() &&                        \
                         stageBson.getField(kStageName).Obj().isEmpty());                      \
                                                                                               \
-            return std::make_unique<ExtensionV##VERSION_NUM##LogicalStage>();                 \
+            return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>();                    \
         }                                                                                     \
     };                                                                                        \
                                                                                               \

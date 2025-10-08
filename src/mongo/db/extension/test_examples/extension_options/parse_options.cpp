@@ -30,13 +30,17 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
+
+DEFAULT_LOGICAL_AST_PARSE(CheckNum)
 
 struct ExtensionOptions {
     inline static bool checkMax = false;
     inline static double max = -1;
 };
+
 
 /**
  * $checkNum is a no-op stage.
@@ -45,14 +49,13 @@ struct ExtensionOptions {
  * fail to parse. If 'checkMax' is true and the supplied num is greater than 'max', it will fail to
  * parse.
  */
-class CheckNumLogicalStage : public sdk::LogicalAggregationStage {};
 class CheckNumStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$checkNum";
     CheckNumStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         uassert(10999104,
                 "Failed to parse " + kStageName + ", expected an object for $checkNum",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
@@ -70,7 +73,7 @@ public:
                     obj.getField("num").numberDouble() <= ExtensionOptions::max);
         }
 
-        return std::make_unique<CheckNumLogicalStage>();
+        return std::make_unique<CheckNumParseNode>();
     }
 };
 

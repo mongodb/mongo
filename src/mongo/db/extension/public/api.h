@@ -227,15 +227,15 @@ typedef struct MongoExtensionAggregationStageDescriptorVTable {
     MongoExtensionByteView (*get_name)(const MongoExtensionAggregationStageDescriptor* descriptor);
 
     /**
-     * Parse the user provided stage definition into a logical stage.
+     * Parse the user provided stage definition into a parse node.
      *
      * stageBson contains a BSON document with a single (stageName, stageDefinition) element
-     * tuple. In case of success, *logicalStage is populated with the parsed stage. Both the
-     * returned MongoExtensionStatus and logicalStage is owned by the caller.
+     * tuple. In case of success, `*parseNode` is populated with the parsed stage. Both the
+     * returned MongoExtensionStatus and `parseNode` are owned by the caller.
      */
     MongoExtensionStatus* (*parse)(const MongoExtensionAggregationStageDescriptor* descriptor,
                                    MongoExtensionByteView stageBson,
-                                   struct MongoExtensionLogicalAggregationStage** logicalStage);
+                                   struct MongoExtensionAggregationStageParseNode** parseNode);
 } MongoExtensionAggregationStageDescriptorVTable;
 
 /**

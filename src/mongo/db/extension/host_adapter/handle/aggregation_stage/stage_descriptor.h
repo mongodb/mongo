@@ -30,7 +30,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/host_adapter/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/handle.h"
@@ -74,11 +74,11 @@ public:
      * stageBson contains a BSON document with a single (stageName, stageDefinition) element
      * tuple.
      *
-     * On success, the logical stage is returned and belongs to the caller.
+     * On success, the parse node is returned and belongs to the caller.
      * On failure, the error triggers an assertion.
      *
      */
-    LogicalAggregationStageHandle parse(BSONObj stageBson) const;
+    AggregationStageParseNodeHandle parse(BSONObj stageBson) const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
@@ -93,4 +93,5 @@ protected:
                 vtable.parse != nullptr);
     }
 };
+
 }  // namespace mongo::extension::host_adapter

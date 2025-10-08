@@ -83,100 +83,6 @@ private:
 };
 
 /**
- * AggregationStageDescriptor is the base class for implementing the
- * ::MongoExtensionAggregationStageDescriptor interface by an extension.
- *
- * An extension aggregation stage descriptor must provide a specialization of this base class, and
- * expose it to the host as a ExtensionAggregationStageDescriptor.
- */
-class AggregationStageDescriptor {
-public:
-    virtual ~AggregationStageDescriptor() = default;
-
-    std::string_view getName() const {
-        return std::string_view(_name);
-    }
-
-    ::MongoExtensionAggregationStageType getType() const {
-        return _type;
-    }
-
-    virtual std::unique_ptr<class LogicalAggregationStage> parse(BSONObj stageBson) const = 0;
-
-protected:
-    AggregationStageDescriptor(std::string name, ::MongoExtensionAggregationStageType type)
-        : _name(std::move(name)), _type(type) {}
-
-    std::string _name;
-    ::MongoExtensionAggregationStageType _type;
-};
-
-/**
- * ExtensionAggregationStageDescriptor is a boundary object representation of a
- * ::MongoExtensionAggregationStageDescriptor. It is meant to abstract away the C++ implementation
- * by the extension and provides the interface at the API boundary which will be called upon by the
- * host. The static VTABLE member points to static methods which ensure the correct conversion from
- * C++ context to the C API context.
- *
- * This abstraction is required to ensure we maintain the public
- * ::MongoExtensionAggregationStageDescriptor interface and layout as dictated by the public API.
- * Any polymorphic behavior must be deferred to and implemented by the AggregationStageDescriptor.
- */
-class ExtensionAggregationStageDescriptor final
-    : public ::MongoExtensionAggregationStageDescriptor {
-public:
-    ExtensionAggregationStageDescriptor(std::unique_ptr<AggregationStageDescriptor> descriptor)
-        : ::MongoExtensionAggregationStageDescriptor(&VTABLE), _descriptor(std::move(descriptor)) {}
-
-    ~ExtensionAggregationStageDescriptor() = default;
-
-private:
-    const AggregationStageDescriptor& getImpl() const noexcept {
-        return *_descriptor;
-    }
-
-    AggregationStageDescriptor& getImpl() noexcept {
-        return *_descriptor;
-    }
-
-    static ::MongoExtensionByteView _extGetName(
-        const ::MongoExtensionAggregationStageDescriptor* descriptor) noexcept {
-        return stringViewAsByteView(
-            static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
-                ->getImpl()
-                .getName());
-    }
-
-    static ::MongoExtensionAggregationStageType _extGetType(
-        const ::MongoExtensionAggregationStageDescriptor* descriptor) noexcept {
-        return static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
-            ->getImpl()
-            .getType();
-    }
-
-    static ::MongoExtensionStatus* _extParse(
-        const ::MongoExtensionAggregationStageDescriptor* descriptor,
-        ::MongoExtensionByteView stageBson,
-        ::MongoExtensionLogicalAggregationStage** logicalStage) noexcept {
-        return enterCXX([&]() {
-            auto logicalStagePtr =
-                static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
-                    ->getImpl()
-                    .parse(bsonObjFromByteView(stageBson));
-
-            *logicalStage =
-                std::make_unique<ExtensionLogicalAggregationStage>(std::move(logicalStagePtr))
-                    .release();
-        });
-    }
-
-    static constexpr ::MongoExtensionAggregationStageDescriptorVTable VTABLE = {
-        .get_type = &_extGetType, .get_name = &_extGetName, .parse = &_extParse};
-
-    std::unique_ptr<AggregationStageDescriptor> _descriptor;
-};
-
-/**
  * AggregationStageAstNode is the base class for implementing the
  * ::MongoExtensionAggregationStageAstNode interface by an extension.
  *
@@ -403,4 +309,97 @@ private:
         .expand = &_extExpand};
     std::unique_ptr<AggregationStageParseNode> _parseNode;
 };
+/**
+ * AggregationStageDescriptor is the base class for implementing the
+ * ::MongoExtensionAggregationStageDescriptor interface by an extension.
+ *
+ * An extension aggregation stage descriptor must provide a specialization of this base class, and
+ * expose it to the host as an ExtensionAggregationStageDescriptor.
+ */
+class AggregationStageDescriptor {
+public:
+    virtual ~AggregationStageDescriptor() = default;
+
+    std::string_view getName() const {
+        return std::string_view(_name);
+    }
+
+    ::MongoExtensionAggregationStageType getType() const {
+        return _type;
+    }
+
+    virtual std::unique_ptr<class AggregationStageParseNode> parse(BSONObj stageBson) const = 0;
+
+protected:
+    AggregationStageDescriptor(std::string name, ::MongoExtensionAggregationStageType type)
+        : _name(std::move(name)), _type(type) {}
+
+    std::string _name;
+    ::MongoExtensionAggregationStageType _type;
+};
+
+/**
+ * ExtensionAggregationStageDescriptor is a boundary object representation of a
+ * ::MongoExtensionAggregationStageDescriptor. It is meant to abstract away the C++ implementation
+ * by the extension and provides the interface at the API boundary which will be called upon by the
+ * host. The static VTABLE member points to static methods which ensure the correct conversion from
+ * C++ context to the C API context.
+ *
+ * This abstraction is required to ensure we maintain the public
+ * ::MongoExtensionAggregationStageDescriptor interface and layout as dictated by the public API.
+ * Any polymorphic behavior must be deferred to and implemented by the AggregationStageDescriptor.
+ */
+class ExtensionAggregationStageDescriptor final
+    : public ::MongoExtensionAggregationStageDescriptor {
+public:
+    ExtensionAggregationStageDescriptor(std::unique_ptr<AggregationStageDescriptor> descriptor)
+        : ::MongoExtensionAggregationStageDescriptor(&VTABLE), _descriptor(std::move(descriptor)) {}
+
+    ~ExtensionAggregationStageDescriptor() = default;
+
+private:
+    const AggregationStageDescriptor& getImpl() const noexcept {
+        return *_descriptor;
+    }
+
+    AggregationStageDescriptor& getImpl() noexcept {
+        return *_descriptor;
+    }
+
+    static ::MongoExtensionByteView _extGetName(
+        const ::MongoExtensionAggregationStageDescriptor* descriptor) noexcept {
+        return stringViewAsByteView(
+            static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
+                ->getImpl()
+                .getName());
+    }
+
+    static ::MongoExtensionAggregationStageType _extGetType(
+        const ::MongoExtensionAggregationStageDescriptor* descriptor) noexcept {
+        return static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
+            ->getImpl()
+            .getType();
+    }
+
+    static ::MongoExtensionStatus* _extParse(
+        const ::MongoExtensionAggregationStageDescriptor* descriptor,
+        ::MongoExtensionByteView stageBson,
+        ::MongoExtensionAggregationStageParseNode** parseNode) noexcept {
+        return enterCXX([&]() {
+            auto parseNodePtr = static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
+                                    ->getImpl()
+                                    .parse(bsonObjFromByteView(stageBson));
+
+            *parseNode =
+                std::make_unique<ExtensionAggregationStageParseNode>(std::move(parseNodePtr))
+                    .release();
+        });
+    }
+
+    static constexpr ::MongoExtensionAggregationStageDescriptorVTable VTABLE = {
+        .get_type = &_extGetType, .get_name = &_extGetName, .parse = &_extParse};
+
+    std::unique_ptr<AggregationStageDescriptor> _descriptor;
+};
+
 }  // namespace mongo::extension::sdk

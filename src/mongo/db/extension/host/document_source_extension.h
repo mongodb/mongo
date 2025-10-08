@@ -184,7 +184,7 @@ private:
     const Id _id;
     BSONObj _raw_stage;
     const mongo::extension::host_adapter::AggregationStageDescriptorHandle _staticDescriptor;
-    mongo::extension::host_adapter::LogicalAggregationStageHandle _logicalStage;
+    mongo::extension::host_adapter::AggregationStageParseNodeHandle _parseNode;
 };
 }  // namespace extension::host
 }  // namespace mongo

@@ -32,10 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
-class TestBuzzLogicalStage : public sdk::LogicalAggregationStage {};
+DEFAULT_LOGICAL_AST_PARSE(TestBuzz)
 
 class TestBuzzStageDescriptor : public sdk::AggregationStageDescriptor {
 public:
@@ -44,12 +45,12 @@ public:
     TestBuzzStageDescriptor()
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
         uassert(10845402,
                 "Failed to parse " + kStageName + ", expected object",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
 
-        return std::make_unique<TestBuzzLogicalStage>();
+        return std::make_unique<TestBuzzParseNode>();
     }
 };
 
