@@ -212,4 +212,39 @@ struct EncryptedFieldMatchResult {
 boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
     const FieldRef& key, const std::vector<FieldRef>& encryptedFields);
 
+
+/**
+ * Function to evaluate a QueryTypeConfig that appears under an EncryptedField. Used as a
+ * visitor function when iterating all QueryTypeConfig present in an EncryptedFieldConfig.
+ * A return value of true signals that a condition has been met and iteration may halt.
+ */
+using QueryTypeConfigVisitor = std::function<bool(const EncryptedField&, const QueryTypeConfig&)>;
+
+/**
+ * Function to evaluate an EncryptedField that has no QueryTypeConfig (i.e. unindexed). Used as a
+ * visitor function when iterating all EncryptedField present in an EncryptedFieldConfig.
+ * A return value of true signals that a condition has been met and iteration may halt.
+ */
+using UnindexedEncryptedFieldVisitor = std::function<bool(const EncryptedField&)>;
+
+/**
+ * For each QueryTypeConfig present under the EncryptedField, invokes the visitor function visit.
+ * If the EncryptedField does not have any QueryTypeConfig, invokes the visitor function
+ * onEmptyField. Immediately returns true once visit or onEmptyField has returned true. Returns
+ * false if the visitor functions returned false on all QueryTypeConfig.
+ */
+bool visitQueryTypeConfigs(const EncryptedField& field,
+                           const QueryTypeConfigVisitor& visit,
+                           const UnindexedEncryptedFieldVisitor& onEmptyField = nullptr);
+
+/**
+ * For each QueryTypeConfig present under each EncryptedField in the EncryptedFieldConfig, invokes
+ * the visitor function visit. If an EncryptedField does not have any QueryTypeConfig, invokes the
+ * visitor function onEmptyField. Immediately returns true once visit or onEmptyField has returned
+ * true. Returns false if the visitor functions returned false on all QueryTypeConfig.
+ */
+bool visitQueryTypeConfigs(const EncryptedFieldConfig& efc,
+                           const QueryTypeConfigVisitor& visit,
+                           const UnindexedEncryptedFieldVisitor& onEmptyField = nullptr);
+
 }  // namespace mongo
