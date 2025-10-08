@@ -124,6 +124,11 @@ const nodeOptions = {
 const numShards = 3;
 const st = new ShardingTest({shards: numShards, other: {configOptions: nodeOptions}});
 
+if (!FeatureFlagUtil.isEnabled(st.s.getDB("admin"), "featureFlagDropIndexesDDLCoordinator")) {
+    // Do not check index consistency because a dropIndexes command that times out may leave indexes inconsistent.
+    TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+}
+
 const allShards = [];
 for (let i = 0; i < numShards; i++) {
     allShards.push(st["shard" + i]);
