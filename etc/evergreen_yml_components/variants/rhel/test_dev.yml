@@ -120,6 +120,7 @@ variables:
   multiversion_platform: rhel80
   multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
+  core_analyzer_gdb_index_cache: off
 
 buildvariants:
 - <<: *linux-x86-dynamic-compile-params

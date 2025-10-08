@@ -108,6 +108,7 @@ variables:
   multiversion_platform: rhel80
   multiversion_platform_50_or_later: rhel8
   multiversion_edition: enterprise
+  core_analyzer_gdb_index_cache: off
 
 
 buildvariants:
@@ -348,6 +349,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     large_distro_name: rhel8.8-large
     compile_variant: rhel8-debug-ubsan
+    core_analyzer_gdb_index_cache: off
   tasks:
   - name: compile_test_benchmark_serial_TG
     distros:
@@ -428,6 +430,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     compile_variant: *rhel8-debug-aubsan-lite_fuzzer
+    core_analyzer_gdb_index_cache: off
   display_tasks:
   - name: libfuzzertests!
     execution_tasks:
