@@ -72,7 +72,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
     assert len(collections) == 1
 
     requests = []
-    cards = [25, 50, 100, 200, 300, 400, 500]
+    cards = [25, 50, 100, 200, 300, 400, 500] + list(range(1000, 10_001, 1000))
     # For every query, we run it as both a forward and backward scan.
     for direction, note in [(1, "FORWARD"), (-1, "BACKWARD")]:
         for card in cards:
@@ -154,12 +154,12 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
 async def execute_collection_scans(
     database: DatabaseInstance, collections: Sequence[CollectionInfo]
 ):
-    collections = [c for c in collections if c.name == "doc_scan_100000"]
+    collections = [c for c in collections if c.name == "doc_scan_200000"]
     assert len(collections) == 1
 
-    # Even though these numbers are not representative of the way COLLSCANs are usually used,
-    # we can use them for calibration based on the assumption that the cost scales linearly.
-    limits = [1, 5, 25, 50, 100, 1000, 2000, 3000, 4000, 5000]
+    # We use higher numbers here to be representative of how COLLSCANs are used and to avoid
+    # the instability we experienced when using smaller numbers.
+    limits = [100_000, 110_000, 120_000, 130_000, 140_000, 150_000]
     requests = []
     for direction, dir_text in [(1, "FORWARD"), (-1, "BACKWARD")]:
         note = f"COLLSCAN_{dir_text}"

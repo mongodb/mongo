@@ -341,7 +341,7 @@ projection_collection = config.CollectionTemplate(
 )
 
 doc_scan_collection = create_coll_scan_collection_template(
-    "doc_scan", cardinalities=[100_000], payload_size=2000
+    "doc_scan", cardinalities=[100_000, 200_000], payload_size=2000
 )
 sort_collections = create_coll_scan_collection_template(
     "sort",
