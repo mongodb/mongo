@@ -30,6 +30,7 @@
 #include <list>
 #include <vector>
 
+#include "mongo/base/counter.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclient_connection.h"
@@ -70,6 +71,12 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
+
+auto& replCoordMutexTotalWaitTimeInOplogServerStatus = makeServerStatusMetric<Counter64>(
+    "repl.waiters.replCoordMutexTotalWaitTimeInOplogServerStatusMillis");
+
+auto& numReplCoordMutexAcquisitionsInOplogServerStatus = makeServerStatusMetric<Counter64>(
+    "repl.waiters.numReplCoordMutexAcquisitionsInOplogServerStatus");
 
 // Hangs in the beginning of each hello command when set.
 MONGO_FAIL_POINT_DEFINE(waitInHello);
@@ -241,7 +248,12 @@ public:
         }
 
         BSONObjBuilder result;
+
+        // Time the total amount of time spent waiting for repl coord mutex.
+        Timer timer;
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
+        replCoordMutexTotalWaitTimeInOplogServerStatus.increment(timer.millis());
+        numReplCoordMutexAcquisitionsInOplogServerStatus.increment(1);
 
         auto earliestOplogTimestampFetch = [&]() -> Timestamp {
             // Hold reference to the catalog for collection lookup without locks to be safe.
