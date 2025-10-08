@@ -45,8 +45,7 @@ struct ClusterKillCursorsCmd {
                               const NamespaceString& nss,
                               CursorId cursorId) {
         auto const authzSession = AuthorizationSession::get(opCtx->getClient());
-        auto authChecker = [&authzSession,
-                            &nss](const boost::optional<UserName>& userName) -> Status {
+        auto authChecker = [&authzSession, &nss](AuthzCheckFnInputType userName) -> Status {
             return auth::checkAuthForKillCursors(authzSession, nss, userName);
         };
 
@@ -57,7 +56,13 @@ struct ClusterKillCursorsCmd {
     static Status doKillCursor(OperationContext* opCtx,
                                const NamespaceString& nss,
                                CursorId cursorId) {
-        return Grid::get(opCtx)->getCursorManager()->killCursor(opCtx, cursorId);
+        auto const authzSession = AuthorizationSession::get(opCtx->getClient());
+        const auto authChecker = [&authzSession, &nss](AuthzCheckFnInputType userName) -> Status {
+            return auth::checkAuthForKillCursors(authzSession, nss, userName);
+        };
+
+        return Grid::get(opCtx)->getCursorManager()->killCursorWithAuthCheck(
+            opCtx, cursorId, authChecker);
     }
 };
 KillCursorsCmdBase<ClusterKillCursorsCmd> clusterKillCursorsCmd;

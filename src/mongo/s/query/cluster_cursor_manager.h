@@ -70,6 +70,14 @@ class StatusWith;
  *
  * No public methods throw exceptions, and all public methods are thread-safe.
  */
+
+// 'AuthzCheckFnInputType' represents the argument of a the 'AuthzCheckFn' function.
+// The function may be passed into a ClusterCursorManager method which checks whether the
+// current client is authorized to perform the operation in question by checking the user that
+// issues the command against the authorised users.
+using AuthzCheckFnInputType = const boost::optional<UserName>&;
+using AuthzCheckFn = std::function<Status(AuthzCheckFnInputType)>;
+
 class ClusterCursorManager {
     ClusterCursorManager(const ClusterCursorManager&) = delete;
     ClusterCursorManager& operator=(const ClusterCursorManager&) = delete;
@@ -113,11 +121,6 @@ public:
         // Count of pinned cursors.
         size_t cursorsPinned = 0;
     };
-
-    // Represents a function that may be passed into a ClusterCursorManager method which checks
-    // whether the current client is authorized to perform the operation in question. The function
-    // will be passed the list of users authorized to use the cursor.
-    using AuthzCheckFn = std::function<Status(const boost::optional<UserName>&)>;
 
     /**
      * PinnedCursor is a moveable, non-copyable class representing ownership of a cursor that has
@@ -465,6 +468,14 @@ public:
     Status killCursor(OperationContext* opCtx, CursorId cursorId);
 
     /**
+     * Same as 'killCursor' but with an 'authChecker' callback that can be used to recheck
+     * authorization before the cursor is killed.
+     */
+    Status killCursorWithAuthCheck(OperationContext* opCtx,
+                                   CursorId cursorId,
+                                   AuthzCheckFn authChecker);
+
+    /**
      * Kill the cursors satisfying the given predicate. Returns the number of cursors killed.
      */
     std::size_t killCursorsSatisfying(
@@ -573,6 +584,8 @@ private:
      * Flags the OperationContext that's using the given cursor as interrupted.
      */
     void killOperationUsingCursor(WithLock, CursorEntry* entry);
+
+    Status _killCursor(OperationContext* opCtx, CursorId cursorId, AuthzCheckFn authChecker);
 
     // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.  May be
     // concurrently accessed by multiple threads.

@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/killcursors_common.h"
 #include "mongo/db/cursor_manager.h"
@@ -54,8 +53,15 @@ struct KillCursorsCmd {
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
         }
 
+        auto authCheck = [&](const ClientCursor& cc) {
+            uassertStatusOK(
+                auth::checkAuthForKillCursors(AuthorizationSession::get(opCtx->getClient()),
+                                              cc.nss(),
+                                              cc.getAuthenticatedUser()));
+        };
+
         auto cursorManager = CursorManager::get(opCtx);
-        return cursorManager->killCursor(opCtx, id);
+        return cursorManager->killCursorWithAuthCheck(opCtx, id, authCheck);
     }
 };
 KillCursorsCmdBase<KillCursorsCmd> cmdKillCursors;

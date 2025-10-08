@@ -35,15 +35,20 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session_test_fixture.h"
+#include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/cursor_manager.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -51,6 +56,22 @@ namespace {
 class AuthorizationSessionTest : public AuthorizationSessionTestFixture {
 public:
     void testInvalidateUser(std::string mechanismData);
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
+        OperationContext* _opCtx, NamespaceString nss) {
+        // Create a mock ExpressionContext.
+        auto expCtx = make_intrusive<ExpressionContext>(_opCtx, nullptr, nss);
+        auto workingSet = std::make_unique<WorkingSet>();
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), workingSet.get());
+        return unittest::assertGet(
+            plan_executor_factory::make(expCtx,
+                                        std::move(workingSet),
+                                        std::move(queuedDataStage),
+                                        &CollectionPtr::null,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                        QueryPlannerParams::DEFAULT,
+                                        nss));
+    }
 };
 
 const NamespaceString testFooNss = NamespaceString::createNamespaceString_forTest("test.foo");
@@ -1326,6 +1347,95 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
                  ActionType::insert);
 }
 ****/
+
+TEST_F(AuthorizationSessionTest, CheckAuthorizationForKillCursorsAuthorizedUser) {
+    authzManager->setAuthEnabled(true);
+
+    UserName username("spencer", "admin", boost::none);
+    UserRequest usernameTestRequest = UserRequest(username, boost::none);
+
+    // Get the authorization session that will be used when running the command.
+    ASSERT_OK(createUser(username, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), usernameTestRequest, boost::none));
+
+    // Assume privileges for the database to allow killAnyCursor action.
+    PrivilegeVector privileges;
+    auth::generateUniversalPrivileges(&privileges);
+    auto user = authzSession->getAuthenticatedUser();
+    ASSERT(user != boost::none);
+    (*user)->addPrivileges(privileges);
+    ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forExactNamespace((testFooNss)), ActionType::killAnyCursor));
+
+    // Get the cursor manager and register a cursor. We need to detach it from the operation context
+    // to allow killCursors to reattach it later during execution.
+    CursorManager* _cursorManager = CursorManager::get(_opCtx.get());
+    getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
+    _cursorManager->setPreciseClockSource(getServiceContext()->getPreciseClockSource());
+
+    auto exec = makeFakePlanExecutor(_opCtx.get(), testFooNss);
+    exec->saveState();
+    exec->detachFromOperationContext();
+
+    auto cursorPin = _cursorManager->registerCursor(
+        _opCtx.get(),
+        {
+            std::move(exec),
+            testFooNss,
+            username,
+            APIParameters(),
+            _opCtx->getWriteConcern(),
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            BSONObj(),
+            PrivilegeVector(),
+        });
+    const auto cursorId = cursorPin->cursorid();
+    cursorPin.release();
+
+    auto authCheck = [&](const ClientCursor& cc) {
+        uassertStatusOK(
+            auth::checkAuthForKillCursors(authzSession.get(), cc.nss(), cc.getAuthenticatedUser()));
+    };
+    ASSERT_OK(_cursorManager->killCursorWithAuthCheck(_opCtx.get(), cursorId, authCheck));
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthorizationForKillCursorsUnauthorizedUser) {
+    authzManager->setAuthEnabled(true);
+    ASSERT_TRUE(authzManager->isAuthEnabled());
+    UserName usernameUnauth("fakeSpencer", "admin");
+
+    CursorManager* _cursorManager = CursorManager::get(_opCtx.get());
+    getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
+    _cursorManager->setPreciseClockSource(getServiceContext()->getPreciseClockSource());
+    auto exec = makeFakePlanExecutor(_opCtx.get(), testFooNss);
+    exec->saveState();
+    exec->detachFromOperationContext();
+
+    auto cursorPin = _cursorManager->registerCursor(
+        _opCtx.get(),
+        {
+            std::move(exec),
+            testFooNss,
+            usernameUnauth,
+            APIParameters(),
+            _opCtx->getWriteConcern(),
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            BSONObj(),
+            PrivilegeVector(),
+        });
+    const auto cursorId = cursorPin->cursorid();
+    cursorPin.release();
+
+    auto authCheck = [&](const ClientCursor& cc) {
+        uassertStatusOK(
+            auth::checkAuthForKillCursors(authzSession.get(), cc.nss(), cc.getAuthenticatedUser()));
+    };
+    ASSERT_THROWS_CODE(_cursorManager->killCursorWithAuthCheck(_opCtx.get(), cursorId, authCheck),
+                       DBException,
+                       ErrorCodes::Unauthorized);
+}
 
 class SystemBucketsTest : public AuthorizationSessionTest {
 protected:

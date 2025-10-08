@@ -622,6 +622,36 @@ TEST_F(ClusterCursorManagerTest, KillCursorsSatisfyingBasedOnOpKey) {
     }
 }
 
+// Tests that killCursors with a passing auth check succeeds.
+TEST_F(ClusterCursorManagerTest, KillCursorsWithAuthCheckSuccessfulAuthCheckSucceeds) {
+    const auto cursorId =
+        assertGet(getManager()->registerCursor(getOperationContext(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               boost::none));
+    // Kill the cursor and verify that it was successfully killed.
+    ASSERT_OK(
+        getManager()->killCursorWithAuthCheck(getOperationContext(), cursorId, successAuthChecker));
+    ASSERT(isMockCursorKilled(0));
+}
+
+// Tests that killCursors with a failing auth check fails.
+TEST_F(ClusterCursorManagerTest, KillCursorsWithAuthCheckFailingAuthCheckFails) {
+    const auto cursorId =
+        assertGet(getManager()->registerCursor(getOperationContext(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               boost::none));
+    // Kill the cursor and verify that it was successfully killed.
+    ASSERT_EQ(
+        getManager()->killCursorWithAuthCheck(getOperationContext(), cursorId, failAuthChecker),
+        ErrorCodes::Unauthorized);
+}
+
 // Test that the Client that registered a cursor is correctly recorded.
 TEST_F(ClusterCursorManagerTest, CorrectlyRecordsOriginatingClient) {
     ASSERT_OK(getManager()->registerCursor(getOperationContext(),

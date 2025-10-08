@@ -437,12 +437,29 @@ void CursorManager::_destroyCursor(OperationContext* opCtx,
 }
 
 Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
+    return _killCursor(opCtx, id, /*authChecker*/ {});
+}
+
+Status CursorManager::killCursorWithAuthCheck(
+    OperationContext* opCtx,
+    CursorId id,
+    const std::function<void(const ClientCursor&)>& authChecker) {
+    return _killCursor(opCtx, id, authChecker);
+}
+
+Status CursorManager::_killCursor(OperationContext* opCtx,
+                                  CursorId id,
+                                  const std::function<void(const ClientCursor&)>& authChecker) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
     if (it == lockedPartition->end()) {
         return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
     }
     auto cursor = it->second;
+
+    if (authChecker) {
+        authChecker(*cursor);
+    }
 
     if (cursor->_operationUsingCursor) {
         // Rather than removing the cursor directly, kill the operation that's currently using the

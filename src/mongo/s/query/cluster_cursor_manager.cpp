@@ -36,6 +36,7 @@
 #include <set>
 
 #include "mongo/db/allocate_cursor_id.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -315,6 +316,21 @@ void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry
 }
 
 Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursorId) {
+    AuthzCheckFn passingAuthChecker = [](AuthzCheckFnInputType) -> Status {
+        return Status::OK();
+    };
+    return _killCursor(opCtx, cursorId, passingAuthChecker);
+}
+
+Status ClusterCursorManager::killCursorWithAuthCheck(OperationContext* opCtx,
+                                                     CursorId cursorId,
+                                                     AuthzCheckFn authChecker) {
+    return _killCursor(opCtx, cursorId, std::move(authChecker));
+}
+
+Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
+                                         CursorId cursorId,
+                                         AuthzCheckFn authChecker) {
     invariant(opCtx);
 
     stdx::unique_lock<Latch> lk(_mutex);
@@ -322,6 +338,13 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursor
     CursorEntry* entry = _getEntry(lk, cursorId);
     if (!entry) {
         return cursorNotFoundStatus(cursorId);
+    }
+
+    auto authCheckStatus = authChecker(entry->getAuthenticatedUser());
+    if (!authCheckStatus.isOK()) {
+        return authCheckStatus.withContext(str::stream()
+                                           << "cursor id " << cursorId
+                                           << " was not created by the authenticated user");
     }
 
     // Interrupt any operation currently using the cursor, unless if it's the current operation.
