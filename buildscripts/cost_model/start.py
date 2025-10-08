@@ -179,14 +179,19 @@ async def execute_collection_scans(
                     Query(
                         {
                             "limit": limit,
-                            "filter": {"int_uniform_unindexed": 1},
+                            "filter": {"int_uniform_unindexed": {"$gt": 0, "$lt": 2}},
                             "sort": {"$natural": direction},
                         },
                         note="COLLSCAN_W_FILTER",
                         expected_stage={
                             "COLLSCAN": {
                                 "direction": dir_text.lower(),
-                                "filter": {"int_uniform_unindexed": {"$eq": 1}},
+                                "filter": {
+                                    "$and": [
+                                        {"int_uniform_unindexed": {"$lt": 2}},
+                                        {"int_uniform_unindexed": {"$gt": 0}},
+                                    ]
+                                },
                             }
                         },
                     )
@@ -462,9 +467,23 @@ async def execute_fetches(database: DatabaseInstance, collections: Sequence[Coll
         requests.append(
             Query(
                 # 'int_uniform_unindexed' is not indexed, so the fetch will have a filter.
-                {"filter": {"int_uniform": {"$lt": card}, "int_uniform_unindexed": 1}},
+                {
+                    "filter": {
+                        "int_uniform": {"$lt": card},
+                        "int_uniform_unindexed": {"$gt": 0, "$lt": 2},
+                    }
+                },
                 note="FETCH_W_FILTER",
-                expected_stage={"FETCH": {"filter": {"int_uniform_unindexed": {"$eq": 1}}}},
+                expected_stage={
+                    "FETCH": {
+                        "filter": {
+                            "$and": [
+                                {"int_uniform_unindexed": {"$lt": 2}},
+                                {"int_uniform_unindexed": {"$gt": 0}},
+                            ]
+                        }
+                    }
+                },
             )
         )
 
