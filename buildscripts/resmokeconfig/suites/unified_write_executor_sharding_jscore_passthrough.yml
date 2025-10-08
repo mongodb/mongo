@@ -29,14 +29,6 @@ selector:
     - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
     - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
 
-    # Disabled because some features covered in these tests are not yet supported in the UWE.
-    # TODO SERVER-104139: Add timeseries support.
-    - jstests/core/**/*timeseries*.js
-    - jstests/core/timeseries/**/*.js
-    - jstests/core_sharding/resharding/reshard_collection_timeseries.js
-    - jstests/core_sharding/zones/zone_timeseries_basic.js
-    - jstests/core_sharding/chunk_migration/move_range_timeseries.js
-    - jstests/core_sharding/global_catalog/sharded_data_distribution.js
     # TODO SERVER-105762: add support for errorsOnly to UWE.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
   exclude_with_any_tags:

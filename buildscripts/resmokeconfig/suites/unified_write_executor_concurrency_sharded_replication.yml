@@ -5,10 +5,6 @@ selector:
     - jstests/concurrency/fsm_workloads/**/*.js
     - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
-    # Disabled because some features covered in these tests are not yet supported in the UWE.
-    # TODO SERVER-104139: Add timeseries support.
-    - jstests/concurrency/fsm_workloads/timeseries/*.js
-    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
     # TODO SERVER-109752: Test expects BulkWriteError, but doesn't get one.
     - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
     - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js

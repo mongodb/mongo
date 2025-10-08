@@ -104,11 +104,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     const retryCount = 3;
     for (const bulkWrite of [false, true]) {
         for (const timeseries of [false, true]) {
-            // Skip this if we are using the UWE against a timeseries collection.
-            // TODO SERVER-104139: Add timeseries support to the UWE.
-            if (!timeseries || !uweEnabled) {
-                runTest(true /* isMongos */, st, bulkWrite, retryCount, timeseries);
-            }
+            runTest(true /* isMongos */, st, bulkWrite, retryCount, timeseries);
         }
     }
 

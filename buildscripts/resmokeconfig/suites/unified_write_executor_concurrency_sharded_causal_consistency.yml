@@ -23,17 +23,6 @@ selector:
 
     # Exclusions because of unimplemented functionalities in the unified write executor.
 
-    # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
-    - jstests/concurrency/fsm_workloads/timeseries/**/*.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/**/*.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_arbitrary_updates.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_deletes.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_findAndModify_remove.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_findAndModify_update.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_insert_many.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_inserts.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_meta_updates.js
-
   exclude_with_any_tags:
     - requires_standalone
     - does_not_support_causal_consistency

@@ -49,9 +49,6 @@ selector:
     - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
-    # Disabled because some features covered in these tests are not yet supported in the UWE.
-    # TODO SERVER-104139: Add timeseries support.
-    - jstests/core/timeseries/**/*.js
     # TODO SERVER-105762: add support for errorsOnly to UWE.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
   exclude_with_any_tags:

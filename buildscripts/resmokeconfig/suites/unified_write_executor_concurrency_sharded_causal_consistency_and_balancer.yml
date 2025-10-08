@@ -30,11 +30,6 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
-    # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
-    - jstests/concurrency/fsm_workloads/timeseries/**/*.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/**/*.js
-
   exclude_with_any_tags:
     - requires_standalone
     - does_not_support_causal_consistency

@@ -41,9 +41,6 @@ selector:
     # TODO SERVER-105762: add support for errorsOnly to UWE.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
 
-    # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
-    - jstests/core/timeseries/**/*.js
-
   exclude_with_any_tags:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections
     # can't be created on `getCollection` call.
