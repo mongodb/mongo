@@ -862,6 +862,72 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     ASSERT_TRUE(wcError->getErrmsg().find(reply2WcErrorMsg) != std::string::npos);
 }
 
+TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
+    auto updateRequest = write_ops::UpdateCommandRequest(
+        nss1,
+        std::vector<write_ops::UpdateOpEntry>{write_ops::UpdateOpEntry(
+            BSON("_id" << 0), write_ops::UpdateModification(BSON("a" << 0)))});
+    auto request = BatchedCommandRequest(updateRequest);
+    auto reply = makeReply();
+    reply.setNMatched(1);
+    reply.setNModified(1);
+    reply.setCursor(BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        NoRetryWriteBatchResponse{
+            StatusWith<BulkWriteCommandReply>(reply), boost::none /* wce */, WriteOp(request, 0)});
+    ASSERT_TRUE(result.opsToRetry.empty());
+    ASSERT_TRUE(result.collsToCreate.empty());
+
+    ASSERT_EQ(processor.getNumOkResponsesProcessed(), 1);
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
+
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 1);
+    ASSERT_EQ(*batchedCommandReply.getNModifiedOpt(), 1);
+    ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseError) {
+    auto updateRequest = write_ops::UpdateCommandRequest(
+        nss1,
+        std::vector<write_ops::UpdateOpEntry>{write_ops::UpdateOpEntry(
+            BSON("_id" << 0), write_ops::UpdateModification(BSON("a" << 0)))});
+    auto request = BatchedCommandRequest(updateRequest);
+    auto reply = makeReply();
+    reply.setNMatched(1);
+    reply.setNModified(0);
+    reply.setCursor(BulkWriteCommandResponseCursor(
+        0, {BulkWriteReplyItem{0, Status(ErrorCodes::BadValue, "Wrong argument")}}, nss1));
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        NoRetryWriteBatchResponse{
+            StatusWith<BulkWriteCommandReply>(reply), boost::none /* wce */, WriteOp(request, 0)});
+    ASSERT_TRUE(result.opsToRetry.empty());
+    ASSERT_TRUE(result.collsToCreate.empty());
+
+    ASSERT_EQ(processor.getNumOkResponsesProcessed(), 0);
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
+
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 1);
+    ASSERT_EQ(*batchedCommandReply.getNModifiedOpt(), 0);
+    ASSERT_EQ(batchedCommandReply.getErrDetails().size(), 1);
+    ASSERT_EQ(batchedCommandReply.getErrDetails()[0].getStatus().code(), ErrorCodes::BadValue);
+}
+
 TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
     auto request = BulkWriteCommandRequest(
         {

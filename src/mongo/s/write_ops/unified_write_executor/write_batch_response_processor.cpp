@@ -149,13 +149,6 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
         _wcErrors.push_back(ShardWCError{std::move(*response.wce)});
     }
 
-    // Update the counters.
-    _nInserted += parsedReply.getNInserted();
-    _nDeleted += parsedReply.getNDeleted();
-    _nMatched += parsedReply.getNMatched();
-    _nUpserted += parsedReply.getNUpserted();
-    _nModified += parsedReply.getNModified();
-
     // Update the list of retried stmtIds.
     if (auto retriedStmtIds = parsedReply.getRetriedStmtIds();
         retriedStmtIds && !retriedStmtIds->empty()) {
@@ -173,12 +166,22 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
         fmt::format("reply with invalid opId {} when command only had 1 op", replyItem.getIdx()),
         static_cast<WriteOpId>(replyItem.getIdx()) == 0);
 
-    tassert(11151300,
-            "Unexpected reply item error for NoRetryWriteBatchResponse",
-            replyItem.getStatus().isOK());
+    // Update the counters.
+    _nInserted += parsedReply.getNInserted();
+    _nDeleted += parsedReply.getNDeleted();
+    _nMatched += parsedReply.getNMatched();
+    _nUpserted += parsedReply.getNUpserted();
+    _nModified += parsedReply.getNModified();
 
-    // Process the reply item.
-    processReplyItem(op, std::move(replyItem), boost::none);
+    // Process the reply item or error.
+    if (replyItem.getStatus().isOK()) {
+        processReplyItem(op, std::move(replyItem), boost::none);
+    } else {
+        tassert(11222400,
+                "Unexpected retryable error reply from NoRetryWriteBatchResponse",
+                !write_op_helpers::isRetryErrCode(replyItem.getStatus().code()));
+        processError(op, replyItem.getStatus(), boost::none);
+    }
 
     // Batch types that produce NoRetryWriteBatchResponse are executed using a mechanism that deals
     // with stale errors and retrying internally, so 'opsToRetry' will always be empty.
@@ -430,7 +433,7 @@ void WriteBatchResponseProcessor::processError(const WriteOp& op,
                                                const Status& status,
                                                boost::optional<ShardId> shardId) {
     tassert(10896503, "Unexpectedly got an OK status", !status.isOK());
-    processReplyItem(op, BulkWriteReplyItem(0, status), shardId);
+    processReplyItem(op, BulkWriteReplyItem(op.getId(), status), shardId);
 }
 
 void WriteBatchResponseProcessor::processErrorForBatch(OperationContext* opCtx,
