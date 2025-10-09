@@ -58,6 +58,46 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    class LiteParsed final : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions&) {
+            uassert(ErrorCodes::FailedToParse,
+                    "$_internalSearchIdLookup specification must be an object",
+                    spec.type() == BSONType::object);
+            return std::make_unique<LiteParsed>(spec.fieldName(), spec.Obj().getOwned());
+        }
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
+            return {};
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override {
+            return {};
+        }
+
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
+
+        bool isInitialSource() const override {
+            return false;
+        }
+
+        const BSONObj& getBsonSpec() const {
+            return _ownedSpec;
+        }
+
+        explicit LiteParsed(std::string parseTimeName, BSONObj ownedSpec)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _ownedSpec(std::move(ownedSpec)) {}
+
+    private:
+        BSONObj _ownedSpec;
+    };
+
     DocumentSourceInternalSearchIdLookUp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long limit = 0,

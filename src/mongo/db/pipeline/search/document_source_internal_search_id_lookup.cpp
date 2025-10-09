@@ -34,7 +34,6 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
-#include "mongo/db/pipeline/search/lite_parsed_search.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -43,7 +42,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
-                         LiteParsedSearchStage::parse,
+                         DocumentSourceInternalSearchIdLookUp::LiteParsed::parse,
                          DocumentSourceInternalSearchIdLookUp::createFromBson,
                          AllowedWithApiStrict::kInternal);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchIdLookup, DocumentSourceInternalSearchIdLookUp::id)
