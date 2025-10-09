@@ -1042,6 +1042,7 @@ error_codes:
       name: IDLUnknownFieldPossibleMongocryptd,
       categories: [IDLParseError],
     }
+  - {code: 6371402, name: EncryptedFindAndModifyNewNotSupported}
 
   # The following is for rewriting errors returned by a remote server while running a retriable
   # command so that the error is not passed through to other servers in a cluster. See SERVER-91331

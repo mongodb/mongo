@@ -994,7 +994,7 @@ void validateFindAndModifyRequest(OperationContext* opCtx,
             "Must specify either update or remove to findAndModify, not both",
             !(request.getUpdate().has_value() && isDelete));
 
-    uassert(6371402,
+    uassert(ErrorCodes::EncryptedFindAndModifyNewNotSupported,
             "findAndModify with encryption only supports new: false",
             request.getNew().value_or(false) == false);
 
