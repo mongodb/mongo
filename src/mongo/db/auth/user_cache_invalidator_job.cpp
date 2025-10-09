@@ -109,39 +109,6 @@ std::string oidOrTimestampToString(const OIDorTimestamp& oidOrTimestamp) {
     MONGO_UNREACHABLE;
 }
 
-/**
- * TODO: SERVER-86458 - remove.
- *
- * RAII type for making the OperationContext it is instantiated with use the router service util it
- * goes out of scope.
- */
-class ScopedSetRouterService {
-public:
-    ScopedSetRouterService(OperationContext* opCtx);
-    ~ScopedSetRouterService();
-
-private:
-    OperationContext* const _opCtx;
-    Service* const _originalService;
-};
-
-ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
-    : _opCtx(opCtx), _originalService(opCtx->getService()) {
-    // Verify that the opCtx is not using the router service already.
-    ClientLock lk(_opCtx->getClient());
-
-    auto service = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
-    invariant(service);
-    _opCtx->getClient()->setService(service);
-}
-
-ScopedSetRouterService::~ScopedSetRouterService() {
-    // Verify that the opCtx is still using the router service.
-    ClientLock lk(_opCtx->getClient());
-    invariant(_opCtx->getService()->role().has(ClusterRole::RouterServer));
-    _opCtx->getClient()->setService(_originalService);
-}
-
 }  // namespace
 
 Status userCacheInvalidationIntervalSecsNotify(const int& value) {
@@ -178,8 +145,8 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
 
 void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* opCtx) {
     // UserCacheInvalidator should only run on a router.
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
-    ScopedSetRouterService guard(opCtx);
+    invariant(opCtx->getService()->role().has(ClusterRole::RouterServer));
+
     auto invalidator =
         std::make_unique<UserCacheInvalidator>(AuthorizationManager::get(opCtx->getService()));
     invalidator->initialize(opCtx);
@@ -214,7 +181,7 @@ void UserCacheInvalidator::stop(ServiceContext* serviceCtx) {
 
 void UserCacheInvalidator::run() try {
     auto opCtx = cc().makeOperationContext();
-    ScopedSetRouterService guard(opCtx.get());
+    invariant(opCtx->getService()->role().has(ClusterRole::RouterServer));
 
     // Get current cache generation from the config server.
     auto swCurrentGeneration = getCurrentCacheGeneration(opCtx.get());
