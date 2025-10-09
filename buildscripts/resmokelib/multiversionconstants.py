@@ -45,8 +45,9 @@ def generate_releases_file():
     with open(RELEASES_YAML, "wb") as file:
         response = requests.get(MASTER_RELEASES_REMOTE_FILE)
         if response.status_code != http.HTTPStatus.OK:
-            raise RuntimeError("Http response for releases yml file was not 200 but was " +
-                               response.status_code)
+            raise RuntimeError(
+                f"Fetching releases.yml file returned unsuccessful status: {response.status_code}, "
+                f"response body: {response.text}\n")
         file.write(response.content)
 
 
