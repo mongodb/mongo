@@ -514,7 +514,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                         _metadata.getSourceNss(),
                         _critSecReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                        *onReleaseCriticalSectionAction);
+                        *onReleaseCriticalSectionAction,
+                        false /*throwIfReasonDiffers*/);
 
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                     resharding::getCurrentTime());
