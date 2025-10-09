@@ -400,7 +400,9 @@ public:
         }
 
         auto client = opCtx->getClient();
+        bool isInitialHandshake = false;
         if (ClientMetadata::tryFinalize(client)) {
+            isInitialHandshake = true;
             audit::logClientMetadata(client);
 
             // If we are the first hello, then set split horizon parameters.
@@ -561,7 +563,7 @@ public:
             }
         }
 
-        handleHelloAuth(opCtx, dbName, cmd, &result);
+        handleHelloAuth(opCtx, dbName, cmd, isInitialHandshake, &result);
 
         if (getTestCommandsEnabled()) {
             validateResult(&result);

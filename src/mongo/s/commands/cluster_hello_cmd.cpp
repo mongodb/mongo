@@ -158,7 +158,9 @@ public:
             .serverNegotiate(cmd.getCompression(), &result);
 
         auto client = opCtx->getClient();
+        bool isInitialHandshake = false;
         if (ClientMetadata::tryFinalize(client)) {
+            isInitialHandshake = true;
             audit::logClientMetadata(client);
         }
 
@@ -274,7 +276,7 @@ public:
             }
         }
 
-        handleHelloAuth(opCtx, dbName, cmd, &result);
+        handleHelloAuth(opCtx, dbName, cmd, isInitialHandshake, &result);
 
         if (getTestCommandsEnabled()) {
             validateResult(&result);

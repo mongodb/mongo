@@ -3,8 +3,8 @@
 (function() {
 'use strict';
 
-let expectedSuccessLogs = 0;
-let expectedFailureLogs = 0;
+let expectedSuccessLogs;
+let expectedFailureLogs;
 
 function authnSuccessIncrementsServerStatusTotalAuthTime(mongodRunner) {
     jsTest.log(
@@ -53,6 +53,29 @@ function authnFailureIncrementsServerStatusTotalAuthTime(mongodRunner) {
     admin.logout();
 }
 
+function newConnectionWithoutAuthn(mongodRunner, connectionHealthLoggingOn) {
+    jsTest.log(
+        "============================ newConnectionWithoutAuthn ============================");
+
+    // Create a new connection without authentication.
+    new Mongo(mongodRunner.host);
+
+    if (connectionHealthLoggingOn) {
+        assert.soon(() => checkLog.checkContainsWithCountJson(
+                        mongodRunner,
+                        10483900,
+                        {"doc": {"application": {"name": "MongoDB Shell"}}},
+                        2,  // 1 for the mongodRunner connection and 1 for the new connection above
+                        null,
+                        true),
+                    "Did not find expected 1 metadata log entry for non-auth connection");
+    } else {
+        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 10483900, {}),
+                  false,
+                  "Expected not to find metadata log entry for non-auth connection");
+    }
+}
+
 // Test that a successful authentication is logged correctly
 function authnSuccessLogsMetricsReportWithSuccessStatus(mongodRunner, connectionHealthLoggingOn) {
     jsTest.log(
@@ -72,16 +95,17 @@ function authnSuccessLogsMetricsReportWithSuccessStatus(mongodRunner, connection
                 5286306,
                 {
                     "result": 0,
-                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
+                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}},
+                    "doc": {"application": {"name": "MongoDB Shell"}}
                 },
                 expectedSuccessLogs,
                 null,
                 true),
-            "Did not find expected 1 successful metric log entries");
+            "Did not find expected 1 successful log entry");
     } else {
-        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286306, {}),
+        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 5286306, {}),
                   false,
-                  "Expected not to find metric log entries");
+                  "Expected not to find log entry");
     }
 
     admin.logout();
@@ -97,19 +121,22 @@ function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner, connectionH
     expectedFailureLogs += 1;
 
     if (connectionHealthLoggingOn) {
-        assert.soon(
-            () => checkLog.checkContainsWithCountJson(
-                mongodRunner,
-                5286307,
-                {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
-                expectedFailureLogs,
-                null,
-                true),
-            "Did not find expected 1 failure metric log entries");
+        assert.soon(() => checkLog.checkContainsWithCountJson(
+                        mongodRunner,
+                        5286307,
+                        {
+                            "result": 18,
+                            "metrics": {"conversation_duration": {"summary": [{"step": 1}]}},
+                            "doc": {"application": {"name": "MongoDB Shell"}}
+                        },
+                        expectedFailureLogs,
+                        null,
+                        true),
+                    "Did not find expected 1 failure log entry");
     } else {
-        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286307, {}),
+        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 5286307, {}),
                   false,
-                  "Expected not to find failure metric log entries");
+                  "Expected not to find failure log entry");
     }
 
     admin.logout();
@@ -136,16 +163,17 @@ function multipleAuthnSuccessLogsMultipleCorrectReports(mongodRunner, connection
                 5286306,
                 {
                     "result": 0,
-                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
+                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}},
+                    "doc": {"application": {"name": "MongoDB Shell"}}
                 },
                 expectedSuccessLogs,
                 null,
                 true),
-            "Did not find expected 2 successful metric log entries");
+            "Did not find expected 2 successful log entries");
     } else {
-        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286306, {}),
+        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 5286306, {}),
                   false,
-                  "Expected not to find successful metric log entries");
+                  "Expected not to find successful log entries");
     }
 }
 
@@ -162,19 +190,22 @@ function multiAuthnFailureLogsMetricsReportWithFailedStatus(mongodRunner,
     expectedFailureLogs += 2;
 
     if (connectionHealthLoggingOn) {
-        assert.soon(
-            () => checkLog.checkContainsWithCountJson(
-                mongodRunner,
-                5286307,
-                {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
-                expectedFailureLogs,
-                null,
-                true),
-            "Did not find expected 2 failure metric log entries");
+        assert.soon(() => checkLog.checkContainsWithCountJson(
+                        mongodRunner,
+                        5286307,
+                        {
+                            "result": 18,
+                            "metrics": {"conversation_duration": {"summary": [{"step": 1}]}},
+                            "doc": {"application": {"name": "MongoDB Shell"}}
+                        },
+                        expectedFailureLogs,
+                        null,
+                        true),
+                    "Did not find expected 2 failure log entries");
     } else {
-        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286307, {}),
+        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 5286307, {}),
                   false,
-                  "Expected not to find failure metric log entries");
+                  "Expected not to find failure log entries");
     }
 
     admin.logout();
@@ -200,16 +231,17 @@ function multipleAuthnMixedLogsMultipleCorrectReports(mongodRunner, connectionHe
                 5286306,
                 {
                     "result": 0,
-                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
+                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}},
+                    "doc": {"application": {"name": "MongoDB Shell"}}
                 },
                 expectedSuccessLogs,
                 null,
                 true),
-            "Did not find expected 1 successful metric log entries");
+            "Did not find expected 1 successful log entry");
     } else {
-        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286306, {}),
+        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 5286306, {}),
                   false,
-                  "Expected not to find successful metric log entries");
+                  "Expected not to find successful log entry");
     }
 
     expectedFailureLogs += 1;
@@ -217,19 +249,22 @@ function multipleAuthnMixedLogsMultipleCorrectReports(mongodRunner, connectionHe
     admin.auth('admin', 'wrong');
 
     if (connectionHealthLoggingOn) {
-        assert.soon(
-            () => checkLog.checkContainsWithCountJson(
-                mongodRunner,
-                5286307,
-                {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
-                expectedFailureLogs,
-                null,
-                true),
-            "Did not find expected 1 failure metric log entries");
+        assert.soon(() => checkLog.checkContainsWithCountJson(
+                        mongodRunner,
+                        5286307,
+                        {
+                            "result": 18,
+                            "metrics": {"conversation_duration": {"summary": [{"step": 1}]}},
+                            "doc": {"application": {"name": "MongoDB Shell"}}
+                        },
+                        expectedFailureLogs,
+                        null,
+                        true),
+                    "Did not find expected 1 failure log entry");
     } else {
-        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286307, {}),
+        assert.eq(checkLog.checkContainsOnceJson(mongodRunner, 5286307, {}),
                   false,
-                  "Expected not to find failure metric log entries");
+                  "Expected not to find failure log entry");
     }
 }
 
@@ -237,10 +272,14 @@ let runTest = (connectionHealthLoggingOn) => {
     const mongod = MongoRunner.runMongod(
         {setParameter: {enableDetailedConnectionHealthMetricLogLines: connectionHealthLoggingOn}});
 
+    expectedSuccessLogs = 0;
+    expectedFailureLogs = 0;
+
     try {
         mongod.getDB("admin").createUser(
             {user: 'admin', pwd: 'pwd', roles: ['root'], mechanisms: ['SCRAM-SHA-256']});
 
+        newConnectionWithoutAuthn(mongod, connectionHealthLoggingOn);
         authnSuccessLogsMetricsReportWithSuccessStatus(mongod, connectionHealthLoggingOn);
         authnFailureLogsMetricsReportWithFailedStatus(mongod, connectionHealthLoggingOn);
         multiAuthnFailureLogsMetricsReportWithFailedStatus(mongod, connectionHealthLoggingOn);
