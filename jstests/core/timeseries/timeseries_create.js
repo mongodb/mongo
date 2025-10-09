@@ -3,43 +3,59 @@
  * configurations of options in conjunction with and within the timeseries option.
  *
  * @tags: [
+ *   # TODO (SERVER-73967): Remove this tag.
+ *   does_not_support_stepdowns,
+ *   requires_timeseries,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/fixture_helpers.js");
 
-const conn = MongoRunner.runMongod();
-
-const dbName = jsTestName();
-const testDB = conn.getDB(dbName);
+const testDB = db.getSiblingDB(jsTestName());
 let collCount = 0;
 
 const bucketGranularityError = ErrorCodes.InvalidOptions;
 const bucketMaxSpanSecondsError = ErrorCodes.InvalidOptions;
 
-const testOptions = function(allowed,
-                             createOptions,
-                             timeseriesOptions = {
-                                 timeField: "time"
-                             },
-                             errorCode = ErrorCodes.InvalidOptions,
-                             fixture = {
-                                 // This method is run before creating time-series collection.
-                                 setUp: (testDB, collName) => {},
-                                 // This method is run at the end of this function after
-                                 // passing all the test assertions.
-                                 tearDown: (testDB, collName) => {},
-                             }) {
+const testOptions = function({
+    errorCode,
+    createOptions = {},
+    timeseriesOptions = {
+        timeField: "time"
+    },
+    optionsAffectStorage = true,
+    fixture = {
+        // This method is run before creating time-series collection.
+        setUp: (testDB, collName) => {},
+        // This method is run at the end of this function after
+        // passing all the test assertions.
+        tearDown: (testDB, collName) => {},
+    },
+}) {
     const collName = 'timeseries_' + collCount++;
     const bucketsCollName = 'system.buckets.' + collName;
 
     fixture.setUp(testDB, collName);
-    const res = testDB.runCommand(
-        Object.extend({create: collName, timeseries: timeseriesOptions}, createOptions));
-    if (allowed) {
+
+    const create = function() {
+        return testDB.runCommand(
+            Object.extend({create: collName, timeseries: timeseriesOptions}, createOptions));
+    };
+    const res = create();
+
+    if (!errorCode) {
         assert.commandWorked(res);
+
+        // TODO (SERVER-80362): Always test idempotency.
+        const version = db.version().split('.');
+        if ((version[0] == 7 && version[1] >= 1) || version[0] > 7) {
+            // Test that the creation is idempotent.
+            assert.commandWorked(create());
+        }
+
         const collections =
             assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
@@ -58,6 +74,18 @@ const testOptions = function(allowed,
         }
 
         assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
+
+        // If there are more options than only the time field, test that we get NamespaceExists if a
+        // collection already exists with the same name but without those additional options.
+        if (optionsAffectStorage &&
+            (Object.entries(createOptions).length > 0 ||
+             Object.entries(timeseriesOptions).length > 1)) {
+            assert.commandWorked(testDB.runCommand(
+                {create: collName, timeseries: {timeField: timeseriesOptions["timeField"]}}));
+            assert.commandFailedWithCode(create(), ErrorCodes.NamespaceExists);
+
+            assert.commandWorked(testDB.runCommand({drop: collName}));
+        }
     } else {
         assert.commandFailedWithCode(res, errorCode);
     }
@@ -69,33 +97,49 @@ const testOptions = function(allowed,
 };
 
 const testValidTimeseriesOptions = function(timeseriesOptions) {
-    testOptions(true, {}, timeseriesOptions);
+    testOptions({errorCode: null, timeseriesOptions: timeseriesOptions});
 };
 
-const testInvalidTimeseriesOptions = function(timeseriesOptions, errorCode) {
-    testOptions(false, {}, timeseriesOptions, errorCode);
+const testInvalidTimeseriesOptions = function(timeseriesOptions,
+                                              errorCode = ErrorCodes.InvalidOptions) {
+    testOptions({
+        errorCode: errorCode,
+        timeseriesOptions: timeseriesOptions,
+    });
 };
 
-const testIncompatibleCreateOptions = function(createOptions, errorCode) {
-    testOptions(false, createOptions, {timeField: 'time'}, errorCode);
+const testIncompatibleCreateOptions = function(createOptions,
+                                               errorCode = ErrorCodes.InvalidOptions) {
+    testOptions({
+        errorCode: errorCode,
+        createOptions: createOptions,
+    });
 };
 
-const testCompatibleCreateOptions = function(createOptions) {
-    testOptions(true, createOptions);
+const testCompatibleCreateOptions = function(createOptions, optionsAffectStorage = true) {
+    testOptions({
+        errorCode: null,
+        createOptions: createOptions,
+        optionsAffectStorage: optionsAffectStorage,
+    });
 };
 
 const testTimeseriesNamespaceExists = function(setUp) {
-    testOptions(false, {}, {timeField: "time"}, ErrorCodes.NamespaceExists, {
-        setUp: setUp,
-        tearDown: (testDB, collName) => {
-            assert.commandWorked(testDB.dropDatabase());
-        }
+    testOptions({
+        errorCode: ErrorCodes.NamespaceExists,
+        fixture: {
+            setUp: setUp,
+            tearDown: (testDB, collName) => {
+                assert.commandWorked(testDB.dropDatabase());
+            }
+        },
     });
 };
 
 testValidTimeseriesOptions({timeField: "time"});
 testValidTimeseriesOptions({timeField: "time", metaField: "meta"});
-testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "seconds"});
+testValidTimeseriesOptions({timeField: "time", granularity: "minutes"});
+testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "minutes"});
 
 if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
     // A bucketMaxSpanSeconds may be provided, but only if they are the default for the granularity.
@@ -170,11 +214,13 @@ testInvalidTimeseriesOptions(
     bucketMaxSpanSecondsError);
 
 testCompatibleCreateOptions({expireAfterSeconds: NumberLong(100)});
-testCompatibleCreateOptions({storageEngine: {}});
-testCompatibleCreateOptions({indexOptionDefaults: {}});
+testCompatibleCreateOptions({storageEngine: {}}, false);
+testCompatibleCreateOptions({storageEngine: {[TestData.storageEngine]: {}}});
+testCompatibleCreateOptions({indexOptionDefaults: {}}, false);
+testCompatibleCreateOptions({indexOptionDefaults: {storageEngine: {[TestData.storageEngine]: {}}}});
 testCompatibleCreateOptions({collation: {locale: "ja"}});
-testCompatibleCreateOptions({writeConcern: {}});
-testCompatibleCreateOptions({comment: ""});
+testCompatibleCreateOptions({writeConcern: {}}, false);
+testCompatibleCreateOptions({comment: ""}, false);
 
 testIncompatibleCreateOptions({expireAfterSeconds: NumberLong(-10)}, ErrorCodes.InvalidOptions);
 testIncompatibleCreateOptions({expireAfterSeconds: NumberLong("4611686018427387904")},
@@ -239,6 +285,4 @@ testTimeseriesNamespaceExists((testDB, collName) => {
                                  ErrorCodes.DocumentValidationFailure);
     assert.commandWorked(testDB.runCommand({drop: coll.getName(), writeConcern: {w: "majority"}}));
 }
-
-MongoRunner.stopMongod(conn);
 })();

@@ -41,6 +41,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -144,6 +145,52 @@ void checkCollectionOptions(OperationContext* opCtx,
                                 << " already exists, but with collation: "
                                 << defaultCollatorSpecBSON << " rather than " << options.collation);
     }
+}
+
+void checkTimeseriesBucketsCollectionOptions(OperationContext* opCtx,
+                                             const Status& error,
+                                             const NamespaceString& bucketsNs,
+                                             CollectionOptions& options) {
+    AutoGetCollectionForReadMaybeLockFree coll{opCtx, bucketsNs};
+    uassert(error.code(), error.reason(), coll);
+
+    auto existingOptions = coll->getCollectionOptions();
+    uassert(error.code(), error.reason(), existingOptions.timeseries);
+
+    uassertStatusOK(timeseries::validateAndSetBucketingParameters(*options.timeseries));
+
+    // When checking that the options for the buckets collection are the same, filter out the
+    // options that were internally generated upon time-series collection creation (i.e. were not
+    // specified by the user).
+    uassert(error.code(),
+            error.reason(),
+            options.matchesStorageOptions(
+                uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
+                    false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions))),
+                CollatorFactoryInterface::get(opCtx->getServiceContext())));
+}
+
+void checkTimeseriesViewOptions(OperationContext* opCtx,
+                                const Status& error,
+                                const NamespaceString& viewNs,
+                                const CollectionOptions& options) {
+    AutoGetCollectionForReadMaybeLockFree acquisition{
+        opCtx,
+        viewNs,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted)};
+    uassert(error.code(), error.reason(), acquisition.getView());
+    const auto& view = *acquisition.getView();
+
+    uassert(error.code(), error.reason(), view.viewOn() == viewNs.makeTimeseriesBucketsNamespace());
+    uassert(error.code(),
+            error.reason(),
+            CollatorInterface::collatorsMatch(
+                view.defaultCollator(),
+                !options.collation.isEmpty()
+                    ? uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                          ->makeFromBSON(options.collation))
+                          .get()
+                    : nullptr));
 }
 
 class CmdCreate final : public CreateCmdVersion1Gen<CmdCreate> {
@@ -411,10 +458,17 @@ public:
             // if a collection with identical options already exists.
             if (createStatus == ErrorCodes::NamespaceExists &&
                 !opCtx->inMultiDocumentTransaction()) {
-                checkCollectionOptions(opCtx,
-                                       createStatus,
-                                       cmd.getNamespace(),
-                                       CollectionOptions::fromCreateCommand(cmd));
+                auto options = CollectionOptions::fromCreateCommand(cmd);
+                if (options.timeseries) {
+                    checkTimeseriesBucketsCollectionOptions(
+                        opCtx,
+                        createStatus,
+                        cmd.getNamespace().makeTimeseriesBucketsNamespace(),
+                        options);
+                    checkTimeseriesViewOptions(opCtx, createStatus, cmd.getNamespace(), options);
+                } else {
+                    checkCollectionOptions(opCtx, createStatus, cmd.getNamespace(), options);
+                }
             } else {
                 uassertStatusOK(createStatus);
             }
