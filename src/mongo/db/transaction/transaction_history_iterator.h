@@ -31,8 +31,9 @@
 
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class OperationContext;
 
@@ -40,7 +41,7 @@ class OperationContext;
  * An iterator class that traverses backwards through a transaction's oplog entries by following the
  * "prevOpTime" link in each entry.
  */
-class TransactionHistoryIteratorBase {
+class MONGO_MOD_OPEN TransactionHistoryIteratorBase {
 public:
     virtual ~TransactionHistoryIteratorBase() = default;
 
@@ -91,4 +92,4 @@ private:
     repl::OpTime _nextOpTime;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

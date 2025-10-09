@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/util/modules.h"
+
+
 #pragma once
 
 #include "mongo/base/error_codes.h"

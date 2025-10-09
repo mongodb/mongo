@@ -34,6 +34,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/stats/single_transaction_stats.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 

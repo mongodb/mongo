@@ -37,6 +37,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"

@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo::txn"
+    mod_visibility: private
     cpp_includes:
         - "mongo/db/s/transaction_coordinator_structures.h"
 

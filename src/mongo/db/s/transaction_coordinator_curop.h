@@ -31,13 +31,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
 namespace mongo {
 
-void reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
-                                                bool includeIdle,
-                                                std::vector<BSONObj>* ops);
+MONGO_MOD_PUB void reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
+                                                              bool includeIdle,
+                                                              std::vector<BSONObj>* ops);
 
 }  // namespace mongo

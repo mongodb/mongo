@@ -59,6 +59,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
@@ -70,7 +71,9 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo::txn_api {
+namespace mongo {
+namespace MONGO_MOD_PUB txn_api {
+
 namespace details {
 class TxnHooks;
 class TransactionWithRetries;
@@ -271,7 +274,7 @@ private:
  * Contains implementation details for the above API. Classes in this namespace should not be used
  * directly.
  */
-namespace details {
+namespace MONGO_MOD_PRIVATE details {
 
 /**
  * Customization point for behaviors different in the default SEPTransactionClient and the one for
@@ -323,7 +326,7 @@ public:
  * Default transaction client that runs given commands through the local process service entry
  * point.
  */
-class SEPTransactionClient : public TransactionClient {
+class MONGO_MOD_PUB SEPTransactionClient : public TransactionClient {
 public:
     SEPTransactionClient(OperationContext* opCtx,
                          std::shared_ptr<executor::InlineExecutor> inlineExecutor,
@@ -693,5 +696,6 @@ private:
     CancellationToken _token;
 };
 
-}  // namespace details
-}  // namespace mongo::txn_api
+}  // namespace MONGO_MOD_PRIVATE details
+}  // namespace MONGO_MOD_PUB txn_api
+}  // namespace mongo

@@ -35,6 +35,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod_transaction_interface.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -43,7 +44,7 @@ namespace mongo {
 /**
  * Facade around the TransactionParticipant class in the db/transaction library.
  */
-class MongoDSessionCatalogTransactionInterfaceImpl
+class MONGO_MOD_PUB MongoDSessionCatalogTransactionInterfaceImpl
     : public MongoDSessionCatalogTransactionInterface {
     MongoDSessionCatalogTransactionInterfaceImpl(
         const MongoDSessionCatalogTransactionInterfaceImpl&) = delete;

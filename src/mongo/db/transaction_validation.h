@@ -38,8 +38,9 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Returns true if the given command name can run as a retryable write.
@@ -78,4 +79,4 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
  */
 void doTransactionValidationForWrites(OperationContext* opCtx, const NamespaceString& ns);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

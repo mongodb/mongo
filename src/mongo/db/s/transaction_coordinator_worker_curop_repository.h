@@ -33,17 +33,18 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
 namespace mongo {
 
-class TransactionCoordinatorWorkerCurOpRepository {
+class MONGO_MOD_PUB TransactionCoordinatorWorkerCurOpRepository {
 public:
     TransactionCoordinatorWorkerCurOpRepository() {}
     virtual ~TransactionCoordinatorWorkerCurOpRepository() {}
 
-    enum class CoordinatorAction {
+    enum class MONGO_MOD_PRIVATE CoordinatorAction {
         kWritingParticipantList,
         kSendingPrepare,
         kWritingDecision,
@@ -70,7 +71,7 @@ public:
     virtual void reportState(OperationContext* opCtx, BSONObjBuilder* parent) const = 0;
 };
 
-std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
+MONGO_MOD_PUB std::shared_ptr<TransactionCoordinatorWorkerCurOpRepository>
 getTransactionCoordinatorWorkerCurOpRepository();
 
 }  // namespace mongo

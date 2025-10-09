@@ -39,6 +39,7 @@
 #include "mongo/db/transaction/integer_interval_set.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -61,7 +62,7 @@ extern FailPoint hangAfterLoggingApplyOpsForTransaction;
  * Provides methods for exporting ReplOperations in one or more applyOps oplog entries.
  * Concurrency control for this class is maintained by the TransactionParticipant.
  */
-class TransactionOperations {
+class MONGO_MOD_PUB TransactionOperations {
 public:
     using TransactionOperation = repl::ReplOperation;
     using CollectionUUIDs = stdx::unordered_set<UUID, UUID::Hash>;

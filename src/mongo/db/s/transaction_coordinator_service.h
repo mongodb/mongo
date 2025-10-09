@@ -41,6 +41,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/time_support.h"
 
@@ -54,7 +55,7 @@
 
 namespace mongo {
 
-class TransactionCoordinatorService {
+class MONGO_MOD_PUB TransactionCoordinatorService {
     TransactionCoordinatorService(const TransactionCoordinatorService&) = delete;
     TransactionCoordinatorService& operator=(const TransactionCoordinatorService&) = delete;
 
