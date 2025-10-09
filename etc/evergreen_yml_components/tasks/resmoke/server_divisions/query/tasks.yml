@@ -399,7 +399,11 @@ tasks:
           jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=750
           npm_command: agg-fuzzer
           suite: generational_fuzzer
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          # TODO SERVER-112055: Enable CreateViewlessTimeseriesCollections feature flag once all aggregation stages
+          # work properly on viewless timeseries collections.
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   ## Like "aggregation_timeseries_fuzzer_gen", but it uses a pinned git revision for the
   ## "jstestfuzz" repo and it uses a fixed seed.
@@ -434,8 +438,16 @@ tasks:
           npm_command: agg-fuzzer
           suite: generational_fuzzer
           use_large_distro: "true"
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 71acfa2
+          # TODO SERVER-112055: Enable CreateViewlessTimeseriesCollections feature flag once all aggregation stages
+          # work properly on viewless timeseries collections.
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+          jstestfuzz_vars: >-
+            --diffTestingMode timeseries
+            --numPipelines=1000
+            --metaSeed 1726779665485
+            --jstestfuzzGitRev 71acfa2
 
   ## Standalone fuzzer for checking block_processing correctness ##
   - <<: *jstestfuzz_template

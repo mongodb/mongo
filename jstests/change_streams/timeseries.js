@@ -4,7 +4,8 @@
  * @tags: [
  *     change_stream_does_not_expect_txns,
  *     assumes_unsharded_collection,
- *     requires_fcv_61,
+ *     # TODO SERVER-111733 re-enable this test in viewless timeseries suites
+ *     featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

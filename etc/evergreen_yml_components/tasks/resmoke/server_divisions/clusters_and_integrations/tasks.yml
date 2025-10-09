@@ -2324,6 +2324,10 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
+        vars:
+          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_primary_step_down_passthrough_gen
@@ -2337,6 +2341,10 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
+        vars:
+          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template
@@ -2461,6 +2469,9 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
+          # TODO SERVER-112130 remove timeout override
+          exec_timeout_secs: 4800 # 80min
+          timeout_secs: 4800 # 80min
           # Requires legacy timeseries (system.buckets) even in all feature flags variants
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
@@ -2494,6 +2505,9 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
+          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
@@ -2507,6 +2521,10 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
+        vars:
+          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   ## jstestfuzz concurrent sharded cluster causal consistency ##
   - <<: *jstestfuzz_template

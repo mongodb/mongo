@@ -50,6 +50,7 @@ selector:
     - jstests/noPassthrough/index_builds/create_indexes_return_on_start.js
     - jstests/noPassthrough/logging/log_collectionType.js
     - jstests/noPassthrough/move_collection_not_tracked.js
+    - jstests/noPassthrough/query/out_merge/out_primary_stepdown_during_insert.js
     - jstests/noPassthrough/query/queryStats/query_stats_collectionType.js
     - jstests/noPassthrough/query/server_status/serverstatus_index_stats.js
     - jstests/noPassthrough/**/timeseries/**/*.js

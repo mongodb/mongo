@@ -6,6 +6,8 @@
  * multiversion_incompatible,
  * uses_transactions,
  * does_not_support_stepdowns,
+ * # TODO SERVER-110187 re-enable this test in viewless timeseries suites
+ * featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 

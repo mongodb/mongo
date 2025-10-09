@@ -3,6 +3,11 @@
  * the target range on the recipient shard. This prevents mixing legitimate
  * documents (incoming via migration) with invalid ones (incorrectly present
  * due to historical reasons like direct connections or range deleter bugs).
+ * @tags: [
+ *   # TODO SERVER-112060 re-enable this test in viewless timeseries suites
+ *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
+ * ]
+
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

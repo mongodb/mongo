@@ -3,6 +3,8 @@
  *
  * @tags: [
  *   requires_sharding,
+ *   # TODO SERVER-111756 re-enable this test in viewless timeseries suites
+ *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 

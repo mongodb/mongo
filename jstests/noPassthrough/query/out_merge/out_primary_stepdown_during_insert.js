@@ -3,6 +3,11 @@
  * steps down between batches of inserts into the temp collection. The temp collection exists on the
  * primary and is deleted during step down which can result in incomplete $out results being
  * returned to the user. This test asserts that an error is thrown.
+ *
+ * @tags: [
+ *   # TODO SERVER-112061 re-enable this test in viewless timeseries suites
+ *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

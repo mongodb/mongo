@@ -1,3 +1,9 @@
+/*
+ * @tags: [
+ *   # TODO SERVER-112059 re-enable this test in viewless timeseries suites
+ *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
+ * ]
+ */
 import {runReadOnlyTest} from "jstests/readonly/lib/read_only_test.js";
 
 runReadOnlyTest(
