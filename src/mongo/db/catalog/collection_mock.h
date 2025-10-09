@@ -344,7 +344,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void onDeregisterFromCatalog(OperationContext* opCtx) {}
+    void onDeregisterFromCatalog(ServiceContext* svcCtx) {}
 
     UUID uuid() const {
         return _uuid;

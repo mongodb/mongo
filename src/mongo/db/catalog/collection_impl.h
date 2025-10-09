@@ -309,7 +309,7 @@ public:
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 
-    void onDeregisterFromCatalog(OperationContext* opCtx) final;
+    void onDeregisterFromCatalog(ServiceContext* svcCtx) final;
 
     StatusWith<int> checkMetaDataForIndex(const std::string& indexName,
                                           const BSONObj& spec) const final;
