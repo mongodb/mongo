@@ -229,6 +229,7 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
 
     invariant(session->cursorsOut() == 0);
     session->detachOperationContext();
+    session->_storageExecutionTime = Microseconds::zero();
 
     {
         // Release resources in the session we're about to cache.

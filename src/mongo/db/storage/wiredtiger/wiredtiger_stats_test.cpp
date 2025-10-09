@@ -36,14 +36,12 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -166,6 +164,24 @@ protected:
     void read() {
         ASSERT_LT(_readKey, _kMaxReads);
         readAtKey(_readKey++);
+    }
+
+    int64_t getStorageExecutionTime(WiredTigerSession& session) {
+        // Querying stats also advances the tick source
+        tickSourceMock.setAdvanceOnRead(Microseconds{0});
+        WiredTigerStats stats{session};
+        BSONObj statsObj = stats.toBSON();
+        auto waitingObj = statsObj["timeWaitingMicros"];
+        if (waitingObj.eoo()) {
+            return 0LL;
+        }
+
+        auto storageExecutionTime = waitingObj["storageExecutionMicros"];
+        if (storageExecutionTime.eoo()) {
+            return 0LL;
+        }
+
+        return storageExecutionTime.Long();
     }
 
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
@@ -314,25 +330,6 @@ TEST_F(WiredTigerStatsTest, Clone) {
 }
 
 TEST_F(WiredTigerStatsTest, StorageExecutionTime) {
-    auto getStorageExecutionTime = [&](WiredTigerSession& session) {
-        // querying stats also advances the tick source
-        tickSourceMock.setAdvanceOnRead(Microseconds{0});
-        WiredTigerStats stats{session};
-        BSONObj statsObj = stats.toBSON();
-        auto waitingObj = statsObj["timeWaitingMicros"];
-        if (waitingObj.eoo()) {
-            return 0LL;
-        }
-
-        auto storageExecutionTime = waitingObj["storageExecutionMicros"];
-        if (storageExecutionTime.eoo()) {
-            return 0LL;
-        }
-
-        return storageExecutionTime.Long();
-    };
-
-
     ASSERT_EQ(getStorageExecutionTime(*_session), 0);
     tickSourceMock.setAdvanceOnRead(Microseconds{200});
     _session->checkpoint(nullptr);
@@ -345,6 +342,39 @@ TEST_F(WiredTigerStatsTest, StorageExecutionTime) {
 
     storageExecutionTime = getStorageExecutionTime(*_session);
     ASSERT_EQ(storageExecutionTime, 400);
+}
+
+TEST_F(WiredTigerStatsTest, StorageExecutionTimeReuseCachedSession) {
+    ASSERT_EQ(_conn->getIdleSessionsCount(), 0);
+
+    {
+        // Creates a session which will be cached.
+        auto session = _conn->getUninterruptibleSession();
+        session->setTickSource_forTest(&tickSourceMock);
+        ASSERT_EQ(getStorageExecutionTime(*session), 0);
+
+        tickSourceMock.setAdvanceOnRead(Microseconds{200});
+        session->checkpoint(nullptr);
+
+        auto storageExecutionTime = getStorageExecutionTime(*session);
+        ASSERT_EQ(storageExecutionTime, 200);
+    }
+
+    // Ensure the session is cached.
+    ASSERT_EQ(_conn->getIdleSessionsCount(), 1);
+
+    {
+        // Ensure we're reusing the cached session.
+        auto session = _conn->getUninterruptibleSession();
+        ASSERT_EQ(_conn->getIdleSessionsCount(), 0);
+
+        ASSERT_EQ(getStorageExecutionTime(*session), 0);
+        tickSourceMock.setAdvanceOnRead(Microseconds{200});
+        session->checkpoint(nullptr);
+
+        auto storageExecutionTime = getStorageExecutionTime(*session);
+        ASSERT_EQ(storageExecutionTime, 200);
+    }
 }
 
 }  // namespace
