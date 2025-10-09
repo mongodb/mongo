@@ -69,14 +69,14 @@ function runAllTests(launcher) {
     testShutdownLogging(
         launcher,
         makeShutdownByCrashFn("fault"),
-        makeRegExMatchFn(/Invalid access at address[\s\S]*printStructuredStackTrace/),
+        makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/),
         SIGSEGV,
     );
 
     testShutdownLogging(
         launcher,
         makeShutdownByCrashFn("abort"),
-        makeRegExMatchFn(/Got signal[\s\S]*printStructuredStackTrace/),
+        makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/),
         SIGABRT,
     );
 }

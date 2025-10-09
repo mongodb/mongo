@@ -164,7 +164,7 @@ TEST(Unwind, Linkage) {
     // names otherwise, so we can't do an `unw_backtrace` and then lookup the names in the usual
     // way (i.e. `mergeDlInfo` calling `dladdr`).
     std::string frames[] = {
-        "printStructuredStackTrace",
+        "printStackTrace",
         "staticFunction",
         "anonymousNamespaceFunction",
         "hiddenFunction",

@@ -434,12 +434,6 @@ StackTrace getStackTraceImpl(const Options& options) {
 }
 
 }  // namespace
-
-StackTrace getStructuredStackTrace() {
-    stack_trace_detail::Options options{};
-    options.rawAddress = true;
-    return getStackTraceImpl(options);
-}
 }  // namespace stack_trace_detail
 
 void StackTraceAddressMetadata::printTo(StackTraceSink& sink) const {
@@ -462,19 +456,25 @@ const StackTraceAddressMetadata& StackTraceAddressMetadataGenerator::load(void* 
     return _meta;
 }
 
-void printStructuredStackTrace(StackTraceSink& sink) {
+StackTrace getStackTrace() {
+    stack_trace_detail::Options options{};
+    options.rawAddress = true;
+    return getStackTraceImpl(options);
+}
+
+void printStackTrace(StackTraceSink& sink) {
     stack_trace_detail::Options options{};
     options.rawAddress = true;
     const bool withHumanReadable = true;
     getStackTraceImpl(options).sink(&sink, withHumanReadable);
 }
 
-void printStructuredStackTrace(std::ostream& os) {
+void printStackTrace(std::ostream& os) {
     OstreamStackTraceSink sink{os};
     printStackTrace(sink);
 }
 
-void printStructuredStackTrace() {
+void printStackTrace() {
     stack_trace_detail::Options options{};
     options.rawAddress = true;
     const bool withHumanReadable = true;

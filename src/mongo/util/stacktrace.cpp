@@ -34,28 +34,18 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
-#include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/ctype.h"
 
 #include <algorithm>
 #include <iterator>
-#include <sstream>
 
 #include <fmt/format.h>
-
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-#include "mongo/logv2/log_plain.h"
-
-#include <cpptrace/formatting.hpp>
-#include <cpptrace/utils.hpp>
-#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 
-namespace mongo {
-namespace stack_trace_detail {
+namespace mongo::stack_trace_detail {
 namespace {
 
 template <size_t base>
@@ -110,59 +100,6 @@ uint64_t Hex::fromHex(StringData s) {
     return x;
 }
 
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-
-/**
- * Determine whether the context running this program supports colorized output.
- */
-bool supportsColor() {
-    if (isatty(STDOUT_FILENO))
-        return true;
-    // TODO: support color when run under `bazel test`.
-    return false;
-}
-
-void printCppTrace(StackTraceSink* sink) {
-    auto trace = cpptrace::generate_trace(0, kStackTraceFrameMax);
-    static StaticImmortal<cpptrace::formatter> baseFormat =
-        cpptrace::formatter{}
-            .break_before_filename(true)
-            .symbols(cpptrace::formatter::symbol_mode::pretty)
-            .transform([](cpptrace::stacktrace_frame f) {
-                // Strip off bazel prefix to make filenames clickable.
-                constexpr auto prefix = toStdStringViewForInterop("./"_sd);
-                if (f.filename.starts_with(prefix)) {
-                    f.filename.erase(0, prefix.size());
-                }
-                return f;
-            });
-
-    cpptrace::formatter formatter;
-    if (sink == nullptr && supportsColor()) {
-        formatter = baseFormat->colors(cpptrace::formatter::color_mode::always);
-    } else {
-        formatter = baseFormat->colors(cpptrace::formatter::color_mode::none);
-    }
-
-
-    std::ostringstream btss;
-    btss << "BACKTRACE:\n";
-    for (size_t i = 0; i < trace.frames.size(); ++i) {
-        auto&& frame = trace.frames[i];
-        btss << "#" << i << " " << formatter.format(frame) << std::endl;
-        if (frame.filename.find("src/mongo/") != std::string::npos && frame.line.has_value()) {
-            btss << cpptrace::get_snippet(frame.filename, frame.line.value(), frame.column, 2, true)
-                 << "\n";
-        }
-    }
-    if (sink) {
-        *sink << btss.str();
-    } else {
-        logv2::plainLogBypass(btss.str());
-    }
-}
-#endif
-
 void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable) {
     if (sink) {
         *sink << fmt::format("BACKTRACE: {}\n", tojson(bt, ExtendedRelaxedV2_0_0));
@@ -187,47 +124,21 @@ void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanR
     }
 }
 
-}  // namespace stack_trace_detail
+}  // namespace mongo::stack_trace_detail
 
-void StackTrace::log(bool withHumanReadable) const {
+void mongo::StackTrace::log(bool withHumanReadable) const {
     if (hasError()) {
         LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = _error);
     }
 
-    sink(nullptr, withHumanReadable);
+    StackTraceSink* logv2Sink = nullptr;
+    stack_trace_detail::logBacktraceObject(_stacktrace, logv2Sink, withHumanReadable);
 }
 
-void StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
+void mongo::StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
     if (hasError()) {
         *sink << fmt::format("Error collecting stack trace: {}", _error);
     }
 
     stack_trace_detail::logBacktraceObject(_stacktrace, sink, withHumanReadable);
 }
-
-void printStackTrace(StackTraceSink& sink) {
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-    stack_trace_detail::printCppTrace(&sink);
-#else
-    printStructuredStackTrace(sink);
-#endif
-}
-
-void printStackTrace(std::ostream& os) {
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-    OstreamStackTraceSink sink{os};
-    stack_trace_detail::printCppTrace(&sink);
-#else
-    printStructuredStackTrace(os);
-#endif
-}
-
-void printStackTrace() {
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-    stack_trace_detail::printCppTrace(nullptr);
-#else
-    printStructuredStackTrace();
-#endif
-}
-
-}  // namespace mongo

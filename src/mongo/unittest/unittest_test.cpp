@@ -340,7 +340,7 @@ TEST(UnitTestSelfTest, StackTraceForAssertion) {
         threw = true;
     }
     ASSERT_TRUE(threw);
-    ASSERT_STRING_CONTAINS(stacktrace, "printStructuredStackTrace");
+    ASSERT_STRING_CONTAINS(stacktrace, "printStackTrace");
 }
 
 TEST(UnitTestSelfTest, ComparisonAssertionOverloadResolution) {

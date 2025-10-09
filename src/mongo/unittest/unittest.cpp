@@ -439,7 +439,7 @@ TestAssertionFailureException::TestAssertionFailureException(std::string file,
                                                              std::string message)
     : _file(std::move(file)), _line(line), _message(std::move(message)) {
     std::ostringstream ostream;
-    printStructuredStackTrace(ostream);
+    printStackTrace(ostream);
     _stacktrace = ostream.str();
 }
 

@@ -73,10 +73,6 @@
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/exceptions.hpp>
 
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-#include "mongo/logv2/dev_stacktrace_formatter.h"
-#endif
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
@@ -262,11 +258,6 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
                 [&] { return JSONFormatter(options.maxAttributeSizeKB, options.timestampFormat); });
             break;
     }
-
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-    _consoleSink->set_formatter(
-        DevStacktraceFormatter(_config.maxAttributeSizeKB, _config.timestampFormat));
-#endif
 
     if (options.consoleEnabled) {
         if (_consoleSink.use_count() == 1) {

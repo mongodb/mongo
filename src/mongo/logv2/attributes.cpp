@@ -96,9 +96,4 @@ const boost::log::attribute_name& userassert() {
     return attr;
 }
 
-const boost::log::attribute_name& devStacktrace() {
-    static const boost::log::attribute_name attr("devStacktraces");
-    return attr;
-}
-
 }  // namespace mongo::logv2::attributes

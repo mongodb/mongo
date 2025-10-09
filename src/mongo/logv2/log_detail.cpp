@@ -260,8 +260,7 @@ void _doLogImpl(int32_t id,
                 LogSeverity const& severity,
                 LogOptions const& options,
                 StringData message,
-                TypeErasedAttributeStorage const& attrs,
-                bool devStacktraces = false) {
+                TypeErasedAttributeStorage const& attrs) {
     dassert(options.component() != LogComponent::kNumLogComponents);
     // TestingProctor isEnabled cannot be called before it has been
     // initialized. But log statements occurring earlier than that still need
@@ -291,13 +290,6 @@ void _doLogImpl(int32_t id,
                 new boost::log::attributes::attribute_value_impl<TypeErasedAttributeStorage>(
                     attrs)));
 
-#ifdef MONGO_CONFIG_DEV_STACKTRACE
-        record.attribute_values().insert(
-            attributes::devStacktrace(),
-            boost::log::attribute_value(
-                new boost::log::attributes::attribute_value_impl<bool>(devStacktraces)));
-#endif
-
         if (auto fn = getTenantID()) {
             auto tenant = fn();
             if (!tenant.empty()) {
@@ -317,8 +309,7 @@ void doLogImpl(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
                StringData message,
-               TypeErasedAttributeStorage const& attrs,
-               bool devStacktraces) {
+               TypeErasedAttributeStorage const& attrs) {
     if (loggingInProgress()) {
         doSafeLog("Logging in Progress", id, severity, options, message, attrs);
         return;
@@ -330,7 +321,7 @@ void doLogImpl(int32_t id,
     };
 
     try {
-        _doLogImpl(id, severity, options, message, attrs, devStacktraces);
+        _doLogImpl(id, severity, options, message, attrs);
     } catch (const fmt::format_error& ex) {
         _doLogImpl(4638200,
                    LogSeverity::Error(),

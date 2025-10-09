@@ -246,8 +246,6 @@ private:
     synchronized_value<std::unique_ptr<SharedPromise<void>>> _promise;
 };
 
-StackTrace getStructuredStackTrace();
-
 }  // namespace stack_trace_detail
 
 #ifndef _WIN32
@@ -384,15 +382,7 @@ size_t rawBacktrace(void** addrs, size_t capacity);
 void printStackTrace(StackTraceSink& sink);
 void printStackTrace(std::ostream& os);
 void printStackTrace();
-
-/**
- * These are called by default when the `dev_stacktrace` bazel option is disabled.
- * When `dev_stacktrace` is enabled and stacktrace output may be unstructured,
- * these functions are available to force structured output of stacktraces.
- */
-void printStructuredStackTrace(StackTraceSink& sink);
-void printStructuredStackTrace(std::ostream& os);
-void printStructuredStackTrace();
+StackTrace getStackTrace();
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
