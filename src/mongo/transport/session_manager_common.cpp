@@ -89,8 +89,16 @@ bool quiet() {
     return serverGlobalParams.quiet.load();
 }
 
-// Limit maximum sessions to `net.maxIncomingConnections`/`--maxConns`
-// On non-windows, this is automatically capped to 80% of the current system rlimit.
+
+/**
+ * Limit maximum sessions to `serverGlobalParams.maxConns`.
+ *
+ * Furthermore, on non-Windows, the max number of open connections is automatically
+ * capped to 80% of half the open file limit. Half to account for the two file
+ * descriptors for each open connection (a second file descriptor is needed to make clients
+ * notifable through eventfd) and 80% to pad for descriptors unrelated to connections, such as for
+ * collections.
+ */
 std::size_t getSupportedMax() {
     const auto supportedMax = ([] {
 #ifdef _WIN32
@@ -98,8 +106,8 @@ std::size_t getSupportedMax() {
 #else
         struct rlimit limit;
         MONGO_verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
-
-        const auto max = static_cast<std::size_t>(limit.rlim_cur * .8);
+        const auto openFileLimit = limit.rlim_cur / 2;
+        const auto max = static_cast<std::size_t>(openFileLimit * .8);
 
         LOGV2_DEBUG(22940,
                     1,

@@ -296,6 +296,9 @@ mongo_cc_unit_test(
         "//src/mongo/transport/asio:asio_transport_layer_test.cpp",
         "//src/mongo/transport/asio:asio_utils_test.cpp",
     ] + select({
+        "@platforms//os:linux": ["session_manager_common_test.cpp"],
+        "//conditions:default": [],
+    }) + select({
         "//bazel/config:build_grpc_enabled": ["transport_layer_manager_grpc_test.cpp"],
         "//conditions:default": [],
     }),
