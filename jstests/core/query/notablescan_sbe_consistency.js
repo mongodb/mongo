@@ -45,10 +45,13 @@ function runCmds() {
     naturalHints.forEach(runWithHint);
 }
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeRestricted"}));
+const prevQueryEngine = assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeRestricted"}),
+).was;
 runCmds();
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 runCmds();
 
 assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: prevnotablescan}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: prevQueryEngine}));
