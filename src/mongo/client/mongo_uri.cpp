@@ -715,6 +715,11 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
         bob.append(saslCommandServiceNameFieldName, it->second);
     }
 
+    it = _options.find("gssapiHostName");
+    if (it != _options.end()) {
+        bob.append(saslCommandServiceHostnameFieldName, it->second);
+    }
+
     if (!username.empty()) {
         bob.append("user", username);
     }
