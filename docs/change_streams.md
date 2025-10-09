@@ -77,7 +77,8 @@ _mongosh_, the "jstest shell" (_mongo_) and many drivers provide simpler "watch"
 
 ### Opening a Collection-Level Change Stream
 
-To open a collection-level change stream on a specific collection (e.g., `testDB.testCollection`):
+To open a collection-level change stream on a specific collection (e.g., `testDB.testCollection`),
+the following _mongosh_ command can be used:
 
 ```js
 db.getSiblingDB("testDB").runCommand({
@@ -93,7 +94,8 @@ db.getSiblingDB("testDB").runCommand({
 
 ### Opening a Database-Level Change Stream
 
-To open a database-level change stream on a specific database (e.g., `testDB`), use
+To open a database-level change stream on a specific database (e.g., `testDB`), use the following
+command in _mongosh_:
 
 ```js
 db.getSiblingDB("testDB").runCommand({
@@ -115,7 +117,8 @@ The internal namespace that is used by database-level change streams is `<dbName
 ### Opening an All-Cluster Change Stream
 
 All-cluster change streams can only be opened on the `admin` database and also need the
-`allChangesForCluster` flag to be set to `true` in order to work:
+`allChangesForCluster` flag to be set to `true` in order to work. The following _mongosh_ command
+can be used to open an all-cluster change stream:
 
 ```js
 db.adminCommand({
@@ -187,6 +190,10 @@ Resume tokens are serialized and deserialized by the [ResumeToken](https://githu
 class. The resume token internal data is stored in [ResumeTokenData](https://github.com/mongodb/mongo/blob/6d182bc73acdf2270320eba611538f6619b627bc/src/mongo/db/pipeline/resume_token.h#L50).
 
 Resume tokens are versioned. Currently only version 2 is supported.
+
+Future versions may introduce new resume token versions. Client applications should treat resume
+tokens as opaque identifiers and should not make any assumptions about the format or internals
+or resume tokens, nor should they rely on the internal implementation details of resume tokens.
 
 ### Change Stream Cursors
 

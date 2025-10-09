@@ -345,24 +345,22 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // Check that the oplog entry format is as expected:
             // - if there is an '_id' field, it is a replace.
             // - if there is no '_id' field and the '$v' is 2, it is a delta (diff) update.
-            // - if there is no '_id' field and the '$v' is not 2, it is a modifier update.
-            uassert(6741200,
-                    str::stream() << "Expected _id field, or $v field missing, or $v equal to "
-                                  << static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1)
-                                  << " (kUpdateNodeV1) or "
-                                  << static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)
-                                  << " (kDeltaV2), but got oplog version $v: "
-                                  << oplogVersion.toString(),
-                    !id.missing() || oplogVersion.missing() ||
-                        oplogVersion.getInt() ==
-                            static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1) ||
-                        oplogVersion.getInt() ==
-                            static_cast<int>(UpdateOplogEntryVersion::kDeltaV2));
-
+            // If there is no '_id' field and the '$v' is not 2, it is an old-style modifier
+            // update. This is unsupported.
             // It is important to check for '_id' field first, because a replacement style update
             // can still have a '$v' field in the object.
-            if (id.missing() && !oplogVersion.missing() &&
-                oplogVersion.getInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
+            const bool isUpdateEntry = id.missing();
+            uassert(
+                6741200,
+                str::stream() << "Expected _id field, or $v field missing, or $v equal to "
+                              << static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)
+                              << " (kDeltaV2), but got oplog version $v: "
+                              << oplogVersion.toString(),
+                !isUpdateEntry ||
+                    (!oplogVersion.missing() && oplogVersion.getType() == BSONType::numberInt &&
+                     oplogVersion.getInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)));
+
+            if (isUpdateEntry) {
                 // Parsing the delta oplog entry.
                 operationType = DocumentSourceChangeStream::kUpdateOpType;
                 Value diffObj = input[repl::OplogEntry::kObjectFieldName]
@@ -395,6 +393,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                     }
                 }
             } else {
+                // Replace.
                 operationType = DocumentSourceChangeStream::kReplaceOpType;
                 fullDocument = input[repl::OplogEntry::kObjectFieldName];
             }
@@ -630,7 +629,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 boost::optional<std::pair<StringData, Value>>
 ChangeStreamDefaultEventTransformation::handleSupportedEvent(const Document& o2Field) const {
     for (auto&& supportedEvent : _supportedEvents) {
-        if (auto lookup = o2Field[supportedEvent]; !o2Field[supportedEvent].missing()) {
+        if (auto lookup = o2Field[supportedEvent]; !lookup.missing()) {
             // Known event.
             return std::make_pair(supportedEvent,
                                   Value{copyDocExceptFields(o2Field, {supportedEvent})});
