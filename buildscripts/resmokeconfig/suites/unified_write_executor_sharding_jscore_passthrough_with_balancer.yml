@@ -34,8 +34,6 @@ selector:
     - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
     # override library is not able to intercept createIndex commands executed inside benchRun
     - jstests/core/**/bench_test1.js
-    # TODO SERVER-91073: Validate command does not check if a received shard version is stale before proceeding.
-    - jstests/core/index/index_partial_write_ops.js
     # moveCollection will drop indexes which will reset index statistics this test asserts on.
     - jstests/core/index/index_stats.js
     # moveCollection and the many deleteMany commands in this test block each other and can easily cause the test to time out.
