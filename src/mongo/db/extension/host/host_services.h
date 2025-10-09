@@ -44,5 +44,10 @@ public:
      * Logs a message from the extension with severity INFO, WARNING, or ERROR.
      */
     static void log(const mongo::extension::MongoExtensionLog& log);
+
+    /**
+     * Logs a debug message from the extension with levels [1, 5].
+     */
+    static void logDebug(const mongo::extension::MongoExtensionDebugLog& bsonLog);
 };
 }  // namespace mongo::extension::host

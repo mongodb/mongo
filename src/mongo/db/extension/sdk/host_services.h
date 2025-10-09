@@ -90,6 +90,12 @@ public:
         enterC([&]() { return vtable().log(objAsByteView(obj)); });
     }
 
+    void logDebug(std::string message, std::int32_t code, std::int32_t level = 1) const {
+        assertValid();
+        BSONObj debugLogBsonObj = createExtensionDebugLogMessage(message, code, level);
+        enterC([&]() { return vtable().log_debug(objAsByteView(debugLogBsonObj)); });
+    }
+
     /**
      * setHostServices() should be called only once during initialization of the extension. The host
      * guarantees that the pointer remains valid during the lifetime of the extension.

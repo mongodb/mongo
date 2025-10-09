@@ -59,12 +59,15 @@ private:
 
     static MongoExtensionStatus* _extLog(::MongoExtensionByteView logMessage) noexcept;
 
+    static MongoExtensionStatus* _extLogDebug(::MongoExtensionByteView rawLog) noexcept;
+
     static ::MongoExtensionStatus* _extUserAsserted(
         ::MongoExtensionByteView structuredErrorMessage);
+
     static ::MongoExtensionStatus* _extTripwireAsserted(
         ::MongoExtensionByteView structuredErrorMessage);
 
     static constexpr ::MongoExtensionHostServicesVTable VTABLE{
-        &_extAlwaysOK_TEMPORARY, &_extLog, &_extUserAsserted, &_extTripwireAsserted};
+        &_extAlwaysOK_TEMPORARY, &_extLog, &_extLogDebug, &_extUserAsserted, &_extTripwireAsserted};
 };
 }  // namespace mongo::extension::host_adapter

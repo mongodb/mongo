@@ -66,4 +66,24 @@ void HostServices::log(const mongo::extension::MongoExtensionLog& log) {
     // extension.
     logv2::detail::doLogImpl(log.getCode(), severity, options, log.getMessage(), attrs);
 }
+
+void HostServices::logDebug(const mongo::extension::MongoExtensionDebugLog& debugLog) {
+    // For now we always log extension messages under the EXTENSION-MONGOT component. Someday we'd
+    // like to dynamically create EXTENSION sub-components per extension.
+    logv2::LogOptions options(logv2::LogComponent::kExtensionMongot);
+
+    // We're trimming the debug levels to the range [1, 5] since we want to make sure that the log
+    // line is using one of the server's logv2 debug severities.
+    logv2::LogSeverity level =
+        logv2::LogSeverity::Debug(std::min(5, std::max(1, debugLog.getLevel())));
+
+    std::int32_t code = debugLog.getCode();
+    StringData message = debugLog.getMessage();
+
+    // TODO SERVER-111339 Populate attributes.
+    logv2::TypeErasedAttributeStorage attrs;
+
+    logv2::detail::doLogImpl(code, level, options, message, attrs);
+}
+
 }  // namespace mongo::extension::host

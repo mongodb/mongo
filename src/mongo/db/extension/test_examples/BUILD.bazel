@@ -28,6 +28,7 @@ extensions_with_config(
         ":bar_mongo_extension",
         ":foo_mongo_extension",
         ":logging_mongo_extension",
+        ":debug_logging_mongo_extension",
         ":parse_options_mongo_extension",
         ":test_options_mongo_extension",
         ":extension_errors_mongo_extension",
@@ -97,6 +98,7 @@ extensions_with_config(
     for extension_name in [
         "logging",
         "extension_errors",
+        "debug_logging",
     ]
 ]
 

@@ -34,6 +34,7 @@ mongo_cc_library(
     hdrs = ["host_services.h"],
     deps = [
         "//src/mongo:base",
+        # Needed for the IDL generated code.
         "//src/mongo/db/extension/public:extensions_api_public",
     ],
 )

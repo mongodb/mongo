@@ -424,6 +424,15 @@ typedef struct MongoExtensionHostServicesVTable {
     MongoExtensionStatus* (*log)(MongoExtensionByteView rawLog);
 
     /**
+     * Sends a debug log message to the server, and logs it as long as the 'Extension' log component
+     * in the server has a level greater or equal to the debug log's level.
+     *
+     * The rawLog parameter is expected to be a BSON document with the structure defined by
+     * the MongoExtensionDebugLog struct in extension_log.idl.
+     */
+    MongoExtensionStatus* (*log_debug)(MongoExtensionByteView rawLog);
+
+    /**
      * Throws a non-fatal exception to end the current operation with an error. This should be
      * called when the user made an error.
      */

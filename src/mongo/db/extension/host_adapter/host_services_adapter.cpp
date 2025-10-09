@@ -53,6 +53,14 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(::MongoExtensionByteView logM
     });
 }
 
+MongoExtensionStatus* HostServicesAdapter::_extLogDebug(::MongoExtensionByteView rawLog) noexcept {
+    return enterCXX([&]() {
+        BSONObj bsonLog = bsonObjFromByteView(rawLog);
+        auto debugLog = mongo::extension::MongoExtensionDebugLog::parse(bsonLog);
+        return host::HostServices::logDebug(std::move(debugLog));
+    });
+}
+
 ::MongoExtensionStatus* HostServicesAdapter::_extUserAsserted(
     ::MongoExtensionByteView structuredErrorMessage) {
     // We throw the exception here so that we get a stack trace that looks like a host exception but
