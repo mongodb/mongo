@@ -109,9 +109,11 @@ public:
 
     void setNModified(long long n);
     long long getNModified() const;
+    boost::optional<long long> getNModifiedOpt() const;
 
     void setN(long long n);
     long long getN() const;
+    boost::optional<long long> getNOpt() const;
 
     void setUpsertDetails(const std::vector<BatchedUpsertDetail*>& upsertDetails);
     void addToUpsertDetails(BatchedUpsertDetail* upsertDetails);

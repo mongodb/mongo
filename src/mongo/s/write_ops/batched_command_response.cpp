@@ -291,6 +291,14 @@ long long BatchedCommandResponse::getNModified() const {
     }
 }
 
+boost::optional<long long> BatchedCommandResponse::getNModifiedOpt() const {
+    if (_isNModifiedSet) {
+        return _nModified;
+    } else {
+        return boost::none;
+    }
+}
+
 void BatchedCommandResponse::setN(long long n) {
     _n = n;
     _isNSet = true;
@@ -301,6 +309,14 @@ long long BatchedCommandResponse::getN() const {
         return _n;
     } else {
         return n.getDefault();
+    }
+}
+
+boost::optional<long long> BatchedCommandResponse::getNOpt() const {
+    if (_isNSet) {
+        return _n;
+    } else {
+        return boost::none;
     }
 }
 

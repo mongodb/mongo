@@ -121,8 +121,42 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     // is the combination of 'nInserted' and 'nMatched', and 'nModified', which is only set on
     // updates.
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 8);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 8);
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, OKRepliesWithUpdateCommand) {
+    auto updateRequest = write_ops::UpdateCommandRequest(
+        nss1,
+        std::vector<write_ops::UpdateOpEntry>{
+            write_ops::UpdateOpEntry(BSON("_id" << 0),
+                                     write_ops::UpdateModification(BSON("a" << 0))),
+            write_ops::UpdateOpEntry(BSON("_id" << 1),
+                                     write_ops::UpdateModification(BSON("a" << 1)))});
+    auto request = BatchedCommandRequest(updateRequest);
+    auto reply = makeReply();
+    reply.setNMatched(1);
+    reply.setNModified(1);
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {shard1Name, Response{rcr1, {}}},
+            {shard2Name, Response{rcr2, {WriteOp(request, 0), WriteOp(request, 1)}}}});
+
+    // Generating a 'BatchedCommandResponse' should output the same statistics, save for 'n', which
+    // is the combination of 'nInserted' and 'nMatched', and 'nModified', which is only set on
+    // updates.
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 2);
+    ASSERT_EQ(*batchedCommandReply.getNModifiedOpt(), 2);
 }
 
 TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
@@ -878,8 +912,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
     ASSERT_EQ(batch.size(), 0);
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 0);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_FALSE(batchedCommandReply.getNOpt().has_value());
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
 }
 
@@ -911,8 +945,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
     ASSERT_EQ(batch.size(), 0);
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 0);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_FALSE(batchedCommandReply.getNOpt().has_value());
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
 }
 
@@ -961,8 +995,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
     ASSERT_EQ(batch.size(), 0);
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 0);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_FALSE(batchedCommandReply.getNOpt().has_value());
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
 }
 
@@ -1491,8 +1525,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, OKReplies) {
     ASSERT_EQ(clientReply.getNModified(), 0);
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 2);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 2);
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
 }
 
@@ -1618,8 +1652,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHalt
     ASSERT_EQ(batch[1].getStatus(), Status(errorCode, errorMsg));
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 1);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 1);
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     const auto errors = batchedCommandReply.getErrDetails();
     ASSERT_EQ(errors.size(), 1);
     ASSERT_EQ(errors[0].getIndex(), 1);
@@ -1724,8 +1758,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
     ASSERT_EQ(batch[1].getStatus(), Status(errorCode, errorMsg));
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 1);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 1);
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     const auto errors = batchedCommandReply.getErrDetails();
     ASSERT_EQ(errors.size(), 1);
     ASSERT_EQ(errors[0].getIndex(), 1);
@@ -1786,8 +1820,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
     ASSERT_EQ(batch[1].getStatus(), Status(errorCode, errorMsg));
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 0);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 0);
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     const auto errors = batchedCommandReply.getErrDetails();
     ASSERT_EQ(errors.size(), 1);
     ASSERT_EQ(errors[0].getIndex(), 1);
@@ -1849,8 +1883,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientRe
     ASSERT_FALSE(it == retriedStmtIdsBulkWrite->end());
 
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
-    ASSERT_EQ(batchedCommandReply.getN(), 2);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    ASSERT_EQ(*batchedCommandReply.getNOpt(), 2);
+    ASSERT_FALSE(batchedCommandReply.getNModifiedOpt().has_value());
     ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
     const auto retriedStmtIdsBatchedWrite = clientReply.getRetriedStmtIds();
     ASSERT_EQ(retriedStmtIdsBatchedWrite->size(), 2);
