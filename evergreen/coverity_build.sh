@@ -17,7 +17,7 @@ activate_venv
 # number of parallel jobs to use for build.
 # Even with scale=0 (the default), bc command adds decimal digits in case of multiplication. Division by 1 gives us a whole number with scale=0
 bazel_jobs=$(bc <<<"$(grep -c '^processor' /proc/cpuinfo) * .85 / 1")
-build_config="--config=local --jobs=$bazel_jobs --compiler_type=gcc --opt=off --dbg=False --allocator=system --define=MONGO_VERSION=${version}"
+build_config="--config=local --jobs=$bazel_jobs --build_atlas=True --compiler_type=gcc --opt=off --dbg=False --allocator=system --define=MONGO_VERSION=${version}"
 bazel_query='mnemonic("CppCompile|LinkCompile", filter(//src/mongo, deps(//:install-core)) except //src/mongo/db/modules/enterprise/src/streams/third_party/...)'
 bazel_cache="--output_user_root=$workdir/bazel_cache"
 
