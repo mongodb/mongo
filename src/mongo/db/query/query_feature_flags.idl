@@ -247,7 +247,8 @@ feature_flags:
     featureFlagConvertBinDataVectors:
         description: "Feature flag to enable converting to and from BinDataVectors and BSON Arrays"
         cpp_varname: gFeatureFlagConvertBinDataVectors
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
 
     featureFlagVectorSimilarityExpressions:
