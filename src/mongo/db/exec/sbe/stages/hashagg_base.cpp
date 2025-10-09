@@ -90,7 +90,7 @@ void HashAggBaseStage<Derived>::doRestoreState(bool relinquishCursor) {
         _recordStore->restoreState();
     }
 
-    if (_rsCursor && relinquishCursor) {
+    if (_recordStore && _rsCursor && relinquishCursor) {
         auto couldRestore = _recordStore->restoreCursor(_opCtx, _rsCursor);
         uassert(6196500, "HashAggStage could not restore cursor", couldRestore);
     }
