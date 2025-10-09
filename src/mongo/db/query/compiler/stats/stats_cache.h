@@ -66,7 +66,7 @@ public:
      *  Returns statsCacheLoader currently used for testing only.
      */
     StatsCacheLoader* getStatsCacheLoader() {
-        invariant(_statsCacheLoader);
+        tassert(11051900, "Expecting stats cache loader to be provided", _statsCacheLoader);
 
         return _statsCacheLoader.get();
     }

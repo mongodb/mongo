@@ -177,7 +177,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteComparisonExpression(
     }
 
     const auto& operandList = expr->getOperandList();
-    invariant(operandList.size() == 2);
+    tassert(11051905, "Expect comparison expression to have 2 operands", operandList.size() == 2);
 
     ExpressionFieldPath* lhs{nullptr};
     ExpressionConstant* rhs{nullptr};
@@ -186,11 +186,14 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteComparisonExpression(
     // Extract left-hand side and right-hand side MatchExpression components.
     if ((lhs = dynamic_cast<ExpressionFieldPath*>(operandList[0].get()))) {
         rhs = dynamic_cast<ExpressionConstant*>(operandList[1].get());
-        invariant(rhs);
+        tassert(11051904, "Expect rhs operand to be of type ExpressionConstant", rhs);
     } else {
         lhs = dynamic_cast<ExpressionFieldPath*>(operandList[1].get());
         rhs = dynamic_cast<ExpressionConstant*>(operandList[0].get());
-        invariant(lhs && rhs);
+        tassert(11051903,
+                "Expect lhs and rhs operands to be of types ExpressionFieldPath and "
+                "ExpressionConstant respectively",
+                lhs && rhs);
 
         // The MatchExpression is normalized so that the field path expression is on the left. For
         // cases like {$gt: [1, "$x"]} where the order of the child expressions matter, we also
@@ -334,7 +337,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
     const boost::intrusive_ptr<ExpressionIn>& expr) {
 
     const auto& operandList = expr->getOperandList();
-    invariant(operandList.size() == 2);
+    tassert(11051902, "Expect InExpression to have 2 operands", operandList.size() == 2);
 
     auto lhs = operandList[0].get();
     auto rhs = operandList[1].get();

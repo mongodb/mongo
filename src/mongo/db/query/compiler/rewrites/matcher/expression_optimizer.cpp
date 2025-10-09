@@ -684,7 +684,7 @@ std::unique_ptr<MatchExpression> inOptimizer(std::unique_ptr<MatchExpression> ex
     if (regexes.size() == 1 && ime.equalitiesIsEmpty()) {
         // Simplify IN of exactly one regex to be a regex match.
         auto& childRe = regexes.front();
-        invariant(!childRe->getTag());
+        tassert(11051908, "Expect RegexMatchExpression to be untagged", !childRe->getTag());
 
         auto simplifiedExpression = std::make_unique<RegexMatchExpression>(
             expression->path(), childRe->getString(), childRe->getFlags());

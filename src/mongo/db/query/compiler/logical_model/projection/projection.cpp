@@ -98,40 +98,38 @@ public:
  */
 class ProjectionAnalysisVisitor final : public ProjectionASTConstVisitor {
 public:
-    ProjectionAnalysisVisitor(ProjectionDependencies* deps) : _deps(deps) {
-        invariant(_deps);
-    }
+    ProjectionAnalysisVisitor(ProjectionDependencies& deps) : _deps(deps) {}
 
     void visit(const ProjectionPathASTNode* node) final {
         if (node->parent()) {
-            _deps->hasDottedPath = true;
+            _deps.hasDottedPath = true;
         }
     }
 
     void visit(const ProjectionPositionalASTNode* node) final {
-        _deps->requiresMatchDetails = true;
-        _deps->requiresDocument = true;
+        _deps.requiresMatchDetails = true;
+        _deps.requiresDocument = true;
     }
 
     void visit(const ProjectionSliceASTNode* node) final {
-        _deps->requiresDocument = true;
-        _deps->hasExpressions = true;
+        _deps.requiresDocument = true;
+        _deps.hasExpressions = true;
     }
 
     void visit(const ProjectionElemMatchASTNode* node) final {
-        _deps->requiresDocument = true;
-        _deps->hasExpressions = true;
-        _deps->containsElemMatch = true;
+        _deps.requiresDocument = true;
+        _deps.hasExpressions = true;
+        _deps.containsElemMatch = true;
     }
 
     void visit(const ExpressionASTNode* node) final {
-        _deps->hasExpressions = true;
+        _deps.hasExpressions = true;
     }
     void visit(const BooleanConstantASTNode* node) final {}
     void visit(const MatchExpressionASTNode* node) final {}
 
 private:
-    ProjectionDependencies* _deps;
+    ProjectionDependencies& _deps;
 };
 
 /**
@@ -143,13 +141,12 @@ private:
  */
 class DepsAnalysisVisitor final : public ProjectionASTConstVisitor {
 public:
-    DepsAnalysisVisitor(PathTrackingVisitorContext<DepsAnalysisData>* context) : _context{context} {
-        invariant(_context);
-    }
+    DepsAnalysisVisitor(PathTrackingVisitorContext<DepsAnalysisData>& context)
+        : _context{context} {}
 
     void visit(const MatchExpressionASTNode* node) final {
         dependency_analysis::addDependencies(&(*node->matchExpression()),
-                                             &_context->data().fieldDependencyTracker);
+                                             &_context.data().fieldDependencyTracker);
     }
 
     void visit(const ProjectionPositionalASTNode* node) final {
@@ -170,11 +167,10 @@ public:
 
     void visit(const ExpressionASTNode* node) final {
         // The output of an expression on a dotted path depends on whether that field is an array.
-        invariant(node->parent());
-        expression::addDependencies(node->expressionRaw(),
-                                    &_context->data().fieldDependencyTracker);
+        tassert(11051954, "Projection AST node is missing parent", node->parent());
+        expression::addDependencies(node->expressionRaw(), &_context.data().fieldDependencyTracker);
 
-        if (_context->fullPath().getPathLength() > 1) {
+        if (_context.fullPath().getPathLength() > 1) {
             // If assigning to a top-level field, the value of that field is not actually required.
             // Otherwise, any assignment of an expression to a field requires the first component
             // of that field. e.g. {a.b.c: <expression>} will require all of 'a' since it may be an
@@ -188,7 +184,7 @@ public:
         if (node->value()) {
             addFullPathAsDependency();
         } else {
-            _context->data().addExcludedPath(_context->fullPath().fullPath());
+            _context.data().addExcludedPath(_context.fullPath().fullPath());
         }
     }
 
@@ -196,25 +192,25 @@ public:
 
 private:
     void addTopLevelPathAsDependency() {
-        const auto& path = _context->fullPath();
+        const auto& path = _context.fullPath();
 
-        _context->data().addRequiredField(std::string{path.front()});
+        _context.data().addRequiredField(std::string{path.front()});
     }
 
     void addFullPathAsDependency() {
-        const auto& path = _context->fullPath();
+        const auto& path = _context.fullPath();
 
-        _context->data().addRequiredField(path.fullPath());
+        _context.data().addRequiredField(path.fullPath());
     }
 
-    PathTrackingVisitorContext<DepsAnalysisData>* _context;
+    PathTrackingVisitorContext<DepsAnalysisData>& _context;
 };
 
 auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
     ProjectionDependencies deps;
     PathTrackingVisitorContext<DepsAnalysisData> context;
-    DepsAnalysisVisitor depsAnalysisVisitor{&context};
-    ProjectionAnalysisVisitor projectionAnalysisVisitor{&deps};
+    DepsAnalysisVisitor depsAnalysisVisitor{context};
+    ProjectionAnalysisVisitor projectionAnalysisVisitor{deps};
     PathTrackingWalker walker{&context, {&depsAnalysisVisitor, &projectionAnalysisVisitor}, {}};
 
     tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);
@@ -224,8 +220,7 @@ auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
 
     if (type == ProjectType::kInclusion || type == ProjectType::kAddition) {
         deps.paths = userData.requiredFields();
-    } else {
-        invariant(type == ProjectType::kExclusion);
+    } else {  // type == ProjectType::kExclusion
         deps.requiresDocument = true;
         deps.paths = std::move(userData.excludedPaths);
     }
@@ -349,7 +344,7 @@ using MetaFieldVisitorContext = PathTrackingVisitorContext<MetaFieldData>;
  */
 class MetaFieldVisitor final : public ProjectionASTConstVisitor {
 public:
-    MetaFieldVisitor(MetaFieldVisitorContext* context) : _context(context) {}
+    MetaFieldVisitor(MetaFieldVisitorContext& context) : _context(context) {}
 
     void visit(const ExpressionASTNode* node) final {
         const auto* metaExpr = dynamic_cast<const ExpressionMeta*>(node->expressionRaw());
@@ -357,7 +352,7 @@ public:
             return;
         }
 
-        _context->data().metaPaths.push_back(_context->fullPath());
+        _context.data().metaPaths.push_back(_context.fullPath());
     }
 
     void visit(const ProjectionPositionalASTNode* node) final {}
@@ -368,13 +363,13 @@ public:
     void visit(const MatchExpressionASTNode* node) final {}
 
 private:
-    MetaFieldVisitorContext* _context;
+    MetaFieldVisitorContext& _context;
 };
 }  // namespace
 
 std::vector<FieldPath> Projection::extractSortKeyMetaFields() const {
     MetaFieldVisitorContext ctx;
-    MetaFieldVisitor visitor(&ctx);
+    MetaFieldVisitor visitor(ctx);
     PathTrackingConstWalker<MetaFieldData> walker{&ctx, {&visitor}, {}};
     tree_walker::walk<true, ASTNode>(root(), &walker);
 

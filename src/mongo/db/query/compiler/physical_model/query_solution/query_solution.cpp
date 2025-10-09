@@ -845,9 +845,10 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
     }
 
     std::set<StringData> ret;
-    invariant(bounds.fields.size() == static_cast<size_t>(indexKeyPattern.nFields()));
+    tassert(11051911,
+            "Expect the number of input bounds to match the number of fields in index key pattern",
+            bounds.fields.size() == static_cast<size_t>(indexKeyPattern.nFields()));
     for (const auto& oil : bounds.fields) {
-        invariant(keyPatternIterator.more());
         BSONElement el = keyPatternIterator.next();
         OrderedIntervalList intersection = buildStringBoundsOil(el.fieldName());
         IndexBoundsBuilder::intersectize(oil, &intersection);
@@ -924,7 +925,9 @@ bool confirmBoundsProvideSortComponentGivenMultikeyness(
         // This is because if they are equal and do not have [minKey, maxKey] bounds, we would
         // already have bailed out of the function. If they do have [minKey, maxKey] bounds,
         // they will be skipped in the check for [minKey, maxKey] bounds above.
-        invariant(refName != boundsPath);
+        if (refName == boundsPath) {
+            MONGO_UNREACHABLE_TASSERT(11051910);
+        }
         // Checks if there's a common prefix between the interval list name and the sort pattern
         // name.
         if (commonPrefixSize > 0) {
@@ -1360,7 +1363,7 @@ void ProjectionNode::appendToString(str::stream* ss, int indent) const {
 }
 
 void ProjectionNode::computeProperties() {
-    invariant(children.size() == 1U);
+    tassert(11051909, "Expect projection to have 1 query solution", children.size() == 1U);
     children[0]->computeProperties();
 
     // Our input sort is not necessarily maintained if we project some fields that are part of the

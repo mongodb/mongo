@@ -212,7 +212,9 @@ BSONObj astToDebugBSON(const ASTNode* root) {
 
     tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);
 
-    invariant(context.data().builders.size() == 1);
+    tassert(11051944,
+            "Stack of BSONObjBuilders doesn't contain a single element",
+            context.data().builders.size() == 1);
     return context.data().builders.top().obj();
 }
 
@@ -223,7 +225,9 @@ BSONObj serialize(const ProjectionPathASTNode& root, const SerializationOptions&
     PathTrackingWalker walker{&context, {&preVisitor}, {&postVisitor}};
     tree_walker::walk<true, projection_ast::ASTNode>(&root, &walker);
 
-    invariant(context.data().builders.size() == 1);
+    tassert(11051943,
+            "Stack of BSONObjBuilders doesn't contain a single element",
+            context.data().builders.size() == 1);
     return context.data().builders.top().obj();
 }
 }  // namespace mongo::projection_ast

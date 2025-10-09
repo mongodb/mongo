@@ -81,15 +81,17 @@ void assertOILIsAscendingLocally(const vector<Interval>& intervals, size_t idx) 
     // Each individual interval being examined should be ascending or none.
     const auto dir = intervals[idx].getDirection();
 
-    // Should be either ascending, or have no direction (be a point/null/empty interval).
-    invariant(dir == Interval::Direction::kDirectionAscending ||
-              dir == Interval::Direction::kDirectionNone);
+    tassert(11051932,
+            "Expect interval direction to be either ascending, or have no direction",
+            dir == Interval::Direction::kDirectionAscending ||
+                dir == Interval::Direction::kDirectionNone /*  point/null/empty interval */);
 
-    // The previous OIL's end value should be <= the next OIL's start value.
     if (idx > 0) {
         // Pass 'false' to avoid comparing the field names.
         const int res = intervals[idx - 1].end.woCompare(intervals[idx].start, false);
-        invariant(res <= 0);
+        tassert(11051931,
+                "Expect previous OIL's end value to be not more than the next OIL's start value",
+                res <= 0);
     }
 }
 
@@ -190,8 +192,10 @@ IndexBoundsBuilder::BoundsTightness translateWildcardIndexBoundsAndTightness(
     // planning, *before* finishWildcardIndexScanNode has been invoked. The IndexEntry should thus
     // only have a single keyPattern field and multikeyPath entry, but this is sufficient to
     // determine whether it will be necessary to adjust the tightness.
-    invariant(index.type == IndexType::INDEX_WILDCARD);
-    invariant(oil);
+    tassert(11051930,
+            str::stream() << "Expecting Wildcard index type, got " << index.type,
+            index.type == IndexType::INDEX_WILDCARD);
+    tassert(11051929, "Missing OrderedIntervalList parameter", oil);
 
     // If 'oil' was not filled the filter type may not be supported, but we can still use this
     // wildcard index for queries on prefix fields. The index bounds for the wildcard field will be
@@ -392,9 +396,11 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
 namespace {
 IndexBoundsBuilder::BoundsTightness computeTightnessForTypeSet(const MatcherTypeSet& typeSet,
                                                                const IndexEntry& index) {
-    // The Array case will not be handled because a typeSet with Array should not reach this
-    // function
-    invariant(!typeSet.hasType(BSONType::array));
+    if (typeSet.hasType(BSONType::array)) {
+        // The Array case will not be handled because a typeSet with Array should not reach this
+        // function
+        MONGO_UNREACHABLE_TASSERT(11051928);
+    }
 
     // The String and Object types with collation require an inexact fetch.
     if (index.collator != nullptr &&
@@ -587,8 +593,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                                              OrderedIntervalList* oilOut,
                                              BoundsTightness* tightnessOut,
                                              interval_evaluation_tree::Builder* ietBuilder) {
-    // We expect that the OIL we are constructing starts out empty.
-    invariant(oilOut->intervals.empty());
+    tassert(11051927, "Expect the OIL to start out empty", oilOut->intervals.empty());
 
     oilOut->name = elt.fieldName();
 
@@ -597,8 +602,9 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         isHashed = true;
     }
 
-    // We should never be asked to translate an unsupported predicate for a hashed index.
-    invariant(!isHashed || Indexability::nodeIsSupportedByHashedIndex(expr));
+    tassert(11051926,
+            "Translating unsupported predicate for a hashed index",
+            !isHashed || Indexability::nodeIsSupportedByHashedIndex(expr));
 
     if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
         _translatePredicate(expr->getChild(0), elt, index, oilOut, tightnessOut, ietBuilder);
@@ -627,8 +633,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         // If we have a NOT -> EXISTS, we must handle separately.
         if (MatchExpression::EXISTS == child->matchType()) {
-            // We should never try to use a sparse index for $exists:false.
-            invariant(!index.sparse);
+            tassert(11051925, "Expect dense index for $exists:false", !index.sparse);
             // {$exists:false} is a point-interval on [null,null] that requires a fetch.
             oilOut->intervals.push_back(makeNullPointInterval(isHashed));
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
@@ -1182,8 +1187,6 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             ime = clonedInMatchExpr;
         }
 
-        invariant(ime->isBSONOwned());
-
         // Because we own the BSON buffer for the $in array, this allows us to create Interval
         // objects which point directly to this BSON (without having to make copies just to strip
         // out the field name as is usually done in IndexBoundsBuilder::translateEquality()).
@@ -1287,8 +1290,8 @@ Interval IndexBoundsBuilder::makeRangeInterval(const BSONObj& obj, BoundInclusio
 
 // static
 void IndexBoundsBuilder::intersectize(const OrderedIntervalList& oilA, OrderedIntervalList* oilB) {
-    invariant(oilB);
-    invariant(oilA.name == oilB->name);
+    tassert(11051924, "missing oilB parameter", oilB);
+    tassert(11051923, "Expect oilA and oilB to have the same name", oilA.name == oilB->name);
 
     size_t oilAIdx = 0;
     const vector<Interval>& oilAIntervals = oilA.intervals;
@@ -1611,8 +1614,8 @@ void IndexBoundsBuilder::appendTrailingAllValuesInterval(const Interval& interva
                                                          bool endKeyInclusive,
                                                          BSONObjBuilder* startBob,
                                                          BSONObjBuilder* endBob) {
-    invariant(startBob);
-    invariant(endBob);
+    tassert(11051922, "missing startBob parameter", startBob);
+    tassert(11051921, "missing endBob parameter", endBob);
 
     // Must be min->max or max->min.
     if (interval.isMinToMax()) {

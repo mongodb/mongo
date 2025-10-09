@@ -62,7 +62,7 @@ StatsCache::LookupResult StatsCache::_lookupStats(OperationContext* opCtx,
                                                   const StatsCacheValueHandle& stats) {
 
     try {
-        invariant(_statsCacheLoader);
+        tassert(11051901, "Expecting stats cache loader to be provided", _statsCacheLoader);
         auto newStats = _statsCacheLoader->getStats(opCtx, statsPath).get();
         return LookupResult(std::move(newStats));
     } catch (const DBException& ex) {

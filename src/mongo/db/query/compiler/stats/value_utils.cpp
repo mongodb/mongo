@@ -573,7 +573,6 @@ absl::flat_hash_map<sbe::value::TypeTags, sbe::value::TypeTags> nextTypeTagsMap(
 
     // Skips the last one as there is no next type.
     sbe::value::TypeTags nextTag = kTypeTagsSorted[kTypeTagsSorted.size() - 1];
-    invariant(!kTypeTagsSorted.empty());
     for (int32_t index = kTypeTagsSorted.size() - 2; index >= 0; --index) {
         auto tag = kTypeTagsSorted[index];
         nextTypeTagsMap[tag] = nextTag;

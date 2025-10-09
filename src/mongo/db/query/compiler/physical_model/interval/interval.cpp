@@ -89,7 +89,7 @@ Interval::Direction Interval::getDirection() const {
     // 'false' to not consider the field name.
     const int res = start.woCompare(end, false);
 
-    invariant(res != 0);
+    tassert(11051912, "Calling getDirection on a point interval", res != 0);
     return res < 0 ? Direction::kDirectionAscending : Direction::kDirectionDescending;
 }
 
@@ -121,7 +121,7 @@ bool Interval::equals(const Interval& other) const {
 }
 
 bool Interval::intersects(const Interval& other) const {
-    if (kDebugBuild) {
+    if constexpr (kDebugBuild) {
         // This function assumes that both intervals are ascending (or are empty/point intervals).
         // Determining this may be expensive, so we only do these checks when in a debug build.
         const auto thisDir = getDirection();

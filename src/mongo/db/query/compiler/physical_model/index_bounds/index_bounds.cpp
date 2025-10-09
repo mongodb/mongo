@@ -915,7 +915,9 @@ IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
 
     // Additional check to determine if interval contains key.
     Location where = intervalCmp(*i, elt, expectedDirection);
-    invariant(BEHIND == where || WITHIN == where);
+    tassert(11051913,
+            "Expect the element to be either behind, or within the interval",
+            BEHIND == where || WITHIN == where);
 
     return where;
 }

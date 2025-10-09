@@ -84,9 +84,10 @@ struct CoreIndexInfo {
           collator(ci),
           indexPathProjection(indexPathProj),
           indexCatalogEntryStorage(std::move(iceStorage)) {
-        // If a projection executor exists, we always expect a $** index
         if (indexPathProjection != nullptr)
-            invariant(type == IndexType::INDEX_WILDCARD);
+            tassert(11051934,
+                    "Wildcard index is expected if index path projection is provided",
+                    type == IndexType::INDEX_WILDCARD);
     }
 
     virtual ~CoreIndexInfo() = default;
@@ -209,8 +210,9 @@ struct MONGO_MOD_NEEDS_REPLACEMENT IndexEntry : CoreIndexInfo {
           multikeyPathSet(std::move(multikeyPathSet)),
           infoObj(io),
           wildcardFieldPos(wildcardPos) {
-        // The caller must not supply multikey metadata in two different formats.
-        invariant(this->multikeyPaths.empty() || this->multikeyPathSet.empty());
+        tassert(11051933,
+                "Multikey data must not be supplied in two different formats",
+                this->multikeyPaths.empty() || this->multikeyPathSet.empty());
     }
 
     IndexEntry(const IndexEntry&) = default;

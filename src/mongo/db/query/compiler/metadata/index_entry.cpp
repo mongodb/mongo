@@ -89,7 +89,7 @@ BSONElement IndexEntry::getWildcardField() const {
     BSONObjIterator it(keyPattern);
     BSONElement wildcardElt = it.next();
     for (size_t i = 0; i < wildcardFieldPos; ++i) {
-        invariant(it.more());
+        tassert(11051935, "the wildcardFieldPos is larger than the keyPattern length", it.more());
         wildcardElt = it.next();
     }
 

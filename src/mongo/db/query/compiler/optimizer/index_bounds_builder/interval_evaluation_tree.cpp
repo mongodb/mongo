@@ -196,10 +196,12 @@ public:
             return algebra::walk(child, *this);
         }();
 
-        invariant(node.index() < static_cast<int>(childOil.intervals.size()));
+        tassert(11051920,
+                "Expect the node index to be less than the number of childOil intervals",
+                node.index() < static_cast<int>(childOil.intervals.size()));
         childOil.intervals[0] = childOil.intervals[node.index()];
         childOil.intervals.resize(1);
-        invariant(childOil.isPoint());
+        tassert(11051919, "Expect the childOil to be a point interval", childOil.isPoint());
 
         return childOil;
     }

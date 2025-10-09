@@ -275,7 +275,8 @@ class MatchExpressionParameterizationVisitor final : public MatchExpressionMutab
 public:
     MatchExpressionParameterizationVisitor(MatchExpressionParameterizationVisitorContext* context)
         : _context{context} {
-        invariant(_context);
+        tassert(
+            11051907, "MatchExpressionParameterizationVisitor is missing the context", _context);
     }
 
     void visit(AlwaysFalseMatchExpression* expr) final {}
@@ -356,7 +357,7 @@ class MatchExpressionParameterizationWalker {
 public:
     MatchExpressionParameterizationWalker(MatchExpressionParameterizationVisitor* visitor)
         : _visitor{visitor} {
-        invariant(_visitor);
+        tassert(11051906, "MatchExpressionParameterizationWalker is missing the visitor", _visitor);
     }
 
     void preVisit(MatchExpression* expr) {

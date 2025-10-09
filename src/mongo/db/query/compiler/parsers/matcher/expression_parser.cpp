@@ -1336,7 +1336,9 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
         return {std::make_unique<GeoMatchExpression>(
             name, gq.release(), section, createAnnotation(expCtx, operatorName, name, section))};
     } else {
-        invariant(PathAcceptingKeyword::GEO_NEAR == type);
+        tassert(11051918,
+                "Expect PathAcceptingKeyword to be $geoNear",
+                PathAcceptingKeyword::GEO_NEAR == type);
 
         if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kGeoNear) == 0u) {
             return {Status(ErrorCodes::Error(5626500),
@@ -1418,7 +1420,9 @@ StatusWithMatchExpression parseElemMatch(boost::optional<StringData> name,
     bool isElemMatchValue = false;
     if (isExpressionDocument(e, true)) {
         auto elt = obj.firstElement();
-        invariant(elt);
+        if (!elt) {
+            return {Status(ErrorCodes::BadValue, "$elemMatch needs a non-empty Object")};
+        }
 
         isElemMatchValue = !retrievePathlessParser(elt.fieldNameStringData().substr(1));
     }
@@ -1714,7 +1718,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                         const ExtensionsCallback* extensionsCallback,
                                         MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                         DocumentParseLevel currentLevel) {
-    invariant(e);
+    tassert(11051917, "Missing match expression parameter", e);
 
     if ("$not"_sd == e.fieldNameStringData()) {
         return parseNot(name, e, expCtx, extensionsCallback, allowedFeatures, currentLevel);

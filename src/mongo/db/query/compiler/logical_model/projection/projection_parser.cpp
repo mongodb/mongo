@@ -156,8 +156,10 @@ bool isInclusionOrExclusionType(BSONType type) {
 ProjectionPathASTNode* findLastInnerNodeOnPath(ProjectionPathASTNode* root,
                                                const FieldPath& path,
                                                size_t componentIndex) {
-    invariant(root);
-    invariant(path.getPathLength() > componentIndex);
+    tassert(11051942, "Missing root node", root);
+    tassert(11051941,
+            "Field path is longer than the size of componentIndex",
+            path.getPathLength() > componentIndex);
 
     auto child = exact_pointer_cast<ProjectionPathASTNode*>(
         root->getChild(path.getFieldName(componentIndex)));
@@ -174,8 +176,11 @@ void addNodeAtPathHelper(ProjectionPathASTNode* root,
                          const FieldPath& path,
                          size_t componentIndex,
                          std::unique_ptr<ASTNode> newChild) {
-    invariant(root);
-    invariant(path.getPathLength() > componentIndex);
+    tassert(11051940, "Missing root node", root);
+    tassert(11051939,
+            "Field path is longer than the size of componentIndex",
+            path.getPathLength() > componentIndex);
+
     const auto nextComponent = path.getFieldName(componentIndex);
 
     ASTNode* child = root->getChild(nextComponent);
@@ -366,7 +371,6 @@ bool parseSubObjectAsExpression(ParseContext* parseCtx,
 
             // Create a MatchExpression for the elemMatch.
             BSONObj elemMatchObj = BSON(path.fullPath() << subObj);
-            invariant(elemMatchObj.isOwned());
 
             auto matcher = CopyableMatchExpression{elemMatchObj,
                                                    parseCtx->expCtx,
@@ -443,7 +447,7 @@ void parseInclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* 
         // attached to the tree.
         CopyableMatchExpression matcher{ctx->queryObj, ctx->query->clone()};
 
-        invariant(ctx->query);
+        tassert(11051938, "ParseContext is missing MatchExpression", ctx->query);
         addNodeAtPath(parent,
                       path,
                       std::make_unique<ProjectionPositionalASTNode>(
@@ -465,7 +469,9 @@ void parseInclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* 
  * Treats the given element as an exclusion projection and updates the tree as necessary.
  */
 void parseExclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* parent) {
-    invariant(!elem.trueValue());
+    tassert(11051937,
+            str::stream() << " field " << elem.fieldNameStringData() << " is missing value",
+            !elem.trueValue());
     FieldPath path(elem.fieldNameStringData());
     addNodeAtPath(parent, path, std::make_unique<BooleanConstantASTNode>(false));
 
@@ -669,7 +675,6 @@ Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
                                          ctx.idIncludedEntirely,
                                          ctx.idExcludedEntirely);
     }
-    invariant(ctx.type);
 
     if (!ctx.idSpecified) {
         if (policies.idPolicy == ProjectionPolicies::DefaultIdPolicy::kIncludeId &&
@@ -686,7 +691,7 @@ Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (*ctx.type == ProjectType::kExclusion && ctx.idSpecified && ctx.idIncludedEntirely) {
         // The user explicitly included _id in an exclusion projection. This is legal syntax, but
         // the node indicating that _id is included doesn't need to be in the tree.
-        invariant(root.removeChild("_id"));
+        tassert(11051936, "_id field is missing in the projection AST", root.removeChild("_id"));
     }
 
     // Optimize the projection expression if requested and as long as not explicitly disabled

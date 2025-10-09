@@ -111,7 +111,9 @@ public:
     }
 
     const OrderedPathSet& getExcludedPaths() const {
-        invariant(_type == ProjectType::kExclusion);
+        tassert(11051953,
+                "Expecting projection to be of exclusion type",
+                _type == ProjectType::kExclusion);
         return *_deps.paths;
     }
 

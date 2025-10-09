@@ -53,8 +53,10 @@ public:
     PathTrackingVisitorContext(UserData data) : _data{std::move(data)} {}
 
     auto fullPath() const {
-        invariant(!_fieldNames.empty());
-        invariant(!_fieldNames.top().empty());
+        tassert(11051949, "Empty stack of field names", !_fieldNames.empty());
+        tassert(11051948,
+                "Empty list of field names to visit at the top of the stack",
+                !_fieldNames.top().empty());
 
         if (!_basePath) {
             return FieldPath(_fieldNames.top().front());
@@ -80,7 +82,9 @@ public:
     }
 
     void popFieldNames() {
-        invariant(_fieldNames.top().empty());
+        tassert(11051947,
+                "List of field names to visit at the top of the stack is not empty",
+                _fieldNames.top().empty());
         _fieldNames.pop();
     }
 
@@ -114,7 +118,7 @@ template <class UserData = PathTrackingDummyDefaultType, bool IsConst = true>
 class PathTrackingPreVisitor final : public ProjectionASTVisitor<IsConst> {
 public:
     PathTrackingPreVisitor(PathTrackingVisitorContext<UserData>* context) : _context{context} {
-        invariant(_context);
+        tassert(11051946, "PathTrackingPreVisitor is missing the context", _context);
     }
 
     void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {
@@ -147,7 +151,7 @@ template <class UserData = PathTrackingDummyDefaultType, bool IsConst = true>
 class PathTrackingPostVisitor final : public ProjectionASTVisitor<IsConst> {
 public:
     PathTrackingPostVisitor(PathTrackingVisitorContext<UserData>* context) : _context{context} {
-        invariant(_context);
+        tassert(11051945, "PathTrackingPostVisitor is missing the context", _context);
     }
 
     void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {

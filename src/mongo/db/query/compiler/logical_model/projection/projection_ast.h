@@ -91,7 +91,10 @@ public:
     }
 
     ASTNode* child(size_t index) const {
-        invariant(index < _children.size());
+        tassert(11051952,
+                str::stream() << "Expect child index to be less than " << _children.size()
+                              << " but got " << index,
+                index < _children.size());
         return _children[index].get();
     }
 
@@ -290,7 +293,9 @@ private:
 class ProjectionPositionalASTNode final : public ASTNode {
 public:
     ProjectionPositionalASTNode(std::unique_ptr<MatchExpressionASTNode> child) {
-        invariant(child);
+        tassert(11051951,
+                "Projection positional AST node is missing MatchExpression child node",
+                child);
         addChildToInternalVector(std::move(child));
     }
 
@@ -339,7 +344,9 @@ private:
 class ProjectionElemMatchASTNode final : public ASTNode {
 public:
     ProjectionElemMatchASTNode(std::unique_ptr<MatchExpressionASTNode> child) {
-        invariant(child);
+        tassert(11051950,
+                "Projection element match AST node is missing MatchExpression child node",
+                child);
         addChildToInternalVector(std::move(child));
     }
 

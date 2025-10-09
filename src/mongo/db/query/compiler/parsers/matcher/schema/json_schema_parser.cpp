@@ -148,7 +148,9 @@ std::unique_ptr<MatchExpression> makeRestriction(
     boost::optional<StringData> path,
     std::unique_ptr<MatchExpression> restrictionExpr,
     InternalSchemaTypeExpression* statedType) {
-    invariant(restrictionType.isSingleType());
+    tassert(11051916,
+            "Expecting restriction type set to contain a single type",
+            restrictionType.isSingleType());
 
     if (statedType && statedType->typeSet().isSingleType()) {
         // Use NumberInt in the "number" case as a stand-in.
@@ -866,7 +868,8 @@ StatusWithMatchExpression translateSchemaDependency(
     BSONElement dependency,
     AllowedFeatureSet allowedFeatures,
     bool ignoreUnknownKeywords) {
-    invariant(dependency.type() == BSONType::object);
+    tassert(
+        11051915, "Expect dependency bson to be an object", dependency.type() == BSONType::object);
 
     auto nestedSchemaMatch =
         _parse(expCtx, path, dependency.embeddedObject(), allowedFeatures, ignoreUnknownKeywords);
@@ -898,7 +901,8 @@ StatusWithMatchExpression translatePropertyDependency(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<StringData> path,
     BSONElement dependency) {
-    invariant(dependency.type() == BSONType::array);
+    tassert(
+        11051914, "Expect dependency bson to be an array", dependency.type() == BSONType::array);
 
     if (dependency.embeddedObject().isEmpty()) {
         return {ErrorCodes::FailedToParse,
