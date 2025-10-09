@@ -117,11 +117,17 @@ void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
             auto participant = TransactionParticipant::get(session);
             return participant.transactionIsInProgress();
         },
-        [](OperationContext* opCtx, const SessionToKill& session) {
+        [reason](OperationContext* opCtx, const SessionToKill& session) {
             auto participant = TransactionParticipant::get(session);
             // This is the same test as in the filter, but we must check again now
             // that the session is checked out.
             if (participant.transactionIsInProgress()) {
+                LOGV2(11101700,
+                      "Aborting unprepared transaction",
+                      "session"_attr = session.getSessionId().toBSON(),
+                      "txnNumberAndRetryCounter"_attr =
+                          participant.getActiveTxnNumberAndRetryCounter().toBSON(),
+                      "reason"_attr = reason);
                 participant.abortTransaction(opCtx);
             }
         },
