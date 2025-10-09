@@ -189,6 +189,12 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "stable"
+            # General container for end user and client information that needs to be propagated from a mongos to a config server
+            # or shard for audit logging.
+            # Allowed values: a BSON object with an optional username, a required
+            # (but possibly empty) array of rolenames, and an optional nested BSON object with an array of IP addresses representing
+            # the source and any intermediate clients a request passed through. See AuditMetadata for more details.
+            # Authorization: The client must possess the `impersonate` action on the `cluster` resource to set this field.
             $audit:
                 type: AuditMetadata
                 cpp_name: "dollarAudit"
@@ -321,11 +327,23 @@ structs:
                     which ensures that feature flag checks are stable through its execution."
                 optional: true
                 stability: "internal"
+            # Indicates whether or not a write-based command should be allowed even if the server is blocking user writes as part
+            # of user write blocking mode.
+            # Allowed values: true or false.
+            # Authorization: This field can only be set if the client possesses action type `internal` on the `cluster` resource.
             mayBypassWriteBlocking:
                 type: bool
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Specifies whether or not database names are expected to be prefixed with a tenantID
+            # in command requests. The multitenancySupport flag needs to be enabled for expectPrefix
+            # to take effect. Note that since serverless is deprecated, this will likely be removed
+            # entirely in the future.
+            # Allowed values: true or false.
+            # Authorization: The field is only appended when forwarding requests that presented a security token
+            # with the Atlas Proxy protocol. Security tokens are only allowed from internal thread Clients
+            # or if an external client possesses action type `useTenant` on the `cluster` resource.
             expectPrefix:
                 type: bool
                 forward_to_shards: false
