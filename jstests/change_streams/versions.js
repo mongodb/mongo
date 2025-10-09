@@ -12,8 +12,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 const dbName = jsTestName();
 const collName = jsTestName();
 
-// TODO SERVER-107442: reenable testing of "v2" reader version here.
-const validVersions = ["v1", undefined];
+const validVersions = ["v1", "v2", undefined];
 const isPreciseShardTargetingEnabled = FeatureFlagUtil.isEnabled(db, "ChangeStreamPreciseShardTargeting");
 
 function testChangeStreamWithVersionAttributeSet(version = undefined) {
@@ -34,7 +33,7 @@ function testChangeStreamWithVersionAttributeSet(version = undefined) {
     // Database-level and all database-change streams are currently not implemented for v2 readers, so we
     // only add them to the test when it is safe to do so (non-v2 change stream reader and/or feature flag is
     // disabled).
-    if (version !== "v2" || !isPreciseShardTargetingEnabled) {
+    if (version !== "v2" && !isPreciseShardTargetingEnabled) {
         tests = tests.concat([
             {collection: 1}, // Whole-DB change stream
             {}, // Whole-cluster change stream

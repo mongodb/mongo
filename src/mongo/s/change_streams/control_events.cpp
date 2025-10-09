@@ -48,6 +48,7 @@ static constexpr StringData kAllCollectionChunksMigratedFromDonorField =
     "allCollectionChunksMigratedFromDonor"_sd;
 static constexpr StringData kFromField = "from"_sd;
 static constexpr StringData kToField = "to"_sd;
+static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
 
 Value assertFieldType(const Document& document, StringData fieldName, BSONType expectedType) {
     auto val = document[fieldName];
@@ -62,22 +63,27 @@ Value assertFieldType(const Document& document, StringData fieldName, BSONType e
 }  // namespace
 
 MoveChunkControlEvent MoveChunkControlEvent::createFromDocument(const Document& event) {
+    auto opDescription =
+        assertFieldType(event, kOperationDescriptionField, BSONType::object).getDocument();
     Timestamp clusterTime =
         assertFieldType(event, kClusterTimeField, BSONType::timestamp).getTimestamp();
-    ShardId fromShard = assertFieldType(event, kDonorField, BSONType::string).getString();
-    ShardId toShard = assertFieldType(event, kRecipientField, BSONType::string).getString();
+    ShardId fromShard = assertFieldType(opDescription, kDonorField, BSONType::string).getString();
+    ShardId toShard = assertFieldType(opDescription, kRecipientField, BSONType::string).getString();
     bool allCollectionChunksMigratedFromDonor =
-        assertFieldType(event, kAllCollectionChunksMigratedFromDonorField, BSONType::boolean)
+        assertFieldType(
+            opDescription, kAllCollectionChunksMigratedFromDonorField, BSONType::boolean)
             .getBool();
     return MoveChunkControlEvent{
         clusterTime, fromShard, toShard, allCollectionChunksMigratedFromDonor};
 }
 
 MovePrimaryControlEvent MovePrimaryControlEvent::createFromDocument(const Document& event) {
+    auto opDescription =
+        assertFieldType(event, kOperationDescriptionField, BSONType::object).getDocument();
     Timestamp clusterTime =
         assertFieldType(event, kClusterTimeField, BSONType::timestamp).getTimestamp();
-    ShardId fromShard = assertFieldType(event, kFromField, BSONType::string).getString();
-    ShardId toShard = assertFieldType(event, kToField, BSONType::string).getString();
+    ShardId fromShard = assertFieldType(opDescription, kFromField, BSONType::string).getString();
+    ShardId toShard = assertFieldType(opDescription, kToField, BSONType::string).getString();
     return MovePrimaryControlEvent{clusterTime, fromShard, toShard};
 }
 
@@ -85,13 +91,11 @@ NamespacePlacementChangedControlEvent NamespacePlacementChangedControlEvent::cre
     const Document& event) {
     Timestamp clusterTime =
         assertFieldType(event, kClusterTimeField, BSONType::timestamp).getTimestamp();
-    Timestamp committedAt =
-        assertFieldType(event, kCommittedAtField, BSONType::timestamp).getTimestamp();
     auto nsField = assertFieldType(event, kNamespaceField, BSONType::object).getDocument();
     auto nssSpec = NamespaceSpec::parse(nsField.toBson(),
                                         IDLParserContext("NamespacePlacementChangedControlEvent"));
     NamespaceString nss = NamespaceStringUtil::deserialize(*nssSpec.getDb(), *nssSpec.getColl());
-    return NamespacePlacementChangedControlEvent{clusterTime, committedAt, nss};
+    return NamespacePlacementChangedControlEvent{clusterTime, nss};
 }
 
 DatabaseCreatedControlEvent DatabaseCreatedControlEvent::createFromDocument(const Document& event) {

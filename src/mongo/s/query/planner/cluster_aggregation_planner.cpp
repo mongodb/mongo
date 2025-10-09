@@ -844,6 +844,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 bool eligibleForSampling,
                                 bool requestQueryStatsFromRemotes) {
     auto expCtx = targeter.pipeline->getContext();
+    const bool isChangeStreamV2Pipeline = expCtx->isChangeStreamV2();
 
     // If not, split the pipeline as necessary and dispatch to the relevant shards.
     auto shardDispatchResults =
@@ -859,8 +860,9 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
     // Check for valid usage of SEARCH_META. We wait until after we've dispatched pipelines to the
     // shards in the event that we need to resolve any views.
     // TODO PM-1966: We can resume doing this at parse time once views are tracked in the catalog.
+    // Change stream v2 does not have a shard pipeline.
     auto svcCtx = opCtx->getServiceContext();
-    if (svcCtx) {
+    if (svcCtx && !isChangeStreamV2Pipeline) {
         if (shardDispatchResults.pipelineForSingleShard) {
             search_helpers::assertSearchMetaAccessValid(
                 shardDispatchResults.pipelineForSingleShard->getSources(), expCtx.get());
@@ -882,9 +884,39 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
             std::move(shardDispatchResults), expCtx, result);
     }
 
-    // If this isn't an explain, then we must have established cursors on at least one
-    // shard.
-    invariant(shardDispatchResults.remoteCursors.size() > 0);
+    // Change stream v2 pipeline does not target any shards, yet needs to have a $mergeCursors stage
+    // attached to its merge pipeline running on mongos.
+    if (isChangeStreamV2Pipeline) {
+        tassert(10744203,
+                "change stream v2 should not target any shards",
+                shardDispatchResults.remoteCursors.empty());
+
+        auto mongosPipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
+        tassert(10744204,
+                "tried to dispatch merge pipeline but there was no merge portion of the split "
+                "pipeline",
+                mongosPipeline);
+
+        // Add $mergeCursors stage to the merge pipeline with an empty set of remote shards. Shard
+        // cursors will be later added by the ChangeStreamHandleTopologyChangeV2 stage.
+        sharded_agg_helpers::partitionAndAddMergeCursorsSource(
+            mongosPipeline.get(),
+            {} /* cursors */,
+            shardDispatchResults.splitPipeline->shardCursorsSortSpec,
+            requestQueryStatsFromRemotes);
+        return runPipelineOnMongoS(namespaces,
+                                   batchSize,
+                                   std::move(mongosPipeline),
+                                   result,
+                                   privileges,
+                                   requestQueryStatsFromRemotes);
+    }
+
+    // If this isn't an explain or change stream v2, then we must have established cursors on at
+    // least one shard.
+    tassert(10744205,
+            "aggregate must have established cursors on at least one shard",
+            shardDispatchResults.remoteCursors.size() > 0);
 
     // If we sent the entire pipeline to a single shard, store the remote cursor and return.
     if (!shardDispatchResults.splitPipeline) {

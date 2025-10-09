@@ -159,10 +159,11 @@ TEST_F(CollectionChangeStreamShardTargeterImplFixture,
     auto& eventHandlerMock =
         dynamic_cast<ChangeStreamShardTargeterEventHandlerMock&>(*targeter().getEventHandler());
 
-    Document moveChunkEvent = Document(BSON(
-        "operationType" << MoveChunkControlEvent::opType << "clusterTime" << Timestamp() << "donor"
-                        << "shardA" << "recipient" << "shardB"
-                        << "allCollectionChunksMigratedFromDonor" << true));
+    Document moveChunkEvent = Document(
+        BSON("operationType" << MoveChunkControlEvent::opType << "clusterTime" << Timestamp()
+                             << "operationDescription"
+                             << BSON("donor" << "shardA" << "recipient" << "shardB"
+                                             << "allCollectionChunksMigratedFromDonor" << true)));
     auto controlEvent = parseControlEvent(moveChunkEvent);
     targeter().handleEvent(opCtx(), moveChunkEvent, readerCtx());
     ASSERT_EQ(eventHandlerMock.calls.size(), 1);

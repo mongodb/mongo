@@ -214,14 +214,15 @@ TEST_F(
     CollectionDbPresentStateEventHandlerFixture,
     Given_NamespacePlacementChangedControlEventWithShards_When_HandleEventIsCalled_Then_CursorsAreUpdated) {
     Timestamp clusterTime(60, 10);
-    Timestamp committedAt(60, 10);
-    NamespacePlacementChangedControlEvent event{clusterTime, committedAt, makeTestNss()};
+    NamespacePlacementChangedControlEvent event{clusterTime, makeTestNss()};
 
     ShardId shardA("shardA");
     ShardId shardB("shardB");
-    readerCtx().currentlyTargetedShards = {shardA};
+    ShardId shardC("shardC");
+    ShardId shardD("shardD");
+    readerCtx().currentlyTargetedShards = {shardA, shardD};
 
-    std::vector<ShardId> shards = {shardB};
+    std::vector<ShardId> shards = {shardA, shardB, shardC};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -234,11 +235,11 @@ TEST_F(
     ASSERT_EQ(readerCtx().openCursorsOnDataShardsCalls.size(), 1);
     ASSERT_EQ(readerCtx().openCursorsOnDataShardsCalls[0].atClusterTime, clusterTime + 1);
     ASSERT_EQ(readerCtx().openCursorsOnDataShardsCalls[0].shardSet,
-              stdx::unordered_set<ShardId>{shardB});
+              (stdx::unordered_set<ShardId>{shardB, shardC}));
 
     ASSERT_EQ(readerCtx().closeCursorsOnDataShardsCalls.size(), 1);
     ASSERT_EQ(readerCtx().closeCursorsOnDataShardsCalls[0].shardSet,
-              stdx::unordered_set<ShardId>{shardA});
+              (stdx::unordered_set<ShardId>{shardD}));
 }
 
 TEST_F(

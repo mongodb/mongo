@@ -51,6 +51,7 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <initializer_list>
@@ -315,6 +316,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // can be overriden for specific event types below.
     bool requireUUID = true;
 
+    bool shouldAddOperationDescriptionField = _changeStreamSpec.getShowExpandedEvents();
+
     MutableDocument doc;
 
     switch (opType) {
@@ -503,10 +506,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // Check for dynamic events that were specified via the 'supportedEvents' change stream
             // parameter.
             // This also checks for some hard-coded sharding-related events.
-            if (auto result = handleSupportedEvent(o2Field)) {
+            if (const auto& result = handleSupportedEvent(o2Field)) {
                 // Apply returned event name and operationDescription.
-                operationType = result->first;
-                operationDescription = result->second;
+                operationType = result->opType;
+                operationDescription = result->opDescription;
+                shouldAddOperationDescriptionField |= !result->isBuiltInEvent;
 
                 // Check if the 'reshardingUUID' field needs to be added to the event.
                 if (kOpsWithReshardingUUIDs.contains(operationType)) {
@@ -600,7 +604,10 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // The event may have a documentKey OR an operationDescription, but not both. We already
     // validated this while creating the resume token.
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, std::move(documentKey));
-    if (_changeStreamSpec.getShowExpandedEvents() && !operationDescription.missing()) {
+
+    // Control events must be emitted with the corresponding 'operationDescription' field,
+    // regardless of change stream being opened in 'showExpandedEvents' mode or not.
+    if (shouldAddOperationDescriptionField && !operationDescription.missing()) {
         doc.addField(DocumentSourceChangeStream::kOperationDescriptionField,
                      std::move(operationDescription));
     }
@@ -626,13 +633,18 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     return doc.freeze();
 }
 
-boost::optional<std::pair<StringData, Value>>
+boost::optional<ChangeStreamDefaultEventTransformation::SupportedEventResult>
 ChangeStreamDefaultEventTransformation::handleSupportedEvent(const Document& o2Field) const {
     for (auto&& supportedEvent : _supportedEvents) {
         if (auto lookup = o2Field[supportedEvent]; !lookup.missing()) {
             // Known event.
-            return std::make_pair(supportedEvent,
-                                  Value{copyDocExceptFields(o2Field, {supportedEvent})});
+            const bool isBuiltInEvent =
+                std::find(kBuiltInNoopEvents.begin(), kBuiltInNoopEvents.end(), supportedEvent) !=
+                kBuiltInNoopEvents.end();
+            return ChangeStreamDefaultEventTransformation::SupportedEventResult{
+                supportedEvent,
+                Value{copyDocExceptFields(o2Field, {supportedEvent})},
+                isBuiltInEvent};
         }
     }
     return boost::none;

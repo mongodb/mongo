@@ -45,7 +45,7 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
     // string.
     const auto targetWholeCluster = !nss.has_value() || nss->isEmpty();
     ConfigsvrGetHistoricalPlacement request(
-        targetWholeCluster ? nss.value() : NamespaceString::kEmpty, atClusterTime);
+        targetWholeCluster ? NamespaceString::kEmpty : nss.value(), atClusterTime);
     request.setTargetWholeCluster(targetWholeCluster);
     request.setCheckIfPointInTimeIsInFuture(checkIfPointInTimeIsInFuture);
 

@@ -49,10 +49,11 @@ TEST(
     Timestamp ts;
     ShardId donorShard("fromShard");
     ShardId recipientShard("toShard");
-    Document event =
-        Document(BSON("operationType" << MoveChunkControlEvent::opType << "clusterTime" << ts
-                                      << "donor" << donorShard << "recipient" << recipientShard
-                                      << "allCollectionChunksMigratedFromDonor" << true));
+    Document event = Document(
+        BSON("operationType" << MoveChunkControlEvent::opType << "clusterTime" << ts
+                             << "operationDescription"
+                             << BSON("donor" << donorShard << "recipient" << recipientShard
+                                             << "allCollectionChunksMigratedFromDonor" << true)));
 
     ControlEvent expectedControlEvent = MoveChunkControlEvent{ts, donorShard, recipientShard, true};
     ASSERT_EQ(parseControlEvent(event), expectedControlEvent);
@@ -73,7 +74,8 @@ TEST(
     ShardId recipientShard("toShard");
     Document event =
         Document(BSON("operationType" << MovePrimaryControlEvent::opType << "clusterTime" << ts
-                                      << "from" << donorShard << "to" << recipientShard));
+                                      << "operationDescription"
+                                      << BSON("from" << donorShard << "to" << recipientShard)));
 
     ControlEvent expectedControlEvent = MovePrimaryControlEvent{ts, donorShard, recipientShard};
     ASSERT_EQ(parseControlEvent(event), expectedControlEvent);
@@ -90,7 +92,6 @@ TEST(
     ControlEventTest,
     GivenValidNamespacePlacementChangedControlEventAsDocument_WhenCallingParseControlEvent_ThenParsingIsSuccessful) {
     Timestamp ts;
-    Timestamp committedAt;
 
     auto nss = NamespaceString::kDefaultInitialSyncIdNamespace;
     auto nssSpec = [&]() {
@@ -100,11 +101,11 @@ TEST(
         return nssSpec;
     }();
 
-    Document event = Document(BSON("operationType" << NamespacePlacementChangedControlEvent::opType
-                                                   << "clusterTime" << ts << "committedAt"
-                                                   << committedAt << "ns" << nssSpec.toBSON()));
+    Document event =
+        Document(BSON("operationType" << NamespacePlacementChangedControlEvent::opType
+                                      << "clusterTime" << ts << "ns" << nssSpec.toBSON()));
 
-    ControlEvent expectedControlEvent = NamespacePlacementChangedControlEvent{ts, committedAt, nss};
+    ControlEvent expectedControlEvent = NamespacePlacementChangedControlEvent{ts, nss};
     ASSERT_EQ(parseControlEvent(event), expectedControlEvent);
 }
 

@@ -189,6 +189,15 @@ void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
  */
 BSONObj targetShardsForExplain(Pipeline* ownedPipeline);
 
+/**
+ * Returns a set of targeted shards responsible for answering the 'shardQuery'.
+ */
+std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                    PipelineDataSource pipelineDataSource,
+                                    const boost::optional<CollectionRoutingInfo>& cri,
+                                    const BSONObj& shardQuery,
+                                    const BSONObj& collation,
+                                    const boost::optional<ShardId>& mergeShardId);
 
 void mergeExplainOutputFromShards(const std::vector<AsyncRequestsSender::Response>& shardResponses,
                                   BSONObjBuilder* result);
@@ -291,6 +300,17 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     AggregateCommandRequest request,
     ShardId shardId,
     bool requestQueryStatsFromRemotes);
+
+/**
+ * Opens a $changeStream cursor on the 'config.shards' collection to watch for new shards if:
+ * - 'pipelineDataSource' is kChangeStream
+ * - change stream is not of version v2
+ * - change stream is not already running over 'config.shards' collection.
+ */
+boost::optional<RemoteCursor> openChangeStreamCursorOnConfigsvrIfNeeded(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineDataSource pipelineDataSource,
+    Timestamp startMonitoringAtTime);
 
 }  // namespace sharded_agg_helpers
 }  // namespace mongo

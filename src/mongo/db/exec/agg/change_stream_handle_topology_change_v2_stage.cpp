@@ -192,7 +192,9 @@ public:
     void closeCursorsOnDataShards(const stdx::unordered_set<ShardId>& shardIds) override {
         closeCursors(shardIds, false /* isConfigServer */);
 
-        _currentlyTargetedDataShards.erase(shardIds.begin(), shardIds.end());
+        for (const auto& shardId : shardIds) {
+            _currentlyTargetedDataShards.erase(shardId);
+        }
     }
 
     void closeCursorOnConfigServer(OperationContext* opCtx) override {

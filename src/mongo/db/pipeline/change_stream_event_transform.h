@@ -90,6 +90,12 @@ protected:
  * The event builder class to be used for oplog entries with no special behavior.
  */
 class ChangeStreamDefaultEventTransformation final : public ChangeStreamEventTransformation {
+    struct SupportedEventResult {
+        StringData opType;
+        Value opDescription;
+        bool isBuiltInEvent;
+    };
+
 public:
     ChangeStreamDefaultEventTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec);
@@ -104,11 +110,11 @@ public:
 private:
     /**
      * Checks the 'o2Field' value of an oplog entry has any field name that is contained in
-     * '_supportedEvents'. If so, it returns the name of the field and the value mapped to the field
-     * in the oplog entry. Otherwise returns 'boost::none'.
+     * '_supportedEvents'. If so, it returns the name of the field, the value mapped to the field
+     * in the oplog entry, as well as whether the event is a builtin event. Otherwise returns
+     * 'boost::none'.
      */
-    boost::optional<std::pair<StringData, Value>> handleSupportedEvent(
-        const Document& o2Field) const;
+    boost::optional<SupportedEventResult> handleSupportedEvent(const Document& o2Field) const;
 
     /**
      * Build the '_supportedEvents' container from the 'supportedEvents' change stream parameter.

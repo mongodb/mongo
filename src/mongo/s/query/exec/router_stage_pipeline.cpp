@@ -126,6 +126,12 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
 }
 
 bool RouterStagePipeline::remotesExhausted() const {
+    // Change stream pipelines can never be exhausted. Instead invalidation event may be sent,
+    // closing the stream.
+    if (_mergePipeline->getContext()->isTailableAwaitData()) {
+        return false;
+    }
+
     return !_mergeCursorsStage || _mergeCursorsStage->remotesExhausted();
 }
 

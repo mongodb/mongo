@@ -384,7 +384,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     // We can only run on a replica set, or through mongoS. Confirm that this is the case.
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->getOperationContext());
     uassert(40573,
-            "The $changeStream stage is only supported on replica sets",
+            "The $changeStream stage is only supported on replica sets or mongos",
             expCtx->getInRouter() || (replCoord && replCoord->getSettings().isReplSet()));
 
     // We will not validate user specified options when we are not expecting to execute queries,

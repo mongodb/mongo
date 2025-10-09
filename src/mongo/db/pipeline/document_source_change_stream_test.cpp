@@ -3312,7 +3312,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
         {DSChangeStream::kOperationTypeField, "eventType1"_sd},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}};
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, Document{operationDescription}}};
 
     auto stage =
         exec::agg::MockStage::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
@@ -3371,7 +3372,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
         {DSChangeStream::kOperationTypeField, "eventType1"_sd},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}};
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, Document{operationDescriptionEvent1}}};
 
     Document expectedDoc2{
         {DSChangeStream::kIdField,
@@ -3379,7 +3381,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
         {DSChangeStream::kOperationTypeField, "eventType2"_sd},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}};
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, Document{operationDescriptionEvent2}}};
 
     std::deque<exec::agg::GetNextResult> docs;
     docs.push_back(Document{entry1.getEntry().toBSON()});

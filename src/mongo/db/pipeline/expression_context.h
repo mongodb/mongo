@@ -800,6 +800,14 @@ public:
         _params.changeStreamSpec = std::move(changeStreamSpec);
     }
 
+    bool isChangeStreamV2() const {
+        if (const auto& spec = _params.changeStreamSpec) {
+            return spec->getVersion() == ChangeStreamReaderVersionEnum::kV2;
+        }
+
+        return false;
+    }
+
     const BSONObj& getOriginalAggregateCommand() const {
         return _params.originalAggregateCommand;
     }

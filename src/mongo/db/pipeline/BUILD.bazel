@@ -1590,6 +1590,7 @@ mongo_cc_unit_test(
         "sequential_document_cache_test.cpp",
         "serverless_aggregation_context_fixture.cpp",
         "serverless_aggregation_context_fixture.h",
+        "sharded_agg_helpers_test.cpp",
         "sharded_union_test.cpp",
         "skip_and_limit_test.cpp",
         "tee_buffer_test.cpp",

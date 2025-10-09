@@ -441,7 +441,10 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
 
     // Noop change events that are only applicable when merging results on router:
     //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
-    if (expCtx->getInRouter() || expCtx->getNeedsMerge()) {
+    // Do not emit 'migrateChunkToNewShard' event for change streams version 2, as it is not needed
+    // for handling topology changes.
+    // TODO: SERVER-111727 Stop emitting migrateChunkToNewShard change event.
+    if (!expCtx->isChangeStreamV2() && (expCtx->getInRouter() || expCtx->getNeedsMerge())) {
         internalOpTypes.push_back("migrateChunkToNewShard"_sd);
     }
 

@@ -82,7 +82,6 @@ struct NamespacePlacementChangedControlEvent {
     bool operator==(const NamespacePlacementChangedControlEvent& other) const = default;
 
     Timestamp clusterTime;
-    Timestamp committedAt;
     NamespaceString nss;
 };
 

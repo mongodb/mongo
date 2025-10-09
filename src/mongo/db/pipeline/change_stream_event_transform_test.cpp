@@ -62,10 +62,32 @@ namespace mongo {
 namespace {
 using namespace change_stream_test_helper;
 
-Document applyTransformation(const repl::OplogEntry& oplogEntry, NamespaceString ns = nss) {
+repl::MutableOplogEntry buildMovePrimaryOplogEntry(OperationContext* opCtx,
+                                                   const DatabaseName& dbName,
+                                                   const ShardId& oldPrimary,
+                                                   const ShardId& newPrimary) {
+    repl::MutableOplogEntry oplogEntry;
+    const auto dbNameStr =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(NamespaceString(dbName));
+    oplogEntry.setObject(BSON("msg" << BSON("movePrimary" << dbNameStr)));
+    oplogEntry.setObject2(
+        BSON("movePrimary" << dbNameStr << "from" << oldPrimary << "to" << newPrimary));
+    oplogEntry.setOpTime(repl::OpTime(kDefaultTs, 0));
+    oplogEntry.setWallClockTime(Date_t());
+
+    return oplogEntry;
+}
+
+Document applyTransformation(const repl::OplogEntry& oplogEntry,
+                             NamespaceString ns = nss,
+                             const std::vector<std::string>& supportedEvents = {}) {
     const auto oplogDoc = Document(oplogEntry.getEntry().toBSON());
     DocumentSourceChangeStreamSpec spec;
     spec.setStartAtOperationTime(kDefaultTs);
+    spec.setSupportedEvents(supportedEvents);
     spec.setShowExpandedEvents(true);
 
     ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(ns), spec);
@@ -281,6 +303,69 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
         {DocumentSourceChangeStream::kDocumentKeyField, documentKey}};
 
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
+}
+
+TEST(ChangeStreamEventTransformTest,
+     Given_NoopOplogEntry_When_CallingTransform_Then_FieldsAreNotCopied) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+
+    // Create a noop oplog entry that represents a 'shardCollection' event.
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(nss);
+    oplogEntry.setObject(BSON("msg" << BSON("shardCollection" << nss.toString_forTest())));
+    oplogEntry.setObject2(BSON("shardCollection" << nss.toString_forTest() << "key"
+                                                 << BSON("x" << 1) << "unique" << false));
+    oplogEntry.setOpTime(repl::OpTime(kDefaultTs, 0));
+    oplogEntry.setWallClockTime(Date_t());
+
+    // Expect fields from the oplog entry to be present in the 'operationDescription' field.
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(kDefaultTs,
+                         Value(),
+                         Document{{"key", Document{{"x", 1}}}, {"unique", false}},
+                         DocumentSourceChangeStream::kShardCollectionOpType)},
+        {DocumentSourceChangeStream::kOperationTypeField,
+         DocumentSourceChangeStream::kShardCollectionOpType},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField,
+         Document{{"key", Document{{"x", 1}}}, {"unique", false}}},
+    };
+
+    repl::OplogEntry immutableEntry(oplogEntry.toBSON());
+    ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, nss), expectedDoc);
+}
+
+TEST(
+    ChangeStreamEventTransformTest,
+    Given_NoopOplogEntryWhichIsNotBuiltIn_When_CallingTransform_Then_OperationDescriptionIsPresent) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+    auto serviceContext = std::make_unique<QueryTestServiceContext>();
+    auto opCtx = serviceContext->makeOperationContext();
+    auto oplogEntry = buildMovePrimaryOplogEntry(
+        opCtx.get(), nss.dbName(), ShardId("oldPrimary"), ShardId("newPrimary"));
+    auto opDescription = Document{{
+        {"from"_sd, "oldPrimary"_sd},
+        {"to"_sd, "newPrimary"_sd},
+    }};
+
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, Value(), opDescription, "movePrimary")},
+        {DocumentSourceChangeStream::kOperationTypeField, "movePrimary"_sd},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField, Document{{"db", nss.db_forTest()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
+
+    repl::OplogEntry immutableEntry(oplogEntry.toBSON());
+    ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, nss, {"movePrimary"}), expectedDoc);
 }
 
 }  // namespace

@@ -31,8 +31,6 @@
 
 #include "mongo/util/assert_util.h"
 
-#include <algorithm>
-
 namespace mongo {
 namespace {
 void updateActiveShardCursors(Timestamp atClusterTime,
@@ -40,22 +38,22 @@ void updateActiveShardCursors(Timestamp atClusterTime,
                               ChangeStreamReaderContext& readerCtx) {
     const auto& currentActiveShardSet = readerCtx.getCurrentlyTargetedDataShards();
     stdx::unordered_set<ShardId> shardsToCloseCursors;
-    std::set_difference(currentActiveShardSet.begin(),
-                        currentActiveShardSet.end(),
-                        newActiveShardSet.begin(),
-                        newActiveShardSet.end(),
-                        std::inserter(shardsToCloseCursors, shardsToCloseCursors.begin()));
+    for (const auto& currentActiveShard : currentActiveShardSet) {
+        if (!newActiveShardSet.contains(currentActiveShard)) {
+            shardsToCloseCursors.insert(currentActiveShard);
+        }
+    }
 
     if (!shardsToCloseCursors.empty()) {
         readerCtx.closeCursorsOnDataShards(shardsToCloseCursors);
     }
 
     stdx::unordered_set<ShardId> shardsToOpenCursors;
-    std::set_difference(newActiveShardSet.begin(),
-                        newActiveShardSet.end(),
-                        currentActiveShardSet.begin(),
-                        currentActiveShardSet.end(),
-                        std::inserter(shardsToOpenCursors, shardsToOpenCursors.begin()));
+    for (const auto& newActiveShard : newActiveShardSet) {
+        if (!currentActiveShardSet.contains(newActiveShard)) {
+            shardsToOpenCursors.insert(newActiveShard);
+        }
+    }
 
     if (!shardsToOpenCursors.empty()) {
         readerCtx.openCursorsOnDataShards(atClusterTime, shardsToOpenCursors);
