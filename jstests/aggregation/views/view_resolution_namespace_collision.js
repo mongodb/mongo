@@ -54,4 +54,30 @@ for (const writeStage of [mergeStage, outStage]) {
     siblingDB[collidingCollName].drop();
 }
 
+// Now test that crossDB $unionWith works correctly with views.
+siblingDB[collidingCollName].drop();
+testDB[collidingCollName].drop();
+siblingDB[otherCollName].drop();
+assert.commandWorked(siblingDB[otherCollName].insert({_id: 1, fromSibling: true}));
+siblingDB.createView(collidingCollName, otherCollName, [
+    {$unionWith: {coll: otherCollName, pipeline: [{$addFields: {fromView: true}}]}},
+]);
+assert.commandWorked(testDB[collidingCollName].insert({_id: 0, fromSibling: false}));
+const unionWithResult = testDB[collidingCollName]
+    .aggregate([{$unionWith: {db: siblingDBName, coll: collidingCollName}}])
+    .toArray();
+assert.eq(unionWithResult, [
+    {_id: 0, fromSibling: false},
+    {_id: 1, fromSibling: true},
+    {_id: 1, fromSibling: true, fromView: true},
+]);
+
+const reverseUnionWithResult = siblingDB[collidingCollName]
+    .aggregate([{$unionWith: {db: testDBName, coll: collidingCollName}}])
+    .toArray();
+assert.eq(reverseUnionWithResult, [
+    {_id: 1, fromSibling: true},
+    {_id: 1, fromSibling: true, fromView: true},
+    {_id: 0, fromSibling: false},
+]);
 siblingDB.dropDatabase();

@@ -6,6 +6,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 
 const db = st.s.getDB("test");
+const fdb = st.s.getDB("fdb");
 const sourceUnsharded = db.source_collection_unsharded;
 const unshardedData = [
     {_id: 0},
@@ -24,6 +25,10 @@ assert.commandWorked(sourceUnsharded.insert(unshardedData));
 const sourceSharded = db.source_collection_sharded;
 st.shardColl(sourceSharded, {shardKey: 1}, {shardKey: 0}, {shardKey: 1}, db.getName());
 
+// Shard a backing collection and distribute amongst the two shards in fdb.
+const fdbSourceSharded = fdb.source_collection_sharded;
+st.shardColl(fdbSourceSharded, {shardKey: 1}, {shardKey: 0}, {shardKey: 1}, fdb.getName());
+
 const shardedData = [
     {_id: 0, shardKey: -100},
     {_id: 1, shardKey: -100},
@@ -38,16 +43,26 @@ const shardedData = [
     {_id: 10, shardKey: 100},
 ];
 assert.commandWorked(sourceSharded.insert(shardedData));
+assert.commandWorked(fdbSourceSharded.insert(shardedData));
 
 // Test that we can query the backing collection normally.
 assert.eq(sourceSharded.aggregate().itcount(), shardedData.length);
+assert.eq(fdbSourceSharded.aggregate().itcount(), shardedData.length);
 assert.eq(sourceUnsharded.aggregate().itcount(), unshardedData.length);
 assert.eq(
     sourceSharded.aggregate([{$unionWith: sourceUnsharded.getName()}]).itcount(),
     shardedData.length + unshardedData.length,
 );
 assert.eq(
+    fdbSourceSharded.aggregate([{$unionWith: {db: "test", coll: sourceUnsharded.getName()}}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
+assert.eq(
     sourceUnsharded.aggregate([{$unionWith: sourceSharded.getName()}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
+assert.eq(
+    sourceUnsharded.aggregate([{$unionWith: {db: "fdb", coll: fdbSourceSharded.getName()}}]).itcount(),
     shardedData.length + unshardedData.length,
 );
 
@@ -60,14 +75,28 @@ assert.commandWorked(
 const identitySharded = db.identity_sharded;
 assert.commandWorked(db.runCommand({create: identitySharded.getName(), viewOn: sourceSharded.getName(), pipeline: []}));
 
+const fdbIdentitySharded = fdb.identity_sharded;
+assert.commandWorked(
+    fdb.runCommand({create: fdbIdentitySharded.getName(), viewOn: fdbSourceSharded.getName(), pipeline: []}),
+);
+
 assert.eq(identitySharded.aggregate().itcount(), shardedData.length);
+assert.eq(fdbIdentitySharded.aggregate().itcount(), shardedData.length);
 assert.eq(identityUnsharded.aggregate().itcount(), unshardedData.length);
 assert.eq(
     identitySharded.aggregate([{$unionWith: identityUnsharded.getName()}]).itcount(),
     shardedData.length + unshardedData.length,
 );
 assert.eq(
+    fdbIdentitySharded.aggregate([{$unionWith: {db: "test", coll: identityUnsharded.getName()}}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
+assert.eq(
     identityUnsharded.aggregate([{$unionWith: identitySharded.getName()}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
+assert.eq(
+    identityUnsharded.aggregate([{$unionWith: {db: "fdb", coll: fdbIdentitySharded.getName()}}]).itcount(),
     shardedData.length + unshardedData.length,
 );
 
