@@ -131,11 +131,9 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
     result.appendNumber("totalRefreshing", static_cast<long long>(totalRefreshing));
     result.appendNumber("totalRefreshed", static_cast<long long>(totalRefreshed));
     result.appendNumber("totalWasNeverUsed", static_cast<long long>(totalWasNeverUsed));
-    if (forFTDC) {
-        result.appendNumber("totalWasUsedOnce", static_cast<long long>(totalWasUsedOnce));
-        result.appendNumber("totalConnUsageTimeMillis",
-                            durationCount<Milliseconds>(totalConnUsageTime));
-    }
+    result.appendNumber("totalWasUsedOnce", static_cast<long long>(totalWasUsedOnce));
+    result.appendNumber("totalConnUsageTimeMillis",
+                        durationCount<Milliseconds>(totalConnUsageTime));
     result.appendNumber("totalRejectedRequests", static_cast<long long>(totalRejectedRequests));
     result.appendNumber("totalPendingRequests", static_cast<long long>(totalPendingRequests));
 

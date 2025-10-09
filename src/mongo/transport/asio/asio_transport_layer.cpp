@@ -1165,17 +1165,17 @@ std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBackl
 
 void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
-}
-
-void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
-    BSONArrayBuilder queueDepthsArrayBuilder(bob.subarrayStart("listenerSocketBacklogQueueDepths"));
+    BSONArrayBuilder queueDepthsArrayBuilder(
+        bob->subarrayStart("listenerSocketBacklogQueueDepths"));
     for (const auto& record : _acceptorRecords) {
         BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
             record->address.toString(), record->backlogQueueDepth.load());
     }
     queueDepthsArrayBuilder.done();
-    bob.append("connsDiscardedDueToClientDisconnect", _discardedDueToClientDisconnect.get());
+    bob->append("connsDiscardedDueToClientDisconnect", _discardedDueToClientDisconnect.get());
 }
+
+void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder&) const {}
 
 void AsioTransportLayer::_runListener() {
     setThreadName("listener");

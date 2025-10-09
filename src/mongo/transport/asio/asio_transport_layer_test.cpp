@@ -276,7 +276,7 @@ public:
 
     auto getDiscardedDueToClientDisconnect() {
         BSONObjBuilder bob;
-        tla().appendStatsForFTDC(bob);
+        tla().appendStatsForServerStatus(&bob);
         return bob.obj()["connsDiscardedDueToClientDisconnect"].Long();
     }
 
@@ -461,7 +461,7 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
 
 
     BSONObjBuilder tlaFTDCBuilder;
-    tf.tla().appendStatsForFTDC(tlaFTDCBuilder);
+    tf.tla().appendStatsForServerStatus(&tlaFTDCBuilder);
     BSONObj tlaFTDCStats = tlaFTDCBuilder.obj();
 
     const auto& queueDepthsArray =
