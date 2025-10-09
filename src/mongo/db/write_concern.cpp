@@ -79,6 +79,14 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
     WriteConcernOptions writeConcern = wcResult.getValue();
 
+    if (writeConcern.hasCustomWriteMode()) {
+        if (auto wMode = get_if<std::string>(&writeConcern.w)) {
+            uassert(103742,
+                    "illegal embedded NUL byte in write concern " + *wMode,
+                    wMode->find('\0') == std::string::npos);
+        }
+    }
+
     // This is the WC extracted from the command object, so the CWWC or implicit default hasn't been
     // applied yet, which is why "usedDefaultConstructedWC" flag can be used an indicator of whether
     // the client supplied a WC or not.
