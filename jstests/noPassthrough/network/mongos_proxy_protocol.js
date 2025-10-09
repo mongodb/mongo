@@ -1,6 +1,7 @@
 /**
  * Verify mongos supports proxy protocol connections.
  * @tags: [
+ *    requires_fcv_83,
  *    grpc_incompatible,
  * ]
  */

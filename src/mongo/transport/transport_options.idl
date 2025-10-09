@@ -134,3 +134,25 @@ server_parameters:
         cpp_vartype: Atomic<bool>
         default: false
         redact: false
+
+    proxyProtocolMaximumWaitBackoffMillis:
+        description: >-
+            The listener thread exponentially increases the wait between checking for the proxy header
+            on an accepted socket. This value decided the maximum wait time (in milliseconds).
+        set_at: [startup, runtime]
+        cpp_varname: gProxyProtocolMaximumWaitBackoffMillis
+        cpp_vartype: Atomic<int32_t>
+        default: 200
+        validator: {gte: 0}
+        redact: false
+
+    proxyProtocolTimeoutSecs:
+        description: >-
+            The maximum wait time (in seconds) before expiring accepted sockets from the proxy port,
+            unless the proxy protocol header is presented to the server before that.
+        set_at: [startup, runtime]
+        cpp_varname: gProxyProtocolTimeoutSecs
+        cpp_vartype: Atomic<int32_t>
+        default: 120
+        validator: {gte: 0}
+        redact: false
