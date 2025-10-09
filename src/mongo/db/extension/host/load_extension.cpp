@@ -105,7 +105,7 @@ host_adapter::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
             swGetExtensionFunction.isOK());
 
     const ::MongoExtension* extension = nullptr;
-    enterC([&]() {
+    invokeCAndConvertStatusToException([&]() {
         return swGetExtensionFunction.getValue()(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED,
                                                  &extension);
     });

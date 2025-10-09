@@ -45,7 +45,7 @@ BSONObj AggregationStageParseNodeHandle::getQueryShape(const SerializationOption
     auto* ptr = get();
     host::QueryShapeOptsAdapter optsCtx(&opts);
 
-    enterC([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
+    invokeCAndConvertStatusToException([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
 
     if (!buf) {
         // TODO SERVER-111882 tassert here instead of returning empty string, since this would
@@ -67,7 +67,7 @@ std::vector<VariantNodeHandle> AggregationStageParseNodeHandle::expand() const {
     std::vector<::MongoExtensionExpandedArrayElement> buf{expandedSize};
     ::MongoExtensionExpandedArray expandedArray{expandedSize, buf.data()};
 
-    enterC([&] { return vtable().expand(get(), &expandedArray); });
+    invokeCAndConvertStatusToException([&] { return vtable().expand(get(), &expandedArray); });
 
     // This guard provides a best-effort cleanup in the case of an exception.
     //

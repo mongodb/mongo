@@ -47,7 +47,7 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
     ::MongoExtensionByteBuf* buf;
     auto* ptr = get();
 
-    enterC([&]() { return apiFunc(ptr, byteView, &buf); });
+    invokeCAndConvertStatusToException([&]() { return apiFunc(ptr, byteView, &buf); });
 
     if (!buf) {
         // TODO SERVER-111882 tassert here instead of returning empty string, since this would

@@ -36,7 +36,7 @@ LogicalAggregationStageHandle AggregationStageAstNodeHandle::bind() const {
     ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
 
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
-    enterC([&]() { return vtable().bind(get(), &logicalStagePtr); });
+    invokeCAndConvertStatusToException([&]() { return vtable().bind(get(), &logicalStagePtr); });
 
     return LogicalAggregationStageHandle(logicalStagePtr);
 }

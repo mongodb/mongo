@@ -55,7 +55,7 @@ TEST(ExtensionStatusTest, extensionStatusOKTest) {
 // Test that a std::exception correctly returns MONGO_EXTENSION_STATUS_RUNTIME_ERROR when called via
 // enterCXX.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_stdException) {
-    HostStatusHandle status(enterCXX(
+    HostStatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
 }
@@ -63,8 +63,8 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_stdException) {
 // Test that a std::exception can be rethrown when it crosses from a C++ context through the C API
 // boundary and back to a C++ context.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_stdException) {
-    ASSERT_THROWS(enterC([&]() {
-                      return enterCXX([&]() {
+    ASSERT_THROWS(invokeCAndConvertStatusToException([&]() {
+                      return wrapCXXAndConvertExceptionToStatus([&]() {
                           throw std::runtime_error("Runtime exception in $noOpExtension parse.");
                       });
                   }),
@@ -74,16 +74,16 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_stdException) {
 // Test that enterCXX correctly wraps a DBException (uassert) and returns the correct code when a
 // call is made at the C API boundary.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_AssertionException) {
-    HostStatusHandle status(
-        enterCXX([&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
+    HostStatusHandle status(wrapCXXAndConvertExceptionToStatus(
+        [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == 10596408);
 }
 
 // Test that a DBException (uassert) can be rethrown when it crosses from a C++ context through the
 // C API boundary and back to a C++ context.
 TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_AssertionException) {
-    ASSERT_THROWS_CODE(enterC([&]() {
-                           return enterCXX([&]() {
+    ASSERT_THROWS_CODE(invokeCAndConvertStatusToException([&]() {
+                           return wrapCXXAndConvertExceptionToStatus([&]() {
                                uasserted(10596409, "Failed with uassert in $noOpExtension parse.");
                            });
                        }),
@@ -105,18 +105,20 @@ TEST(ExtensionStatusTest, extensionStatusEnterC_enterCXX_ExtensionDBException) {
         std::make_unique<ExtensionStatusException>(nullptr, 10596412, kErrorString);
     const auto* extensionStatusOriginalPtr = extensionStatusPtr.get();
 
-    HostStatusHandle propagatedStatus(
-        enterCXX([&]() { enterC([&]() { return extensionStatusPtr.release(); }); }));
+    HostStatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus([&]() {
+        invokeCAndConvertStatusToException([&]() { return extensionStatusPtr.release(); });
+    }));
 
-    // Verify that the MongoExtensionStatus* we propagated through enterCXX(enterC(..)) is the same
-    // one we originally allocated.
+    // Verify that the MongoExtensionStatus* we propagated through
+    // wrapCXXAndConvertExceptionToStatus(invokeCAndConvertStatusToException(..)) is the same one we
+    // originally allocated.
     ASSERT_TRUE(propagatedStatus.get() == extensionStatusOriginalPtr);
 }
 
 TEST(ExtensionStatusTest, extensionStatusEnterC_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
-    ASSERT_THROWS_CODE_AND_WHAT(enterC([&]() {
+    ASSERT_THROWS_CODE_AND_WHAT(invokeCAndConvertStatusToException([&]() {
                                     return std::make_unique<ExtensionStatusException>(
                                                nullptr, 10596412, kErrorString)
                                         .release();

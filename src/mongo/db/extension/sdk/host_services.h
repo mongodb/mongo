@@ -54,7 +54,7 @@ public:
 
     bool alwaysTrue_TEMPORARY() const {
         assertValid();
-        enterC([&]() { return vtable().alwaysOK_TEMPORARY(); });
+        invokeCAndConvertStatusToException([&]() { return vtable().alwaysOK_TEMPORARY(); });
         return true;
     }
 
@@ -87,13 +87,14 @@ public:
         assertValid();
 
         BSONObj obj = createExtensionLogMessage(std::move(message), code, severity);
-        enterC([&]() { return vtable().log(objAsByteView(obj)); });
+        invokeCAndConvertStatusToException([&]() { return vtable().log(objAsByteView(obj)); });
     }
 
     void logDebug(std::string message, std::int32_t code, std::int32_t level = 1) const {
         assertValid();
         BSONObj debugLogBsonObj = createExtensionDebugLogMessage(message, code, level);
-        enterC([&]() { return vtable().log_debug(objAsByteView(debugLogBsonObj)); });
+        invokeCAndConvertStatusToException(
+            [&]() { return vtable().log_debug(objAsByteView(debugLogBsonObj)); });
     }
 
     /**

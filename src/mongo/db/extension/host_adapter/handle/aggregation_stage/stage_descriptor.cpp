@@ -35,7 +35,8 @@ namespace mongo::extension::host_adapter {
 AggregationStageParseNodeHandle AggregationStageDescriptorHandle::parse(BSONObj stageBson) const {
     ::MongoExtensionAggregationStageParseNode* parseNodePtr;
     // The API's contract mandates that parseNodePtr will only be allocated if status is OK.
-    enterC([&]() { return vtable().parse(get(), objAsByteView(stageBson), &parseNodePtr); });
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().parse(get(), objAsByteView(stageBson), &parseNodePtr); });
     return AggregationStageParseNodeHandle(parseNodePtr);
 }
 }  // namespace mongo::extension::host_adapter

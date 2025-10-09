@@ -95,7 +95,7 @@ private:
         // during initialization if needed.
         HostServicesHandle::setHostServices(hostServices);
 
-        return enterCXX([&]() {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
             // The host portal will go out of scope on the host side after initialization, so we
             // should not retain it to avoid a dangling pointer
             auto hostPortal = HostPortalHandle(portal);
@@ -135,7 +135,7 @@ private:
     ::MongoExtensionStatus* get_mongodb_extension(                                           \
         const ::MongoExtensionAPIVersionVector* hostVersions,                                \
         const ::MongoExtension** extension) {                                                \
-        return mongo::extension::enterCXX([&] {                                              \
+        return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {                    \
             const auto& versionedExtensionContainer =                                        \
                 mongo::extension::sdk::VersionedExtensionContainer::getInstance();           \
             static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>( \

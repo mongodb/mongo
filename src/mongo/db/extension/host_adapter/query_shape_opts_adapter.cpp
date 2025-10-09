@@ -38,7 +38,7 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
     const ::MongoHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* identifier,
     ::MongoExtensionByteBuf** output) noexcept {
-    return enterCXX([&]() {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
         *output = nullptr;
 
         const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
@@ -55,7 +55,7 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
     const ::MongoHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* fieldPath,
     ::MongoExtensionByteBuf** output) noexcept {
-    return enterCXX([&]() {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
         *output = nullptr;
 
         const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
@@ -72,7 +72,7 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
     const ::MongoHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* bsonElementPtr,
     ::MongoExtensionByteBuf** output) noexcept {
-    return enterCXX([&]() {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
         *output = nullptr;
 
         const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();

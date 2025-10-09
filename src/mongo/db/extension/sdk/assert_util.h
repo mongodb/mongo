@@ -37,7 +37,7 @@
 #define userAsserted(code, message)                                          \
     do {                                                                     \
         auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);             \
-        mongo::extension::enterC([&]() {                                     \
+        mongo::extension::invokeCAndConvertStatusToException([&]() {         \
             return sdk::HostServicesHandle::getHostServices()->userAsserted( \
                 mongo::extension::objAsByteView(exceptionInfo));             \
         });                                                                  \
@@ -46,7 +46,7 @@
 #define tripwireAsserted(code, message)                                          \
     do {                                                                         \
         auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                 \
-        mongo::extension::enterC([&]() {                                         \
+        mongo::extension::invokeCAndConvertStatusToException([&]() {             \
             return sdk::HostServicesHandle::getHostServices()->tripwireAsserted( \
                 mongo::extension::objAsByteView(exceptionInfo));                 \
         });                                                                      \

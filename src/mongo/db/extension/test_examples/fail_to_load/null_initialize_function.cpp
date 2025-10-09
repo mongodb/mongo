@@ -45,6 +45,7 @@ static const ::MongoExtension my_extension = {
 extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
                                               const ::MongoExtension** extension) {
-    return mongo::extension::enterCXX([&]() { *extension = &my_extension; });
+    return mongo::extension::wrapCXXAndConvertExceptionToStatus(
+        [&]() { *extension = &my_extension; });
 }
 }

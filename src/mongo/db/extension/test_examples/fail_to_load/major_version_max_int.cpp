@@ -42,7 +42,7 @@ public:
 extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
                                               const ::MongoExtension** extension) {
-    return mongo::extension::enterCXX([&]() {
+    return mongo::extension::wrapCXXAndConvertExceptionToStatus([&]() {
         static auto ext = std::make_unique<sdk::ExtensionAdapter>(
             std::make_unique<MyExtension>(),
             // Major version is max uint32_t, which is incompatible with the current version

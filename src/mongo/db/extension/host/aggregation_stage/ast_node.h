@@ -132,7 +132,7 @@ private:
     static ::MongoExtensionStatus* _hostBind(
         const ::MongoExtensionAggregationStageAstNode* astNode,
         ::MongoExtensionLogicalAggregationStage** logicalStage) noexcept {
-        return enterCXX([]() {
+        return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(11133600,
                       "_hostBind should not be called. Ensure that astNode is "
                       "extension-allocated, not host-allocated.");

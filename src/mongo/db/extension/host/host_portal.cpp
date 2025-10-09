@@ -44,7 +44,7 @@ void HostPortal::registerStageDescriptor(
 
 ::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(
     const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept {
-    return enterCXX([&]() { return registerStageDescriptor(stageDesc); });
+    return wrapCXXAndConvertExceptionToStatus([&]() { return registerStageDescriptor(stageDesc); });
 }
 
 ::MongoExtensionByteView HostPortal::_extGetOptions(

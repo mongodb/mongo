@@ -51,7 +51,7 @@ const ::MongoExtensionStatusVTable extension::ExtensionStatusException::VTABLE =
     &ExtensionStatusException::_extGetReason,
 };
 
-void enterC_ErrorHandler(HostStatusHandle status) {
+void convertStatusToException(HostStatusHandle status) {
     /**
      * If we can extract an exception pointer from the received status from the C API call, it means
      * that this was originally a C++ exception. In that case, we can go ahead and rethrow that

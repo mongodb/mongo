@@ -134,7 +134,7 @@ private:
         const ::MongoExtensionAggregationStageParseNode* parseNode,
         const ::MongoHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
-        return enterCXX([]() {
+        return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(10977800,
                       "_hostGetQueryShape should not be called. Ensure that parseNode is "
                       "extension-allocated, not host-allocated.");
@@ -153,7 +153,7 @@ private:
     static ::MongoExtensionStatus* _hostExpand(
         const ::MongoExtensionAggregationStageParseNode* parseNode,
         ::MongoExtensionExpandedArray* outExpanded) noexcept {
-        return enterCXX([]() {
+        return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(10977801,
                       "_hostExpand should not be called. Ensure that parseNode is "
                       "extension-allocated, not host-allocated.");

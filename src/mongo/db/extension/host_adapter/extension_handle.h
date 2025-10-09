@@ -60,7 +60,7 @@ public:
      */
     void initialize(const extension::host::HostPortal& portal,
                     const extension::host_adapter::HostServicesAdapter* hostServices) const {
-        enterC([&] {
+        invokeCAndConvertStatusToException([&] {
             assertValid();
             return vtable().initialize(get(), &portal, hostServices);
         });

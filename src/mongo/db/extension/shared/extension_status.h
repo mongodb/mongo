@@ -210,13 +210,18 @@ private:
 };
 
 /**
- * enterCXX is a template helper that allows functions called at the C API boundary to call into C++
- * code safely. Exceptions are not allowed to cross the API boundary. Executing C++ wrapped in this
- * enterCXX function, translates any C++ exceptions into a MongoExtensionStatus* that is compatible
- * with the C API and can be passed across to the caller.
+ * wrapCXXAndConvertExceptionToStatus is a template helper that allows functions that will be
+ * invoked across the C API boundary to return control to the caller safely.
+ *
+ * In other words: Since exceptions are not allowed to cross the API boundary, this helper is used
+ * in the **implementation of Extension API functionality** (or, "adapters") to ensure that
+ * exceptions are caught and translated into a MongoExtensionStatus*, which can be safely returned
+ * to the caller. Once the caller receives the status, they may use the helper
+ * invokeCAndConvertStatusToException to translate the status back into a C++ exception (assuming
+ * the caller is in C++).
  */
 template <typename Fn>
-::MongoExtensionStatus* enterCXX(Fn&& fn) {
+::MongoExtensionStatus* wrapCXXAndConvertExceptionToStatus(Fn&& fn) {
     try {
         fn();
         return &ExtensionStatusOK::getInstance();
@@ -242,18 +247,19 @@ template <typename Fn>
     }
 }
 
-void enterC_ErrorHandler(HostStatusHandle status);
+void convertStatusToException(HostStatusHandle status);
 
 /**
- * enterC is a template helper that allows functions called at the C API boundary on the C++ side to
- * call into C from C++. The provided functor must return a MongoExtensionStatus*, which this helper
- * will translate into a C++ exception.
+ * invokeCAndConvertStatusToException is a template helper that wraps a function that **calls into
+ * the C API** and returns a MongoExtensionStatus* (likely within some extension "handle" class).
+ * The provided functor must return a MongoExtensionStatus*, which this helper will translate into a
+ * C++ exception.
  */
 template <typename Fn>
-void enterC(Fn&& fn) {
+void invokeCAndConvertStatusToException(Fn&& fn) {
     HostStatusHandle status(fn());
     if (auto code = status.getCode(); MONGO_unlikely(code != MONGO_EXTENSION_STATUS_OK)) {
-        return enterC_ErrorHandler(std::move(status));
+        return convertStatusToException(std::move(status));
     }
 }
 }  // namespace mongo::extension

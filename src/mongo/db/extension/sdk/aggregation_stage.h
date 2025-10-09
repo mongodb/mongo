@@ -131,7 +131,7 @@ private:
     static ::MongoExtensionStatus* _extBind(
         const ::MongoExtensionAggregationStageAstNode* astNode,
         ::MongoExtensionLogicalAggregationStage** logicalStage) noexcept {
-        return enterCXX([&]() {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
             auto logicalStagePtr =
                 static_cast<const ExtensionAggregationStageAstNode*>(astNode)->getImpl().bind();
 
@@ -203,7 +203,7 @@ private:
         const ::MongoExtensionAggregationStageParseNode* parseNode,
         const ::MongoHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
-        return enterCXX([&]() {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
             *queryShape = nullptr;
 
             const auto& impl =
@@ -249,7 +249,7 @@ private:
     static ::MongoExtensionStatus* _extExpand(
         const ::MongoExtensionAggregationStageParseNode* parseNode,
         ::MongoExtensionExpandedArray* expanded) noexcept {
-        return enterCXX([&]() {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
             const auto& impl =
                 static_cast<const ExtensionAggregationStageParseNode*>(parseNode)->getImpl();
             const auto expandedSize = impl.getExpandedSize();
@@ -385,7 +385,7 @@ private:
         const ::MongoExtensionAggregationStageDescriptor* descriptor,
         ::MongoExtensionByteView stageBson,
         ::MongoExtensionAggregationStageParseNode** parseNode) noexcept {
-        return enterCXX([&]() {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
             auto parseNodePtr = static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
                                     ->getImpl()
                                     .parse(bsonObjFromByteView(stageBson));

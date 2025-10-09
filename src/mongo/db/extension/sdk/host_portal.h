@@ -52,7 +52,7 @@ public:
         : UnownedHandle<const ::MongoExtensionHostPortal>(portal) {}
 
     void registerStageDescriptor(const ExtensionAggregationStageDescriptor* stageDesc) const {
-        enterC([&] {
+        invokeCAndConvertStatusToException([&] {
             assertValid();
             return vtable().registerStageDescriptor(
                 reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(stageDesc));

@@ -32,6 +32,6 @@
 extern "C" {
 ::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
                                               const ::MongoExtension** extension) {
-    return mongo::extension::enterCXX([&]() {});
+    return mongo::extension::wrapCXXAndConvertExceptionToStatus([&]() {});
 }
 }

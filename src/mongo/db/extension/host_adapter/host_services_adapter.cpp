@@ -39,11 +39,12 @@ namespace mongo::extension::host_adapter {
 HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
 
 MongoExtensionStatus* HostServicesAdapter::_extAlwaysOK_TEMPORARY() noexcept {
-    return enterCXX([&]() { return host::HostServices::alwaysTrue_TEMPORARY(); });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() { return host::HostServices::alwaysTrue_TEMPORARY(); });
 }
 
 MongoExtensionStatus* HostServicesAdapter::_extLog(::MongoExtensionByteView logMessage) noexcept {
-    return enterCXX([&]() {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
         BSONObj obj = bsonObjFromByteView(logMessage);
 
         mongo::extension::MongoExtensionLog extensionLog =
@@ -54,7 +55,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(::MongoExtensionByteView logM
 }
 
 MongoExtensionStatus* HostServicesAdapter::_extLogDebug(::MongoExtensionByteView rawLog) noexcept {
-    return enterCXX([&]() {
+    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
         BSONObj bsonLog = bsonObjFromByteView(rawLog);
         auto debugLog = mongo::extension::MongoExtensionDebugLog::parse(bsonLog);
         return host::HostServices::logDebug(std::move(debugLog));
@@ -68,7 +69,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(::MongoExtensionByteView
     // information. At the same time, we are not allowed to throw an exception across the API
     // boundary, so we immediately convert this to a MongoExtensionStatus. It will be rethrown after
     // being passed through the boundary.
-    return extension::enterCXX([&]() {
+    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
         BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
         auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
             errorBson, IDLParserContext("extUassert"));
@@ -83,7 +84,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(::MongoExtensionByteView
     ::MongoExtensionByteView structuredErrorMessage) {
     // We follow the same throw-then-catch pattern here as in _extUserAsserted, for the same
     // reasons.
-    return extension::enterCXX([&]() {
+    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
         BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
         auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
             errorBson, IDLParserContext("extTassert"));
