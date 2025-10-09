@@ -171,17 +171,26 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
     "control all dirty page evictions through forcing update restore eviction", C_BOOL, 2, 0, 0,
     V_GLOBAL_DEBUG_UPDATE_RESTORE_EVICT},
 
-  {"disagg.page_log", "configure page log for disaggregated storage (off | palm)",
-    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_DISAGG_PAGE_LOG},
+  {"disagg.internal_page_delta", "writing deltas for internal pages", C_BOOL, 95, 0, 0,
+    V_GLOBAL_DISAGG_INTERNAL_PAGE_DELTA},
 
-  {"disagg.mode", "configure mode for disaggregated storage (follower | leader | switch)",
-    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_DISAGG_MODE},
+  {"disagg.leaf_page_delta", "writing deltas for leaf pages", C_BOOL, 95, 0, 0,
+    V_GLOBAL_DISAGG_LEAF_PAGE_DELTA},
 
   {"disagg.enabled", "configure disaggregated storage", C_IGNORE | C_BOOL | C_TABLE | C_TYPE_ROW, 0,
     0, 0, V_TABLE_DISAGG_ENABLED},
 
   {"disagg.layered", "use layered URI for any disaggregated tables", C_BOOL, 100, 1, 0,
     V_GLOBAL_DISAGG_LAYERED},
+
+  {"disagg.mode", "configure mode for disaggregated storage (follower | leader | switch)",
+    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_DISAGG_MODE},
+
+  {"disagg.page_log", "configure page log for disaggregated storage (off | palm | palite)",
+    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_DISAGG_PAGE_LOG},
+
+  {"disagg.page_log.verbose", "set page log verbosity (default=WT_VERBOSE_INFO)", C_IGNORE, 0, 0,
+    WT_VERBOSE_DEBUG_5, V_GLOBAL_DISAGG_PAGE_LOG_VERBOSE},
 
   {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_DISK_CHECKSUM},

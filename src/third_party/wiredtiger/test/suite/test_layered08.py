@@ -45,8 +45,7 @@ class test_layered08(wttest.WiredTigerTestCase, DisaggConfigMixin):
         ('snappy', dict(block_compress='snappy')),
     ]
 
-    conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm),'
+    conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     disagg_storages = gen_disagg_storages('test_layered08', disagg_only = True)
 
     scenarios = make_scenarios(encrypt, compress, disagg_storages)
@@ -80,10 +79,8 @@ class test_layered08(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Inserted timing delays around reopen, apparently needed because of the
         # layered table watcher implementation
         import time
-        time.sleep(1.0)
         follower_config = self.conn_base_config + 'disaggregated=(role="follower")'
         self.reopen_conn(config=follower_config)
-        time.sleep(1.0)
 
         cursor = self.session.open_cursor(uri, None, None)
 

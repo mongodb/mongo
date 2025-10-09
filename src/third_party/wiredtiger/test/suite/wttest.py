@@ -40,6 +40,15 @@ import unittest
 from contextlib import contextmanager
 import errno, glob, os, re, shutil, sys, threading, time, traceback, types
 import abstract_test_case, test_result, wiredtiger, wthooks, wtscenario
+from dataclasses import dataclass
+from types import SimpleNamespace
+
+# A readonly namespace, initialized from a dictionary
+@dataclass(frozen=True)
+class ReadonlySimpleNamespace(SimpleNamespace):
+    def __init__(self, d):
+        super().__init__(**d)
+
 
 # The pattern for ignoring file/line number messages.
 WT_ERROR_LOG_PATTERN = "WT_VERB_ERROR_RETURNS.*Error at "
@@ -93,7 +102,7 @@ class TestSuiteConnection(object):
 # Just like a list of strings, but with a convenience function
 class ExtensionList(list):
     skipIfMissing = False
-    def extension(self, dirname, name, extarg=None, configs=[]):
+    def extension(self, dirname, name, extarg=None, configs=[], extra_wtconfig=None):
         if name and name != 'none':
             ext = '' if extarg == None else '=' + extarg
             if configs != []:
@@ -135,11 +144,15 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
     conn_extensions = ()
 
     @staticmethod
-    def globalSetup(preserveFiles = False, removeAtStart = True, useTimestamp = False,
+    def globalSetup(command_line_vars, preserveFiles = False, removeAtStart = True, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
                     longtest = False, extralongtest = False, zstdtest = False, ignoreStdout = False,
                     printOutput = False, seedw = 0, seedz = 0, hookmgr = None,
                     ss_random_prefix = 0, timeout = 0):
+        # Make a readonly view of the command line options passed in.
+        # This view will be shared by all test cases.
+        WiredTigerTestCase._command_line_vars = ReadonlySimpleNamespace(command_line_vars)
+
         parentTestDir = 'WT_TEST' if dirarg == None else dirarg
         wtscenario.set_long_run(longtest)
         WiredTigerTestCase._builddir = builddir
@@ -185,12 +198,31 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
     def setCurrentTestCase(val):
         return setattr(WiredTigerTestCase._threadLocal, 'currentTestCase', val)
 
+    def pdb(self):
+        WiredTigerTestCase.pdb()
+
+    # Set a breakpoint in a Python tests.
+    # Tests have output redirected, which messes with the debugger session.
+    # Calling this will successfully stop in the Python debugger, although
+    # output for the test will no longer be captured and checked correctly.
+    @staticmethod
+    def pdb():
+        import pdb, sys
+        sys.stdin = open('/dev/tty', 'r')
+        sys.stdout = open('/dev/tty', 'w')
+        sys.stderr = open('/dev/tty', 'w')
+        pdb.set_trace()
+
+    @staticmethod
+    def vars():
+        return WiredTigerTestCase._command_line_vars
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.skipped = False
         self.teardown_actions = []
         if not self._globalSetup:
-            WiredTigerTestCase.globalSetup()
+            WiredTigerTestCase.globalSetup({})
         self.platform_api = WiredTigerTestCase._hookmgr.get_platform_api()
 
     # Platform specific functions (may be overridden by hooks):
@@ -300,6 +332,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
             skipIfMissing = exts.skip_if_missing
         if hasattr(exts, 'early_load_ext') and exts.early_load_ext == True:
             earlyLoading = '=(early_load=true)'
+        other_wt_config = ''
         for ext in exts:
             extconf = ''
             if '=' in ext:
@@ -329,8 +362,14 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
                         str(exts))
             else:
                 extfiles[ext] = complete
+                # For some extensions, it's helpful to modify the wiredtiger_open configuration here.
+                # This could be done within individual tests, but it is cumbersome to do so.
+                if dirname == 'page_log':
+                    other_wt_config += f',disaggregated=(page_log={libname})'
+
         if len(extfiles) != 0:
-            result = ',extensions=[' + ','.join(list(extfiles.values())) + earlyLoading + ']'
+            result = other_wt_config + ',extensions=[' + ','.join(list(extfiles.values())) + earlyLoading + ']'
+        result += other_wt_config
         return result
 
     # Can be overridden, but first consider setting self.conn_config
@@ -361,6 +400,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
     # a proxied connection that knows to close it itself at the
     # end of the run, unless it was already closed.
     def wiredtiger_open(self, home=None, config=''):
+        self.pr(f'wiredtiger_open: config={config}')
         conn = wiredtiger.wiredtiger_open(home, config)
         return TestSuiteConnection(conn, self._connections)
 
@@ -431,6 +471,9 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0
+
+        # Testcases can view command line options via: self.vars.some_variable_name
+        self.vars = WiredTigerTestCase._command_line_vars
 
         # We want to have a unique execution directory name for each test.
         # When a test fails, or with the -p option, we want to preserve the
@@ -1001,7 +1044,7 @@ def runsuite(suite, parallel):
     if parallel > 1:
         from concurrencytest import ConcurrentTestSuite, fork_for_tests
         if not WiredTigerTestCase._globalSetup:
-            WiredTigerTestCase.globalSetup()
+            WiredTigerTestCase.globalSetup({})
         WiredTigerTestCase._concurrent = True
         suite_to_run = ConcurrentTestSuite(suite, fork_for_tests(parallel), wrap_result=wrap_result_for_tags)
     try:

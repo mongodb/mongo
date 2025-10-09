@@ -38,15 +38,9 @@ class test_layered03(wttest.WiredTigerTestCase):
 
     uri_base = "test_layered03"
     conn_config = 'verbose=[layered],disaggregated=(role="leader"),' \
-                + 'disaggregated=(page_log=palm,lose_all_my_data=true),'
+                + 'disaggregated=(lose_all_my_data=true),'
 
     uri = "layered:" + uri_base
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('page_log', 'palm')
 
     # Test inserting a record into a layered tree
     def test_layered03(self):
@@ -78,7 +72,6 @@ class test_layered03(wttest.WiredTigerTestCase):
             self.pr("Traversal retrieved: " + cursor.get_key() + ":" + cursor.get_value())
 
         self.pr('closing cursor')
-        time.sleep(0.5)
         cursor.close()
 
         self.pr('closing cursor')

@@ -42,11 +42,13 @@ def get_conn_config(disagg_storage):
         f'statistics=(all),name={disagg_storage.ds_name},lose_all_my_data=true'
 
 def gen_disagg_storages(test_name='', disagg_only = False):
+    # Get the string of the configured page_log, e.g. 'palm' or 'palite'.
+    page_log = wttest.WiredTigerTestCase.vars().page_log
     disagg_storages = [
-        ('palm', dict(is_disagg = True,
+        (page_log, dict(is_disagg = True,
             is_local_storage = True,
             num_ops=100,
-            ds_name = 'palm')),
+            ds_name = page_log)),
         # This must be the last item as we separate the non-disagg from the disagg items later on.
         ('non_disagg', dict(is_disagg = False)),
     ]
@@ -63,7 +65,7 @@ def disagg_ignore_expected_output(testcase):
 # A decorator for a disaggregated test class, that ignores verbose warnings about RTS at shutdown.
 # The class decorator takes a class as input, and returns a class to take its place.
 def disagg_test_class(cls):
-    class disagg_test_case_class(cls):
+    class disagg_test_case_class(cls, DisaggConfigMixin):
         @functools.wraps(cls, updated=())
         def __init__(self, *args, **kwargs):
             super(disagg_test_case_class, self).__init__(*args, **kwargs)
@@ -80,15 +82,28 @@ def disagg_test_class(cls):
         # Load the page log extension, only if extensions hasn't already been specified.
         if cls.conn_extensions == wttest.WiredTigerTestCase.conn_extensions:
             def conn_extensions(self, extlist):
-                if os.name == 'nt':
-                    extlist.skip_if_missing = True
-                return DisaggConfigMixin.conn_extensions(self, extlist)
+                self.add_scenario_config()
+                return self.disagg_conn_extensions(extlist)
+
+        def page_log(self):
+            return wttest.WiredTigerTestCase.vars().page_log
 
     # Preserve the original name of the wrapped class, so that the test ID is unmodified.
     disagg_test_case_class.__name__ = cls.__name__
     disagg_test_case_class.__qualname__ = cls.__qualname__
     # Preserve the original module, as it is an integral part of the test's identity.
     disagg_test_case_class.__module__ = cls.__module__
+
+    # Put the configured page_log in the config if it isn't already there.
+    # The conn_config may be defined as a function, not a string.
+    # If so, leave it alone.
+    if not hasattr(disagg_test_case_class, 'conn_config'):
+        disagg_test_case_class.conn_config = ''
+    if type(disagg_test_case_class.conn_config) == str and \
+       not 'page_log=' in disagg_test_case_class.conn_config:
+        page_log = wttest.WiredTigerTestCase.vars().page_log
+        disagg_test_case_class.conn_config += f',disaggregated=(page_log={page_log})'
+
     return disagg_test_case_class
 
 # This mixin class provides disaggregated storage configuration methods.
@@ -128,7 +143,15 @@ class DisaggConfigMixin:
 
     # Load the storage sources extension.
     def conn_extensions(self, extlist):
+        self.add_scenario_config()
         return self.disagg_conn_extensions(extlist)
+
+    def add_scenario_config(self):
+        if not hasattr(self, 'is_disagg'):
+            self.is_disagg = True
+            self.is_local_storage = False
+        if self.is_disagg and not hasattr(self, 'ds_name'):
+            self.ds_name = self.vars.page_log
 
     # Returns configuration to be passed to the extension.
     # Call may override, in which case, they probably want to
@@ -175,7 +198,7 @@ class DisaggConfigMixin:
     def disagg_get_complete_checkpoint_ext(self, conn=None):
         if conn is None:
             conn = self.conn
-        page_log = conn.get_page_log('palm')
+        page_log = conn.get_page_log(self.vars.page_log)
 
         session = conn.open_session('')
         r = page_log.pl_get_complete_checkpoint_ext(session)

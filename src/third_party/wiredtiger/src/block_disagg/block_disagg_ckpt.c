@@ -137,12 +137,6 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
     WT_ERR(md_cursor->get_value(md_cursor, &md_value));
 
     /*
-     * Release the metadata cursor early, so that the subsequent functions can reuse the cached
-     * metadata cursor in the session.
-     */
-    WT_ERR(__wt_metadata_cursor_release(session, &md_cursor));
-
-    /*
      * Store the metadata of regular shared tables in the shared metadata table. Store the metadata
      * of the shared metadata table in the system-level metadata (similar to the turtle file).
      */
@@ -156,6 +150,12 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
         WT_SAVE_DHANDLE(
           session, ret = __wt_disagg_update_shared_metadata(session, md_key, md_value));
         WT_ERR(ret);
+
+        /*
+         * Release the metadata cursor early, so that the subsequent functions can reuse the cached
+         * metadata cursor in the session.
+         */
+        WT_ERR(__wt_metadata_cursor_release(session, &md_cursor));
 
         /* Check if we need to include any other metadata keys. */
         if (WT_SUFFIX_MATCH(block_disagg->name, ".wt")) {

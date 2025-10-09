@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class
+from helper_disagg import disagg_test_class
 from wtscenario import make_scenarios
 
 StorageSource = wiredtiger.StorageSource  # easy access to constants
@@ -35,11 +35,11 @@ StorageSource = wiredtiger.StorageSource  # easy access to constants
 # test_layered01.py
 #    Basic layered tree creation test
 @disagg_test_class
-class test_layered01(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered01(wttest.WiredTigerTestCase):
 
     uri_base = "test_layered01"
     conn_config = 'verbose=[layered],disaggregated=(role="leader"),' \
-                + 'disaggregated=(page_log=palm,lose_all_my_data=true)'
+                + 'disaggregated=(lose_all_my_data=true)'
 
     uri = "layered:" + uri_base
 
@@ -48,12 +48,6 @@ class test_layered01(wttest.WiredTigerTestCase, DisaggConfigMixin):
             ("file:" + uri_base + ".wt_ingest", ''),
             ("file:" + uri_base + ".wt_stable", '')
             ]
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('page_log', 'palm')
 
     # Check for a specific string as part of the uri's metadata.
     def check_metadata(self, uri, val_str):
@@ -64,7 +58,7 @@ class test_layered01(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     # Test calling the create API for a layered table.
     def test_layered01(self):
-        base_create = 'key_format=S,value_format=S,disaggregated=(page_log=palm)'
+        base_create = 'key_format=S,value_format=S'
 
         self.pr("create layered tree")
         #conf = ',layered=true'

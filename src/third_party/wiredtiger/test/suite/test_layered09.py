@@ -37,7 +37,7 @@ from wtscenario import make_scenarios
 # Simple read write testing for leaf page delta
 
 @disagg_test_class
-class test_layered09(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered09(wttest.WiredTigerTestCase):
     encrypt = [
         ('none', dict(encryptor='none', encrypt_args='')),
         ('rotn', dict(encryptor='rotn', encrypt_args='keyid=13')),
@@ -59,7 +59,7 @@ class test_layered09(wttest.WiredTigerTestCase, DisaggConfigMixin):
     ]
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'page_delta=(delta_pct=100),disaggregated=(page_log=palm),'
+                     + 'page_delta=(delta_pct=100),,'
     disagg_storages = gen_disagg_storages('test_layered09', disagg_only = True)
 
     # Make scenarios for different cloud service providers

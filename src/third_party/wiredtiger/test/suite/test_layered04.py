@@ -37,15 +37,9 @@ class test_layered04(wttest.WiredTigerTestCase):
     nitems = 50000
     uri_base = "test_layered04"
     conn_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),disaggregated=(role="leader"),' \
-                + 'disaggregated=(page_log=palm,lose_all_my_data=true),'
+                + 'disaggregated=(lose_all_my_data=true),'
 
     uri = "layered:" + uri_base
-
-    # Load the directory store extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('page_log', 'palm')
 
     # Test inserting a record into a layered tree
     def test_layered04(self):
@@ -61,14 +55,11 @@ class test_layered04(wttest.WiredTigerTestCase):
             cursor["Hello " + str(i)] = "World"
             cursor["Hi " + str(i)] = "There"
             cursor["OK " + str(i)] = "Go"
-            if i % 10000 == 0:
-                time.sleep(5)
 
         cursor.reset()
 
         self.pr('opening cursor')
         cursor.close()
-        time.sleep(1)
 
         item_count = 0
         self.pr('read cursor saw: ' + str(item_count))

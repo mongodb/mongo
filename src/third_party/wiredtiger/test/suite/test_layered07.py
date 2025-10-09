@@ -27,35 +27,21 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, sys, time, wiredtiger, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class
+from helper_disagg import disagg_test_class
 
 # test_layered07.py
 #    Start a second WT that becomes leader and checke that content appears in the first.
 @disagg_test_class
-class test_layered07(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered07(wttest.WiredTigerTestCase):
     nitems = 500
 
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm,lose_all_my_data=true),'
+                     + 'disaggregated=(lose_all_my_data=true),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     create_session_config = 'key_format=S,value_format=S'
 
     uri = "layered:test_layered07"
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('page_log', 'palm')
-        self.pr(f"{extlist=}")
-
-    # Custom test case setup
-    def early_setup(self):
-        os.mkdir('follower')
-        # Create the home directory for the PALM k/v store, and share it with the follower.
-        os.mkdir('kv_home')
-        os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
     # Test inserting records into a follower that turned into a leader
     def test_layered07(self):
@@ -80,14 +66,10 @@ class test_layered07(wttest.WiredTigerTestCase, DisaggConfigMixin):
             cursor["Hello " + str(i)] = "World"
             cursor["Hi " + str(i)] = "There"
             cursor["OK " + str(i)] = "Go"
-            if i % 250 == 0:
-                time.sleep(1)
 
         # Ensure that all data makes it to the follower.
         cursor.close()
-        time.sleep(1)
         self.session.checkpoint()
-        time.sleep(1)
 
         #
         # Part 2: The big switcheroo
@@ -96,7 +78,6 @@ class test_layered07(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         # This function call implies the follower will pick up a new checkpoint.
         self.disagg_switch_follower_and_leader(conn_follow, self.conn)
-        time.sleep(2)
 
         #
         # Part 3: Insert content to old follower
@@ -106,11 +87,8 @@ class test_layered07(wttest.WiredTigerTestCase, DisaggConfigMixin):
             cursor["* Hello " + str(i)] = "World"
             cursor["* Hi " + str(i)] = "There"
             cursor["* OK " + str(i)] = "Go"
-            if i % 250 == 0:
-                time.sleep(1)
 
         cursor.close()
-        time.sleep(1)
         session_follow.checkpoint()
         self.disagg_advance_checkpoint(self.conn, conn_follow)
 
