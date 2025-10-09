@@ -1,10 +1,10 @@
 # This file gets automatically updated by profile_data_pr.py. Do not change the path to this file or variables in this file
 # without updating that script.
-DEFAULT_CLANG_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_ad9e7134e19973fa2f347366764935237209f658_aarch64_clang_thinlto_pgo_8.3.0-alpha0-1948-gad9e713-patch-68e5de6cfe714a0007cbee1f.profdata"
-DEFAULT_CLANG_PGO_DATA_CHECKSUM = "ab3f9a8e6e6f4d6e9fba1e6142df6e9a01aab6d204ff38bb9e7390bdcd49fe5d"
+DEFAULT_CLANG_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_fd3e5a8927aa2a65561e1de6483ef5cb5c508b7f_aarch64_clang_thinlto_pgo_8.3.0-alpha0-1998-gfd3e5a8-patch-68e7127a4908600007f262e4.profdata"
+DEFAULT_CLANG_PGO_DATA_CHECKSUM = "ef3879b3e95d85a36d4c10ecf4494684da9085f2aa291f3baaf4ccd98f25f381"
 
 DEFAULT_GCC_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/pgo_gcda.tgz"
 DEFAULT_GCC_PGO_DATA_CHECKSUM = "4a0f3191776d2b8cc36fe2d69b07034b325c9989252e412bacfef35826362c35"
 
-DEFAULT_BOLT_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_ad9e7134e19973fa2f347366764935237209f658_aarch64_clang_thinlto_pgo_bolt_8.3.0-alpha0-1948-gad9e713-patch-68e5de6cfe714a0007cbee1f.fdata"
-DEFAULT_BOLT_DATA_CHECKSUM = "7c8771594df9e6891dded223596f5ebd122b9e64ceb5cf072a083dc546668379"
+DEFAULT_BOLT_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_fd3e5a8927aa2a65561e1de6483ef5cb5c508b7f_aarch64_clang_thinlto_pgo_bolt_8.3.0-alpha0-1998-gfd3e5a8-patch-68e7127a4908600007f262e4.fdata"
+DEFAULT_BOLT_DATA_CHECKSUM = "404694fae4910cafc04ee09996c5e362a82fe65fec31c17d7efbe9cba2f456df"
