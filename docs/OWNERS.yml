@@ -12,6 +12,9 @@ filters:
   - "devcontainer-setup.md":
     approvers:
       - 10gen/devprod-correctness
+  - "devcontainer/**":
+    approvers:
+      - 10gen/devprod-correctness
   - "exception_architecture.md":
     approvers:
       - 10gen/server-programmability

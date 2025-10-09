@@ -19,7 +19,7 @@
       "type": "volume"
     },
     {
-      "source": "projectname-bashhistory",
+      "source": "mongo-bashhistory",
       "target": "/commandhistory",
       "type": "volume"
     }

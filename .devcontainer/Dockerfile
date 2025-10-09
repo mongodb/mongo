@@ -56,6 +56,9 @@ USER $USERNAME
 ENV USER=${USERNAME}
 RUN /opt/mongodbtoolchain/revisions/*/scripts/install.sh; echo "Toolchain installation complete"
 
+# Add MongoDB toolchain to PATH
+ENV PATH="/opt/mongodbtoolchain/v5/bin:${PATH}"
+
 # Bazel telemetry
 RUN echo "common --bes_keywords=devcontainer:use=true" >> "$HOME/.bazelrc" && \
   echo "common --bes_keywords=devcontainer:image=$BASE_IMAGE" >> "$HOME/.bazelrc" && \
