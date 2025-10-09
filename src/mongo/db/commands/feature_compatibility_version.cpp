@@ -494,8 +494,9 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     runUpdateCommand(opCtx, newFCVDoc);
 }
 
-repl::OpTime FeatureCompatibilityVersion::setIfCleanStartup(
-    OperationContext* opCtx, repl::StorageInterface* storageInterface, long long term) {
+Timestamp FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
+                                                         repl::StorageInterface* storageInterface,
+                                                         long long term) {
     if (!hasNoReplicatedCollections(opCtx)) {
         if (!gDefaultStartupFCV.empty()) {
             LOGV2(7557701,
@@ -541,25 +542,31 @@ repl::OpTime FeatureCompatibilityVersion::setIfCleanStartup(
         fcvDoc.setVersion(GenericFCV::kLatest);
     }
 
-    repl::OpTime opTime;
     auto action = [&]() {
+        Timestamp timestamp;
         NamespaceString nss(NamespaceString::kServerConfigurationNamespace);
         CollectionOptions options;
         options.uuid = UUID::gen();
         uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
+        WriteUnitOfWork wuow(opCtx);
+
+        // Register a callback to update the timestamp on committing the FCV document.
+        if (term != repl::OpTime::kUninitializedTerm) {
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [&timestamp](OperationContext*, boost::optional<Timestamp> commitTime) {
+                    if (commitTime) {
+                        timestamp = *commitTime;
+                    }
+                });
+        }
 
         // We then insert the featureCompatibilityVersion document into the server configuration
         // collection. The server parameter will be updated on commit by the op observer.
-        if (term != repl::OpTime::kUninitializedTerm) {
-            WriteUnitOfWork wuow(opCtx);
-            auto slots = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1);
-            wuow.commit();
-            opTime = slots.front();
-            invariant(term == opTime.getTerm());
-        }
+        // Leave the timestamp empty to be populated by the OpObserver.
         uassertStatusOK(storageInterface->insertDocument(
-            opCtx, nss, repl::TimestampedBSONObj{fcvDoc.toBSON(), opTime.getTimestamp()}, term));
-        return opTime;
+            opCtx, nss, repl::TimestampedBSONObj{fcvDoc.toBSON(), Timestamp()}, term));
+        wuow.commit();
+        return timestamp;
     };
 
     if (term == repl::OpTime::kUninitializedTerm) {

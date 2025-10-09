@@ -115,11 +115,11 @@ public:
      * downgrade value.
      *
      * If 'term' is provided, writes FCV with a timestamp and replicates it in oplog.
-     * Returns FCV's OpTime.
+     * Returns FCV's Timestamp.
      */
-    static repl::OpTime setIfCleanStartup(OperationContext* opCtx,
-                                          repl::StorageInterface* storageInterface,
-                                          long long term = repl::OpTime::kUninitializedTerm);
+    static Timestamp setIfCleanStartup(OperationContext* opCtx,
+                                       repl::StorageInterface* storageInterface,
+                                       long long term = repl::OpTime::kUninitializedTerm);
 
     /**
      * Returns true if the server has no replicated collections.
