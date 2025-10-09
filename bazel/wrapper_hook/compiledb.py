@@ -225,7 +225,7 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
             + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
             + compiledb_config
             + [
-                "dist_test_extensions",
+                "//src/mongo/db/extension/test_examples:dist_test_extensions",
             ]
         )
         run_pty_command(gen_source_cmd)
