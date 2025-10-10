@@ -27,25 +27,33 @@
  *    it in the license file.
  */
 #pragma once
-
+#include "mongo/base/string_data.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::host_adapter {
 
+namespace mongo::extension::host_connector {
 /**
- * LogicalAggStageHandle is an owned handle wrapper around a
- * MongoExtensionLogicalAggStage.
+ * ExtensionByteBufHandle is an owned handle wrapper around a
+ * MongoExtensionByteBuf.
  */
-class LogicalAggStageHandle : public OwnedHandle<::MongoExtensionLogicalAggStage> {
+class ExtensionByteBufHandle : public OwnedHandle<::MongoExtensionByteBuf> {
 public:
-    LogicalAggStageHandle(::MongoExtensionLogicalAggStage* ptr)
-        : OwnedHandle<::MongoExtensionLogicalAggStage>(ptr) {
-        _assertValidVTable();
-    }
+    ExtensionByteBufHandle(::MongoExtensionByteBuf* byteBufPtr)
+        : OwnedHandle<::MongoExtensionByteBuf>(byteBufPtr) {}
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {}
+    /**
+     * Get a read-only view of the contents of MongoExtensionByteBuf.
+     */
+    StringData getView() const {
+        if (!isValid()) {
+            return StringData();
+        }
+
+        auto stringView = byteViewAsStringView(vtable().get_view(get()));
+        return StringData{stringView.data(), stringView.size()};
+    }
 };
-}  // namespace mongo::extension::host_adapter
+}  // namespace mongo::extension::host_connector

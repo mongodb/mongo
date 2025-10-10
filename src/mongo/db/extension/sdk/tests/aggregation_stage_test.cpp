@@ -33,9 +33,9 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/ast_node.h"
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/parse_node.h"
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -59,15 +59,15 @@ inline StringData stringViewToStringData(std::string_view sv) {
 }
 
 template <class Variant>
-const extension::host_adapter::AggStageAstNodeHandle& asAst(const Variant& v) {
-    ASSERT_TRUE(std::holds_alternative<extension::host_adapter::AggStageAstNodeHandle>(v));
-    return std::get<extension::host_adapter::AggStageAstNodeHandle>(v);
+const extension::host_connector::AggStageAstNodeHandle& asAst(const Variant& v) {
+    ASSERT_TRUE(std::holds_alternative<extension::host_connector::AggStageAstNodeHandle>(v));
+    return std::get<extension::host_connector::AggStageAstNodeHandle>(v);
 }
 
 template <class Variant>
-const extension::host_adapter::AggStageParseNodeHandle& asParse(const Variant& v) {
-    ASSERT_TRUE(std::holds_alternative<extension::host_adapter::AggStageParseNodeHandle>(v));
-    return std::get<extension::host_adapter::AggStageParseNodeHandle>(v);
+const extension::host_connector::AggStageParseNodeHandle& asParse(const Variant& v) {
+    ASSERT_TRUE(std::holds_alternative<extension::host_connector::AggStageParseNodeHandle>(v));
+    return std::get<extension::host_connector::AggStageParseNodeHandle>(v);
 }
 
 static constexpr std::string_view kNoOpName = "$noOp";
@@ -351,10 +351,10 @@ class ParseNodeVTableTest : public unittest::Test {
 public:
     // This special handle class is only used within this fixture so that we can unit test the
     // assertVTableConstraints functionality of the handle.
-    class TestParseNodeVTableHandle : public extension::host_adapter::AggStageParseNodeHandle {
+    class TestParseNodeVTableHandle : public extension::host_connector::AggStageParseNodeHandle {
     public:
         TestParseNodeVTableHandle(absl::Nonnull<::MongoExtensionAggStageParseNode*> parseNode)
-            : extension::host_adapter::AggStageParseNodeHandle(parseNode) {};
+            : extension::host_connector::AggStageParseNodeHandle(parseNode) {};
 
         void assertVTableConstraints(const VTable_t& vtable) {
             _assertVTableConstraints(vtable);
@@ -364,10 +364,10 @@ public:
 
 class AstNodeVTableTest : public unittest::Test {
 public:
-    class TestAstNodeVTableHandle : public extension::host_adapter::AggStageAstNodeHandle {
+    class TestAstNodeVTableHandle : public extension::host_connector::AggStageAstNodeHandle {
     public:
         TestAstNodeVTableHandle(absl::Nonnull<::MongoExtensionAggStageAstNode*> astNode)
-            : extension::host_adapter::AggStageAstNodeHandle(astNode) {};
+            : extension::host_connector::AggStageAstNodeHandle(astNode) {};
 
         void assertVTableConstraints(const VTable_t& vtable) {
             _assertVTableConstraints(vtable);
@@ -377,7 +377,7 @@ public:
 
 TEST(AggStageTest, CountingParseExpansionSucceedsTest) {
     auto countingParseNode = new extension::sdk::ExtensionAggStageParseNode(CountingParse::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{countingParseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{countingParseNode};
 
     auto expanded = handle.expand();
     ASSERT_EQUALS(expanded.size(), 1);
@@ -389,7 +389,7 @@ TEST(AggStageTest, CountingParseExpansionSucceedsTest) {
 TEST(AggStageTest, NestedExpansionSucceedsTest) {
     auto nestedDesugarParseNode =
         new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
 
     auto expanded = handle.expand();
     ASSERT_EQUALS(expanded.size(), 2);
@@ -418,7 +418,7 @@ TEST(AggStageTest, HandlesPreventMemoryLeaksOnSuccess) {
         new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
 
     {
-        auto handle = extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode};
+        auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
 
         [[maybe_unused]] auto expanded = handle.expand();
         ASSERT_EQUALS(CountingAst::alive, 1);
@@ -438,7 +438,7 @@ TEST(AggStageTest, HandlesPreventMemoryLeaksOnFailure) {
     auto nestedDesugarParseNode =
         new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
 
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
 
     auto failExpand = globalFailPointRegistry().find("failExtensionExpand");
     failExpand->setMode(FailPoint::skip, 1);
@@ -464,7 +464,7 @@ TEST(AggStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
 
     auto nestedDesugarParseNode =
         new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
 
     auto failExpand = globalFailPointRegistry().find("failVariantNodeConversion");
     failExpand->setMode(FailPoint::skip, 1);
@@ -485,7 +485,7 @@ TEST(AggStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
 DEATH_TEST(AggStageTest, EmptyDesugarExpansionFails, "11113803") {
     auto emptyDesugarParseNode =
         new extension::sdk::ExtensionAggStageParseNode(DesugarToEmptyParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{emptyDesugarParseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{emptyDesugarParseNode};
 
     [[maybe_unused]] auto expanded = handle.expand();
 }
@@ -494,7 +494,7 @@ DEATH_TEST(AggStageTest, GetExpandedSizeLessThanActualExpansionSizeFails, "11113
     auto getExpandedSizeLessThanActualExpansionSizeParseNode =
         new extension::sdk::ExtensionAggStageParseNode(
             GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{
+    auto handle = extension::host_connector::AggStageParseNodeHandle{
         getExpandedSizeLessThanActualExpansionSizeParseNode};
 
     [[maybe_unused]] auto expanded = handle.expand();
@@ -504,7 +504,7 @@ DEATH_TEST(AggStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails, "11
     auto getExpandedSizeGreaterThanActualExpansionSizeParseNode =
         new extension::sdk::ExtensionAggStageParseNode(
             GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{
+    auto handle = extension::host_connector::AggStageParseNodeHandle{
         getExpandedSizeGreaterThanActualExpansionSizeParseNode};
 
     [[maybe_unused]] auto expanded = handle.expand();
@@ -513,7 +513,7 @@ DEATH_TEST(AggStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails, "11
 DEATH_TEST(AggStageTest, DescriptorAndParseNodeNameMismatchFails, "11217602") {
     auto descriptor = std::make_unique<extension::sdk::ExtensionAggStageDescriptor>(
         NameMismatchStageDescriptor::make());
-    auto handle = extension::host_adapter::AggStageDescriptorHandle{descriptor.get()};
+    auto handle = extension::host_connector::AggStageDescriptorHandle{descriptor.get()};
 
     BSONObj stageBson = BSON(NameMismatchStageDescriptor::kStageName << BSONObj());
     [[maybe_unused]] auto parseNodeHandle = handle.parse(stageBson);
@@ -557,7 +557,7 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602")
 
 TEST(AggStageTest, NoOpAstNodeTest) {
     auto noOpAggStageAstNode = new extension::sdk::ExtensionAggStageAstNode(NoOpAstNode::make());
-    auto handle = extension::host_adapter::AggStageAstNodeHandle{noOpAggStageAstNode};
+    auto handle = extension::host_connector::AggStageAstNodeHandle{noOpAggStageAstNode};
 
     [[maybe_unused]] auto logicalStageHandle = handle.bind();
 }
@@ -609,7 +609,7 @@ public:
 TEST(AggStageTest, SimpleComputeQueryShapeSucceeds) {
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(SimpleQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
     auto queryShape = handle.getQueryShape(opts);
@@ -657,7 +657,7 @@ TEST(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation) 
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(IdentifierQueryShapeParseNode::make());
 
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
     auto queryShape = handle.getQueryShape(opts);
@@ -670,7 +670,7 @@ TEST(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation) 
 TEST(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) {
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(IdentifierQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
     opts.transformIdentifiers = true;
@@ -687,7 +687,7 @@ TEST(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) {
 TEST(AggStageTest, DesugarToEmptyDescriptorParseTest) {
     auto descriptor =
         std::make_unique<extension::sdk::ExtensionAggStageDescriptor>(NoOpStageDescriptor::make());
-    auto handle = extension::host_adapter::AggStageDescriptorHandle{descriptor.get()};
+    auto handle = extension::host_connector::AggStageDescriptorHandle{descriptor.get()};
 
     BSONObj stageBson = BSON(NoOpStageDescriptor::kStageName << BSONObj());
     auto parseNodeHandle = handle.parse(stageBson);
@@ -696,7 +696,7 @@ TEST(AggStageTest, DesugarToEmptyDescriptorParseTest) {
 
     ASSERT_EQUALS(expanded.size(), 1);
     ASSERT_TRUE(
-        std::holds_alternative<extension::host_adapter::AggStageAstNodeHandle>(expanded[0]));
+        std::holds_alternative<extension::host_connector::AggStageAstNodeHandle>(expanded[0]));
 }
 
 class FieldPathQueryShapeParseNode : public extension::sdk::AggStageParseNode {
@@ -740,7 +740,7 @@ public:
 TEST(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation) {
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(FieldPathQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
     auto queryShape = handle.getQueryShape(opts);
@@ -756,7 +756,7 @@ TEST(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation) {
 TEST(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(FieldPathQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
     opts.transformIdentifiers = true;
@@ -839,7 +839,7 @@ const Date_t LiteralQueryShapeParseNode::kDateValue = Date_t::fromMillisSinceEpo
 TEST(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
     auto queryShape = handle.getQueryShape(opts);
@@ -861,7 +861,7 @@ TEST(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
 TEST(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
     auto queryShape = handle.getQueryShape(opts);
@@ -879,7 +879,7 @@ TEST(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
 TEST(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValues) {
     auto parseNode =
         new extension::sdk::ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
+    auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
     auto queryShape = handle.getQueryShape(opts);

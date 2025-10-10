@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_adapter/query_shape_opts_adapter.h"
+#include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"

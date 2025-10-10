@@ -27,33 +27,65 @@
  *    it in the license file.
  */
 #pragma once
+
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
+#include <absl/base/nullability.h>
 
-namespace mongo::extension::host_adapter {
+namespace mongo::extension::host_connector {
+
 /**
- * ExtensionByteBufHandle is an owned handle wrapper around a
- * MongoExtensionByteBuf.
+ * AggStageDescriptorHandle is a wrapper around a
+ * MongoExtensionAggStageDescriptor.
  */
-class ExtensionByteBufHandle : public OwnedHandle<::MongoExtensionByteBuf> {
+class AggStageDescriptorHandle : public UnownedHandle<const ::MongoExtensionAggStageDescriptor> {
 public:
-    ExtensionByteBufHandle(::MongoExtensionByteBuf* byteBufPtr)
-        : OwnedHandle<::MongoExtensionByteBuf>(byteBufPtr) {}
+    AggStageDescriptorHandle(absl::Nonnull<const ::MongoExtensionAggStageDescriptor*> descriptor)
+        : UnownedHandle<const ::MongoExtensionAggStageDescriptor>(descriptor) {
+        _assertValidVTable();
+    }
 
     /**
-     * Get a read-only view of the contents of MongoExtensionByteBuf.
+     * Returns a StringData containing the name of this aggregation stage.
      */
-    StringData getView() const {
-        if (!isValid()) {
-            return StringData();
-        }
-
-        auto stringView = byteViewAsStringView(vtable().get_view(get()));
+    StringData getName() const {
+        auto stringView = byteViewAsStringView(vtable().get_name(get()));
         return StringData{stringView.data(), stringView.size()};
     }
+
+    /**
+     * Return the type for this stage.
+     */
+    MongoExtensionAggStageType getType() const {
+        return vtable().get_type(get());
+    }
+
+    /**
+     * Parse the user provided stage definition for this stage descriptor.
+     *
+     * stageBson contains a BSON document with a single (stageName, stageDefinition) element
+     * tuple.
+     *
+     * On success, the parse node is returned and belongs to the caller.
+     * On failure, the error triggers an assertion.
+     *
+     */
+    AggStageParseNodeHandle parse(BSONObj stageBson) const;
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            10930102, "ExtensionAggStageDescriptor 'get_name' is null", vtable.get_name != nullptr);
+        tassert(
+            10930103, "ExtensionAggStageDescriptor 'get_type' is null", vtable.get_type != nullptr);
+        tassert(10930104, "ExtensionAggStageDescriptor 'parse' is null", vtable.parse != nullptr);
+    }
 };
-}  // namespace mongo::extension::host_adapter
+
+}  // namespace mongo::extension::host_connector

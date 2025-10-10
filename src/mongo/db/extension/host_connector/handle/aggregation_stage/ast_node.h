@@ -28,9 +28,7 @@
  */
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/handle.h"
@@ -38,16 +36,16 @@
 
 #include <absl/base/nullability.h>
 
-namespace mongo::extension::host_adapter {
+namespace mongo::extension::host_connector {
 
 /**
- * AggStageDescriptorHandle is a wrapper around a
- * MongoExtensionAggStageDescriptor.
+ * AggStageAstNodeHandle is an owned handle wrapper around a
+ * MongoExtensionAggStageAstNode.
  */
-class AggStageDescriptorHandle : public UnownedHandle<const ::MongoExtensionAggStageDescriptor> {
+class AggStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggStageAstNode> {
 public:
-    AggStageDescriptorHandle(absl::Nonnull<const ::MongoExtensionAggStageDescriptor*> descriptor)
-        : UnownedHandle<const ::MongoExtensionAggStageDescriptor>(descriptor) {
+    AggStageAstNodeHandle(::MongoExtensionAggStageAstNode* ptr)
+        : OwnedHandle<::MongoExtensionAggStageAstNode>(ptr) {
         _assertValidVTable();
     }
 
@@ -60,32 +58,20 @@ public:
     }
 
     /**
-     * Return the type for this stage.
-     */
-    MongoExtensionAggStageType getType() const {
-        return vtable().get_type(get());
-    }
-
-    /**
-     * Parse the user provided stage definition for this stage descriptor.
+     * Returns a logical stage with the stage's runtime implementation of the optimization
+     * interface.
      *
-     * stageBson contains a BSON document with a single (stageName, stageDefinition) element
-     * tuple.
-     *
-     * On success, the parse node is returned and belongs to the caller.
+     * On success, the logical stage is returned and belongs to the caller.
      * On failure, the error triggers an assertion.
      *
      */
-    AggStageParseNodeHandle parse(BSONObj stageBson) const;
+    LogicalAggStageHandle bind() const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(
-            10930102, "ExtensionAggStageDescriptor 'get_name' is null", vtable.get_name != nullptr);
-        tassert(
-            10930103, "ExtensionAggStageDescriptor 'get_type' is null", vtable.get_type != nullptr);
-        tassert(10930104, "ExtensionAggStageDescriptor 'parse' is null", vtable.parse != nullptr);
+            11217601, "ExtensionAggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
+        tassert(11113700, "ExtensionAggStageAstNode 'bind' is null", vtable.bind != nullptr);
     }
 };
-
-}  // namespace mongo::extension::host_adapter
+}  // namespace mongo::extension::host_connector

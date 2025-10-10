@@ -26,14 +26,14 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_adapter/host_services_adapter.h"
+#include "mongo/db/extension/host_connector/host_services_adapter.h"
 
 #include "mongo/db/extension/host/host_services.h"
 #include "mongo/db/extension/public/extension_error_types_gen.h"
 #include "mongo/db/extension/public/extension_log_gen.h"
 #include "mongo/db/extension/shared/extension_status.h"
 
-namespace mongo::extension::host_adapter {
+namespace mongo::extension::host_connector {
 
 // Initialize the static instance of HostServicesAdapter.
 HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
@@ -94,4 +94,4 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(::MongoExtensionByteView
                   "Extension encountered error: " + exceptionInfo.getMessage());
     });
 }
-}  // namespace mongo::extension::host_adapter
+}  // namespace mongo::extension::host_connector

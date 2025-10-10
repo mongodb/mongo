@@ -29,7 +29,7 @@
 
 #include "mongo/db/extension/sdk/host_services.h"
 
-#include "mongo/db/extension/host_adapter/host_services_adapter.h"
+#include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -41,7 +41,7 @@ namespace {
 class HostServicesTest : public unittest::Test {
 public:
     void setUp() override {
-        sdk::HostServicesHandle::setHostServices(host_adapter::HostServicesAdapter::get());
+        sdk::HostServicesHandle::setHostServices(host_connector::HostServicesAdapter::get());
     }
 };
 

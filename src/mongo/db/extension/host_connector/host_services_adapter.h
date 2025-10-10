@@ -31,7 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 
 #include <memory>
-namespace mongo::extension::host_adapter {
+namespace mongo::extension::host_connector {
 /**
  * HostServicesAdapter is an implementation of ::MongoExtensionHostServices, providing host
  * services to extensions.
@@ -41,8 +41,8 @@ namespace mongo::extension::host_adapter {
  * provided primarily through mongo::extension::host::HostServices.
  *
  * The HostServicesAdapter instance is a singleton, and is accessible via
- * HostServicesAdapter::get(). The pointer to the singleton instance is passed to extensions during
- * initialization, and is expected to be valid for the lifetime of the extension.
+ * HostServicesAdapter::get(). The pointer to the singleton instance is passed to extensions
+ * during initialization, and is expected to be valid for the lifetime of the extension.
  */
 class HostServicesAdapter final : public ::MongoExtensionHostServices {
 public:
@@ -70,4 +70,4 @@ private:
     static constexpr ::MongoExtensionHostServicesVTable VTABLE{
         &_extAlwaysOK_TEMPORARY, &_extLog, &_extLogDebug, &_extUserAsserted, &_extTripwireAsserted};
 };
-}  // namespace mongo::extension::host_adapter
+}  // namespace mongo::extension::host_connector

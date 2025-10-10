@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/db/query/query_shape/query_shape.h"
@@ -36,7 +36,7 @@
 
 #include <vector>
 
-namespace mongo::extension::host_adapter {
+namespace mongo::extension::host_connector {
 
 class AggStageParseNodeHandle;
 using VariantNodeHandle = std::variant<AggStageParseNodeHandle, AggStageAstNodeHandle>;
@@ -99,4 +99,4 @@ private:
     }
 };
 
-}  // namespace mongo::extension::host_adapter
+}  // namespace mongo::extension::host_connector

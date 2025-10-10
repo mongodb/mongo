@@ -30,7 +30,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
@@ -144,12 +144,12 @@ public:
     Value serialize(const SerializationOptions& opts) const override;
 
     // This method is invoked by extensions to register descriptor.
-    static void registerStage(host_adapter::AggStageDescriptorHandle descriptor);
+    static void registerStage(host_connector::AggStageDescriptorHandle descriptor);
 
 private:
     static void registerStage(const std::string& name,
                               DocumentSource::Id id,
-                              host_adapter::AggStageDescriptorHandle descriptor);
+                              host_connector::AggStageDescriptorHandle descriptor);
 
     /**
      * Give access to DocumentSourceExtensionTest to unregister parser.
@@ -164,7 +164,7 @@ private:
                             boost::intrusive_ptr<ExpressionContext> exprCtx,
                             Id id,
                             BSONObj rawStage,
-                            mongo::extension::host_adapter::AggStageDescriptorHandle descriptor);
+                            mongo::extension::host_connector::AggStageDescriptorHandle descriptor);
 
     // Do not support copy or move.
     DocumentSourceExtension(const DocumentSourceExtension&) = delete;
@@ -182,8 +182,8 @@ private:
     const std::string _stageName;
     const Id _id;
     BSONObj _raw_stage;
-    const mongo::extension::host_adapter::AggStageDescriptorHandle _staticDescriptor;
-    mongo::extension::host_adapter::AggStageParseNodeHandle _parseNode;
+    const mongo::extension::host_connector::AggStageDescriptorHandle _staticDescriptor;
+    mongo::extension::host_connector::AggStageParseNodeHandle _parseNode;
 };
 }  // namespace extension::host
 }  // namespace mongo

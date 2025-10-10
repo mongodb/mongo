@@ -30,7 +30,7 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
 
@@ -48,7 +48,7 @@ PrivilegeVector DocumentSourceExtension::LiteParsed::requiredPrivileges(
 }
 
 // static
-void DocumentSourceExtension::registerStage(host_adapter::AggStageDescriptorHandle descriptor) {
+void DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor.getName();
     auto id = DocumentSource::allocateId(nameStringData);
     auto nameAsString = std::string(nameStringData);
@@ -77,7 +77,7 @@ void DocumentSourceExtension::registerStage(host_adapter::AggStageDescriptorHand
 // static
 void DocumentSourceExtension::registerStage(const std::string& name,
                                             DocumentSource::Id id,
-                                            host_adapter::AggStageDescriptorHandle descriptor) {
+                                            host_connector::AggStageDescriptorHandle descriptor) {
     DocumentSource::registerParser(
         name,
         [id, descriptor](BSONElement specElem,
@@ -97,7 +97,7 @@ DocumentSourceExtension::DocumentSourceExtension(
     boost::intrusive_ptr<ExpressionContext> exprCtx,
     Id id,
     BSONObj rawStage,
-    host_adapter::AggStageDescriptorHandle staticDescriptor)
+    host_connector::AggStageDescriptorHandle staticDescriptor)
     : DocumentSource(name, exprCtx),
       _stageName(std::string(name)),
       _id(id),

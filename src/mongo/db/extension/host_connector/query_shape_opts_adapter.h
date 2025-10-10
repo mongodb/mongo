@@ -34,7 +34,7 @@
 
 namespace mongo::extension::host {
 /**
- * QueryShapeOptsAdapter is an adapter of ::MongoExtensionHostQueryShapeOpts,
+ * QueryShapeOptsAdapter is an adapter to ::MongoExtensionHostQueryShapeOpts,
  * providing host serialization options to extensions.
  */
 class QueryShapeOptsAdapter final : public ::MongoExtensionHostQueryShapeOpts {

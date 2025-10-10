@@ -26,28 +26,26 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host/host_portal.h"
+#pragma once
 
-#include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
-#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::host_connector {
 
-void HostPortal::registerStageDescriptor(const ::MongoExtensionAggStageDescriptor* descriptor) {
-    tassert(
-        10596400, "Got null stage descriptor during extension registration", descriptor != nullptr);
-    DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHandle(descriptor));
-}
+/**
+ * LogicalAggStageHandle is an owned handle wrapper around a
+ * MongoExtensionLogicalAggStage.
+ */
+class LogicalAggStageHandle : public OwnedHandle<::MongoExtensionLogicalAggStage> {
+public:
+    LogicalAggStageHandle(::MongoExtensionLogicalAggStage* ptr)
+        : OwnedHandle<::MongoExtensionLogicalAggStage>(ptr) {
+        _assertValidVTable();
+    }
 
-::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(
-    const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() { return registerStageDescriptor(stageDesc); });
-}
-
-::MongoExtensionByteView HostPortal::_extGetOptions(
-    const ::MongoExtensionHostPortal* portal) noexcept {
-    return stringViewAsByteView(static_cast<const HostPortal*>(portal)->_extensionOpts);
-}
-
-}  // namespace mongo::extension::host
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {}
+};
+}  // namespace mongo::extension::host_connector

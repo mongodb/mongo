@@ -18,7 +18,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
+        "//src/mongo/db/extension/host_connector:extensions_host_connector",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/shared",
         "//src/mongo/db/extension/shared/handle",

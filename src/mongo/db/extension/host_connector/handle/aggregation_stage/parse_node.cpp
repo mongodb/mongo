@@ -26,16 +26,16 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
 
-#include "mongo/db/extension/host_adapter/query_shape_opts_adapter.h"
+#include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
-namespace mongo::extension::host_adapter {
+namespace mongo::extension::host_connector {
 
 MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 
@@ -129,4 +129,4 @@ std::vector<VariantNodeHandle> AggStageParseNodeHandle::expand() const {
     guard.dismiss();
     return expandedVec;
 }
-}  // namespace mongo::extension::host_adapter
+}  // namespace mongo::extension::host_connector

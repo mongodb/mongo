@@ -28,50 +28,55 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host_adapter/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/host/host_portal.h"
+#include "mongo/db/extension/host/host_services.h"
+#include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/shared/byte_buf_utils.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
-#include <absl/base/nullability.h>
+// TODO SERVER-112345: Move this file to the /handle directory.
 
-namespace mongo::extension::host_adapter {
+namespace mongo::extension::host_connector {
 
 /**
- * AggStageAstNodeHandle is an owned handle wrapper around a
- * MongoExtensionAggStageAstNode.
+ * Wrapper for ::MongoExtension providing safe access to its public API via the vtable.
+ * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
+ * is never transferred to the host.
  */
-class AggStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggStageAstNode> {
+class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
+
 public:
-    AggStageAstNodeHandle(::MongoExtensionAggStageAstNode* ptr)
-        : OwnedHandle<::MongoExtensionAggStageAstNode>(ptr) {
+    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {
         _assertValidVTable();
     }
 
     /**
-     * Returns a StringData containing the name of this aggregation stage.
+     * Initialize the extension by providing it with a HostPortal and HostServices.
+     *
+     * Note that the HostServices is passed as a pointer since its lifetime extends beyond
+     * the call to initialize() and will be saved by the extension. The HostPortal, on the other
+     * hand, will go out of scope immediately after the call to initialize() so it is passed by
+     * reference.
      */
-    StringData getName() const {
-        auto stringView = byteViewAsStringView(vtable().get_name(get()));
-        return StringData{stringView.data(), stringView.size()};
+    void initialize(const extension::host::HostPortal& portal,
+                    const extension::host_connector::HostServicesAdapter* hostServices) const {
+        invokeCAndConvertStatusToException([&] {
+            assertValid();
+            return vtable().initialize(get(), &portal, hostServices);
+        });
     }
 
-    /**
-     * Returns a logical stage with the stage's runtime implementation of the optimization
-     * interface.
-     *
-     * On success, the logical stage is returned and belongs to the caller.
-     * On failure, the error triggers an assertion.
-     *
-     */
-    LogicalAggStageHandle bind() const;
+    ::MongoExtensionAPIVersion getVersion() const {
+        assertValid();
+        return get()->version;
+    }
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(
-            11217601, "ExtensionAggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
-        tassert(11113700, "ExtensionAggStageAstNode 'bind' is null", vtable.bind != nullptr);
-    }
+        tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
+    };
 };
-}  // namespace mongo::extension::host_adapter
+
+}  // namespace mongo::extension::host_connector

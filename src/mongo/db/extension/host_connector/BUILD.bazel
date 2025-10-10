@@ -2,10 +2,10 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
-# Like the C++ SDK, we should do our best to minimize the dependencies of this adapter layer so
+# Like the C++ SDK, we should do our best to minimize the dependencies of this connector layer so
 # that it can be mostly self-contained.
 mongo_cc_library(
-    name = "extensions_host_adapter",
+    name = "extensions_host_connector",
     srcs = [
         "query_shape_opts_adapter.cpp",
     ],
@@ -25,7 +25,7 @@ mongo_cc_library(
     ],
 )
 
-# Unlike the "extensions_host_adapter" target above that provides adapters to manage
+# Unlike the "extensions_host_connector" target above that provides adapters and handles to manage
 # extension-provided data structures, the host services adapter has many server dependencies since
 # it is responsible for exposing certain server functionality through the API.
 mongo_cc_library(
