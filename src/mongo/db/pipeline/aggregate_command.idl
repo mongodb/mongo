@@ -184,6 +184,9 @@ commands:
                 - privilege: # $backupCursorExtend, backupCursor
                       resource_pattern: cluster
                       action_type: fsync
+                - privilege: # $_backupFile
+                      resource_pattern: cluster
+                      action_type: readBackupFile
                 - privilege: # $_internalAllCollectionStats
                       agg_stage: _internalAllCollectionStats
                       resource_pattern: cluster

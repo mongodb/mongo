@@ -7384,8 +7384,8 @@ export const authCommandsLib = {
             testcases: [
                 {
                     runOnDb: adminDbName,
-                    roles: {__system: 1},
-                    privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                    roles: {backup: 1, root: 1, __system: 1},
+                    privileges: [{resource: {cluster: true}, actions: ["readBackupFile"]}],
                     expectFail: true,
                 },
             ],

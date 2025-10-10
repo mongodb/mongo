@@ -157,6 +157,7 @@ enums:
             queryStatsRead: "queryStatsRead" # view untransformed contents of queryStats store
             queryStatsReadTransformed: "queryStatsReadTransformed" # view transformed contents of queryStats store
             performRawDataOperations: "performRawDataOperations" # allow operations that use the rawData field
+            readBackupFile: "readBackupFile" # run $_backupFile aggregation
             refineCollectionShardKey: "refineCollectionShardKey"
             reIndex: "reIndex"
             releaseMemoryAnyCursor: "releaseMemoryAnyCursor"
