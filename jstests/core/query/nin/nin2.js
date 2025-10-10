@@ -9,17 +9,17 @@ t.drop();
 function checkOperators(array, inMatches) {
     let inCount = inMatches ? 1 : 0;
     let notInCount = 1 - inCount;
-    assert.eq(inCount, t.count({foo: {$in: array}}));
-    assert.eq(notInCount, t.count({foo: {$not: {$in: array}}}));
-    assert.eq(notInCount, t.count({foo: {$nin: array}}));
-    assert.eq(inCount, t.count({foo: {$not: {$nin: array}}}));
+    assert.eq(inCount, t.countDocuments({foo: {$in: array}}));
+    assert.eq(notInCount, t.countDocuments({foo: {$not: {$in: array}}}));
+    assert.eq(notInCount, t.countDocuments({foo: {$nin: array}}));
+    assert.eq(inCount, t.countDocuments({foo: {$not: {$nin: array}}}));
 }
 
 t.save({});
 
-assert.eq(1, t.count({foo: null}));
-assert.eq(0, t.count({foo: {$ne: null}}));
-assert.eq(0, t.count({foo: 1}));
+assert.eq(1, t.countDocuments({foo: null}));
+assert.eq(0, t.countDocuments({foo: {$ne: null}}));
+assert.eq(0, t.countDocuments({foo: 1}));
 
 // Check matching null against missing field.
 checkOperators([null], true);
@@ -29,9 +29,9 @@ checkOperators([1, null], true);
 t.remove({});
 t.save({foo: null});
 
-assert.eq(1, t.count({foo: null}));
-assert.eq(0, t.count({foo: {$ne: null}}));
-assert.eq(0, t.count({foo: 1}));
+assert.eq(1, t.countDocuments({foo: null}));
+assert.eq(0, t.countDocuments({foo: {$ne: null}}));
+assert.eq(0, t.countDocuments({foo: 1}));
 
 // Check matching empty set.
 checkOperators([], false);
@@ -44,9 +44,9 @@ checkOperators([1, null], true);
 t.remove({});
 t.save({foo: 1});
 
-assert.eq(0, t.count({foo: null}));
-assert.eq(1, t.count({foo: {$ne: null}}));
-assert.eq(1, t.count({foo: 1}));
+assert.eq(0, t.countDocuments({foo: null}));
+assert.eq(1, t.countDocuments({foo: {$ne: null}}));
+assert.eq(1, t.countDocuments({foo: 1}));
 
 // Check matching null against 1.
 checkOperators([null], false);
