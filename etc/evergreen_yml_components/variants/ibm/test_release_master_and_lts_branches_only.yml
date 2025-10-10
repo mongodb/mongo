@@ -211,7 +211,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - rhel83-zseries-large
-      - name: run_unit_tests_TG
+      - name: run_unit_tests_8_way_split_TG
         distros:
           - rhel83-zseries-large
 
@@ -280,6 +280,6 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - rhel9-zseries-large
-      - name: run_unit_tests_TG
+      - name: run_unit_tests_8_way_split_TG
         distros:
           - rhel9-zseries-large
