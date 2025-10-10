@@ -65,4 +65,9 @@ inline MongoExtensionByteView objAsByteView(const BSONObj& obj) {
 inline MongoExtensionByteView stringViewAsByteView(std::string_view str) {
     return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(str.data()), str.size()};
 }
+
+inline MongoExtensionByteView stringDataAsByteView(mongo::StringData sd) noexcept {
+    return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(sd.data()),
+                                  static_cast<size_t>(sd.size())};
+}
 }  // namespace mongo::extension

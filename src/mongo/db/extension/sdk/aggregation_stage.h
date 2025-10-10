@@ -91,7 +91,18 @@ public:
     AggStageAstNode() = default;
     virtual ~AggStageAstNode() = default;
 
+
+    std::string_view getName() const {
+        return _name;
+    }
+
     virtual std::unique_ptr<LogicalAggStage> bind() const = 0;
+
+protected:
+    AggStageAstNode(std::string_view name) : _name(name) {}
+
+private:
+    const std::string_view _name;
 };
 
 /**
@@ -125,6 +136,12 @@ private:
         delete static_cast<ExtensionAggStageAstNode*>(extAstNode);
     }
 
+    static ::MongoExtensionByteView _extGetName(
+        const ::MongoExtensionAggStageAstNode* astNode) noexcept {
+        return stringViewAsByteView(
+            static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl().getName());
+    }
+
     static ::MongoExtensionStatus* _extBind(
         const ::MongoExtensionAggStageAstNode* astNode,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
@@ -136,8 +153,8 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {.destroy = &_extDestroy,
-                                                                     .bind = &_extBind};
+    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {
+        .destroy = &_extDestroy, .get_name = &_extGetName, .bind = &_extBind};
     std::unique_ptr<AggStageAstNode> _astNode;
 };
 
@@ -170,11 +187,21 @@ class AggStageParseNode {
 public:
     virtual ~AggStageParseNode() = default;
 
+    std::string_view getName() const {
+        return _name;
+    }
+
     virtual BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const = 0;
 
     virtual size_t getExpandedSize() const = 0;
 
     virtual std::vector<VariantNode> expand() const = 0;
+
+protected:
+    AggStageParseNode(std::string_view name) : _name(name) {}
+
+private:
+    const std::string_view _name;
 };
 
 /**
@@ -206,6 +233,12 @@ private:
 
     static void _extDestroy(::MongoExtensionAggStageParseNode* parseNode) noexcept {
         delete static_cast<ExtensionAggStageParseNode*>(parseNode);
+    }
+
+    static ::MongoExtensionByteView _extGetName(
+        const ::MongoExtensionAggStageParseNode* parseNode) noexcept {
+        return stringViewAsByteView(
+            static_cast<const ExtensionAggStageParseNode*>(parseNode)->getImpl().getName());
     }
 
     static ::MongoExtensionStatus* _extGetQueryShape(
@@ -302,6 +335,7 @@ private:
 
     static constexpr ::MongoExtensionAggStageParseNodeVTable VTABLE = {
         .destroy = &_extDestroy,
+        .get_name = &_extGetName,
         .get_query_shape = &_extGetQueryShape,
         .get_expanded_size = &_extGetExpandedSize,
         .expand = &_extExpand};
@@ -333,7 +367,7 @@ protected:
     AggStageDescriptor(std::string name, ::MongoExtensionAggStageType type)
         : _name(std::move(name)), _type(type) {}
 
-    std::string _name;
+    const std::string _name;
     ::MongoExtensionAggStageType _type;
 };
 
@@ -380,9 +414,15 @@ private:
         ::MongoExtensionByteView stageBson,
         ::MongoExtensionAggStageParseNode** parseNode) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
-            auto parseNodePtr = static_cast<const ExtensionAggStageDescriptor*>(descriptor)
-                                    ->getImpl()
-                                    .parse(bsonObjFromByteView(stageBson));
+            const auto& impl =
+                static_cast<const ExtensionAggStageDescriptor*>(descriptor)->getImpl();
+            auto parseNodePtr = impl.parse(bsonObjFromByteView(stageBson));
+
+            tassert(11217602,
+                    str::stream() << "Descriptor and parse node stage names differ: descriptor='"
+                                  << std::string(impl.getName()) << "' parseNode='"
+                                  << std::string(parseNodePtr->getName()) << "'.",
+                    impl.getName() == parseNodePtr->getName());
 
             *parseNode = new ExtensionAggStageParseNode(std::move(parseNodePtr));
         });

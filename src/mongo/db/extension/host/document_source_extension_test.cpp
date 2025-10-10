@@ -82,6 +82,8 @@ public:
 }  // namespace extension::host
 
 namespace {
+static constexpr std::string_view kNoOpName = "$noOp";
+
 class NoOpLogicalAggStage : public extension::sdk::LogicalAggStage {
 public:
     NoOpLogicalAggStage() {}
@@ -89,6 +91,8 @@ public:
 
 class NoOpAggStageAstNode : public extension::sdk::AggStageAstNode {
 public:
+    NoOpAggStageAstNode() : extension::sdk::AggStageAstNode(kNoOpName) {}
+
     std::unique_ptr<extension::sdk::LogicalAggStage> bind() const override {
         return std::make_unique<NoOpLogicalAggStage>();
     }
@@ -100,6 +104,8 @@ public:
 
 class NoOpAggStageParseNode : public mongo::extension::sdk::AggStageParseNode {
 public:
+    NoOpAggStageParseNode() : extension::sdk::AggStageParseNode(kNoOpName) {}
+
     static constexpr size_t kExpansionSize = 1;
 
     size_t getExpandedSize() const override {
@@ -121,7 +127,7 @@ public:
 
 class NoOpAggStageDescriptor : public mongo::extension::sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$noOpExtension";
+    static inline const std::string kStageName = std::string(kNoOpName);
 
     NoOpAggStageDescriptor()
         : mongo::extension::sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {

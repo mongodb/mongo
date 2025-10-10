@@ -36,7 +36,7 @@
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(VectorSearch)
+DEFAULT_LOGICAL_AST_PARSE(VectorSearch, "$vectorSearch")
 
 /**
  * $vectorSearch is stage used to imitate overriding the existing $vectorSearch implementation
@@ -44,7 +44,7 @@ DEFAULT_LOGICAL_AST_PARSE(VectorSearch)
  */
 class VectorSearchStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$vectorSearch";
+    static inline const std::string kStageName = std::string(VectorSearchStageName);
 
     VectorSearchStageDescriptor()
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}

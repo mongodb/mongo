@@ -35,8 +35,8 @@
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(OptionA)
-DEFAULT_LOGICAL_AST_PARSE(OptionB)
+DEFAULT_LOGICAL_AST_PARSE(OptionA, "$optionA")
+DEFAULT_LOGICAL_AST_PARSE(OptionB, "$optionB")
 struct ExtensionOptions {
     inline static bool optionA = false;
 };
@@ -48,7 +48,7 @@ struct ExtensionOptions {
  */
 class OptionAStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$optionA";
+    static inline const std::string kStageName = std::string(OptionAStageName);
 
     OptionAStageDescriptor()
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
@@ -67,7 +67,7 @@ public:
  */
 class OptionBStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$optionB";
+    static inline const std::string kStageName = std::string(OptionBStageName);
 
     OptionBStageDescriptor()
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}

@@ -312,6 +312,11 @@ typedef struct MongoExtensionAggStageParseNodeVTable {
     void (*destroy)(MongoExtensionAggStageParseNode* parseNode);
 
     /**
+     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
+     */
+    MongoExtensionByteView (*get_name)(const MongoExtensionAggStageParseNode* parseNode);
+
+    /**
      * Populates the ByteBuf with the stage's query shape as serialized BSON. Ownership is
      * transferred to the caller.
      */
@@ -355,6 +360,11 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
      * Destroys `astNode` and free any related resources.
      */
     void (*destroy)(MongoExtensionAggStageAstNode* astNode);
+
+    /**
+     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
+     */
+    MongoExtensionByteView (*get_name)(const MongoExtensionAggStageAstNode* astNode);
 
     /**
      * Populates `logicalStage` with the stage's runtime implementation of the optimization

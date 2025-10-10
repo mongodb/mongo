@@ -36,11 +36,11 @@
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(Foo)
+DEFAULT_LOGICAL_AST_PARSE(Foo, "$foo")
 
 class FooStageDescriptor : public mongo::extension::sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$foo";
+    static inline const std::string kStageName = std::string(FooStageName);
 
     FooStageDescriptor()
         : mongo::extension::sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {
@@ -54,11 +54,11 @@ public:
     }
 };
 
-DEFAULT_LOGICAL_AST_PARSE(Bar)
+DEFAULT_LOGICAL_AST_PARSE(Bar, "$bar")
 
 class BarStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$bar";
+    static inline const std::string kStageName = std::string(BarStageName);
 
     BarStageDescriptor() : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 

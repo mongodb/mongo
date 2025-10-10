@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -129,6 +130,13 @@ private:
         delete static_cast<HostAggStageAstNode*>(astNode);
     }
 
+    static ::MongoExtensionByteView _hostGetName(
+        const ::MongoExtensionAggStageAstNode* astNode) noexcept {
+        return stringDataAsByteView(static_cast<const HostAggStageAstNode*>(astNode)
+                                        ->getIdLookupSpec()
+                                        .firstElementFieldNameStringData());
+    }
+
     static ::MongoExtensionStatus* _hostBind(
         const ::MongoExtensionAggStageAstNode* astNode,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
@@ -139,8 +147,8 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE{.destroy = &_hostDestroy,
-                                                                  .bind = &_hostBind};
+    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE{
+        .destroy = &_hostDestroy, .get_name = &_hostGetName, .bind = &_hostBind};
 
     std::unique_ptr<AggStageAstNode> _astNode;
 };

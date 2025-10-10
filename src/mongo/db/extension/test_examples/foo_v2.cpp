@@ -35,7 +35,7 @@
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(TestFoo)
+DEFAULT_LOGICAL_AST_PARSE(TestFoo, "$testFoo")
 
 /**
  * $testFoo is a no-op stage.
@@ -45,7 +45,7 @@ DEFAULT_LOGICAL_AST_PARSE(TestFoo)
  */
 class TestFooStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$testFoo";
+    static inline const std::string kStageName = std::string(TestFooStageName);
 
     TestFooStageDescriptor()
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}

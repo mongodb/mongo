@@ -35,7 +35,7 @@
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(Assert)
+DEFAULT_LOGICAL_AST_PARSE(Assert, "$assert")
 
 /**
  * $assert is a no-op stage. It will assert or error at parse time based on the specified arguments.
@@ -51,7 +51,7 @@ DEFAULT_LOGICAL_AST_PARSE(Assert)
  */
 class AssertStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$assert";
+    static inline const std::string kStageName = std::string(AssertStageName);
     AssertStageDescriptor()
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 

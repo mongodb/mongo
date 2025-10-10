@@ -36,11 +36,12 @@ namespace sdk = mongo::extension::sdk;
 
 // Defines a complete extension version (Extension, StageDescriptor, ParseNode, and LogicalStage).
 #define DEFINE_EXTENSION_VERSION(VERSION_NUM)                                                    \
-    DEFAULT_LOGICAL_AST_PARSE(ExtensionV##VERSION_NUM)                                           \
+    DEFAULT_LOGICAL_AST_PARSE(ExtensionV##VERSION_NUM, "$extensionV" #VERSION_NUM)               \
                                                                                                  \
     class ExtensionV##VERSION_NUM##StageDescriptor : public sdk::AggStageDescriptor {            \
     public:                                                                                      \
-        static inline const std::string kStageName = "$extensionV" #VERSION_NUM;                 \
+        static inline const std::string kStageName =                                             \
+            std::string(ExtensionV##VERSION_NUM##StageName);                                     \
                                                                                                  \
         ExtensionV##VERSION_NUM##StageDescriptor()                                               \
             : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}          \

@@ -46,6 +46,8 @@ public:
 
 class NoOpExtensionAstNode : public sdk::AggStageAstNode {
 public:
+    NoOpExtensionAstNode() : sdk::AggStageAstNode("$noOp") {}
+
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         MONGO_UNIMPLEMENTED;
     }
@@ -95,6 +97,15 @@ TEST(HostAstNodeTest, IsNotHostAllocated) {
     auto handle = host_adapter::AggStageAstNodeHandle{noOpExtensionAstNode};
 
     ASSERT_FALSE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
+}
+
+DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217601") {
+    auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
+    auto handle = TestHostAstNodeVTableHandle{noOpAstNode.release()};
+
+    auto vtable = handle.vtable();
+    vtable.get_name = nullptr;
+    handle.assertVTableConstraints(vtable);
 }
 
 DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsBind, "11113700") {

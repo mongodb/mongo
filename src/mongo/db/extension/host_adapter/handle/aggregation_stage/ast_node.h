@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/host_adapter/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
@@ -49,6 +50,14 @@ public:
     }
 
     /**
+     * Returns a StringData containing the name of this aggregation stage.
+     */
+    StringData getName() const {
+        auto stringView = byteViewAsStringView(vtable().get_name(get()));
+        return StringData{stringView.data(), stringView.size()};
+    }
+
+    /**
      * Returns a logical stage with the stage's runtime implementation of the optimization
      * interface.
      *
@@ -60,6 +69,8 @@ public:
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            11217601, "ExtensionAggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
         tassert(11113700, "ExtensionAggStageAstNode 'bind' is null", vtable.bind != nullptr);
     }
 };

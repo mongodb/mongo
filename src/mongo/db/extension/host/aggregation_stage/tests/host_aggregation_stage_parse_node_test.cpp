@@ -46,6 +46,8 @@ public:
 
 class NoOpExtensionParseNode : public sdk::AggStageParseNode {
 public:
+    NoOpExtensionParseNode() : sdk::AggStageParseNode("$noOp") {}
+
     size_t getExpandedSize() const override {
         MONGO_UNIMPLEMENTED;
     }
@@ -106,6 +108,15 @@ TEST(HostParseNodeTest, IsNotHostAllocated) {
 
     ASSERT_FALSE(host::HostAggStageParseNode::isHostAllocated(*handle.get()));
 }
+
+DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217600") {
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
+    auto handle = TestHostParseNodeVTableHandle{noOpParseNode.release()};
+
+    auto vtable = handle.vtable();
+    vtable.get_name = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
 
 DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977601") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));

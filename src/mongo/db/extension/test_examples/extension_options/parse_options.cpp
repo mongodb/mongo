@@ -35,7 +35,7 @@
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(CheckNum)
+DEFAULT_LOGICAL_AST_PARSE(CheckNum, "$checkNum")
 
 struct ExtensionOptions {
     inline static bool checkMax = false;
@@ -52,7 +52,7 @@ struct ExtensionOptions {
  */
 class CheckNumStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$checkNum";
+    static inline const std::string kStageName = std::string(CheckNumStageName);
     CheckNumStageDescriptor()
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 

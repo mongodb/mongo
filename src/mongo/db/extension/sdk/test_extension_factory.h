@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#define DEFAULT_LOGICAL_AST_PARSE(ExtensionName)                                                \
+#define DEFAULT_LOGICAL_AST_PARSE(ExtensionName, StageNameStringView)                           \
+    inline constexpr std::string_view ExtensionName##StageName = StageNameStringView;           \
     class ExtensionName##LogicalStage : public sdk::LogicalAggStage {};                         \
     class ExtensionName##AstNode : public sdk::AggStageAstNode {                                \
+    public:                                                                                     \
+        ExtensionName##AstNode() : sdk::AggStageAstNode(ExtensionName##StageName) {}            \
         std::unique_ptr<sdk::LogicalAggStage> bind() const override {                           \
             return std::make_unique<ExtensionName##LogicalStage>();                             \
         };                                                                                      \
     };                                                                                          \
     class ExtensionName##ParseNode : public sdk::AggStageParseNode {                            \
+    public:                                                                                     \
+        ExtensionName##ParseNode() : sdk::AggStageParseNode(ExtensionName##StageName) {}        \
         size_t getExpandedSize() const override {                                               \
             return 1;                                                                           \
         }                                                                                       \

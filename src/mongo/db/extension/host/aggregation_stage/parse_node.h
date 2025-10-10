@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -130,6 +131,13 @@ private:
         delete static_cast<HostAggStageParseNode*>(parseNode);
     }
 
+    static ::MongoExtensionByteView _hostGetName(
+        const ::MongoExtensionAggStageParseNode* parseNode) noexcept {
+        return stringDataAsByteView(static_cast<const HostAggStageParseNode*>(parseNode)
+                                        ->getBsonSpec()
+                                        .firstElementFieldNameStringData());
+    }
+
     static ::MongoExtensionStatus* _hostGetQueryShape(
         const ::MongoExtensionAggStageParseNode* parseNode,
         const ::MongoExtensionHostQueryShapeOpts* ctx,
@@ -162,6 +170,7 @@ private:
 
     static constexpr ::MongoExtensionAggStageParseNodeVTable VTABLE{
         .destroy = &_hostDestroy,
+        .get_name = &_hostGetName,
         .get_query_shape = &_hostGetQueryShape,
         .get_expanded_size = &_hostGetExpandedSize,
         .expand = &_hostExpand};

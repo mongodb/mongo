@@ -52,6 +52,15 @@ public:
         _assertValidVTable();
     }
 
+
+    /**
+     * Returns a StringData containing the name of this aggregation stage.
+     */
+    StringData getName() const {
+        auto stringView = byteViewAsStringView(vtable().get_name(get()));
+        return StringData{stringView.data(), stringView.size()};
+    }
+
     BSONObj getQueryShape(const SerializationOptions& opts) const;
 
     /**
@@ -69,6 +78,8 @@ public:
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            11217600, "ExtensionAggStageParseNode 'get_name' is null", vtable.get_name != nullptr);
         tassert(10977601,
                 "ExtensionAggStageParseNode 'get_query_shape' is null",
                 vtable.get_query_shape != nullptr);

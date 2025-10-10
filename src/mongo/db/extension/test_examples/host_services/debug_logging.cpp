@@ -41,11 +41,11 @@ namespace sdk = mongo::extension::sdk;
  * stage will never assert on unexpected input but instead will log lines depending on
  * the level provided and the server's log level.
  */
-DEFAULT_LOGICAL_AST_PARSE(DebugLog);
+DEFAULT_LOGICAL_AST_PARSE(DebugLog, "$debugLog");
 
 class DebugLogStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$debugLog";
+    static inline const std::string kStageName = std::string(DebugLogStageName);
     static inline const std::string kDebugLogLevelField = "level";
 
     DebugLogStageDescriptor()

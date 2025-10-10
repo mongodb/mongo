@@ -37,11 +37,11 @@
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(TestBuzz)
+DEFAULT_LOGICAL_AST_PARSE(TestBuzz, "$testBuzz")
 
 class TestBuzzStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = "$testBuzz";
+    static inline const std::string kStageName = std::string(TestBuzzStageName);
 
     TestBuzzStageDescriptor()
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
