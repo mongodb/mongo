@@ -80,11 +80,20 @@ protected:
         "featureFlagPreventDirectShardDDLsDuringPromotion", true};
 };
 
-TEST_F(DirectConnectionDDLHookTestReplicaSet, BasicRegisterUnauthorizedShardingDisabled) {
+TEST_F(DirectConnectionDDLHookTestReplicaSet, BasicRegisterUnauthorizedShardingDisabledWithNss) {
     makeUnauthorizedForDirectOps(operationContext.get()->getClient());
 
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext.get(), std::vector<NamespaceString>{kNss});
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext.get()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+}
+
+TEST_F(DirectConnectionDDLHookTestReplicaSet, BasicRegisterUnauthorizedShardingDisabledNoNss) {
+    makeUnauthorizedForDirectOps(operationContext.get()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext.get(), std::vector<NamespaceString>{});
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext.get()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
@@ -112,7 +121,7 @@ protected:
         "featureFlagPreventDirectShardDDLsDuringPromotion", true};
 };
 
-TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpAuthorizedDirectShardOps) {
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpAuthorizedDirectShardOpsWithNss) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
@@ -121,7 +130,16 @@ TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpAuthorizedDirectShardOps) {
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
 
-TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpUnauthorized) {
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpAuthorizedDirectShardOpsNoNss) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{});
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+}
+
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpUnauthorizedWithNss) {
     makeUnauthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
@@ -130,11 +148,29 @@ TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpUnauthorized) {
                        ErrorCodes::Unauthorized);
 }
 
-TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpNoAuth) {
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpUnauthorizedNoNss) {
+    makeUnauthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    ASSERT_THROWS_CODE(hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{}),
+                       DBException,
+                       ErrorCodes::Unauthorized);
+}
+
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpNoAuthWithNss) {
     AuthorizationManager::get(getServiceContext()->getService())->setAuthEnabled(false);
 
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+}
+
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpNoAuthNoNss) {
+    AuthorizationManager::get(getServiceContext()->getService())->setAuthEnabled(false);
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{});
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
@@ -148,7 +184,7 @@ TEST_F(DirectConnectionDDLHookTest, RegisterOpSessionsCollection) {
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
-TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecks) {
+TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecksWithNss) {
     makeUnauthorizedForDirectOps(operationContext()->getClient());
 
     RAIIServerParameterControllerForTest multitenancyController("enableDirectShardDDLOperations",
@@ -156,6 +192,18 @@ TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecks) {
 
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+}
+
+TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecksNoNss) {
+    makeUnauthorizedForDirectOps(operationContext()->getClient());
+
+    RAIIServerParameterControllerForTest multitenancyController("enableDirectShardDDLOperations",
+                                                                true);
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{});
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
@@ -172,13 +220,20 @@ TEST_F(DirectConnectionDDLHookTest, RegisterMultiple) {
 
     hook.onBeginDDL(secondOpCtx.get(), std::vector<NamespaceString>{kAnotherNss});
 
-    ASSERT_EQ(hook.getOngoingOperations().size(), 2);
+    auto thirdClient = makeClient();
+    auto thirdOpCtx = thirdClient->makeOperationContext();
+    makeAuthorizedForDirectOps(thirdOpCtx.get()->getClient());
+
+    hook.onBeginDDL(thirdOpCtx.get(), std::vector<NamespaceString>{});
+
+    ASSERT_EQ(hook.getOngoingOperations().size(), 3);
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1},
-                                                      {secondOpCtx.get()->getOpID(), 1}};
+                                                      {secondOpCtx.get()->getOpID(), 1},
+                                                      {thirdOpCtx.get()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
 
-TEST_F(DirectConnectionDDLHookTest, RegisterReEntrant) {
+TEST_F(DirectConnectionDDLHookTest, RegisterReEntrantWithNss) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
@@ -198,12 +253,41 @@ TEST_F(DirectConnectionDDLHookTest, RegisterReEntrant) {
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
-TEST_F(DirectConnectionDDLHookTest, BasicDeRegisterOp) {
+TEST_F(DirectConnectionDDLHookTest, RegisterReEntrantNoNss) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{});
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{});
+
+    ASSERT_EQ(hook.getOngoingOperations().size(), 1);
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 2}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{});
+    ASSERT_EQ(hook.getOngoingOperations().size(), 1);
+    expectedMap.at(operationContext()->getOpID()) = 1;
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{});
+    ASSERT_TRUE(hook.getOngoingOperations().empty());
+}
+
+TEST_F(DirectConnectionDDLHookTest, BasicDeRegisterOpWithNss) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
     hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    ASSERT_TRUE(hook.getOngoingOperations().empty());
+}
+
+TEST_F(DirectConnectionDDLHookTest, BasicDeRegisterOpNoNss) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{});
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{});
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 

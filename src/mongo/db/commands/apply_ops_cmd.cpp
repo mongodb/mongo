@@ -245,6 +245,10 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+
+        ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+            opCtx, std::vector<NamespaceString>{});
+
         validateApplyOpsCommand(cmdObj);
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;

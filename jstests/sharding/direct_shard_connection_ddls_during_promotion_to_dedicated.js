@@ -15,6 +15,21 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
+const testCommands = [
+    {
+        name: "dropCollection",
+        execute: (db) => db.runCommand({drop: "testColl"}),
+    },
+    {
+        name: "applyOps with DDL operation",
+        execute: (db) => db.runCommand({applyOps: [{op: "c", ns: "testDB.$cmd", o: {create: "testColl"}}]}),
+    },
+    {
+        name: "applyOps with CRUD operation",
+        execute: (db) => db.runCommand({applyOps: [{op: "i", ns: "testDB.testColl", o: {_id: 1, x: 1}}]}),
+    },
+];
+
 describe("Check direct DDLs during promotion and after promotion to sharded cluster with dedicated config server", function () {
     before(function () {
         this.keyFile = "jstests/libs/key1";
@@ -53,6 +68,13 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Creating new user with dbOwner permissions on replica set");
         this.testDBDirectConnection = this.createRegularUser(this.rs.getPrimary(), "testDB", "user", "x");
 
+        jsTest.log.info("Granting dbAdminAnyDatabase with applyOps privileges to user");
+        assert(this.cluster.getDB("admin").auth("admin", "x"), "Authentication failed");
+        this.rs
+            .getPrimary()
+            .getDB("testDB")
+            .grantRolesToUser("user", [{role: "dbAdminAnyDatabase", db: "admin"}]);
+
         jsTest.log.info("Inserting data on the replica set");
         assert.commandWorked(this.testDBDirectConnection.testColl.insertOne({x: 1}));
     });
@@ -80,18 +102,26 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Waiting hangAfterShardingInitialization");
         shardInitializationFP.wait();
 
-        jsTest.log.info("Checking that direct DDLs are disallowed without special permissions");
         const userDirectConnection = new Mongo(this.rs.getPrimary().host);
         this.testDBDirectConnection = userDirectConnection.getDB("testDB");
         assert(this.testDBDirectConnection.auth("user", "x"), "Authentication failed");
-        assert.commandFailedWithCode(this.testDBDirectConnection.dropDatabase(), ErrorCodes.Unauthorized);
+        testCommands.forEach((testCommand) => {
+            jsTest.log.info(
+                `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
+            );
+            assert.commandFailedWithCode(testCommand.execute(this.testDBDirectConnection), ErrorCodes.Unauthorized);
+        });
 
-        jsTest.log.info("Checking that direct DDLs are allowed with special permissions");
         this.rs
             .getPrimary()
             .getDB("testDB")
             .grantRolesToUser("user", [{role: "directShardOperations", db: "admin"}]);
-        assert.commandWorked(this.testDBDirectConnection.dropDatabase());
+        testCommands.forEach((testCommand) => {
+            jsTest.log.info(
+                `Checking that ${testCommand.name} is allowed with directShardOperations special permissions`,
+            );
+            assert.commandWorked(testCommand.execute(this.testDBDirectConnection));
+        });
 
         jsTest.log.info("Clearing fail point hangAfterShardingInitialization");
         shardInitializationFP.off();
@@ -146,20 +176,31 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Adding replica set as a shard to the cluster");
         assert.commandWorked(this.cluster.s.adminCommand({addShard: this.rs.getURL()}));
 
-        jsTest.log.info("Checking that direct DDLs are disallowed without special permissions");
         const userDirectConnection = new Mongo(this.rs.getPrimary().host);
         this.testDBDirectConnection = userDirectConnection.getDB("testDB");
         assert(this.testDBDirectConnection.auth("user", "x"), "Authentication failed");
-        assert.commandFailedWithCode(this.testDBDirectConnection.dropDatabase(), ErrorCodes.Unauthorized);
+        testCommands.forEach((testCommand) => {
+            jsTest.log.info(
+                `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
+            );
+            assert.commandFailedWithCode(testCommand.execute(this.testDBDirectConnection), ErrorCodes.Unauthorized);
+        });
 
-        jsTest.log.info("Checking that direct DDLs are allowed with special permissions");
         this.rs
             .getPrimary()
             .getDB("testDB")
             .grantRolesToUser("user", [{role: "directShardOperations", db: "admin"}]);
-        assert.commandWorked(this.testDBDirectConnection.dropDatabase());
+        testCommands.forEach((testCommand) => {
+            jsTest.log.info(`Checking that ${testCommand.name} is allowed with directShardOperations special
+                    permissions`);
+            assert.commandWorked(testCommand.execute(this.testDBDirectConnection));
+        });
 
         jsTest.log.info("Checking that DDLs are allowed through mongos");
-        assert.commandWorked(this.cluster.s.getDB("testDB").testColl.insertOne({x: 1}));
+        // We test all the test commands, except applyOps since it cannot be run through mongos
+        testCommands.slice(0, -2).forEach((testCommand) => {
+            jsTest.log.info(`Checking that ${testCommand.name} is allowed through mongos`);
+            assert.commandWorked(testCommand.execute(this.cluster.s.getDB("testDB")));
+        });
     });
 });

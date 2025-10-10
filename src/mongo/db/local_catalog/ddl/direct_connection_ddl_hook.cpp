@@ -68,6 +68,9 @@ void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx,
             .isEnabledUseLastLTSFCVWhenUninitialized(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (namespaces.empty()) {
+            direct_connection_util::checkDirectShardDDLAllowed(opCtx, NamespaceString{});
+        }
         for (const auto& nss : namespaces) {
             direct_connection_util::checkDirectShardDDLAllowed(opCtx, nss);
         }

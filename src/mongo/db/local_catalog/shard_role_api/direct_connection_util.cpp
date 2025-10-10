@@ -55,7 +55,8 @@ bool shouldSkipDirectShardOpChecks(OperationContext* opCtx, const NamespaceStrin
     // Skip direct shard connection checks for namespaces which can have independent contents on
     // each shard. The direct shard connection check still applies to the sharding metadata
     // collection namespaces because those collections exist on a single, particular shard.
-    if ((nss.isDbOnly() && nss.dbName().isInternalDb()) || nss.isShardLocalNamespace()) {
+    if (!nss.isEmpty() &&
+        ((nss.isDbOnly() && nss.dbName().isInternalDb()) || nss.isShardLocalNamespace())) {
         return true;
     }
     // Skip direct shard connection checks for commands which explicitly request skipping these
