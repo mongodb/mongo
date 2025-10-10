@@ -162,7 +162,22 @@ try {
         {x: "$a.c"},
     ];
 
-    // Test all combinations
+    const fieldPaths = [
+        "$a.a",
+        "$a.a.a",
+        "$a.a.a.a",
+        "$a.a.b",
+        "$a.a.c",
+        "$a.b",
+        "$a.b.a",
+        "$a.b.c",
+        "$a.b.d",
+        "$a.c",
+        "$a.d.e",
+        "$b.c",
+    ];
+
+    jsTest.log("Running $projects");
     for (let projIndex = 0; projIndex < projects.length; projIndex++) {
         const project = projects[projIndex];
         const pipeline = [{$project: project}, {$sort: {_id: 1}}];
@@ -174,6 +189,31 @@ try {
             assert.docEq(resultsWithExtract[i], resultsWithoutExtract[i]);
         }
     }
+
+    jsTest.log("Running $groups");
+    let seenExtract = false;
+    for (let keyPath of fieldPaths) {
+        for (let accPath of fieldPaths) {
+            const pipeline = {$group: {_id: {path: keyPath}, pathSum: {$sum: accPath}}};
+            // TODO SERVER-111637 revisit this try/catch. Some of these plans do not feed a result obj
+            // slot into what would be the extract_field_paths stage, so the "uses extract_field_paths
+            // stage assertion" can fail. We expect SERVER-111637 will resolve all these cases.
+            try {
+                const resultsWithExtract = runTestWithParameter(documents, pipeline, true);
+                const resultsWithoutExtract = runTestWithParameter(documents, pipeline, false);
+                assert(resultsWithExtract.length > 0);
+                assert(resultsWithoutExtract.length > 0);
+                for (let i = 0; i < resultsWithExtract.length; i++) {
+                    assert.docEq(resultsWithExtract[i], resultsWithoutExtract[i]);
+                }
+                seenExtract = true;
+                jsTest.log({"Pipeline used extract": pipeline});
+            } catch {
+                jsTest.log({"Pipeline did not use extract": pipeline});
+            }
+        }
+    }
+    assert.eq(seenExtract, true, "expected at least one $group pipeline to use extract stage");
 
     jsTest.log("All ExtractFieldPathsStage tests completed successfully!");
 } finally {

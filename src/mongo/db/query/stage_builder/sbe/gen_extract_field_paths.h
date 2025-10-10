@@ -35,10 +35,11 @@ namespace mongo::stage_builder {
 boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
     StageBuilderState& state,
     const std::vector<const Expression*>& expressions,
-    PlanStageSlots& childStageOutputs);
+    const PlanStageSlots& childStageOutputs);
 
 std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
                                                           StageBuilderState& state,
                                                           const PlanStageSlots& childStageOutputs,
-                                                          PlanStageReqs& extractFieldPathsReqs);
+                                                          PlanStageReqs& extractFieldPathsReqs,
+                                                          PlanNodeId nodeId);
 }  // namespace mongo::stage_builder

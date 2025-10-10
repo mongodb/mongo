@@ -32,6 +32,7 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
+#include "mongo/db/query/stage_builder/sbe/gen_extract_field_paths.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
@@ -232,15 +233,33 @@ SbStage projectFieldPathsToPathExprSlots(
     SbBuilder b(state, groupNode.nodeId());
 
     SbExprOptSlotVector projects;
+    std::vector<const Expression*> exprs;
     for (auto& fp : groupFieldMap) {
         projects.emplace_back(stage_builder::generateExpression(
                                   state, fp.second, outputs.getResultObjIfExists(), outputs),
                               boost::none);
+        exprs.push_back(fp.second);
+    }
+    if (projects.empty()) {
+        return stage;
     }
 
-    if (!projects.empty()) {
-        auto [outStage, outSlots] =
-            b.makeProject(buildVariableTypes(outputs), std::move(stage), std::move(projects));
+    const VariableTypes varTypes = buildVariableTypes(outputs);
+
+    boost::optional<PlanStageReqs> extractFieldPathsReqs =
+        makeExtractFieldPathsPlanStageReqs(state, exprs, outputs);
+    if (extractFieldPathsReqs.has_value()) {
+        for (auto& [expr, optSlot] : projects) {
+            expr.optimize(state, &varTypes);
+        }
+        auto [outStage, outSlots] = buildExtractFieldPaths(
+            std::move(stage), state, outputs, *extractFieldPathsReqs, b.getNodeId());
+        stage = std::move(outStage);
+        for (auto& [name, slot] : outSlots.getSlotNameToIdMap()) {
+            outputs.set(name, slot);
+        }
+    } else {
+        auto [outStage, outSlots] = b.makeProject(varTypes, std::move(stage), std::move(projects));
         stage = std::move(outStage);
 
         size_t i = 0;

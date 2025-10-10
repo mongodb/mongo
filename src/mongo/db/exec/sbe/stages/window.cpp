@@ -537,7 +537,7 @@ value::SlotAccessor* WindowStage::getAccessor(CompileCtx& ctx, value::SlotId slo
     if (auto it = _outAccessorMap.find(slot); it != _outAccessorMap.end()) {
         return it->second;
     }
-    return ctx.getAccessor(slot);
+    return _children[0]->getAccessor(ctx, slot);
 }
 
 void WindowStage::setPartition(int id) {

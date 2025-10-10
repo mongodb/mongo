@@ -2971,6 +2971,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjectionImpl(
 
     // Collect required paths.
     std::vector<const Expression*> expressions;
+    expressions.reserve(exprPaths.size());
     for (const auto& exprPath : exprPaths) {
         expressions.push_back(plan->pathExprMap[exprPath]);
     }
@@ -2978,8 +2979,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjectionImpl(
         makeExtractFieldPathsPlanStageReqs(_state, expressions, outputs);
     // Build extract field paths stage.
     if (extractFieldPathsReqs.has_value()) {
-        auto [outStage, extractionOutputs] =
-            buildExtractFieldPaths(std::move(stage), _state, outputs, *extractFieldPathsReqs);
+        auto [outStage, extractionOutputs] = buildExtractFieldPaths(
+            std::move(stage), _state, outputs, *extractFieldPathsReqs, b.getNodeId());
         stage = std::move(outStage);
         // Extend outputs with all slots from field path extraction stage.
         for (auto& p : extractionOutputs.getSlotNameToIdMap()) {
