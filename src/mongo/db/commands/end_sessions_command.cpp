@@ -77,6 +77,9 @@ public:
         return false;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

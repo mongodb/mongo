@@ -305,6 +305,9 @@ public:
     // When the current authorization will expire.
     // boost::none indicates a non-expiring session.
     virtual const boost::optional<Date_t>& getExpiration() const = 0;
+
+    // Returns the authorization contract associated with the current authorization session
+    virtual const AuthorizationContract& getAuthorizationContract() const = 0;
 };
 
 // Returns a status encoding whether the current session in the specified `opCtx` has privilege to

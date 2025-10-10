@@ -83,6 +83,7 @@ namespace {
 struct AdminOnlyNoTenant {
     static constexpr bool kAdminOnly = true;
     static constexpr bool kAllowedWithSecurityToken = false;
+    static constexpr bool kRequiresAuthzChecks = true;
 };
 
 template <typename RequestT, typename Traits = AdminOnlyNoTenant>
@@ -120,15 +121,20 @@ public:
     typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return TC::AllowedOnSecondary::kAlways;
     }
+
+    bool requiresAuthzChecks() const override {
+        return Traits::kRequiresAuthzChecks;
+    }
 };
 
-struct AnyDbAllowTenant {
+struct AnyDbAllowTenantRequiresNoAuthz {
     static constexpr bool kAdminOnly = false;
     static constexpr bool kAllowedWithSecurityToken = true;
+    static constexpr bool kRequiresAuthzChecks = false;
 };
 
 // { features: 1 }
-using FeaturesCmd = GenericTC<FeaturesCommand, AnyDbAllowTenant>;
+using FeaturesCmd = GenericTC<FeaturesCommand, AnyDbAllowTenantRequiresNoAuthz>;
 template <>
 void FeaturesCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
     if (request().getOidReset().value_or(false)) {
@@ -140,6 +146,7 @@ void FeaturesCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) cons
                     ActionType::oidReset));
     }
 }
+
 template <>
 FeaturesReply FeaturesCmd::Invocation::typedRun(OperationContext*) {
     FeaturesReply reply;
@@ -157,13 +164,14 @@ FeaturesReply FeaturesCmd::Invocation::typedRun(OperationContext*) {
 }
 MONGO_REGISTER_COMMAND(FeaturesCmd).forRouter().forShard();
 
-struct AnyDbNoTenant {
+struct AnyDbNoTenantRequiresAuthz {
     static constexpr bool kAdminOnly = false;
     static constexpr bool kAllowedWithSecurityToken = false;
+    static constexpr bool kRequiresAuthzChecks = true;
 };
 
 // { hostInfo: 1 }
-using HostInfoCmd = GenericTC<HostInfoCommand, AnyDbNoTenant>;
+using HostInfoCmd = GenericTC<HostInfoCommand, AnyDbNoTenantRequiresAuthz>;
 template <>
 void HostInfoCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
     auto* as = AuthorizationSession::get(opCtx->getClient());
@@ -365,14 +373,21 @@ public:
 };
 MONGO_REGISTER_COMMAND(GetLogCmd).forRouter().forShard();
 
+struct ClearLogCmdTraitsRequiresAuthz {
+    static constexpr bool kAdminOnly = true;
+    static constexpr bool kAllowedWithSecurityToken = false;
+    static constexpr bool kRequiresAuthzChecks = false;
+};
+
 // { clearLog: 'name' }
-using ClearLogCmd = GenericTC<ClearLogCommand>;
+using ClearLogCmd = GenericTC<ClearLogCommand, ClearLogCmdTraitsRequiresAuthz>;
 template <>
 void ClearLogCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
     // We don't perform authorization,
     // so refuse to authorize this when test commands are not enabled.
     invariant(getTestCommandsEnabled());
 }
+
 template <>
 OkReply ClearLogCmd::Invocation::typedRun(OperationContext* opCtx) {
     auto logName = request().getCommandParameter();

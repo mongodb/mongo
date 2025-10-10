@@ -109,6 +109,9 @@ public:
         return true;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
@@ -235,6 +238,9 @@ public:
         return true;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

@@ -343,6 +343,10 @@ public:
         return Status::OK();
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     std::string help() const override {
         return "internal. for testing only.";
     }

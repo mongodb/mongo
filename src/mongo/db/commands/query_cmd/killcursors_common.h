@@ -72,6 +72,10 @@ public:
         return true;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     class Invocation : public KCV1Gen::InvocationBaseGen {
     public:
         using KCV1Gen::InvocationBaseGen::InvocationBaseGen;

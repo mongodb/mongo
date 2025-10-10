@@ -137,6 +137,10 @@ public:
         return false;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     bool allowedWithSecurityToken() const final {
         return true;
     }

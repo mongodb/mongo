@@ -80,6 +80,10 @@ public:
         return Status::OK();
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,

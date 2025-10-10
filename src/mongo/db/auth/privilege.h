@@ -132,4 +132,9 @@ private:
     ActionSet _actions;  // bitmask of actions this privilege grants
 };
 
+inline bool operator==(const Privilege& lhs, const Privilege& rhs) {
+    return lhs.getResourcePattern() == rhs.getResourcePattern() &&
+        lhs.getActions() == rhs.getActions();
+}
+
 }  // namespace mongo

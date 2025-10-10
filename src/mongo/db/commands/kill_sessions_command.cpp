@@ -112,6 +112,10 @@ public:
         return Status::OK();
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     /**
      * Should ignore the lsid attached to this command in order to prevent it from killing itself.
      */

@@ -78,6 +78,9 @@ public:
         return true;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
     class Invocation : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;

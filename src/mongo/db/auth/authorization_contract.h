@@ -78,7 +78,7 @@ public:
         stdx::lock_guard<stdx::mutex> lck(other._mutex);
         _checks = other._checks;
         _privilegeChecks = other._privilegeChecks;
-        _isPermissionChecked.storeRelaxed(other._isPermissionChecked.loadRelaxed());
+        _isPermissionChecked = other._isPermissionChecked;
         _commandDepth = other._commandDepth;
     }
 
@@ -125,15 +125,70 @@ public:
     bool contains(const AuthorizationContract& other) const;
 
     /**
-     * Return true if PermissionCheckStatus is Checked
+     * Return true if PermissionCheckStatus is Checked.
      */
-    bool isPermissionChecked() const {
-        return _isPermissionChecked.loadRelaxed();
+    bool isPermissionChecked() const;
+
+    /**
+     * Get the set of common access checks that are performed by code common to all commands.
+     */
+    static const std::vector<AccessCheckEnum>& getCommonAccessChecks() {
+        static const std::vector<AccessCheckEnum> commonAccessChecks = {
+            // The first two checks are done by initializeOperationSessionInfo
+            AccessCheckEnum::kIsUsingLocalhostBypass,
+            AccessCheckEnum::kIsAuthenticated,
+            // These checks are done by auditing
+            AccessCheckEnum::kGetAuthenticatedUserName,
+            AccessCheckEnum::kGetAuthenticatedRoleNames,
+            // Since internal sessions are started by the server...
+            AccessCheckEnum::kGetAuthenticatedUser,
+            AccessCheckEnum::kLookupUser};
+        return commonAccessChecks;
+    }
+
+    /**
+     * Get the set of common privileges checks that are performed by code common to all commands.
+     */
+    static const std::vector<Privilege>& getCommonPrivileges() {
+        static const std::vector<Privilege> commonPrivileges = {
+            // "internal" comes from readRequestMetadata and sharded clusters
+            // "advanceClusterTime" is an implicit check in clusters in metadata handling
+            Privilege(ResourcePattern::forClusterResource(boost::none),
+                      {ActionType::advanceClusterTime, ActionType::internal}),
+            // Implicitly checked often to keep mayBypassWriteBlockingMode() fast
+            Privilege(ResourcePattern::forClusterResource(boost::none),
+                      ActionType::bypassWriteBlockingMode),
+            // Operations which do not specify a maxTimeMS check if the defaultMaxTimeMS can be
+            // bypassed.
+            Privilege(ResourcePattern::forClusterResource(boost::none),
+                      ActionType::bypassDefaultMaxTimeMS),
+            // Implicitly checked often to keep useTenant checks fast
+            Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant),
+            // makeLogicalSessionId checks for impersonate privileges
+            Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::impersonate),
+            // Needed for internal sessions started by the server.
+            Privilege(ResourcePattern::forClusterResource(boost::none),
+                      ActionType::issueDirectShardOperations),
+            Privilege(ResourcePattern::forExactNamespace(NamespaceString::kEmpty),
+                      {ActionType::performRawDataOperations, ActionType::internal})};
+        return commonPrivileges;
     }
 
 private:
     // Clear the authorization contract.
     void clear(WithLock lk);
+
+    /**
+     * Determines if an access check is part of kCommonAccessChecks which are common to all commands
+     * and don't trigger authz checks tracking.
+     */
+    bool isCommonAccessCheck(AccessCheckEnum check) const;
+
+    /**
+     * Determines if a privilege is part of kCommonPrivileges which are common to all commands and
+     * don't trigger authz checks tracking.
+     */
+    bool isCommonPrivilege(const Privilege& p) const;
 
     mutable stdx::mutex _mutex;
 
@@ -144,7 +199,7 @@ private:
     std::array<ActionSet, idlEnumCount<MatchTypeEnum>> _privilegeChecks;
 
     // Current status of permission check, updated on added access check, added privilege, or clear
-    Atomic<bool> _isPermissionChecked{false};
+    bool _isPermissionChecked{false};
 
     // If false accounting and mutex guards are disabled
     bool _isTestModeEnabled{true};

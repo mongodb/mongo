@@ -71,6 +71,10 @@ public:
         return Status::OK();
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     std::string help() const override {
         return "returns the hash of the first BSONElement val in a BSONObj";
     }

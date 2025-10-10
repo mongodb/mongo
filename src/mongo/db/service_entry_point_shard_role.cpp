@@ -42,6 +42,7 @@
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_contract_guard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -513,10 +514,8 @@ public:
         // Release the ingress admission ticket
         _admissionTicket = boost::none;
 
-        if (!_execContext.client().isInDirectClient()) {
-            auto authzSession = AuthorizationSession::get(_execContext.client());
-            authzSession->verifyContract(_execContext.getCommand()->getAuthorizationContract());
-        }
+        // Perform authorization verification checks in test environments.
+        _performAuthorizationVerificationChecks(status);
 
         if (MONGO_unlikely(!status.isOK()))
             _handleFailure(std::move(status));
@@ -665,6 +664,9 @@ private:
     StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                                                           bool startTransaction,
                                                           bool startOrContinueTransaction);
+
+    // Performs authorization verification checks in test environments.
+    void _performAuthorizationVerificationChecks(const Status& status);
 
     const HandleRequest::ExecutionContext& _execContext;
     AuthorizationContractGuard _contractGuard;
@@ -2173,6 +2175,31 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     if (ErrorCodes::isA<ErrorCategory::CloseConnectionError>(status.code())) {
         // Rethrow the exception to the top to signal that the client connection should be closed.
         iasserted(status);
+    }
+}
+
+void ExecCommandDatabase::_performAuthorizationVerificationChecks(const Status& status) {
+    if (MONGO_likely(!TestingProctor::instance().isEnabled() ||
+                     _execContext.client().isInDirectClient())) {
+        return;
+    }
+
+    auto authzSession = AuthorizationSession::get(_execContext.client());
+
+    // Verify command didn't perform more authorization checks than defined in IDL.
+    authzSession->verifyContract(_execContext.getCommand()->getAuthorizationContract());
+
+    // Mandatory authz check: verify command performed authorization checks or explicitly
+    // opted out. Note: Commands may exit early or auth may be disabled.
+    auto authManager = AuthorizationManager::get(_execContext.getOpCtx()->getService());
+    if (status.isOK() && authManager->isAuthEnabled() &&
+        gFeatureFlagMandatoryAuthzChecks.isEnabled() &&
+        _execContext.getCommand()->requiresAuthzChecks()) {
+
+        invariant(authzSession->getAuthorizationContract().isPermissionChecked(),
+                  "Must specify authorization checks for command: '" +
+                      _execContext.getCommand()->getName() +
+                      "' or manually opt out by overriding requiresAuthzChecks to false");
     }
 }
 

@@ -80,6 +80,10 @@ public:
                                  const BSONObj&) const override {
         return Status::OK();
     }
+
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
 };
 
 class CmdDropConnectionsToMongot final : public BasicCommand {
@@ -121,6 +125,10 @@ public:
                                  const DatabaseName&,
                                  const BSONObj&) const override {
         return Status::OK();
+    }
+
+    bool requiresAuthzChecks() const override {
+        return false;
     }
 };
 

@@ -80,6 +80,10 @@ public:
         return Status::OK();  // No auth required
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     bool run(OperationContext* txn,
              const DatabaseName&,
              const BSONObj& cmdObj,

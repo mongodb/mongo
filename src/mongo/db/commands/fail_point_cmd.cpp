@@ -97,6 +97,10 @@ public:
         return false;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     // No auth needed because it only works when enabled via command line.
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
@@ -178,6 +182,10 @@ public:
     }
 
     bool requiresAuth() const override {
+        return false;
+    }
+
+    bool requiresAuthzChecks() const override {
         return false;
     }
 };

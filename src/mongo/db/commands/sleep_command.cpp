@@ -89,6 +89,10 @@ public:
         return Status::OK();
     }
 
+    bool requiresAuthzChecks() const final {
+        return false;
+    }
+
     /**
      * An empty 'ns' causes the global lock to be taken.
      * A 'ns' that contains <db> causes only the rstl/global/database locks to be taken.

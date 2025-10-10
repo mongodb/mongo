@@ -1007,51 +1007,14 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     // Make a mutable copy so that the common auth checks can be added.
     auto tempContract = *contract;
 
-    // Certain access checks are done by code common to all commands.
-    //
-    // The first two checks are done by initializeOperationSessionInfo
-    tempContract.addAccessCheck(AccessCheckEnum::kIsUsingLocalhostBypass);
-    tempContract.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
-
-    // These checks are done by auditing
-    tempContract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedUserName);
-    tempContract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedRoleNames);
-
-    // Since internal sessions are started by the server, the generated authorization contract is
-    // missing the following user access checks, so we add them here to allow commands that spawn
-    // internal sessions to pass this authorization check.
-    tempContract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedUser);
-    tempContract.addAccessCheck(AccessCheckEnum::kLookupUser);
-
-    // "internal" comes from readRequestMetadata and sharded clusters
-    // "advanceClusterTime" is an implicit check in clusters in metadata handling
-    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
-                                        {ActionType::advanceClusterTime, ActionType::internal}));
-
-    // Implicitly checked often to keep mayBypassWriteBlockingMode() fast
-    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
-                                        ActionType::bypassWriteBlockingMode));
-
-    // Operations which do not specify a maxTimeMS check if the defaultMaxTimeMS can be bypassed.
-    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
-                                        ActionType::bypassDefaultMaxTimeMS));
-
-    // Implicitly checked often to keep useTenant checks fast
-    tempContract.addPrivilege(
-        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant));
-
-
-    // makeLogicalSessionId checks for impersonate privileges
-    tempContract.addPrivilege(
-        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::impersonate));
-
-    // Needed for internal sessions started by the server.
-    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
-                                        ActionType::issueDirectShardOperations));
-
-    tempContract.addPrivilege(
-        Privilege(ResourcePattern::forExactNamespace(NamespaceString{}),
-                  {ActionType::performRawDataOperations, ActionType::internal}));
+    // Certain access checks are done by code common to all commands and will be recorded in the
+    // authorizationSession _contract.
+    for (const auto& check : AuthorizationContract::getCommonAccessChecks()) {
+        tempContract.addAccessCheck(check);
+    }
+    for (const auto& privilege : AuthorizationContract::getCommonPrivileges()) {
+        tempContract.addPrivilege(privilege);
+    }
 
     uassert(5452401,
             "Authorization Session contains more authorization checks than permitted by contract.",

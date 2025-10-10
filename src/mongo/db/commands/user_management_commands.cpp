@@ -974,6 +974,10 @@ public:
     using Reply = typename RequestT::Reply;
     using TC = TypedCommand<CmdUMCTyped<RequestT, Params>>;
 
+    bool requiresAuthzChecks() const final {
+        return false;
+    }
+
     class Invocation final : public TC::InvocationBase {
     public:
         using TC::InvocationBase::InvocationBase;

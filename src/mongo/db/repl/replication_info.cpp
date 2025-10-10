@@ -411,6 +411,10 @@ public:
         return Status::OK();  // No auth required
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     bool runWithReplyBuilder(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const BSONObj& cmdObj,

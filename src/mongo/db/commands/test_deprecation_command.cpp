@@ -77,6 +77,10 @@ public:
         return Status::OK();
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     std::string help() const override {
         return "replies with the values of the OperationContext's API parameters";
     }

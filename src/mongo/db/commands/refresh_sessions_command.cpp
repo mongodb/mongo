@@ -63,6 +63,10 @@ public:
         return "renew a set of logical sessions";
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

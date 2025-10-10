@@ -66,6 +66,10 @@ public:
                                  const BSONObj&) const override {
         return Status::OK();
     }
+
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
 };
 MONGO_REGISTER_COMMAND(GetShardingReadyCmd).forShard().testOnly();
 }  // namespace mongo

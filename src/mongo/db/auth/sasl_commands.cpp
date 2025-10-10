@@ -113,6 +113,10 @@ public:
         return false;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     HandshakeRole handshakeRole() const final {
         return HandshakeRole::kAuth;
     }
@@ -149,6 +153,10 @@ public:
     }
 
     bool requiresAuth() const final {
+        return false;
+    }
+
+    bool requiresAuthzChecks() const override {
         return false;
     }
 

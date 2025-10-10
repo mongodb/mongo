@@ -46,6 +46,7 @@
 
 
 namespace mongo {
+
 void AuthorizationContract::enterCommandScope() {
     stdx::lock_guard<stdx::mutex> lck(_mutex);
 
@@ -73,7 +74,7 @@ void AuthorizationContract::clear(WithLock lk) {
         _privilegeChecks[i].removeAllActions();
     }
 
-    _isPermissionChecked.storeRelaxed(false);
+    _isPermissionChecked = false;
 }
 
 void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
@@ -88,7 +89,9 @@ void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
 
     _checks.set(static_cast<size_t>(check), true);
 
-    _isPermissionChecked.storeRelaxed(true);
+    if (!isCommonAccessCheck(check)) {
+        _isPermissionChecked = true;
+    }
 }
 
 bool AuthorizationContract::hasAccessCheck(AccessCheckEnum check) const {
@@ -111,7 +114,9 @@ void AuthorizationContract::addPrivilege(const Privilege& p) {
 
     _privilegeChecks[static_cast<size_t>(matchType)].addAllActionsFromSet(p.getActions());
 
-    _isPermissionChecked.storeRelaxed(true);
+    if (!isCommonPrivilege(p)) {
+        _isPermissionChecked = true;
+    }
 }
 
 bool AuthorizationContract::hasPrivileges(const Privilege& p) const {
@@ -171,6 +176,22 @@ bool AuthorizationContract::contains(const AuthorizationContract& other) const {
     }
 
     return true;
+}
+
+bool AuthorizationContract::isPermissionChecked() const {
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+
+    return _isPermissionChecked;
+}
+
+bool AuthorizationContract::isCommonAccessCheck(AccessCheckEnum check) const {
+    const auto& commonChecks = getCommonAccessChecks();
+    return std::find(commonChecks.begin(), commonChecks.end(), check) != commonChecks.end();
+}
+
+bool AuthorizationContract::isCommonPrivilege(const Privilege& p) const {
+    const auto& commonPrivileges = getCommonPrivileges();
+    return std::find(commonPrivileges.begin(), commonPrivileges.end(), p) != commonPrivileges.end();
 }
 
 }  // namespace mongo

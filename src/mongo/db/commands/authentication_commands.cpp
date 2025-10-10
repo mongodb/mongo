@@ -108,6 +108,10 @@ public:
         return true;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
@@ -418,6 +422,9 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

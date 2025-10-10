@@ -87,6 +87,10 @@ public:
                                  const BSONObj&) const override {
         return Status::OK();
     }
+
+    bool requiresAuthzChecks() const final {
+        return false;
+    }
 };
 
 MONGO_REGISTER_COMMAND(CmdWhatsMySNI).testOnly().forShard();

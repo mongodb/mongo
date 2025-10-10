@@ -88,6 +88,10 @@ public:
         return true;
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
@@ -165,6 +169,10 @@ public:
     bool requiresAuth() const override {
         return false;
     }
+
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
 };
 
 MONGO_REGISTER_COMMAND(EchoCommand).testOnly().forRouter().forShard();
@@ -216,6 +224,10 @@ public:
     }
 
     bool requiresAuth() const final {
+        return false;
+    }
+
+    bool requiresAuthzChecks() const override {
         return false;
     }
 

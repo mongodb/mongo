@@ -68,6 +68,10 @@ public:
         return Status::OK();  // No auth required
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
@@ -98,6 +102,10 @@ public:
                                  const DatabaseName&,
                                  const BSONObj&) const override {
         return Status::OK();  // No auth required
+    }
+
+    bool requiresAuthzChecks() const override {
+        return false;
     }
 
     bool run(OperationContext* opCtx,
@@ -136,6 +144,10 @@ public:
         return Status::OK();  // No auth required
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
@@ -166,6 +178,10 @@ public:
                                  const DatabaseName&,
                                  const BSONObj&) const override {
         return Status::OK();  // No auth required
+    }
+
+    bool requiresAuthzChecks() const override {
+        return false;
     }
 
     bool run(OperationContext* opCtx,
