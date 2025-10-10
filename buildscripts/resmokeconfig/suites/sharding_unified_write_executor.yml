@@ -21,7 +21,8 @@ selector:
     # TODO SERVER-104134 add support for max replies size
     # - jstests/sharding/bulk_write_max_replies_size.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
-    - jstests/sharding/timeseries/**/*.js
+    # TODO SERVER-111710: enable viewful timeseries
+    # - jstests/sharding/timeseries/**/*.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
     - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
@@ -38,7 +39,6 @@ selector:
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
     - jstests/noPassthrough/crud/bulk_write_metrics.js
-    - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
     - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     - jstests/sharding/retryable_writes.js
     - jstests/sharding/retryable_writes_nested_shard_key.js
@@ -47,10 +47,12 @@ selector:
     # - jstests/sharding/retryable_write_error_labels.js
 
     # No passthrough tests.
-    - jstests/noPassthrough/timeseries/**/*.js
+    # TODO SERVER-111710: enable viewful timeseries
+    # - jstests/noPassthrough/timeseries/**/*.js
     # - jstests/noPassthrough/crud/bulk_write_currentop.js
     - jstests/noPassthrough/crud/bulk_write_metrics.js
-    - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
+    # TODO SERVER-111710: enable viewful timeseries
+    # - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
     - jstests/noPassthrough/crud/bulk_write_currentop.js
 
     # - jstests/noPassthrough/query/command_diagnostics_sharded.js
@@ -68,10 +70,6 @@ selector:
     - jstests/sharding/migration_blocking_operation/mongos_calls_shardsvr_coordinate_multi_update_command.js
     - jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
     - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
-
-  exclude_files:
-    # TODO SERVER-110635: enable
-    - jstests/sharding/timeseries/timeseries_retry_delete_and_update_unsharded.js
 
 executor:
   config:

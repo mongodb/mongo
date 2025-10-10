@@ -595,12 +595,11 @@ buildvariants:
       max_sub_suites: 3
       idle_timeout_factor: 1.5
       exec_timeout_factor: 1.5
-      # TODO SERVER-112195 enable viewless timeseries in this suite.
       test_flags: >-
         --runAllFeatureFlagTests
+        --additionalFeatureFlags "featureFlagCreateViewlessTimeseriesCollections"
         --mongodSetParameters="{internalQueryUnifiedWriteExecutor: true}"
         --mongosSetParameters="{internalQueryUnifiedWriteExecutor: true}"
-        --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
     # For now just unified write executor suites but tasks will be added as development continues.
     tasks:
       - name: unified_write_executor

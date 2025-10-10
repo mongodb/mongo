@@ -51,6 +51,10 @@ selector:
 
     # TODO SERVER-105762: add support for errorsOnly to UWE.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
+
+    # TODO SERVER-111710: enable viewful timeseries
+    - jstests/core/timeseries/**/*.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
