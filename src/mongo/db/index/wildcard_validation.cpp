@@ -176,7 +176,7 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
                         str::stream()
                             << "Index Key and Wildcard Projection cannot contain "
                                "overlapping fields, however '"
-                            << indexPos->dottedField() << "' index field is ovverlapping with '"
+                            << indexPos->dottedField() << "' index field is overlapping with '"
                             << projectionPos->dottedField() << "' wildcardProjection path."};
             }
 
