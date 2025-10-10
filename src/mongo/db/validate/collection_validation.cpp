@@ -495,7 +495,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
                 fmt::format("The 'multikey' field for index {} was false with non-empty "
                             "'multikeyPaths': {}",
                             indexName,
-                            multikeyPathsToString(multikeyPaths)));
+                            multikey_paths::toString(multikeyPaths)));
         }
     }
 }

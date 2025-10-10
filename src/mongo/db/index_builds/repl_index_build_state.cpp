@@ -122,6 +122,14 @@ void IndexBuildState::setState(State state,
     }
 }
 
+void IndexBuildState::setMultikey(std::vector<boost::optional<MultikeyPaths>> multikey) {
+    _multikey = std::move(multikey);
+}
+
+const std::vector<boost::optional<MultikeyPaths>>& IndexBuildState::getMultikey() const {
+    return _multikey;
+}
+
 bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentState,
                                               IndexBuildState::State newState) const {
     switch (currentState) {
@@ -727,6 +735,14 @@ void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
     builder->append("resumable", !_lastOpTimeBeforeInterceptors.isNull());
 
     _indexBuildState.appendBuildInfo(builder);
+}
+
+void ReplIndexBuildState::setMultikey(std::vector<boost::optional<MultikeyPaths>> multikey) {
+    _indexBuildState.setMultikey(std::move(multikey));
+}
+
+const std::vector<boost::optional<MultikeyPaths>>& ReplIndexBuildState::getMultikey() const {
+    return _indexBuildState.getMultikey();
 }
 
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {

@@ -3,8 +3,6 @@
  * results to be created. This test is focused on testing timeseries with sort and geo indexes.
  *
  * @tags: [
- *     # TODO(SERVER-110846): Index on the secondary is not marked multikey.
- *     primary_driven_index_builds_incompatible,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
  *     # This complicates aggregation extraction.

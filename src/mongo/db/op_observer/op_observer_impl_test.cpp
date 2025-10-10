@@ -772,7 +772,32 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onCommitIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, {}, false /*fromMigrate*/);
+        opObserver.onCommitIndexBuild(opCtx.get(),
+                                      nss,
+                                      uuid,
+                                      indexBuildUUID,
+                                      specs,
+                                      {boost::none, BSON("a" << "value")},
+                                      false /*fromMigrate*/);
+        ASSERT_THROWS_CODE(opObserver.onCommitIndexBuild(opCtx.get(),
+                                                         nss,
+                                                         uuid,
+                                                         indexBuildUUID,
+                                                         specs,
+                                                         {boost::none},
+                                                         false /*fromMigrate*/),
+                           DBException,
+                           11084600);
+        ASSERT_THROWS_CODE(opObserver.onCommitIndexBuild(opCtx.get(),
+                                                         nss,
+                                                         uuid,
+                                                         indexBuildUUID,
+                                                         specs,
+                                                         {boost::none, boost::none, boost::none},
+                                                         false /*fromMigrate*/),
+                           DBException,
+                           11084600);
         wunit.commit();
     }
 
@@ -784,12 +809,17 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
     indexesArr.append(specX);
     indexesArr.append(specA);
     indexesArr.done();
-    BSONObj commitIndexBuildCmd = commitIndexBuildBuilder.done();
 
     // Ensure the commitIndexBuild fields were correctly set.
-    auto oplogEntry = getSingleOplogEntry(opCtx.get());
-    auto o = oplogEntry.getObjectField("o");
-    ASSERT_BSONOBJ_EQ(commitIndexBuildCmd, o);
+    auto oplogEntries = getNOplogEntries(opCtx.get(), 2);
+    ASSERT_BSONOBJ_EQ(commitIndexBuildBuilder.asTempObj(), oplogEntries[0].getObjectField("o"));
+
+    BSONArrayBuilder multikeyArrBuilder(commitIndexBuildBuilder.subarrayStart("multikey"));
+    multikeyArrBuilder.appendNull();
+    multikeyArrBuilder.append(BSON("a" << "value"));
+    multikeyArrBuilder.done();
+
+    ASSERT_BSONOBJ_EQ(commitIndexBuildBuilder.asTempObj(), oplogEntries[1].getObjectField("o"));
 }
 
 TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {

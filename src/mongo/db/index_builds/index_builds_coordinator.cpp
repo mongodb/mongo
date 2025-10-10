@@ -286,7 +286,8 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
  */
 void onCommitIndexBuild(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        std::shared_ptr<ReplIndexBuildState> replState) {
+                        std::shared_ptr<ReplIndexBuildState> replState,
+                        std::vector<boost::optional<MultikeyPaths>> multikeys) {
     const auto& buildUUID = replState->buildUUID;
 
     replState->commit(opCtx);
@@ -314,7 +315,24 @@ void onCommitIndexBuild(OperationContext* opCtx,
         return;
     }
 
-    opObserver->onCommitIndexBuild(opCtx, nss, collUUID, buildUUID, indexSpecs, fromMigrate);
+    std::vector<boost::optional<BSONObj>> multikeyObjs;
+    if (!multikeys.empty()) {
+        invariant(multikeys.size() == indexSpecs.size());
+        multikeyObjs.reserve(multikeys.size());
+        for (size_t i = 0; i < multikeys.size(); ++i) {
+            if (multikeys[i]) {
+                multikeyObjs.push_back(
+                    !multikeys[i]->empty()
+                        ? multikey_paths::serialize(indexSpecs[i]["key"].Obj(), *multikeys[i])
+                        : BSONObj{});
+            } else {
+                multikeyObjs.push_back(boost::none);
+            }
+        }
+    }
+
+    opObserver->onCommitIndexBuild(
+        opCtx, nss, collUUID, buildUUID, indexSpecs, multikeyObjs, fromMigrate);
 }
 
 /**
@@ -1207,6 +1225,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
         swReplState = _getIndexBuild(buildUUID);
     }
     auto replState = uassertStatusOK(swReplState);
+    replState->setMultikey(std::move(oplogEntry.multikey));
 
     // Retry until we are able to put the index build in the kApplyCommitOplogEntry state. None of
     // the conditions for retrying are common or expected to be long-lived, so we believe this to be
@@ -2295,7 +2314,9 @@ void IndexBuildsCoordinator::_createIndex(OperationContext* opCtx,
         _indexBuildsManager.startBuildingIndex(opCtx, nss.dbName(), collection->uuid(), buildUUID));
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    auto onCreateEachFn = [&](const BSONObj& spec, StringData ident) {
+    auto onCreateEachFn = [&](const BSONObj& spec,
+                              const IndexCatalogEntry& entry,
+                              boost::optional<MultikeyPaths>&& multikey) {
         opObserver->onCreateIndex(
             opCtx, collection->ns(), collection->uuid(), indexBuildInfo, fromMigrate);
     };
@@ -3520,19 +3541,40 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         }
         indexBuildsSSS.commit.addAndFetch(1);
 
+        std::vector<boost::optional<MultikeyPaths>> multikeys;
+
         // If two phase index builds is enabled, index build will be coordinated using
         // startIndexBuild and commitIndexBuild oplog entries.
         auto onCommitFn = [&] {
-            onCommitIndexBuild(opCtx, collection->ns(), replState);
+            onCommitIndexBuild(opCtx, collection->ns(), replState, multikeys);
         };
 
-        auto onCreateEachFn = [&](const BSONObj& spec, StringData ident) {
+        int i = 0;
+        auto onCreateEachFn = [&](const BSONObj& spec,
+                                  IndexCatalogEntry& entry,
+                                  boost::optional<MultikeyPaths>&& multikey) {
             if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+                // TODO (SERVER-109664): Check build protocol rather than feature flag.
+                auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                if (!fcvSnapshot.isVersionInitialized() ||
+                    !feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                        VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                    return;
+                }
+
+                if (IndexBuildAction::kOplogCommit == action) {
+                    if (auto& m = replState->getMultikey()[i]) {
+                        entry.setMultikey(opCtx, collection.get(), {}, *m);
+                    }
+                } else {
+                    multikeys.push_back(std::move(multikey));
+                }
+                ++i;
                 return;
             }
 
             auto opObserver = opCtx->getServiceContext()->getOpObserver();
-            IndexBuildInfo indexBuildInfo(spec, std::string{ident});
+            IndexBuildInfo indexBuildInfo(spec, std::string{entry.getIdent()});
             auto fromMigrate = false;
             opObserver->onCreateIndex(
                 opCtx, collection->ns(), replState->collectionUUID, indexBuildInfo, fromMigrate);

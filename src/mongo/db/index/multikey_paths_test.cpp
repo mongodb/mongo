@@ -29,35 +29,39 @@
 
 #include "mongo/db/index/multikey_paths.h"
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-namespace mongo {
+namespace mongo::multikey_paths {
 namespace {
 
 TEST(MultikeyPaths, PrintEmptyPaths) {
     MultikeyPaths paths;
-    ASSERT_EQ(multikeyPathsToString(paths), "[]");
+    ASSERT_EQ(toString(paths), "[]");
 }
 
 TEST(MultikeyPaths, PrintEmptySetPaths) {
     MultikeyPaths paths;
     paths.resize(1);
-    ASSERT_EQ(multikeyPathsToString(paths), "[{}]");
+    ASSERT_EQ(toString(paths), "[{}]");
 }
 
 TEST(MultikeyPaths, PrintEmptySetsPaths) {
     MultikeyPaths paths;
     paths.resize(2);
-    ASSERT_EQ(multikeyPathsToString(paths), "[{},{}]");
+    ASSERT_EQ(toString(paths), "[{},{}]");
 }
 
 TEST(MultikeyPaths, PrintNonEmptySetPaths) {
     MultikeyPaths paths;
     paths.resize(2);
     paths[1].insert(2);
-    ASSERT_EQ(multikeyPathsToString(paths), "[{},{2}]");
+    ASSERT_EQ(toString(paths), "[{},{2}]");
 }
 
 TEST(MultikeyPaths, PrintNonEmptySetsPaths) {
@@ -67,8 +71,40 @@ TEST(MultikeyPaths, PrintNonEmptySetsPaths) {
     paths[3].insert(0);
     paths[3].insert(1);
     paths[3].insert(2);
-    ASSERT_EQ(multikeyPathsToString(paths), "[{},{2},{},{0,1,2}]");
+    ASSERT_EQ(toString(paths), "[{},{2},{},{0,1,2}]");
+}
+
+TEST(MultikeyPaths, SerializeParseRoundTrip) {
+    MultikeyPaths paths;
+    ASSERT_EQ(parse(serialize({}, paths)), paths);
+
+    paths.resize(1);
+    ASSERT_EQ(parse(serialize(BSON("a" << 1), paths)), paths);
+
+    paths.resize(2);
+    ASSERT_EQ(parse(serialize(BSON("a" << 1 << "a.b.c" << 1), paths)), paths);
+
+    paths[1].insert(2);
+    ASSERT_EQ(parse(serialize(BSON("a" << 1 << "a.b.c" << 1), paths)), paths);
+
+    paths.resize(4);
+    paths[3].insert(0);
+    paths[3].insert(1);
+    paths[3].insert(2);
+    ASSERT_EQ(parse(serialize(BSON("a" << 1 << "a.b.c" << 1 << "a.d.e.f" << 1 << "a.g.h.i.j" << 1),
+                              paths)),
+              paths);
+}
+
+TEST(MultikeyPaths, ParseInvalid) {
+    ASSERT_EQ(parse(BSON("a" << 1)), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(BSON("a" << "str")), ErrorCodes::BadValue);
+
+    std::string value(2049, 'a');
+    BSONBinData binData{
+        value.data(), static_cast<int>(value.length()), BinDataType::BinDataGeneral};
+    ASSERT_EQ(parse(BSON("a" << binData)), ErrorCodes::BadValue);
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::multikey_paths

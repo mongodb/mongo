@@ -3,8 +3,6 @@
  * results to be created. This test is focused on negative scenarios when the rewrite doesn't occur.
  *
  * @tags: [
- * # TODO(SERVER-110846): Index on the secondary is not marked multikey.
- * primary_driven_index_builds_incompatible,
  * # Explain of a resolved view must be executed by mongos.
  * directly_against_shardsvrs_incompatible,
  * # This complicates aggregation extraction.

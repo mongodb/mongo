@@ -957,6 +957,23 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
     }
 
     {
+        const auto o = BSON("commitIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
+                                               << "indexes" << indexSpecs << "multikey"
+                                               << BSON_ARRAY(BSONNULL << BSONNULL));
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, boost::none, uuid);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
+        ASSERT_EQ(parsed.collUUID, uuid);
+        ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kCommitIndexBuild);
+        ASSERT_EQ(parsed.commandName, "commitIndexBuild");
+        ASSERT_EQ(toIndexNames(parsed.indexes), indexNames);
+        ASSERT_BSONOBJ_VECTOR_EQ(toIndexSpecs(parsed.indexes), indexSpecs);
+        ASSERT_EQ(parsed.indexes.size(), 2);
+        ASSERT(parsed.indexes[0].indexIdent.empty());
+        ASSERT(parsed.indexes[1].indexIdent.empty());
+        ASSERT_FALSE(parsed.cause);
+    }
+
+    {
         BSONObjBuilder builder;
         builder.append("ok", false);
         const auto cause = Status(ErrorCodes::IndexBuildAborted, "aborted");
@@ -1004,6 +1021,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
     ASSERT_EQ(parse(setField("indexes", BSON_ARRAY(""))), ErrorCodes::BadValue);
     ASSERT_EQ(parse(setField("indexes", BSON_ARRAY(BSON("nameless" << "")))),
               ErrorCodes::NoSuchKey);
+    ASSERT_EQ(parse(setField("multikey", BSON_ARRAY(BSONNULL))), ErrorCodes::BadValue);
     // parse does not verify that the specs are valid beyond having names, so no further tests for
     // them here
 
@@ -1025,12 +1043,27 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                        ErrorCodes::TypeMismatch);
 
     baseObj =
+        BSON("commitIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
+                                << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
+                                                       << "x_1")
+                                              << BSON("v" << 2 << "key" << BSON("y" << 1) << "name"
+                                                          << "y_1")));
+
+    ASSERT_EQ(parse(setField("multikey", 1)), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("multikey", BSONObj{})), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("multikey", BSON_ARRAY(BSONNULL))), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("multikey", BSON_ARRAY(BSONNULL << 1))), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("multikey", BSON_ARRAY(BSONNULL << BSONNULL << BSONNULL))),
+              ErrorCodes::BadValue);
+
+    baseObj =
         BSON("abortIndexBuild" << "test.coll"
                                << "indexBuildUUID" << UUID::gen() << "indexes"
                                << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
                                                       << "x_1")));
     ASSERT_EQ(parse(baseObj), ErrorCodes::BadValue);
     ASSERT_EQ(parse(setField("cause", 1)), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("multikey", BSON_ARRAY(BSONNULL))), ErrorCodes::BadValue);
 
     // The cause field being an object which can't be interpreted as a Status results in the
     // top-level parse succeeding and the "cause" field reporting a parse error

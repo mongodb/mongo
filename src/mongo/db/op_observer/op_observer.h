@@ -223,6 +223,7 @@ public:
                                     const UUID& collUUID,
                                     const UUID& indexBuildUUID,
                                     const std::vector<BSONObj>& indexes,
+                                    const std::vector<boost::optional<BSONObj>>& multikey,
                                     bool fromMigrate,
                                     bool isTimeseries = false) = 0;
 

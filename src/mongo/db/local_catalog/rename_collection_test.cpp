@@ -117,6 +117,7 @@ public:
                             const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
+                            const std::vector<boost::optional<BSONObj>>& multikey,
                             bool fromMigrate,
                             bool isViewlessTimeseries) override;
 
@@ -232,11 +233,12 @@ void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,
                                         const UUID& collUUID,
                                         const UUID& indexBuildUUID,
                                         const std::vector<BSONObj>& indexes,
+                                        const std::vector<boost::optional<BSONObj>>& multikey,
                                         bool fromMigrate,
                                         bool isViewlessTimeseries) {
     _logOp(opCtx, nss, "commitIndex");
     OpObserverNoop::onCommitIndexBuild(
-        opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate, isViewlessTimeseries);
+        opCtx, nss, collUUID, indexBuildUUID, indexes, multikey, fromMigrate, isViewlessTimeseries);
 }
 
 void OpObserverMock::onAbortIndexBuild(OperationContext* opCtx,

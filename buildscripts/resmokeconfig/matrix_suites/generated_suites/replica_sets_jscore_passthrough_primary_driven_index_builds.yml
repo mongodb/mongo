@@ -49,8 +49,6 @@ selector:
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
     - jstests/core/timeseries/write/timeseries_update_multi.js
-    - jstests/core/query/**/*.js
-    - jstests/core/index/**/*.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling

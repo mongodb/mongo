@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 #include <cstddef>
 #include <functional>
@@ -69,5 +72,35 @@ using MultikeyComponents = boost::container::flat_set<
 constexpr std::size_t kFewCompoundIndexFields = 4;
 using MultikeyPaths = boost::container::small_vector<MultikeyComponents, kFewCompoundIndexFields>;
 
-std::string multikeyPathsToString(MultikeyPaths paths);
+namespace multikey_paths {
+
+std::string toString(MultikeyPaths paths);
+
+/**
+ * Encodes 'paths' as binary data and appends it to 'builder'.
+ *
+ * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
+ * multikey. The object {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be appended to
+ * 'builder'.
+ */
+void serialize(const BSONObj& keyPattern, const MultikeyPaths& paths, BSONObjBuilder& builder);
+
+/**
+ * Returns 'multikeyPaths' encoded as binary data into BSON.
+ *
+ * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
+ * multikey. The object {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be returned.
+ */
+BSONObj serialize(const BSONObj& keyPattern, const MultikeyPaths& paths);
+
+/**
+ * Returns the path-level multikey information encoded as binary data in 'obj'.
+ *
+ * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
+ * multikey. The binary data {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be parsed
+ * into std::vector<std::set<size_t>>{{0U, 1U}, {0U}}.
+ */
+StatusWith<MultikeyPaths> parse(const BSONObj& obj);
+
+}  // namespace multikey_paths
 }  // namespace mongo

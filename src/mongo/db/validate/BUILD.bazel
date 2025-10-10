@@ -97,6 +97,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index:multikey_paths",
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/local_catalog:catalog_impl",
         "//src/mongo/db/local_catalog:collection_options",

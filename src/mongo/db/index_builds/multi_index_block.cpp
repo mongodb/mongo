@@ -1139,7 +1139,7 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collecti
 }
 
 MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn =
-    +[](const BSONObj&, StringData) {
+    +[](const BSONObj&, IndexCatalogEntry&, boost::optional<MultikeyPaths>&&) {
     };
 MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn = +[]() {
 };
@@ -1190,6 +1190,8 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo();
 
     for (auto& index : _indexes) {
+        boost::optional<MultikeyPaths> paths;
+
         // Do this before calling success(), which unsets the interceptor pointer on the index
         // catalog entry. The interceptor will write multikey metadata keys into the index during
         // IndexBuildInterceptor::sideWrite, so we only need to pass the cached MultikeyPaths into
@@ -1204,6 +1206,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                                CollectionPtr::CollectionPtr_UNSAFE(collection),
                                                {},
                                                multikeyPaths.value());
+                paths = std::move(multikeyPaths);
             }
 
             multikeyPaths = interceptor->getSkippedRecordTracker()->getMultikeyPaths();
@@ -1214,6 +1217,11 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                                CollectionPtr::CollectionPtr_UNSAFE(collection),
                                                {},
                                                multikeyPaths.value());
+                if (!paths) {
+                    paths = std::move(multikeyPaths);
+                } else {
+                    MultikeyPathTracker::mergeMultikeyPaths(&*paths, *multikeyPaths);
+                }
             }
         }
 
@@ -1230,9 +1238,14 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                            CollectionPtr::CollectionPtr_UNSAFE(collection),
                                            {},
                                            bulkBuilder->getMultikeyPaths());
+            if (!paths) {
+                paths = bulkBuilder->getMultikeyPaths();
+            } else {
+                MultikeyPathTracker::mergeMultikeyPaths(&*paths, bulkBuilder->getMultikeyPaths());
+            }
         }
 
-        onCreateEach(index.block->getSpec(), indexCatalogEntry->getIdent());
+        onCreateEach(index.block->getSpec(), *indexCatalogEntry, std::move(paths));
     }
 
     onCommit();

@@ -9,4 +9,3 @@ overrides:
 
 excludes:
   - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"
-  - "primary_driven_index_builds.exclude_jscore_multikey_index_tests"

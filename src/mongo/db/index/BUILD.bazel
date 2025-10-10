@@ -34,6 +34,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "multikey_paths",
+    srcs = [
+        "multikey_paths.cpp",
+    ],
+    hdrs = [
+        "multikey_paths.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+    ],
+)
+
+mongo_cc_library(
     name = "index_access_method",
     srcs = [
         "2d_access_method.cpp",
@@ -44,7 +58,6 @@ mongo_cc_library(
         "fts_access_method.cpp",
         "hash_access_method.cpp",
         "index_access_method.cpp",
-        "multikey_paths.cpp",
         "s2_access_method.cpp",
         "s2_key_generator.cpp",
         "sort_key_generator.cpp",
@@ -77,6 +90,7 @@ mongo_cc_library(
     ],
     deps = [
         ":expression_params",
+        ":multikey_paths",
         "//src/mongo/bson/dotted_path:dotted_path_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:multi_key_path_tracker",  # TODO(SERVER-93876): Remove.
@@ -150,6 +164,7 @@ mongo_cc_unit_test(
     deps = [
         ":expression_params",
         ":index_access_method",
+        ":multikey_paths",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:record_id_helpers",

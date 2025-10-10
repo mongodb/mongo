@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
@@ -61,6 +62,7 @@ public:
     IndexBuildMethodEnum indexBuildMethod{IndexBuildMethodEnum::kHybrid};
     UUID buildUUID;
     std::vector<IndexBuildInfo> indexes;
+    std::vector<boost::optional<MultikeyPaths>> multikey;
     boost::optional<Status> cause;
     repl::OpTime opTime;
 };

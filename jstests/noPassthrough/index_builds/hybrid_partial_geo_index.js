@@ -2,8 +2,6 @@
  * Tests that building partial geo indexes using the hybrid method preserves multikey information.
  *
  * @tags: [
- *   # TODO(SERVER-110846): Index on the secondary is not marked multikey.
- *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
  *   primary_driven_index_builds_incompatible,

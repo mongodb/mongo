@@ -267,7 +267,8 @@ public:
      * Requires holding an exclusive lock on the collection.
      */
     using OnCommitFn = function_ref<void()>;
-    using OnCreateEachFn = function_ref<void(const BSONObj& spec, StringData ident)>;
+    using OnCreateEachFn = function_ref<void(
+        const BSONObj& spec, IndexCatalogEntry& entry, boost::optional<MultikeyPaths>&& multikey)>;
     Status commit(OperationContext* opCtx,
                   Collection* collection,
                   OnCreateEachFn onCreateEach,

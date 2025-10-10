@@ -500,8 +500,10 @@ public:
             ASSERT_OK(indexer.commit(
                 _opCtx,
                 coll.getWritableCollection(_opCtx),
-                [&](const BSONObj& indexSpec, StringData ident) {
-                    auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
+                [&](const BSONObj& indexSpec,
+                    const IndexCatalogEntry& entry,
+                    boost::optional<MultikeyPaths> multikey) {
+                    auto indexBuildInfo = IndexBuildInfo(indexSpec, entry.getIdent());
                     indexBuildInfo.setInternalIdents(*storageEngine,
                                                      VersionContext::getDecoration(_opCtx));
                     _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
@@ -2110,11 +2112,13 @@ public:
             ASSERT_OK(indexer.commit(
                 _opCtx,
                 coll.getWritableCollection(_opCtx),
-                [&](const BSONObj& indexSpec, StringData ident) {
+                [&](const BSONObj& indexSpec,
+                    const IndexCatalogEntry& entry,
+                    boost::optional<MultikeyPaths> multikey) {
                     if (simulatePrimary) {
                         // The timestamping responsibility for each index is placed
                         // on the caller.
-                        auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
+                        auto indexBuildInfo = IndexBuildInfo(indexSpec, entry.getIdent());
                         indexBuildInfo.setInternalIdents(*storageEngine,
                                                          VersionContext::getDecoration(_opCtx));
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
@@ -2834,8 +2838,10 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         ASSERT_OK(indexer.commit(
             _opCtx,
             collection.getWritableCollection(_opCtx),
-            [&](const BSONObj& indexSpec, StringData ident) {
-                auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
+            [&](const BSONObj& indexSpec,
+                const IndexCatalogEntry& entry,
+                boost::optional<MultikeyPaths> multikey) {
+                auto indexBuildInfo = IndexBuildInfo(indexSpec, entry.getIdent());
                 indexBuildInfo.setInternalIdents(*storageEngine,
                                                  VersionContext::getDecoration(_opCtx));
                 _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(

@@ -451,6 +451,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
                                         const UUID& collUUID,
                                         const UUID& indexBuildUUID,
                                         const std::vector<BSONObj>& indexes,
+                                        const std::vector<boost::optional<BSONObj>>& multikey,
                                         bool fromMigrate,
                                         bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
@@ -467,6 +468,21 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
         indexesArr.append(indexDoc);
     }
     indexesArr.done();
+
+    if (!multikey.empty()) {
+        uassert(11084600,
+                "Multikey array length must match length of indexes",
+                indexes.size() == multikey.size());
+
+        BSONArrayBuilder multikeyBuilder{oplogEntryBuilder.subarrayStart("multikey")};
+        for (auto&& m : multikey) {
+            if (m) {
+                multikeyBuilder.append(*m);
+            } else {
+                multikeyBuilder.appendNull();
+            }
+        }
+    }
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);

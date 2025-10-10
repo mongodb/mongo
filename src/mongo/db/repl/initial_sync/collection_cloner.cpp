@@ -404,6 +404,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
                                         indexBuildMethod,
                                         groupedIndexSpec.first,
                                         std::move(indexes),
+                                        {},  // multikey
                                         boost::none});
         } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
             // Suppress the IndexAlreadyExists error code.

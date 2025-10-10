@@ -144,6 +144,7 @@ mongo_cc_library(
     deps = [
         ":collection_options",
         "//src/mongo/db:common",
+        "//src/mongo/db/index:multikey_paths",
     ],
 )
 

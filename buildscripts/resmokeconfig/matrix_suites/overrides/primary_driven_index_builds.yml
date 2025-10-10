@@ -44,12 +44,6 @@
       - requires_commit_quorum
       - requires_capped
       - exclude_when_record_ids_replicated
-- name: exclude_jscore_multikey_index_tests
-  value:
-    exclude_files:
-      # TODO(SERVER-110846): Index on the secondary is not marked multikey.
-      - jstests/core/query/**/*.js
-      - jstests/core/index/**/*.js
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:

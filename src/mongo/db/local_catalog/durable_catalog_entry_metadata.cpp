@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -53,11 +54,6 @@ namespace mongo {
 
 namespace {
 
-// An index will fail to get created if the size in bytes of its key pattern is greater than 2048.
-// We use that value to represent the largest number of path components we could ever possibly
-// expect to see in an indexed field.
-const size_t kMaxKeyPatternPathLength = 2048;
-
 const std::string kTimeseriesBucketsMayHaveMixedSchemaDataFieldName =
     "timeseriesBucketsMayHaveMixedSchemaData";
 
@@ -65,60 +61,6 @@ const std::string kTimeseriesBucketsMayHaveMixedSchemaDataFieldName =
 const std::string kTimeseriesBucketingParametersHaveChanged_DO_NOT_USE =
     "timeseriesBucketingParametersHaveChanged";
 
-/**
- * Encodes 'multikeyPaths' as binary data and appends it to 'bob'.
- *
- * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
- * multikey. The object {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be appended to
- * 'bob'.
- */
-void appendMultikeyPathsAsBytes(BSONObj keyPattern,
-                                const MultikeyPaths& multikeyPaths,
-                                BSONObjBuilder* bob) {
-    char multikeyPathsEncodedAsBytes[kMaxKeyPatternPathLength];
-
-    size_t i = 0;
-    for (const auto& keyElem : keyPattern) {
-        StringData keyName = keyElem.fieldNameStringData();
-        size_t numParts = FieldRef{keyName}.numParts();
-        invariant(numParts > 0);
-        invariant(numParts <= kMaxKeyPatternPathLength);
-
-        std::fill_n(multikeyPathsEncodedAsBytes, numParts, 0);
-        for (const auto multikeyComponent : multikeyPaths[i]) {
-            multikeyPathsEncodedAsBytes[multikeyComponent] = 1;
-        }
-        bob->appendBinData(keyName, numParts, BinDataGeneral, &multikeyPathsEncodedAsBytes[0]);
-
-        ++i;
-    }
-}
-
-/**
- * Parses the path-level multikey information encoded as binary data from 'multikeyPathsObj' and
- * sets 'multikeyPaths' as that value.
- *
- * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
- * multikey. The binary data {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be parsed
- * into std::vector<std::set<size_t>>{{0U, 1U}, {0U}}.
- */
-void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multikeyPaths) {
-    invariant(multikeyPaths);
-    for (const auto& elem : multikeyPathsObj) {
-        MultikeyComponents multikeyComponents;
-        int len;
-        const char* data = elem.binData(len);
-        invariant(len > 0);
-        invariant(static_cast<size_t>(len) <= kMaxKeyPatternPathLength);
-
-        for (int i = 0; i < len; ++i) {
-            if (data[i]) {
-                multikeyComponents.insert(i);
-            }
-        }
-        multikeyPaths->push_back(multikeyComponents);
-    }
-}
 }  // namespace
 
 namespace durable_catalog {
@@ -250,9 +192,9 @@ BSONObj CatalogEntryMetaData::toBSON(bool hasExclusiveAccess) const {
 
                 if (!indexes[i].multikeyPaths.empty()) {
                     BSONObjBuilder subMultikeyPaths(sub.subobjStart("multikeyPaths"));
-                    appendMultikeyPathsAsBytes(indexes[i].spec.getObjectField("key"),
-                                               indexes[i].multikeyPaths,
-                                               &subMultikeyPaths);
+                    multikey_paths::serialize(indexes[i].spec.getObjectField("key"),
+                                              indexes[i].multikeyPaths,
+                                              subMultikeyPaths);
                     subMultikeyPaths.doneFast();
                 }
             }
@@ -298,7 +240,7 @@ void CatalogEntryMetaData::parse(const BSONObj& obj) {
             imd.multikey = idx["multikey"].trueValue();
 
             if (auto multikeyPathsElem = idx["multikeyPaths"]) {
-                parseMultikeyPathsFromBytes(multikeyPathsElem.Obj(), &imd.multikeyPaths);
+                imd.multikeyPaths = uassertStatusOK(multikey_paths::parse(multikeyPathsElem.Obj()));
             }
 
             if (idx["buildUUID"]) {

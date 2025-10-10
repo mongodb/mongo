@@ -171,11 +171,13 @@ public:
                             const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
+                            const std::vector<boost::optional<BSONObj>>& multikey,
                             bool fromMigrate,
                             bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
-            o->onCommitIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+            o->onCommitIndexBuild(
+                opCtx, nss, collUUID, indexBuildUUID, indexes, multikey, fromMigrate);
         }
     }
 

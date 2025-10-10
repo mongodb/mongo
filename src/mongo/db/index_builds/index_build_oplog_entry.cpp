@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -71,6 +72,12 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
     //             "name" : "k_1",
     //             ...
     //         }
+    //     ],
+    //     "multikey" : [  // Only allowed for 'commitIndexBuild'.
+    //         null,
+    //         {
+    //             "k": BinData(0,"AQ=="),
+    //         },
     //     ],
     //     "cause" : <Object> // Only required for 'abortIndexBuild'.
     // }
@@ -129,6 +136,42 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
         indexesVec.emplace_back(indexElem.Obj().getOwned(), boost::none);
     }
 
+    auto multikeyElem = obj["multikey"];
+    if (multikeyElem) {
+        if (multikeyElem.type() != BSONType::array) {
+            return {ErrorCodes::BadValue, "Field 'multikey' must be an array"};
+        }
+        if (commandType != repl::OplogEntry::CommandType::kCommitIndexBuild) {
+            return {ErrorCodes::BadValue,
+                    "Field 'multikey' can only be used with 'commitIndexBuild'"};
+        }
+    }
+
+    std::vector<boost::optional<MultikeyPaths>> multikey;
+    for (auto&& elem : multikeyElem ? multikeyElem.Obj() : BSONObj{}) {
+        switch (elem.type()) {
+            case BSONType::null:
+                multikey.push_back(boost::none);
+                break;
+            case BSONType::object: {
+                auto parsed = multikey_paths::parse(elem.Obj());
+                if (!parsed.isOK()) {
+                    return parsed.getStatus();
+                }
+                multikey.push_back(parsed.getValue());
+                break;
+            }
+            default:
+                return {ErrorCodes::BadValue,
+                        "Multikey array can only contain null or object types"};
+        }
+    }
+
+    if (!multikey.empty() && multikey.size() != indexesVec.size()) {
+        return {ErrorCodes::BadValue,
+                "Multikey array must have the same number of elements as indexes array"};
+    }
+
     // Get the reason this index build was aborted on the primary.
     boost::optional<Status> cause;
     if (repl::OplogEntry::CommandType::kAbortIndexBuild == commandType) {
@@ -179,6 +222,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                                 indexBuildMethod,
                                 swBuildUUID.getValue(),
                                 std::move(indexesVec),
+                                std::move(multikey),
                                 cause,
                                 entry.getOpTime()};
 }
