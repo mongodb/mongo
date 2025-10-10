@@ -93,6 +93,8 @@ protected:
 
     ShardRegistry* shardRegistry() const;
 
+    std::shared_ptr<ShardSharedStateCache::State> getShardState(const ShardId& shardId) const;
+
     /**
      * Returns the NetworkInterfaceMock associated with the fixed TaskExecutor.
      */

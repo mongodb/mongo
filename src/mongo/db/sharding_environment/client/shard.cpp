@@ -110,20 +110,79 @@ StatusWith<Shard::CommandResponse> runCommandWithRetryStrategy(Interruptible* in
 }  // namespace
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy)
-    : RetryStrategy{
-          shard, retryPolicy, DefaultRetryStrategy::getRetryParametersFromServerParameters()} {}
+    : RetryStrategy{shard,
+                    retryPolicy,
+                    DefaultRetryStrategy::getRetryParametersFromServerParameters(),
+                    *shard._sharedState} {}
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard,
                                     Shard::RetryPolicy retryPolicy,
                                     std::int32_t maxRetryAttempts)
-    : RetryStrategy{shard, retryPolicy, backoffFromMaxRetryAttempts(maxRetryAttempts)} {}
+    : RetryStrategy{
+          shard, retryPolicy, backoffFromMaxRetryAttempts(maxRetryAttempts), *shard._sharedState} {}
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard,
                                     Shard::RetryPolicy retryPolicy,
-                                    AdaptiveRetryStrategy::RetryParameters parameters)
-    : _underlyingStrategy{shard._sharedState->retryBudget,
+                                    AdaptiveRetryStrategy::RetryParameters parameters,
+                                    ShardSharedStateCache::State& sharedState)
+    : _underlyingStrategy{sharedState.retryBudget,
                           makeRetryCriteriaForShard(shard, retryPolicy),
-                          parameters} {}
+                          parameters},
+      _stats{&sharedState.stats} {}
+
+bool Shard::RetryStrategy::recordFailureAndEvaluateShouldRetry(
+    Status s,
+    const boost::optional<HostAndPort>& target,
+    std::span<const std::string> errorLabels) {
+    const bool willRetry =
+        _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+
+    _recordOperationAttempted();
+
+    if (containsSystemOverloadedLabels(errorLabels)) {
+        _stats->numOverloadErrorsReceived.addAndFetch(1);
+
+        if (willRetry) {
+            _stats->numRetriesDueToOverloadAttempted.addAndFetch(1);
+        }
+
+        if (!_previousAttemptOverloaded) {
+            _stats->numOperationsRetriedAtLeastOnceDueToOverload.addAndFetch(1);
+        }
+
+        _previousAttemptOverloaded = true;
+    } else {
+        _recordOperationNotOverloaded();
+    }
+
+    return willRetry;
+}
+
+void Shard::RetryStrategy::recordSuccess(const boost::optional<HostAndPort>& target) {
+    _underlyingStrategy.recordSuccess(target);
+
+    _recordOperationAttempted();
+    _recordOperationNotOverloaded();
+}
+
+void Shard::RetryStrategy::recordBackoff(Milliseconds backoff) {
+    _underlyingStrategy.recordBackoff(backoff);
+    _stats->totalBackoffTimeMillis.addAndFetch(backoff.count());
+}
+
+void Shard::RetryStrategy::_recordOperationAttempted() {
+    if (!_recordedAttempted) {
+        _recordedAttempted = true;
+        _stats->numOperationsAttempted.addAndFetch(1);
+    }
+}
+
+void Shard::RetryStrategy::_recordOperationNotOverloaded() {
+    if (_previousAttemptOverloaded) {
+        _stats->numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.addAndFetch(1);
+        _previousAttemptOverloaded = false;
+    }
+}
 
 Status Shard::CommandResponse::getEffectiveStatus(
     const StatusWith<Shard::CommandResponse>& swResponse) {

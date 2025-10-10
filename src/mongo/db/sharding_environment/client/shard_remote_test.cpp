@@ -220,11 +220,14 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
 }
 
 TEST_F(ShardRemoteTest, ShardRetryStrategy) {
+    constexpr auto backoff = Milliseconds{100};
     auto firstShard = kTestShardIds.front();
     auto firstShardHostAndPort = kTestShardHosts.front();
 
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
     auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
-    auto& retryBudget = shard->getRetryBudget_forTest();
     auto retryStrategy = Shard::RetryStrategy{*shard, Shard::RetryPolicy::kIdempotent};
 
     auto initialBalance = retryBudget.getBalance_forTest();
@@ -235,6 +238,29 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     ASSERT_LT(retryBudget.getBalance_forTest(), initialBalance);
     ASSERT(
         retryStrategy.getTargetingMetadata().deprioritizedServers.contains(firstShardHostAndPort));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.totalBackoffTimeMillis.loadRelaxed(), 0);
+
+    ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 2);
+
+    retryStrategy.recordBackoff(backoff);
+    retryStrategy.recordSuccess(firstShardHostAndPort);
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 2);
+    ASSERT_EQ(stats.totalBackoffTimeMillis.loadRelaxed(), backoff.count());
 }
 
 TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloaded) {

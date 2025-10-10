@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
 
 namespace mongo {
@@ -44,6 +45,45 @@ namespace mongo {
  */
 class ShardSharedStateCache {
 public:
+    struct Stats {
+        /**
+         * Number of operations attempted. Increments only once per operation, regardless of the
+         * amount of retries performed to complete the operation.
+         */
+        Atomic<std::int64_t> numOperationsAttempted;
+
+        /**
+         * Number of operations that had to be retried because of an error that had the label
+         * 'SystemOverloaded'. A high amount of operations failing against the total amount of
+         * retries would indicate insufficient backoff.
+         */
+        Atomic<std::int64_t> numOperationsRetriedAtLeastOnceDueToOverload;
+
+        /**
+         * Number of operations that eventually yielded a response without the 'SystemOverloaded'
+         * label. A low amount of operations that end up succeeding after backing off could mean
+         * that the backoff is not aggresive enough or too many retries are allowed.
+         */
+        Atomic<std::int64_t> numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded;
+
+        /**
+         * The total amount of retries performed that were in response to an error that had the
+         * 'SystemOverloaded' label.
+         */
+        Atomic<std::int64_t> numRetriesDueToOverloadAttempted;
+
+        /**
+         * The total amount of requests that had the 'SystemOverloaded' error label in the error
+         * response.
+         */
+        Atomic<std::int64_t> numOverloadErrorsReceived;
+
+        /**
+         * The total amount of milliseconds waited due to backing off.
+         */
+        Atomic<std::int64_t> totalBackoffTimeMillis;
+    };
+
     /**
      * Represents the shared state for all instances of a Shard with the same ShardId.
      *
@@ -57,6 +97,7 @@ public:
     struct State {
         State(double returnRate, double capacity) : retryBudget{returnRate, capacity} {}
         AdaptiveRetryStrategy::RetryBudget retryBudget;
+        Stats stats = {};
     };
 
     void forgetShardState(const ShardId& shardId);

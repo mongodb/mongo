@@ -40,6 +40,7 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/s/async_requests_sender.h"
@@ -516,6 +517,12 @@ TEST_F(AsyncRequestsSenderTest, MultipleRetriesSystemOverloaded) {
     requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
     requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"));
 
+    constexpr int backoffMillis = 100;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backoffMillis)};
+
+    auto shardState =
+        ShardSharedStateCache::get(operationContext()).getShardState(kTestShardIds[2]);
+
     BSONObj resWithSystemOverloadedError =
         createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
 
@@ -565,6 +572,9 @@ TEST_F(AsyncRequestsSenderTest, MultipleRetriesSystemOverloaded) {
             advanceUntilReadyRequest();
         }
     }
+
+    ASSERT_EQ(shardState->stats.totalBackoffTimeMillis.load(),
+              backoffMillis * kDefaultClientMaxRetryAttemptsDefault);
 
     future.default_timed_get();
 }

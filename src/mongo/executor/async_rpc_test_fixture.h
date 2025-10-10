@@ -55,11 +55,11 @@ using executor::NetworkTestEnv;
 using executor::ThreadPoolMock;
 using executor::ThreadPoolTaskExecutor;
 
-class TestRetryStrategy : public mongo::RetryStrategy {
+class TestRetryStrategy final : public mongo::RetryStrategy {
 public:
     bool recordFailureAndEvaluateShouldRetry(Status s,
                                              const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) final {
+                                             std::span<const std::string> errorLabels) override {
         if (_numRetriesPerformed == _maxRetries) {
             return false;
         }
@@ -74,15 +74,19 @@ public:
         return true;
     }
 
-    Milliseconds getNextRetryDelay() const final {
+    Milliseconds getNextRetryDelay() const override {
         return _nextRetryDelay;
     }
 
-    void recordSuccess(const boost::optional<HostAndPort>& target) final {
+    void recordSuccess(const boost::optional<HostAndPort>& target) override {
         // Noop, as there's nothing to cleanup on success.
     }
 
-    const TargetingMetadata& getTargetingMetadata() const final {
+    void recordBackoff(Milliseconds backoff) override {
+        _totalBackoff += backoff;
+    }
+
+    const TargetingMetadata& getTargetingMetadata() const override {
         static const TargetingMetadata emptyMetadata{};
         return emptyMetadata;
     }
@@ -99,10 +103,15 @@ public:
         return _numRetriesPerformed;
     }
 
+    Milliseconds getTotalBackoff() const {
+        return _totalBackoff;
+    }
+
 private:
     int _numRetriesPerformed, _maxRetries = 0;
     Milliseconds _nextRetryDelay{0};  // Current retry delay
     std::deque<Milliseconds> _retryDelays;
+    Milliseconds _totalBackoff;
 };
 
 class AsyncRPCTestFixture : public ServiceContextTest {

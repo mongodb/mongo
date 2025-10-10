@@ -142,6 +142,10 @@ public:
         _underlyingStrategy.recordSuccess(target);
     }
 
+    void recordBackoff(Milliseconds backoff) override {
+        _underlyingStrategy.recordBackoff(backoff);
+    }
+
     Milliseconds getNextRetryDelay() const override {
         return _testBaseBackoffMillis;
     }

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -127,6 +128,9 @@ public:
     /**
      * Shard specific retry strategy. An instance of this class cannot outlive the shard passed in
      * as it internally holds a pointer to the shard.
+     *
+     * Unlike the Shard class, this type is not thread-safe when using mutating methods
+     * concurrently.
      */
     class RetryStrategy final : public mongo::RetryStrategy {
     public:
@@ -135,16 +139,12 @@ public:
                       Shard::RetryPolicy retryPolicy,
                       std::int32_t maxRetryAttempts);
 
-        bool recordFailureAndEvaluateShouldRetry(
-            Status s,
-            const boost::optional<HostAndPort>& target,
-            std::span<const std::string> errorLabels) override {
-            return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
-        }
+        bool recordFailureAndEvaluateShouldRetry(Status s,
+                                                 const boost::optional<HostAndPort>& target,
+                                                 std::span<const std::string> errorLabels) override;
 
-        void recordSuccess(const boost::optional<HostAndPort>& target) override {
-            _underlyingStrategy.recordSuccess(target);
-        }
+        void recordSuccess(const boost::optional<HostAndPort>& target) override;
+        void recordBackoff(Milliseconds backoff) override;
 
         Milliseconds getNextRetryDelay() const override {
             return _underlyingStrategy.getNextRetryDelay();
@@ -155,11 +155,18 @@ public:
         }
 
     private:
+        void _recordOperationAttempted();
+        void _recordOperationNotOverloaded();
+
         RetryStrategy(const Shard& shard,
                       Shard::RetryPolicy retryPolicy,
-                      AdaptiveRetryStrategy::RetryParameters parameters);
+                      AdaptiveRetryStrategy::RetryParameters parameters,
+                      ShardSharedStateCache::State& sharedState);
 
         AdaptiveRetryStrategy _underlyingStrategy;
+        ShardSharedStateCache::Stats* _stats;
+        bool _recordedAttempted = false;
+        bool _previousAttemptOverloaded = false;
     };
 
     /**
@@ -188,6 +195,10 @@ public:
 
         void recordSuccess(const boost::optional<HostAndPort>& target) override {
             _underlyingStrategy.recordSuccess(target);
+        }
+
+        void recordBackoff(Milliseconds backoff) override {
+            _underlyingStrategy.recordBackoff(backoff);
         }
 
         Milliseconds getNextRetryDelay() const override {

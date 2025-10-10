@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/executor/network_interface.h"
@@ -106,6 +107,11 @@ OperationContext* ShardingTestFixtureCommon::operationContext() const {
 
 ShardRegistry* ShardingTestFixtureCommon::shardRegistry() const {
     return Grid::get(operationContext())->shardRegistry();
+}
+
+std::shared_ptr<ShardSharedStateCache::State> ShardingTestFixtureCommon::getShardState(
+    const ShardId& shardId) const {
+    return ShardSharedStateCache::get(operationContext()).getShardState(shardId);
 }
 
 RoutingTableHistoryValueHandle ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(

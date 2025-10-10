@@ -333,6 +333,8 @@ TEST_F(AsyncRPCTestFixture, DynamicDelayBetweenRetries) {
     const auto maxNumRetries = 3;
     const std::array<Milliseconds, maxNumRetries> retryDelays{
         Milliseconds(100), Milliseconds(50), Milliseconds(10)};
+    const auto totalRetryDelay =
+        std::accumulate(retryDelays.begin(), retryDelays.end(), Milliseconds{0});
     testStrategy->setMaxNumRetries(maxNumRetries);
     testStrategy->pushRetryDelay(retryDelays[0]);
     testStrategy->pushRetryDelay(retryDelays[1]);
@@ -373,6 +375,7 @@ TEST_F(AsyncRPCTestFixture, DynamicDelayBetweenRetries) {
     ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
     ASSERT_EQ(maxNumRetries, testStrategy->getNumRetriesPerformed());
+    ASSERT_EQ(testStrategy->getTotalBackoff(), totalRetryDelay);
 }
 
 /*

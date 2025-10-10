@@ -203,7 +203,10 @@ inline Status makeErrorIfNeeded(TaskExecutor::ResponseStatus r) {
 struct RetryDelayAsBackoff {
     RetryDelayAsBackoff(mongo::RetryStrategy* strategy) : _strategy{strategy} {}
     Milliseconds nextSleep() const {
-        return _strategy->getNextRetryDelay();
+        // TODO(SERVER-108329): Only record the backoff after the wait for the backoff is done.
+        auto delay = _strategy->getNextRetryDelay();
+        _strategy->recordBackoff(delay);
+        return delay;
     }
     mongo::RetryStrategy* _strategy;
 };
@@ -286,6 +289,8 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
 
                 return !shouldRetry;
             })
+            // TODO(SERVER-108329): Use withRetryStrategy instead of manually using a retry
+            // strategy inside until.
             .withBackoffBetweenIterations(RetryDelayAsBackoff(options->retryStrategy.get()))
             .on(proxyExec, CancellationToken::uncancelable());
 

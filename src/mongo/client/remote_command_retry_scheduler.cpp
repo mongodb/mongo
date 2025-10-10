@@ -178,7 +178,7 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
 
     if (status.isOK()) {
         {
-            auto _ = stdx::lock_guard<stdx::mutex>{_mutex};
+            auto _ = stdx::lock_guard{_mutex};
             _retryStrategy->recordSuccess(rcba.request.target);
         }
         _onComplete(rcba);
@@ -186,7 +186,7 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
     }
 
     auto retryDelay = [&]() -> boost::optional<Milliseconds> {
-        auto _ = stdx::lock_guard<stdx::mutex>{_mutex};
+        auto _ = stdx::lock_guard{_mutex};
         auto shouldRetry =
             _retryStrategy->recordFailureAndEvaluateShouldRetry(status, rcba.request.target, {});
         return shouldRetry ? boost::make_optional(_retryStrategy->getNextRetryDelay())
@@ -224,7 +224,13 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
     };
 
     _executor->sleepFor(*retryDelay, _cancellationSource.token())
-        .then([scheduleCommand]() { return scheduleCommand(); })
+        .then([scheduleCommand, retryDelay = *retryDelay, this] {
+            {
+                auto _ = stdx::lock_guard{_mutex};
+                _retryStrategy->recordBackoff(retryDelay);
+            }
+            return scheduleCommand();
+        })
         .getAsync(handleScheduleError);
 }
 

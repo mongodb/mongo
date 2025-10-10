@@ -293,10 +293,8 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest() -> SemiFuture<RemoteComm
     return getShard()
         .thenRunOn(*_ars->_subBaton)
         .then([this](const auto& shard) -> SemiFuture<std::vector<HostAndPort>> {
-            if (!_ownedRetryStrategy) {
-                _ownedRetryStrategy.emplace(shard, _ars->_retryPolicy);
-            } else if (_ownedRetryStrategy->owner->getId() != shard->getId()) {
-                _ownedRetryStrategy = OwnedRetryStrategy{shard, _ars->_retryPolicy};
+            if (!_retryStrategy) {
+                _retryStrategy.emplace(shard, _ars->_retryPolicy);
             }
 
             if (!_designatedHostAndPort.empty()) {
@@ -357,15 +355,15 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
         isRemote = true;
     }
 
-    invariant(_ownedRetryStrategy);
+    invariant(_retryStrategy);
 
     if (MONGO_likely(status.isOK())) {
         status = getWriteConcernStatusFromCommandResult(rcr.response.data);
         if (MONGO_likely(status.isOK())) {
             // If we're okay (RemoteCommandResponse, command result and write concern)-wise we're
             // done. Otherwise check for retryability
-            _ownedRetryStrategy->strategy.recordSuccess(rcr.request.target);
-            _ownedRetryStrategy.reset();
+            _retryStrategy->recordSuccess(rcr.request.target);
+            _retryStrategy.reset();
             return rcr;
         }
         _writeConcernErrorRCR.emplace(rcr);
@@ -386,7 +384,7 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
 
             bool isStartingTransaction = _cmdObj.getField("startTransaction").booleanSafe();
             if (!_ars->_stopRetrying && !isStartingTransaction &&
-                _ownedRetryStrategy->strategy.recordFailureAndEvaluateShouldRetry(
+                _retryStrategy->recordFailureAndEvaluateShouldRetry(
                     status, rcr.response.target, rcr.response.getErrorLabels())) {
                 LOGV2_DEBUG(
                     4615637,
@@ -396,17 +394,16 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
                     "attemptedHosts"_attr = rcr.request.target,
                     "failedHost"_attr = rcr.response.target,
                     "error"_attr = redact(status));
-                // TODO(SERVER-110000): Consider removing this retry count used for logging.
-                ++_retryCount;
                 // TODO(SERVER-108323): Evaluate if we need to change the targeting logic here.
                 _shardHostAndPort.reset();
-                const auto delay = _ownedRetryStrategy->strategy.getNextRetryDelay();
+                const auto delay = _retryStrategy->getNextRetryDelay();
 
                 if (delay > Milliseconds{0}) {
                     return _ars->_subBaton
                         ->waitUntil(_ars->_subExecutor->now() + delay,
                                     _ars->_cancellationSource.token())
-                        .then([this] {
+                        .then([this, delay] {
+                            _retryStrategy->recordBackoff(delay);
                             // retry through recursion
                             return scheduleRequest();
                         })
