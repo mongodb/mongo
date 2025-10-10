@@ -123,6 +123,7 @@ executor:
           # and generally retry operations.
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
+          killShards: true
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousInitialSync]
 

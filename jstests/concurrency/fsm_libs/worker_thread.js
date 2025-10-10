@@ -191,6 +191,10 @@ export const workerThread = (function () {
                     assert(!TestData.hasOwnProperty("networkErrorAndTxnOverrideConfig"), TestData);
                     TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
                     await import("jstests/libs/override_methods/network_error_and_txn_override.js");
+                    if (TestData.killShards) {
+                        // TODO (SERVER-107404): Remove the override below.
+                        await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
+                    }
                 }
 
                 // Operations that run after a "dropDatabase" command has been issued may fail with
