@@ -125,6 +125,8 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/telemetry_context_serialization.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
@@ -1627,6 +1629,14 @@ void ExecCommandDatabase::_initiateCommand() {
         uassert(ErrorCodes::InvalidOptions,
                 "Can not specify maxTimeMSOpOnly for non internal clients",
                 _isInternalClient());
+    }
+
+    if (auto& traceCtx = genericArgs.getTraceCtx()) {
+        auto telemetryCtx = otel::TelemetryContextSerializer::fromBSON(*traceCtx);
+        if (telemetryCtx) {
+            auto& telemetryCtxHolder = otel::TelemetryContextHolder::get(opCtx);
+            telemetryCtxHolder.set(telemetryCtx);
+        }
     }
 
     if (MONGO_unlikely(genericArgs.getHelp().value_or(false))) {

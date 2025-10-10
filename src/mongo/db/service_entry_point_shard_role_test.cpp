@@ -278,6 +278,16 @@ TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedWithDe
     testWriteConcernClientUnspecifiedWithDefault(false);
 }
 
+#ifdef MONGO_CONFIG_OTEL
+TEST_F(ServiceEntryPointShardServerTest, TelemetryContextDeserializedFromRequest) {
+    testTelemetryContextDeserializedFromRequest();
+}
+
+TEST_F(ServiceEntryPointShardServerTest, TelemetryContextNotSetWhenNotInRequest) {
+    testTelemetryContextNotSetWhenNotInRequest();
+}
+#endif
+
 
 class ServiceEntryPointReplicaSetTest : public virtual service_context_test::ReplicaSetRoleOverride,
                                         public ServiceEntryPointShardRoleTest {};
@@ -391,6 +401,16 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedWithDef
     _replCoordMock->setWriteConcernMajorityShouldJournal(false);
     testWriteConcernClientUnspecifiedWithDefault(true);
 }
+
+#ifdef MONGO_CONFIG_OTEL
+TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextDeserializedFromRequest) {
+    testTelemetryContextDeserializedFromRequest();
+}
+
+TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextNotSetWhenNotInRequest) {
+    testTelemetryContextNotSetWhenNotInRequest();
+}
+#endif
 
 }  // namespace
 }  // namespace mongo

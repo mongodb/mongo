@@ -82,6 +82,8 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/telemetry_context_serialization.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
@@ -514,6 +516,14 @@ void ParseAndRunCommand::_parseCommand() {
     if (auto& commentField = _invocation->getGenericArguments().getComment()) {
         stdx::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField->getElement().wrap());
+    }
+
+    if (auto& traceCtx = _invocation->getGenericArguments().getTraceCtx()) {
+        auto telemetryCtx = otel::TelemetryContextSerializer::fromBSON(*traceCtx);
+        if (telemetryCtx) {
+            auto& telemetryCtxHolder = otel::TelemetryContextHolder::get(opCtx);
+            telemetryCtxHolder.set(telemetryCtx);
+        }
     }
 
     auto apiParams = parseAndValidateAPIParameters(*_invocation);

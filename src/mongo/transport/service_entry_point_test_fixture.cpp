@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
@@ -41,6 +42,13 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/telemetry_context_serialization.h"
+
+#ifdef MONGO_CONFIG_OTEL
+#include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#endif
+
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/message.h"
@@ -582,5 +590,42 @@ void ServiceEntryPointTestFixture::runWriteConcernTestExpectClusterDefault(
     logs.stop();
     ASSERT_EQ(logs.countTextContaining("Applying default writeConcern"), 1);
 }
+
+#ifdef MONGO_CONFIG_OTEL
+void ServiceEntryPointTestFixture::testTelemetryContextDeserializedFromRequest() {
+    auto opCtx = makeOperationContext();
+
+    // "traceparent" format: version-traceid-spanid-traceflags. "tracestate" can be any string.
+    BSONObjBuilder traceCtxBuilder;
+    traceCtxBuilder.append("traceparent",
+                           "00-11111111111111111111111111111111-1111111111111111-01");
+    traceCtxBuilder.append("tracestate", "dummystring");
+
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append(TestCmdSucceeds::kCommandName, 1);
+    cmdBuilder.append("$traceCtx", traceCtxBuilder.obj());
+
+    runCommandTestWithResponse(cmdBuilder.obj(), opCtx.get());
+
+    auto& holder = otel::TelemetryContextHolder::get(opCtx.get());
+    auto retrievedCtx = holder.get();
+    ASSERT_NE(retrievedCtx, nullptr);
+
+    auto spanCtx = std::dynamic_pointer_cast<otel::traces::SpanTelemetryContextImpl>(retrievedCtx);
+    ASSERT_NE(spanCtx, nullptr);
+    auto span = spanCtx->getSpan();
+    ASSERT_TRUE(span->GetContext().IsValid());
+}
+
+void ServiceEntryPointTestFixture::testTelemetryContextNotSetWhenNotInRequest() {
+    auto opCtx = makeOperationContext();
+
+    runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+
+    auto& holder = otel::TelemetryContextHolder::get(opCtx.get());
+    auto retrievedCtx = holder.get();
+    ASSERT_EQ(retrievedCtx, nullptr);
+}
+#endif
 
 }  // namespace mongo

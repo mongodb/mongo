@@ -157,5 +157,15 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestWriteConcernClientUnspecifiedWithDef
     testWriteConcernClientUnspecifiedWithDefault(true);
 }
 
+#ifdef MONGO_CONFIG_OTEL
+TEST_F(ServiceEntryPointRouterRoleTest, TelemetryContextDeserializedFromRequest) {
+    testTelemetryContextDeserializedFromRequest();
+}
+
+TEST_F(ServiceEntryPointRouterRoleTest, TelemetryContextNotSetWhenNotInRequest) {
+    testTelemetryContextNotSetWhenNotInRequest();
+}
+#endif
+
 }  // namespace
 }  // namespace mongo

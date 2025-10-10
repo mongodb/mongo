@@ -108,6 +108,11 @@ public:
     void testWriteConcernClientUnspecifiedNoDefault();
     void testWriteConcernClientUnspecifiedWithDefault(bool expectClusterDefault);
 
+#ifdef MONGO_CONFIG_OTEL
+    void testTelemetryContextDeserializedFromRequest();
+    void testTelemetryContextNotSetWhenNotInRequest();
+#endif
+
 protected:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 
