@@ -183,7 +183,7 @@ export function assertEndOfTransaction(changes) {
     }
 }
 
-function isResumableChangeStreamError(error) {
+export function isResumableChangeStreamError(error) {
     return "errorLabels" in error && error.errorLabels.includes("ResumableChangeStreamError");
 }
 
