@@ -104,10 +104,9 @@ public:
         : _mockResults(std::move(mockResults)) {}
 
     std::unique_ptr<Pipeline> preparePipelineForExecution(
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
-        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
 
         pipeline->addInitialSource(
             DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
@@ -117,12 +116,13 @@ public:
     std::unique_ptr<Pipeline> preparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final {
-        return preparePipelineForExecution(pipeline, shardTargetingPolicy, std::move(readConcern));
+        return preparePipelineForExecution(
+            std::move(pipeline), shardTargetingPolicy, std::move(readConcern));
     }
 
 private:

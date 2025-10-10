@@ -75,7 +75,7 @@ namespace mongo {
 std::unique_ptr<Pipeline>
 NonShardServerProcessInterface::finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
     std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        Pipeline* pipeline,
@@ -84,29 +84,29 @@ NonShardServerProcessInterface::finalizeAndMaybePreparePipelineForExecution(
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
     return finalizeAndAttachCursorToPipelineForLocalRead(expCtx,
-                                                         ownedPipeline,
+                                                         std::move(pipeline),
                                                          attachCursorAfterOptimizing,
                                                          finalizePipeline,
                                                          shouldUseCollectionDefaultCollator);
 }
 
 std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExecution(
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
-    return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
+    return attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
 }
 
 std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
-    Pipeline* pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
     return attachCursorSourceToPipelineForLocalRead(
-        pipeline, aggRequest, shouldUseCollectionDefaultCollator);
+        std::move(pipeline), aggRequest, shouldUseCollectionDefaultCollator);
 }
 
 std::vector<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
@@ -375,26 +375,22 @@ void NonShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
 }
 
 BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
-    Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity) {
+    std::unique_ptr<Pipeline> pipeline, ExplainOptions::Verbosity verbosity) {
     std::vector<Value> pipelineVec;
-    auto firstStage = ownedPipeline->peekFront();
+    auto firstStage = pipeline->peekFront();
     auto opts = SerializationOptions{.verbosity = verbosity};
     // If the pipeline already has a cursor explain with that one, otherwise attach a new one like
     // we would for a normal execution and explain that.
     if (firstStage && typeid(*firstStage) == typeid(DocumentSourceCursor)) {
-        // Managed pipeline goes out of scope at the end of this else block, but we've already
-        // extracted the necessary information and won't need it again.
-        std::unique_ptr<Pipeline> managedPipeline(ownedPipeline);
         // If we need execution stats, this runs the plan in order to gather the stats.
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            auto managedExecPipeline = exec::agg::buildPipeline(managedPipeline->freeze());
-            pipelineVec = mergeExplains(*managedPipeline, *managedExecPipeline, opts);
+            auto managedExecPipeline = exec::agg::buildPipeline(pipeline->freeze());
+            pipelineVec = mergeExplains(*pipeline, *managedExecPipeline, opts);
         } else {
-            pipelineVec = managedPipeline->writeExplainOps(opts);
+            pipelineVec = pipeline->writeExplainOps(opts);
         }
-        ownedPipeline = nullptr;
     } else {
-        auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
+        auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
         // If we need execution stats, this runs the plan in order to gather the stats.
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->freeze());

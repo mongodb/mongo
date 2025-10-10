@@ -93,7 +93,7 @@ public:
 
     std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
         std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            Pipeline* pipeline,
@@ -101,23 +101,21 @@ public:
         ShardTargetingPolicy shardTargetingPolicy,
         boost::optional<BSONObj> readConcern,
         bool shouldUseCollectionDefaultCollator) final {
-        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
         if (finalizePipeline) {
             finalizePipeline(expCtx, pipeline.get(), std::monostate{});
         }
 
         if (attachCursorAfterOptimizing) {
             return preparePipelineForExecution(
-                pipeline.release(), shardTargetingPolicy, readConcern);
+                std::move(pipeline), shardTargetingPolicy, readConcern);
         }
         return pipeline;
     }
 
     std::unique_ptr<Pipeline> preparePipelineForExecution(
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
-        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
         pipeline->addInitialSource(
             DocumentSourceMock::createForTest(_results, pipeline->getContext()));
         return pipeline;
@@ -126,12 +124,12 @@ public:
     std::unique_ptr<mongo::Pipeline> preparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final {
-        return preparePipelineForExecution(pipeline, shardTargetingPolicy, readConcern);
+        return preparePipelineForExecution(std::move(pipeline), shardTargetingPolicy, readConcern);
     }
 
 private:

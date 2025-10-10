@@ -128,14 +128,14 @@ public:
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) override;
     std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         bool shouldUseCollectionDefaultCollator = false,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
 
     std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
         std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            Pipeline* pipeline,

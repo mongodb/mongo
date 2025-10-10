@@ -143,9 +143,8 @@ BSONObj pipelineFromJsonArray(const std::string& jsonArray) {
 }
 
 class StubExplainInterface : public StubMongoProcessInterface {
-    BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
+    BSONObj preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
                                       ExplainOptions::Verbosity verbosity) override {
-        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
         BSONArrayBuilder bab;
         auto opts = SerializationOptions{.verbosity = boost::make_optional(verbosity)};
         auto pipelineVec = pipeline->writeExplainOps(opts);
@@ -155,11 +154,10 @@ class StubExplainInterface : public StubMongoProcessInterface {
         return BSON("pipeline" << bab.arr());
     }
     std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest,
         bool shouldUseCollectionDefaultCollator,
         ExecShardFilterPolicy = AutomaticShardFiltering{}) override {
-        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
         return pipeline;
     }
 };

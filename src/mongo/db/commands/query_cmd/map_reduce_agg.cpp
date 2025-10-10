@@ -185,7 +185,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
         return expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-            pipeline.release());
+            std::move(pipeline));
     }();
     auto exec = plan_executor_factory::make(expCtx, std::move(runnablePipeline));
     auto&& explainer = exec->getPlanExplainer();

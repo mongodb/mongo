@@ -177,7 +177,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
             auto pipeline = makePipeline(opCtx.get(), MongoProcessInterface::create(opCtx.get()));
             _pipeline = pipeline->getContext()
                             ->getMongoProcessInterface()
-                            ->attachCursorSourceToPipelineForLocalRead(pipeline.release());
+                            ->attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
             _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
             _execPipeline->dismissDisposal();
         }

@@ -437,7 +437,7 @@ public:
      */
     virtual std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
         std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            Pipeline* pipeline,
@@ -452,15 +452,11 @@ public:
      * thrown if ExpressionContext has a UUID and that UUID doesn't exist anymore. That should be
      * the only case where NamespaceNotFound is returned.
      *
-     * This function takes ownership of the 'pipeline' argument as if it were a unique_ptr.
-     * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
-     * compiler expects to find an implementation of PipelineDeleter.
-     *
      * If `shardTargetingPolicy` is kNotAllowed, the cursor will only be for local reads regardless
      * of whether or not this function is called in a sharded environment.
      */
     virtual std::unique_ptr<Pipeline> preparePipelineForExecution(
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) = 0;
 
@@ -479,14 +475,11 @@ public:
      * The 'readConcern' parameter specifies the read concern level for the aggregation request. If
      * 'shouldUseCollectionDefaultCollator' is set to true, the default collection collator will be
      * attached to the 'expCtx'.
-     *
-     * This function takes ownership of the 'pipeline' argument, which is expected to be a valid
-     * pointer to a Pipeline object.
      */
     virtual std::unique_ptr<Pipeline> preparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
@@ -497,7 +490,7 @@ public:
      * {"pipeline": <explainOutput>}. Note that <explainOutput> can be an object (shardsvr) or an
      * array (non_shardsvr).
      */
-    virtual BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
+    virtual BSONObj preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
                                               ExplainOptions::Verbosity verbosity) = 0;
 
     /**
@@ -512,13 +505,9 @@ public:
      *
      * When 'shouldUseCollectionDefaultCollator' is set to true, the collator of the target
      * collection will be used instead of previously provided collator.
-     *
-     * This function takes ownership of the 'pipeline' argument as if it were a unique_ptr.
-     * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
-     * compiler expects to find an implementation of PipelineDeleter.
      */
     virtual std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         bool shouldUseCollectionDefaultCollator = false,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) = 0;
@@ -534,7 +523,7 @@ public:
      */
     virtual std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
         std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            Pipeline* pipeline,

@@ -367,7 +367,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
 
     return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
         _fromExpCtx,
-        parsedPipeline.release(),
+        std::move(parsedPipeline),
         attachCursorAfterOptimizing,
         finalizePipeline,
         shardTargetingPolicy);
@@ -469,7 +469,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         try {
             return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
                 fromExpCtx,
-                parsedPipeline.release(),
+                std::move(parsedPipeline),
                 true /* attachCursorAfterOptimizing */,
                 finalizePipeline,
                 shardTargetingPolicy);
@@ -520,7 +520,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     try {
         pipeline = pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             fromExpCtx,
-            parsedPipeline.release(),
+            std::move(parsedPipeline),
             !cacheIsServing,
             finalizePipeline,
             shardTargetingPolicy);

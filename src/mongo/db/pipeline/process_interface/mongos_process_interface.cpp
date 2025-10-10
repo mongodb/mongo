@@ -144,7 +144,7 @@ MongosProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
 
 std::unique_ptr<Pipeline> MongosProcessInterface::finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
     std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        Pipeline* pipeline,
@@ -158,7 +158,7 @@ std::unique_ptr<Pipeline> MongosProcessInterface::finalizeAndMaybePreparePipelin
             shardTargetingPolicy != ShardTargetingPolicy::kNotAllowed);
     return sharded_agg_helpers::finalizeAndMaybePreparePipelineForExecution(
         expCtx,
-        ownedPipeline,
+        std::move(pipeline),
         attachCursorAfterOptimizing,
         finalizePipeline,
         shardTargetingPolicy,
@@ -167,7 +167,7 @@ std::unique_ptr<Pipeline> MongosProcessInterface::finalizeAndMaybePreparePipelin
 }
 
 std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
     // On mongos we can't have local cursors.
@@ -176,13 +176,13 @@ std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
             shardTargetingPolicy != ShardTargetingPolicy::kNotAllowed);
 
     return sharded_agg_helpers::preparePipelineForExecution(
-        ownedPipeline, shardTargetingPolicy, std::move(readConcern));
+        std::move(pipeline), shardTargetingPolicy, std::move(readConcern));
 }
 
 std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
-    Pipeline* pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
@@ -191,25 +191,25 @@ std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
     tassert(7393502,
             "shardTargetingPolicy cannot be kNotAllowed on mongos",
             shardTargetingPolicy != ShardTargetingPolicy::kNotAllowed);
-    std::unique_ptr<Pipeline> targetPipeline(pipeline);
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(
         expCtx,
-        std::make_pair(aggRequest, std::move(targetPipeline)),
+        std::make_pair(aggRequest, std::move(pipeline)),
         shardCursorsSortSpec,
         shardTargetingPolicy,
         std::move(readConcern));
 }
 
-BSONObj MongosProcessInterface::preparePipelineAndExplain(Pipeline* ownedPipeline,
+BSONObj MongosProcessInterface::preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
                                                           ExplainOptions::Verbosity verbosity) {
-    auto firstStage = ownedPipeline->peekFront();
+    auto firstStage = pipeline->peekFront();
+
     // We don't want to serialize and send a MergeCursors stage to the shards.
     if (firstStage &&
         (typeid(*firstStage) == typeid(DocumentSourceMerge) ||
          typeid(*firstStage) == typeid(DocumentSourceMergeCursors))) {
-        ownedPipeline->popFront();
+        pipeline->popFront();
     }
-    return sharded_agg_helpers::targetShardsForExplain(ownedPipeline);
+    return sharded_agg_helpers::targetShardsForExplain(std::move(pipeline));
 }
 
 boost::optional<Document> MongosProcessInterface::lookupSingleDocument(

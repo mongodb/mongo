@@ -237,16 +237,16 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
 }
 
 BSONObj ShardServerProcessInterface::preparePipelineAndExplain(
-    Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity) {
-    auto firstStage = ownedPipeline->peekFront();
+    std::unique_ptr<Pipeline> pipeline, ExplainOptions::Verbosity verbosity) {
+    auto firstStage = pipeline->peekFront();
     // We don't want to send an internal stage to the shards.
     if (firstStage &&
         (typeid(*firstStage) == typeid(DocumentSourceMerge) ||
          typeid(*firstStage) == typeid(DocumentSourceMergeCursors) ||
          typeid(*firstStage) == typeid(DocumentSourceCursor))) {
-        ownedPipeline->popFront();
+        pipeline->popFront();
     }
-    return sharded_agg_helpers::targetShardsForExplain(ownedPipeline);
+    return sharded_agg_helpers::targetShardsForExplain(std::move(pipeline));
 }
 
 void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
@@ -623,7 +623,7 @@ Status ShardServerProcessInterface::insertTimeseries(
 
 std::unique_ptr<Pipeline> ShardServerProcessInterface::finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
     std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        Pipeline* pipeline,
@@ -633,7 +633,7 @@ std::unique_ptr<Pipeline> ShardServerProcessInterface::finalizeAndMaybePreparePi
     bool shouldUseCollectionDefaultCollator) {
     return sharded_agg_helpers::finalizeAndMaybePreparePipelineForExecution(
         expCtx,
-        ownedPipeline,
+        std::move(pipeline),
         attachCursorAfterOptimizing,
         finalizePipeline,
         shardTargetingPolicy,
@@ -642,25 +642,24 @@ std::unique_ptr<Pipeline> ShardServerProcessInterface::finalizeAndMaybePreparePi
 }
 
 std::unique_ptr<Pipeline> ShardServerProcessInterface::preparePipelineForExecution(
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
     return sharded_agg_helpers::preparePipelineForExecution(
-        ownedPipeline, shardTargetingPolicy, std::move(readConcern));
+        std::move(pipeline), shardTargetingPolicy, std::move(readConcern));
 }
 
 std::unique_ptr<Pipeline> ShardServerProcessInterface::preparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
-    Pipeline* pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
-    std::unique_ptr<Pipeline> targetPipeline(pipeline);
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(
         expCtx,
-        std::make_pair(aggRequest, std::move(targetPipeline)),
+        std::make_pair(aggRequest, std::move(pipeline)),
         shardCursorsSortSpec,
         shardTargetingPolicy,
         std::move(readConcern),

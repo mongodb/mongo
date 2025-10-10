@@ -571,7 +571,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
     try {
         return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             _fromExpCtx,
-            pipeline.release(),
+            std::move(pipeline),
             true /* attachCursorAfterOptimizing */,
             finalizePipeline,
             shardTargetingPolicy);
@@ -614,7 +614,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
 
         return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             _fromExpCtx,
-            pipeline.release(),
+            std::move(pipeline),
             true /* attachCursorAfterOptimizing */,
             finalizePipeline,
             shardTargetingPolicy);

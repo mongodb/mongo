@@ -906,7 +906,7 @@ std::unique_ptr<Pipeline> Pipeline::makePipeline(
         pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
             expCtx,
             aggRequest,
-            pipeline.release(),
+            std::move(pipeline),
             boost::none /* shardCursorsSortSpec */,
             opts.shardTargetingPolicy,
             std::move(opts.readConcern),
@@ -950,7 +950,7 @@ std::unique_ptr<Pipeline> Pipeline::makePipeline(
         pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
             expCtx,
             aggRequest,
-            pipeline.release(),
+            std::move(pipeline),
             shardCursorsSortSpec,
             opts.shardTargetingPolicy,
             std::move(readConcern),

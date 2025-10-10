@@ -140,7 +140,7 @@ GetNextResult UnionWithStage::doGetNext() {
             logPipeline(104243, "$unionWith before pipeline prep: ", *_sharedState->_pipeline);
             _sharedState->_pipeline =
                 pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
-                    _sharedState->_pipeline.release());
+                    std::move(_sharedState->_pipeline));
             logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
 
             _sharedState->_executionState =

@@ -146,7 +146,7 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
 
             pipeline =
                 pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-                    pipeline.release(), boost::none, false, _shardFilterPolicy);
+                    std::move(pipeline), boost::none, false, _shardFilterPolicy);
             auto execPipeline = buildPipeline(pipeline->freeze());
             result = execPipeline->getNext();
             if (auto next = execPipeline->getNext()) {

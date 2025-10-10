@@ -587,13 +587,13 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
         auto pipelineWithCursor = finalizePipeline
             ? expCtx->getMongoProcessInterface()->finalizeAndAttachCursorToPipelineForLocalRead(
                   expCtx,
-                  preFinalizedPipeline.release(),
+                  std::move(preFinalizedPipeline),
                   true /* attachCursorAfterOptimizing */,
                   finalizePipeline,
                   useCollectionDefaultCollator,
                   aggRequest)
             : expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-                  pipelineToTarget.release(), aggRequest, useCollectionDefaultCollator);
+                  std::move(pipelineToTarget), aggRequest, useCollectionDefaultCollator);
 
         LOGV2_DEBUG(5837600,
                     3,
@@ -1577,9 +1577,9 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
     return Status::OK();
 }
 
-BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
-    auto expCtx = ownedPipeline->getContext();
-    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+BSONObj targetShardsForExplain(std::unique_ptr<Pipeline> pipeline) {
+    auto expCtx = pipeline->getContext();
+
     // The pipeline is going to be explained on the shards, and we don't want to send a
     // mergeCursors stage.
     invariant(pipeline->empty() ||
@@ -1834,7 +1834,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
                 "Only shard role operations can perform local reads.",
                 expCtx->getOperationContext()->getService()->role().has(ClusterRole::ShardServer));
         return expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-            pipeline.release(), aggRequest, useCollectionDefaultCollator);
+            std::move(pipeline), aggRequest, useCollectionDefaultCollator);
     }
 
     // We're not required to read locally, and we need a cursor source. We need to perform routing
@@ -1858,11 +1858,10 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
         });
 }
 
-std::unique_ptr<Pipeline> preparePipelineForExecution(Pipeline* ownedPipeline,
+std::unique_ptr<Pipeline> preparePipelineForExecution(std::unique_ptr<Pipeline> pipeline,
                                                       ShardTargetingPolicy shardTargetingPolicy,
                                                       boost::optional<BSONObj> readConcern) {
-    auto expCtx = ownedPipeline->getContext();
-    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+    auto expCtx = pipeline->getContext();
     return targetShardsAndAddMergeCursors(expCtx,
                                           std::move(pipeline),
                                           boost::none /* shardCursorsSortSpec */,
@@ -1872,7 +1871,7 @@ std::unique_ptr<Pipeline> preparePipelineForExecution(Pipeline* ownedPipeline,
 
 std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
     std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        Pipeline* pipeline,
@@ -1880,7 +1879,6 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
-    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
 
     // If the pipeline doesn't require any collection acquisition, since it can execute without a
     // cursor, or attachCursorAfterOptimizing is false we do not need to attach a cursor or perform
@@ -1900,7 +1898,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                 "Only shard role operations can perform local reads.",
                 expCtx->getOperationContext()->getService()->role().has(ClusterRole::ShardServer));
         return expCtx->getMongoProcessInterface()->finalizeAndAttachCursorToPipelineForLocalRead(
-            expCtx, pipeline.release(), attachCursorAfterOptimizing, finalizePipeline);
+            expCtx, std::move(pipeline), attachCursorAfterOptimizing, finalizePipeline);
     }
 
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),

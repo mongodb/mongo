@@ -331,11 +331,10 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         //  sub-pipeline depends on if we've started reading from it. For instance, there could be a
         //  $limit stage after the $unionWith which results in only reading from the base collection
         //  branch and not the sub-pipeline.
-        Pipeline* pipeCopy = nullptr;
+        std::unique_ptr<Pipeline> pipeCopy;
         if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner) {
             pipeCopy = Pipeline::create(_sharedState->_pipeline->getSources(),
-                                        _sharedState->_pipeline->getContext())
-                           .release();
+                                        _sharedState->_pipeline->getContext());
         } else if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
                    _sharedState->_executionState >
                        UnionWithSharedState::ExecutionProgress::kIteratingSource) {
@@ -360,16 +359,14 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             if (_resolvedNsForView.has_value()) {
                 // This takes care of the case where this code is executing on a mongod and we have
                 // the full catalog information, so we can resolve the view.
-                pipeCopy =
-                    buildPipelineFromViewDefinition(
-                        getExpCtx(),
-                        ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
-                        std::move(recoveredPipeline),
-                        _userNss)
-                        .release();
+                pipeCopy = buildPipelineFromViewDefinition(
+                    getExpCtx(),
+                    ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
+                    std::move(recoveredPipeline),
+                    _userNss);
             } else {
-                pipeCopy = Pipeline::parse(recoveredPipeline, _sharedState->_pipeline->getContext())
-                               .release();
+                pipeCopy =
+                    Pipeline::parse(recoveredPipeline, _sharedState->_pipeline->getContext());
             }
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
@@ -388,7 +385,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
 
         invariant(pipeCopy);
 
-        auto preparePipelineAndExplain = [&](Pipeline* ownedPipeline) {
+        auto preparePipelineAndExplain = [&](std::unique_ptr<Pipeline> pipeline) {
             // Query settings are looked up after parsing and therefore are not populated in the
             // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith
             // constructor. Attach query settings to the '_pipeline->getContext()' by copying
@@ -401,13 +398,13 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 getExpCtx()->getQuerySettings());
 
             return getExpCtx()->getMongoProcessInterface()->preparePipelineAndExplain(
-                ownedPipeline, *opts.verbosity);
+                std::move(pipeline), *opts.verbosity);
         };
 
         BSONObj explainLocal = [&] {
             auto serializedPipe = pipeCopy->serializeToBson();
             try {
-                return preparePipelineAndExplain(pipeCopy);
+                return preparePipelineAndExplain(std::move(pipeCopy));
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
                 logShardedViewFound(e, _sharedState->_pipeline->serializeToBson());
                 // This takes care of the case where this code is executing on mongos and we had to
@@ -417,7 +414,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                     ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                     std::move(serializedPipe),
                     _userNss);
-                return preparePipelineAndExplain(resolvedPipeline.release());
+                return preparePipelineAndExplain(std::move(resolvedPipeline));
             }
         }();
 

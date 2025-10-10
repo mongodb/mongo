@@ -95,7 +95,7 @@ public:
 
     std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
         std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            Pipeline* pipeline,
@@ -105,28 +105,28 @@ public:
         bool shouldUseCollectionDefaultCollator = false) final;
 
     std::unique_ptr<Pipeline> preparePipelineForExecution(
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final;
 
     std::unique_ptr<Pipeline> preparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final;
 
     std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         bool shouldUseCollectionDefaultCollator = false,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
 
     std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
         std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            Pipeline* pipeline,

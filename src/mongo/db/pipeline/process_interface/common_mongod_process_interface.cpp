@@ -338,15 +338,13 @@ bool requiresCollectionAcquisition(const Pipeline& pipeline) {
 }
 
 std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadImpl(
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     CollectionOrViewAcquisitionMap& allAcquisitions,
     bool isAnySecondaryCollectionNotLocal,
     boost::optional<const AggregateCommandRequest&> aggRequest,
     bool shouldUseCollectionDefaultCollator,
     ExecShardFilterPolicy shardFilterPolicy) {
-    const boost::intrusive_ptr<ExpressionContext>& expCtx = ownedPipeline->getContext();
-
-    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx = pipeline->getContext();
 
     if (expCtx->eligibleForSampling()) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
@@ -410,7 +408,7 @@ std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadImpl(
                                                           catalogResourceHandle,
                                                           shardFilterPolicy);
 
-    const bool isMongotPipeline = search_helpers::isMongotPipeline(ownedPipeline);
+    const bool isMongotPipeline = search_helpers::isMongotPipeline(pipeline.get());
     if (isMongotPipeline) {
         // For mongot pipelines, we will not have a cursor attached and now must perform
         // $search-specific stage preparation. It's important that we release locks early, before
@@ -758,7 +756,7 @@ query_shape::CollectionType CommonMongodProcessInterface::getCollectionType(
 std::unique_ptr<Pipeline>
 CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
     std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        Pipeline* pipeline,
@@ -766,7 +764,6 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     bool shouldUseCollectionDefaultCollator,
     boost::optional<const AggregateCommandRequest&> aggRequest,
     ExecShardFilterPolicy shardFilterPolicy) {
-    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
 
     // TODO: SPM-4050 Remove this.
     boost::optional<BypassCheckAllShardRoleAcquisitionsVersioned>
@@ -801,7 +798,7 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     if (finalizePipeline) {
         finalizePipeline(expCtx, pipeline.get(), primaryAcquisition);
     }
-    return attachCursorSourceToPipelineForLocalReadImpl(pipeline.release(),
+    return attachCursorSourceToPipelineForLocalReadImpl(std::move(pipeline),
                                                         allAcquisitions,
                                                         isAnySecondaryCollectionNotLocal,
                                                         aggRequest,
@@ -810,11 +807,10 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
 }
 
 std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     boost::optional<const AggregateCommandRequest&> aggRequest,
     bool shouldUseCollectionDefaultCollator,
     ExecShardFilterPolicy shardFilterPolicy) {
-    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
     const boost::intrusive_ptr<ExpressionContext>& expCtx = pipeline->getContext();
 
     // TODO: SPM-4050 Remove this.
@@ -833,7 +829,7 @@ std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipe
     bool isAnySecondaryCollectionNotLocal =
         acquireCollectionsForPipeline(expCtx, pipeline->serializeToBson(), allAcquisitions);
 
-    return attachCursorSourceToPipelineForLocalReadImpl(pipeline.release(),
+    return attachCursorSourceToPipelineForLocalReadImpl(std::move(pipeline),
                                                         allAcquisitions,
                                                         isAnySecondaryCollectionNotLocal,
                                                         aggRequest,

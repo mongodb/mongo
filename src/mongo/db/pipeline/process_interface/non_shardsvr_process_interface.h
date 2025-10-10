@@ -83,7 +83,7 @@ public:
 
     std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
+        std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
         std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            Pipeline* pipeline,
@@ -93,20 +93,20 @@ public:
         bool shouldUseCollectionDefaultCollator = false) override;
 
     std::unique_ptr<Pipeline> preparePipelineForExecution(
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) override;
 
     std::unique_ptr<Pipeline> preparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
-        Pipeline* pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) override;
 
-    BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
+    BSONObj preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
                                       ExplainOptions::Verbosity verbosity) override;
 
     void checkRoutingInfoEpochOrThrow(

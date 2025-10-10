@@ -184,10 +184,10 @@ void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
                                        bool requestQueryStatsFromRemotes);
 
 /**
- * Targets the shards with an aggregation command built from `ownedPipeline` and explain set to
- * true. Returns a BSONObj of the form {"pipeline": {<pipelineExplainOutput>}}.
+ * Targets the shards with an aggregation command built from `pipeline` and explain set to true.
+ * Returns a BSONObj of the form {"pipeline": {<pipelineExplainOutput>}}.
  */
-BSONObj targetShardsForExplain(Pipeline* ownedPipeline);
+BSONObj targetShardsForExplain(std::unique_ptr<Pipeline> pipeline);
 
 /**
  * Returns a set of targeted shards responsible for answering the 'shardQuery'.
@@ -233,17 +233,17 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
  * $mergeCursors.
  *
  * Will retry on network errors and also on StaleConfig errors to avoid restarting the entire
- * operation. Returns `ownedPipeline`, but made-ready for execution.
+ * operation. Returns `pipeline`, but made-ready for execution.
  */
 std::unique_ptr<Pipeline> preparePipelineForExecution(
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none);
 
 
 std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
+    std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
     std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        Pipeline* pipeline,
