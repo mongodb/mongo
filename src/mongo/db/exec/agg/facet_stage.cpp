@@ -132,7 +132,7 @@ DocumentSource::GetNextResult FacetStage::doGetNext() {
     const size_t maxBytes = _maxOutputDocSizeBytes;
     auto ensureUnderMemoryLimit = [usedBytes = 0ul, &maxBytes](long long additional) mutable {
         usedBytes += additional;
-        uassert(4031700,
+        uassert(ErrorCodes::ExceededMemoryLimit,
                 str::stream() << "document constructed by $facet is " << usedBytes
                               << " bytes, which exceeds the limit of " << maxBytes << " bytes",
                 usedBytes <= maxBytes);

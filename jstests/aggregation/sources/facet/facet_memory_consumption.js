@@ -65,5 +65,11 @@ function cartesianProductPipeline(exponent) {
     const result = assert.throws(() =>
         coll.aggregate([{$facet: {product: cartesianProductPipeline(10)}}, {$unwind: "$product"}]).toArray(),
     );
-    assert.eq(result.code, kFacetOutputTooLargeCode);
+    // Since v8.3, $facet will return the 'ExceededMemoryLimit' error code. Older versions can return error code
+    // kFacetOutputTooLarge (4031700) in this case.
+    // Both error codes are permitted here because of multi-version testing.
+    assert(
+        result.code == ErrorCodes.ExceededMemoryLimit || result.code == kFacetOutputTooLargeCode,
+        () => "unexpected return code: " + tojson(result.code),
+    );
 })();
