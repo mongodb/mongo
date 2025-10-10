@@ -37,11 +37,7 @@ namespace mongo {
 namespace repl {
 std::tuple<std::string, std::vector<HostAndPort>> parseReplSetSeedList(
     ReplicationCoordinatorExternalState* externalState, const StringData replSetString) {
-    // TODO SERVER-106540: This uassert fails in sharding and maintenance js test suites.
-    // Once behavior is specified (on whether an empty string can be passed to this function),
-    // we can enable or remove this assert.
-    // uassert(10283305, "bad --replSet command line config string (empty)",
-    // !replSetString.empty());
+    uassert(10283305, "bad --replSet command line config string (empty)", !replSetString.empty());
 
     std::string setName;
     std::vector<HostAndPort> seeds;

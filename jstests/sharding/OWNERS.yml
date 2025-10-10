@@ -124,6 +124,3 @@ filters:
   - "safe_secondary_reads_single_migration_waitForDelete.js":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "sharding_ready.js":
-    approvers:
-      - 10gen/server-cluster-scalability

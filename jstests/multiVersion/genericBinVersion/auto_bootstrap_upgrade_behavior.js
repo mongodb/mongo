@@ -7,29 +7,6 @@ function fetchShardIdentityDoc(conn) {
 }
 
 (function () {
-    jsTest.log("Test auto-bootstrap doesn't happen for standalone in old fcv");
-
-    let oldStandalone = MongoRunner.runMongod({binVersion: "last-lts"});
-
-    MongoRunner.stopMongod(oldStandalone, null, {noCleanData: true});
-
-    let newStandalone = MongoRunner.runMongod({
-        noCleanData: true,
-        dbpath: oldStandalone.dbpath,
-        port: oldStandalone.port,
-        setParameter: {featureFlagAllMongodsAreSharded: true},
-    });
-
-    assert.soon(() => {
-        return newStandalone.getDB("admin").hello().isWritablePrimary;
-    });
-
-    assert.eq(null, fetchShardIdentityDoc(newStandalone));
-
-    MongoRunner.stopMongod(newStandalone, null);
-})();
-
-(function () {
     jsTest.log("Test auto-bootstrap doesn't happen for replSet in old fcv");
 
     let nodeOption = {binVersion: "last-lts"};
