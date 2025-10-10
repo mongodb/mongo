@@ -151,19 +151,27 @@ private:
 };
 
 /**
- * OwnedHandle is a move-only wrapper around a raw pointer allocated by the host, whose
- * ownership has been transferred to the host. OwnedHandle acts as a wrapper that
- * abstracts the vtable and underlying pointer, and makes sure to destroy the associated pointer
- * when it goes out of scope.
+ * OwnedHandle is a move-only wrapper around a raw pointer allocated by either the host or the
+ * extension, whose ownership has been transferred to the other side. OwnedHandle acts as a wrapper
+ * that abstracts the vtable and underlying pointer, and makes sure to destroy the associated
+ * pointer when it goes out of scope.
+ *
+ * We use 'new' for allocating owned handles in the heap instead of the 'make_unique().release()'
+ * pattern since we're not taking advantage of unique pointers but rather we rely on the scope for
+ * destroying the pointer.
  */
 template <typename T>
 using OwnedHandle = Handle<T, true>;
 
 /**
- * UnownedHandle is a wrapper around a raw pointer allocated by the host, whose
- * ownership has not been transferred to the extension. UnownedHandle acts as a wrapper that
- * abstracts the vtable and underlying pointer, but does not destroy the pointer when it goes out of
- * scope.
+ * UnownedHandle is a wrapper around a raw pointer allocated by the either the host or the
+ * extension, whose ownership has not been transferred to the other side. UnownedHandle acts as a
+ * wrapper that abstracts the vtable and underlying pointer, but does not destroy the pointer when
+ * it goes out of scope.
+ *
+ * We should NOT use 'new' for allocating unowned handles since keeping the unique pointer from
+ * 'make_unique()' makes it more explicit that whichever side allocates the handle needs to also
+ * take care of destroying the underlying pointer.
  */
 template <typename T>
 using UnownedHandle = Handle<T, false>;

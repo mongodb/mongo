@@ -77,30 +77,29 @@ TEST(HostAstNodeTest, GetSpec) {
     ASSERT_TRUE(astNode.getIdLookupSpec().binaryEqual(spec));
 
     // Get BSON spec through handle.
-    auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make(spec));
-    auto handle = host_adapter::AggStageAstNodeHandle{noOpAstNode.release()};
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(spec));
+    auto handle = host_adapter::AggStageAstNodeHandle{noOpAstNode};
     ASSERT_TRUE(
         static_cast<host::HostAggStageAstNode*>(handle.get())->getIdLookupSpec().binaryEqual(spec));
 }
 
 TEST(HostAstNodeTest, IsHostAllocated) {
-    auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
-    auto handle = host_adapter::AggStageAstNodeHandle{noOpAstNode.release()};
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
+    auto handle = host_adapter::AggStageAstNodeHandle{noOpAstNode};
 
     ASSERT_TRUE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
 }
 
 TEST(HostAstNodeTest, IsNotHostAllocated) {
-    auto noOpExtensionAstNode =
-        std::make_unique<sdk::ExtensionAggStageAstNode>(NoOpExtensionAstNode::make());
-    auto handle = host_adapter::AggStageAstNodeHandle{noOpExtensionAstNode.release()};
+    auto noOpExtensionAstNode = new sdk::ExtensionAggStageAstNode(NoOpExtensionAstNode::make());
+    auto handle = host_adapter::AggStageAstNodeHandle{noOpExtensionAstNode};
 
     ASSERT_FALSE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
 }
 
 DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsBind, "11113700") {
-    auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
-    auto handle = TestHostAstNodeVTableHandle{noOpAstNode.release()};
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
+    auto handle = TestHostAstNodeVTableHandle{noOpAstNode};
 
     auto vtable = handle.vtable();
     vtable.bind = nullptr;
@@ -108,11 +107,11 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsBind, "11113700")
 }
 
 DEATH_TEST(HostAstNodeTest, HostBindUnimplemented, "11133600") {
-    auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
-    auto handle = host_adapter::AggStageAstNodeHandle{noOpAstNode.release()};
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
+    auto handle = host_adapter::AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionLogicalAggStage** bind = nullptr;
-    handle.vtable().bind(noOpAstNode.get(), bind);
+    handle.vtable().bind(noOpAstNode, bind);
 }
 
 }  // namespace

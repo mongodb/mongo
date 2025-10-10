@@ -108,7 +108,7 @@ protected:
 
 TEST(HandleTest, ownedHandleMoveAndDestroy) {
     DestroyableImpl::resetDestroyCount();
-    OwnedDestroyableHandle handle(std::make_unique<DestroyableImpl>().release());
+    OwnedDestroyableHandle handle(new DestroyableImpl());
     ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
     handle.assertValid();
     {

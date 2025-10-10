@@ -238,12 +238,10 @@ template <typename Fn>
          * custom ExtensionStatusException type. If we ever re-enter into our C++ execution context,
          * we can rethrow the captured exception.
          */
-        return std::make_unique<ExtensionStatusException>(std::current_exception(), e.code())
-            .release();
+        return new ExtensionStatusException(std::current_exception(), e.code());
     } catch (...) {
-        return std::make_unique<ExtensionStatusException>(std::current_exception(),
-                                                          MONGO_EXTENSION_STATUS_RUNTIME_ERROR)
-            .release();
+        return new ExtensionStatusException(std::current_exception(),
+                                            MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
     }
 }
 

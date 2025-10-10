@@ -132,8 +132,7 @@ private:
             auto logicalStagePtr =
                 static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl().bind();
 
-            *logicalStage =
-                std::make_unique<ExtensionLogicalAggStage>(std::move(logicalStagePtr)).release();
+            *logicalStage = new ExtensionLogicalAggStage(std::move(logicalStagePtr));
         });
     }
 
@@ -385,8 +384,7 @@ private:
                                     ->getImpl()
                                     .parse(bsonObjFromByteView(stageBson));
 
-            *parseNode =
-                std::make_unique<ExtensionAggStageParseNode>(std::move(parseNodePtr)).release();
+            *parseNode = new ExtensionAggStageParseNode(std::move(parseNodePtr));
         });
     }
 

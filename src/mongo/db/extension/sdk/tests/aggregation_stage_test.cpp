@@ -294,9 +294,8 @@ public:
 };
 
 TEST(AggStageTest, CountingParseExpansionSucceedsTest) {
-    auto countingParseNode =
-        std::make_unique<extension::sdk::ExtensionAggStageParseNode>(CountingParse::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{countingParseNode.release()};
+    auto countingParseNode = new extension::sdk::ExtensionAggStageParseNode(CountingParse::make());
+    auto handle = extension::host_adapter::AggStageParseNodeHandle{countingParseNode};
 
     auto expanded = handle.expand();
     ASSERT_EQUALS(expanded.size(), 1);
@@ -307,10 +306,9 @@ TEST(AggStageTest, CountingParseExpansionSucceedsTest) {
 }
 
 TEST(AggStageTest, NestedExpansionSucceedsTest) {
-    auto nestedDesugarParseNode = std::make_unique<extension::sdk::ExtensionAggStageParseNode>(
-        NestedDesugaringParseNode::make());
-    auto handle =
-        extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode.release()};
+    auto nestedDesugarParseNode =
+        new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
+    auto handle = extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode};
 
     auto expanded = handle.expand();
     ASSERT_EQUALS(expanded.size(), 2);
@@ -336,12 +334,11 @@ TEST(AggStageTest, HandlesPreventMemoryLeaksOnSuccess) {
     CountingAst::alive = 0;
     CountingParse::alive = 0;
 
-    auto nestedDesugarParseNode = std::make_unique<extension::sdk::ExtensionAggStageParseNode>(
-        NestedDesugaringParseNode::make());
+    auto nestedDesugarParseNode =
+        new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
 
     {
-        auto handle =
-            extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode.release()};
+        auto handle = extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode};
 
         [[maybe_unused]] auto expanded = handle.expand();
         ASSERT_EQUALS(CountingAst::alive, 1);
@@ -358,11 +355,10 @@ TEST(AggStageTest, HandlesPreventMemoryLeaksOnFailure) {
     CountingAst::alive = 0;
     CountingParse::alive = 0;
 
-    auto nestedDesugarParseNode = std::make_unique<extension::sdk::ExtensionAggStageParseNode>(
-        NestedDesugaringParseNode::make());
+    auto nestedDesugarParseNode =
+        new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
 
-    auto handle =
-        extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode.release()};
+    auto handle = extension::host_adapter::AggStageParseNodeHandle{nestedDesugarParseNode};
 
     auto failExpand = globalFailPointRegistry().find("failExtensionExpand");
     failExpand->setMode(FailPoint::skip, 1);
@@ -407,37 +403,36 @@ TEST(AggStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
 }
 
 DEATH_TEST(AggStageTest, EmptyDesugarExpansionFails, "11113803") {
-    auto emptyDesugarParseNode = std::make_unique<extension::sdk::ExtensionAggStageParseNode>(
-        DesugarToEmptyParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{emptyDesugarParseNode.release()};
+    auto emptyDesugarParseNode =
+        new extension::sdk::ExtensionAggStageParseNode(DesugarToEmptyParseNode::make());
+    auto handle = extension::host_adapter::AggStageParseNodeHandle{emptyDesugarParseNode};
 
     [[maybe_unused]] auto expanded = handle.expand();
 }
 
 DEATH_TEST(AggStageTest, GetExpandedSizeLessThanActualExpansionSizeFails, "11113802") {
     auto getExpandedSizeLessThanActualExpansionSizeParseNode =
-        std::make_unique<extension::sdk::ExtensionAggStageParseNode>(
+        new extension::sdk::ExtensionAggStageParseNode(
             GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
     auto handle = extension::host_adapter::AggStageParseNodeHandle{
-        getExpandedSizeLessThanActualExpansionSizeParseNode.release()};
+        getExpandedSizeLessThanActualExpansionSizeParseNode};
 
     [[maybe_unused]] auto expanded = handle.expand();
 }
 
 DEATH_TEST(AggStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails, "11113802") {
     auto getExpandedSizeGreaterThanActualExpansionSizeParseNode =
-        std::make_unique<extension::sdk::ExtensionAggStageParseNode>(
+        new extension::sdk::ExtensionAggStageParseNode(
             GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
     auto handle = extension::host_adapter::AggStageParseNodeHandle{
-        getExpandedSizeGreaterThanActualExpansionSizeParseNode.release()};
+        getExpandedSizeGreaterThanActualExpansionSizeParseNode};
 
     [[maybe_unused]] auto expanded = handle.expand();
 }
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977601") {
-    auto noOpParseNode =
-        std::make_unique<extension::sdk::ExtensionAggStageParseNode>(NoOpParseNode::make());
-    auto handle = TestParseNodeVTableHandle{noOpParseNode.release()};
+    auto noOpParseNode = new extension::sdk::ExtensionAggStageParseNode(NoOpParseNode::make());
+    auto handle = TestParseNodeVTableHandle{noOpParseNode};
 
     auto vtable = handle.vtable();
     vtable.get_query_shape = nullptr;
@@ -445,9 +440,8 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "109
 };
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
-    auto noOpParseNode =
-        std::make_unique<extension::sdk::ExtensionAggStageParseNode>(NoOpParseNode::make());
-    auto handle = TestParseNodeVTableHandle{noOpParseNode.release()};
+    auto noOpParseNode = new extension::sdk::ExtensionAggStageParseNode(NoOpParseNode::make());
+    auto handle = TestParseNodeVTableHandle{noOpParseNode};
 
     auto vtable = handle.vtable();
     vtable.get_expanded_size = nullptr;
@@ -455,9 +449,8 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "1
 };
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602") {
-    auto noOpParseNode =
-        std::make_unique<extension::sdk::ExtensionAggStageParseNode>(NoOpParseNode::make());
-    auto handle = TestParseNodeVTableHandle{noOpParseNode.release()};
+    auto noOpParseNode = new extension::sdk::ExtensionAggStageParseNode(NoOpParseNode::make());
+    auto handle = TestParseNodeVTableHandle{noOpParseNode};
 
     auto vtable = handle.vtable();
     vtable.expand = nullptr;
@@ -465,17 +458,15 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602")
 };
 
 TEST(AggStageTest, NoOpAstNodeTest) {
-    auto noOpAggStageAstNode =
-        std::make_unique<extension::sdk::ExtensionAggStageAstNode>(NoOpAstNode::make());
-    auto handle = extension::host_adapter::AggStageAstNodeHandle{noOpAggStageAstNode.release()};
+    auto noOpAggStageAstNode = new extension::sdk::ExtensionAggStageAstNode(NoOpAstNode::make());
+    auto handle = extension::host_adapter::AggStageAstNodeHandle{noOpAggStageAstNode};
 
     [[maybe_unused]] auto logicalStageHandle = handle.bind();
 }
 
 DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTable, "11113700") {
-    auto noOpAstNode =
-        std::make_unique<extension::sdk::ExtensionAggStageAstNode>(NoOpAstNode::make());
-    auto handle = TestAstNodeVTableHandle{noOpAstNode.release()};
+    auto noOpAstNode = new extension::sdk::ExtensionAggStageAstNode(NoOpAstNode::make());
+    auto handle = TestAstNodeVTableHandle{noOpAstNode};
 
     auto vtable = handle.vtable();
     vtable.bind = nullptr;
@@ -505,9 +496,9 @@ public:
 };
 
 TEST(AggStageTest, SimpleComputeQueryShapeSucceeds) {
-    auto parseNode = std::make_unique<extension::sdk::ExtensionAggStageParseNode>(
-        SimpleQueryShapeParseNode::make());
-    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode.release()};
+    auto parseNode =
+        new extension::sdk::ExtensionAggStageParseNode(SimpleQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
     auto queryShape = handle.getQueryShape(opts);

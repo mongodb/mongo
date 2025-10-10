@@ -124,14 +124,12 @@ TEST(
 TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
-    ASSERT_THROWS_CODE_AND_WHAT(invokeCAndConvertStatusToException([&]() {
-                                    return std::make_unique<ExtensionStatusException>(
-                                               nullptr, 10596412, kErrorString)
-                                        .release();
-                                }),
-                                ExtensionDBException,
-                                10596412,
-                                kErrorString);
+    ASSERT_THROWS_CODE_AND_WHAT(
+        invokeCAndConvertStatusToException(
+            [&]() { return new ExtensionStatusException(nullptr, 10596412, kErrorString); }),
+        ExtensionDBException,
+        10596412,
+        kErrorString);
 }
 
 }  // namespace
