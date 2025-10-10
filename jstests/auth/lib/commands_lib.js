@@ -97,6 +97,7 @@ import {
     storageEngineIsWiredTiger,
 } from "jstests/libs/storage_engine/storage_engine_utils.js";
 import {getUriForColl} from "jstests/disk/libs/wt_file_helper.js";
+import {testOnlyCommands} from "jstests/auth/test_only_commands_list.js";
 
 // constants
 
@@ -245,6 +246,114 @@ const skippedAuthTestingAggStages = [
     // The following stages are stubs defined in aggregation_stage_stub_parsers.json.
     "$stubStage",
     "$testFoo",
+];
+
+// The following commands are skipped in 'authCommandsLib' because they are unable to be
+// tested here and already have auth tests elsewhere.
+//TODO SERVER-112286: Audit commands skipped.
+const skippedAuthTestingCommands = [
+    "analyzeShardKey",
+    "authenticate",
+    "autoSplitVector",
+    "balancerCollectionStatus",
+    "changePrimary",
+    "clearLog",
+    "commitTransitionToDedicatedConfigServer",
+    "configureCollectionBalancing",
+    "configureQueryAnalyzer",
+    "coordinateCommitTransaction",
+    "createUnsplittableCollection",
+    "dbCheck",
+    "dropAllRolesFromDatabase",
+    "dropAllUsersFromDatabase",
+    "dropConnections",
+    "dropRole",
+    "dropUser",
+    "echo",
+    "endSessions",
+    "explain",
+    "exportCollection",
+    "getAuditConfig",
+    "getChangeStreamState",
+    "getShardingReady",
+    "getTransitionToDedicatedConfigServerStatus",
+    "grantPrivilegesToRole",
+    "grantRolesToRole",
+    "grantRolesToUser",
+    "hello",
+    "httpClientRequest",
+    "importCollection",
+    "internalRenameIfOptionsAndIndexesMatch",
+    "invalidateUserCache",
+    "isdbgrid",
+    "killCursors",
+    "killSessions",
+    "listDatabasesForAllTenants",
+    "logApplicationMessage",
+    "logMessage",
+    "logout",
+    "makeSnapshot",
+    "mapReduce",
+    "mergeAllChunksOnShard",
+    "multicast",
+    "pinHistoryReplicated",
+    "planCacheListFilters",
+    "planCacheSetFilter",
+    "prepareTransaction",
+    "reapLogicalSessionCacheNow",
+    "releaseMemory",
+    "repairShardedCollectionChunksHistory",
+    "replicateSearchIndexCommand",
+    "replSetAbortPrimaryCatchUp",
+    "replSetRequestVotes",
+    "replSetResizeOplog",
+    "replSetTestEgress",
+    "replSetUpdatePosition",
+    "resetPlacementHistory",
+    "revokePrivilegesFromRole",
+    "revokeRolesFromRole",
+    "revokeRolesFromUser",
+    "rolesInfo",
+    "saslContinue",
+    "saslStart",
+    "setAllowMigrations",
+    "setAuditConfig",
+    "setChangeStreamState",
+    "setCommittedSnapshot",
+    "setIndexCommitQuorum",
+    "shardDrainingStatus",
+    "startShardDraining",
+    "startTransitionToDedicatedConfigServer",
+    "stopTransitionToDedicatedConfigServer",
+    "streams_getMetrics",
+    "streams_getMoreStreamSample",
+    "streams_getStats",
+    "streams_listStreamProcessors",
+    "streams_sendEvent",
+    "streams_startStreamProcessor",
+    "streams_startStreamSample",
+    "streams_stopStreamProcessor",
+    "streams_testOnlyGetFeatureFlags",
+    "streams_testOnlyInsert",
+    "streams_updateConnection",
+    "streams_updateFeatureFlags",
+    "streams_writeCheckpoint",
+    "testCommandFeatureFlaggedOnLatestFCV83",
+    "testDeprecation",
+    "testDeprecationInVersion2",
+    "testInternalTransactions",
+    "testRemoval",
+    "testReshardCloneCollection",
+    "testVersion2",
+    "testVersions1And2",
+    "timeseriesCatalogBucketParamsChanged",
+    "transitionToShardedCluster",
+    "usersInfo",
+    "voteAbortIndexBuild",
+    "voteCommitImportCollection",
+    "voteCommitIndexBuild",
+    "waitForFailPoint",
+    "whatsmysni",
 ];
 
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -9249,6 +9358,7 @@ export const authCommandsLib = {
         // A test may provide a secondary connection to be intermittently authed
         // with admin privileges for setup/teardown.
         const setupConn = "getSideChannel" in impls ? impls.getSideChannel(conn) : conn;
+        checkCommandCoverage(setupConn);
         checkAggStageCoverage(setupConn);
 
         let failures = [];
@@ -9323,5 +9433,46 @@ function checkAggStageCoverage(conn) {
         `'authCommandsLib.tests' misses auth testing for ${
             unvisitedList.length
         } aggregation stages: ${unvisitedList.join(", ")}`,
+    );
+}
+
+/**
+ * Checks the test coverage on all database commands. If it finds any command that lacks
+ * authorization testing, it throws an error to remind developers to add them.
+ */
+function checkCommandCoverage(conn) {
+    const adminDb = conn.getDB(adminDbName);
+    assert(adminDb.auth("admin", "password"));
+
+    // Get all commands.
+    const res = assert.commandWorked(adminDb.runCommand({listCommands: 1}));
+    const allCommands = Object.keys(res.commands);
+
+    adminDb.logout();
+
+    const unvisited = {};
+    for (let cmd of allCommands) {
+        if (!testOnlyCommands.includes(cmd) && !skippedAuthTestingCommands.includes(cmd) && !cmd.startsWith("_")) {
+            unvisited[cmd] = 1;
+        }
+    }
+
+    for (let test of authCommandsLib.tests) {
+        const keys = Object.keys(test.command);
+        const commandName = keys[0];
+
+        if (commandName && commandName in unvisited) {
+            delete unvisited[commandName];
+        }
+    }
+
+    const unvisitedList = Object.keys(unvisited);
+    assert.eq(
+        unvisitedList.length,
+        0,
+        `'authCommandsLib.tests' misses auth testing for ${
+            unvisitedList.length
+        } commands: ${unvisitedList.join(", ")}. ` +
+            `Add tests for these commands or add them to 'skippedAuthTestingCommands' with justification.`,
     );
 }
