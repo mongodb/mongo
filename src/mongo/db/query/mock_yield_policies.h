@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

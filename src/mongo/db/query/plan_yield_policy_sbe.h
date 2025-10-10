@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <variant>

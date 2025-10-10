@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/yieldable.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <variant>
