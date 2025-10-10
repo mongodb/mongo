@@ -66,7 +66,9 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64
       _cursorsOut(0),
       _compiled(nullptr),
       _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
+    uassert(8268800,
+            "Failed to open a session",
+            conn->open_session(conn, nullptr, "isolation=snapshot", &_session) == 0);
 }
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
@@ -80,7 +82,9 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
       _cache(cache),
       _compiled(nullptr),
       _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
+    uassert(8268801,
+            "Failed to open a session",
+            conn->open_session(conn, nullptr, "isolation=snapshot", &_session) == 0);
     setCompiledConfigurationsPerConnection(cache->getCompiledConfigurations());
 }
 
