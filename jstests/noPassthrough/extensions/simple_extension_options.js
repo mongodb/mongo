@@ -48,7 +48,7 @@ withExtensions({"libtest_options_mongo_extension.so": {optionA: false}}, (conn) 
 
     const confirmStartupFailed = (extensionOptions) => {
         const extensionName = generateExtensionConfigWithOptions(
-            MongoRunner.getExtensionPath("libtest_options_mongo_extension.so"),
+            "libtest_options_mongo_extension.so",
             extensionOptions,
         );
         try {

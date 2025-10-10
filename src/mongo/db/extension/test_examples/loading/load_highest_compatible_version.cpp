@@ -30,6 +30,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -47,11 +48,7 @@ namespace sdk = mongo::extension::sdk;
                                                                                               \
         std::unique_ptr<sdk::AggregationStageParseNode> parse(                                \
             mongo::BSONObj stageBson) const override {                                        \
-            uassert(10977901,                                                                 \
-                    "Failed to parse " + kStageName + ", expected object",                    \
-                    stageBson.hasField(kStageName) &&                                         \
-                        stageBson.getField(kStageName).isABSONObj() &&                        \
-                        stageBson.getField(kStageName).Obj().isEmpty());                      \
+            sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);       \
                                                                                               \
             return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>();                    \
         }                                                                                     \

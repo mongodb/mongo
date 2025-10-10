@@ -34,22 +34,22 @@
 #define MAKE_EXCEPTION_INFO(code, message) \
     BSON("message" << message << "errorCode" << static_cast<int>(code));
 
-#define userAsserted(code, message)                                          \
-    do {                                                                     \
-        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);             \
-        mongo::extension::invokeCAndConvertStatusToException([&]() {         \
-            return sdk::HostServicesHandle::getHostServices()->userAsserted( \
-                mongo::extension::objAsByteView(exceptionInfo));             \
-        });                                                                  \
+#define userAsserted(code, message)                                                            \
+    do {                                                                                       \
+        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                               \
+        mongo::extension::invokeCAndConvertStatusToException([&]() {                           \
+            return mongo::extension::sdk::HostServicesHandle::getHostServices()->userAsserted( \
+                mongo::extension::objAsByteView(exceptionInfo));                               \
+        });                                                                                    \
     } while (false)
 
-#define tripwireAsserted(code, message)                                          \
-    do {                                                                         \
-        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                 \
-        mongo::extension::invokeCAndConvertStatusToException([&]() {             \
-            return sdk::HostServicesHandle::getHostServices()->tripwireAsserted( \
-                mongo::extension::objAsByteView(exceptionInfo));                 \
-        });                                                                      \
+#define tripwireAsserted(code, message)                                                            \
+    do {                                                                                           \
+        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                                   \
+        mongo::extension::invokeCAndConvertStatusToException([&]() {                               \
+            return mongo::extension::sdk::HostServicesHandle::getHostServices()->tripwireAsserted( \
+                mongo::extension::objAsByteView(exceptionInfo));                                   \
+        });                                                                                        \
     } while (false)
 
 #define userAssert(code, message, condition) \

@@ -17,6 +17,7 @@ mongo_cc_library(
         "host_services.h",
         "query_shape_opts_handle.h",
         "test_extension_factory.h",
+        "test_extension_util.h",
         "versioned_extension.h",
     ],
     visibility = ["//visibility:public"],

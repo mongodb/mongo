@@ -31,6 +31,7 @@
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -55,9 +56,7 @@ public:
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        userAssert(11097802,
-                   "Failed to parse " + kStageName + ", expected an object",
-                   stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+        sdk::validateStageDefinition(stageBson, kStageName);
 
         const auto obj = stageBson.getField(kStageName).Obj();
 

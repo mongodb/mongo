@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -49,9 +50,7 @@ public:
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        uassert(10938900,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+        sdk::validateStageDefinition(stageBson, kStageName);
 
         return std::make_unique<VectorSearchParseNode>();
     }

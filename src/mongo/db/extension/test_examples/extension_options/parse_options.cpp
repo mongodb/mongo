@@ -31,6 +31,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -56,21 +57,19 @@ public:
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        uassert(10999104,
-                "Failed to parse " + kStageName + ", expected an object for $checkNum",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+        sdk::validateStageDefinition(stageBson, kStageName);
 
         const auto obj = stageBson.getField(kStageName).Obj();
-        uassert(10999105,
-                "Failed to parse " + kStageName + ", expected {" + kStageName +
-                    ": {num: <double>}}",
-                obj.hasField("num") && obj.getField("num").isNumber());
+        userAssert(10999105,
+                   "Failed to parse " + kStageName + ", expected {" + kStageName +
+                       ": {num: <double>}}",
+                   obj.hasField("num") && obj.getField("num").isNumber());
 
         if (ExtensionOptions::checkMax) {
-            uassert(10999106,
-                    "Failed to parse " + kStageName + ", provided num is higher than max " +
-                        std::to_string(ExtensionOptions::max),
-                    obj.getField("num").numberDouble() <= ExtensionOptions::max);
+            userAssert(10999106,
+                       "Failed to parse " + kStageName + ", provided num is higher than max " +
+                           std::to_string(ExtensionOptions::max),
+                       obj.getField("num").numberDouble() <= ExtensionOptions::max);
         }
 
         return std::make_unique<CheckNumParseNode>();
@@ -81,10 +80,10 @@ class MyExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         YAML::Node node = portal.getExtensionOptions();
-        uassert(10999107, "Extension options must include 'checkMax'", node["checkMax"]);
+        userAssert(10999107, "Extension options must include 'checkMax'", node["checkMax"]);
         ExtensionOptions::checkMax = node["checkMax"].as<bool>();
         if (ExtensionOptions::checkMax) {
-            uassert(10999103, "Extension options must include 'max'", node["max"]);
+            userAssert(10999103, "Extension options must include 'max'", node["max"]);
             ExtensionOptions::max = node["max"].as<double>();
         }
         _registerStage<CheckNumStageDescriptor>(portal);

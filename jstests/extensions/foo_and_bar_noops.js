@@ -35,7 +35,7 @@ assert.commandWorked(coll.insertMany(testData));
 // Test $testFoo stage fails to parse.
 {
     const pipeline = [{$testFoo: {invalidField: "value"}}];
-    assertErrorCode(coll, pipeline, 10624200, "Using $testFoo with invalid field should be rejected");
+    assertErrorCode(coll, pipeline, 11165101, "Using $testFoo with invalid field should be rejected");
 }
 
 // Test $testBar stage fails to parse.

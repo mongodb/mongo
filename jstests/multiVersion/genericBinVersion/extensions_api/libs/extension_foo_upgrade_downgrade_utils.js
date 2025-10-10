@@ -17,7 +17,7 @@ const data = [
     {_id: 2, test: "c"},
 ];
 
-const fooParseErrorCodes = [10624200, 10624201];
+const fooParseErrorCodes = [11165101, 10624201];
 
 export function generateMultiversionExtensionConfigs() {
     return generateExtensionConfigs(["libfoo_mongo_extension.so", "libfoo_extension_v2.so"]);

@@ -30,6 +30,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -51,16 +52,17 @@ public:
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        uassert(11134101,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
-                    !stageBson.getField(kStageName).Obj().isEmpty());
+        sdk::validateStageDefinition(stageBson, kStageName);
+
+        userAssert(11134101,
+                   "Failed to parse " + kStageName + ", expected non-empty object",
+                   !stageBson.getField(kStageName).Obj().isEmpty());
 
         mongo::BSONObj bsonSpec = stageBson.getField(kStageName).Obj();
-        uassert(11134102,
-                kStageName + " stage missing or invalid " + kDebugLogLevelField + " field.",
-                bsonSpec.hasElement(kDebugLogLevelField) &&
-                    bsonSpec.getField(kDebugLogLevelField).isNumber());
+        userAssert(11134102,
+                   kStageName + " stage missing or invalid " + kDebugLogLevelField + " field.",
+                   bsonSpec.hasElement(kDebugLogLevelField) &&
+                       bsonSpec.getField(kDebugLogLevelField).isNumber());
 
         int level = bsonSpec.getIntField(kDebugLogLevelField);
         sdk::HostServicesHandle::getHostServices()->logDebug("Test log message", 11134100, level);

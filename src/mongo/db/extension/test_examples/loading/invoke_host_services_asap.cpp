@@ -31,6 +31,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -44,14 +45,11 @@ public:
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        uassert(11097602,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
-                    stageBson.getField(kStageName).Obj().isEmpty());
+        sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
-        uassert(11097603,
-                "Dummy assertion to test usage of the host services",
-                sdk::HostServicesHandle::getHostServices()->alwaysTrue_TEMPORARY());
+        userAssert(11097603,
+                   "Dummy assertion to test usage of the host services",
+                   sdk::HostServicesHandle::getHostServices()->alwaysTrue_TEMPORARY());
 
         return std::make_unique<TestFooForHostServicesAsapStageParseNode>();
     }
@@ -63,9 +61,9 @@ public:
         // We test that the host services are accessible as soon as the initialization function is
         // invoked. This is the first entrypoint where extensions are allowed to call into the host
         // services.
-        uassert(11097601,
-                "Dummy assertion to test usage of the host services",
-                sdk::HostServicesHandle::getHostServices()->alwaysTrue_TEMPORARY());
+        userAssert(11097601,
+                   "Dummy assertion to test usage of the host services",
+                   sdk::HostServicesHandle::getHostServices()->alwaysTrue_TEMPORARY());
 
         _registerStage<TestFooForHostServicesAsapStageDescriptor>(portal);
     }

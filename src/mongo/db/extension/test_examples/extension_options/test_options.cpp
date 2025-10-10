@@ -31,6 +31,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -53,10 +54,7 @@ public:
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        uassert(10999101,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
-                    stageBson.getField(kStageName).Obj().isEmpty());
+        sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
         return std::make_unique<OptionAParseNode>();
     }
@@ -75,10 +73,7 @@ public:
         : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        uassert(10999102,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj() &&
-                    stageBson.getField(kStageName).Obj().isEmpty());
+        sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
         return std::make_unique<OptionBParseNode>();
     }
@@ -88,7 +83,7 @@ class MyExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         YAML::Node node = portal.getExtensionOptions();
-        uassert(10999100, "Extension options must include 'optionA'", node["optionA"]);
+        userAssert(10999100, "Extension options must include 'optionA'", node["optionA"]);
         ExtensionOptions::optionA = node["optionA"].as<bool>();
 
         if (ExtensionOptions::optionA) {

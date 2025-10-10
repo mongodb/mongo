@@ -27,38 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 
-namespace sdk = mongo::extension::sdk;
-
-DEFAULT_LOGICAL_AST_PARSE(MyStage)
-
-class MyStageDescriptor : public sdk::AggregationStageDescriptor {
-public:
-    static inline const std::string kStageName = "$myStage";
-
-    MyStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
-
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
-
-        return std::make_unique<MyStageParseNode>();
+namespace mongo::extension::sdk {
+/**
+ * Helper function to assert that the input BSON for an aggregation stage has a 'stageName' object
+ * field.
+ */
+inline void validateStageDefinition(mongo::BSONObj stageBson,
+                                    const std::string& stageName,
+                                    bool checkEmpty = false) {
+    userAssert(11165100,
+               "Failed to parse " + stageName + ", expected object",
+               stageBson.hasField(stageName) && stageBson.getField(stageName).isABSONObj());
+    if (checkEmpty) {
+        userAssert(11165101,
+                   stageName + " stage definition must be an empty object",
+                   stageBson.getField(stageName).Obj().isEmpty());
     }
-};
-
-class MyExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        // Should fail due to registering the same StageDescriptor multiple times.
-        _registerStage<MyStageDescriptor>(portal);
-        _registerStage<MyStageDescriptor>(portal);
-    }
-};
-
-REGISTER_EXTENSION(MyExtension)
-DEFINE_GET_EXTENSION()
+}
+}  // namespace mongo::extension::sdk
