@@ -5,6 +5,10 @@
  * replicate a commitIndexBuild oplog entry after the takeover.
  *
  * @tags: [
+ *   # Note: It is possible to patch this test to only expect one index at the end, but then the test
+ *   # doesn't test anything useful. Gating the test behind this tag provides better control over
+ *   # re-enabling it.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_replication,
  * ]
  */

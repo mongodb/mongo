@@ -94,6 +94,7 @@ const awaitCreateIndex = startParallelShell(
 );
 fpSecondaryDrain.wait();
 
+// Secondaries do not build indexes, so they do not drain side writes.
 if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
     // Two documents are scanned but only one key is inserted.
     checkLog.containsJson(secondary, 20391, {namespace: coll.getFullName(), totalRecords: 2});
@@ -114,8 +115,11 @@ fpSecondaryDrain.off();
 fpPrimarySetup.off();
 awaitCreateIndex();
 
-// The skipped document is resolved, and causes the index to flip to multikey.
-// "Index set to multi key ..."
-checkLog.containsJson(secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
+// TODO(SERVER-110846): Possibly re-enable this check.
+if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
+    // The skipped document is resolved, and causes the index to flip to multikey.
+    // "Index set to multi key ..."
+    checkLog.containsJson(secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
+}
 
 replTest.stopSet();

@@ -3,7 +3,7 @@
  * state.
  *
  * @tags: [
- *   # TODO(SERVER-109667): Primary-driven index builds don't support draining side writes yet.
+ *   # TODO(SERVER-110840): Primary-driven index builds don't support draining side writes yet.
  *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  *   uses_prepare_transaction,

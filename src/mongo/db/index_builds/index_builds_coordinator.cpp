@@ -73,6 +73,7 @@
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
 #include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_state.h"
@@ -1779,8 +1780,57 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     });
 }
 
+void IndexBuildsCoordinator::abortAllTwoPhaseIndexBuildsForStepUp(OperationContext* opCtx,
+                                                                  Status abortStatus) {
+    // 'abortIndexBuildByBuildUUID' will register the necessary intents, so we only need to wait
+    // until we are primary (can register a Write intent).
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    for (int retryAttempts = 0; !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
+         ++retryAttempts) {
+        logAndBackoff(11166102,
+                      MONGO_LOGV2_DEFAULT_COMPONENT,
+                      logv2::LogSeverity::Debug(1),
+                      retryAttempts,
+                      "Waiting to declare Write intent for step-up abort");
+        opCtx->checkForInterrupt();
+    }
+
+    auto abortAllTwoPhaseIndexBuilds = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
+        if (replState->protocol == IndexBuildProtocol::kSinglePhase) {
+            return;
+        }
+
+        try {
+            if (!abortIndexBuildByBuildUUID(
+                    opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, abortStatus)) {
+                LOGV2(11166100,
+                      "Index build: failed to abort index build, this is expected if the build "
+                      "is already being committed or in the process of tearing down.",
+                      "buildUUID"_attr = replState->buildUUID,
+                      "database"_attr = replState->dbName,
+                      "collectionUUID"_attr = replState->collectionUUID);
+            }
+        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+            throw;
+        } catch (const DBException& ex) {
+            LOGV2_WARNING(
+                11166101,
+                "One or more in-progress index builds failed to abort during step-up. It "
+                "is recommended that the following indexes be dropped via the dropIndexes command",
+                "buildUUID"_attr = replState->buildUUID,
+                "indexNames"_attr = toIndexNames(replState->getIndexes()),
+                "status"_attr = ex.toStatus());
+        }
+    };
+
+    auto builds = activeIndexBuilds.getAllIndexBuilds();
+    forEachIndexBuild(
+        builds, "IndexBuildsCoordinator::_onStepUpAsyncTaskFn"_sd, abortAllTwoPhaseIndexBuilds);
+}
+
+
 void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
-    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     const auto signalCommitQuorumAndRetrySkippedRecords = [this,
                                                            opCtx](const std::shared_ptr<
                                                                   ReplIndexBuildState>& replState) {
@@ -1884,14 +1934,18 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
     };
 
     try {
-        forEachIndexBuild(indexBuilds,
+        if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+            abortAllTwoPhaseIndexBuildsForStepUp(opCtx,
+                                                 Status{ErrorCodes::InterruptedDueToReplStateChange,
+                                                        "aborting all two-phase index builds"});
+        }
+
+        auto builds = activeIndexBuilds.getAllIndexBuilds();
+        forEachIndexBuild(builds,
                           "IndexBuildsCoordinator::_onStepUpAsyncTaskFn"_sd,
                           signalCommitQuorumAndRetrySkippedRecords);
     } catch (const DBException& ex) {
-        LOGV2_DEBUG(7333100,
-                    1,
-                    "Step-up retry of skipped records for all index builds interrupted",
-                    "exception"_attr = ex);
+        LOGV2_DEBUG(7333100, 1, "Step-up task interrupted", "status"_attr = ex);
     }
     LOGV2(7508300, "Finished performing asynchronous step-up checks on index builds");
 }
@@ -1941,48 +1995,6 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
         indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback"_sd, onIndexBuild);
 
     return buildsStopped;
-}
-
-IndexBuilds IndexBuildsCoordinator::restartAllTwoPhaseIndexBuilds(OperationContext* opCtx) {
-    LOGV2(10705500, "Index build: restarting all two-phase index builds");
-
-    IndexBuilds buildsRestarted;
-    auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
-        if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
-            return;
-        }
-
-        // This will unblock the index build and allow it to complete without cleaning up.
-        if (!abortIndexBuildByBuildUUID(opCtx,
-                                        replState->buildUUID,
-                                        IndexBuildAction::kRollbackAbort,
-                                        Status{ErrorCodes::InterruptedDueToReplStateChange,
-                                               "restarting all two-phase index builds"})) {
-            // The index build may already be in the midst of tearing down.
-            // Leave this index build out of 'buildsStopped'.
-            LOGV2(10705501,
-                  "Index build: failed to abort index build",
-                  "buildUUID"_attr = replState->buildUUID,
-                  "database"_attr = replState->dbName,
-                  "collectionUUID"_attr = replState->collectionUUID);
-            return;
-        }
-
-        _restartIndexBuild(
-            opCtx, replState->collectionUUID, replState->buildUUID, replState->getIndexes());
-
-        IndexBuildsEntry indexBuildEntry{replState->collectionUUID};
-        for (const auto& spec : toIndexSpecs(replState->getIndexes())) {
-            indexBuildEntry.indexSpecs.emplace_back(spec.getOwned());
-        }
-        buildsRestarted.insert({replState->buildUUID, std::move(indexBuildEntry)});
-    };
-
-    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
-    forEachIndexBuild(
-        indexBuilds, "IndexBuildsCoordinator::restartAllTwoPhaseIndexBuilds"_sd, onIndexBuild);
-
-    return buildsRestarted;
 }
 
 void IndexBuildsCoordinator::_restartIndexBuild(OperationContext* opCtx,
@@ -3250,7 +3262,7 @@ void IndexBuildsCoordinator::_buildPrimaryDrivenIndex(
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
               shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
-    // TODO(SERVER-107055): Confirm that it's ok to check if the node is primary as done below.
+    // TODO (SERVER-111936): Confirm that it's ok to check if the node is primary as done below.
     bool isPrimary{false};
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().isReplSet()) {

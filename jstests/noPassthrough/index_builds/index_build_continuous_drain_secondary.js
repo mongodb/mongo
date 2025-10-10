@@ -6,15 +6,17 @@
  * to complete the index builds. The expectation is that these values are close to each other.
  *
  * @tags: [
- *   # TODO(SERVER-109667): Primary-driven index builds don't support draining side writes yet.
- *   primary_driven_index_builds_incompatible,
+ *   # While secondaries do not build indexes and do not drain side writes, this test specifically
+ *   # fails due to in-progress index builds being aborted on step up.
+ *   # TODO SERVER-111896 - This test may also not be relevant for primary driven index builds overall.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_replication,
  *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
  *   primary_driven_index_builds_incompatible,
  * ]
  *
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -66,11 +68,7 @@ checkLog.containsJson(secondary, 3856203);
 // replicated from primary.
 insertDocs(50000);
 
-// TODO(SERVER-107055): Re-enable this check again.
-if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
-    // "index build: drained side writes"
-    checkLog.containsJson(secondary, 20689);
-}
+checkLog.containsJson(secondary, 20689);
 
 // Record how long it takes for the index build to complete from this point onward.
 let start = new Date();

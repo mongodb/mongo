@@ -43,6 +43,12 @@
       - rolling_index_builds
       - requires_commit_quorum
       - requires_capped
+      # Tests marked with this tag are excluded because primary-driven index builds do not restart
+      # on failover (or that was otherwise the last known reason).
+      # This is also an easy way to identify and control tests specifically excluded as part of 111661.
+      # TODO SERVER-112247, TODO SERVER-112251: We may be able to enable this test if either we
+      # emulate this restart behavior while testing, or when resumability is added.
+      - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
       - exclude_when_record_ids_replicated
 - name: all_no_passthrough_index_builds_tests_selector
   value:

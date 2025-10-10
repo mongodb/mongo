@@ -228,13 +228,8 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
             invariant(skippedRecordsTracker->areAllRecordsApplied(opCtx));
         }
 
-        // TODO(SERVER-107055): Remove the following condition after standby is able to receive and
-        // apply container ops.
-        if (_method != IndexBuildMethodEnum::kPrimaryDriven ||
-            replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
-            // An index build should never be completed with writes remaining in the interceptor.
-            _indexBuildInterceptor->invariantAllWritesApplied(opCtx);
-        }
+        // An index build should never be completed with writes remaining in the interceptor.
+        _indexBuildInterceptor->invariantAllWritesApplied(opCtx);
     }
 
     auto indexCatalogEntry = getWritableEntry(opCtx, collection);

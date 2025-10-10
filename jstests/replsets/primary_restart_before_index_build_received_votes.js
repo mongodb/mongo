@@ -1,9 +1,9 @@
 /*
  * Tests that primary retains commit quorum provided to createIndexes across restarts.
  * @tags: [
- *   # TODO(SERVER-109667): Primary-driven index builds don't support failover yet.
- *   primary_driven_index_builds_incompatible,
  *   requires_persistence,
+ *   # This test will fail because primary driven index builds do not restart on failover.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

@@ -6,8 +6,8 @@
  *     requires_persistence,
  *     requires_replication,
  *     requires_wiredtiger,
- *     # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
- *     primary_driven_index_builds_incompatible,
+ *     # Primary driven index builds are aborted when a new primary steps up.
+ *     primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

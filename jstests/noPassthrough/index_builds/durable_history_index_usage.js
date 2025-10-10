@@ -2,8 +2,8 @@
  * Tests index usage with durable history across restarts.
  *
  * @tags: [
- *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
- *   primary_driven_index_builds_incompatible,
+ *   # Primary driven index builds are aborted on step up by the new primary.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_persistence,
  *   requires_replication,
  * ]

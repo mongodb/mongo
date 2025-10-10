@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/collection_options.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -555,6 +557,115 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
         operationContext(), opObserver->startIndexBuildIdents[0]));
     ASSERT(collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
         operationContext(), opObserver->startIndexBuildIdents[1]));
+}
+
+// Creates a single and two-phase index build and checks that 'abortAllTwoPhaseIndexBuildsForStepUp'
+// aborts only the two phase index build.
+TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+
+    const auto twoPhaseNss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds.twoPhase");
+    ASSERT_OK(storageInterface()->createCollection(opCtx, twoPhaseNss, CollectionOptions()));
+    auto status = storageInterface()->createCollection(
+        opCtx, NamespaceString::kIndexBuildEntryNamespace, CollectionOptions());
+    if (status != ErrorCodes::NamespaceExists) {
+        ASSERT_OK(status);
+    }
+
+    const auto singlePhaseNss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds.singlePhase");
+    ASSERT_OK(storageInterface()->createCollection(opCtx, singlePhaseNss, CollectionOptions()));
+
+    // Avoid the empty collection index build optimization.
+    auto twoPhaseUUID = [&] {
+        auto collection = getCollectionExclusive(opCtx, twoPhaseNss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, collection.getCollectionPtr(), InsertStatement(BSON("_id" << 1)), nullptr));
+        wuow.commit();
+        return collection.uuid();
+    }();
+
+    auto singlePhaseUUID = [&] {
+        auto collection = getCollectionExclusive(opCtx, singlePhaseNss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, collection.getCollectionPtr(), InsertStatement(BSON("_id" << 1)), nullptr));
+        wuow.commit();
+        return collection.uuid();
+    }();
+
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto twoPhaseIndexes = toIndexBuildInfoVec(
+        std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1")},
+        *storageEngine,
+        twoPhaseNss.dbName(),
+        VersionContext::getDecoration(opCtx));
+    auto singlePhaseIndexes = toIndexBuildInfoVec(
+        std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1")},
+        *storageEngine,
+        singlePhaseNss.dbName(),
+        VersionContext::getDecoration(opCtx));
+
+    // Create a window to enumerate the index builds while they are running.
+    indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
+
+    IndexBuildsCoordinator::IndexBuildOptions twoPhaseOptions;
+    twoPhaseOptions.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
+    twoPhaseOptions.commitQuorum = CommitQuorumOptions(0);
+    auto twoPhaseFuture =
+        unittest::assertGet(indexBuildsCoord->startIndexBuild(opCtx,
+                                                              twoPhaseNss.dbName(),
+                                                              twoPhaseUUID,
+                                                              twoPhaseIndexes,
+                                                              UUID::gen(),
+                                                              IndexBuildProtocol::kTwoPhase,
+                                                              twoPhaseOptions));
+
+    IndexBuildsCoordinator::IndexBuildOptions singlePhaseOptions;
+    singlePhaseOptions.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
+    singlePhaseOptions.commitQuorum = CommitQuorumOptions(0);
+    auto singlePhaseFuture =
+        unittest::assertGet(indexBuildsCoord->startIndexBuild(opCtx,
+                                                              singlePhaseNss.dbName(),
+                                                              singlePhaseUUID,
+                                                              singlePhaseIndexes,
+                                                              UUID::gen(),
+                                                              IndexBuildProtocol::kSinglePhase,
+                                                              singlePhaseOptions));
+
+    ASSERT_TRUE(indexBuildsCoord->inProgForCollection(twoPhaseUUID, IndexBuildProtocol::kTwoPhase));
+    ASSERT_TRUE(
+        indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
+
+    indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+    indexBuildsCoord->abortAllTwoPhaseIndexBuildsForStepUp(
+        opCtx,
+        Status{ErrorCodes::InterruptedDueToReplStateChange, "aborting all two-phase index builds"});
+
+    twoPhaseFuture.wait();
+    ASSERT_THROWS_CODE(
+        twoPhaseFuture.get(), DBException, ErrorCodes::InterruptedDueToReplStateChange);
+
+    singlePhaseFuture.wait();
+    auto catalogStats = singlePhaseFuture.get();
+    ASSERT_GTE(catalogStats.numIndexesAfter, catalogStats.numIndexesBefore);
+
+    // Both indexes should no longer exist after one completes and the other is aborted.
+    indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
+        opCtx, twoPhaseUUID, IndexBuildProtocol::kTwoPhase);
+    ASSERT_FALSE(
+        indexBuildsCoord->inProgForCollection(twoPhaseUUID, IndexBuildProtocol::kTwoPhase));
+
+    indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
+        opCtx, singlePhaseUUID, IndexBuildProtocol::kSinglePhase);
+    ASSERT_FALSE(
+        indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
 }
 
 }  // namespace

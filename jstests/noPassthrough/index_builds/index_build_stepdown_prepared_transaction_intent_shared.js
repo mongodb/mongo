@@ -15,6 +15,10 @@
  *    stepdown by holding the RSTL in MODE_IX.
  *
  * @tags: [
+ *   # TODO SERVER-111896 - Investigate whether this test is relevant / correct for primary driven
+ *   # index builds.
+ *   # This test may fail only because primary driven index builds are aborted when a new primary steps up.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   uses_prepare_transaction,
  *   uses_transactions,
  *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.

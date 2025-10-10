@@ -23,6 +23,7 @@ selector:
     - rolling_index_builds
     - requires_commit_quorum
     - requires_capped
+    - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
     - exclude_when_record_ids_replicated
   roots:
     - jstests/replsets/*index_build*.js

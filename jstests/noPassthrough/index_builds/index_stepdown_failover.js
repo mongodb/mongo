@@ -2,6 +2,9 @@
  * Confirms that index builds on a stepped down primary are not aborted and will
  * wait for a commitIndexBuild from the new primary before committing.
  * @tags: [
+ *   # Though secondaries will wait, in progress primary driven index builds
+ *   # are aborted on step up by the new primary.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_replication,
  * ]
  */

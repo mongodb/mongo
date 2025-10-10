@@ -15,7 +15,9 @@
  *    step-up from ocurring.
  *
  * @tags: [
- *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   # When primary-driven index builds are enabled, secondaries do not run their own index builds.
+ *   # TODO SERVER-111896: May also be subject to investigation for whether this scenario is relevant
+ *   # to primary driven index builds
  *   primary_driven_index_builds_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
