@@ -10,7 +10,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Configure 'internalQueryExecYieldIterations' on both shards such that operations will yield on
@@ -51,23 +51,6 @@ function setupTest() {
     }
     assert.commandWorked(bulkOp.execute());
     jsTest.log("Inserted initial data.");
-}
-
-function runMigration() {
-    const awaitResult = startParallelShell(
-        funWithArgs(
-            function (ns, toShard) {
-                jsTest.log("Starting migration.");
-                assert.commandWorked(db.adminCommand({moveChunk: ns, find: {x: -1}, to: toShard}));
-                jsTest.log("Completed migration.");
-            },
-            ns,
-            st.shard1.shardName,
-        ),
-        st.s.port,
-    );
-
-    return awaitResult;
 }
 
 async function updateOperationFn(shardColl, numInitialDocsOnShard0) {
@@ -119,19 +102,19 @@ function runTest(writeOpFn) {
 
     let fp1 = configureFailPoint(st.rs0.getPrimary(), "setYieldAllLocksHang", {namespace: coll.getFullName()});
 
-    const awaitWriteResult = startParallelShell(
-        funWithArgs(
-            function (writeOpFn, dbName, collName, numDocs) {
-                const shardColl = db.getSiblingDB(dbName)[collName];
-                writeOpFn(shardColl, numDocs);
-            },
-            writeOpFn,
-            coll.getDB().getName(),
-            coll.getName(),
-            numDocs,
-        ),
-        st.rs0.getPrimary().port,
+    const writeThread = new Thread(
+        (shard0PrimaryHost, writeOpFn, dbName, collName, numDocs) => {
+            const mongos = new Mongo(shard0PrimaryHost);
+            const shardColl = mongos.getDB(dbName)[collName];
+            writeOpFn(shardColl, numDocs);
+        },
+        st.rs0.getPrimary().host,
+        writeOpFn,
+        coll.getDB().getName(),
+        coll.getName(),
+        numDocs,
     );
+    writeThread.start();
 
     // Wait for the write op to yield.
     fp1.wait();
@@ -139,7 +122,18 @@ function runTest(writeOpFn) {
 
     // Start chunk migration and wait for it to enter the critical section.
     let failpointHangMigrationWhileInCriticalSection = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep5");
-    const awaitMigration = runMigration();
+    const migrationThread = new Thread(
+        (mongosHost, ns, toShard) => {
+            const mongos = new Mongo(mongosHost);
+            jsTest.log("Starting migration.");
+            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {x: -1}, to: toShard}));
+            jsTest.log("Completed migration.");
+        },
+        st.s.host,
+        ns,
+        st.shard1.shardName,
+    );
+    migrationThread.start();
     failpointHangMigrationWhileInCriticalSection.wait();
 
     // Let the multi-write resume from the yield.
@@ -153,10 +147,10 @@ function runTest(writeOpFn) {
     // Let the migration continue and release the critical section.
     jsTest.log("Letting migration exit its critical section and complete");
     failpointHangMigrationWhileInCriticalSection.off();
-    awaitMigration();
+    migrationThread.join();
 
     // Wait for the write op to finish. It should succeed.
-    awaitWriteResult();
+    writeThread.join();
 }
 
 runTest(updateOperationFn);
