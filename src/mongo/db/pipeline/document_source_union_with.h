@@ -123,8 +123,7 @@ public:
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             NamespaceString unionNss,
-                            std::vector<BSONObj> pipeline,
-                            bool hasForeignDB = false);
+                            std::vector<BSONObj> pipeline);
 
     // Expose a constructor that skips the parsing step for testing purposes.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -266,10 +265,6 @@ private:
     // $unionWith with a view. Otherwise we wouldn't be able to see details about the execution of
     // the view pipeline in the explain result.
     boost::optional<ResolvedNamespace> _resolvedNsForView;
-
-    // States whether this unionWith is crossDB and thus needs to serialize the db name in the
-    // namespace.
-    bool _hasForeignDB = false;
 };
 
 }  // namespace mongo

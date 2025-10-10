@@ -192,48 +192,6 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
     ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
 }
 
-TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDB) {
-    auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
-    auto bson = BSON("$unionWith" << BSON("db" << "crossDB"
-                                               << "coll" << nsToUnionWith.coll() << "pipeline"
-                                               << BSONArray()));
-    auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
-    std::vector<Value> serializedArray;
-    unionWith->serializeToArray(serializedArray);
-    auto serializedBson = serializedArray[0].getDocument().toBson();
-    ASSERT_BSONOBJ_EQ(serializedBson, bson);
-    unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
-    ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
-}
-
-TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDBAndPipeline) {
-    auto expCtx = getExpCtx();
-    NamespaceString nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
-    auto bson =
-        BSON("$unionWith" << BSON(
-                 "db" << "crossDB"
-                      << "coll" << nsToUnionWith.coll() << "pipeline"
-                      << BSON_ARRAY(BSON("$addFields" << BSON("a" << BSON("$const" << 3))))));
-    auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
-    std::vector<Value> serializedArray;
-    unionWith->serializeToArray(serializedArray);
-    auto serializedBson = serializedArray[0].getDocument().toBson();
-    ASSERT_BSONOBJ_EQ(serializedBson, bson);
-    unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
-    ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
-}
-
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipeline) {
     auto expCtx = getExpCtx();
     NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
@@ -341,42 +299,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                            getExpCtx()),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
-    // $unionWith db is not allowed within a view definition.
-    expCtx->setIsParsingViewDefinition(true);
-    ASSERT_THROWS_CODE(
-        DocumentSourceUnionWith::createFromBson(
-            BSON("$unionWith" << BSON("db" << nsToUnionWith.dbName().toString_forTest() << "coll"
-                                           << nsToUnionWith.coll()))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
 }
-
-TEST_F(DocumentSourceUnionWithTest, CrossDBNotAllowedOnMongos) {
-    auto expCtx = getExpCtx();
-    expCtx->setFromRouter(true);
-    // Test that we fail with an unresolved namespace, if it is in a different database.
-    ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
-                           BSON("$unionWith" << BSON("db" << "some_db" << "coll"
-                                                          << "some_coll"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
-
-    expCtx->setFromRouter(false);
-    expCtx->setInRouter(true);
-    // Test that we fail with an unresolved namespace, if it is in a different database.
-    ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
-                           BSON("$unionWith" << BSON("db" << "some_db" << "coll"
-                                                          << "some_coll"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
-}
-
 
 TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
     const auto mock =
