@@ -41,7 +41,8 @@
         std::vector<sdk::VariantNode> expand() const override {                             \
             std::vector<sdk::VariantNode> expanded;                                         \
             expanded.reserve(getExpandedSize());                                            \
-            expanded.emplace_back(std::make_unique<ExtensionName##AstNode>());              \
+            expanded.emplace_back(new sdk::ExtensionAggregationStageAstNode(                \
+                std::make_unique<ExtensionName##AstNode>()));                               \
             return expanded;                                                                \
         }                                                                                   \
         mongo::BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override { \

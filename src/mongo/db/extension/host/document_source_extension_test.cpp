@@ -109,7 +109,8 @@ public:
     std::vector<extension::sdk::VariantNode> expand() const override {
         std::vector<extension::sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(std::make_unique<NoOpAggregationStageAstNode>());
+        expanded.emplace_back(new extension::sdk::ExtensionAggregationStageAstNode(
+            std::make_unique<NoOpAggregationStageAstNode>()));
         return expanded;
     }
 

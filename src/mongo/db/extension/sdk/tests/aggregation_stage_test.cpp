@@ -80,7 +80,8 @@ public:
     std::vector<extension::sdk::VariantNode> expand() const override {
         std::vector<extension::sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(std::make_unique<NoOpAstNode>());
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageAstNode(NoOpAstNode::make()));
         return expanded;
     }
 
@@ -131,15 +132,15 @@ public:
     }
 };
 
-class CountingAST final : public extension::sdk::AggregationStageAstNode {
+class CountingAst final : public extension::sdk::AggregationStageAstNode {
 public:
     static int alive;
 
-    CountingAST() {
+    CountingAst() {
         ++alive;
     }
 
-    ~CountingAST() override {
+    ~CountingAst() override {
         --alive;
     }
 
@@ -148,7 +149,7 @@ public:
     }
 
     static inline std::unique_ptr<extension::sdk::AggregationStageAstNode> make() {
-        return std::make_unique<CountingAST>();
+        return std::make_unique<CountingAst>();
     }
 };
 
@@ -172,7 +173,8 @@ public:
     std::vector<extension::sdk::VariantNode> expand() const override {
         std::vector<extension::sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(std::make_unique<CountingAST>());
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageAstNode(CountingAst::make()));
         return expanded;
     }
 
@@ -186,7 +188,7 @@ public:
 };
 
 int CountingParse::alive = 0;
-int CountingAST::alive = 0;
+int CountingAst::alive = 0;
 
 class NestedDesugaringParseNode final : public extension::sdk::AggregationStageParseNode {
 public:
@@ -199,8 +201,10 @@ public:
     std::vector<extension::sdk::VariantNode> expand() const override {
         std::vector<extension::sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(std::make_unique<CountingAST>());
-        expanded.emplace_back(std::make_unique<CountingParse>());
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageAstNode(CountingAst::make()));
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageParseNode(CountingParse::make()));
         return expanded;
     }
 
@@ -225,8 +229,10 @@ public:
     std::vector<extension::sdk::VariantNode> expand() const override {
         std::vector<extension::sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(std::make_unique<CountingAST>());
-        expanded.emplace_back(std::make_unique<CountingParse>());
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageAstNode(CountingAst::make()));
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageParseNode(CountingParse::make()));
         return expanded;
     }
 
@@ -251,8 +257,10 @@ public:
     std::vector<extension::sdk::VariantNode> expand() const override {
         std::vector<extension::sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(std::make_unique<CountingAST>());
-        expanded.emplace_back(std::make_unique<CountingParse>());
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageAstNode(CountingAst::make()));
+        expanded.emplace_back(
+            new extension::sdk::ExtensionAggregationStageParseNode(CountingParse::make()));
         return expanded;
     }
 
@@ -338,7 +346,7 @@ TEST(AggregationStageTest, NestedExpansionSucceedsTest) {
 }
 
 TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnSuccess) {
-    CountingAST::alive = 0;
+    CountingAst::alive = 0;
     CountingParse::alive = 0;
 
     auto nestedDesugarParseNode =
@@ -350,18 +358,18 @@ TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnSuccess) {
             nestedDesugarParseNode.release()};
 
         [[maybe_unused]] auto expanded = handle.expand();
-        ASSERT_EQUALS(CountingAST::alive, 1);
+        ASSERT_EQUALS(CountingAst::alive, 1);
         ASSERT_EQUALS(CountingParse::alive, 1);
     }
 
     // Assert that the result of expand(), a vector of VariantNodeHandles, is properly cleaned up
     // once it goes out of scope.
-    ASSERT_EQUALS(CountingAST::alive, 0);
+    ASSERT_EQUALS(CountingAst::alive, 0);
     ASSERT_EQUALS(CountingParse::alive, 0);
 }
 
 TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnFailure) {
-    CountingAST::alive = 0;
+    CountingAst::alive = 0;
     CountingParse::alive = 0;
 
     auto nestedDesugarParseNode =
@@ -383,7 +391,31 @@ TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnFailure) {
 
     // Assert that the result of expand(), a vector of VariantNodeHandles, is properly cleaned up
     // after an exception is thrown.
-    ASSERT_EQUALS(CountingAST::alive, 0);
+    ASSERT_EQUALS(CountingAst::alive, 0);
+    ASSERT_EQUALS(CountingParse::alive, 0);
+
+    failExpand->setMode(FailPoint::off, 0);
+}
+
+TEST(AggregationStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
+    CountingAst::alive = 0;
+    CountingParse::alive = 0;
+
+    auto nestedDesugarParseNode =
+        new extension::sdk::ExtensionAggregationStageParseNode(NestedDesugaringParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{nestedDesugarParseNode};
+
+    auto failExpand = globalFailPointRegistry().find("failVariantNodeConversion");
+    failExpand->setMode(FailPoint::skip, 1);
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            [[maybe_unused]] auto expanded = handle.expand();
+        }(),
+        DBException,
+        11197200);
+
+    ASSERT_EQUALS(CountingAst::alive, 0);
     ASSERT_EQUALS(CountingParse::alive, 0);
 
     failExpand->setMode(FailPoint::off, 0);

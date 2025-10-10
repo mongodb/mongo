@@ -31,9 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/scopeguard.h"
 
 #include <memory>
 #include <string>
@@ -146,9 +144,23 @@ private:
     std::unique_ptr<AggregationStageAstNode> _astNode;
 };
 
-class AggregationStageParseNode;
-using VariantNode = std::variant<std::unique_ptr<AggregationStageParseNode>,
-                                 std::unique_ptr<AggregationStageAstNode>>;
+/**
+ * Represents the possible types of nodes created during expansion.
+ *
+ * Expansion can result in four types of nodes:
+ * 1. Host-defined parse node
+ * 2. Extension-defined parse node
+ * 3. Host-defined AST node
+ * 4. Extension-defined AST node
+ *
+ * This variant allows extension developers to return both host- and extension-defined nodes in
+ * AggregationStageParseNode::expand() without knowing the underlying implementation of host-defined
+ * nodes.
+ *
+ * The host is responsible for differentiating between host- and extension-defined nodes later on.
+ */
+using VariantNode = std::variant<::MongoExtensionAggregationStageParseNode*,
+                                 ::MongoExtensionAggregationStageAstNode*>;
 
 /**
  * AggregationStageParseNode is the base class for implementing the
@@ -222,85 +234,77 @@ private:
     }
 
     /**
-     * Converts an SDK VariantNode into ABI objects and writes the raw pointers into the
-     * host-allocated ExpandedArray element. Ownership stays in the RAII holder vectors until we
-     * explicitly release() them.
+     * Converts an SDK VariantNode into a tagged union of ABI objects and writes the raw pointers
+     * into the host-allocated ExpandedArray element.
      */
     struct ConsumeVariantNodeToAbi {
         ::MongoExtensionExpandedArrayElement& dst;
-        std::vector<std::unique_ptr<ExtensionAggregationStageParseNode>>& parseNodes;
-        std::vector<std::unique_ptr<ExtensionAggregationStageAstNode>>& astNodes;
 
-        void operator()(std::unique_ptr<AggregationStageParseNode>&& parseNode) const {
-            parseNodes.push_back(
-                std::make_unique<ExtensionAggregationStageParseNode>(std::move(parseNode)));
+        void operator()(::MongoExtensionAggregationStageParseNode* parseNode) const {
             dst.type = kParseNode;
-            dst.parse = parseNodes.back().get();
+            dst.parse = parseNode;
         }
 
-        void operator()(std::unique_ptr<AggregationStageAstNode>&& astNode) const {
-            astNodes.push_back(
-                std::make_unique<ExtensionAggregationStageAstNode>(std::move(astNode)));
+        void operator()(::MongoExtensionAggregationStageAstNode* astNode) const {
             dst.type = kAstNode;
-            dst.ast = astNodes.back().get();
+            dst.ast = astNode;
         }
     };
 
+    /*
+     * Invokes the destructor for a ::MongoExtensionAggregationStageParseNode and sets the element
+     * to null.
+     */
+    static void destroyAbiNode(::MongoExtensionAggregationStageParseNode*& node) noexcept {
+        if (node && node->vtable && node->vtable->destroy) {
+            node->vtable->destroy(node);
+        }
+        node = nullptr;
+    }
+
+    /*
+     * Invokes the destructor for a ::MongoExtensionAggregationStageAstNode and sets the element
+     * to null.
+     */
+    static void destroyAbiNode(::MongoExtensionAggregationStageAstNode*& node) noexcept {
+        if (node && node->vtable && node->vtable->destroy) {
+            node->vtable->destroy(node);
+        }
+        node = nullptr;
+    }
+
+    /*
+     * Invokes the destructor for a MongoExtensionExpandedArrayElement and sets the element to null.
+     */
+    static void destroyArrayElement(MongoExtensionExpandedArrayElement& node) noexcept {
+        switch (node.type) {
+            case kParseNode: {
+                destroyAbiNode(node.parse);
+                break;
+            }
+            case kAstNode: {
+                destroyAbiNode(node.ast);
+                break;
+            }
+            default: {
+                // Memory is leaked if the type tag is invalid, but this only happens if the
+                // extension violates the API contract.
+                break;
+            }
+        }
+    }
+
+    /**
+     * Expands the provided parse node into one or more AST or parse nodes.
+     *
+     * The resultant expanded array is allocated by the caller and populated by this function. If
+     * populating the expanded array fails for any reason, the expanded array is cleared.
+     *
+     * The caller is responsible for freeing any memory used by the extension during `expand()`.
+     */
     static ::MongoExtensionStatus* _extExpand(
         const ::MongoExtensionAggregationStageParseNode* parseNode,
-        ::MongoExtensionExpandedArray* expanded) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            const auto& impl =
-                static_cast<const ExtensionAggregationStageParseNode*>(parseNode)->getImpl();
-            const auto expandedSize = impl.getExpandedSize();
-            tassert(11113801,
-                    str::stream() << "MongoExtensionExpandedArray.size must equal required size: "
-                                  << "got " << expanded->size << ", but required " << expandedSize,
-                    expanded->size == expandedSize);
-
-            auto expandedNodes = impl.expand();
-            tassert(11113802,
-                    str::stream() << "AggregationStageParseNode expand() returned a different "
-                                     "number of elements than getExpandedSize(): returned "
-                                  << expandedNodes.size() << ", but required " << expandedSize,
-                    expandedNodes.size() == expandedSize);
-
-            // RAII containers for the ABI wrappers, which are owned until we explicitly release().
-            std::vector<std::unique_ptr<ExtensionAggregationStageParseNode>> parseNodes;
-            std::vector<std::unique_ptr<ExtensionAggregationStageAstNode>> astNodes;
-            parseNodes.reserve(expandedSize);
-            astNodes.reserve(expandedSize);
-
-            // If we exit early, null any raw pointers written to the caller's buffer. The RAII
-            // containers will destroy the ABI wrappers automatically.
-            size_t filled = 0;
-            ScopeGuard guard([&]() {
-                for (size_t i = 0; i < filled; ++i) {
-                    auto& el = expanded->elements[i];
-                    el.parse = nullptr;
-                }
-            });
-
-            // Populate the caller's buffer directly with raw pointers to nodes.
-            for (size_t i = 0; i < expandedSize; ++i) {
-                auto& dst = expanded->elements[i];
-                std::visit(ConsumeVariantNodeToAbi{dst, parseNodes, astNodes},
-                           std::move(expandedNodes[i]));
-                ++filled;
-            }
-            guard.dismiss();
-
-            // Transfer ownership to the caller by releasing nodes from the RAII containers.
-            ([&]() noexcept {
-                for (auto& node : parseNodes) {
-                    [[maybe_unused]] auto* releasedPtr = node.release();
-                }
-                for (auto& node : astNodes) {
-                    [[maybe_unused]] auto* releasedPtr = node.release();
-                }
-            })();
-        });
-    }
+        ::MongoExtensionExpandedArray* expanded) noexcept;
 
     static constexpr ::MongoExtensionAggregationStageParseNodeVTable VTABLE = {
         .destroy = &_extDestroy,
@@ -309,6 +313,7 @@ private:
         .expand = &_extExpand};
     std::unique_ptr<AggregationStageParseNode> _parseNode;
 };
+
 /**
  * AggregationStageDescriptor is the base class for implementing the
  * ::MongoExtensionAggregationStageDescriptor interface by an extension.
