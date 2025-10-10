@@ -70,12 +70,6 @@ std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter> createTimelibTime()
     return std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter>(timelib_time_ctor());
 }
 
-int getMilliseconds(const Date_t& date) {
-    const int ms = date.toMillisSinceEpoch() % 1000LL;
-    // Add 1000 since dates before 1970 would have negative milliseconds.
-    return ms >= 0 ? ms : 1000 + ms;
-}
-
 // Converts a date to a number of seconds, being careful to round appropriately for negative numbers
 // of seconds.
 long long seconds(Date_t date) {
@@ -507,7 +501,9 @@ TimeZone::DateParts::DateParts(const timelib_time& timelib_time, Date_t date)
       hour(timelib_time.h),
       minute(timelib_time.i),
       second(timelib_time.s) {
-    millisecond = getMilliseconds(date);
+    const int ms = date.toMillisSinceEpoch() % 1000LL;
+    // Add 1000 since dates before 1970 would have negative milliseconds.
+    millisecond = ms >= 0 ? ms : 1000 + ms;
 }
 
 TimeZone::Iso8601DateParts::Iso8601DateParts(const timelib_time& timelib_time, Date_t date)
@@ -525,7 +521,10 @@ TimeZone::Iso8601DateParts::Iso8601DateParts(const timelib_time& timelib_time, D
     year = static_cast<int>(tmpIsoYear);
     weekOfYear = static_cast<int>(tmpIsoWeekOfYear);
     dayOfWeek = static_cast<int>(tmpIsoDayOfWeek);
-    millisecond = getMilliseconds(date);
+
+    const int ms = date.toMillisSinceEpoch() % 1000LL;
+    // Add 1000 since dates before 1970 would have negative milliseconds.
+    millisecond = ms >= 0 ? ms : 1000 + ms;
 }
 
 
@@ -1177,7 +1176,7 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
             isDateAddAmountValid(amount, unit));
 
     auto localTime = timezone.getTimelibTime(date);
-    auto microSec = durationCount<Microseconds>(Milliseconds(getMilliseconds(date)));
+    auto microSec = durationCount<Microseconds>(Milliseconds(date.toMillisSinceEpoch() % 1000));
     localTime->us = microSec;
 
     // Check if an adjustment for the last day of month is necessary.

@@ -8,10 +8,6 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {executeAggregationTestCase} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
-// TODO(SERVER-103530) : Remove multiversion check when 9.0 becomes last-lts
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-
 const coll = db.date_add_subtract;
 coll.drop();
 
@@ -37,27 +33,9 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
 }
 
 (function testDateAddWithValidInputs() {
-    runAndAssert({$dateAdd: {startDate: ISODate("2020-11-30T12:10:05.872Z"), unit: "day", amount: 1}}, [
-        {newDate: ISODate("2020-12-01T12:10:05.872Z")},
+    runAndAssert({$dateAdd: {startDate: ISODate("2020-11-30T12:10:05Z"), unit: "day", amount: 1}}, [
+        {newDate: ISODate("2020-12-01T12:10:05Z")},
     ]);
-
-    if (!isMultiversion) {
-        runAndAssert({$dateAdd: {startDate: ISODate("1950-11-30T12:10:05.872Z"), unit: "day", amount: 1}}, [
-            {newDate: ISODate("1950-12-01T12:10:05.872Z")},
-        ]);
-
-        runAndAssert(
-            {
-                $dateAdd: {
-                    startDate: ISODate("1950-12-01T03:00:00.872Z"),
-                    unit: "month",
-                    amount: 2,
-                    timezone: "America/New_York",
-                },
-            },
-            [{newDate: ISODate("1951-01-31T03:00:00.872Z")}],
-        );
-    }
 
     // Test that adding with a null argument (non-existing field) results in null.
     runAndAssert({$dateAdd: {startDate: "$dateSent", unit: "day", amount: 1}}, [{newDate: null}]);
@@ -196,32 +174,14 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
     runAndAssert(
         {
             $dateSubtract: {
-                startDate: ISODate("2021-01-31T03:00:00.872Z"),
+                startDate: ISODate("2021-01-31T03:00:00Z"),
                 unit: "month",
                 amount: 2,
                 timezone: "America/New_York",
             },
         },
-        [{newDate: ISODate("2020-12-01T03:00:00.872Z")}],
+        [{newDate: ISODate("2020-12-01T03:00:00Z")}],
     );
-
-    if (!isMultiversion) {
-        runAndAssert({$dateSubtract: {startDate: ISODate("1950-12-01T12:10:05.872Z"), unit: "day", amount: 1}}, [
-            {newDate: ISODate("1950-11-30T12:10:05.872Z")},
-        ]);
-
-        runAndAssert(
-            {
-                $dateSubtract: {
-                    startDate: ISODate("1951-01-31T03:00:00.872Z"),
-                    unit: "month",
-                    amount: 2,
-                    timezone: "America/New_York",
-                },
-            },
-            [{newDate: ISODate("1950-12-01T03:00:00.872Z")}],
-        );
-    }
 })();
 
 // Test combinations of $dateAdd and $dateSubtract.
