@@ -27,25 +27,26 @@
  *    it in the license file.
  */
 
-#define DEFAULT_LOGICAL_AST_PARSE(ExtensionName)                                            \
-    class ExtensionName##LogicalStage : public sdk::LogicalAggregationStage {};             \
-    class ExtensionName##AstNode : public sdk::AggregationStageAstNode {                    \
-        std::unique_ptr<sdk::LogicalAggregationStage> bind() const override {               \
-            return std::make_unique<ExtensionName##LogicalStage>();                         \
-        };                                                                                  \
-    };                                                                                      \
-    class ExtensionName##ParseNode : public sdk::AggregationStageParseNode {                \
-        size_t getExpandedSize() const override {                                           \
-            return 1;                                                                       \
-        }                                                                                   \
-        std::vector<sdk::VariantNode> expand() const override {                             \
-            std::vector<sdk::VariantNode> expanded;                                         \
-            expanded.reserve(getExpandedSize());                                            \
-            expanded.emplace_back(new sdk::ExtensionAggregationStageAstNode(                \
-                std::make_unique<ExtensionName##AstNode>()));                               \
-            return expanded;                                                                \
-        }                                                                                   \
-        mongo::BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override { \
-            return mongo::BSONObj();                                                        \
-        }                                                                                   \
+#define DEFAULT_LOGICAL_AST_PARSE(ExtensionName)                                                \
+    class ExtensionName##LogicalStage : public sdk::LogicalAggStage {};                         \
+    class ExtensionName##AstNode : public sdk::AggStageAstNode {                                \
+        std::unique_ptr<sdk::LogicalAggStage> bind() const override {                           \
+            return std::make_unique<ExtensionName##LogicalStage>();                             \
+        };                                                                                      \
+    };                                                                                          \
+    class ExtensionName##ParseNode : public sdk::AggStageParseNode {                            \
+        size_t getExpandedSize() const override {                                               \
+            return 1;                                                                           \
+        }                                                                                       \
+        std::vector<sdk::VariantNode> expand() const override {                                 \
+            std::vector<sdk::VariantNode> expanded;                                             \
+            expanded.reserve(getExpandedSize());                                                \
+            expanded.emplace_back(                                                              \
+                new sdk::ExtensionAggStageAstNode(std::make_unique<ExtensionName##AstNode>())); \
+            return expanded;                                                                    \
+        }                                                                                       \
+        mongo::BSONObj getQueryShape(                                                           \
+            const ::MongoExtensionHostQueryShapeOpts* ctx) const override {                     \
+            return mongo::BSONObj();                                                            \
+        }                                                                                       \
     };

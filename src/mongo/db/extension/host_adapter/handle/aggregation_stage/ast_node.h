@@ -38,13 +38,13 @@
 namespace mongo::extension::host_adapter {
 
 /**
- * AggregationStageAstNodeHandle is an owned handle wrapper around a
- * MongoExtensionAggregationStageAstNode.
+ * AggStageAstNodeHandle is an owned handle wrapper around a
+ * MongoExtensionAggStageAstNode.
  */
-class AggregationStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggregationStageAstNode> {
+class AggStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggStageAstNode> {
 public:
-    AggregationStageAstNodeHandle(::MongoExtensionAggregationStageAstNode* ptr)
-        : OwnedHandle<::MongoExtensionAggregationStageAstNode>(ptr) {
+    AggStageAstNodeHandle(::MongoExtensionAggStageAstNode* ptr)
+        : OwnedHandle<::MongoExtensionAggStageAstNode>(ptr) {
         _assertValidVTable();
     }
 
@@ -56,12 +56,11 @@ public:
      * On failure, the error triggers an assertion.
      *
      */
-    LogicalAggregationStageHandle bind() const;
+    LogicalAggStageHandle bind() const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(
-            11113700, "ExtensionAggregationStageAstNode 'bind' is null", vtable.bind != nullptr);
+        tassert(11113700, "ExtensionAggStageAstNode 'bind' is null", vtable.bind != nullptr);
     }
 };
 }  // namespace mongo::extension::host_adapter

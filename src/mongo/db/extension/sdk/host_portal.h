@@ -51,11 +51,11 @@ public:
     HostPortalHandle(const ::MongoExtensionHostPortal* portal)
         : UnownedHandle<const ::MongoExtensionHostPortal>(portal) {}
 
-    void registerStageDescriptor(const ExtensionAggregationStageDescriptor* stageDesc) const {
+    void registerStageDescriptor(const ExtensionAggStageDescriptor* stageDesc) const {
         invokeCAndConvertStatusToException([&] {
             assertValid();
-            return vtable().registerStageDescriptor(
-                reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(stageDesc));
+            return vtable().register_stage_descriptor(
+                reinterpret_cast<const ::MongoExtensionAggStageDescriptor*>(stageDesc));
         });
     }
 
@@ -71,17 +71,17 @@ public:
 
     YAML::Node getExtensionOptions() const {
         assertValid();
-        return YAML::Load(std::string(byteViewAsStringView(vtable().getExtensionOptions(get()))));
+        return YAML::Load(std::string(byteViewAsStringView(vtable().get_extension_options(get()))));
     }
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(10926401,
                 "Extension 'registerStageDescriptor' is null",
-                vtable.registerStageDescriptor != nullptr);
+                vtable.register_stage_descriptor != nullptr);
         tassert(10999108,
                 "Extension 'getExtensionOptions' is null",
-                vtable.getExtensionOptions != nullptr);
+                vtable.get_extension_options != nullptr);
     };
 };
 

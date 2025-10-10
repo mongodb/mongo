@@ -42,14 +42,14 @@ DEFAULT_LOGICAL_AST_PARSE(VectorSearch)
  * $vectorSearch is stage used to imitate overriding the existing $vectorSearch implementation
  * with an extension stage.
  */
-class VectorSearchStageDescriptor : public sdk::AggregationStageDescriptor {
+class VectorSearchStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$vectorSearch";
 
     VectorSearchStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
         return std::make_unique<VectorSearchParseNode>();

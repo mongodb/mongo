@@ -43,12 +43,11 @@ public:
         : ::MongoExtensionHostPortal{&VTABLE, apiVersion, maxWireVersion},
           _extensionOpts(std::move(extensionOptions)) {}
 
-    static void registerStageDescriptor(
-        const ::MongoExtensionAggregationStageDescriptor* descriptor);
+    static void registerStageDescriptor(const ::MongoExtensionAggStageDescriptor* descriptor);
 
 private:
     static ::MongoExtensionStatus* _extRegisterStageDescriptor(
-        const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept;
+        const MongoExtensionAggStageDescriptor* stageDesc) noexcept;
 
     static ::MongoExtensionByteView _extGetOptions(
         const ::MongoExtensionHostPortal* portal) noexcept;

@@ -42,16 +42,16 @@
 namespace mongo::extension::sdk {
 
 /**
- * Wrapper for ::MongoHostQueryShapeOpts, providing safe access to its public API through the
- * underlying vtable.
+ * Wrapper for ::MongoExtensionHostQueryShapeOpts, providing safe access to its public API through
+ * the underlying vtable.
  *
  * This is an unowned handle, meaning the object is fully owned by the host, and
  * ownership is never transferred to the extension.
  */
-class QueryShapeOptsHandle : public UnownedHandle<const ::MongoHostQueryShapeOpts> {
+class QueryShapeOptsHandle : public UnownedHandle<const ::MongoExtensionHostQueryShapeOpts> {
 public:
-    QueryShapeOptsHandle(const ::MongoHostQueryShapeOpts* ctx)
-        : UnownedHandle<const ::MongoHostQueryShapeOpts>(ctx) {}
+    QueryShapeOptsHandle(const ::MongoExtensionHostQueryShapeOpts* ctx)
+        : UnownedHandle<const ::MongoExtensionHostQueryShapeOpts>(ctx) {}
 
     std::string serializeIdentifier(const std::string& identifier) const;
 
@@ -82,7 +82,7 @@ private:
     template <typename T>
     T serializeUsingOptsHelper(
         const MongoExtensionByteView* byteViewToSerialize,
-        const std::function<MongoExtensionStatus*(const MongoHostQueryShapeOpts*,
+        const std::function<MongoExtensionStatus*(const MongoExtensionHostQueryShapeOpts*,
                                                   const MongoExtensionByteView*,
                                                   ::MongoExtensionByteBuf**)>& apiFunc,
         const std::function<T(const VecByteBufHandle&)>& transformBufferToReturn) const;

@@ -86,16 +86,16 @@ Note that when a `MongoExtensionStatus` is returned by a function call, ownershi
 transferred to the caller of the function. Once the error is no longer needed by the caller,
 its deallocation must be delegated to the other side of the API boundary.
 
-## MongoExtensionAggregationStageDescriptor
+## MongoExtensionAggStageDescriptor
 
-A `MongoExtensionAggregationStageDescriptor` describes features of an aggregation stage that are
+A `MongoExtensionAggStageDescriptor` describes features of an aggregation stage that are
 not bound to the stage definition. This object functions as a factory to create a logical stage
-through parsing. Note, that a `MongoExtensionAggregationStageDescriptor` is always fully owned by
+through parsing. Note, that a `MongoExtensionAggStageDescriptor` is always fully owned by
 the extension, and is expected to remain valid for the entire time an extension is loaded.
 
-## MongoExtensionLogicalAggregationStage
+## MongoExtensionLogicalAggStage
 
-A `MongoExtensionLogicalAggregationStage` describes a stage that has been parsed and bound to
+A `MongoExtensionLogicalAggStage` describes a stage that has been parsed and bound to
 instance specific context -- the stage definition and other context data from the pipeline.
 These objects are suitable for pipeline optimization. Once optimization is complete they can
 be used to generate objects for execution.

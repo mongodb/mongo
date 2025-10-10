@@ -39,14 +39,14 @@ namespace sdk = mongo::extension::sdk;
 
 DEFAULT_LOGICAL_AST_PARSE(TestBuzz)
 
-class TestBuzzStageDescriptor : public sdk::AggregationStageDescriptor {
+class TestBuzzStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$testBuzz";
 
     TestBuzzStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
         return std::make_unique<TestBuzzParseNode>();

@@ -35,13 +35,13 @@
 namespace mongo::extension::host_adapter {
 
 /**
- * LogicalAggregationStageHandle is an owned handle wrapper around a
- * MongoExtensionLogicalAggregationStage.
+ * LogicalAggStageHandle is an owned handle wrapper around a
+ * MongoExtensionLogicalAggStage.
  */
-class LogicalAggregationStageHandle : public OwnedHandle<::MongoExtensionLogicalAggregationStage> {
+class LogicalAggStageHandle : public OwnedHandle<::MongoExtensionLogicalAggStage> {
 public:
-    LogicalAggregationStageHandle(::MongoExtensionLogicalAggregationStage* ptr)
-        : OwnedHandle<::MongoExtensionLogicalAggregationStage>(ptr) {
+    LogicalAggStageHandle(::MongoExtensionLogicalAggStage* ptr)
+        : OwnedHandle<::MongoExtensionLogicalAggStage>(ptr) {
         _assertValidVTable();
     }
 

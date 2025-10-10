@@ -35,30 +35,28 @@
 namespace sdk = mongo::extension::sdk;
 
 // Defines a complete extension version (Extension, StageDescriptor, ParseNode, and LogicalStage).
-#define DEFINE_EXTENSION_VERSION(VERSION_NUM)                                                 \
-    DEFAULT_LOGICAL_AST_PARSE(ExtensionV##VERSION_NUM)                                        \
-                                                                                              \
-    class ExtensionV##VERSION_NUM##StageDescriptor : public sdk::AggregationStageDescriptor { \
-    public:                                                                                   \
-        static inline const std::string kStageName = "$extensionV" #VERSION_NUM;              \
-                                                                                              \
-        ExtensionV##VERSION_NUM##StageDescriptor()                                            \
-            : sdk::AggregationStageDescriptor(kStageName,                                     \
-                                              MongoExtensionAggregationStageType::kNoOp) {}   \
-                                                                                              \
-        std::unique_ptr<sdk::AggregationStageParseNode> parse(                                \
-            mongo::BSONObj stageBson) const override {                                        \
-            sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);       \
-                                                                                              \
-            return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>();                    \
-        }                                                                                     \
-    };                                                                                        \
-                                                                                              \
-    class ExtensionV##VERSION_NUM : public sdk::Extension {                                   \
-    public:                                                                                   \
-        void initialize(const sdk::HostPortalHandle& portal) override {                       \
-            _registerStage<ExtensionV##VERSION_NUM##StageDescriptor>(portal);                 \
-        }                                                                                     \
+#define DEFINE_EXTENSION_VERSION(VERSION_NUM)                                                    \
+    DEFAULT_LOGICAL_AST_PARSE(ExtensionV##VERSION_NUM)                                           \
+                                                                                                 \
+    class ExtensionV##VERSION_NUM##StageDescriptor : public sdk::AggStageDescriptor {            \
+    public:                                                                                      \
+        static inline const std::string kStageName = "$extensionV" #VERSION_NUM;                 \
+                                                                                                 \
+        ExtensionV##VERSION_NUM##StageDescriptor()                                               \
+            : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}          \
+                                                                                                 \
+        std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override { \
+            sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);          \
+                                                                                                 \
+            return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>();                       \
+        }                                                                                        \
+    };                                                                                           \
+                                                                                                 \
+    class ExtensionV##VERSION_NUM : public sdk::Extension {                                      \
+    public:                                                                                      \
+        void initialize(const sdk::HostPortalHandle& portal) override {                          \
+            _registerStage<ExtensionV##VERSION_NUM##StageDescriptor>(portal);                    \
+        }                                                                                        \
     };
 
 // Generate code for 4 extension versions, all with unique stage names.

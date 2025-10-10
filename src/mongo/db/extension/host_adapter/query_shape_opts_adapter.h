@@ -34,33 +34,35 @@
 
 namespace mongo::extension::host {
 /**
- * QueryShapeOptsAdapter is an adapter of ::MongoHostQueryShapeOpts,
+ * QueryShapeOptsAdapter is an adapter of ::MongoExtensionHostQueryShapeOpts,
  * providing host serialization options to extensions.
  */
-class QueryShapeOptsAdapter final : public ::MongoHostQueryShapeOpts {
+class QueryShapeOptsAdapter final : public ::MongoExtensionHostQueryShapeOpts {
 public:
     QueryShapeOptsAdapter(const SerializationOptions* opts)
-        : ::MongoHostQueryShapeOpts{&VTABLE}, _opts(opts) {}
+        : ::MongoExtensionHostQueryShapeOpts{&VTABLE}, _opts(opts) {}
 
     const SerializationOptions* getOptsImpl() const {
         return _opts;
     }
 
 private:
-    static MongoExtensionStatus* _extSerializeIdentifier(const ::MongoHostQueryShapeOpts* ctx,
-                                                         const ::MongoExtensionByteView* identifier,
-                                                         ::MongoExtensionByteBuf** output) noexcept;
+    static MongoExtensionStatus* _extSerializeIdentifier(
+        const ::MongoExtensionHostQueryShapeOpts* ctx,
+        const ::MongoExtensionByteView* identifier,
+        ::MongoExtensionByteBuf** output) noexcept;
 
-    static MongoExtensionStatus* _extSerializeFieldPath(const ::MongoHostQueryShapeOpts* ctx,
-                                                        const ::MongoExtensionByteView* fieldPath,
-                                                        ::MongoExtensionByteBuf** output) noexcept;
+    static MongoExtensionStatus* _extSerializeFieldPath(
+        const ::MongoExtensionHostQueryShapeOpts* ctx,
+        const ::MongoExtensionByteView* fieldPath,
+        ::MongoExtensionByteBuf** output) noexcept;
 
     static MongoExtensionStatus* _extSerializeLiteral(
-        const ::MongoHostQueryShapeOpts* ctx,
+        const ::MongoExtensionHostQueryShapeOpts* ctx,
         const ::MongoExtensionByteView* bsonElementPtr,
         ::MongoExtensionByteBuf** output) noexcept;
 
-    static constexpr ::MongoHostQueryShapeOptsVTable VTABLE{
+    static constexpr ::MongoExtensionHostQueryShapeOptsVTable VTABLE{
         &_extSerializeIdentifier, &_extSerializeFieldPath, &_extSerializeLiteral};
 
     const SerializationOptions* _opts;

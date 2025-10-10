@@ -36,12 +36,11 @@ namespace mongo::extension::sdk {
 
 MONGO_FAIL_POINT_DEFINE(failVariantNodeConversion);
 
-::MongoExtensionStatus* ExtensionAggregationStageParseNode::_extExpand(
-    const ::MongoExtensionAggregationStageParseNode* parseNode,
+::MongoExtensionStatus* ExtensionAggStageParseNode::_extExpand(
+    const ::MongoExtensionAggStageParseNode* parseNode,
     ::MongoExtensionExpandedArray* expanded) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl =
-            static_cast<const ExtensionAggregationStageParseNode*>(parseNode)->getImpl();
+        const auto& impl = static_cast<const ExtensionAggStageParseNode*>(parseNode)->getImpl();
         const auto expandedSize = impl.getExpandedSize();
         tassert(11113801,
                 str::stream() << "MongoExtensionExpandedArray.size must equal required size: "
@@ -50,7 +49,7 @@ MONGO_FAIL_POINT_DEFINE(failVariantNodeConversion);
 
         auto expandedNodes = impl.expand();
         tassert(11113802,
-                str::stream() << "AggregationStageParseNode expand() returned a different "
+                str::stream() << "AggStageParseNode expand() returned a different "
                                  "number of elements than getExpandedSize(): returned "
                               << expandedNodes.size() << ", but required " << expandedSize,
                 expandedNodes.size() == expandedSize);

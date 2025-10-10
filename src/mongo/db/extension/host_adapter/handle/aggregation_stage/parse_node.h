@@ -38,20 +38,17 @@
 
 namespace mongo::extension::host_adapter {
 
-class AggregationStageParseNodeHandle;
-using VariantNodeHandle =
-    std::variant<AggregationStageParseNodeHandle, AggregationStageAstNodeHandle>;
+class AggStageParseNodeHandle;
+using VariantNodeHandle = std::variant<AggStageParseNodeHandle, AggStageAstNodeHandle>;
 
 /**
- * AggregationStageParseNodeHandle is a wrapper around a
- * MongoExtensionAggregationStageParseNode.
+ * AggStageParseNodeHandle is a wrapper around a
+ * MongoExtensionAggStageParseNode.
  */
-class AggregationStageParseNodeHandle
-    : public OwnedHandle<::MongoExtensionAggregationStageParseNode> {
+class AggStageParseNodeHandle : public OwnedHandle<::MongoExtensionAggStageParseNode> {
 public:
-    AggregationStageParseNodeHandle(
-        absl::Nonnull<::MongoExtensionAggregationStageParseNode*> parseNode)
-        : OwnedHandle<::MongoExtensionAggregationStageParseNode>(parseNode) {
+    AggStageParseNodeHandle(absl::Nonnull<::MongoExtensionAggStageParseNode*> parseNode)
+        : OwnedHandle<::MongoExtensionAggStageParseNode>(parseNode) {
         _assertValidVTable();
     }
 
@@ -73,14 +70,12 @@ public:
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(10977601,
-                "ExtensionAggregationStageParseNode 'get_query_shape' is null",
+                "ExtensionAggStageParseNode 'get_query_shape' is null",
                 vtable.get_query_shape != nullptr);
         tassert(11113800,
-                "ExtensionAggregationStageParseNode 'get_expanded_size' is null",
+                "ExtensionAggStageParseNode 'get_expanded_size' is null",
                 vtable.get_expanded_size != nullptr);
-        tassert(10977602,
-                "ExtensionAggregationStageParseNode 'expand' is null",
-                vtable.expand != nullptr);
+        tassert(10977602, "ExtensionAggStageParseNode 'expand' is null", vtable.expand != nullptr);
     }
 
 private:

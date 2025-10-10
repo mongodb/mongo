@@ -14,8 +14,8 @@ comprehensive set of interfaces in the API which the extension must service.
 
 `DocumentSourceExtension` delegates calls to its interface to the following Public API components:
 
-- `MongoExtensionAggregationStageDescriptor` (Static Descriptor)
-- `MongoExtensionLogicalAggregationStage` (Logical Stage)
+- `MongoExtensionAggStageDescriptor` (Static Descriptor)
+- `MongoExtensionLogicalAggStage` (Logical Stage)
 
 ## Loading Extensions
 

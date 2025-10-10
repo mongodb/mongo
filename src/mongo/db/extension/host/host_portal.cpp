@@ -34,16 +34,14 @@
 
 namespace mongo::extension::host {
 
-void HostPortal::registerStageDescriptor(
-    const ::MongoExtensionAggregationStageDescriptor* descriptor) {
+void HostPortal::registerStageDescriptor(const ::MongoExtensionAggStageDescriptor* descriptor) {
     tassert(
         10596400, "Got null stage descriptor during extension registration", descriptor != nullptr);
-    DocumentSourceExtension::registerStage(
-        host_adapter::AggregationStageDescriptorHandle(descriptor));
+    DocumentSourceExtension::registerStage(host_adapter::AggStageDescriptorHandle(descriptor));
 }
 
 ::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(
-    const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept {
+    const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() { return registerStageDescriptor(stageDesc); });
 }
 

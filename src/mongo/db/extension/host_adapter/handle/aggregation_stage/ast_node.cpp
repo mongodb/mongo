@@ -32,12 +32,12 @@
 
 namespace mongo::extension::host_adapter {
 
-LogicalAggregationStageHandle AggregationStageAstNodeHandle::bind() const {
-    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
+LogicalAggStageHandle AggStageAstNodeHandle::bind() const {
+    ::MongoExtensionLogicalAggStage* logicalStagePtr;
 
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
     invokeCAndConvertStatusToException([&]() { return vtable().bind(get(), &logicalStagePtr); });
 
-    return LogicalAggregationStageHandle(logicalStagePtr);
+    return LogicalAggStageHandle(logicalStagePtr);
 }
 }  // namespace mongo::extension::host_adapter

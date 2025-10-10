@@ -46,14 +46,14 @@ struct ExtensionOptions {
  *
  * The stage definition must be empty, like {$optionA: {}}, or it will fail to parse.
  */
-class OptionAStageDescriptor : public sdk::AggregationStageDescriptor {
+class OptionAStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$optionA";
 
     OptionAStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
         return std::make_unique<OptionAParseNode>();
@@ -65,14 +65,14 @@ public:
  *
  * The stage definition must be empty, like {$optionB: {}}, or it will fail to parse.
  */
-class OptionBStageDescriptor : public sdk::AggregationStageDescriptor {
+class OptionBStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$optionB";
 
     OptionBStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
         return std::make_unique<OptionBParseNode>();

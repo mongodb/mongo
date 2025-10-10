@@ -38,7 +38,7 @@ namespace mongo::extension::sdk {
 template <typename T>
 T QueryShapeOptsHandle::serializeUsingOptsHelper(
     const MongoExtensionByteView* byteView,
-    const std::function<MongoExtensionStatus*(const MongoHostQueryShapeOpts*,
+    const std::function<MongoExtensionStatus*(const MongoExtensionHostQueryShapeOpts*,
                                               const MongoExtensionByteView*,
                                               ::MongoExtensionByteBuf**)>& apiFunc,
     const std::function<T(const VecByteBufHandle&)>& transformBufferToReturn) const {

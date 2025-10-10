@@ -39,7 +39,7 @@ namespace mongo::extension::host_adapter {
 
 MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 
-BSONObj AggregationStageParseNodeHandle::getQueryShape(const SerializationOptions& opts) const {
+BSONObj AggStageParseNodeHandle::getQueryShape(const SerializationOptions& opts) const {
     ::MongoExtensionByteBuf* buf;
     const auto& vtbl = vtable();
     auto* ptr = get();
@@ -59,11 +59,10 @@ BSONObj AggregationStageParseNodeHandle::getQueryShape(const SerializationOption
     return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
 }
 
-std::vector<VariantNodeHandle> AggregationStageParseNodeHandle::expand() const {
+std::vector<VariantNodeHandle> AggStageParseNodeHandle::expand() const {
     // Host allocates buffer with the expected size.
     const auto expandedSize = getExpandedSize();
-    tassert(
-        11113803, "AggregationStageParseNode getExpandedSize() must be >= 1", expandedSize >= 1);
+    tassert(11113803, "AggStageParseNode getExpandedSize() must be >= 1", expandedSize >= 1);
     std::vector<::MongoExtensionExpandedArrayElement> buf{expandedSize};
     ::MongoExtensionExpandedArray expandedArray{expandedSize, buf.data()};
 

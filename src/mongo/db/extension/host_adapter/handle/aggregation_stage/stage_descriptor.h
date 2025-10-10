@@ -41,15 +41,13 @@
 namespace mongo::extension::host_adapter {
 
 /**
- * AggregationStageDescriptorHandle is a wrapper around a
- * MongoExtensionAggregationStageDescriptor.
+ * AggStageDescriptorHandle is a wrapper around a
+ * MongoExtensionAggStageDescriptor.
  */
-class AggregationStageDescriptorHandle
-    : public UnownedHandle<const ::MongoExtensionAggregationStageDescriptor> {
+class AggStageDescriptorHandle : public UnownedHandle<const ::MongoExtensionAggStageDescriptor> {
 public:
-    AggregationStageDescriptorHandle(
-        absl::Nonnull<const ::MongoExtensionAggregationStageDescriptor*> descriptor)
-        : UnownedHandle<const ::MongoExtensionAggregationStageDescriptor>(descriptor) {
+    AggStageDescriptorHandle(absl::Nonnull<const ::MongoExtensionAggStageDescriptor*> descriptor)
+        : UnownedHandle<const ::MongoExtensionAggStageDescriptor>(descriptor) {
         _assertValidVTable();
     }
 
@@ -64,7 +62,7 @@ public:
     /**
      * Return the type for this stage.
      */
-    MongoExtensionAggregationStageType getType() const {
+    MongoExtensionAggStageType getType() const {
         return vtable().get_type(get());
     }
 
@@ -78,19 +76,15 @@ public:
      * On failure, the error triggers an assertion.
      *
      */
-    AggregationStageParseNodeHandle parse(BSONObj stageBson) const;
+    AggStageParseNodeHandle parse(BSONObj stageBson) const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10930102,
-                "ExtensionAggregationStageDescriptor 'get_name' is null",
-                vtable.get_name != nullptr);
-        tassert(10930103,
-                "ExtensionAggregationStageDescriptor 'get_type' is null",
-                vtable.get_type != nullptr);
-        tassert(10930104,
-                "ExtensionAggregationStageDescriptor 'parse' is null",
-                vtable.parse != nullptr);
+        tassert(
+            10930102, "ExtensionAggStageDescriptor 'get_name' is null", vtable.get_name != nullptr);
+        tassert(
+            10930103, "ExtensionAggStageDescriptor 'get_type' is null", vtable.get_type != nullptr);
+        tassert(10930104, "ExtensionAggStageDescriptor 'parse' is null", vtable.parse != nullptr);
     }
 };
 

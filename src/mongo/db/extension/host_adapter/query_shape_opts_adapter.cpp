@@ -35,7 +35,7 @@
 namespace mongo::extension::host {
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
-    const ::MongoHostQueryShapeOpts* ctx,
+    const ::MongoExtensionHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* identifier,
     ::MongoExtensionByteBuf** output) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -52,7 +52,7 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
 }
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
-    const ::MongoHostQueryShapeOpts* ctx,
+    const ::MongoExtensionHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* fieldPath,
     ::MongoExtensionByteBuf** output) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -69,7 +69,7 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
 }
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
-    const ::MongoHostQueryShapeOpts* ctx,
+    const ::MongoExtensionHostQueryShapeOpts* ctx,
     const ::MongoExtensionByteView* bsonElementPtr,
     ::MongoExtensionByteBuf** output) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {

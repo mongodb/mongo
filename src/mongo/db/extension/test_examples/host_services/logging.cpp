@@ -42,15 +42,14 @@ namespace sdk = mongo::extension::sdk;
  */
 DEFAULT_LOGICAL_AST_PARSE(Log);
 
-class LogStageDescriptor : public sdk::AggregationStageDescriptor {
+class LogStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$log";
     static inline const std::string kNumInfoLogLinesField = "numInfoLogLines";
 
-    LogStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+    LogStageDescriptor() : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         // Log an error log and short-circuit if the spec is empty or not an object.
         if (!stageBson.hasField(kStageName) || !stageBson.getField(kStageName).isABSONObj() ||
             stageBson.getField(kStageName).Obj().isEmpty()) {

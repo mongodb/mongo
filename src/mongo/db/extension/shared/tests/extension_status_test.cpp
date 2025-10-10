@@ -53,8 +53,8 @@ TEST(ExtensionStatusTest, extensionStatusOKTest) {
 }
 
 // Test that a std::exception correctly returns MONGO_EXTENSION_STATUS_RUNTIME_ERROR when called via
-// enterCXX.
-TEST(ExtensionStatusTest, extensionStatusEnterCXX_stdException) {
+// wrapCXXAndConvertExceptionToStatus.
+TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_stdException) {
     HostStatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
@@ -62,7 +62,9 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_stdException) {
 
 // Test that a std::exception can be rethrown when it crosses from a C++ context through the C API
 // boundary and back to a C++ context.
-TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_stdException) {
+TEST(
+    ExtensionStatusTest,
+    extensionStatusWrapCXXAndConvertExceptionToStatus_invokeCAndConvertStatusToException_rethrow_stdException) {
     ASSERT_THROWS(invokeCAndConvertStatusToException([&]() {
                       return wrapCXXAndConvertExceptionToStatus([&]() {
                           throw std::runtime_error("Runtime exception in $noOpExtension parse.");
@@ -71,9 +73,9 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_stdException) {
                   std::exception);
 }
 
-// Test that enterCXX correctly wraps a DBException (uassert) and returns the correct code when a
-// call is made at the C API boundary.
-TEST(ExtensionStatusTest, extensionStatusEnterCXX_AssertionException) {
+// Test that wrapCXXAndConvertExceptionToStatus correctly wraps a DBException (uassert) and returns
+// the correct code when a call is made at the C API boundary.
+TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_AssertionException) {
     HostStatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == 10596408);
@@ -81,7 +83,9 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_AssertionException) {
 
 // Test that a DBException (uassert) can be rethrown when it crosses from a C++ context through the
 // C API boundary and back to a C++ context.
-TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_AssertionException) {
+TEST(
+    ExtensionStatusTest,
+    extensionStatusWrapCXXAndConvertExceptionToStatus_invokeCAndConvertStatusToException_rethrow_AssertionException) {
     ASSERT_THROWS_CODE(invokeCAndConvertStatusToException([&]() {
                            return wrapCXXAndConvertExceptionToStatus([&]() {
                                uasserted(10596409, "Failed with uassert in $noOpExtension parse.");
@@ -98,7 +102,9 @@ TEST(ExtensionStatusTest, extensionStatusEnterCXX_enterC_rethrow_AssertionExcept
  * no underlying exception that can be rethrown. Instead, we throw a ExtensionDBException that wraps
  * the underlying MongoExtensinStatus.
  */
-TEST(ExtensionStatusTest, extensionStatusEnterC_enterCXX_ExtensionDBException) {
+TEST(
+    ExtensionStatusTest,
+    extensionStatusInvokeCAndConvertStatusToException_wrapCXXAndConvertExceptionToStatus_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
     auto extensionStatusPtr =
@@ -115,7 +121,7 @@ TEST(ExtensionStatusTest, extensionStatusEnterC_enterCXX_ExtensionDBException) {
     ASSERT_TRUE(propagatedStatus.get() == extensionStatusOriginalPtr);
 }
 
-TEST(ExtensionStatusTest, extensionStatusEnterC_ExtensionDBException) {
+TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
     ASSERT_THROWS_CODE_AND_WHAT(invokeCAndConvertStatusToException([&]() {

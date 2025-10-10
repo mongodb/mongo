@@ -43,15 +43,15 @@ namespace sdk = mongo::extension::sdk;
  */
 DEFAULT_LOGICAL_AST_PARSE(DebugLog);
 
-class DebugLogStageDescriptor : public sdk::AggregationStageDescriptor {
+class DebugLogStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$debugLog";
     static inline const std::string kDebugLogLevelField = "level";
 
     DebugLogStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
         userAssert(11134101,

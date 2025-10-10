@@ -37,7 +37,7 @@
 #include <memory>
 
 /**
- * A host `AggregationStageAstNode` should be allocated for internal stages that we don't expect to
+ * A host `AggStageAstNode` should be allocated for internal stages that we don't expect to
  * be written in user pipelines and don't participate in query shape.
  */
 namespace mongo::extension::host {
@@ -48,11 +48,11 @@ namespace mongo::extension::host {
  * This class wraps the BSON specification for the internal stage $_internalSearchIdLookup and
  * serves as a node that a host-defined parse node can expand into.
  */
-class AggregationStageAstNode {
+class AggStageAstNode {
 public:
-    AggregationStageAstNode(BSONObj spec) : _spec(spec.getOwned()) {}
+    AggStageAstNode(BSONObj spec) : _spec(spec.getOwned()) {}
 
-    ~AggregationStageAstNode() = default;
+    ~AggStageAstNode() = default;
 
     /**
      * Gets the BSON representation of the $_internalSearchIdLookup stage. This will be extended to
@@ -69,33 +69,33 @@ private:
 };
 
 /**
- * Boundary object representation of a ::MongoExtensionAggregationStageAstNode.
+ * Boundary object representation of a ::MongoExtensionAggStageAstNode.
  *
  * This class abstracts the C++ implementation of the extension and provides the interface at the
  * API boundary which will be called upon by the host. The static VTABLE member points to static
  * methods which ensure the correct conversion from C++ context to the C API context.
  *
  * This abstraction is required to ensure we maintain the public
- * ::MongoExtensionAggregationStageAstNode interface and layout as dictated by the public API.
- * Any polymorphic behavior must be deferred to and implemented by the AggregationStageAstNode.
+ * ::MongoExtensionAggStageAstNode interface and layout as dictated by the public API.
+ * Any polymorphic behavior must be deferred to and implemented by the AggStageAstNode.
  *
- * WARNING: Do not use the HostAggregationStageAstNode vtable function `bind`. It is
- * unimplemented. Future work will enable a HostAggregationStageAstNode to bind directly into a
+ * WARNING: Do not use the HostAggStageAstNode vtable function `bind`. It is
+ * unimplemented. Future work will enable a HostAggStageAstNode to bind directly into a
  * host-implemented LiteParsedExpandedDocumentSource and thus provide an implementation for `bind`.
  */
-class HostAggregationStageAstNode final : public ::MongoExtensionAggregationStageAstNode {
+class HostAggStageAstNode final : public ::MongoExtensionAggStageAstNode {
 public:
-    HostAggregationStageAstNode(std::unique_ptr<AggregationStageAstNode> astNode)
-        : ::MongoExtensionAggregationStageAstNode(&VTABLE), _astNode(std::move(astNode)) {}
+    HostAggStageAstNode(std::unique_ptr<AggStageAstNode> astNode)
+        : ::MongoExtensionAggStageAstNode(&VTABLE), _astNode(std::move(astNode)) {}
 
-    ~HostAggregationStageAstNode() = default;
+    ~HostAggStageAstNode() = default;
 
     /**
      * Gets the BSON representation of the $_internalSearchIdLookup stage stored in the underlying
-     * AggregationStageAstNode. This will be extended to additional internal stage types in the
+     * AggStageAstNode. This will be extended to additional internal stage types in the
      * future.
      *
-     * The returned BSONObj is owned by the underlying AggregationStageAstNode. If you want the
+     * The returned BSONObj is owned by the underlying AggStageAstNode. If you want the
      * BSON to outlive this class instance, you should create your own copy.
      */
     inline BSONObj getIdLookupSpec() const {
@@ -105,33 +105,33 @@ public:
     /**
      * Specifies whether the provided AST node was allocated by the host.
      *
-     * Since ExtensionAggregationStageAstNode and HostAggregationStageAstNode implement the same
+     * Since ExtensionAggStageAstNode and HostAggStageAstNode implement the same
      * vtable, this function is necessary for differentiating between host- and extension-allocated
      * AST nodes.
      *
      * Use this function to check if an AST node is host-allocated before casting a
-     * MongoExtensionAggregationStageAstNode to a HostAggregationStageAstNode.
+     * MongoExtensionAggStageAstNode to a HostAggStageAstNode.
      */
-    static inline bool isHostAllocated(::MongoExtensionAggregationStageAstNode& astNode) {
+    static inline bool isHostAllocated(::MongoExtensionAggStageAstNode& astNode) {
         return astNode.vtable == &VTABLE;
     }
 
 private:
-    const AggregationStageAstNode& getImpl() const noexcept {
+    const AggStageAstNode& getImpl() const noexcept {
         return *_astNode;
     }
 
-    AggregationStageAstNode& getImpl() noexcept {
+    AggStageAstNode& getImpl() noexcept {
         return *_astNode;
     }
 
-    static void _hostDestroy(::MongoExtensionAggregationStageAstNode* astNode) noexcept {
-        delete static_cast<HostAggregationStageAstNode*>(astNode);
+    static void _hostDestroy(::MongoExtensionAggStageAstNode* astNode) noexcept {
+        delete static_cast<HostAggStageAstNode*>(astNode);
     }
 
     static ::MongoExtensionStatus* _hostBind(
-        const ::MongoExtensionAggregationStageAstNode* astNode,
-        ::MongoExtensionLogicalAggregationStage** logicalStage) noexcept {
+        const ::MongoExtensionAggStageAstNode* astNode,
+        ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(11133600,
                       "_hostBind should not be called. Ensure that astNode is "
@@ -139,9 +139,9 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggregationStageAstNodeVTable VTABLE{.destroy = &_hostDestroy,
-                                                                          .bind = &_hostBind};
+    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE{.destroy = &_hostDestroy,
+                                                                  .bind = &_hostBind};
 
-    std::unique_ptr<AggregationStageAstNode> _astNode;
+    std::unique_ptr<AggStageAstNode> _astNode;
 };
 };  // namespace mongo::extension::host

@@ -37,7 +37,7 @@
 #include <memory>
 
 /**
- * A host `AggregationStageParseNode` should be allocated for server stages that can be written in a
+ * A host `AggStageParseNode` should be allocated for server stages that can be written in a
  * user pipeline and can participate in query shape.
  */
 namespace mongo::extension::host {
@@ -51,11 +51,11 @@ namespace mongo::extension::host {
  * into a LiteParsedDocumentSource for preliminary validation and later into a fully constructed
  * DocumentSource stage during full pipeline parsing.
  */
-class AggregationStageParseNode {
+class AggStageParseNode {
 public:
-    AggregationStageParseNode(BSONObj spec) : _spec(spec.getOwned()) {}
+    AggStageParseNode(BSONObj spec) : _spec(spec.getOwned()) {}
 
-    ~AggregationStageParseNode() = default;
+    ~AggStageParseNode() = default;
 
     /**
      * Gets the BSON representation of the host-defined aggregation stage.
@@ -71,32 +71,32 @@ private:
 };
 
 /**
- * Boundary object representation of a ::MongoExtensionAggregationStageParseNode.
+ * Boundary object representation of a ::MongoExtensionAggStageParseNode.
  *
  * This class abstracts the C++ implementation of the extension and provides the interface at the
  * API boundary which will be called upon by the host. The static VTABLE member points to static
  * methods which ensure the correct conversion from C++ context to the C API context.
  *
  * This abstraction is required to ensure we maintain the public
- * ::MongoExtensionAggregationStageParseNode interface and layout as dictated by the public API.
- * Any polymorphic behavior must be deferred to and implemented by the AggregationStageParseNode.
+ * ::MongoExtensionAggStageParseNode interface and layout as dictated by the public API.
+ * Any polymorphic behavior must be deferred to and implemented by the AggStageParseNode.
  *
- * WARNING: Do not use the HostAggregationStageParseNode vtable functions. They are unimplemented.
- * Future work will enable a HostAggregationStageParseNode to expand into a host-implemented
+ * WARNING: Do not use the HostAggStageParseNode vtable functions. They are unimplemented.
+ * Future work will enable a HostAggStageParseNode to expand into a host-implemented
  * LiteParsedDocumentSource and thus provide an implementation for `getQueryShape`, `expand`, etc.
  */
-class HostAggregationStageParseNode final : public ::MongoExtensionAggregationStageParseNode {
+class HostAggStageParseNode final : public ::MongoExtensionAggStageParseNode {
 public:
-    HostAggregationStageParseNode(std::unique_ptr<AggregationStageParseNode> parseNode)
-        : ::MongoExtensionAggregationStageParseNode(&VTABLE), _parseNode(std::move(parseNode)) {}
+    HostAggStageParseNode(std::unique_ptr<AggStageParseNode> parseNode)
+        : ::MongoExtensionAggStageParseNode(&VTABLE), _parseNode(std::move(parseNode)) {}
 
-    ~HostAggregationStageParseNode() = default;
+    ~HostAggStageParseNode() = default;
 
     /**
      * Gets the BSON representation of the host-defined aggregation stage stored in the underlying
-     * AggregationStageParseNode.
+     * AggStageParseNode.
      *
-     * The returned BSONObj is owned by the underlying AggregationStageParseNode. If you want the
+     * The returned BSONObj is owned by the underlying AggStageParseNode. If you want the
      * BSON to outlive this class instance, you should create your own copy.
      */
     inline BSONObj getBsonSpec() const {
@@ -106,33 +106,33 @@ public:
     /**
      * Specifies whether the provided parse node was allocated by the host.
      *
-     * Since ExtensionAggregationStageParseNode and HostAggregationStageParseNode implement the same
+     * Since ExtensionAggStageParseNode and HostAggStageParseNode implement the same
      * vtable, this function is necessary for differentiating between host- and extension-allocated
      * parse nodes.
      *
      * Use this function to check if a parse node is host-allocated before casting a
-     * MongoExtensionAggregationStageParseNode to a HostAggregationStageParseNode.
+     * MongoExtensionAggStageParseNode to a HostAggStageParseNode.
      */
-    static inline bool isHostAllocated(::MongoExtensionAggregationStageParseNode& parseNode) {
+    static inline bool isHostAllocated(::MongoExtensionAggStageParseNode& parseNode) {
         return parseNode.vtable == &VTABLE;
     }
 
 private:
-    const AggregationStageParseNode& getImpl() const noexcept {
+    const AggStageParseNode& getImpl() const noexcept {
         return *_parseNode;
     }
 
-    AggregationStageParseNode& getImpl() noexcept {
+    AggStageParseNode& getImpl() noexcept {
         return *_parseNode;
     }
 
-    static void _hostDestroy(::MongoExtensionAggregationStageParseNode* parseNode) noexcept {
-        delete static_cast<HostAggregationStageParseNode*>(parseNode);
+    static void _hostDestroy(::MongoExtensionAggStageParseNode* parseNode) noexcept {
+        delete static_cast<HostAggStageParseNode*>(parseNode);
     }
 
     static ::MongoExtensionStatus* _hostGetQueryShape(
-        const ::MongoExtensionAggregationStageParseNode* parseNode,
-        const ::MongoHostQueryShapeOpts* ctx,
+        const ::MongoExtensionAggStageParseNode* parseNode,
+        const ::MongoExtensionHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(10977800,
@@ -142,7 +142,7 @@ private:
     };
 
     static size_t _hostGetExpandedSize(
-        const ::MongoExtensionAggregationStageParseNode* parseNode) noexcept {
+        const ::MongoExtensionAggStageParseNode* parseNode) noexcept {
         // This function should not be called, but tassert cannot be used because C++ errors must
         // not propagate across the C ABI boundary and the return type of this function is size_t.
         // Since the invariant that get_expansion_size returns a size > 0 is enforced elsewhere,
@@ -151,7 +151,7 @@ private:
     }
 
     static ::MongoExtensionStatus* _hostExpand(
-        const ::MongoExtensionAggregationStageParseNode* parseNode,
+        const ::MongoExtensionAggStageParseNode* parseNode,
         ::MongoExtensionExpandedArray* outExpanded) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(10977801,
@@ -160,12 +160,12 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggregationStageParseNodeVTable VTABLE{
+    static constexpr ::MongoExtensionAggStageParseNodeVTable VTABLE{
         .destroy = &_hostDestroy,
         .get_query_shape = &_hostGetQueryShape,
         .get_expanded_size = &_hostGetExpandedSize,
         .expand = &_hostExpand};
 
-    std::unique_ptr<AggregationStageParseNode> _parseNode;
+    std::unique_ptr<AggStageParseNode> _parseNode;
 };
 };  // namespace mongo::extension::host

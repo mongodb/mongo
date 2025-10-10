@@ -37,14 +37,14 @@ namespace mongo::extension {
 
 namespace {
 
-class NoOpHostParseNode : public host::AggregationStageParseNode {
+class NoOpHostParseNode : public host::AggStageParseNode {
 public:
-    static inline std::unique_ptr<host::AggregationStageParseNode> make(BSONObj spec) {
+    static inline std::unique_ptr<host::AggStageParseNode> make(BSONObj spec) {
         return std::make_unique<NoOpHostParseNode>(spec);
     }
 };
 
-class NoOpExtensionParseNode : public sdk::AggregationStageParseNode {
+class NoOpExtensionParseNode : public sdk::AggStageParseNode {
 public:
     size_t getExpandedSize() const override {
         MONGO_UNIMPLEMENTED;
@@ -54,11 +54,11 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         MONGO_UNIMPLEMENTED;
     }
 
-    static inline std::unique_ptr<sdk::AggregationStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<NoOpExtensionParseNode>();
     }
 };
@@ -67,11 +67,10 @@ class HostParseNodeVTableTest : public unittest::Test {
 public:
     // This special handle class is only used within this fixture so that we can unit test the
     // assertVTableConstraints functionality of the handle.
-    class TestHostParseNodeVTableHandle : public host_adapter::AggregationStageParseNodeHandle {
+    class TestHostParseNodeVTableHandle : public host_adapter::AggStageParseNodeHandle {
     public:
-        TestHostParseNodeVTableHandle(
-            absl::Nonnull<::MongoExtensionAggregationStageParseNode*> parseNode)
-            : host_adapter::AggregationStageParseNodeHandle(parseNode) {};
+        TestHostParseNodeVTableHandle(absl::Nonnull<::MongoExtensionAggStageParseNode*> parseNode)
+            : host_adapter::AggStageParseNodeHandle(parseNode) {};
 
         void assertVTableConstraints(const VTable_t& vtable) {
             _assertVTableConstraints(vtable);
@@ -83,37 +82,34 @@ TEST(HostParseNodeTest, GetSpec) {
     auto spec = BSON("foo" << BSON("bar" << 0));
 
     // Get BSON spec directly.
-    auto parseNode = host::AggregationStageParseNode{spec};
+    auto parseNode = host::AggStageParseNode{spec};
     ASSERT_TRUE(parseNode.getBsonSpec().binaryEqual(spec));
 
     // Get BSON spec through handle.
     auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make(spec));
-    auto handle = host_adapter::AggregationStageParseNodeHandle{noOpParseNode.release()};
-    ASSERT_TRUE(static_cast<host::HostAggregationStageParseNode*>(handle.get())
-                    ->getBsonSpec()
-                    .binaryEqual(spec));
+        std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make(spec));
+    auto handle = host_adapter::AggStageParseNodeHandle{noOpParseNode.release()};
+    ASSERT_TRUE(
+        static_cast<host::HostAggStageParseNode*>(handle.get())->getBsonSpec().binaryEqual(spec));
 }
 
 TEST(HostParseNodeTest, IsHostAllocated) {
-    auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make({}));
-    auto handle = host_adapter::AggregationStageParseNodeHandle{noOpParseNode.release()};
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
+    auto handle = host_adapter::AggStageParseNodeHandle{noOpParseNode.release()};
 
-    ASSERT_TRUE(host::HostAggregationStageParseNode::isHostAllocated(*handle.get()));
+    ASSERT_TRUE(host::HostAggStageParseNode::isHostAllocated(*handle.get()));
 }
 
 TEST(HostParseNodeTest, IsNotHostAllocated) {
     auto noOpExtensionParseNode =
-        std::make_unique<sdk::ExtensionAggregationStageParseNode>(NoOpExtensionParseNode::make());
-    auto handle = host_adapter::AggregationStageParseNodeHandle{noOpExtensionParseNode.release()};
+        std::make_unique<sdk::ExtensionAggStageParseNode>(NoOpExtensionParseNode::make());
+    auto handle = host_adapter::AggStageParseNodeHandle{noOpExtensionParseNode.release()};
 
-    ASSERT_FALSE(host::HostAggregationStageParseNode::isHostAllocated(*handle.get()));
+    ASSERT_FALSE(host::HostAggStageParseNode::isHostAllocated(*handle.get()));
 }
 
 DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977601") {
-    auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make({}));
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
     auto handle = TestHostParseNodeVTableHandle{noOpParseNode.release()};
 
     auto vtable = handle.vtable();
@@ -122,8 +118,7 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, 
 };
 
 DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
-    auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make({}));
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
     auto handle = TestHostParseNodeVTableHandle{noOpParseNode.release()};
 
     auto vtable = handle.vtable();
@@ -132,8 +127,7 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize
 };
 
 DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602") {
-    auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make({}));
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
     auto handle = TestHostParseNodeVTableHandle{noOpParseNode.release()};
 
     auto vtable = handle.vtable();
@@ -142,18 +136,16 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "109776
 };
 
 DEATH_TEST(HostParseNodeTest, HostGetQueryShapeUnimplemented, "10977800") {
-    auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make({}));
-    auto handle = host_adapter::AggregationStageParseNodeHandle{noOpParseNode.release()};
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
+    auto handle = host_adapter::AggStageParseNodeHandle{noOpParseNode.release()};
 
     ::MongoExtensionByteBuf* shape = {};
     handle.vtable().get_query_shape(noOpParseNode.get(), nullptr, &shape);
 }
 
 DEATH_TEST(HostParseNodeTest, HostGetExpandedSizeUnimplemented, "11113803") {
-    auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make({}));
-    auto handle = host_adapter::AggregationStageParseNodeHandle{noOpParseNode.release()};
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
+    auto handle = host_adapter::AggStageParseNodeHandle{noOpParseNode.release()};
 
     ASSERT_EQ(handle.vtable().get_expanded_size(noOpParseNode.get()), 0);
 
@@ -164,9 +156,8 @@ DEATH_TEST(HostParseNodeTest, HostGetExpandedSizeUnimplemented, "11113803") {
 }
 
 DEATH_TEST(HostParseNodeTest, HostExpandUnimplemented, "10977801") {
-    auto noOpParseNode =
-        std::make_unique<host::HostAggregationStageParseNode>(NoOpHostParseNode::make({}));
-    auto handle = host_adapter::AggregationStageParseNodeHandle{noOpParseNode.release()};
+    auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
+    auto handle = host_adapter::AggStageParseNodeHandle{noOpParseNode.release()};
 
     ::MongoExtensionExpandedArray expanded = {};
     handle.vtable().expand(noOpParseNode.get(), &expanded);

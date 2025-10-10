@@ -37,14 +37,14 @@ namespace sdk = mongo::extension::sdk;
 
 DEFAULT_LOGICAL_AST_PARSE(TestFooForHostServicesAsapStage)
 
-class TestFooForHostServicesAsapStageDescriptor : public sdk::AggregationStageDescriptor {
+class TestFooForHostServicesAsapStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$testFooForHostServicesAsap";
 
     TestFooForHostServicesAsapStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
         userAssert(11097603,

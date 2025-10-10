@@ -44,14 +44,14 @@ DEFAULT_LOGICAL_AST_PARSE(TestBar)
  * The stage definition must NOT be empty or it will fail to parse. The contents of the stage
  * definition can be anything, as long as it is not an empty object.
  */
-class TestBarStageDescriptor : public sdk::AggregationStageDescriptor {
+class TestBarStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$testBar";
 
     TestBarStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
         userAssert(10785800,

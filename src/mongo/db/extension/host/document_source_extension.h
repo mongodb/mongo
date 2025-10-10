@@ -144,12 +144,12 @@ public:
     Value serialize(const SerializationOptions& opts) const override;
 
     // This method is invoked by extensions to register descriptor.
-    static void registerStage(host_adapter::AggregationStageDescriptorHandle descriptor);
+    static void registerStage(host_adapter::AggStageDescriptorHandle descriptor);
 
 private:
     static void registerStage(const std::string& name,
                               DocumentSource::Id id,
-                              host_adapter::AggregationStageDescriptorHandle descriptor);
+                              host_adapter::AggStageDescriptorHandle descriptor);
 
     /**
      * Give access to DocumentSourceExtensionTest to unregister parser.
@@ -160,12 +160,11 @@ private:
     friend class mongo::DocumentSourceExtensionTest;
     static void unregisterParser_forTest(const std::string& name);
 
-    DocumentSourceExtension(
-        StringData name,
-        boost::intrusive_ptr<ExpressionContext> exprCtx,
-        Id id,
-        BSONObj rawStage,
-        mongo::extension::host_adapter::AggregationStageDescriptorHandle descriptor);
+    DocumentSourceExtension(StringData name,
+                            boost::intrusive_ptr<ExpressionContext> exprCtx,
+                            Id id,
+                            BSONObj rawStage,
+                            mongo::extension::host_adapter::AggStageDescriptorHandle descriptor);
 
     // Do not support copy or move.
     DocumentSourceExtension(const DocumentSourceExtension&) = delete;
@@ -183,8 +182,8 @@ private:
     const std::string _stageName;
     const Id _id;
     BSONObj _raw_stage;
-    const mongo::extension::host_adapter::AggregationStageDescriptorHandle _staticDescriptor;
-    mongo::extension::host_adapter::AggregationStageParseNodeHandle _parseNode;
+    const mongo::extension::host_adapter::AggStageDescriptorHandle _staticDescriptor;
+    mongo::extension::host_adapter::AggStageParseNodeHandle _parseNode;
 };
 }  // namespace extension::host
 }  // namespace mongo

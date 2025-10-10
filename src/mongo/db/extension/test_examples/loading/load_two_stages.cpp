@@ -38,15 +38,15 @@ namespace sdk = mongo::extension::sdk;
 
 DEFAULT_LOGICAL_AST_PARSE(Foo)
 
-class FooStageDescriptor : public mongo::extension::sdk::AggregationStageDescriptor {
+class FooStageDescriptor : public mongo::extension::sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$foo";
 
     FooStageDescriptor()
-        : mongo::extension::sdk::AggregationStageDescriptor(
-              kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : mongo::extension::sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {
+    }
 
-    std::unique_ptr<mongo::extension::sdk::AggregationStageParseNode> parse(
+    std::unique_ptr<mongo::extension::sdk::AggStageParseNode> parse(
         mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
@@ -56,14 +56,13 @@ public:
 
 DEFAULT_LOGICAL_AST_PARSE(Bar)
 
-class BarStageDescriptor : public sdk::AggregationStageDescriptor {
+class BarStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$bar";
 
-    BarStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+    BarStageDescriptor() : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
         return std::make_unique<BarParseNode>();

@@ -42,14 +42,14 @@ DEFAULT_LOGICAL_AST_PARSE(TestFoo)
  *
  * The stage definition must be empty, like {$testFoo: {}}, or it will fail to parse.
  */
-class TestFooStageDescriptor : public sdk::AggregationStageDescriptor {
+class TestFooStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$testFoo";
 
     TestFooStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
         return std::make_unique<TestFooParseNode>();

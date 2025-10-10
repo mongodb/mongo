@@ -43,14 +43,14 @@ DEFAULT_LOGICAL_AST_PARSE(TestFoo)
  * This file is identical to foo.cpp except this stage does _not_ fail parsing if the
  * stage definition is empty. This is used for extenison upgrade/downgrade testing.
  */
-class TestFooStageDescriptor : public sdk::AggregationStageDescriptor {
+class TestFooStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$testFoo";
 
     TestFooStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
-    std::unique_ptr<sdk::AggregationStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         // Unlike foo.cpp, this will NOT fail to parse if the stage definition is not empty. Any/all
         // fields are just quietly ignored.
         sdk::validateStageDefinition(stageBson, kStageName);
