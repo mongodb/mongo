@@ -1,5 +1,8 @@
 /**
  * Tests that requests with $meta: "recordId" correctly return the recordId.
+ * @tags: [
+ *  requires_fcv_83
+ * ]
  */
 const testDB = db.getSiblingDB("record_id_meta");
 const collName = jsTestName();
