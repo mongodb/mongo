@@ -203,7 +203,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
         cpp_varname: gStorageEngineHeuristicNumYieldsDeprioritizeThreshold
-        default: 10
+        default: 3
         validator:
             gte: 0
         redact: false
