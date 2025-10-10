@@ -44,6 +44,7 @@ class ContinuousTransition(interface.Hook):
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousTransition.DESCRIPTION)
 
         self._fixture = fixture
+        self._restart_counters = []
         self._rs_fixtures = []
         self._transition_interval_min_secs = float(transition_interval_min_ms) / 1000
         self._transition_interval_max_secs = float(transition_interval_max_ms) / 1000
@@ -102,6 +103,10 @@ class ContinuousTransition(interface.Hook):
 
     def before_test(self, test, test_report):
         """Before test."""
+        for idx, fixture in enumerate(self._rs_fixtures):
+            if fixture.teardown_counter != self._restart_counters[idx]:
+                self._transition_thread.reset(idx)
+                self._restart_counters[idx] = fixture.teardown_counter
         self.logger.info("Resuming the transition thread.")
         self._transition_thread.pause()
         self._transition_thread.resume()
@@ -122,6 +127,7 @@ class ContinuousTransition(interface.Hook):
             raise ValueError(
                 "Transition to and from CSRS hook cannot be specified on any fixture other than a ReplicaSetFixture."
             )
+        self._restart_counters.append(fixture.teardown_counter)
         self._rs_fixtures.append(fixture)
 
 
@@ -266,6 +272,9 @@ class _TransitionThread(threading.Thread):
     def resume(self):
         """Resume the thread."""
         self.__lifecycle.mark_test_started()
+
+    def reset(self, idx):
+        self._current_states[idx] = 0
 
     def _check_thread(self):
         if not self.is_alive():

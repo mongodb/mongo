@@ -178,6 +178,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # teared down earlier, it must be skipped during those final checks.
         self.removeshard_teardown_marker = False
         self.removeshard_teardown_mutex = Lock()
+        # Track the number of times the fixture has been teared down. This can be used as a restart
+        # indicator for hooks that need to reset state upon a restart.
+        self.teardown_counter = 0
 
     def setup(self):
         """Set up the replica set."""
@@ -736,6 +739,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         if teardown_handler.was_successful():
             self.logger.info("Successfully stopped all members of the replica set.")
+            self.teardown_counter += 1
         else:
             self.logger.error("Stopping the replica set fixture failed.")
             raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
