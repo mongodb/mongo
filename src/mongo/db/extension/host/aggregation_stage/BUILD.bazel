@@ -13,5 +13,6 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/shared",
+        "//src/mongo/db/pipeline",
     ],
 )

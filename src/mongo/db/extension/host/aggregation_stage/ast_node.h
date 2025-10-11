@@ -32,6 +32,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -46,27 +47,32 @@ namespace mongo::extension::host {
 /**
  * Host-defined AST node.
  *
- * This class wraps the BSON specification for the internal stage $_internalSearchIdLookup and
- * serves as a node that a host-defined parse node can expand into.
+ * Wraps a LiteParsedDocumentSource and serves as a node that a host-defined parse node can expand
+ * into. Currently only supports $_internalSearchIdLookup.
  */
 class AggStageAstNode {
 public:
-    AggStageAstNode(BSONObj spec) : _spec(spec.getOwned()) {}
+    AggStageAstNode(std::unique_ptr<LiteParsedDocumentSource> lp) : _liteParsed(std::move(lp)) {}
 
     ~AggStageAstNode() = default;
 
     /**
-     * Gets the BSON representation of the $_internalSearchIdLookup stage. This will be extended to
-     * additional internal stage types in the future.
-     *
+     * Gets the BSON representation of an $_internalSearchIdLookup stage.
      * The returned BSONObj is owned by this class.
      */
-    inline BSONObj getIdLookupSpec() const {
-        return _spec;
+    BSONObj getIdLookupSpec() const {
+        const auto* idLookup =
+            dynamic_cast<const DocumentSourceInternalSearchIdLookUp::LiteParsed*>(
+                _liteParsed.get());
+        uassert(11160700,
+                str::stream() << "Expected $_internalSearchIdLookup stage, but got: "
+                              << _liteParsed->getParseTimeName(),
+                idLookup);
+        return idLookup->getBsonSpec();
     }
 
 private:
-    BSONObj _spec;
+    std::unique_ptr<LiteParsedDocumentSource> _liteParsed;
 };
 
 /**

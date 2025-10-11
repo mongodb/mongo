@@ -39,8 +39,12 @@ namespace {
 
 class NoOpHostAstNode : public host::AggStageAstNode {
 public:
-    static inline std::unique_ptr<host::AggStageAstNode> make(BSONObj spec) {
-        return std::make_unique<NoOpHostAstNode>(spec);
+    explicit NoOpHostAstNode(std::unique_ptr<mongo::LiteParsedDocumentSource> lp)
+        : host::AggStageAstNode(std::move(lp)) {}
+
+    static inline std::unique_ptr<host::AggStageAstNode> make(
+        std::unique_ptr<mongo::LiteParsedDocumentSource> lp) {
+        return std::make_unique<NoOpHostAstNode>(std::move(lp));
     }
 };
 
@@ -74,19 +78,25 @@ public:
 TEST(HostAstNodeTest, GetSpec) {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
 
-    // Get BSON spec directly.
-    auto astNode = host::AggStageAstNode{spec};
+    // Get BSON spec directly, build a LiteParsed that holds the spec.
+    auto astNode = host::AggStageAstNode{
+        std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            "$_internalSearchIdLookup", spec.getOwned())};
     ASSERT_TRUE(astNode.getIdLookupSpec().binaryEqual(spec));
 
     // Get BSON spec through handle.
-    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(spec));
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            "$_internalSearchIdLookup", spec.getOwned())));
     auto handle = host_connector::AggStageAstNodeHandle{noOpAstNode};
     ASSERT_TRUE(
         static_cast<host::HostAggStageAstNode*>(handle.get())->getIdLookupSpec().binaryEqual(spec));
 }
 
 TEST(HostAstNodeTest, IsHostAllocated) {
-    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            "$_internalSearchIdLookup", BSONObj())));
     auto handle = host_connector::AggStageAstNodeHandle{noOpAstNode};
 
     ASSERT_TRUE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
@@ -109,7 +119,9 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsGetName, "1121760
 }
 
 DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsBind, "11113700") {
-    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            "$_internalSearchIdLookup", BSONObj())));
     auto handle = TestHostAstNodeVTableHandle{noOpAstNode};
 
     auto vtable = handle.vtable();
