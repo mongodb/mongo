@@ -489,10 +489,12 @@ public:
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
 
-        if (expCtx->shouldParserAllowBasicRankFusion()) {
+        if (expCtx->isRankFusion()) {
             // The 'modern' way to do $rank is to just use the sort key. But we only support this on
             // newer versions, since we need to make sure that the $sort stage is giving us the sort
             // key.
+            // On 8.0, we only use the new path for $rank in the context of $rankFusion, in order to
+            // avoid upgrade issues and reduce changes to a stable release.
             return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
                 expCtx, accumulatorName->toString(), std::move(bounds));
         }

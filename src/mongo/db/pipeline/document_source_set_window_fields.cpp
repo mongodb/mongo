@@ -294,7 +294,9 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
             expCtx,
             SortPattern{std::move(combined)},
             // We will rely on this to efficiently compute ranks.
-            {.outputSortKeyMetadata = expCtx->shouldParserAllowBasicRankFusion()}));
+            // On 8.0, we only use this field in the context of $rankFusion, in order to
+            // avoid upgrade issues and reduce changes to a stable release.
+            {.outputSortKeyMetadata = expCtx->isRankFusion()}));
     }
 
     // $_internalSetWindowFields

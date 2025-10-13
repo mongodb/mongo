@@ -679,6 +679,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         allowDiskUseByDefault.load());
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
+    if (request.getIsHybridSearch()) {
+        expCtx->setIsRankFusion();
+    }
     return expCtx;
 }
 

@@ -3,9 +3,6 @@
  * @tags: [
  *   # We're testing the explain plan, not the query results, so the facet passthrough would fail.
  *   do_not_wrap_aggregations_in_facets,
- *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
- *   # $sort stage.
- *   featureFlagRankFusionBasic,
  * ]
  */
 
@@ -69,7 +66,7 @@ let testCases = [
     [
         {$fill: {sortBy: {key: 1}, output: {val: {method: "linear"}}}},
         [
-            {"$sort": {"sortKey": {"key": 1}, "outputSortKeyMetadata": true}},
+            {"$sort": {"sortKey": {"key": 1}}},
             {
                 "$_internalSetWindowFields":
                     {"sortBy": {"key": 1}, "output": {"val": {"$linearFill": "$val"}}}
@@ -124,7 +121,7 @@ let testCases = [
         {$fill: {output: {val: {method: "locf"}}, partitionByFields: ["part", "partTwo"]}},
         [
             {"$addFields": {"UUIDPLACEHOLDER": {"part": "$part", "partTwo": "$partTwo"}}},
-            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1}, "outputSortKeyMetadata": true}},
+            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1}}},
             {
                 "$_internalSetWindowFields":
                     {"partitionBy": "$UUIDPLACEHOLDER", "output": {"val": {"$locf": "$val"}}}
@@ -145,7 +142,7 @@ let testCases = [
         },
         [
             {"$addFields": {"UUIDPLACEHOLDER": {"part": "$part", "partTwo": "$partTwo"}}},
-            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1}, "outputSortKeyMetadata": true}},
+            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1}}},
             {
                 "$_internalSetWindowFields":
                     {"partitionBy": "$UUIDPLACEHOLDER", "output": {"val": {"$locf": "$val"}}}
@@ -169,7 +166,7 @@ let testCases = [
         },
         [
             {"$addFields": {"UUIDPLACEHOLDER": {"part": "$part", "partTwo": "$partTwo"}}},
-            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1, "key": 1}, "outputSortKeyMetadata": true}},
+            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1, "key": 1}}},
             {
                 "$_internalSetWindowFields": {
                     "partitionBy": "$UUIDPLACEHOLDER",
@@ -196,7 +193,7 @@ let testCases = [
         },
         [
             {"$addFields": {"UUIDPLACEHOLDER": {"part": "$part", "partTwo": "$partTwo"}}},
-            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1, "key": 1}, "outputSortKeyMetadata": true}},
+            {"$sort": {"sortKey": {"UUIDPLACEHOLDER": 1, "key": 1}}},
             {
                 "$_internalSetWindowFields": {
                     "partitionBy": "$UUIDPLACEHOLDER",

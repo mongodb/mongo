@@ -798,8 +798,6 @@ public:
     bool isFeatureFlagBinDataConvertEnabled();
     bool shouldParserAllowBinDataConvert() const;
 
-    bool shouldParserAllowBasicRankFusion() const;
-
     void setIsRankFusion() {
         _isRankFusion = true;
     }
@@ -934,11 +932,6 @@ private:
     // feature flag check would refer to the same FCV once it has been obtained.
     Deferred<bool (*)()> _featureFlagBinDataConvertValue{[] {
         return feature_flags::gFeatureFlagBinDataConvert.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    }};
-
-    Deferred<bool (*)()> _featureFlagRankFusionBasic{[] {
-        return feature_flags::gFeatureFlagRankFusionBasic.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }};
 };

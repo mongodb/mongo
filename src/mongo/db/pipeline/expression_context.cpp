@@ -384,6 +384,8 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     expCtx->_querySettings = _querySettings;
 
+    expCtx->_isRankFusion = _isRankFusion;
+
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
 
@@ -489,10 +491,6 @@ bool ExpressionContext::isFeatureFlagBinDataConvertEnabled() {
 
 bool ExpressionContext::shouldParserAllowBinDataConvert() const {
     return shouldParserIgnoreFeatureFlagCheck() || _featureFlagBinDataConvertValue.get();
-}
-
-bool ExpressionContext::shouldParserAllowBasicRankFusion() const {
-    return shouldParserIgnoreFeatureFlagCheck() || _featureFlagRankFusionBasic.get();
 }
 
 void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(
