@@ -589,6 +589,10 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
 
     expCtx->setQuerySettings(other->getOptionalQuerySettings());
 
+    if (other->isHybridSearch()) {
+        expCtx->setIsHybridSearch();
+    }
+
     // Note that we intentionally skip copying the state of '_interruptChecker' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
 

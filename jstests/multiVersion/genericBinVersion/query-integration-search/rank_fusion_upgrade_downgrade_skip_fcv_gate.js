@@ -11,43 +11,18 @@ import {
     collName,
     getDB,
     setupCollection,
+    setupUnshardedCollection,
     assertRankFusionAggregateAccepted,
+    assertRefactoredMQLKeepsWorking,
 } from "jstests/multiVersion/genericBinVersion/query-integration-search/libs/rank_fusion_upgrade_downgrade_utils.js";
 
 function assertRankFusionFeaturesAccepted(primaryConn) {
     const db = getDB(primaryConn);
 
+    assertRefactoredMQLKeepsWorking(db);
+
     // Test that $rankFusion with and without scoreDetails is accepted.
     assertRankFusionAggregateAccepted(db, collName);
-
-    {
-        // Run a $lookup with a $setWindowFields. This covers the case
-        // where an upgraded shard requests sort key metadata from a
-        // non-upgraded shard.
-        const results = db[collName]
-            .aggregate([
-                {
-                    $lookup: {
-                        from: collName,
-                        pipeline: [{$setWindowFields: {sortBy: {numOccurrences: 1}, output: {rank: {$rank: {}}}}}],
-                        as: "out",
-                    },
-                },
-            ])
-            .toArray();
-        assert.gt(results.length, 0);
-        assert.gt(results[0]["out"].length, 0, results);
-    }
-
-    {
-        // Run a $text query that produces $textScore metadata. This covers
-        // the case where shards generate implicit $score metadata before mongos
-        // is upgraded.
-        const results = db[collName]
-            .aggregate([{$match: {$text: {$search: "xyz"}}}, {$sort: {score: {$meta: "textScore"}}}])
-            .toArray();
-        assert.eq(results, [{_id: 0, foo: "xyz"}]);
-    }
 }
 
 testPerformUpgradeReplSet({
@@ -60,10 +35,24 @@ testPerformUpgradeReplSet({
     whenFullyUpgraded: assertRankFusionFeaturesAccepted,
 });
 
+// Sharded collection in a sharded cluster.
 testPerformUpgradeSharded({
     startingNodeOptions: {setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true}},
     upgradeNodeOptions: {setParameter: {bypassRankFusionFCVGate: true}},
     setupFn: setupCollection,
+    whenFullyDowngraded: assertRankFusionFeaturesAccepted,
+    whenOnlyConfigIsLatestBinary: assertRankFusionFeaturesAccepted,
+    whenSecondariesAndConfigAreLatestBinary: assertRankFusionFeaturesAccepted,
+    whenMongosBinaryIsLastLTS: assertRankFusionFeaturesAccepted,
+    whenBinariesAreLatestAndFCVIsLastLTS: assertRankFusionFeaturesAccepted,
+    whenFullyUpgraded: assertRankFusionFeaturesAccepted,
+});
+
+// Unsharded collection in a sharded cluster.
+testPerformUpgradeSharded({
+    startingNodeOptions: {setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true}},
+    upgradeNodeOptions: {setParameter: {bypassRankFusionFCVGate: true}},
+    setupFn: setupUnshardedCollection,
     whenFullyDowngraded: assertRankFusionFeaturesAccepted,
     whenOnlyConfigIsLatestBinary: assertRankFusionFeaturesAccepted,
     whenSecondariesAndConfigAreLatestBinary: assertRankFusionFeaturesAccepted,

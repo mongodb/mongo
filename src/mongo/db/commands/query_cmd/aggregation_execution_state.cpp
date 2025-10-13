@@ -787,6 +787,10 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .explain(_aggExState.getVerbosity())
                       .build();
 
+    if (_aggExState.getRequest().getIsHybridSearch()) {
+        expCtx->setIsHybridSearch();
+    }
+
     return expCtx;
 }
 

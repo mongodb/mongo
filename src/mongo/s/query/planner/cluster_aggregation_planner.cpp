@@ -267,6 +267,10 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         mergeCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
 
+    if (mergeCtx->isHybridSearch()) {
+        mergeCmd[AggregateCommandRequest::kIsHybridSearchFieldName] = Value(true);
+    }
+
     // If the user didn't specify a collation already, make sure there's a collation attached to
     // the merge command, since the merging shard may not have the collection metadata.
     if (mergeCmd.peek()["collation"].missing()) {

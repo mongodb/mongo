@@ -9,7 +9,9 @@ import {
     rankFusionPipeline,
     rankFusionPipelineWithScoreDetails,
     setupCollection,
+    setupUnshardedCollection,
     assertRankFusionAggregateAccepted,
+    assertRefactoredMQLKeepsWorking,
 } from "jstests/multiVersion/genericBinVersion/query-integration-search/libs/rank_fusion_upgrade_downgrade_utils.js";
 
 const viewName = "rank_fusion_view";
@@ -24,6 +26,8 @@ const kUnrecognizedPipelineStageErrorCode = 40324;
 function assertRankFusionCompletelyRejected(primaryConn) {
     const db = getDB(primaryConn);
     db[viewName].drop();
+
+    assertRefactoredMQLKeepsWorking(db);
 
     // $rankFusion is rejected in a plain aggregation command.
     assert.commandFailedWithCode(db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}), [
@@ -62,6 +66,8 @@ function assertRankFusionCompletelyAccepted(primaryConn) {
     const db = getDB(primaryConn);
     db[viewName].drop();
 
+    assertRefactoredMQLKeepsWorking(db);
+
     assertRankFusionAggregateAccepted(db, collName);
 
     // View creation is rejected when view pipeline has $rankFusion.
@@ -92,6 +98,18 @@ testPerformUpgradeReplSet({
     whenFullyUpgraded: assertRankFusionCompletelyAccepted,
 });
 
+// Unsharded collection in a sharded cluster.
+testPerformUpgradeSharded({
+    setupFn: setupUnshardedCollection,
+    whenFullyDowngraded: assertRankFusionCompletelyRejected,
+    whenOnlyConfigIsLatestBinary: assertRankFusionCompletelyRejected,
+    whenSecondariesAndConfigAreLatestBinary: assertRankFusionCompletelyRejected,
+    whenMongosBinaryIsLastLTS: assertRankFusionCompletelyRejected,
+    whenBinariesAreLatestAndFCVIsLastLTS: assertRankFusionCompletelyRejected,
+    whenFullyUpgraded: assertRankFusionCompletelyAccepted,
+});
+
+// Sharded collection in a sharded cluster.
 testPerformUpgradeSharded({
     setupFn: setupCollection,
     whenFullyDowngraded: assertRankFusionCompletelyRejected,

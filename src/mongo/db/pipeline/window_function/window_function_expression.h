@@ -485,7 +485,16 @@ public:
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
 
-        if (expCtx->isBasicRankFusionEnabled()) {
+        // Use the new $rank implementation that depends on sort key metadata if
+        // 1) we are the context of a $rankFusion query, or
+        // 2) the feature flag is enabled
+        // #1 is because $rankFusion was backported to 8.0, and we don't want $rankFusion queries to
+        // fail during an FCV-gated upgrade.
+        // #2 is because we still need to preserve FCV-gating for generic $setWindowFields queries
+        // in order to avoid failures during upgrade (this $setWindowFields feature is *only*
+        // enabled for $rankFusion on 8.0, so it is new behavior on this version).
+        // TODO SERVER-85426 Always use the new $rank implementation.
+        if (expCtx->isHybridSearch() || expCtx->isBasicRankFusionFeatureFlagEnabled()) {
             // The 'modern' way to do $rank is to just use the sort key. But we only support this on
             // newer versions, since we need to make sure that the $sort stage is giving us the sort
             // key.

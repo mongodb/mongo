@@ -289,11 +289,22 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     if (!combined.empty()) {
-        result.push_back(DocumentSourceSort::create(
-            expCtx,
-            SortPattern{std::move(combined)},
-            // We will rely on this to efficiently compute ranks.
-            {.outputSortKeyMetadata = expCtx->isBasicRankFusionEnabled()}));
+        // Use the new $rank implementation that depends on sort key metadata if
+        // 1) we are the context of a $rankFusion query, or
+        // 2) the feature flag is enabled
+        // #1 is because $rankFusion was backported to 8.0, and we don't want $rankFusion queries to
+        // fail during an FCV-gated upgrade. #2 is because we still need to preserve FCV-gating for
+        // generic $setWindowFields queries in order to avoid failures during upgrade (this
+        // $setWindowFields feature is *only* enabled for $rankFusion on 8.0, so it is new behavior
+        // on this version).
+        // TODO SERVER-85426 Always generate sort key metadata.
+        bool shouldOutputSortKeyMetadata =
+            expCtx->isHybridSearch() || expCtx->isBasicRankFusionFeatureFlagEnabled();
+        result.push_back(
+            DocumentSourceSort::create(expCtx,
+                                       SortPattern{std::move(combined)},
+                                       // We will rely on this to efficiently compute ranks.
+                                       {.outputSortKeyMetadata = shouldOutputSortKeyMetadata}));
     }
 
     // $_internalSetWindowFields

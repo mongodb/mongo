@@ -155,7 +155,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(ErrorCodes::QueryFeatureNotAllowed,
             "'featureFlagRankFusionBasic' must be enabled to use rankFusion",
-            pExpCtx->isBasicRankFusionEnabled());
+            bypassRankFusionFCVGate || pExpCtx->isBasicRankFusionFeatureFlagEnabled());
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName

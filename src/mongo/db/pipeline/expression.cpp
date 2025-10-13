@@ -2096,7 +2096,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
     const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
     const bool hybridScoringFeatureFlagEnabled =
         expCtx->shouldParserIgnoreFeatureFlagCheck() || isRankFusionFullEnabled();
-    uassert(ErrorCodes::FailedToParse,
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
             "'featureFlagRankFusionFull' must be enabled to use "
             "'score' or 'scoreDetails' meta field",
             !usesHybridScoringProtectedField || hybridScoringFeatureFlagEnabled);
