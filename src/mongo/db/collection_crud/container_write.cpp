@@ -39,6 +39,11 @@ Status insert(OperationContext* opCtx,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value) {
+    uassert(ErrorCodes::NotWritablePrimary,
+            str::stream() << "Not primary while inserting to container for "
+                          << coll->ns().toStringForErrorMsg(),
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, coll->ns()));
+
     auto status = container.insert(ru, key, value);
     if (!status.isOK()) {
         return status;
@@ -56,6 +61,11 @@ Status insert(OperationContext* opCtx,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value) {
+    uassert(ErrorCodes::NotWritablePrimary,
+            str::stream() << "Not primary while inserting to container for "
+                          << coll->ns().toStringForErrorMsg(),
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, coll->ns()));
+
     auto status = container.insert(ru, key, value);
     if (!status.isOK()) {
         return status;
@@ -72,6 +82,11 @@ Status remove(OperationContext* opCtx,
               const CollectionPtr& coll,
               IntegerKeyedContainer& container,
               int64_t key) {
+    uassert(ErrorCodes::NotWritablePrimary,
+            str::stream() << "Not primary while removing from container for "
+                          << coll->ns().toStringForErrorMsg(),
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, coll->ns()));
+
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;
@@ -88,6 +103,11 @@ Status remove(OperationContext* opCtx,
               const CollectionPtr& coll,
               StringKeyedContainer& container,
               std::span<const char> key) {
+    uassert(ErrorCodes::NotWritablePrimary,
+            str::stream() << "Not primary while removing from container for "
+                          << coll->ns().toStringForErrorMsg(),
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, coll->ns()));
+
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;
