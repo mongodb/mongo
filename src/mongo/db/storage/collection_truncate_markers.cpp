@@ -616,4 +616,75 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
     }
 }
 
+YieldableOplogIterator::YieldableOplogIterator(OperationContext* opCtx,
+                                               RecordStore* rs,
+                                               TickSource* ticks,
+                                               Milliseconds yieldInterval)
+    : UnyieldableCollectionIterator(opCtx, rs),
+      _opCtx(opCtx),
+      _yieldTimer(ticks),
+      _yieldInterval(yieldInterval),
+      _lastRecordId([&] {
+          auto record = rs->getCursor(opCtx, /*forward=*/false)->next();
+          if (!record) {
+              // This shouldn't really happen unless the size storer values are far off from
+              // reality. The collection is definitely empty.
+              LOGV2(11211701,
+                    "Collection was empty when creating initial markers",
+                    "uuid"_attr = rs->uuid());
+              // Null recordid is less than all record IDs, so this makes the collection seem empty.
+              return RecordId{};
+          }
+          return record->id;
+      }()) {}
+
+// Note: Since oplog sampling explicitly reads the entire oplog, the effect of yielding will be that
+// the sampling cursor sees the end of the collection moving away from it. To prevent Zeno's paradox
+// from impacting our customers, we explicitly bound the end for the purpose of sampling.
+boost::optional<std::pair<RecordId, BSONObj>> YieldableOplogIterator::getNext() {
+    _maybeYield();
+    auto ret = UnyieldableCollectionIterator::getNext();
+    if (!ret || ret.value().first > _lastRecordId) {
+        return boost::none;
+    }
+    return ret;
+}
+
+// Note: Random cursors do not support timestamped reads. So the result of yielding will be a
+// reduced probability of sampling in the region between the end of the oplog when sampling starts
+// and the end when sampling stops. This is fine for initial marker generation.
+boost::optional<std::pair<RecordId, BSONObj>> YieldableOplogIterator::getNextRandom() {
+    _maybeYield();
+    return UnyieldableCollectionIterator::getNextRandom();
+}
+
+void YieldableOplogIterator::_maybeYield() {
+    if (_yieldTimer.elapsed() < _yieldInterval) {
+        return;
+    }
+
+    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
+
+    _directionalCursor->save();
+    _randomCursor->save();
+
+    ru.abandonSnapshot();
+
+    Locker::LockSnapshot lockState;
+    invariant(shard_role_details::getLocker(_opCtx)->canSaveLockState());
+    shard_role_details::getLocker(_opCtx)->saveLockStateAndUnlock(&lockState);
+
+    LOGV2_DEBUG(11211700, 2, "Yielding truncate markers iterator", "rs"_attr = _rs->getIdent());
+
+    _opCtx->checkForInterrupt();
+    shard_role_details::getLocker(_opCtx)->restoreLockState(_opCtx, lockState);
+
+    // Invariant here. Collections using this iterator are being maintained by it, so we should not
+    // be able to get into a situation where a previously saved cursor is not restoreable.
+    invariant(_randomCursor->restore());
+    invariant(_directionalCursor->restore());
+
+    _yieldTimer.reset();
+}
+
 }  // namespace mongo

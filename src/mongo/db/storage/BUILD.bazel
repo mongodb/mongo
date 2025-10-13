@@ -636,6 +636,7 @@ mongo_cc_library(
         "storage_options",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/storage:collection_truncate_markers_parameters_gen",
         "//src/mongo/util:fail_point",
     ] + select({

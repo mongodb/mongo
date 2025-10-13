@@ -125,10 +125,7 @@ public:
                         int numElements,
                         Timestamp timestampToUse) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-        const auto correctedSize = dataLength -
-            BSON("x"
-                 << "")
-                .objsize();
+        const auto correctedSize = dataLength - BSON("x" << "").objsize();
         invariant(correctedSize >= 0);
         const auto objToInsert = BSON("x" << std::string(correctedSize, 'a'));
         WriteUnitOfWork wuow(opCtx);
@@ -147,14 +144,14 @@ public:
                                                int64_t leftoverRecordsBytes,
                                                int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
-              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
 
     TestCollectionMarkersWithPartialExpiration(std::deque<Marker> markers,
                                                int64_t leftoverRecordsCount,
                                                int64_t leftoverRecordsBytes,
                                                int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
 
     void setExpirePartialMarker(bool value) {
         _expirePartialMarker = value;
@@ -180,14 +177,14 @@ public:
                           int64_t leftoverRecordsBytes,
                           int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
-              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
 
     TestCollectionMarkers(std::deque<Marker> markers,
                           int64_t leftoverRecordsCount,
                           int64_t leftoverRecordsBytes,
                           int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override {
@@ -580,4 +577,53 @@ TEST_F(CollectionMarkersTest, SamplingAutoYieldingWorks) {
                   kNumElementsToSample / internalQueryExecYieldIterations.load());
     }
 }
+
+// Test that cursors will yield periodically, and (since the yield drops the snapshot) that the
+// cursor doesn't "see" new records.
+TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
+    static constexpr auto kNumElements = 100;
+    static constexpr auto kElementSize = 100;
+
+    TickSourceMock mockTickSource;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_OK(createCollection(opCtx.get(), collNs));
+        insertElements(opCtx.get(), collNs, kElementSize, kNumElements, Timestamp(1, 0));
+    }
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    YieldableOplogIterator iterator(
+        opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
+
+    AtomicWord<bool> hasYielded(false);
+    stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
+        ThreadClient client(getServiceContext()->getService());
+        auto innerOpCtx = cc().makeOperationContext();
+        // We won't be able to acquire the write lock until the read yields.
+        insertElements(
+            innerOpCtx.get(), collNs, /*dataLength=*/100, /*numElements=*/10, Timestamp(1, 0));
+        hasYielded.store(true);
+    });
+
+    ASSERT_FALSE(hasYielded.load());
+
+    size_t seenRecords = 0;
+    while (!hasYielded.load()) {
+        mockTickSource.advance(Milliseconds(11));
+        if (iterator.getNext()) {
+            ++seenRecords;
+        }
+    }
+    yieldNotifier.join();
+
+    while (iterator.getNext()) {
+        ++seenRecords;
+    }
+
+    ASSERT_EQ(seenRecords, kNumElements);
+    ASSERT_LT(static_cast<long long>(seenRecords), coll->getRecordStore()->numRecords(opCtx.get()));
+}
+
 }  // namespace mongo
