@@ -68,14 +68,23 @@ void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opC
 
 Status FeatureFlagServerParameter::set(const BSONElement& newValueElement,
                                        const boost::optional<TenantId>&) {
-    bool newValue;
-
-    if (auto status = newValueElement.tryCoerce(&newValue); !status.isOK()) {
-        return {status.code(),
-                str::stream() << "Failed setting " << name() << ": " << status.reason()};
-    }
-
     try {
+        bool newValue = [&]() {
+            if (newValueElement.isABSONObj()) {
+                auto parameterDocument = newValueElement.embeddedObject();
+                uassert(11033800,
+                        "Feature flag document must at least be of form {value: <bool>}",
+                        parameterDocument.nFields() >= 1);
+                auto embeddedValue = newValueElement["value"];
+                uassert(11033801,
+                        "Feature flag document must have 'value' field",
+                        !embeddedValue.eoo());
+                return embeddedValue.trueValue();
+            } else {
+                return newValueElement.trueValue();
+            }
+        }();
+
         _flag->setForServerParameter(newValue);
     } catch (DBException& e) {
         return e.toStatus();
