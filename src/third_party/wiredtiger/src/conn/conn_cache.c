@@ -169,6 +169,24 @@ __cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
     WT_RET(__wt_config_gets(session, cfg, "cache_stuck_timeout_ms", &cval));
     cache->cache_stuck_timeout_ms = (uint64_t)cval.val;
 
+    WT_RET(__wt_config_gets(session, cfg, "eviction.prefer_scrub_eviction", &cval));
+    if (cval.val != 0)
+        F_SET_ATOMIC_16(&(cache->cache_eviction_controls), WT_CACHE_PREFER_SCRUB_EVICTION);
+
+    /*
+     * The cache tolerance is a percentage value with range 0 - 100, inclusive.
+     * Given input percentage is considered in multiples of 10 only, by applying floor().
+     * 00 < value < 10  -> 00
+     * 10 < value < 20  -> 10
+     * 20 < value < 30  -> 20
+     * ...
+     * 90 < value < 100 -> 90
+     * value is 100     -> 100
+     */
+    WT_RET(__wt_config_gets(session, cfg, "eviction.cache_tolerance_for_app_eviction", &cval));
+    __wt_atomic_store8(&cache->cache_eviction_controls.cache_tolerance_for_app_eviction,
+      (((uint8_t)cval.val / 10) * 10));
+
     return (0);
 }
 
