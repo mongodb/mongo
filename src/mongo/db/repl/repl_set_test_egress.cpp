@@ -166,6 +166,10 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
+
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
 };
 
 MONGO_REGISTER_COMMAND(CmdReplSetTestEgress).testOnly().forShard();

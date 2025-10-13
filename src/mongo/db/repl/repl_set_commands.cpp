@@ -134,6 +134,10 @@ public:
         return Status::OK();
     }
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     CmdReplSetTest() : ReplSetCommand("replSetTest") {}
     bool run(OperationContext* opCtx,
              const DatabaseName&,
