@@ -182,6 +182,10 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     }
 
     for (auto& timestampAndIdentInfo : toDrop) {
+        // Dropping tables can be expensive since it involves disk operations. If the table also
+        // needs a checkpoint, that adds even more overhead.
+        opCtx->checkForInterrupt();
+
         const auto& dropTimestamp = timestampAndIdentInfo.first;
         auto& identInfo = timestampAndIdentInfo.second;
         const auto& identName = identInfo->identName;
