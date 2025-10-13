@@ -47,9 +47,6 @@ filters:
     approvers:
       - 10gen/query-execution-query-settings
       - 10gen/query-integration-observability
-  - "*viewless_timeseries*":
-    approvers:
-      - 10gen/server-catalog-and-routing-shard-catalog
   - "*legacy_timeseries_no_rawdata*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

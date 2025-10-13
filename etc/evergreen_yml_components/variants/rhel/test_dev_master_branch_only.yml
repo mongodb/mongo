@@ -266,7 +266,7 @@ buildvariants:
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
       # concurrency suites that use a ReplicaSetFixture will fail on this build variant.
       # TODO(SERVER-108818): Remove concurrency_replication_primary_driven_index_builds_gen after removing temporary primary-driven index builds suites.
-      - name: .concurrency !.auth !concurrency_replication_causal_consistency_gen !concurrency_replication_maintenance_gen !concurrency_replication_multi_stmt_txn_gen !concurrency_replication_primary_driven_index_builds_gen !concurrency_replication_gen !concurrency_replication_viewless_timeseries_gen !concurrency_simultaneous_replication_gen !config_fuzzer_concurrency_replication_gen !config_fuzzer_concurrency_simultaneous_replication_gen
+      - name: .concurrency !.auth !concurrency_replication_causal_consistency_gen !concurrency_replication_maintenance_gen !concurrency_replication_multi_stmt_txn_gen !concurrency_replication_primary_driven_index_builds_gen !concurrency_replication_gen !concurrency_simultaneous_replication_gen !config_fuzzer_concurrency_replication_gen !config_fuzzer_concurrency_simultaneous_replication_gen
       - name: .grpc_misc_js
 
   - &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template

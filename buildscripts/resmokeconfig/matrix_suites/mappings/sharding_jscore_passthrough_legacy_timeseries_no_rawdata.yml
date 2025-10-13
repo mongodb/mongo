@@ -5,5 +5,5 @@
 # TODO SERVER-109519: remove this temporary suite and all its usages.
 base_suite: sharding_jscore_passthrough
 overrides:
-  - "viewless_timeseries.all_jscore_timeseries_tests_selector"
-  - "viewless_timeseries.do_not_use_rawdata_for_legacy_timeseries"
+  - "legacy_timeseries.all_jscore_timeseries_tests_selector"
+  - "legacy_timeseries.do_not_use_rawdata_for_legacy_timeseries"

@@ -6,9 +6,6 @@ filters:
   - "README.md":
     approvers:
       - 10gen/devprod-correctness
-  - "/generated_suites/*viewless_timeseries.yml":
-    approvers:
-      - 10gen/server-catalog-and-routing-shard-catalog
   - "/generated_suites/*legacy_timeseries_no_rawdata.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

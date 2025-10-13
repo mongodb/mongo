@@ -24,7 +24,7 @@ filters:
   - "repeat_queries.yml":
     approvers:
       - 10gen/query-optimization
-  - "*viewless_timeseries.yml":
+  - "*legacy_timeseries.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
   - "stepdown_primary_change_streams.yml":
