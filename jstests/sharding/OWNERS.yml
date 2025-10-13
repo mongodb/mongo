@@ -124,3 +124,6 @@ filters:
   - "safe_secondary_reads_single_migration_waitForDelete.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "startup_with_all_configs_down.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
