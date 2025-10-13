@@ -2325,7 +2325,7 @@ tasks:
   - name: unit-test-macos
     tags: ["python"]
     depends_on:
-    - name: compile
+      - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "python config check"
