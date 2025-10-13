@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -122,8 +123,18 @@ public:
                                 RecoveryUnit& ru,
                                 StringData opStr,
                                 const NamespaceStringOrUUID& nssOrUUID,
-                                boost::optional<size_t> retryLimit)
-        : _opCtx{opCtx}, _ru(ru), _opStr{opStr}, _nssOrUUID{nssOrUUID}, _retryLimit{retryLimit} {
+                                boost::optional<size_t> retryLimit,
+                                int dumpStateRetryCount)
+        : _opCtx{opCtx},
+          _ru(ru),
+          _opStr{opStr},
+          _nssOrUUID{nssOrUUID},
+          _retryLimit{retryLimit},
+          _dumpStateRetryCount(
+              dumpStateRetryCount
+                  ? std::max(dumpStateRetryCount,
+                             gMinimalWriteConflictRetryCountForStateDump.loadRelaxed())
+                  : 0) {
         invariant(_opCtx);
         invariant(shard_role_details::getLocker(_opCtx));
     }
@@ -131,12 +142,18 @@ public:
                                 std::function<RecoveryUnit&()> ru,
                                 StringData opStr,
                                 const NamespaceStringOrUUID& nssOrUUID,
-                                boost::optional<size_t> retryLimit)
+                                boost::optional<size_t> retryLimit,
+                                int dumpStateRetryCount)
         : _opCtx{opCtx},
           _ru(std::move(ru)),
           _opStr{opStr},
           _nssOrUUID{nssOrUUID},
-          _retryLimit{retryLimit} {
+          _retryLimit{retryLimit},
+          _dumpStateRetryCount(
+              dumpStateRetryCount
+                  ? std::max(dumpStateRetryCount,
+                             gMinimalWriteConflictRetryCountForStateDump.loadRelaxed())
+                  : 0) {
         invariant(_opCtx);
         invariant(shard_role_details::getLocker(_opCtx));
     }
@@ -180,7 +197,6 @@ private:
             throw;
         }
     }
-
     void _emitLog(StringData reason);
     void _assertRetryLimit() const;
     void _handleStorageUnavailable(const Status& e);
@@ -201,7 +217,7 @@ private:
     const StringData _opStr;
     const NamespaceStringOrUUID& _nssOrUUID;
     const boost::optional<size_t> _retryLimit;
-
+    const int _dumpStateRetryCount = 0;
     size_t _attemptCount = 0;
     size_t _wceCount = 0;
     size_t _tempUnavailableCount = 0;
@@ -228,26 +244,34 @@ private:
  * TODO (SERVER-105773): Remove the overload without RecoveryUnit.
  */
 template <typename F>
-auto writeConflictRetry(OperationContext* opCtx,
-                        RecoveryUnit& ru,
-                        StringData opStr,
-                        const NamespaceStringOrUUID& nssOrUUID,
-                        F&& f,
-                        boost::optional<size_t> retryLimit = boost::none) {
-    return WriteConflictRetryAlgorithm{opCtx, ru, opStr, nssOrUUID, retryLimit}(std::forward<F>(f));
+auto writeConflictRetry(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    StringData opStr,
+    const NamespaceStringOrUUID& nssOrUUID,
+    F&& f,
+    boost::optional<size_t> retryLimit = boost::none,
+    /* Dump the WT state on every N times when you hit a WCE, where N == dumpStateRetryCount. */
+    int dumpStateRetryCount = 0) {
+    return WriteConflictRetryAlgorithm{
+        opCtx, ru, opStr, nssOrUUID, retryLimit, dumpStateRetryCount}(std::forward<F>(f));
 }
 template <typename F>
-auto writeConflictRetry(OperationContext* opCtx,
-                        StringData opStr,
-                        const NamespaceStringOrUUID& nssOrUUID,
-                        F&& f,
-                        boost::optional<size_t> retryLimit = boost::none) {
+auto writeConflictRetry(
+    OperationContext* opCtx,
+    StringData opStr,
+    const NamespaceStringOrUUID& nssOrUUID,
+    F&& f,
+    boost::optional<size_t> retryLimit = boost::none,
+    /* Dump the WT state on every N times when you hit a WCE, where N == dumpStateRetryCount. */
+    int dumpStateRetryCount = 0) {
     return WriteConflictRetryAlgorithm{
         opCtx,
         [opCtx]() -> RecoveryUnit& { return *shard_role_details::getRecoveryUnit(opCtx); },
         opStr,
         nssOrUUID,
-        retryLimit}(std::forward<F>(f));
+        retryLimit,
+        dumpStateRetryCount}(std::forward<F>(f));
 }
 
 }  // namespace mongo
