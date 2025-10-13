@@ -15,6 +15,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "_shardsvrUnregisterIndex",
     "_configsvrCommitIndex",
     "_configsvrDropIndexCatalogEntry",
+    "configureBackgroundTask",
     "testCommandFeatureFlaggedOnLatestFCV",
 ];
 

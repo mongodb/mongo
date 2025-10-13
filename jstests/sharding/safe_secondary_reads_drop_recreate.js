@@ -174,7 +174,6 @@ let testCases = {
     commitTransaction: {skip: "primary only"},
     compact: {skip: "does not return user data"},
     compactStructuredEncryptionData: {skip: "does not return user data"},
-    configureBackgroundTask: {skip: "primary only"},
     configureCollectionBalancing: {skip: "does not return user data"},
     configureFailPoint: {skip: "does not return user data"},
     configureQueryAnalyzer: {skip: "does not return user data"},

@@ -520,11 +520,6 @@ const allCommands = {
         },
     },
     compactStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
-    configureBackgroundTask: {
-        command: {configureBackgroundTask: 1, task: "ttlMonitor", mode: "enabled"},
-        isAdminCommand: true,
-        doesNotRunOnMongos: true,
-    },
     configureFailPoint: {skip: isAnInternalCommand},
     configureCollectionBalancing: {
         setUp: function(conn) {

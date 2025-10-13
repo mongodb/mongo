@@ -55,9 +55,6 @@ filters:
   - "check_metadata*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "*configure_background_tasks*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "start_shard_draining*":
     approvers:
       - 10gen/server-catalog-and-routing

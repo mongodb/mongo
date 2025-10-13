@@ -405,11 +405,6 @@ const allCommands = {
         },
     },
     compactStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
-    configureBackgroundTask: {
-        command: {configureBackgroundTask: 1, task: "ttlMonitor", mode: "enabled"},
-        shouldFail: false,
-        isAdminCommand: true,
-    },
     configureFailPoint: {skip: isAnInternalCommand},
     configureCollectionBalancing: {skip: requiresMongoS},
     configureQueryAnalyzer: {skip: requiresMongoS},

@@ -548,15 +548,6 @@ idl_generator(
     ],
 )
 
-idl_generator(
-    name = "configure_background_task_command_gen",
-    src = "configure_background_task_command.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
 mongo_cc_library(
     name = "list_collections_filter",
     srcs = [
@@ -1402,8 +1393,6 @@ mongo_cc_library(
     name = "standalone",
     srcs = [
         "collmod_cmd.cpp",
-        "configure_background_task_command.cpp",
-        "configure_background_task_command_gen",
         "create_command.cpp",
         "create_indexes_cmd.cpp",
         "dbcommands.cpp",
