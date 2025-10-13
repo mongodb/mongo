@@ -529,4 +529,53 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
     ASSERT_GT(countTextFormatLogLinesContaining("Collection sampling progress"), 0);
     ASSERT_EQUALS(countTextFormatLogLinesContaining("Collection sampling complete"), 1);
 }
+
+// Test that cursors will yield periodically, and (since the yield drops the snapshot) that the
+// cursor doesn't "see" new records.
+TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
+    static constexpr auto kNumElements = 100;
+    static constexpr auto kElementSize = 100;
+
+    TickSourceMock mockTickSource;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        createCollection(opCtx.get(), collNs);
+        insertElements(opCtx.get(), collNs, kElementSize, kNumElements, Timestamp(1, 0));
+    }
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    YieldableCollectionIterator iterator(
+        opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
+
+    AtomicWord<bool> hasYielded(false);
+    stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
+        ThreadClient client(getServiceContext()->getService());
+        auto innerOpCtx = cc().makeOperationContext();
+        // We won't be able to acquire the write lock until the read yields.
+        insertElements(
+            innerOpCtx.get(), collNs, /*dataLength=*/100, /*numElements=*/10, Timestamp(1, 0));
+        hasYielded.store(true);
+    });
+
+    ASSERT_FALSE(hasYielded.load());
+
+    size_t seenRecords = 0;
+    while (!hasYielded.load()) {
+        mockTickSource.advance(Milliseconds(11));
+        if (iterator.getNext()) {
+            ++seenRecords;
+        }
+    }
+    yieldNotifier.join();
+
+    while (iterator.getNext()) {
+        ++seenRecords;
+    }
+
+    ASSERT_EQ(seenRecords, kNumElements);
+    ASSERT_LT(static_cast<long long>(seenRecords), coll->getRecordStore()->numRecords());
+}
+
 }  // namespace mongo
