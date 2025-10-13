@@ -81,3 +81,12 @@ server_parameters:
         cpp_varname: gOplogSamplingAsyncEnabled
         default: true
         redact: false
+
+    oplogSamplingAsyncYieldIntervalMs:
+        description: "Period of time to wait between yielding during oplog sampling. -1 is a special value that disables yielding."
+        set_at: [startup]
+        cpp_vartype: "int"
+        cpp_varname: gOplogSamplingAsyncYieldIntervalMs
+        default: 100
+        validator: {gte: -1}
+        redact: false

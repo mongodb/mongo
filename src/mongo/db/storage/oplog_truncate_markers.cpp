@@ -88,10 +88,16 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
     // We need to read the whole oplog, override the recoveryUnit's oplogVisibleTimestamp.
     ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
         shard_role_details::getRecoveryUnit(opCtx), boost::none);
-    UnyieldableCollectionIterator iterator(opCtx, &rs);
+    std::unique_ptr<CollectionTruncateMarkers::CollectionIterator> iterator;
+    if (gOplogSamplingAsyncEnabled && gOplogSamplingAsyncYieldIntervalMs >= 0) {
+        iterator = std::make_unique<YieldableCollectionIterator>(
+            opCtx, &rs, globalSystemTickSource(), Milliseconds(gOplogSamplingAsyncYieldIntervalMs));
+    } else {
+        iterator = std::make_unique<UnyieldableCollectionIterator>(opCtx, &rs);
+    }
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx,
-        iterator,
+        *iterator,
         minBytesPerTruncateMarker,
         [](const Record& record) {
             BSONObj obj = record.data.toBson();

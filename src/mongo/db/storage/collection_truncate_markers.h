@@ -202,6 +202,8 @@ public:
      */
     class CollectionIterator {
     public:
+        virtual ~CollectionIterator() = default;
+
         // Returns the next element in the collection. Behaviour is the same as performing a normal
         // collection scan.
         virtual boost::optional<std::pair<RecordId, BSONObj>> getNext() = 0;
@@ -463,8 +465,8 @@ protected:
 };
 
 /**
- * A Collection iterator meant to work with raw RecordStores. This iterator will not yield between
- * calls to getNext()/getNextRandom().
+ * A Collection iterator meant to work with raw RecordStores. Whether this iterator yields between
+ * calls to getNext()/getNextRandom(), or not, is decided by the child class.
  *
  * It is only safe to use when the user is not accepting any user operation. Some examples of when
  * this class can be used are during oplog initialisation, repair, recovery, etc.
@@ -475,7 +477,9 @@ public:
         reset(opCtx);
     }
 
-    boost::optional<std::pair<RecordId, BSONObj>> getNext() final {
+    ~UnyieldableCollectionIterator() override = default;
+
+    boost::optional<std::pair<RecordId, BSONObj>> getNext() override {
         auto record = _directionalCursor->next();
         if (!record) {
             return boost::none;
@@ -483,7 +487,7 @@ public:
         return std::make_pair(std::move(record->id), record->data.releaseToBson());
     }
 
-    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final {
+    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() override {
         auto record = _randomCursor->next();
         if (!record) {
             return boost::none;
@@ -500,10 +504,31 @@ public:
         _randomCursor = _rs->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
 
-private:
+protected:
     RecordStore* _rs;
     std::unique_ptr<RecordCursor> _directionalCursor;
     std::unique_ptr<RecordCursor> _randomCursor;
+};
+
+class YieldableCollectionIterator : public UnyieldableCollectionIterator {
+public:
+    YieldableCollectionIterator(OperationContext* opCtx,
+                                RecordStore* rs,
+                                TickSource* ticks,
+                                Milliseconds yieldInterval);
+
+    boost::optional<std::pair<RecordId, BSONObj>> getNext() final;
+
+    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final;
+
+private:
+    // Release resources held by the iterator, allowing other concurrent operations to proceed.
+    void _maybeYield();
+
+    OperationContext* _opCtx;
+    Timer _yieldTimer;
+    Milliseconds _yieldInterval;
+    RecordId _lastRecordId;
 };
 
 }  // namespace mongo

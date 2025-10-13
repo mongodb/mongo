@@ -128,6 +128,9 @@ private:
         ServiceContextMongoDTest::tearDown();
     }
 
+    // Use 0ms yield interval (i.e. yield every next()) in tests.
+    RAIIServerParameterControllerForTest _zeroMsYield =
+        RAIIServerParameterControllerForTest("oplogSamplingAsyncYieldIntervalMs", 0);
     ServiceContext::UniqueOperationContext _opCtx;
     StorageInterfaceImpl _storage;
 };
@@ -148,6 +151,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampleAndU
         insertOplog(i, realSizePerRecord);
     }
 
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
@@ -174,6 +178,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeInProgress
     insertOplog(1, 100);
 
     // Note if in async mode, at this point we have not yet sampled.
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
@@ -216,6 +221,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) 
 
     LocalOplogInfo::get(opCtx)->setRecordStore(opCtx, rs);
     // Note if in async mode, at this point we have not yet sampled.
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
@@ -243,6 +249,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeCreateOplo
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
     // Note if in async mode, at this point we have not yet sampled.
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
