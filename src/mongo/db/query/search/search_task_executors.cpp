@@ -33,6 +33,7 @@
 #include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/pinned_connection_task_executor_registry.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
@@ -151,6 +152,9 @@ void shutdownSearchExecutorsIfNeeded(ServiceContext* svc) {
     auto& state = getExecutorHolder(svc);
     if (!globalMongotParams.host.empty()) {
         LOGV2_INFO(10026102, "Shutting down mongot task executor.");
+        // The underlying mongot TaskExecutor must outlive any PinnedConnectionTaskExecutor that
+        // uses it, so we must drain PCTEs first and then shut down the mongot executor.
+        shutdownPinnedExecutors(svc, state.mongotExecutor);
         // Deleting the executor will also call shutdown() and join(), but might as well call them
         // explicitly here.
         state.mongotExecutor->shutdown();
@@ -160,6 +164,7 @@ void shutdownSearchExecutorsIfNeeded(ServiceContext* svc) {
 
     if (!globalSearchIndexParams.host.empty()) {
         LOGV2_INFO(10026103, "Shutting down search index management task executor.");
+        shutdownPinnedExecutors(svc, state.searchIndexMgmtExecutor);
         state.searchIndexMgmtExecutor->shutdown();
         state.searchIndexMgmtExecutor->join();
         state.searchIndexMgmtExecutor.reset();
