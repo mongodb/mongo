@@ -18,6 +18,7 @@ import {
     getQueryStatsCountCmd,
     getQueryStatsDistinctCmd,
     getQueryStatsServerParameters,
+    getQueryExecMetrics,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -77,12 +78,13 @@ function runStorageStatsTestFind(conn, coll) {
         expectedDocs: expectedDocs,
     });
 
+    const queryExecMetrics = getQueryExecMetrics(queryStats.metrics);
     // The assertions in exhaustCursorAndGetQueryStats will check that the metrics are
     // sensible (e.g., max >= min), so we'll just assert that the minimum > 0.
-    assert.gt(queryStats.metrics.bytesRead.min, 0, queryStats);
+    assert.gt(queryExecMetrics.bytesRead.min, 0, queryStats);
     // The read time can be zero even when the number of bytes read is non-zero, so we can assert
     // a non-negative value here.
-    assert.gte(queryStats.metrics.readTimeMicros.min, 0);
+    assert.gte(queryExecMetrics.readTimeMicros.min, 0);
 }
 
 function runStorageStatsTestDistinct(conn, coll) {
@@ -119,8 +121,9 @@ function runStorageStatsTestDistinct(conn, coll) {
         getMores: false,
     });
 
-    assert.gt(queryStats[0].metrics.bytesRead.min, 0);
-    assert.gte(queryStats[0].metrics.readTimeMicros.min, 0);
+    const queryExecMetrics = getQueryExecMetrics(queryStats[0].metrics);
+    assert.gt(queryExecMetrics.bytesRead.min, 0);
+    assert.gte(queryExecMetrics.readTimeMicros.min, 0);
 }
 
 /**
@@ -164,8 +167,9 @@ function runStorageStatsTestCount(conn, coll) {
         getMores: false,
     });
 
-    assert.gt(queryStats[0].metrics.bytesRead.min, 0, queryStats);
-    assert.gte(queryStats[0].metrics.readTimeMicros.min, 0, queryStats);
+    const queryExecMetrics = getQueryExecMetrics(queryStats[0].metrics);
+    assert.gt(queryExecMetrics.bytesRead.min, 0, queryStats);
+    assert.gte(queryExecMetrics.readTimeMicros.min, 0, queryStats);
 }
 
 /**

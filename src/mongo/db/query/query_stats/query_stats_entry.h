@@ -41,48 +41,17 @@
 
 namespace mongo::query_stats {
 
-/**
- * The value stored in the query stats store. It contains a Key representing this "kind" of
- * query, and some metrics about that shape. This class is responsible for knowing its size and
- * updating our server status metrics about the size of the query stats store accordingly. At the
- * time of this writing, the LRUCache utility does not easily expose its size in a way we could use
- * as server status metrics.
- */
-struct QueryStatsEntry {
-    QueryStatsEntry(std::unique_ptr<const Key> key_)
-        : firstSeenTimestamp(Date_t::now()), key(std::move(key_)) {}
-
-    BSONObj toBSON() const;
-
-    /**
-     * Timestamp for when this query shape was added to the store. Set on construction.
-     */
-    const Date_t firstSeenTimestamp;
-
-    /**
-     * Timestamp for when the latest time this query shape was seen.
-     */
-    Date_t latestSeenTimestamp;
-
-    /**
-     * Last execution time in microseconds.
-     */
-    uint64_t lastExecutionMicros = 0;
-
-    /**
-     * Number of query executions.
-     */
-    uint64_t execCount = 0;
-
-    /**
-     * Aggregates the total time for execution including getMore requests.
-     */
-    AggregatedMetric<uint64_t> totalExecMicros;
+struct CursorEntry {
+    void toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const;
 
     /**
      * Aggregates the time for execution for first batch only.
      */
     AggregatedMetric<uint64_t> firstResponseExecMicros;
+};
+
+struct QueryExecEntry {
+    void toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const;
 
     /**
      * Aggregates the number of documents returned for the query including getMore requests.
@@ -110,16 +79,6 @@ struct QueryStatsEntry {
     AggregatedMetric<int64_t> readTimeMicros;
 
     /**
-     * Aggregates the executing time (excluding time spent blocked) including getMore requests.
-     */
-    AggregatedMetric<int64_t> workingTimeMillis;
-
-    /**
-     * Aggregates the executing time including getMore requests.
-     */
-    AggregatedMetric<int64_t> cpuNanos;
-
-    /**
      * Aggregates the delinquent acquisitions stats including getMore requests.
      */
     AggregatedMetric<uint64_t> delinquentAcquisitions;
@@ -131,26 +90,94 @@ struct QueryStatsEntry {
      */
     AggregatedMetric<uint64_t> numInterruptChecksPerSec;
     AggregatedMetric<int64_t> overdueInterruptApproxMaxMillis;
+};
+
+struct QueryPlannerEntry {
+    void toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const;
 
     /**
-     * Counts the frequency of the boolean value hasSortStage.
+     * Aggregates the number of queries that used a sort stage including getMore requests.
      */
     AggregatedBool hasSortStage;
 
     /**
-     * Counts the frequency of the boolean value usedDisk.
+     * Aggregates the number of queries that used disk including getMore requests.
      */
     AggregatedBool usedDisk;
 
     /**
-     * Counts the frequency of the boolean value fromMultiPlanner.
+     * Aggregates the number of queries that used the multi-planner including getMore requests.
      */
     AggregatedBool fromMultiPlanner;
 
     /**
-     * Counts the frequency of the boolean value fromPlanCache.
+     * Aggregates the number of queries that used the plan cache including getMore requests.
      */
     AggregatedBool fromPlanCache;
+};
+
+/**
+ * The value stored in the query stats store. It contains a Key representing this "kind" of
+ * query, and some metrics about that shape. This class is responsible for knowing its size and
+ * updating our server status metrics about the size of the query stats store accordingly. At the
+ * time of this writing, the LRUCache utility does not easily expose its size in a way we could use
+ * as server status metrics.
+ */
+struct QueryStatsEntry {
+    QueryStatsEntry(std::unique_ptr<const Key> key_)
+        : firstSeenTimestamp(Date_t::now()), key(std::move(key_)) {}
+
+    BSONObj toBSON(bool buildSubsections = false) const;
+
+    /**
+     * Timestamp for when this query shape was added to the store. Set on construction.
+     */
+    const Date_t firstSeenTimestamp;
+
+    /**
+     * Timestamp for when the latest time this query shape was seen.
+     */
+    Date_t latestSeenTimestamp;
+
+    /**
+     * Last execution time in microseconds.
+     */
+    uint64_t lastExecutionMicros = 0;
+
+    /**
+     * Number of query executions.
+     */
+    uint64_t execCount = 0;
+
+    /**
+     * Aggregates the total time for execution including getMore requests.
+     */
+    AggregatedMetric<uint64_t> totalExecMicros;
+
+    /**
+     * Aggregates the executing time (excluding time spent blocked) including getMore requests.
+     */
+    AggregatedMetric<int64_t> workingTimeMillis;
+
+    /**
+     * Aggregates the executing time including getMore requests.
+     */
+    AggregatedMetric<int64_t> cpuNanos;
+
+    /**
+     * Metrics relevant to the cursor and batching protocol
+     */
+    CursorEntry cursorStats;
+
+    /**
+     * Metrics related to query execution.
+     */
+    QueryExecEntry queryExecStats;
+
+    /**
+     * Metrics related to query planner.
+     */
+    QueryPlannerEntry queryPlannerStats;
 
     /**
      * The Key that can generate the query stats key for this request.

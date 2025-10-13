@@ -190,10 +190,12 @@ boost::optional<Document> QueryStatsStage::toDocument(
                       "queryStatsFailToReparseQueryShape fail point is enabled");
         }
 
+        bool useQueryStatsWithSubsectionsFormat =
+            feature_flags::gFeatureFlagQueryStatsMetricsSubsections.isEnabled();
         return Document{{"key", std::move(queryStatsKey)},
                         {"keyHash", keyHash},
                         {"queryShapeHash", queryShapeHash},
-                        {"metrics", queryStatsEntry.toBSON()},
+                        {"metrics", queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat)},
                         {"asOf", partitionReadTime}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();

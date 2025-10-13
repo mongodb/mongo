@@ -285,6 +285,12 @@ feature_flags:
         default: false
         fcv_gated: true
 
+    featureFlagQueryStatsMetricsSubsections:
+        description: "Feature flag to enable query stats metrics being reorganized into subsections, rather than a flat structure."
+        cpp_varname: gFeatureFlagQueryStatsMetricsSubsections
+        default: false
+        fcv_gated: false
+
     featureFlagExtractFieldPathsSbeStage:
         description: "Feature flag to enable extract_field_paths SBE stage."
         cpp_varname: gFeatureFlagExtractFieldPathsSbeStage

@@ -5,6 +5,7 @@ import {
     getQueryStats,
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
+    getQueryPlannerMetrics,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -106,7 +107,7 @@ function runTest(conn, sharded = false) {
         hasSortStage: false,
         // Don't validate the value of 'usedDisk' here. On some variants this can actually be true,
         // but this test is not concerned with validating that.
-        usedDisk: queryStatsPerQuery[0].metrics.usedDisk["true"] > 0,
+        usedDisk: getQueryPlannerMetrics(queryStatsPerQuery[0].metrics).usedDisk["true"] > 0,
         fromMultiPlanner: false,
         fromPlanCache: false,
     });

@@ -3,7 +3,12 @@
  * results fit into a single batch (and thus don't require a cursor), for agg commands.
  * @tags: [requires_fcv_72]
  */
-import {getQueryStatsAggCmd, verifyMetrics} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getCursorMetrics,
+    getQueryExecMetrics,
+    getQueryStatsAggCmd,
+    verifyMetrics,
+} from "jstests/libs/query/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {
@@ -44,14 +49,16 @@ assert.eq(queryStatsEntry.key.client.application.name, "MongoDB Shell");
 assert.eq(queryStatsEntry.metrics.execCount, 2);
 
 // Assert queryStats values are accurate for the two above queries.
-assert.eq(queryStatsEntry.metrics.docsReturned.sum, numDocs);
-assert.eq(queryStatsEntry.metrics.docsReturned.min, numDocs / 2);
-assert.eq(queryStatsEntry.metrics.docsReturned.max, numDocs / 2);
+const queryExecMetrics = getQueryExecMetrics(queryStatsEntry.metrics);
+assert.eq(queryExecMetrics.docsReturned.sum, numDocs);
+assert.eq(queryExecMetrics.docsReturned.min, numDocs / 2);
+assert.eq(queryExecMetrics.docsReturned.max, numDocs / 2);
 
 // The total size of documents in the collection should ensure that the queries in this test can
 // be executed without requiring multiple batches, but we verify that by looking at the
 // timestamps.
-assert.eq(queryStatsEntry.metrics.firstResponseExecMicros, queryStatsEntry.metrics.totalExecMicros);
+const cursorMetrics = getCursorMetrics(queryStatsEntry.metrics);
+assert.eq(cursorMetrics.firstResponseExecMicros, queryStatsEntry.metrics.totalExecMicros);
 
 verifyMetrics(queryStatsResults);
 MongoRunner.stopMongod(conn);

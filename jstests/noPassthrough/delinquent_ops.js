@@ -22,7 +22,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findMatchingLogLine, getMatchingLoglinesCount} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryExecMetrics, getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -246,25 +246,25 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
     {
         const queryStats = getQueryStats(routerDb.getMongo(), {collName: "testColl"});
+        const queryStatsJson = tojson(queryStats);
         assert(
             queryStats.length === 1,
-            "Expected to find exactly one query stats entry for 'testColl' " + tojson(queryStats),
+            "Expected to find exactly one query stats entry for 'testColl' " + queryStatsJson,
         );
-        assert.gte(queryStats[0].metrics.delinquentAcquisitions.sum, 4, tojson(queryStats));
-        assert.gte(
-            queryStats[0].metrics.totalAcquisitionDelinquencyMillis.sum,
-            waitPerIterationMs * 4,
-            tojson(queryStats),
-        );
-        assert.gte(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max, waitPerIterationMs, tojson(queryStats));
+
+        const queryMetrics = queryStats[0].metrics;
+        const queryExecMetrics = getQueryExecMetrics(queryMetrics);
+        assert.gte(queryExecMetrics.delinquentAcquisitions.sum, 4, queryStatsJson);
+        assert.gte(queryExecMetrics.totalAcquisitionDelinquencyMillis.sum, waitPerIterationMs * 4, queryStatsJson);
+        assert.gte(queryExecMetrics.maxAcquisitionDelinquencyMillis.max, waitPerIterationMs, queryStatsJson);
 
         // For first batch, numInterruptChecks >=4, time ~=600ms
         // For second batch, numInterruptChecks >=3, time~=400ms
-        assert.gte(queryStats[0].metrics.numInterruptChecksPerSec.sum, 7, tojson(queryStats));
+        assert.gte(queryExecMetrics.numInterruptChecksPerSec.sum, 7, queryStatsJson);
         assert.gte(
-            queryStats[0].metrics.overdueInterruptApproxMaxMillis.max,
+            queryExecMetrics.overdueInterruptApproxMaxMillis.max,
             waitPerIterationMs - delinquentIntervalMs,
-            tojson(queryStats),
+            queryStatsJson,
         );
     }
 
@@ -326,13 +326,14 @@ function testDelinquencyOnShard(routerDb, shardDb) {
         // Ensure that the query stats for this operation do not indicate that it's delinquent.
         {
             const queryStats = getQueryStats(routerDb.getMongo(), {collName: "txn_coll"});
+            const queryExecMetrics = getQueryExecMetrics(queryStats[0].metrics);
             assert(
                 queryStats.length === 1,
                 "Expected to find exactly one query stats entry for 'testColl' " + tojson(queryStats),
             );
-            assert.eq(queryStats[0].metrics.delinquentAcquisitions.sum, 0, queryStats);
-            assert.eq(queryStats[0].metrics.totalAcquisitionDelinquencyMillis.sum, 0, queryStats);
-            assert.eq(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max, 0, queryStats);
+            assert.eq(queryExecMetrics.delinquentAcquisitions.sum, 0, queryStats);
+            assert.eq(queryExecMetrics.totalAcquisitionDelinquencyMillis.sum, 0, queryStats);
+            assert.eq(queryExecMetrics.maxAcquisitionDelinquencyMillis.max, 0, queryStats);
         }
     }
 }

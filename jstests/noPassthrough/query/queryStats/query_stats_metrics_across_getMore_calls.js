@@ -3,7 +3,12 @@
  * calls, for agg commands.
  * @tags: [requires_fcv_72]
  */
-import {getQueryStatsAggCmd, verifyMetrics} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryStatsAggCmd,
+    verifyMetrics,
+    getQueryExecMetrics,
+    getCursorMetrics,
+} from "jstests/libs/query/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {
@@ -43,9 +48,10 @@ assert.commandWorked(bulk.execute());
     assert.eq(queryStatsEntry.metrics.execCount, 2);
 
     // Assert queryStats values are accurate for the two above queries.
-    assert.eq(queryStatsEntry.metrics.docsReturned.sum, numDocs);
-    assert.eq(queryStatsEntry.metrics.docsReturned.min, numDocs / 2);
-    assert.eq(queryStatsEntry.metrics.docsReturned.max, numDocs / 2);
+    const queryExecMetrics = getQueryExecMetrics(queryStatsEntry.metrics);
+    assert.eq(queryExecMetrics.docsReturned.sum, numDocs);
+    assert.eq(queryExecMetrics.docsReturned.min, numDocs / 2);
+    assert.eq(queryExecMetrics.docsReturned.max, numDocs / 2);
 
     verifyMetrics(queryStatsResults);
 }
@@ -78,10 +84,12 @@ const fooNeBatchSize = 3;
     assert.eq(queryStatsResults[1].key.queryShape.cmdNs.coll, jsTestName());
     assert.eq(queryStatsResults[1].key.client.application.name, "MongoDB Shell");
 
+    const queryStatsEntry0 = queryStatsResults[0].metrics;
+    const queryStatsEntry1 = queryStatsResults[1].metrics;
     assert.eq(queryStatsResults[0].metrics.execCount, 1);
     assert.eq(queryStatsResults[1].metrics.execCount, 1);
-    assert.eq(queryStatsResults[0].metrics.docsReturned.sum, fooEqBatchSize * 2);
-    assert.eq(queryStatsResults[1].metrics.docsReturned.sum, fooNeBatchSize);
+    assert.eq(getQueryExecMetrics(queryStatsResults[0].metrics).docsReturned.sum, fooEqBatchSize * 2);
+    assert.eq(getQueryExecMetrics(queryStatsResults[1].metrics).docsReturned.sum, fooNeBatchSize);
 
     verifyMetrics(queryStatsResults);
 
@@ -92,7 +100,7 @@ const fooNeBatchSize = 3;
         assert(
             bsonWoCompare(
                 queryStatsResults[0].metrics.totalExecMicros[field],
-                queryStatsResults[0].metrics.firstResponseExecMicros[field],
+                getCursorMetrics(queryStatsResults[0].metrics).firstResponseExecMicros[field],
             ) > 0,
         );
 
@@ -100,7 +108,7 @@ const fooNeBatchSize = 3;
         // equal.
         assert.eq(
             queryStatsResults[1].metrics.totalExecMicros[field],
-            queryStatsResults[1].metrics.firstResponseExecMicros[field],
+            getCursorMetrics(queryStatsResults[1].metrics).firstResponseExecMicros[field],
         );
     }
 }
@@ -136,7 +144,7 @@ const fooNeBatchSize = 3;
     assert.eq(queryStatsResults[0].key.queryShape.cmdNs.coll, jsTestName());
     assert.eq(queryStatsResults[0].key.client.application.name, "MongoDB Shell");
     assert.eq(queryStatsResults[0].metrics.execCount, 1);
-    assert.eq(queryStatsResults[0].metrics.docsReturned.sum, numDocs);
+    assert.eq(getQueryExecMetrics(queryStatsResults[0].metrics).docsReturned.sum, numDocs);
 
     // This filters to just the queryStats for query coll.find({foo: {$eq:
     // 1}}).limit(query2Limit).batchSize(2).
@@ -149,7 +157,7 @@ const fooNeBatchSize = 3;
     assert.eq(queryStatsResults[0].key.queryShape.cmdNs.coll, jsTestName());
     assert.eq(queryStatsResults[0].key.client.application.name, "MongoDB Shell");
     assert.eq(queryStatsResults[0].metrics.execCount, 1);
-    assert.eq(queryStatsResults[0].metrics.docsReturned.sum, query2Limit);
+    assert.eq(getQueryExecMetrics(queryStatsResults[0].metrics).docsReturned.sum, query2Limit);
 
     // This filters to just the queryStats for query coll.find({foo: {$eq: 0}}).batchSize(2).
     queryStatsResults = testDB
@@ -170,9 +178,11 @@ const fooNeBatchSize = 3;
     assert.eq(queryStatsResults[0].key.queryShape.cmdNs.coll, jsTestName());
     assert.eq(queryStatsResults[0].key.client.application.name, "MongoDB Shell");
     assert.eq(queryStatsResults[0].metrics.execCount, 2);
-    assert.eq(queryStatsResults[0].metrics.docsReturned.sum, numDocs / 2 + 2 * fooEqBatchSize);
-    assert.eq(queryStatsResults[0].metrics.docsReturned.max, numDocs / 2);
-    assert.eq(queryStatsResults[0].metrics.docsReturned.min, 2 * fooEqBatchSize);
+
+    const docsReturnedMetric = getQueryExecMetrics(queryStatsResults[0].metrics).docsReturned;
+    assert.eq(docsReturnedMetric.sum, numDocs / 2 + 2 * fooEqBatchSize);
+    assert.eq(docsReturnedMetric.max, numDocs / 2);
+    assert.eq(docsReturnedMetric.min, 2 * fooEqBatchSize);
 }
 
 MongoRunner.stopMongod(conn);

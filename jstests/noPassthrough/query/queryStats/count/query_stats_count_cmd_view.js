@@ -11,6 +11,7 @@ import {
     getQueryStats,
     resetQueryStatsStore,
     withQueryStatsEnabled,
+    getQueryPlannerMetrics,
 } from "jstests/libs/query/query_stats_utils.js";
 
 withQueryStatsEnabled(jsTestName(), (coll) => {
@@ -44,13 +45,14 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
     const entry = getLatestQueryStatsEntry(viewsDB.getMongo(), {collName: "identityView"});
     assert.eq("count", entry.key.queryShape.command, entry);
 
+    const queryPlannerMetrics = getQueryPlannerMetrics(entry.metrics);
     assertAggregatedMetricsSingleExec(entry, {
         keysExamined: 0,
         docsExamined: 5,
         hasSortStage: false,
         // Don't validate the value of 'usedDisk' here. On some variants this can actually be true,
         // but this test is not concerned with validating that.
-        usedDisk: entry.metrics.usedDisk["true"] > 0,
+        usedDisk: queryPlannerMetrics.usedDisk["true"] > 0,
         fromMultiPlanner: false,
         fromPlanCache: false,
     });

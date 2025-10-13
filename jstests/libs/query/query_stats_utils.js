@@ -354,7 +354,10 @@ export function assertExpectedResults({
 }) {
     const {key, keyHash, queryShapeHash, metrics, asOf} = results;
     confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
+
     assert.eq(expectedExecCount, metrics.execCount);
+
+    const queryExecStats = getQueryExecMetrics(metrics);
     assert.docEq(
         {
             sum: NumberLong(expectedDocsReturnedSum),
@@ -362,18 +365,12 @@ export function assertExpectedResults({
             min: NumberLong(expectedDocsReturnedMin),
             sumOfSquares: NumberLong(expectedDocsReturnedSumOfSq),
         },
-        metrics.docsReturned,
+        queryExecStats.docsReturned,
     );
 
-    const {
-        firstSeenTimestamp,
-        latestSeenTimestamp,
-        lastExecutionMicros,
-        totalExecMicros,
-        firstResponseExecMicros,
-        workingTimeMillis,
-        cpuNanos,
-    } = metrics;
+    const firstResponseExecMicros = getCursorMetrics(metrics).firstResponseExecMicros;
+    const {firstSeenTimestamp, latestSeenTimestamp, lastExecutionMicros, totalExecMicros, workingTimeMillis, cpuNanos} =
+        metrics;
 
     // The tests can't predict exact timings, so just assert these three fields have been set (are
     // non-zero).
@@ -417,9 +414,64 @@ export function assertExpectedResults({
     }
 }
 
-export function assertAggregatedMetric(results, metricName, {sum, min, max, sumOfSq}) {
-    const {key, metrics, asOf} = results;
+export function getCursorMetrics(metrics) {
+    // When feature flag QueryStatsMetricsSubsections is enabled, metrics related to cursor would be nested
+    // inside "cursor" section within metrics. When it is disabled, metrics would have a flat structure, without
+    // the "cursor" section. This function abstracts away that difference regardless of the status of the feature flag.
+    // TODO SERVER-112150: Once all versions support feature flag, simply return metrics["cursor"].
+    const cursorMetricsSectionName = "cursor";
+    if (metrics.hasOwnProperty(cursorMetricsSectionName)) {
+        return metrics[cursorMetricsSectionName];
+    }
 
+    return {
+        firstResponseExecMicros: metrics.firstResponseExecMicros,
+    };
+}
+
+export function getQueryExecMetrics(metrics) {
+    // When feature flag QueryStatsMetricsSubsections is enabled, metrics related to query execution would be nested
+    // inside "queryExec" section within metrics. When it is disabled, metrics would have a flat structure, without
+    // the "queryExec" section. This function abstracts away that difference regardless of the status of the feature flag.
+    // TODO SERVER-112150: Once all versions support feature flag, simply return metrics["queryExec"].
+    const queryExecSectionName = "queryExec";
+    if (metrics.hasOwnProperty(queryExecSectionName)) {
+        return metrics[queryExecSectionName];
+    }
+
+    return {
+        docsReturned: metrics.docsReturned,
+        keysExamined: metrics.keysExamined,
+        docsExamined: metrics.docsExamined,
+        bytesRead: metrics.bytesRead,
+        readTimeMicros: metrics.readTimeMicros,
+        delinquentAcquisitions: metrics.delinquentAcquisitions,
+        totalAcquisitionDelinquencyMillis: metrics.totalAcquisitionDelinquencyMillis,
+        maxAcquisitionDelinquencyMillis: metrics.maxAcquisitionDelinquencyMillis,
+        numInterruptChecksPerSec: metrics.numInterruptChecksPerSec,
+        overdueInterruptApproxMaxMillis: metrics.overdueInterruptApproxMaxMillis,
+    };
+}
+
+export function getQueryPlannerMetrics(metrics) {
+    // When feature flag QueryStatsMetricsSubsections is enabled, metrics related to query planner would be nested
+    // inside "queryPlanner" section within metrics. When it is disabled, metrics would have a flat structure, without
+    // the "queryPlanner" section. This function abstracts away that difference regardless of the status of the feature flag.
+    // TODO SERVER-112150: Once all versions support feature flag, simply return metrics["queryPlanner"].
+    const queryPlannerSectionName = "queryPlanner";
+    if (metrics.hasOwnProperty(queryPlannerSectionName)) {
+        return metrics[queryPlannerSectionName];
+    }
+
+    return {
+        hasSortStage: metrics.hasSortStage,
+        usedDisk: metrics.usedDisk,
+        fromMultiPlanner: metrics.fromMultiPlanner,
+        fromPlanCache: metrics.fromPlanCache,
+    };
+}
+
+export function assertAggregatedMetric(metrics, metricName, {sum, min, max, sumOfSq}) {
     assert.docEq(
         {
             sum: NumberLong(sum),
@@ -432,9 +484,7 @@ export function assertAggregatedMetric(results, metricName, {sum, min, max, sumO
     );
 }
 
-export function assertAggregatedBoolean(results, metricName, {trueCount, falseCount}) {
-    const {key, metrics, asOf} = results;
-
+export function assertAggregatedBoolean(metrics, metricName, {trueCount, falseCount}) {
     assert.docEq(
         {
             "true": NumberLong(trueCount),
@@ -449,15 +499,22 @@ export function assertAggregatedMetricsSingleExec(
     results,
     {docsExamined, keysExamined, usedDisk, hasSortStage, fromPlanCache, fromMultiPlanner},
 ) {
-    const numericMetric = (x) => ({sum: x, min: x, max: x, sumOfSq: x ** 2});
-    assertAggregatedMetric(results, "docsExamined", numericMetric(docsExamined));
-    assertAggregatedMetric(results, "keysExamined", numericMetric(keysExamined));
+    {
+        // Need to check if new format is used.
+        const queryStatSection = getQueryExecMetrics(results.metrics);
+        const numericMetric = (x) => ({sum: x, min: x, max: x, sumOfSq: x ** 2});
+        assertAggregatedMetric(queryStatSection, "docsExamined", numericMetric(docsExamined));
+        assertAggregatedMetric(queryStatSection, "keysExamined", numericMetric(keysExamined));
+    }
 
-    const booleanMetric = (x) => ({trueCount: x ? 1 : 0, falseCount: x ? 0 : 1});
-    assertAggregatedBoolean(results, "usedDisk", booleanMetric(usedDisk));
-    assertAggregatedBoolean(results, "hasSortStage", booleanMetric(hasSortStage));
-    assertAggregatedBoolean(results, "fromPlanCache", booleanMetric(fromPlanCache));
-    assertAggregatedBoolean(results, "fromMultiPlanner", booleanMetric(fromMultiPlanner));
+    {
+        const queryStatSection = getQueryPlannerMetrics(results.metrics);
+        const booleanMetric = (x) => ({trueCount: x ? 1 : 0, falseCount: x ? 0 : 1});
+        assertAggregatedBoolean(queryStatSection, "usedDisk", booleanMetric(usedDisk));
+        assertAggregatedBoolean(queryStatSection, "hasSortStage", booleanMetric(hasSortStage));
+        assertAggregatedBoolean(queryStatSection, "fromPlanCache", booleanMetric(fromPlanCache));
+        assertAggregatedBoolean(queryStatSection, "fromMultiPlanner", booleanMetric(fromMultiPlanner));
+    }
 }
 
 export function asFieldPath(str) {
@@ -994,14 +1051,18 @@ export function checkChangeStreamEntry({queryStatsEntry, db, collectionName, num
     }
 
     // Checking that metrics match expected metrics.
-    assert.eq(queryStatsEntry.metrics.execCount, numExecs);
-    assert.eq(queryStatsEntry.metrics.docsReturned.sum, numDocsReturned);
+    const queryMetrics = queryStatsEntry.metrics;
+    const queryExecMetrics = getQueryExecMetrics(queryMetrics);
+    assert.eq(queryMetrics.execCount, numExecs);
+    assert.eq(queryExecMetrics.docsReturned.sum, numDocsReturned);
 
     // FirstResponseExecMicros and TotalExecMicros match since each getMore is recorded as a new
     // first response.
-    assert.eq(queryStatsEntry.metrics.totalExecMicros.sum, queryStatsEntry.metrics.firstResponseExecMicros.sum);
-    assert.eq(queryStatsEntry.metrics.totalExecMicros.max, queryStatsEntry.metrics.firstResponseExecMicros.max);
-    assert.eq(queryStatsEntry.metrics.totalExecMicros.min, queryStatsEntry.metrics.firstResponseExecMicros.min);
+    const totalExecMicros = queryMetrics.totalExecMicros;
+    const firstResponseExecMicros = getCursorMetrics(queryMetrics).firstResponseExecMicros;
+    assert.eq(totalExecMicros.sum, firstResponseExecMicros.sum);
+    assert.eq(totalExecMicros.max, firstResponseExecMicros.max);
+    assert.eq(totalExecMicros.min, firstResponseExecMicros.min);
 }
 
 /**

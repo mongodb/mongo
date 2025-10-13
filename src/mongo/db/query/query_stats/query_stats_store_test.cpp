@@ -1528,106 +1528,125 @@ TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowDoubleTest) {
     SumOfSquaresOverflowTest<double>();
 }
 
-TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
-    QueryStatsStore queryStatsStore{5000000, 1000};
+void verifyQueryStatsBSON(QueryStatsEntry& qse,
+                          bool useSubsections = false,
+                          long long lastExecutionMicros = 0LL,
+                          long long execCount = 0LL,
+                          BSONObj hasSortStage = boolMetricBson(0, 0),
+                          BSONObj usedDisk = boolMetricBson(0, 0)) {
     const BSONObj emptyIntMetric = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObjBuilder testBuilder{};
+    testBuilder.appendNumber("lastExecutionMicros", lastExecutionMicros)
+        .appendNumber("execCount", execCount)
+        .append("totalExecMicros", emptyIntMetric)
+        .append("cpuNanos", emptyIntMetric)
+        .append("workingTimeMillis", emptyIntMetric);
 
-    auto getMetrics = [&](BSONObj query) {
-        auto key = makeFindKeyFromQuery(query);
-        auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
-        ASSERT_OK(lookupResult);
-        return *lookupResult.getValue();
-    };
+    BSONObjBuilder* subsectionBuilder = &testBuilder;
+    BSONObjBuilder cursorSection{};
+    if (useSubsections) {
+        subsectionBuilder = &cursorSection;
+    }
 
-    auto collectMetricsBase = [&](BSONObj query) {
-        auto key = makeFindKeyFromQuery(query);
-        auto lookupHash = absl::HashOf(key);
-        auto lookupResult = queryStatsStore.lookup(lookupHash);
-        if (!lookupResult.isOK()) {
-            queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
-            lookupResult = queryStatsStore.lookup(lookupHash);
+    subsectionBuilder->append("firstResponseExecMicros", emptyIntMetric);
+
+    BSONObjBuilder queryExecSection{};
+    if (useSubsections) {
+        testBuilder.append("cursor", subsectionBuilder->obj());
+        subsectionBuilder = &queryExecSection;
+    }
+
+    subsectionBuilder->append("docsReturned", emptyIntMetric)
+        .append("keysExamined", emptyIntMetric)
+        .append("docsExamined", emptyIntMetric)
+        .append("bytesRead", emptyIntMetric)
+        .append("readTimeMicros", emptyIntMetric)
+        .append("delinquentAcquisitions", emptyIntMetric)
+        .append("totalAcquisitionDelinquencyMillis", emptyIntMetric)
+        .append("maxAcquisitionDelinquencyMillis", emptyIntMetric)
+        .append("numInterruptChecksPerSec", emptyIntMetric)
+        .append("overdueInterruptApproxMaxMillis", emptyIntMetric);
+
+    BSONObjBuilder queryPlannerSection{};
+    if (useSubsections) {
+        testBuilder.append("queryExec", subsectionBuilder->obj());
+        subsectionBuilder = &queryPlannerSection;
+    }
+
+    subsectionBuilder->append("hasSortStage", hasSortStage)
+        .append("usedDisk", usedDisk)
+        .append("fromMultiPlanner", boolMetricBson(0, 0))
+        .append("fromPlanCache", boolMetricBson(0, 0));
+
+    if (useSubsections) {
+        testBuilder.append("queryPlanner", subsectionBuilder->obj());
+    }
+
+    testBuilder.append("firstSeenTimestamp", qse.firstSeenTimestamp)
+        .append("latestSeenTimestamp", Date_t());
+
+    ASSERT_BSONOBJ_EQ(qse.toBSON(useSubsections), testBuilder.obj());
+}
+
+TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
+    // TODO SERVER-112150: Once all versions support feature flag QueryStatsMetricsSubsections,
+    // removing testing both with and without subsections.
+    for (bool useSubsections : {false, true}) {
+        QueryStatsStore queryStatsStore{5000000, 1000};
+
+        auto getMetrics = [&](BSONObj query) {
+            auto key = makeFindKeyFromQuery(query);
+            auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+            ASSERT_OK(lookupResult);
+            return *lookupResult.getValue();
+        };
+
+        auto collectMetricsBase = [&](BSONObj query) {
+            auto key = makeFindKeyFromQuery(query);
+            auto lookupHash = absl::HashOf(key);
+            auto lookupResult = queryStatsStore.lookup(lookupHash);
+            if (!lookupResult.isOK()) {
+                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                lookupResult = queryStatsStore.lookup(lookupHash);
+            }
+
+            return lookupResult.getValue();
+        };
+        auto query1 = BSON("query" << 1 << "xEquals" << 42);
+
+        // Collect some metrics
+        {
+            auto metrics = collectMetricsBase(query1);
+            metrics->execCount += 1;
+            metrics->lastExecutionMicros += 123456;
         }
 
-        return lookupResult.getValue();
-    };
+        // Verify the serialization works correctly
+        {
+            auto qse = getMetrics(query1);
+            verifyQueryStatsBSON(
+                qse, useSubsections, 123456LL /* lastExecutionMicros */, 1LL /* execCount */);
+        }
 
-    auto query1 = BSON("query" << 1 << "xEquals" << 42);
+        // Collect some metrics again but with booleans
+        {
+            auto metrics = collectMetricsBase(query1);
+            metrics->execCount += 1;
+            metrics->lastExecutionMicros += 123456;
+            metrics->queryPlannerStats.usedDisk.aggregate(true);
+            metrics->queryPlannerStats.hasSortStage.aggregate(false);
+        }
 
-    // Collect some metrics
-    {
-        auto metrics = collectMetricsBase(query1);
-        metrics->execCount += 1;
-        metrics->lastExecutionMicros += 123456;
-    }
-
-    // Verify the serialization works correctly
-    {
-        auto qse = getMetrics(query1);
-        ASSERT_BSONOBJ_EQ(qse.toBSON(),
-                          BSONObjBuilder{}
-                              .append("lastExecutionMicros", 123456LL)
-                              .append("execCount", 1LL)
-                              .append("totalExecMicros", emptyIntMetric)
-                              .append("firstResponseExecMicros", emptyIntMetric)
-                              .append("docsReturned", emptyIntMetric)
-                              .append("keysExamined", emptyIntMetric)
-                              .append("docsExamined", emptyIntMetric)
-                              .append("bytesRead", emptyIntMetric)
-                              .append("readTimeMicros", emptyIntMetric)
-                              .append("workingTimeMillis", emptyIntMetric)
-                              .append("cpuNanos", emptyIntMetric)
-                              .append("delinquentAcquisitions", emptyIntMetric)
-                              .append("totalAcquisitionDelinquencyMillis", emptyIntMetric)
-                              .append("maxAcquisitionDelinquencyMillis", emptyIntMetric)
-                              .append("numInterruptChecksPerSec", emptyIntMetric)
-                              .append("overdueInterruptApproxMaxMillis", emptyIntMetric)
-                              .append("hasSortStage", boolMetricBson(0, 0))
-                              .append("usedDisk", boolMetricBson(0, 0))
-                              .append("fromMultiPlanner", boolMetricBson(0, 0))
-                              .append("fromPlanCache", boolMetricBson(0, 0))
-                              .append("firstSeenTimestamp", qse.firstSeenTimestamp)
-                              .append("latestSeenTimestamp", Date_t())
-                              .obj());
-    }
-
-    // Collect some metrics again but with booleans
-    {
-        auto metrics = collectMetricsBase(query1);
-        metrics->execCount += 1;
-        metrics->lastExecutionMicros += 123456;
-        metrics->usedDisk.aggregate(true);
-        metrics->hasSortStage.aggregate(false);
-    }
-
-    // With some boolean metrics
-    {
-        auto qse2 = getMetrics(query1);
-
-        ASSERT_BSONOBJ_EQ(qse2.toBSON(),
-                          BSONObjBuilder{}
-                              .append("lastExecutionMicros", 246912LL)
-                              .append("execCount", 2LL)
-                              .append("totalExecMicros", emptyIntMetric)
-                              .append("firstResponseExecMicros", emptyIntMetric)
-                              .append("docsReturned", emptyIntMetric)
-                              .append("keysExamined", emptyIntMetric)
-                              .append("docsExamined", emptyIntMetric)
-                              .append("bytesRead", emptyIntMetric)
-                              .append("readTimeMicros", emptyIntMetric)
-                              .append("workingTimeMillis", emptyIntMetric)
-                              .append("cpuNanos", emptyIntMetric)
-                              .append("delinquentAcquisitions", emptyIntMetric)
-                              .append("totalAcquisitionDelinquencyMillis", emptyIntMetric)
-                              .append("maxAcquisitionDelinquencyMillis", emptyIntMetric)
-                              .append("numInterruptChecksPerSec", emptyIntMetric)
-                              .append("overdueInterruptApproxMaxMillis", emptyIntMetric)
-                              .append("hasSortStage", boolMetricBson(0, 1))
-                              .append("usedDisk", boolMetricBson(1, 0))
-                              .append("fromMultiPlanner", boolMetricBson(0, 0))
-                              .append("fromPlanCache", boolMetricBson(0, 0))
-                              .append("firstSeenTimestamp", qse2.firstSeenTimestamp)
-                              .append("latestSeenTimestamp", Date_t())
-                              .obj());
+        // With some boolean metrics
+        {
+            auto qse2 = getMetrics(query1);
+            verifyQueryStatsBSON(qse2,
+                                 useSubsections,
+                                 246912LL /* lastExecutionMicros */,
+                                 2LL /* execCount */,
+                                 boolMetricBson(0, 1) /* hasSortStage */,
+                                 boolMetricBson(1, 0) /* usedDisk */);
+        }
     }
 }
 

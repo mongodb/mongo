@@ -34,33 +34,24 @@
 
 namespace mongo::query_stats {
 
-BSONObj QueryStatsEntry::toBSON() const {
-    BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
+// Estimated overhead for BSON document header, EOO, and potential subobject field names.
+const size_t kBSONOverhead = 100;
+
+BSONObj QueryStatsEntry::toBSON(bool buildSubsections) const {
+    // Pad not only for the overhead of the BSON structure itself, but also for the
+    // sub-structures it contains. We have 3 sub-structures at the top level:
+    // cursorStats, queryExecStats, queryPlannerStats.
+    // Pad an additional 500 bytes to account for any potential supplemental metrics.
+    BSONObjBuilder builder{sizeof(QueryStatsEntry) + (kBSONOverhead * 4) + 500};
     builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
     builder.append("execCount", (long long)execCount);
     totalExecMicros.appendTo(builder, "totalExecMicros");
-    firstResponseExecMicros.appendTo(builder, "firstResponseExecMicros");
-    docsReturned.appendTo(builder, "docsReturned");
-
-    // Disk use metrics.
-    keysExamined.appendTo(builder, "keysExamined");
-    docsExamined.appendTo(builder, "docsExamined");
-    bytesRead.appendTo(builder, "bytesRead");
-    readTimeMicros.appendTo(builder, "readTimeMicros");
-    workingTimeMillis.appendTo(builder, "workingTimeMillis");
     cpuNanos.appendToIfNonNegative(builder, "cpuNanos");
+    workingTimeMillis.appendTo(builder, "workingTimeMillis");
 
-    delinquentAcquisitions.appendTo(builder, "delinquentAcquisitions");
-    totalAcquisitionDelinquencyMillis.appendTo(builder, "totalAcquisitionDelinquencyMillis");
-    maxAcquisitionDelinquencyMillis.appendTo(builder, "maxAcquisitionDelinquencyMillis");
-
-    numInterruptChecksPerSec.appendTo(builder, "numInterruptChecksPerSec");
-    overdueInterruptApproxMaxMillis.appendTo(builder, "overdueInterruptApproxMaxMillis");
-
-    hasSortStage.appendTo(builder, "hasSortStage");
-    usedDisk.appendTo(builder, "usedDisk");
-    fromMultiPlanner.appendTo(builder, "fromMultiPlanner");
-    fromPlanCache.appendTo(builder, "fromPlanCache");
+    cursorStats.toBSON(builder, buildSubsections);
+    queryExecStats.toBSON(builder, buildSubsections);
+    queryPlannerStats.toBSON(builder, buildSubsections);
 
     builder.append("firstSeenTimestamp", firstSeenTimestamp);
     builder.append("latestSeenTimestamp", latestSeenTimestamp);
@@ -76,6 +67,64 @@ void QueryStatsEntry::addSupplementalStats(std::unique_ptr<SupplementalStatsEntr
             supplementalStatsMap = std::make_unique<SupplementalStatsMap>();
         }
         supplementalStatsMap->update(std::move(metric));
+    }
+}
+
+void QueryExecEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const {
+    BSONObjBuilder* builder = &queryStatsBuilder;
+    BSONObjBuilder queryExecBuilder{sizeof(QueryExecEntry) + kBSONOverhead};
+    if (buildAsSubsection) {
+        builder = &queryExecBuilder;
+    }
+
+    docsReturned.appendTo(*builder, "docsReturned");
+
+    // Disk use metrics.
+    keysExamined.appendTo(*builder, "keysExamined");
+    docsExamined.appendTo(*builder, "docsExamined");
+    bytesRead.appendTo(*builder, "bytesRead");
+    readTimeMicros.appendTo(*builder, "readTimeMicros");
+
+    delinquentAcquisitions.appendTo(*builder, "delinquentAcquisitions");
+    totalAcquisitionDelinquencyMillis.appendTo(*builder, "totalAcquisitionDelinquencyMillis");
+    maxAcquisitionDelinquencyMillis.appendTo(*builder, "maxAcquisitionDelinquencyMillis");
+
+    numInterruptChecksPerSec.appendTo(*builder, "numInterruptChecksPerSec");
+    overdueInterruptApproxMaxMillis.appendTo(*builder, "overdueInterruptApproxMaxMillis");
+
+    if (buildAsSubsection) {
+        queryStatsBuilder.append("queryExec", builder->obj());
+    }
+}
+
+void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const {
+    BSONObjBuilder* builder = &queryStatsBuilder;
+    BSONObjBuilder queryPlannerBuilder{sizeof(QueryPlannerEntry) + kBSONOverhead};
+    if (buildAsSubsection) {
+        builder = &queryPlannerBuilder;
+    }
+
+    hasSortStage.appendTo(*builder, "hasSortStage");
+    usedDisk.appendTo(*builder, "usedDisk");
+    fromMultiPlanner.appendTo(*builder, "fromMultiPlanner");
+    fromPlanCache.appendTo(*builder, "fromPlanCache");
+
+    if (buildAsSubsection) {
+        queryStatsBuilder.append("queryPlanner", builder->obj());
+    }
+}
+
+void CursorEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const {
+    BSONObjBuilder* builder = &queryStatsBuilder;
+    BSONObjBuilder cursorBuilder{sizeof(CursorEntry) + kBSONOverhead};
+    if (buildAsSubsection) {
+        builder = &cursorBuilder;
+    }
+
+    firstResponseExecMicros.appendTo(*builder, "firstResponseExecMicros");
+
+    if (buildAsSubsection) {
+        queryStatsBuilder.append("cursor", builder->obj());
     }
 }
 

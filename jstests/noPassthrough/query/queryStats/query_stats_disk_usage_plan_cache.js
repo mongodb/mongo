@@ -9,6 +9,7 @@ import {
     exhaustCursorAndGetQueryStats,
     getFindQueryStatsKey,
     runForEachDeployment,
+    getQueryPlannerMetrics,
 } from "jstests/libs/query/query_stats_utils.js";
 
 function makeUnshardedCollection(conn) {
@@ -68,7 +69,10 @@ function runCachedPlanTest(conn, coll) {
             key: queryStatsKey,
             expectedDocs: expectedDocs,
         });
-        assertAggregatedBoolean(queryStatsColdCache, "fromPlanCache", {trueCount: 0, falseCount: 1});
+        assertAggregatedBoolean(getQueryPlannerMetrics(queryStatsColdCache.metrics), "fromPlanCache", {
+            trueCount: 0,
+            falseCount: 1,
+        });
 
         // Inactive entry in the plan cache - we still won't use the plan cache here.
         const queryStatsInactiveCache = exhaustCursorAndGetQueryStats({
@@ -77,7 +81,10 @@ function runCachedPlanTest(conn, coll) {
             key: queryStatsKey,
             expectedDocs: expectedDocs,
         });
-        assertAggregatedBoolean(queryStatsInactiveCache, "fromPlanCache", {trueCount: 0, falseCount: 2});
+        assertAggregatedBoolean(getQueryPlannerMetrics(queryStatsInactiveCache.metrics), "fromPlanCache", {
+            trueCount: 0,
+            falseCount: 2,
+        });
 
         // Active entry in the plan cache - we will use the plan cache.
         const queryStatsActiveCache = exhaustCursorAndGetQueryStats({
@@ -86,7 +93,10 @@ function runCachedPlanTest(conn, coll) {
             key: queryStatsKey,
             expectedDocs: expectedDocs,
         });
-        assertAggregatedBoolean(queryStatsActiveCache, "fromPlanCache", {trueCount: 1, falseCount: 2});
+        assertAggregatedBoolean(getQueryPlannerMetrics(queryStatsActiveCache.metrics), "fromPlanCache", {
+            trueCount: 1,
+            falseCount: 2,
+        });
     }
 }
 

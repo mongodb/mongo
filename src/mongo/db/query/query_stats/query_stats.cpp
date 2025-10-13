@@ -249,28 +249,24 @@ bool shouldCollect(ServiceContext* serviceCtx) {
     return true;
 }
 
-void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
-                      QueryStatsEntry& toUpdate,
-                      const QueryStatsSnapshot& snapshot,
-                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalStats) {
-    toUpdate.latestSeenTimestamp = Date_t::now();
-    toUpdate.lastExecutionMicros = snapshot.queryExecMicros;
-    toUpdate.execCount++;
-    toUpdate.totalExecMicros.aggregate(snapshot.queryExecMicros);
-    toUpdate.firstResponseExecMicros.aggregate(snapshot.firstResponseExecMicros);
-    toUpdate.docsReturned.aggregate(snapshot.docsReturned);
+void updateCursorStatistics(CursorEntry& cursorEntryToUpdate, const QueryStatsSnapshot& snapshot) {
+    cursorEntryToUpdate.firstResponseExecMicros.aggregate(snapshot.firstResponseExecMicros);
+}
 
-    toUpdate.keysExamined.aggregate(snapshot.keysExamined);
-    toUpdate.docsExamined.aggregate(snapshot.docsExamined);
-    toUpdate.bytesRead.aggregate(snapshot.bytesRead);
-    toUpdate.readTimeMicros.aggregate(snapshot.readTimeMicros);
-    toUpdate.workingTimeMillis.aggregate(snapshot.workingTimeMillis);
-    toUpdate.cpuNanos.aggregate(snapshot.cpuNanos);
+void updateQueryExecStatistics(QueryExecEntry& queryExecEntryToUpdate,
+                               const QueryStatsSnapshot& snapshot) {
+    queryExecEntryToUpdate.docsReturned.aggregate(snapshot.docsReturned);
 
-    toUpdate.delinquentAcquisitions.aggregate(snapshot.delinquentAcquisitions);
-    toUpdate.totalAcquisitionDelinquencyMillis.aggregate(
+    queryExecEntryToUpdate.keysExamined.aggregate(snapshot.keysExamined);
+    queryExecEntryToUpdate.docsExamined.aggregate(snapshot.docsExamined);
+    queryExecEntryToUpdate.bytesRead.aggregate(snapshot.bytesRead);
+    queryExecEntryToUpdate.readTimeMicros.aggregate(snapshot.readTimeMicros);
+
+    queryExecEntryToUpdate.delinquentAcquisitions.aggregate(snapshot.delinquentAcquisitions);
+    queryExecEntryToUpdate.totalAcquisitionDelinquencyMillis.aggregate(
         snapshot.totalAcquisitionDelinquencyMillis);
-    toUpdate.maxAcquisitionDelinquencyMillis.aggregate(snapshot.maxAcquisitionDelinquencyMillis);
+    queryExecEntryToUpdate.maxAcquisitionDelinquencyMillis.aggregate(
+        snapshot.maxAcquisitionDelinquencyMillis);
 
     // Store the number of interrupt checks per second as a rate, this can give us a better sense of
     // how often interrupts are being checked relative to the total execution time across multiple
@@ -278,13 +274,33 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     auto secondCount = durationCount<Seconds>(Milliseconds{snapshot.workingTimeMillis});
     auto numInterruptChecksPerSec =
         secondCount == 0 ? 0 : snapshot.numInterruptChecks / (static_cast<double>(secondCount));
-    toUpdate.numInterruptChecksPerSec.aggregate(numInterruptChecksPerSec);
-    toUpdate.overdueInterruptApproxMaxMillis.aggregate(snapshot.overdueInterruptApproxMaxMillis);
+    queryExecEntryToUpdate.numInterruptChecksPerSec.aggregate(numInterruptChecksPerSec);
+    queryExecEntryToUpdate.overdueInterruptApproxMaxMillis.aggregate(
+        snapshot.overdueInterruptApproxMaxMillis);
+}
 
-    toUpdate.hasSortStage.aggregate(snapshot.hasSortStage);
-    toUpdate.usedDisk.aggregate(snapshot.usedDisk);
-    toUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
-    toUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
+void updateQueryPlannerStatistics(QueryPlannerEntry& queryPlannerEntryToUpdate,
+                                  const QueryStatsSnapshot& snapshot) {
+    queryPlannerEntryToUpdate.hasSortStage.aggregate(snapshot.hasSortStage);
+    queryPlannerEntryToUpdate.usedDisk.aggregate(snapshot.usedDisk);
+    queryPlannerEntryToUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
+    queryPlannerEntryToUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
+}
+
+void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
+                      QueryStatsEntry& toUpdate,
+                      const QueryStatsSnapshot& snapshot,
+                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalStats) {
+    toUpdate.latestSeenTimestamp = Date_t::now();
+    toUpdate.lastExecutionMicros = snapshot.queryExecMicros;
+    toUpdate.execCount++;
+    toUpdate.workingTimeMillis.aggregate(snapshot.workingTimeMillis);
+    toUpdate.cpuNanos.aggregate(snapshot.cpuNanos);
+    toUpdate.totalExecMicros.aggregate(snapshot.queryExecMicros);
+
+    updateCursorStatistics(toUpdate.cursorStats, snapshot);
+    updateQueryExecStatistics(toUpdate.queryExecStats, snapshot);
+    updateQueryPlannerStatistics(toUpdate.queryPlannerStats, snapshot);
 
     for (auto& supplementalStatsEntry : supplementalStats) {
         toUpdate.addSupplementalStats(std::move(supplementalStatsEntry));
