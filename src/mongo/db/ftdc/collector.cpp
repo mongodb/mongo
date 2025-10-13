@@ -41,10 +41,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/time_support.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
 
@@ -122,16 +125,24 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
                 continue;
             }
 
-            BSONObjBuilder subObjBuilder(parent->subobjStart(collector->name()));
+            try {
+                BSONObjBuilder subObjBuilder(parent->subobjStart(collector->name()));
 
-            // Add a Date_t before and after each BSON is collected so that we can track timing of
-            // the collector.
-            subObjBuilder.appendDate(kFTDCCollectStartField, getStartDate());
+                // Add a Date_t before and after each BSON is collected so that we can track timing
+                // of the collector.
+                subObjBuilder.appendDate(kFTDCCollectStartField, getStartDate());
 
-            collector->collect(opCtx.get(), subObjBuilder);
+                collector->collect(opCtx.get(), subObjBuilder);
 
-            end = client->getServiceContext()->getPreciseClockSource()->now();
-            subObjBuilder.appendDate(kFTDCCollectEndField, end);
+                end = client->getServiceContext()->getPreciseClockSource()->now();
+                subObjBuilder.appendDate(kFTDCCollectEndField, end);
+            } catch (...) {
+                LOGV2_ERROR(9761500,
+                            "Collector threw an error",
+                            "error"_attr = exceptionToStatus(),
+                            "collector"_attr = collector->name());
+                throw;
+            }
 
             // Ensure the collector did not set a read timestamp.
             invariant(shard_role_details::getRecoveryUnit(opCtx.get())->getTimestampReadSource() ==

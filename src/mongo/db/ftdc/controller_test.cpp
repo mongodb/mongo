@@ -97,6 +97,17 @@ private:
     uint64_t _limit = 1;
 };
 
+class MockFailCollector : public FTDCCollectorInterface {
+public:
+    void collect(OperationContext*, BSONObjBuilder&) final {
+        throw std::logic_error("MockFailController");
+    }
+
+    std::string name() const final {
+        return "MockFailCollector";
+    }
+};
+
 class MockCollector : public FTDCCollectorInterface {
 public:
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) final {
@@ -300,6 +311,10 @@ protected:
                              int numRotations,
                              std::unique_ptr<MockCollector> collector);
 
+    FTDCController* controller() {
+        return _controller.get();
+    }
+
 private:
     uint64_t _metadataCaptureFrequency;
     unittest::TempDir _tempdir{"metrics_testpath"};
@@ -493,6 +508,22 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
 
     // Remove RW permissions from the directory to force the FTDC thread to throw.
     boost::filesystem::permissions(dir(), boost::filesystem::no_perms);
+
+    startController();
+
+    // Do a single sample collection to ensure we run through FTDCController::doLoop() and die.
+    doCollection();
+}
+
+DEATH_TEST_REGEX_F(FTDCControllerTest,
+                   LogAndTerminateWhenExceptionThrown,
+                   "9761500.*MockFailCollector") {
+    FTDCConfig config;
+    config.period = Milliseconds(100);
+    setUpControllerAndCheckpoint(config);
+
+    auto collector = std::make_unique<MockFailCollector>();
+    controller()->addPeriodicCollector(std::move(collector), ClusterRole::None);
 
     startController();
 
