@@ -394,6 +394,12 @@ public:
     size_t getApproximateSize() const;
 
     /**
+     * Returns object/array depth of this value. Returns -1 if the depth is at least 'maxDepth'.
+     * Returns 0 on a scalar value.
+     */
+    int32_t depth(int32_t maxDepth, int32_t curDepth = 0) const;
+
+    /**
      * Calculate a hash value.
      *
      * Meant to be used to create composite hashes suitable for hashed container classes such as

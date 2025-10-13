@@ -1743,6 +1743,19 @@ server_parameters:
         redact: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+    internalReduceAccumulatedValueDepthCheckInterval:
+        description: >-
+            Configures how frequently $reduce checks if its accumulated value has exceeded the maximum
+            allowable nestedness. Arrays and subdocuments both count. If set to 0, no check is performed.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: gInternalReduceAccumulatedValueDepthCheckInterval
+        default: 16
+        redact: false
+        validator:
+            gte: 0
+            lte: 1048576 # 1024 ** 2
+
     internalQueryPermitMatchSwappingForComplexRenames:
         description:
             "When enabled, the system assumes that a projection like a:'$b.c' is a renaming
