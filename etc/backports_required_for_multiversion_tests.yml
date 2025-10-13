@@ -863,6 +863,8 @@ last-continuous:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/show_resharding_system_events.js
     ticket: SERVER-93153
+  - test_file: jstests/sharding/resharding_cloning_metrics_after_failover.js
+    ticket: SERVER-92978
   - test_file: jstests/change_streams/ddl_abort_index_build_event.js
     ticket: SERVER-93154
   suites: null
@@ -1790,6 +1792,8 @@ last-lts:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/show_resharding_system_events.js
     ticket: SERVER-93153
+  - test_file: jstests/sharding/resharding_cloning_metrics_after_failover.js
+    ticket: SERVER-92978
   - test_file: jstests/change_streams/ddl_abort_index_build_event.js
     ticket: SERVER-93154
   suites: null
