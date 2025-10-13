@@ -1805,7 +1805,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
                                                               std::move(pipelineTargetingInfo),
                                                               pipelineDataSource,
                                                               std::move(shardCursorsSortSpec),
-                                                              std::move(readConcern),
+                                                              readConcern,
                                                               requestQueryStatsFromRemotes);
         });
 }
