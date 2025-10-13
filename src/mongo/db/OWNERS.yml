@@ -234,7 +234,7 @@ filters:
   - "mongod_options_replication.*":
     approvers:
       - 10gen/server-replication-reviewers
-  - "mongod_options_storage.idl":
+  - "mongod_options_storage.*":
     approvers:
       - 10gen/server-storage-engine-integration
   - "mongod_options_sharding.*":

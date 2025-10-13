@@ -500,6 +500,28 @@ void _validateCatalogEntry(OperationContext* opCtx,
     }
 }
 
+boost::optional<std::string> getConfigOverrideOrThrow(const BSONElement& raw) {
+    if (!raw) {
+        return boost::none;
+    }
+    StringData chosenConfig = raw.valueStringDataSafe();
+    // Only a specific subset of valid configurations are allowlisted here. This is mostly to avoid
+    // having complex logic to parse/sanitize the user-chosen configuration string.
+    static const char* allowed[] = {
+        "",
+        "dump_address",
+        "dump_blocks",
+        "dump_layout",
+        "dump_pages",
+        "dump_tree_shape",
+    };
+    static const char** allowedEnd = allowed + std::size(allowed);
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Unrecognized configuration string " << chosenConfig,
+            std::find(allowed, allowedEnd, chosenConfig) != allowedEnd);
+    return {raw.str()};
+}
+
 }  // namespace
 
 void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLength) {
@@ -547,6 +569,246 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
                     !nextHashPrefix.starts_with(currentHashPrefix));
         }
     }
+}
+
+ValidationOptions parseValidateOptions(OperationContext* opCtx,
+                                       NamespaceString nss,
+                                       const BSONObj& cmdObj) {
+    bool background = cmdObj["background"].trueValue();
+    bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
+
+    const bool fullValidate = cmdObj["full"].trueValue();
+    if (background && fullValidate) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with both { background: true }"
+                                << " and { full: true } is not supported.");
+    }
+
+    const bool enforceFastCount = cmdObj["enforceFastCount"].trueValue();
+    if (background && enforceFastCount) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with both { background: true }"
+                                << " and { enforceFastCount: true } is not supported.");
+    }
+
+    const auto rawCheckBSONConformance = cmdObj["checkBSONConformance"];
+    const bool checkBSONConformance = rawCheckBSONConformance.trueValue();
+    if (rawCheckBSONConformance && !checkBSONConformance && (fullValidate || enforceFastCount)) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Cannot explicitly set 'checkBSONConformance: false' with "
+                                   "full validation set.");
+    }
+
+    const bool repair = cmdObj["repair"].trueValue();
+    if (opCtx->readOnly() && repair) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with { repair: true } in"
+                                << " read-only mode is not supported.");
+    }
+    if (background && repair) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with both { background: true }"
+                                << " and { repair: true } is not supported.");
+    }
+    if (enforceFastCount && repair) {
+        uasserted(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "Running the validate command with both { enforceFastCount: true }"
+                          << " and { repair: true } is not supported.");
+    }
+    if (checkBSONConformance && repair) {
+        uasserted(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "Running the validate command with both { checkBSONConformance: true }"
+                          << " and { repair: true } is not supported.");
+    }
+    repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (repair && replCoord->getSettings().isReplSet()) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with { repair: true } can only be"
+                                << " performed in standalone mode.");
+    }
+
+    const auto rawFixMultikey = cmdObj["fixMultikey"];
+    const bool fixMultikey = cmdObj["fixMultikey"].trueValue();
+    if (fixMultikey && replCoord->getSettings().isReplSet()) {
+        uasserted(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "Running the validate command with { fixMultikey: true } can only be"
+                          << " performed in standalone mode.");
+    }
+    if (rawFixMultikey && !fixMultikey && repair) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with both { fixMultikey: false }"
+                                << " and { repair: true } is not supported.");
+    }
+
+    const bool metadata = cmdObj["metadata"].trueValue();
+    if (metadata &&
+        (background || fullValidate || enforceFastCount || checkBSONConformance || repair)) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with { metadata: true } is not"
+                                << " supported with any other options");
+    }
+
+    const auto rawConfigOverride = cmdObj["wiredtigerVerifyConfigurationOverride"];
+    if (rawConfigOverride && !(fullValidate || enforceFastCount)) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Overriding the verify configuration is only supported with "
+                                   "full validation set.");
+    }
+
+    // Background validation uses point-in-time catalog lookups. This requires an instance of
+    // the collection at the checkpoint timestamp. Because timestamps aren't used in standalone
+    // mode, this prevents the CollectionCatalog from being able to establish the correct
+    // collection instance.
+    const bool isReplSet = repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
+    if (background && !isReplSet) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  str::stream() << "Running the validate command with { background: true } "
+                                << "is not supported in standalone mode");
+    }
+
+    // The same goes for unreplicated collections, DDL operations are untimestamped.
+    if (background && !nss.isReplicated()) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  str::stream() << "Running the validate command with { background: true } "
+                                << "is not supported on unreplicated collections");
+    }
+
+    // collHash parameter.
+    const bool collHash = cmdObj["collHash"].trueValue();
+
+    // hashPrefixes parameter.
+    const auto rawHashPrefixes = cmdObj["hashPrefixes"];
+    boost::optional<std::vector<std::string>> hashPrefixes = boost::none;
+    if (rawHashPrefixes) {
+        hashPrefixes = std::vector<std::string>();
+        for (const auto& e : rawHashPrefixes.Array()) {
+            hashPrefixes->push_back(e.String());
+        }
+        CollectionValidation::validateHashes(*hashPrefixes, /*equalLength=*/true);
+        if (!hashPrefixes->size()) {
+            hashPrefixes->push_back(std::string(""));
+        }
+    }
+    if (rawHashPrefixes && replCoord->getSettings().isReplSet()) {
+        uasserted(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "Running the validate command with { hashPrefixes: [] } can only be"
+                          << " performed in standalone mode.");
+    }
+    if (rawHashPrefixes && !collHash) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with { hashPrefixes: [] }"
+                                << " requires {collHash: true}.");
+    }
+
+    // revealHashedIds parameter.
+    const auto rawRevealHashedIds = cmdObj["revealHashedIds"];
+    boost::optional<std::vector<std::string>> revealHashedIds = boost::none;
+    if (rawRevealHashedIds && replCoord->getSettings().isReplSet()) {
+        uasserted(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "Running the validate command with { revealHashedIds: [] } can only be"
+                          << " performed in standalone mode.");
+    }
+    if (rawRevealHashedIds && !collHash) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with { revealHashedIds: [] }"
+                                << " requires {collHash: true}.");
+    }
+    if (rawRevealHashedIds && rawHashPrefixes) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  str::stream() << "Running the validate command with { revealHashedIds: [] } "
+                                   "cannot be done with"
+                                << " {hashPrefixes: []}.");
+    }
+    if (rawRevealHashedIds) {
+        const auto& rawRevealHashedIdsArr = rawRevealHashedIds.Array();
+        if (rawRevealHashedIdsArr.empty()) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Running the validate command with { revealHashedIds: [] } "
+                                       "cannot be done with"
+                                    << " an empty array provided.");
+        }
+        revealHashedIds = std::vector<std::string>();
+        for (const auto& e : rawRevealHashedIdsArr) {
+            revealHashedIds->push_back(e.String());
+        }
+        CollectionValidation::validateHashes(*revealHashedIds, /*equalLength=*/false);
+    }
+
+    auto validateMode = [&] {
+        if (metadata) {
+            return CollectionValidation::ValidateMode::kMetadata;
+        }
+        if (hashPrefixes) {
+            return CollectionValidation::ValidateMode::kHashDrillDown;
+        }
+        if (collHash) {
+            return CollectionValidation::ValidateMode::kCollectionHash;
+        }
+        if (background) {
+            if (checkBSONConformance) {
+                return CollectionValidation::ValidateMode::kBackgroundCheckBSON;
+            }
+            return CollectionValidation::ValidateMode::kBackground;
+        }
+        if (enforceFastCount) {
+            return CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount;
+        }
+        if (fullValidate) {
+            return CollectionValidation::ValidateMode::kForegroundFull;
+        }
+        if (checkBSONConformance) {
+            return CollectionValidation::ValidateMode::kForegroundCheckBSON;
+        }
+        return CollectionValidation::ValidateMode::kForeground;
+    }();
+
+    auto repairMode = [&] {
+        if (opCtx->readOnly()) {
+            // On read-only mode we can't make any adjustments.
+            return CollectionValidation::RepairMode::kNone;
+        }
+        switch (validateMode) {
+            case CollectionValidation::ValidateMode::kForeground:
+            case CollectionValidation::ValidateMode::kCollectionHash:
+            case CollectionValidation::ValidateMode::kHashDrillDown:
+            case CollectionValidation::ValidateMode::kForegroundCheckBSON:
+            case CollectionValidation::ValidateMode::kForegroundFull:
+            case CollectionValidation::ValidateMode::kForegroundFullIndexOnly:
+                // Foreground validation may not repair data while running as a replica set node
+                // because we do not have timestamps that are required to perform writes.
+                if (replCoord->getSettings().isReplSet()) {
+                    return CollectionValidation::RepairMode::kNone;
+                }
+                if (repair) {
+                    return CollectionValidation::RepairMode::kFixErrors;
+                }
+                if (fixMultikey) {
+                    return CollectionValidation::RepairMode::kAdjustMultikey;
+                }
+                return CollectionValidation::RepairMode::kNone;
+            default:
+                return CollectionValidation::RepairMode::kNone;
+        }
+    }();
+
+    if (repair) {
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    }
+
+    return {validateMode,
+            repairMode,
+            logDiagnostics,
+            getTestCommandsEnabled() ? (ValidationVersion)bsonTestValidationVersion
+                                     : currentValidationVersion,
+            getConfigOverrideOrThrow(rawConfigOverride),
+            hashPrefixes,
+            revealHashedIds};
 }
 
 Status validate(OperationContext* opCtx,

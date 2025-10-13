@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,54 +26,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#pragma once
-
 #include "mongo/base/status.h"
-#include "mongo/db/validate/validate_options.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/mongod_options_storage_gen.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
 
+#include <boost/optional/optional.hpp>
 namespace mongo {
 
-class NamespaceString;
-class OperationContext;
-class Collection;
-class CollectionPtr;
-class BSONObjBuilder;
-class Status;
-class ValidateResults;
+Status CollectionValidateOptionsServerParameter::setFromString(StringData value,
+                                                               const boost::optional<TenantId>&) {
+    _data = CollectionValidateOptions::parse(fromjson(value),
+                                             IDLParserContext("collection validate options"));
+    return Status::OK();
+}
 
-namespace CollectionValidation {
+Status CollectionValidateOptionsServerParameter::set(const BSONElement& newValueElement,
+                                                     const boost::optional<TenantId>&) {
+    _data = CollectionValidateOptions::parse(newValueElement.Obj(),
+                                             IDLParserContext("collection validate options"));
+    return Status::OK();
+}
 
-/**
- * Checks if 'hashPrefixes' contains valid hash strings. Throws if any is invalid.
- * When 'equalLength' is true, also checks all hash strings have the same length.
- */
-void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLength);
-
-/**
- * Parses and checks the command object and returns a 'ValidationOptions' object used for collection
- * validation.
- */
-ValidationOptions parseValidateOptions(OperationContext* opCtx,
-                                       NamespaceString nss,
-                                       const BSONObj& cmdObj);
-
-/**
- * Expects the caller to hold no locks.
- *
- * @return OK if the validate run successfully
- *         OK will be returned even if corruption is found
- *         details will be in 'results'.
- */
-Status validate(OperationContext* opCtx,
-                const NamespaceString& nss,
-                ValidationOptions options,
-                ValidateResults* results);
-
-/**
- * Checks whether a failpoint has been hit in the above validate() code..
- */
-bool getIsValidationPausedForTest();
-
-}  // namespace CollectionValidation
+void CollectionValidateOptionsServerParameter::append(OperationContext*,
+                                                      BSONObjBuilder* bob,
+                                                      StringData name,
+                                                      const boost::optional<TenantId>&) {
+    auto subBob = BSONObjBuilder(bob->subobjStart(name));
+    _data.serialize(&subBob);
+}
 }  // namespace mongo

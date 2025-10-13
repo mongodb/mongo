@@ -1768,7 +1768,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/server_lifecycle_monitor* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/server_recovery* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/mongod_options_replication.* @10gen/server-replication-reviewers @svc-auto-approve-bot
-/src/mongo/db/**/mongod_options_storage.idl @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/src/mongo/db/**/mongod_options_storage.* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/mongod_options_sharding.* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/**/dbhelpers* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/dbcommands.idl @10gen/server-storage-engine-integration @svc-auto-approve-bot

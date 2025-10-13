@@ -845,7 +845,7 @@ storage_engine_integration:
     - src/mongo/db/storage # excluding ./key_string, ./wiredtiger, ./devnull, some of ./kv
     - src/mongo/db/record_id*
     - src/mongo/db/server_recovery*
-    - src/mongo/db/mongod_options_storage.idl
+    - src/mongo/db/mongod_options_storage*
     - src/mongo/db/dbhelpers*
     - src/mongo/db/dbcommands.idl
     - src/mongo/db/local_catalog/import*

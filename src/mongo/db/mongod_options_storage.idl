@@ -37,6 +37,18 @@ global:
         initializer:
             register: addMongodStorageOptions
 
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    CollectionValidateOptions:
+        description: "Options for collection validation."
+        fields:
+            options:
+                description: "Options for collection validation."
+                type: object_owned
+                default: BSONObj()
+
 server_parameters:
     recoverToOplogTimestamp:
         description: >-
@@ -88,6 +100,15 @@ server_parameters:
         cpp_vartype: std::string
         cpp_varname: gValidateCollectionName
         default: ""
+        redact: false
+
+    collectionValidateOptions:
+        description: "Options for collection validation."
+        set_at: [startup]
+        cpp_class:
+            name: CollectionValidateOptionsServerParameter
+            data: CollectionValidateOptions
+            override_set: true
         redact: false
 
 configs:

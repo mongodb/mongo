@@ -717,14 +717,18 @@ void startupRepair(OperationContext* opCtx,
 
 // Perform collection validation for singular collection
 bool offlineValidateCollection(OperationContext* opCtx, NamespaceString nss) {
+    auto collectionValidateOptionsParam =
+        ServerParameterSet::getNodeParameterSet()->get<CollectionValidateOptionsServerParameter>(
+            "collectionValidateOptions");
+    auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
+    auto parsedOptions = !validateOptions.isEmpty()
+        ? CollectionValidation::parseValidateOptions(opCtx, nss, validateOptions)
+        : CollectionValidation::ValidationOptions(
+              CollectionValidation::ValidateMode::kForegroundFull,
+              CollectionValidation::RepairMode::kNone,
+              /*logDiagnostics=*/false);
     ValidateResults validateResults;
-    Status status =
-        CollectionValidation::validate(opCtx,
-                                       nss,
-                                       {CollectionValidation::ValidateMode::kForegroundFull,
-                                        CollectionValidation::RepairMode::kNone,
-                                        /*logDiagnostics=*/false},
-                                       &validateResults);
+    Status status = CollectionValidation::validate(opCtx, nss, parsedOptions, &validateResults);
 
     if (!status.isOK()) {
         uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,

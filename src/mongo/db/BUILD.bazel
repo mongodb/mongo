@@ -391,12 +391,16 @@ idl_generator(
 idl_generator(
     name = "mongod_options_storage_gen",
     src = "mongod_options_storage.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
 )
 
 mongo_cc_library(
     name = "mongod_options",
     srcs = [
         "mongod_options.cpp",
+        "mongod_options_storage.cpp",
         ":mongod_options_general_gen",
         ":mongod_options_legacy_gen",
         ":mongod_options_replication_gen",
