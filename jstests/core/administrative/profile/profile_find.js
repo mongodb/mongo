@@ -135,10 +135,20 @@ assert.eq(profileObj.fromMultiPlanner, true, profileObj);
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1, b: 1 }", profileObj);
 assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
 
-assert.neq(coll.findOne({a: 3, b: 3}), null);
-assert.neq(coll.findOne({a: 3, b: 3}), null);
-profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-assert.eq(profileObj.fromPlanCache, true, profileObj);
+// Using 'assert.soon()' here to skip over transient situations in which a query
+// plan cannot be added to the plan cache.
+assert.soon(() => {
+    assert.neq(coll.findOne({a: 3, b: 3}), null);
+    profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
+    return !!profileObj.fromPlanCache;
+});
+assert.eq(!!profileObj.fromPlanCache, true, () => {
+    const planCacheEntries = coll.getPlanCache().list();
+    return (
+        `Query not served from plan cache.\nProfile: ${tojson(profileObj)}\n` +
+        `Plan cache: ${tojson(planCacheEntries)}`
+    );
+});
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1, b: 1 }", profileObj);
 assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
 

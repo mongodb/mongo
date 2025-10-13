@@ -30,10 +30,20 @@ coll.aggregate([{$match: {a: 1}}], {comment}).toArray();
 let profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
 assert.eq(!!profileObj.fromPlanCache, false, profileObj);
 
-coll.aggregate([{$match: {a: 2}}], {comment}).toArray();
-profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
-assert.eq(!!profileObj.fromPlanCache, true, profileObj);
-
-coll.aggregate([{$match: {a: 3}}], {comment}).toArray();
-profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
-assert.eq(!!profileObj.fromPlanCache, true, profileObj);
+// Run the query two more times, for different values of 'a'. These runs should use the cached query plan.
+[2, 3].forEach((a) => {
+    // Using 'assert.soon()' here to skip over transient situations in which a query
+    // plan cannot be added to the plan cache.
+    assert.soon(() => {
+        coll.aggregate([{$match: {a}}], {comment}).toArray();
+        profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
+        return !!profileObj.fromPlanCache;
+    });
+    assert.eq(!!profileObj.fromPlanCache, true, () => {
+        const planCacheEntries = coll.getPlanCache().list();
+        return (
+            `Query not served from plan cache.\nProfile: ${tojson(profileObj)}\n` +
+            `Plan cache: ${tojson(planCacheEntries)}`
+        );
+    });
+});

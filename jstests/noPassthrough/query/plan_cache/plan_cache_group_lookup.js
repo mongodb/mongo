@@ -25,24 +25,38 @@ function setupForeignColl(index) {
 assert.commandWorked(db.setProfilingLevel(2));
 
 /**
- * Assert that the last aggregation command has a corresponding plan cache entry with the
- * desired properties. 'version' is 1 if it's classic cache, 2 if it's SBE cache. 'isActive' is
- * true if the cache entry is active. 'fromMultiPlanner' is true if the query part of
- * aggregation has been multi-planned. 'fromPlanCache' is true if the winning plan was retrieved
- * from the plan cache. 'forcesClassicEngine' is true if the query is forced to use classic
- * engine.
+ * Assert that executing the aggregation 'pipeline' returns exactly one result, and has a
+ * corresponding plan cache entry with the desired properties.
+ * 'version' is 1 if it's classic cache, 2 if it's SBE cache. 'isActive' is true if the cache
+ * entry is active.
+ * 'fromMultiPlanner' is true if the query part of aggregation has been multi-planned.
+ * 'fromPlanCache' is true if the winning plan was retrieved from the plan cache.
+ * 'forcesClassicEngine' is true if the query is forced to use classic engine.
  */
-function assertCacheUsage({version, fromMultiPlanner, fromPlanCache, isActive, forcesClassicEngine}) {
-    const profileObj = getLatestProfilerEntry(db, {
-        op: "command",
-        "command.pipeline": {$exists: true},
-        ns: coll.getFullName(),
-    });
-    assert.eq(fromMultiPlanner, !!profileObj.fromMultiPlanner, profileObj);
+function assertCacheUsage({pipeline, version, fromMultiPlanner, fromPlanCache, isActive, forcesClassicEngine}) {
+    let profileObj;
 
-    assert.eq(fromPlanCache, !!profileObj.fromPlanCache, profileObj);
+    // Using 'assert.soon()' here to skip over transient situations in which a query
+    // plan cannot be added to the plan cache.
+    assert.soon(() => {
+        let results = coll.aggregate(pipeline).toArray();
+        assert.eq(results.length, 1, results);
+
+        profileObj = getLatestProfilerEntry(db, {
+            op: "command",
+            "command.pipeline": {$exists: true},
+            ns: coll.getFullName(),
+        });
+        assert.eq(fromMultiPlanner, !!profileObj.fromMultiPlanner, profileObj);
+        return !fromPlanCache || !!profileObj.fromPlanCache;
+    });
 
     const entries = coll.getPlanCache().list();
+
+    assert.eq(fromPlanCache, !!profileObj.fromPlanCache, () => {
+        return `Query not served from plan cache.\nProfile: ${tojson(profileObj)}\n` + `Plan cache: ${tojson(entries)}`;
+    });
+
     assert.eq(entries.length, 1, entries);
     const entry = entries[0];
     assert.eq(entry.version, version, entry);
@@ -69,20 +83,18 @@ function assertCacheUsage({version, fromMultiPlanner, fromPlanCache, isActive, f
  *      3. The pipeline runs from cached solution planner, using the active cache entry.
  */
 function testLoweredPipeline({pipeline, version, forcesClassicEngine = false}) {
-    let results = coll.aggregate(pipeline).toArray();
-    assert.eq(results.length, 1, results);
     const entry = assertCacheUsage({
-        version: version,
+        pipeline,
+        version,
         fromMultiPlanner: true,
         fromPlanCache: false,
         isActive: false,
         forcesClassicEngine,
     });
 
-    results = coll.aggregate(pipeline).toArray();
-    assert.eq(results.length, 1, results);
     let nextEntry = assertCacheUsage({
-        version: version,
+        pipeline,
+        version,
         fromMultiPlanner: true,
         fromPlanCache: false,
         isActive: true,
@@ -90,10 +102,9 @@ function testLoweredPipeline({pipeline, version, forcesClassicEngine = false}) {
     });
     assert.eq(entry.planCacheKey, nextEntry.planCacheKey, {entry, nextEntry});
 
-    results = coll.aggregate(pipeline).toArray();
-    assert.eq(results.length, 1, results);
     nextEntry = assertCacheUsage({
-        version: version,
+        pipeline,
+        version,
         fromMultiPlanner: false,
         fromPlanCache: true,
         isActive: true,
