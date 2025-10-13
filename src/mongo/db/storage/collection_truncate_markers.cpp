@@ -30,6 +30,7 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/collection_truncate_markers_parameters_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -223,6 +224,11 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 
         numRecords++;
         dataSize += doc.objsize();
+
+        // Force a call to next() only every ~ 1 second to simulate slowness.
+        if (MONGO_unlikely(gUseSlowCollectionTruncateMarkerScanning)) {
+            sleepFor(Seconds(1));
+        }
     }
 
     collectionIterator.getRecordStore()->updateStatsAfterRepair(numRecords, dataSize);
@@ -406,6 +412,11 @@ CollectionTruncateMarkers::computeInitialCreationMethod(
     // be very little data in the collection; the cost of being wrong is imperceptible.
     if (numRecords == 0 && dataSize == 0) {
         return MarkersCreationMethod::EmptyCollection;
+    }
+
+    // Force scanning if the slow collection scanning flag is enabled.
+    if (gUseSlowCollectionTruncateMarkerScanning) {
+        return MarkersCreationMethod::Scanning;
     }
 
     // Only use sampling to estimate where to place the collection markers if the number of samples
