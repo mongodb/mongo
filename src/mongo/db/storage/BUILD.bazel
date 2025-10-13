@@ -25,10 +25,16 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "collection_truncate_markers_parameters_gen",
+    src = "collection_truncate_markers_parameters.idl",
+)
+
 mongo_cc_library(
     name = "record_store_base",
     srcs = [
         "collection_truncate_markers.cpp",
+        "collection_truncate_markers_parameters_gen",
         "record_store.cpp",
         "record_store_base.cpp",
     ],
