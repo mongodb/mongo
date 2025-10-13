@@ -94,7 +94,11 @@ function testMovePrimary(sharded) {
 
         jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${toShard}`);
         const res = db.adminCommand({movePrimary: db.getName(), to: toShard});
-        if (res.code == ErrorCodes.ShardNotFound) {
+        const shouldRetry =
+            TestData.shardsAddedRemoved &&
+            TestData.hasRandomShardsAddedRemoved &&
+            (res.code == ErrorCodes.ShardNotFound || res.code == ErrorCodes.ConflictingOperationInProgress);
+        if (shouldRetry) {
             jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${toShard} failed, retrying...`);
             return false;
         }
