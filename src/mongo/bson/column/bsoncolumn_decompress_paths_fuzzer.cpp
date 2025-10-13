@@ -29,9 +29,9 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumn_test_util.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
 static bool isDataOnlyInterleaved(const char* binary, size_t size) {

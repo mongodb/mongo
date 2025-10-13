@@ -29,8 +29,8 @@
 
 #include "mongo/db/exec/sbe/values/ts_block.h"
 
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"

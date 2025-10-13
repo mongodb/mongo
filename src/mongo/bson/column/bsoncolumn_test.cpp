@@ -29,31 +29,21 @@
 
 #include "mongo/bson/column/bsoncolumn.h"
 
-#include "mongo/bson/bsonelement.h"
-
-#include <absl/numeric/int128.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn_expressions.h"
 #include "mongo/bson/column/bsoncolumn_fuzzer_util.h"
 #include "mongo/bson/column/bsoncolumn_test_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
-#include "mongo/bson/column/simple8b_builder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/tracking/context.h"
 
@@ -63,6 +53,10 @@
 #include <forward_list>
 #include <limits>
 #include <string>
+
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::bsoncolumn {
 namespace {

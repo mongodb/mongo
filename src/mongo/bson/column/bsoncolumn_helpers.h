@@ -35,10 +35,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn_util.h"
+#include "mongo/bson/column/bsonobj_traversal.h"
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/column/simple8b_type_util.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 
 #include <concepts>
 

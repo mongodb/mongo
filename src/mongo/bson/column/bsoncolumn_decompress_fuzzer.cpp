@@ -29,8 +29,8 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/util/base64.h"
 
 // Returns true if the binary contains interleaved data. This function just scans the binary for an

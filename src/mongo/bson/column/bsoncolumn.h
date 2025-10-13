@@ -34,12 +34,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/column/bsoncolumn_helpers.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn_interleaved.h"
 #include "mongo/bson/column/bsoncolumn_util.h"
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/platform/int128.h"
 
 #include <cstddef>
@@ -49,9 +48,6 @@
 #include <variant>
 #include <vector>
 
-#include <absl/numeric/int128.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>

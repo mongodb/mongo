@@ -34,10 +34,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/util/time_support.h"
 

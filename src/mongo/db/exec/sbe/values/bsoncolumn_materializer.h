@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/value.h"

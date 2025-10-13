@@ -774,7 +774,6 @@ bsoncolumn: # authoritative: @10gen/server-bsoncolumn
     slack: server-storage-execution
     jira: Storage Execution
   files:
-    - src/mongo/bson/util/bsonobj_traversal.h
     - src/mongo/bson/column
 
 external_sorter: # authoritative: @10gen/server-external-sorter
