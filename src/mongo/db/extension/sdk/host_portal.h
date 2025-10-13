@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/modules.h"
 
@@ -76,12 +77,12 @@ public:
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10926401,
-                "Extension 'registerStageDescriptor' is null",
-                vtable.register_stage_descriptor != nullptr);
-        tassert(10999108,
-                "Extension 'getExtensionOptions' is null",
-                vtable.get_extension_options != nullptr);
+        tripwireAssert(10926401,
+                       "Extension 'register_stage_descriptor' is null",
+                       vtable.register_stage_descriptor != nullptr);
+        tripwireAssert(10999108,
+                       "Extension 'get_extension_options' is null",
+                       vtable.get_extension_options != nullptr);
     };
 };
 

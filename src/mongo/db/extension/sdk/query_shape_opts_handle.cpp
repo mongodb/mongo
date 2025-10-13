@@ -30,6 +30,7 @@
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
@@ -49,11 +50,8 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
 
     invokeCAndConvertStatusToException([&]() { return apiFunc(ptr, byteView, &buf); });
 
-    if (!buf) {
-        // TODO SERVER-111882 tassert here instead of returning empty string, since this would
-        // indicate programmer error.
-        return T();
-    }
+    tripwireAssert(
+        11188202, "buffer returned from serialize function must not be null", buf != nullptr);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
     // into a string to be returned.

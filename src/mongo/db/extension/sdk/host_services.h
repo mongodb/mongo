@@ -108,16 +108,7 @@ public:
 private:
     static HostServicesHandle _hostServices;
 
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(11097600,
-                "Host services' 'alwaysOK_TEMPORARY' is null",
-                vtable.alwaysOK_TEMPORARY != nullptr);
-        tassert(11097800,
-                "Host services' 'tripwire_asserted' is null",
-                vtable.tripwire_asserted != nullptr);
-        tassert(
-            11097801, "Host services' 'user_asserted' is null", vtable.user_asserted != nullptr);
-    };
+    void _assertVTableConstraints(const VTable_t& vtable) const override;
 };
 
 }  // namespace mongo::extension::sdk

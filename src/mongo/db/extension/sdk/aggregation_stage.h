@@ -29,6 +29,7 @@
 #pragma once
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/modules.h"
@@ -418,11 +419,12 @@ private:
                 static_cast<const ExtensionAggStageDescriptor*>(descriptor)->getImpl();
             auto parseNodePtr = impl.parse(bsonObjFromByteView(stageBson));
 
-            tassert(11217602,
-                    str::stream() << "Descriptor and parse node stage names differ: descriptor='"
-                                  << std::string(impl.getName()) << "' parseNode='"
-                                  << std::string(parseNodePtr->getName()) << "'.",
-                    impl.getName() == parseNodePtr->getName());
+            tripwireAssert(11217602,
+                           (str::stream()
+                            << "Descriptor and parse node stage names differ: descriptor='"
+                            << std::string(impl.getName()) << "' parseNode='"
+                            << std::string(parseNodePtr->getName()) << "'."),
+                           impl.getName() == parseNodePtr->getName());
 
             *parseNode = new ExtensionAggStageParseNode(std::move(parseNodePtr));
         });

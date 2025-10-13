@@ -47,11 +47,7 @@ BSONObj AggStageParseNodeHandle::getQueryShape(const SerializationOptions& opts)
 
     invokeCAndConvertStatusToException([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
 
-    if (!buf) {
-        // TODO SERVER-111882 tassert here instead of returning empty string, since this would
-        // indicate programmer error. The implementation of get_query_shape cannot return nullptr.
-        return BSONObj();
-    }
+    tassert(11188203, "buffer returned from get_query_shape must not be null", buf != nullptr);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.

@@ -29,11 +29,11 @@
 #pragma once
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/db/extension/shared/handle/handle.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
@@ -63,15 +63,15 @@ public:
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(11136800,
-                "HostQueryShapeOpts' 'serializeIdentifier' is null",
-                vtable.serialize_identifier != nullptr);
-        tassert(11173400,
-                "HostQueryShapeOpts' 'serializeFieldPath' is null",
-                vtable.serialize_field_path != nullptr);
-        tassert(11173500,
-                "HostQueryShapeOpts' 'serializeLiteral' is null",
-                vtable.serialize_literal != nullptr);
+        tripwireAssert(11136800,
+                       "HostQueryShapeOpts' 'serializeIdentifier' is null",
+                       vtable.serialize_identifier != nullptr);
+        tripwireAssert(11173400,
+                       "HostQueryShapeOpts' 'serializeFieldPath' is null",
+                       vtable.serialize_field_path != nullptr);
+        tripwireAssert(11173500,
+                       "HostQueryShapeOpts' 'serializeLiteral' is null",
+                       vtable.serialize_literal != nullptr);
     };
 
     /**

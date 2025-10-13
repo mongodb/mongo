@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/extension_helper.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
@@ -72,9 +72,9 @@ public:
 
     VersionedExtension getVersionedExtension(
         const ::MongoExtensionAPIVersionVector* hostVersions) const {
-        uassert(10930201,
-                "Cannot register duplicate versions of the same extension",
-                !_hasDuplicateVersion);
+        userAssert(10930201,
+                   "Cannot register duplicate versions of the same extension",
+                   !_hasDuplicateVersion);
 
         // Loop from highest version to lowest and return the first compatible extension.
         for (const auto& versionedExtension : _versionedExtensions) {
@@ -83,7 +83,10 @@ public:
             }
         }
 
-        uasserted(10930202, "There are no registered extensions compatible with the host version");
+        userAsserted(10930202,
+                     "There are no registered extensions compatible with the host version");
+        return VersionedExtension{.version = MONGODB_EXTENSION_API_VERSION,
+                                  .factoryFunc = ExtensionFactoryFunc()};
     }
 
 private:
