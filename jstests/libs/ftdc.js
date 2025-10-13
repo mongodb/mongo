@@ -27,52 +27,78 @@ export function hasMultiserviceFTDCSchema(adminDb) {
 }
 
 /**
+ * `has(obj, "foo", "bar", "baz")` returns whether `obj.foo.bar.baz` exists.
+ */
+function has(object, ...properties) {
+    if (properties.length === 0) {
+        return true;
+    }
+    const [prop, ...rest] = properties;
+    return object.hasOwnProperty(prop) && has(object[prop], ...rest);
+}
+
+/**
+ * Returns an array of predicate functions used by `verifyGetDiagnosticData` to
+ * determine whether the response returned for "getDiagnosticData" is as
+ * expected.
+ */
+function getCriteriaForGetDiagnosticData({data, adminDb, assumeMultiserviceSchema}) {
+    let criteria = [];
+
+    criteria.push(() => has(data, "start"));
+
+    if (hasMultiserviceFTDCSchema(adminDb) || assumeMultiserviceSchema ||
+        TestData.testingReplicaSetEndpoint) {
+        criteria.push(() => has(data, "shard", "serverStatus") ||
+                          has(data, "router", "connPoolStats"));
+    } else {
+        criteria.push(() => has(data, "serverStatus"));
+    }
+
+    criteria.push(() => has(data, "end"));
+
+    return criteria;
+}
+
+/**
  * Verify that getDiagnosticData is working correctly.
  */
 export function verifyGetDiagnosticData(adminDb, logData = true, assumeMultiserviceSchema = false) {
-    // We need to retry a few times if run this test immediately after mongod is started as FTDC may
-    // not have run yet.
-    var foundGoodDocument = false;
-
-    for (var i = 0; i < 60 && foundGoodDocument == false; ++i) {
-        var result = adminDb.runCommand("getDiagnosticData");
+    const maxAttempts = 60;
+    const retryMillis = 500;
+    // We need to retry a few times in case we're running this test immediately
+    // after mongod is started. FTDC may not have run yet, or some collectors
+    // might have timed out initially and so be missing from the response.
+    for (let attempt = 1;; ++attempt) {
+        const result = adminDb.runCommand("getDiagnosticData");
         assert.commandWorked(result);
-
-        var data = result.data;
-
-        if (!data.hasOwnProperty("start")) {
-            // Wait a little longer for FTDC to start
-            jsTestLog("Running getDiagnosticData: " + tojson(result));
-
-            sleep(500);
-        } else {
-            // Check for a few common properties to ensure we got data
-            if (hasMultiserviceFTDCSchema(adminDb) || assumeMultiserviceSchema ||
-                TestData.testingReplicaSetEndpoint) {
-                const hasKnownData =
-                    (data.hasOwnProperty("shard") && data.shard.hasOwnProperty("serverStatus")) ||
-                    (data.hasOwnProperty("router") && data.router.hasOwnProperty("connPoolStats"));
-                assert(hasKnownData,
-                       "does not have 'shard.serverStatus' nor 'router.connPoolStats' in '" +
-                           tojson(data) + "'");
-            } else {
-                assert(data.hasOwnProperty("serverStatus"),
-                       "does not have 'serverStatus' in '" + tojson(data) + "'");
-            }
-
-            assert(data.hasOwnProperty("end"), "does not have 'end' in '" + tojson(data) + "'");
-
-            foundGoodDocument = true;
+        const data = result.data;
+        const criteria = getCriteriaForGetDiagnosticData({data, adminDb, assumeMultiserviceSchema});
+        // results :: {[some predicate]: bool result, ...}
+        const results = criteria.reduce((results, predicate) => {
+            results[predicate.toString()] = predicate();
+            return results;
+        }, {});
+        if (Object.values(results).indexOf(false) === -1) {
+            // all predicates are satisfied
             if (logData) {
-                jsTestLog("Got good getDiagnosticData: " + tojson(result));
+                jsTestLog("getDiagnosticData response met all criteria: " +
+                          tojson({criteria: results}));
             }
+            return data;
         }
+
+        assert(attempt < maxAttempts,
+               `getDiagnosticData response failed to satisfy criteria after ${
+                   maxAttempts} attempts: ` +
+                   tojson({criteria: results, data}));
+
+        jsTestLog(
+            `getDiagnosticData response did not satisfy one or more criteria. Trying again in ${
+                retryMillis} milliseconds (attempt ${attempt}/${maxAttempts}). Criteria: ` +
+            tojson(results));
+        sleep(retryMillis);
     }
-
-    assert(foundGoodDocument,
-           "getDiagnosticData failed to return a non-empty command, is FTDC running?");
-
-    return data;
 }
 
 /**
