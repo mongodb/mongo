@@ -1217,7 +1217,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created, bool *clo
          * during backup (see comment above).
          */
         if (__wt_atomic_load64(&conn->hot_backup_start) == 0 && !conn_open)
-            log->prep_missed++;
+            __wt_atomic_add32_relaxed(&log->prep_missed, 1);
         WT_RET(__wti_log_allocfile(session, log->fileid, WT_LOG_FILENAME));
     }
     /*
@@ -1985,11 +1985,14 @@ __wti_log_release(WT_SESSION_IMPL *session, WTI_LOGSLOT *slot, bool *freep)
      * writing to the log will wait while the current fsync completes and advance log->sync_lsn.
      */
     while (F_ISSET_ATOMIC_16(slot, WTI_SLOT_SYNC | WTI_SLOT_SYNC_DIR)) {
+        /* FIXME-WT-15708: Unprotected access to log->sync_lsn.l.file. */
+        uint32_t sync_lsn_value = __wt_tsan_suppress_load_uint32(&log->sync_lsn.l.file);
+
         /*
          * We have to wait until earlier log files have finished their sync operations. The most
          * recent one will set the LSN to the beginning of our file.
          */
-        if (log->sync_lsn.l.file < slot->slot_end_lsn.l.file ||
+        if (sync_lsn_value < slot->slot_end_lsn.l.file ||
           __wt_spin_trylock(session, &log->log_sync_lock) != 0) {
             __wt_cond_wait(session, log->log_sync_cond, 10 * WT_THOUSAND, NULL);
             continue;

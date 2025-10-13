@@ -111,4 +111,3 @@ test_verbose01.py  # FIXME: WT-15372
 test_verbose02.py
 test_verbose03.py
 test_verbose04.py
-test_verify.py    # FIXME: WT-15488

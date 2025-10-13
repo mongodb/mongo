@@ -77,6 +77,10 @@ __wt_atomic_cas_ptr(void *vp, void *old, void *newv)
     {                                                                                             \
         return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));                                     \
     }                                                                                             \
+    static inline ret __wt_atomic_add##name##_relaxed(vp_arg, v_arg)                              \
+    {                                                                                             \
+        return (__atomic_add_fetch(vp, v, __ATOMIC_RELAXED));                                     \
+    }                                                                                             \
     static inline ret __wt_atomic_fetch_add##name(vp_arg, v_arg)                                  \
     {                                                                                             \
         return (__atomic_fetch_add(vp, v, __ATOMIC_SEQ_CST));                                     \

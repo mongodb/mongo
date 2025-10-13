@@ -202,3 +202,22 @@
     char __padding[WT_CACHE_LINE_ALIGNMENT]; \
     }                                        \
     ;
+
+/*
+ * This section was created for functions intended for fine-grained suppression of TSAN warnings.
+ * Since TSAN only supports suppression at the function level, but a single function may trigger
+ * multiple unrelated warnings, it is preferable to use one of the following functions (or create a
+ * new one) to suppress them.
+ *
+ * We use relaxed atomic operations in these functions to provide minimal protection against
+ * compiler optimizations while avoiding potential performance drops. Using atomic variables should
+ * eliminate most warnings; however, we still add these functions to the suppression file to ensure
+ * we don't forget to properly fix them later and to highlight that this is only a temporary
+ * solution while we investigate high-priority TSAN warnings.
+ */
+
+static inline uint32_t
+__wt_tsan_suppress_load_uint32(uint32_t *var)
+{
+    return (__wt_atomic_load32(var));
+}

@@ -1372,8 +1372,6 @@ extern int __wti_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_cache_eviction_controls_config(WT_SESSION_IMPL *session, const char *cfg[])
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_capacity_server_create(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_capacity_server_destroy(WT_SESSION_IMPL *session)
@@ -2189,8 +2187,8 @@ static WT_INLINE int __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cb
 static WT_INLINE int __wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
   WT_ITEM *key, uint64_t recno, WT_UPDATE *upd) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-  WT_ITEM *key, uint64_t recno, WT_UPDATE *upd, WT_UPDATE **prepare_updp, WT_UPDATE **restored_updp)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  WT_ITEM *key, uint64_t recno, WT_UPDATE *upd, WT_UPDATE **prepare_updp, WT_UPDATE **restored_updp,
+  bool *seen_restored_deltap) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_txn_search_check(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_txn_timestamp_usage_check(

@@ -64,6 +64,7 @@ class test_layered43(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     # Custom test case setup
     def early_setup(self):
+        self.skipTest("FIXME-WT-15663: currently block cache is disabled.")
         os.mkdir('kv_home')
 
     def get_stat(self, stat):
@@ -74,7 +75,6 @@ class test_layered43(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     # Test long delta chains
     def test_layered43(self):
-        self.skipTest("FIXME-WT-15663: currently block cache is disabled.")
 
         # Create table
         self.uri = self.prefix + self.table_name

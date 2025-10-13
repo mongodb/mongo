@@ -255,7 +255,7 @@ __rec_row_merge(
     key = &r->k;
     val = &r->v;
 
-    /* FIXME-WT-14880: build delta for split pages. */
+    /* FIXME-WT-15709: build delta for split pages. */
     if (mod->mod_multi_entries > 1) {
         /*
          * We need to remember what has been written for this ref in this internal page
@@ -392,7 +392,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
         /*
-         * FIXME-WT-14880: build delta for split pages.
+         * FIXME-WT-15709: build delta for split pages.
          *
          * Stop building the delta if the page has ever been split.
          *

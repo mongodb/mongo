@@ -2303,55 +2303,6 @@ __wti_heuristic_controls_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wti_cache_eviction_controls_config --
- *     Set cache_eviction_controls configuration.
- */
-int
-__wti_cache_eviction_controls_config(WT_SESSION_IMPL *session, const char *cfg[])
-{
-    WT_CACHE *cache;
-    WT_CONFIG_ITEM cval;
-
-    cache = S2C(session)->cache;
-
-    /*
-     * The cache tolerance is a percentage value with range 0 - 100, inclusive.
-     * Given input percentage is considered in multiples of 10 only, by applying floor().
-     * 00 < value < 10  -> 00
-     * 10 < value < 20  -> 10
-     * 20 < value < 30  -> 20
-     * ...
-     * 90 < value < 100 -> 90
-     * value is 100     -> 100
-     */
-    WT_RET(__wt_config_gets(
-      session, cfg, "cache_eviction_controls.cache_tolerance_for_app_eviction", &cval));
-    __wt_atomic_store8(&cache->cache_eviction_controls.cache_tolerance_for_app_eviction,
-      (((uint8_t)cval.val / 10) * 10));
-
-    WT_RET(
-      __wt_config_gets(session, cfg, "cache_eviction_controls.incremental_app_eviction", &cval));
-    if (cval.val != 0)
-        F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_EVICT_INCREMENTAL_APP);
-
-    WT_RET(__wt_config_gets(
-      session, cfg, "cache_eviction_controls.scrub_evict_under_target_limit", &cval));
-    if (cval.val != 0)
-        F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_EVICT_SCRUB_UNDER_TARGET);
-
-    WT_RET(
-      __wt_config_gets(session, cfg, "cache_eviction_controls.skip_update_obsolete_check", &cval));
-    if (cval.val != 0)
-        F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK);
-
-    WT_RET(__wt_config_gets(
-      session, cfg, "cache_eviction_controls.app_eviction_min_cache_fill_ratio", &cval));
-    __wt_atomic_store8(
-      &cache->cache_eviction_controls.app_eviction_min_cache_fill_ratio, (uint8_t)cval.val);
-    return (0);
-}
-
-/*
  * __wti_json_config --
  *     Set JSON output configuration.
  */
@@ -3368,9 +3319,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     /* Parse the heuristic_controls configuration. */
     WT_ERR(__wti_heuristic_controls_config(session, cfg));
-
-    /* Parse the cache_eviction_controls configuration. */
-    WT_ERR(__wti_cache_eviction_controls_config(session, cfg));
 
     /*
      * Load the extensions after initialization completes; extensions expect everything else to be

@@ -7,6 +7,10 @@
 race:src/include/stat.h
 race:src/support/stat.c
 
+# These functions were created for fine-grained suppressions. Please search for appropriate FIXME tickets
+# around usages of these functions.
+race:__wt_tsan_suppress_load_uint32
+
 # FIXME-WT-12734 this function copies an 8 byte struct which needs further investigation.
 race:__log_wrlsn_server
 race:__wt_log_force_sync

@@ -30,9 +30,9 @@ import wttest
 from wiredtiger import stat
 
 # Test that cache eviction controls can be reconfigured dynamically
-# and that WT_CACHE_EVICT_SCRUB_UNDER_TARGET behaves correctly.
+# and that WT_CACHE_PREFER_SCRUB_EVICTION behaves correctly.
 class test_cache_evict_config02(wttest.WiredTigerTestCase):
-    conn_config = "cache_size=5MB,statistics=(all),cache_eviction_controls=[scrub_evict_under_target_limit=false]"
+    conn_config = "cache_size=5MB,statistics=(all),eviction=[prefer_scrub_eviction=false]"
     uri = "table:eviction02"
 
     def test_cache_eviction_reconfig_and_scrub(self):
@@ -50,9 +50,9 @@ class test_cache_evict_config02(wttest.WiredTigerTestCase):
         pages_scrubbed_baseline = stat_cursor[stat.conn.cache_write_restore_scrub][2]
         stat_cursor.close()
 
-        # Enable scrub_evict_under_target_limit flag
+        # Enable prefer_scrub_eviction flag
         self.conn.reconfigure(
-            "cache_eviction_controls=[scrub_evict_under_target_limit=true]"
+            "eviction=[prefer_scrub_eviction=true]"
         )
 
         cursor = self.session.open_cursor(self.uri)

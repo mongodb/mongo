@@ -46,23 +46,23 @@ class test_cache_evict_config01(wttest.WiredTigerTestCase):
 
         # Try different eviction reconfigurations.
         configs = [
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,app_eviction_min_cache_fill_ratio=0,skip_update_obsolete_check=false]",
-            "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=true,app_eviction_min_cache_fill_ratio=10,skip_update_obsolete_check=true]",
-            "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=false,app_eviction_min_cache_fill_ratio=25,skip_update_obsolete_check=false]",
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=true,app_eviction_min_cache_fill_ratio=50,skip_update_obsolete_check=true]",
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=0,skip_update_obsolete_check=false]",
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=100,skip_update_obsolete_check=true]",
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=25,skip_update_obsolete_check=false]",
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=20,skip_update_obsolete_check=false]",
+            "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,app_eviction_min_cache_fill_ratio=0,skip_update_obsolete_check=false]",
+            "eviction=[incremental_app_eviction=true,prefer_scrub_eviction=true,app_eviction_min_cache_fill_ratio=10,skip_update_obsolete_check=true]",
+            "eviction=[incremental_app_eviction=true,prefer_scrub_eviction=false,app_eviction_min_cache_fill_ratio=25,skip_update_obsolete_check=false]",
+            "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=true,app_eviction_min_cache_fill_ratio=50,skip_update_obsolete_check=true]",
+            "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=0,skip_update_obsolete_check=false]",
+            "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=100,skip_update_obsolete_check=true]",
+            "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=25,skip_update_obsolete_check=false]",
+            "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=20,skip_update_obsolete_check=false]",
         ]
 
         # Try different eviction failure reconfigurations.
         failure_configs = [
-            "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=-1]",
-            "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=60]",
-            "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=110]",
-            "cache_eviction_controls=[cache_tolerance_for_app_eviction=-1]",
-            "cache_eviction_controls=[cache_tolerance_for_app_eviction=110]",
+            "eviction=[app_eviction_min_cache_fill_ratio=-1]",
+            "eviction=[app_eviction_min_cache_fill_ratio=60]",
+            "eviction=[app_eviction_min_cache_fill_ratio=110]",
+            "eviction=[cache_tolerance_for_app_eviction=-1]",
+            "eviction=[cache_tolerance_for_app_eviction=110]",
         ]
 
         for cfg in configs:

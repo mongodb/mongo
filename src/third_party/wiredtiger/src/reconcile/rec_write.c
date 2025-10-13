@@ -10,6 +10,8 @@
 #include "reconcile_private.h"
 #include "reconcile_inline.h"
 
+#define WT_CELL_ADDR_DEL_VISIBLE_ALL_LEN (2)
+
 static int __rec_cleanup(WT_SESSION_IMPL *, WTI_RECONCILE *);
 static int __rec_destroy(WT_SESSION_IMPL *, void *);
 static int __rec_destroy_session(WT_SESSION_IMPL *);
@@ -2208,6 +2210,9 @@ __wti_rec_pack_delta_internal(
     packed_size = key->len;
     if (value != NULL)
         packed_size += value->len;
+    else
+        /* Add 2 extra bytes for the delete cell. */
+        packed_size += WT_CELL_ADDR_DEL_VISIBLE_ALL_LEN;
 
     if (r->delta.size + packed_size > r->delta.memsize)
         WT_RET(__wt_buf_grow(session, &r->delta, r->delta.size + packed_size));
@@ -2221,7 +2226,7 @@ __wti_rec_pack_delta_internal(
 
     /*
      * If the value is NULL, write a cell with zeroed-out values and a data size of zero, setting
-     * the cell type to WT_CELL_ADDR_DEL_VISIBLE_ALL. This approach allows for potential future
+     * the cell type to WT_CELL_ADDR_DEL_VISIBLE_ALL_LEN. This approach allows for potential future
      * extensions where additional information might be added to the delete cell.
      */
     if (value == NULL) {
@@ -2238,8 +2243,8 @@ __wti_rec_pack_delta_internal(
         t_kv->cell_len = __wt_cell_pack_addr(
           session, &t_kv->cell, WT_CELL_ADDR_DEL_VISIBLE_ALL, WT_RECNO_OOB, NULL, &local_ta, 0);
         t_kv->len = t_kv->cell_len;
+        WT_ASSERT(session, t_kv->len == WT_CELL_ADDR_DEL_VISIBLE_ALL_LEN);
         __wti_rec_kv_copy(session, p, t_kv);
-        packed_size += t_kv->len;
         ++r->count_internal_page_delta_key_deleted;
     } else {
         __wti_rec_kv_copy(session, p, value);
@@ -3605,7 +3610,7 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i) {
         if (multi->supd != NULL) {
             WT_ERR(__wti_rec_hs_insert_updates(session, r, multi));
-            /* FIXME-WT-14880: build delta for split pages. */
+            /* FIXME-WT-15709: build delta for split pages. */
             if (!delta_enabled && !multi->supd_restore) {
                 __wt_free(session, multi->supd);
                 multi->supd_entries = 0;

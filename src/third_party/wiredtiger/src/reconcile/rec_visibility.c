@@ -293,15 +293,12 @@ __rec_save_delete_hs_upd_and_free_obs_updates(WT_SESSION_IMPL *session, WTI_RECO
   WT_INSERT *ins, WT_ROW *rip, WTI_UPDATE_SELECT *upd_select)
 {
     WT_UPDATE *delete_upd, *tombstone, *visible_all_upd;
-    wt_timestamp_t prune_timestamp;
-    uint64_t oldest_id, txnid;
+    uint64_t txnid;
     bool seen_committed;
 
     if (upd_select->upd == NULL)
         return (0);
 
-    WT_ACQUIRE_READ(prune_timestamp, S2BT(session)->prune_timestamp);
-    oldest_id = __wt_txn_oldest_id(session);
     visible_all_upd = NULL;
 
     /*
@@ -378,11 +375,11 @@ __rec_save_delete_hs_upd_and_free_obs_updates(WT_SESSION_IMPL *session, WTI_RECO
          * might be possible to do something more aggressive?
          */
         if (F_ISSET(r, WT_REC_CHECKPOINT) && visible_all_upd == NULL && delete_upd->next != NULL &&
-          ((__wt_txn_upd_visible_all(session, delete_upd) ||
-             (F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT) &&
-               (delete_upd->txnid < oldest_id && prune_timestamp != WT_TS_NONE &&
-                 delete_upd->upd_durable_ts <= prune_timestamp))) &&
-            WT_UPDATE_DATA_VALUE(delete_upd)))
+          WT_UPDATE_DATA_VALUE(delete_upd) &&
+          (__wt_txn_upd_visible_all(session, delete_upd) ||
+            (F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT) &&
+              delete_upd->txnid < r->rec_start_oldest_id && r->rec_prune_timestamp != WT_TS_NONE &&
+              delete_upd->upd_durable_ts <= r->rec_prune_timestamp)))
             visible_all_upd = delete_upd;
     }
 

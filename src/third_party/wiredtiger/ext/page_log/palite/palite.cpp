@@ -684,16 +684,18 @@ class Storage {
                 a[GET_CHECKPOINT] = R"(
                     SELECT lsn, timestamp, checkpoint_metadata
                     FROM checkpoints
-                    WHERE (?1 = 18446744073709551615 OR lsn = ?1)
+                    WHERE (?1 = -1 OR lsn = ?1)
                     ORDER BY
                         lsn DESC,
                         timestamp DESC
                     LIMIT 1;)";
-                /* Cannot use stringized WT_PAGE_LOG_LSN_MAX in the statement above
-                 * because it contains the 'ULL' suffix, which is not a valid integer literal
-                 * in SQL queries.
+                /* The sqlite bind call takes a signed 64 bit integer.
+                 * When we pass WT_PAGE_LOG_LSN_MAX (which happens to be the maximum unsigned 64 bit
+                 * integer) to the bind function, it is converted from unsigned max to signed -1.
+                 * Thus the -1 in the above SELECT statement is effectively standing in for
+                 * WT_PAGE_LOG_LSN_MAX.
                  */
-                static_assert(WT_PAGE_LOG_LSN_MAX == 18446744073709551615ULL);
+                static_assert((int64_t)WT_PAGE_LOG_LSN_MAX == -1);
                 a[DELETE_CHECKPOINT] = R"(
                     DELETE FROM checkpoints
                     WHERE lsn > ?;)";

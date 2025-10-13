@@ -22,7 +22,7 @@ typedef enum __wt_cache_op {
  * WT_CACHE_EVICTION_CONTROLS --
  *  Cache eviction controls configuration.
  *  WT_CACHE_EVICT_INCREMENTAL_APP: Only a part of application threads will participate in cache
- * management when a cache threshold reaches its trigger limit. WT_CACHE_EVICT_SCRUB_UNDER_TARGET:
+ * management when a cache threshold reaches its trigger limit. WT_CACHE_PREFER_SCRUB_EVICTION:
  * Change the eviction strategy to scrub eviction when the cache usage is under the target limit.
  */
 struct __wt_cache_eviction_controls {
@@ -33,7 +33,7 @@ struct __wt_cache_eviction_controls {
 
 /* cache eviction controls bit positions */
 #define WT_CACHE_EVICT_INCREMENTAL_APP 0x1u
-#define WT_CACHE_EVICT_SCRUB_UNDER_TARGET 0x2u
+#define WT_CACHE_PREFER_SCRUB_EVICTION 0x2u
 #define WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK 0x4u
     wt_shared uint32_t flags_atomic;
 };

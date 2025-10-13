@@ -183,7 +183,7 @@ struct __wti_log {
 #ifdef HAVE_DIAGNOSTIC
     uint32_t min_fileid; /* Minimum file number needed */
 #endif
-    uint32_t prep_missed;           /* Pre-allocated file misses */
+    wt_shared uint32_t prep_missed; /* Pre-allocated file misses */
     WT_FH *log_fh;                  /* Logging file handle */
     WT_FH *log_dir_fh;              /* Log directory file handle */
     wt_shared WT_FH *log_close_fh;  /* Logging file handle to close */

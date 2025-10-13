@@ -2148,31 +2148,6 @@ struct __wt_connection {
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a string; default
      * empty.}
      * @config{ ),,}
-     * @config{cache_eviction_controls = (, Controls the experimental incremental cache eviction
-     * features., a set of related configuration options defined as follows.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;app_eviction_min_cache_fill_ratio, This setting establishes a
-     * minimum cache fill ratio that must be met before application threads can start assisting with
-     * eviction.  The value is a percentage between 0 and 50\, with 0 disabling the feature.  For it
-     * to have any effect\, this minimum ratio must be higher than the existing \c
-     * eviction_dirty_trigger or \c eviction_update_trigger and less than \c eviction_trigger.
-     * Essentially\, the standard dirty or update triggers won't become active until the cache fill
-     * ratio first reaches this new\, higher threshold., an integer between \c 0 and \c 50; default
-     * \c 0.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_tolerance_for_app_eviction, This setting
-     * establishes a tolerance level for the configured \c eviction_dirty_trigger and \c
-     * eviction_update_trigger.  The value is a percentage between 0 and 100\, with 0 treating \c
-     * eviction_dirty_trigger and \c eviction_update_trigger as hard limit.  The configured
-     * percentage will be taken in increments of 10 only\, by applying the floor to the given
-     * percentage value., an integer between \c 0 and \c 100; default \c 0.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;incremental_app_eviction, Only a part of application threads
-     * will participate in cache management when a cache threshold reaches its trigger limit., a
-     * boolean flag; default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-     * scrub_evict_under_target_limit, Change the eviction strategy to scrub eviction when the cache
-     * usage is under the target limit., a boolean flag; default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;skip_update_obsolete_check, Skip checking for obsolete
-     * updates whenever an update operation is performed., a boolean flag; default \c false.}
-     * @config{ ),,}
      * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will wait
      * for space to be available in cache before giving up.  Default or 0 will wait forever.  1 will
      * never wait., an integer greater than or equal to \c 0; default \c 0.}
@@ -2297,17 +2272,40 @@ struct __wt_connection {
      * @config{error_prefix, prefix string for error messages., a string; default empty.}
      * @config{eviction = (, eviction configuration options., a set of related configuration options
      * defined as follows.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;evict_sample_inmem, If no in-memory ref
-     * is found on the root page\, attempt to locate a random in-memory page by examining all
-     * entries on the root page., a boolean flag; default \c true.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;app_eviction_min_cache_fill_ratio, This
+     * setting establishes a minimum cache fill ratio that must be met before application threads
+     * can start assisting with eviction.  The value is a percentage between 0 and 50\, with 0
+     * disabling the feature.  For it to have any effect\, this minimum ratio must be higher than
+     * the existing \c eviction_dirty_trigger or \c eviction_update_trigger and less than \c
+     * eviction_trigger.  Essentially\, the standard dirty or update triggers won't become active
+     * until the cache fill ratio first reaches this new\, higher threshold., an integer between \c
+     * 0 and \c 50; default \c 0.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_tolerance_for_app_eviction,
+     * This setting establishes a tolerance level for the configured \c eviction_dirty_trigger and
+     * \c eviction_update_trigger.  The value is a percentage between 0 and 100\, with 0 treating \c
+     * eviction_dirty_trigger and \c eviction_update_trigger as hard limit.  The configured
+     * percentage will be taken in increments of 10 only\, by applying the floor to the given
+     * percentage value., an integer between \c 0 and \c 100; default \c 0.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;evict_sample_inmem, If no in-memory ref is found on the root
+     * page\, attempt to locate a random in-memory page by examining all entries on the root page.,
+     * a boolean flag; default \c true.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;incremental_app_eviction,
+     * Only a part of application threads will participate in cache management when a cache
+     * threshold reaches its trigger limit., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;legacy_page_visit_strategy, Use legacy page visit strategy
+     * for eviction.  Using this option is highly discouraged as it will re-introduce the bug
+     * described in WT-9121., a boolean flag; default \c false.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-     * legacy_page_visit_strategy, Use legacy page visit strategy for eviction.  Using this option
-     * is highly discouraged as it will re-introduce the bug described in WT-9121., a boolean flag;
-     * default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
-     * WiredTiger will start to help evict pages from cache.  The number of threads started will
-     * vary depending on the current eviction load.  Each eviction worker thread uses a session from
-     * the configured session_max., an integer between \c 1 and \c 64; default \c 8.}
+     * prefer_scrub_eviction, Change the eviction strategy to scrub eviction when the cache usage is
+     * under half way between the target limit to the trigger limit., a boolean flag; default \c
+     * false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;skip_update_obsolete_check, Skip checking for
+     * obsolete updates whenever an update operation is performed., a boolean flag; default \c
+     * false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger
+     * will start to help evict pages from cache.  The number of threads started will vary depending
+     * on the current eviction load.  Each eviction worker thread uses a session from the configured
+     * session_max., an integer between \c 1 and \c 64; default \c 8.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads WiredTiger will start
      * to help evict pages from cache.  The number of threads currently running will vary depending
      * on the current eviction load., an integer between \c 1 and \c 64; default \c 1.}
@@ -3027,30 +3025,6 @@ struct __wt_connection {
  * @config{cache_cursors, enable caching of cursors for reuse.  This is the default value for any
  * sessions created\, and can be overridden in configuring \c cache_cursors in
  * WT_CONNECTION.open_session., a boolean flag; default \c true.}
- * @config{cache_eviction_controls = (, Controls the experimental incremental cache eviction
- * features., a set of related configuration options defined as follows.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;app_eviction_min_cache_fill_ratio, This setting establishes a
- * minimum cache fill ratio that must be met before application threads can start assisting with
- * eviction.  The value is a percentage between 0 and 50\, with 0 disabling the feature.  For it to
- * have any effect\, this minimum ratio must be higher than the existing \c eviction_dirty_trigger
- * or \c eviction_update_trigger and less than \c eviction_trigger.  Essentially\, the standard
- * dirty or update triggers won't become active until the cache fill ratio first reaches this new\,
- * higher threshold., an integer between \c 0 and \c 50; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_tolerance_for_app_eviction, This setting establishes a
- * tolerance level for the configured \c eviction_dirty_trigger and \c eviction_update_trigger.  The
- * value is a percentage between 0 and 100\, with 0 treating \c eviction_dirty_trigger and \c
- * eviction_update_trigger as hard limit.  The configured percentage will be taken in increments of
- * 10 only\, by applying the floor to the given percentage value., an integer between \c 0 and \c
- * 100; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;incremental_app_eviction, Only a part of
- * application threads will participate in cache management when a cache threshold reaches its
- * trigger limit., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * scrub_evict_under_target_limit, Change the eviction strategy to scrub eviction when the cache
- * usage is under the target limit., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;skip_update_obsolete_check, Skip checking for obsolete updates
- * whenever an update operation is performed., a boolean flag; default \c false.}
- * @config{ ),,}
  * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will wait for
  * space to be available in cache before giving up.  Default or 0 will wait forever.  1 will never
  * wait., an integer greater than or equal to \c 0; default \c 0.}
@@ -3217,21 +3191,42 @@ struct __wt_connection {
  * @config{error_prefix, prefix string for error messages., a string; default empty.}
  * @config{eviction = (, eviction configuration options., a set of related configuration options
  * defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;app_eviction_min_cache_fill_ratio, This
+ * setting establishes a minimum cache fill ratio that must be met before application threads can
+ * start assisting with eviction.  The value is a percentage between 0 and 50\, with 0 disabling the
+ * feature.  For it to have any effect\, this minimum ratio must be higher than the existing \c
+ * eviction_dirty_trigger or \c eviction_update_trigger and less than \c eviction_trigger.
+ * Essentially\, the standard dirty or update triggers won't become active until the cache fill
+ * ratio first reaches this new\, higher threshold., an integer between \c 0 and \c 50; default \c
+ * 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_tolerance_for_app_eviction, This setting establishes a
+ * tolerance level for the configured \c eviction_dirty_trigger and \c eviction_update_trigger.  The
+ * value is a percentage between 0 and 100\, with 0 treating \c eviction_dirty_trigger and \c
+ * eviction_update_trigger as hard limit.  The configured percentage will be taken in increments of
+ * 10 only\, by applying the floor to the given percentage value., an integer between \c 0 and \c
+ * 100; default \c 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;evict_sample_inmem, If no in-memory ref is
  * found on the root page\, attempt to locate a random in-memory page by examining all entries on
  * the root page., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * legacy_page_visit_strategy, Use legacy page visit strategy for eviction.  Using this option is
- * highly discouraged as it will re-introduce the bug described in WT-9121., a boolean flag; default
- * \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger will
- * start to help evict pages from cache.  The number of threads started will vary depending on the
- * current eviction load.  Each eviction worker thread uses a session from the configured
- * session_max., an integer between \c 1 and \c 64; default \c 8.}
+ * incremental_app_eviction, Only a part of application threads will participate in cache management
+ * when a cache threshold reaches its trigger limit., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;legacy_page_visit_strategy, Use legacy page visit strategy for
+ * eviction.  Using this option is highly discouraged as it will re-introduce the bug described in
+ * WT-9121., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * threads_min, minimum number of threads WiredTiger will start to help evict pages from cache.  The
- * number of threads currently running will vary depending on the current eviction load., an integer
- * between \c 1 and \c 64; default \c 1.}
+ * prefer_scrub_eviction, Change the eviction strategy to scrub eviction when the cache usage is
+ * under half way between the target limit to the trigger limit., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;skip_update_obsolete_check, Skip checking for obsolete updates
+ * whenever an update operation is performed., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger will start to
+ * help evict pages from cache.  The number of threads started will vary depending on the current
+ * eviction load.  Each eviction worker thread uses a session from the configured session_max., an
+ * integer between \c 1 and \c 64; default \c 8.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min,
+ * minimum number of threads WiredTiger will start to help evict pages from cache.  The number of
+ * threads currently running will vary depending on the current eviction load., an integer between
+ * \c 1 and \c 64; default \c 1.}
  * @config{ ),,}
  * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring the
  * dirty content in cache to this level.  It is a percentage of the cache size if the value is
@@ -8289,132 +8284,136 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_QUERY_TS			1870
 /*! transaction: race to read prepared update retry */
 #define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_UPDATE	1871
+/*! transaction: rollback to stable applied btrees */
+#define	WT_STAT_CONN_TXN_RTS_BTREES_APPLIED		1872
 /*! transaction: rollback to stable calls */
-#define	WT_STAT_CONN_TXN_RTS				1872
+#define	WT_STAT_CONN_TXN_RTS				1873
 /*!
  * transaction: rollback to stable history store keys that would have
  * been swept in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS_DRYRUN	1873
+#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS_DRYRUN	1874
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1874
+#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1875
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1875
+#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1876
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1876
+#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1877
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1877
+#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1878
 /*!
  * transaction: rollback to stable keys that would have been removed in
  * non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED_DRYRUN	1878
+#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED_DRYRUN	1879
 /*!
  * transaction: rollback to stable keys that would have been restored in
  * non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED_DRYRUN	1879
+#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED_DRYRUN	1880
 /*! transaction: rollback to stable pages visited */
-#define	WT_STAT_CONN_TXN_RTS_PAGES_VISITED		1880
+#define	WT_STAT_CONN_TXN_RTS_PAGES_VISITED		1881
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1881
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1882
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1882
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1883
+/*! transaction: rollback to stable skipped btrees */
+#define	WT_STAT_CONN_TXN_RTS_BTREES_SKIPPED		1884
 /*! transaction: rollback to stable skipping delete rle */
-#define	WT_STAT_CONN_TXN_RTS_DELETE_RLE_SKIPPED		1883
+#define	WT_STAT_CONN_TXN_RTS_DELETE_RLE_SKIPPED		1885
 /*! transaction: rollback to stable skipping stable rle */
-#define	WT_STAT_CONN_TXN_RTS_STABLE_RLE_SKIPPED		1884
+#define	WT_STAT_CONN_TXN_RTS_STABLE_RLE_SKIPPED		1886
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1885
+#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1887
 /*!
  * transaction: rollback to stable tombstones from history store that
  * would have been restored in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES_DRYRUN	1886
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES_DRYRUN	1888
 /*! transaction: rollback to stable tree walk skipping pages */
-#define	WT_STAT_CONN_TXN_RTS_TREE_WALK_SKIP_PAGES	1887
+#define	WT_STAT_CONN_TXN_RTS_TREE_WALK_SKIP_PAGES	1889
 /*! transaction: rollback to stable updates aborted */
-#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED		1888
+#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED		1890
 /*!
  * transaction: rollback to stable updates from history store that would
  * have been restored in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES_DRYRUN	1889
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES_DRYRUN	1891
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1890
+#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1892
 /*!
  * transaction: rollback to stable updates that would have been aborted
  * in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED_DRYRUN		1891
+#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED_DRYRUN		1893
 /*!
  * transaction: rollback to stable updates that would have been removed
  * from history store in non-dryrun mode
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED_DRYRUN		1892
+#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED_DRYRUN		1894
 /*! transaction: sessions scanned in each walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_SESSIONS_WALKED		1893
+#define	WT_STAT_CONN_TXN_SESSIONS_WALKED		1895
 /*! transaction: set timestamp calls */
-#define	WT_STAT_CONN_TXN_SET_TS				1894
+#define	WT_STAT_CONN_TXN_SET_TS				1896
 /*! transaction: set timestamp durable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_DURABLE			1895
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE			1897
 /*! transaction: set timestamp durable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_DURABLE_UPD		1896
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE_UPD		1898
 /*! transaction: set timestamp force calls */
-#define	WT_STAT_CONN_TXN_SET_TS_FORCE			1897
+#define	WT_STAT_CONN_TXN_SET_TS_FORCE			1899
 /*!
  * transaction: set timestamp global oldest timestamp set to be more
  * recent than the global stable timestamp
  */
-#define	WT_STAT_CONN_TXN_SET_TS_OUT_OF_ORDER		1898
+#define	WT_STAT_CONN_TXN_SET_TS_OUT_OF_ORDER		1900
 /*! transaction: set timestamp oldest calls */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1899
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1901
 /*! transaction: set timestamp oldest updates */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1900
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1902
 /*! transaction: set timestamp stable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1901
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1903
 /*! transaction: set timestamp stable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1902
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1904
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1903
+#define	WT_STAT_CONN_TXN_BEGIN				1905
 /*!
  * transaction: transaction checkpoint history store file duration
  * (usecs)
  */
-#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		1904
+#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		1906
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1905
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1907
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1906
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1908
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1907
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1909
 /*! transaction: transaction range of timestamps pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1908
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1910
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * active read timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1909
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1911
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1910
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1912
 /*! transaction: transaction read timestamp of the oldest active reader */
-#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1911
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1913
 /*! transaction: transaction rollback to stable currently running */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1912
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1914
 /*! transaction: transaction walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1913
+#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1915
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1914
+#define	WT_STAT_CONN_TXN_COMMIT				1916
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1915
+#define	WT_STAT_CONN_TXN_ROLLBACK			1917
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1916
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1918
 
 /*!
  * @}
@@ -9520,61 +9519,65 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_TXN_READ_OVERFLOW_REMOVE		2360
 /*! transaction: race to read prepared update retry */
 #define	WT_STAT_DSRC_TXN_READ_RACE_PREPARE_UPDATE	2361
+/*! transaction: rollback to stable applied btrees */
+#define	WT_STAT_DSRC_TXN_RTS_BTREES_APPLIED		2362
 /*!
  * transaction: rollback to stable history store keys that would have
  * been swept in non-dryrun mode
  */
-#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS_DRYRUN	2362
+#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS_DRYRUN	2363
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2363
+#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2364
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2364
+#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2365
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2365
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2366
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2366
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2367
 /*!
  * transaction: rollback to stable keys that would have been removed in
  * non-dryrun mode
  */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED_DRYRUN	2367
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED_DRYRUN	2368
 /*!
  * transaction: rollback to stable keys that would have been restored in
  * non-dryrun mode
  */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED_DRYRUN	2368
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED_DRYRUN	2369
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2369
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2370
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2370
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2371
+/*! transaction: rollback to stable skipped btrees */
+#define	WT_STAT_DSRC_TXN_RTS_BTREES_SKIPPED		2372
 /*! transaction: rollback to stable skipping delete rle */
-#define	WT_STAT_DSRC_TXN_RTS_DELETE_RLE_SKIPPED		2371
+#define	WT_STAT_DSRC_TXN_RTS_DELETE_RLE_SKIPPED		2373
 /*! transaction: rollback to stable skipping stable rle */
-#define	WT_STAT_DSRC_TXN_RTS_STABLE_RLE_SKIPPED		2372
+#define	WT_STAT_DSRC_TXN_RTS_STABLE_RLE_SKIPPED		2374
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2373
+#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2375
 /*!
  * transaction: rollback to stable tombstones from history store that
  * would have been restored in non-dryrun mode
  */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES_DRYRUN	2374
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES_DRYRUN	2376
 /*!
  * transaction: rollback to stable updates from history store that would
  * have been restored in non-dryrun mode
  */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES_DRYRUN	2375
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES_DRYRUN	2377
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2376
+#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2378
 /*!
  * transaction: rollback to stable updates that would have been removed
  * from history store in non-dryrun mode
  */
-#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED_DRYRUN		2377
+#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED_DRYRUN		2379
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2378
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2380
 
 /*!
  * @}

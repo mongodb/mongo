@@ -37,7 +37,7 @@ from wiredtiger import stat
 #
 # Test that reconciliation removes obsolete updates on the page.
 class test_checkpoint37(wttest.WiredTigerTestCase):
-    conn_config = 'cache_eviction_controls=[skip_update_obsolete_check=true]'
+    conn_config = 'eviction=[skip_update_obsolete_check=true]'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),

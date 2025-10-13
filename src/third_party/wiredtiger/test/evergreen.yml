@@ -1534,6 +1534,57 @@ variables:
           format_args: disagg.mode=follower ops.verify=1 runs.mirror=1
           times: 5
 
+  - &format-stress-test-disagg-leader-palite
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.page_log=palite disagg.mode=leader runs.tables=3
+          times: 5
+
+  - &format-stress-data-validation-test-disagg-leader-palite
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # Validate data with a non-layered table.
+          format_args: disagg.page_log=palite disagg.mode=leader ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.tables=2
+          times: 5
+
+  - &format-stress-test-disagg-switch-palite
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.page_log=palite disagg.mode=switch runs.tables=1
+          times: 5
+
+  - &format-stress-test-disagg-follower-palite
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.page_log=palite disagg.mode=follower
+          times: 5
+
+  - &format-stress-data-validation-test-disagg-follower-palite
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.page_log=palite disagg.mode=follower ops.verify=1 runs.mirror=1
+          times: 5
+
   - &format-stress-test
     exec_timeout_secs: 25200
     commands:
@@ -2380,8 +2431,8 @@ tasks:
           upload_source_dir: "wiredtiger"
           upload_filename: unit-test-disagg-follower-tsan.tgz
 
-  - name: unit-test-hook-disagg-leader
-    tags: ["python"]
+  - name: unit-test-hook-disagg-leader-bucket00
+    tags: ["pull_request", "python"]
     depends_on:
     - name: compile
     commands:
@@ -4494,10 +4545,10 @@ tasks:
   - <<: *recovery-stress-test
     name: recovery-stress-test-3
     tags: ["stress-test-3", "stress-test-zseries-3"]
-   # FIXME-WT-14566: Enable disagg leader mode on all platforms once failures has been resolved.
+   # FIXME-WT-14566: Enable disagg leader mode on all platforms once failures have been resolved.
   - <<: *format-stress-test-disagg-leader
     name: format-stress-test-disagg-leader-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-asan-fail"]
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
   - <<: *format-stress-test-disagg-leader
     name: format-stress-test-disagg-leader-2
     tags: ["stress-test-disagg-fail"]
@@ -4527,7 +4578,7 @@ tasks:
     tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-1
-    tags: ["stress-test-disagg", "stress-test-disagg-asan-fail"]
+    tags: ["stress-test-disagg", "stress-test-disagg-san-fail"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-2
     tags: ["stress-test-disagg"]
@@ -4555,10 +4606,10 @@ tasks:
   - <<: *format-stress-data-validation-test-disagg-follower
     name: format-stress-data-validation-test-disagg-follower-5
     tags: ["stress-test-disagg"]
-  # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures has been resolved.
+  # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures have been resolved.
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-asan-fail"]
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-2
     tags: ["stress-test-disagg-fail"]
@@ -4570,6 +4621,84 @@ tasks:
     tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-5
+    tags: ["stress-test-disagg-fail"]
+
+   # FIXME-WT-14566: Enable disagg leader mode on all platforms once failures have been resolved.
+  - <<: *format-stress-test-disagg-leader-palite
+    name: format-stress-test-disagg-leader-palite-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-leader-palite
+    name: format-stress-test-disagg-leader-palite-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-leader-palite
+    name: format-stress-test-disagg-leader-palite-3
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-leader-palite
+    name: format-stress-test-disagg-leader-palite-4
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-leader-palite
+    name: format-stress-test-disagg-leader-palite-5
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader-palite
+    name: format-stress-data-validation-test-disagg-leader-palite-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader-palite
+    name: format-stress-data-validation-test-disagg-leader-palite-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader-palite
+    name: format-stress-data-validation-test-disagg-leader-palite-3
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader-palite
+    name: format-stress-data-validation-test-disagg-leader-palite-4
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader-palite
+    name: format-stress-data-validation-test-disagg-leader-palite-5
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-follower-palite
+    name: format-stress-test-disagg-follower-palite-1
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-test-disagg-follower-palite
+    name: format-stress-test-disagg-follower-palite-2
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-test-disagg-follower-palite
+    name: format-stress-test-disagg-follower-palite-3
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-test-disagg-follower-palite
+    name: format-stress-test-disagg-follower-palite-4
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-test-disagg-follower-palite
+    name: format-stress-test-disagg-follower-palite-5
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower-palite
+    name: format-stress-data-validation-test-disagg-follower-palite-1
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower-palite
+    name: format-stress-data-validation-test-disagg-follower-palite-2
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower-palite
+    name: format-stress-data-validation-test-disagg-follower-palite-3
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower-palite
+    name: format-stress-data-validation-test-disagg-follower-palite-4
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower-palite
+    name: format-stress-data-validation-test-disagg-follower-palite-5
+    tags: ["stress-test-disagg"]
+  # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures have been resolved.
+  - <<: *format-stress-test-disagg-switch-palite
+    name: format-stress-test-disagg-switch-palite-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-palite
+    name: format-stress-test-disagg-switch-palite-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-palite
+    name: format-stress-test-disagg-switch-palite-3
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-palite
+    name: format-stress-test-disagg-switch-palite-4
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-palite
+    name: format-stress-test-disagg-switch-palite-5
     tags: ["stress-test-disagg-fail"]
 
   - name: format-stress-test-no-barrier
@@ -7346,4 +7475,41 @@ buildvariants:
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
   tasks:
     - name: compile
-    - name: ".stress-test-disagg-asan-fail"
+    - name: ".stress-test-disagg-san-fail"
+    - name: checkpoint-test
+
+- name: amazon2023-disagg-msan-stress
+  display_name: "[Failure Expected] (ARMV9) Amazon 2023 MSAN Disagg Stress tests"
+  batchtime: 4320 # once every three days
+  run_on:
+  - amazon2023-arm64-latest-large-m8g
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
+    # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
+    posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
+    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
+    disagg_run: true
+  tasks:
+    - name: compile
+    - name: ".stress-test-disagg-san-fail"
+    - name: checkpoint-test
+
+- name: amazon2023-disagg-ubsan-stress
+  display_name: "[Failure Expected] (ARMV9) Amazon 2023 UBSAN Disagg Stress tests"
+  batchtime: 4320 # once every three days
+  run_on:
+  - amazon2023-arm64-latest-large-m8g
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
+    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    disagg_run: true
+  tasks:
+    - name: compile
+    - name: ".stress-test-disagg-san-fail"
+    - name: checkpoint-test
