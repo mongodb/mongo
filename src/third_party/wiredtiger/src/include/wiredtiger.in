@@ -2200,22 +2200,31 @@ struct __wt_connection {
      * @config{error_prefix, prefix string for error messages., a string; default empty.}
      * @config{eviction = (, eviction configuration options., a set of related configuration options
      * defined as follows.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;evict_sample_inmem, If no in-memory ref
-     * is found on the root page\, attempt to locate a random in-memory page by examining all
-     * entries on the root page., a boolean flag; default \c true.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-     * legacy_page_visit_strategy, Use legacy page visit strategy for eviction.  Using this option
-     * is highly discouraged as it will re-introduce the bug described in WT-9121., a boolean flag;
-     * default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
-     * WiredTiger will start to help evict pages from cache.  The number of threads started will
-     * vary depending on the current eviction load.  Each eviction worker thread uses a session from
-     * the configured session_max., an integer between \c 1 and \c 20; default \c 8.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads WiredTiger will start
-     * to help evict pages from cache.  The number of threads currently running will vary depending
-     * on the current eviction load., an integer between \c 1 and \c 20; default \c 1.}
-     * @config{
-     * ),,}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_tolerance_for_app_eviction, This
+     * setting establishes a tolerance level for the configured \c eviction_dirty_trigger and \c
+     * eviction_update_trigger.  The value is a percentage between 0 and 100\, with 0 treating \c
+     * eviction_dirty_trigger and \c eviction_update_trigger as hard limit.  The configured
+     * percentage will be taken in increments of 10 only\, by applying the floor to the given
+     * percentage value., an integer between \c 0 and \c 100; default \c 0.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;evict_sample_inmem, If no in-memory ref is found on the root
+     * page\, attempt to locate a random in-memory page by examining all entries on the root page.,
+     * a boolean flag; default \c true.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;legacy_page_visit_strategy,
+     * Use legacy page visit strategy for eviction.  Using this option is highly discouraged as it
+     * will re-introduce the bug described in WT-9121., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;prefer_scrub_eviction, Change the eviction strategy to scrub
+     * eviction when the cache usage is under half way between the target limit to the trigger
+     * limit., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max,
+     * maximum number of threads WiredTiger will start to help evict pages from cache.  The number
+     * of threads started will vary depending on the current eviction load.  Each eviction worker
+     * thread uses a session from the configured session_max., an integer between \c 1 and \c 20;
+     * default \c 8.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of threads
+     * WiredTiger will start to help evict pages from cache.  The number of threads currently
+     * running will vary depending on the current eviction load., an integer between \c 1 and \c 20;
+     * default \c 1.}
+     * @config{ ),,}
      * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring
      * the dirty content in cache to this level.  It is a percentage of the cache size if the value
      * is within the range of 0 to 100 or an absolute size when greater than 100. The value is not
@@ -3069,21 +3078,29 @@ struct __wt_connection {
  * @config{error_prefix, prefix string for error messages., a string; default empty.}
  * @config{eviction = (, eviction configuration options., a set of related configuration options
  * defined as follows.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;evict_sample_inmem, If no in-memory ref is
- * found on the root page\, attempt to locate a random in-memory page by examining all entries on
- * the root page., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_tolerance_for_app_eviction, This
+ * setting establishes a tolerance level for the configured \c eviction_dirty_trigger and \c
+ * eviction_update_trigger.  The value is a percentage between 0 and 100\, with 0 treating \c
+ * eviction_dirty_trigger and \c eviction_update_trigger as hard limit.  The configured percentage
+ * will be taken in increments of 10 only\, by applying the floor to the given percentage value., an
+ * integer between \c 0 and \c 100; default \c 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * legacy_page_visit_strategy, Use legacy page visit strategy for eviction.  Using this option is
- * highly discouraged as it will re-introduce the bug described in WT-9121., a boolean flag; default
- * \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger will
- * start to help evict pages from cache.  The number of threads started will vary depending on the
- * current eviction load.  Each eviction worker thread uses a session from the configured
- * session_max., an integer between \c 1 and \c 20; default \c 8.}
+ * evict_sample_inmem, If no in-memory ref is found on the root page\, attempt to locate a random
+ * in-memory page by examining all entries on the root page., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;legacy_page_visit_strategy, Use legacy page visit strategy for
+ * eviction.  Using this option is highly discouraged as it will re-introduce the bug described in
+ * WT-9121., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * threads_min, minimum number of threads WiredTiger will start to help evict pages from cache.  The
- * number of threads currently running will vary depending on the current eviction load., an integer
- * between \c 1 and \c 20; default \c 1.}
+ * prefer_scrub_eviction, Change the eviction strategy to scrub eviction when the cache usage is
+ * under half way between the target limit to the trigger limit., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads WiredTiger will start to
+ * help evict pages from cache.  The number of threads started will vary depending on the current
+ * eviction load.  Each eviction worker thread uses a session from the configured session_max., an
+ * integer between \c 1 and \c 20; default \c 8.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min,
+ * minimum number of threads WiredTiger will start to help evict pages from cache.  The number of
+ * threads currently running will vary depending on the current eviction load., an integer between
+ * \c 1 and \c 20; default \c 1.}
  * @config{ ),,}
  * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring the
  * dirty content in cache to this level.  It is a percentage of the cache size if the value is

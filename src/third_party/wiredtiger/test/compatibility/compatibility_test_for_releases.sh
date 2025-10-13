@@ -30,6 +30,7 @@ bflag()
 {
     # Return if the branch's format command takes the -B flag for backward compatibility.
     test "$1" = "develop" && echo "-B "
+    test "$1" = "mongodb-8.2" && echo "-B"
     test "$1" = "mongodb-8.0" && echo "-B"
     test "$1" = "mongodb-7.0" && echo "-B "
     test "$1" = "mongodb-6.0" && echo "-B "
@@ -178,6 +179,7 @@ create_configs()
     echo "runs.type=row" >> $file_name                # WT-7379 - Temporarily disable column store tests
     echo "btree.huffman_value=0" >> $file_name        # WT-12456 - Never used, removed from newer releases
     echo "btree.prefix=0" >> $file_name               # WT-7579 - Prefix testing isn't portable between releases
+    echo "btree.prefix_len=0" >> $file_name           # WT-15548 - Not supported by older releases
     echo "cache=80" >> $file_name                     # Medium cache so there's eviction
     echo "checksum=on" >> $file_name                  # WT-7851 Fix illegal checksum configuration
     echo "checkpoints=1"  >> $file_name               # Force periodic writes
@@ -192,6 +194,8 @@ create_configs()
     echo "leak_memory=1" >> $file_name                # Faster runs
     echo "logging=1" >> $file_name                    # Test log compatibility
     echo "logging_compression=snappy" >> $file_name   # We only built with snappy, force the choice
+    echo "obsolete_cleanup.method=off" >> $file_name  # WT-14142 - Not supported by older releases
+    echo "obsolete_cleanup.wait=0" >> $file_name      # WT-14142 - Not supported by older releases
     echo "prefetch=0" >> $file_name                   # WT-12978 - Not supported by older releases
     echo "rows=1000000" >> $file_name
     echo "salvage=0" >> $file_name                    # Faster runs

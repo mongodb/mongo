@@ -389,6 +389,14 @@ configure_prefetch(char **p, size_t max)
 static void
 configure_obsolete_cleanup(char **p, size_t max)
 {
+    /*
+     * If it's all off, don't even generate the outer checkpoint_cleanup config. It's not compatible
+     * with older branches, so take both options being configured off as a proxy for the whole
+     * feature being turned off.
+     */
+    if (strcmp(GVS(OBSOLETE_CLEANUP_METHOD), "off") == 0 && GV(OBSOLETE_CLEANUP_WAIT) == 0)
+        return;
+
     CONFIG_APPEND(*p, ",checkpoint_cleanup=[");
 
     /* Strategy. */
@@ -396,7 +404,8 @@ configure_obsolete_cleanup(char **p, size_t max)
         CONFIG_APPEND(*p, "method=%s", (char *)GVS(OBSOLETE_CLEANUP_METHOD));
 
     /* Interval. */
-    CONFIG_APPEND(*p, ",wait=%" PRIu32, GV(OBSOLETE_CLEANUP_WAIT));
+    if (GV(OBSOLETE_CLEANUP_WAIT) != 0)
+        CONFIG_APPEND(*p, ",wait=%" PRIu32, GV(OBSOLETE_CLEANUP_WAIT));
 
     CONFIG_APPEND(*p, "]");
 }

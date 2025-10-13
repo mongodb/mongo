@@ -229,7 +229,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"obsolete_cleanup.method", "obsolete cleanup strategy", C_IGNORE | C_STRING, 0, 0, 0,
     V_GLOBAL_OBSOLETE_CLEANUP_METHOD},
 
-  {"obsolete_cleanup.wait", "obsolete cleanup interval in seconds", 0x0, 1, 3600, 100000,
+  {"obsolete_cleanup.wait", "obsolete cleanup interval in seconds", 0x0, 0, 3600, 100000,
     V_GLOBAL_OBSOLETE_CLEANUP_WAIT},
 
   {"ops.alter", "configure table alterations", C_BOOL, 10, 0, 0, V_GLOBAL_OPS_ALTER},

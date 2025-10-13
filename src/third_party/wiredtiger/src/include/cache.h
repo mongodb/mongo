@@ -19,6 +19,19 @@ typedef enum __wt_cache_op {
 #define WT_HS_FILE_MIN (100 * WT_MEGABYTE)
 
 /*
+ * WT_CACHE_EVICTION_CONTROLS --
+ *  Cache eviction controls configuration.
+ * WT_CACHE_PREFER_SCRUB_EVICTION: Change the eviction strategy to scrub eviction when the
+ *      cache usage is under half way between the target limit to the trigger limit.
+ */
+struct __wt_cache_eviction_controls {
+    wt_shared uint8_t cache_tolerance_for_app_eviction; /* cache tolerance for app eviction.*/
+/* cache eviction controls bit positions */
+#define WT_CACHE_PREFER_SCRUB_EVICTION 0x1u
+    wt_shared uint16_t flags_atomic;
+};
+
+/*
  * WiredTiger cache structure.
  */
 struct __wt_cache {
@@ -41,6 +54,7 @@ struct __wt_cache {
     wt_shared uint64_t bytes_updates;    /* Bytes of updates to pages */
     wt_shared uint64_t bytes_written;
 
+    WT_CACHE_EVICTION_CONTROLS cache_eviction_controls; /* various cache eviction controls */
     /*
      * History store cache usage. TODO: The values for these variables are cached and potentially
      * outdated.

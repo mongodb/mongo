@@ -2256,15 +2256,16 @@ __wt_btcur_skip_page(
 
         /*
          * Otherwise, check the timestamp information. We base this decision on the aggregate stop
-         * point added to the page during the last reconciliation.
+         * point added to the page during the last reconciliation. Never skip a page with prepared
+         * transaction data.
          */
-        if (WT_TIME_AGGREGATE_HAS_STOP(&addr.ta) &&
+        if (WT_TIME_AGGREGATE_HAS_STOP(&addr.ta) && !addr.ta.prepare &&
           __wt_txn_snap_min_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts,
             addr.ta.newest_stop_durable_ts)) {
             *skipp = true;
             walk_skip_stats->total_del_pages_skipped++;
         }
-    } else if (clean_page && __wt_get_page_modify_ta(session, ref->page, &ta) &&
+    } else if (clean_page && __wt_get_page_modify_ta(session, ref->page, &ta) && !ta->prepare &&
       __wt_txn_snap_min_visible(
         session, ta->newest_stop_txn, ta->newest_stop_ts, ta->newest_stop_durable_ts)) {
         /*

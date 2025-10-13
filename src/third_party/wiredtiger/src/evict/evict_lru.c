@@ -761,11 +761,18 @@ __evict_update_work(WT_SESSION_IMPL *session)
     /*
      * Scrub dirty pages and keep them in cache if we are less than half way to the clean, dirty or
      * updates triggers.
+     *
+     * WT_CACHE_PREFER_SCRUB_EVICTION that can be turned on to enable scrub eviction
+     *    as long as overall cache usage is under half way to the trigger limit.
      */
     if (bytes_inuse < (uint64_t)((target + trigger) * bytes_max) / 200) {
-        if (bytes_dirty < (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200 &&
-          bytes_updates < (uint64_t)((updates_target + updates_trigger) * bytes_max) / 200)
+        if (F_ISSET_ATOMIC_16(
+              &(conn->cache->cache_eviction_controls), WT_CACHE_PREFER_SCRUB_EVICTION)) {
             LF_SET(WT_EVICT_CACHE_SCRUB);
+        } else if (bytes_dirty < (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200 &&
+          bytes_updates < (uint64_t)((updates_target + updates_trigger) * bytes_max) / 200) {
+            LF_SET(WT_EVICT_CACHE_SCRUB);
+        }
     } else
         LF_SET(WT_EVICT_CACHE_NOKEEP);
 
