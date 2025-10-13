@@ -123,7 +123,10 @@ MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 // have been removed.
 auto& ttlPasses = *MetricBuilder<Counter64>{"ttl.passes"};
 auto& ttlSubPasses = *MetricBuilder<Counter64>{"ttl.subPasses"};
+
+// Tracks the number of deleted documents, as well as the number of deleted keys from indexes.
 auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
+auto& ttlDeletedKeys = *MetricBuilder<Counter64>{"ttl.deletedKeys"};
 
 // Tracks the number of TTL deletes skipped due to a TTL secondary index being present, but not
 // valid for TTL removal. A non-zero value indicates there is a TTL non-conformant index present and
@@ -630,8 +633,10 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                                                      getBatchedDeleteStageParams(batchingEnabled));
 
     try {
-        const auto numDeleted = exec->executeDelete();
-        ttlDeletedDocuments.increment(numDeleted);
+        const auto numDeletedDocs = exec->executeDelete();
+        const auto numDeletedKeys = opDebug.additiveMetrics.keysDeleted.value_or(0ll);
+        ttlDeletedDocuments.increment(numDeletedDocs);
+        ttlDeletedKeys.increment(numDeletedKeys);
 
         const auto duration = Milliseconds(timer.millis());
         PlanSummaryStats summaryStats;
@@ -646,8 +651,8 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                   "Deleted expired documents using index",
                   logAttrs(collection.nss()),
                   "index"_attr = indexName,
-                  "numDeleted"_attr = numDeleted,
-                  "numKeysDeleted"_attr = opDebug.additiveMetrics.keysDeleted.value_or(0ll),
+                  "numDeleted"_attr = numDeletedDocs,
+                  "numKeysDeleted"_attr = numDeletedKeys,
                   "numKeysExamined"_attr = summaryStats.totalKeysExamined,
                   "numDocsExamined"_attr = summaryStats.totalDocsExamined,
                   "duration"_attr = duration);
@@ -777,8 +782,10 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
         filter);
 
     try {
-        const auto numDeleted = exec->executeDelete();
-        ttlDeletedDocuments.increment(numDeleted);
+        const auto numDeletedDocs = exec->executeDelete();
+        const auto numDeletedKeys = opDebug.additiveMetrics.keysDeleted.value_or(0ll);
+        ttlDeletedDocuments.increment(numDeletedDocs);
+        ttlDeletedKeys.increment(numDeletedKeys);
 
         const auto duration = Milliseconds(timer.millis());
         PlanSummaryStats summaryStats;
@@ -792,8 +799,8 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
             LOGV2(5400702,
                   "Deleted expired documents using clustered index scan",
                   logAttrs(collection.nss()),
-                  "numDeleted"_attr = numDeleted,
-                  "numKeysDeleted"_attr = opDebug.additiveMetrics.keysDeleted.value_or(0ll),
+                  "numDeleted"_attr = numDeletedDocs,
+                  "numKeysDeleted"_attr = numDeletedKeys,
                   "numKeysExamined"_attr = summaryStats.totalKeysExamined,
                   "numDocsExamined"_attr = summaryStats.totalDocsExamined,
                   "duration"_attr = duration,
@@ -835,6 +842,14 @@ long long TTLMonitor::getTTLPasses_forTest() {
 
 long long TTLMonitor::getTTLSubPasses_forTest() {
     return ttlSubPasses.get();
+}
+
+long long TTLMonitor::getTTLDeletedDocuments_forTest() {
+    return ttlDeletedDocuments.get();
+}
+
+long long TTLMonitor::getTTLDeletedKeys_forTest() {
+    return ttlDeletedKeys.get();
 }
 
 long long TTLMonitor::getInvalidTTLIndexSkips_forTest() {

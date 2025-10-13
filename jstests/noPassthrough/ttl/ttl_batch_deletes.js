@@ -44,12 +44,24 @@ const runTestCase = function (fn, isSharded = false) {
     }
 };
 
-const countIndexKeysDeleted = function () {
+const countIndexKeysDeletedByLog = function () {
     const logs = rawMongoProgramOutput('"numKeysDeleted"');
     const indexKeyDeletedLogs = [...logs.matchAll(/"numKeysDeleted":(\d*)/g)];
     const keysDeleted = indexKeyDeletedLogs.reduce((acc, curr) => acc + parseInt(curr[1]), 0);
     clearRawMongoProgramOutput();
     return keysDeleted;
+};
+
+const countIndexKeysDeletedByMetrics = function (db) {
+    let sum = 0;
+    FixtureHelpers.mapOnEachShardNode({
+        db: db,
+        func: (db) => {
+            sum += assert.commandWorked(db.serverStatus()).metrics.ttl.deletedKeys;
+        },
+    });
+
+    return sum;
 };
 
 const disableTTLBatchDeletes = function (conn) {
@@ -81,7 +93,11 @@ const triggerIndexScanTTL = function (db, doShardCollection = false) {
     assert.soon(function () {
         return coll.find().itcount() == 0;
     }, "TTL index on x didn't delete");
-    assert.eq(docCount * (doShardCollection ? 3 : 2), countIndexKeysDeleted());
+
+    // Validate that the correct number of keys has been deleted in the indexes on the _id and x fields.
+    // In a sharded cluster, there is an additional hashed index on the _id field.
+    assert.eq(docCount * (doShardCollection ? 3 : 2), countIndexKeysDeletedByLog());
+    assert.eq(docCount * (doShardCollection ? 3 : 2), countIndexKeysDeletedByMetrics(db));
 };
 
 const testTTLDeleteWithIndexScanBatched = function (conn) {
@@ -142,7 +158,11 @@ const triggerCollectionScanTTL = function (testDB, doShardCollection = false) {
 
     assert.eq(0, coll.find().itcount());
     assert.eq(0, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
-    assert.eq(doShardCollection ? 2 : 1, countIndexKeysDeleted());
+
+    // Validate that the correct number of keys has been deleted in the index on the host/time fields.
+    // In a sharded cluster, there is an additional index on the host field.
+    assert.eq(doShardCollection ? 2 : 1, countIndexKeysDeletedByLog());
+    assert.eq(doShardCollection ? 2 : 1, countIndexKeysDeletedByMetrics(testDB));
 };
 
 const testTTLDeleteWithCollectionScanBatched = function (conn) {

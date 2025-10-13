@@ -84,6 +84,8 @@ public:
 
     long long getTTLPasses_forTest();
     long long getTTLSubPasses_forTest();
+    long long getTTLDeletedDocuments_forTest();
+    long long getTTLDeletedKeys_forTest();
     long long getInvalidTTLIndexSkips_forTest();
 
 private:

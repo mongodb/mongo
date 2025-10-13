@@ -123,6 +123,16 @@ protected:
         return ttlMonitor->getTTLSubPasses_forTest();
     }
 
+    long long getTTLDeletedDocuments() {
+        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
+        return ttlMonitor->getTTLDeletedDocuments_forTest();
+    }
+
+    long long getTTLDeletedKeys() {
+        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
+        return ttlMonitor->getTTLDeletedKeys_forTest();
+    }
+
     long long getInvalidTTLIndexSkips() {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
         return ttlMonitor->getInvalidTTLIndexSkips_forTest();
@@ -266,11 +276,14 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
     createIndex(nss, BSON("y" << 1), "testIndexY", Seconds(1));
 
+    const auto docCount = 122;
     client.insertExpiredDocs(nss, "x", 120);
     client.insertExpiredDocs(nss, "y", 2);
-    ASSERT_EQ(client.count(nss), 122);
+    ASSERT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -282,6 +295,8 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount * 2);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
@@ -302,6 +317,8 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
     auto initTTLPasses = getTTLPasses();
     auto initTTLSubPasses = getTTLSubPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -314,6 +331,8 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     ASSERT_EQ(client.count(nss), 100);
     ASSERT_EQ(getTTLPasses(), initTTLPasses);
     ASSERT_EQ(getTTLSubPasses(), initTTLSubPasses);
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
@@ -329,10 +348,13 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     options.expireAfterSeconds = 1;
     client.createCollWithOptions(nss, options);
 
-    client.insertExpiredDocs(nss, "_id", 100);
-    ASSERT_EQ(client.count(nss), 100);
+    const auto docCount = 100;
+    client.insertExpiredDocs(nss, "_id", docCount);
+    ASSERT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -344,6 +366,10 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+
+    // For a clustered collection without additional indexes, 0 keys deleted is valid.
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
@@ -360,11 +386,14 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     client.createCollWithOptions(nss, options);
     createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
 
+    const auto docCount = 100;
     client.insertExpiredDocs(nss, "_id", 50);
     client.insertExpiredDocs(nss, "foo", 50);
-    ASSERT_EQ(client.count(nss), 100);
+    ASSERT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -376,6 +405,10 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+
+    // For a clustered collection with 1 additional index, 1 deleted key per document is valid.
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
@@ -388,10 +421,13 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     client.createColl(nss);
     createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
 
+    const auto docCount = 50000;
     client.insertExpiredDocs(nss, "foo", 50000);
-    ASSERT_EQ(client.count(nss), 50000);
+    ASSERT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -403,6 +439,8 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
@@ -431,6 +469,8 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     ASSERT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -442,6 +482,11 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     // Everything should be deleted.
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+
+    // For a (timeseries) clustered collection without additional indexes, 0 keys deleted is valid.
+    // In this case, it is known that there are 2 timeseries buckets, corresponding to 2 documents.
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + 2);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
@@ -467,6 +512,8 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
     ASSERT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -478,6 +525,8 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
     // All documents remain after the TTL pass.
     ASSERT_EQ(client.count(nss), documents);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
@@ -625,6 +674,8 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
+    const auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    const auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
@@ -636,6 +687,8 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     // No documents are removed.
     ASSERT_EQ(client.count(nss), 100);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
+    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 
     // A non-TTL index doesn't contribute to the number of skipped invalid TTL indexes.
     ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
@@ -670,6 +723,8 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     ASSERT_EQ(client.count(nss1), xExpiredDocsNss1 + yExpiredDocsNss1);
 
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    auto initTTLDeletedKeys = getTTLDeletedKeys();
 
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the
@@ -682,6 +737,10 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss0), 0);
     ASSERT_EQ(client.count(nss1), 0);
+    ASSERT_EQ(getTTLDeletedDocuments(),
+              xExpiredDocsNss0 + xExpiredDocsNss1 + yExpiredDocsNss1 + initTTLDeletedDocuments);
+    ASSERT_EQ(getTTLDeletedKeys(),
+              xExpiredDocsNss0 + ((xExpiredDocsNss1 + yExpiredDocsNss1) * 2) + initTTLDeletedKeys);
 
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
@@ -1028,6 +1087,8 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
+    const auto initTTLDeletedDocuments = getTTLDeletedDocuments();
+    const auto initTTLDeletedKeys = getTTLDeletedKeys();
     stdx::thread thread([&]() {
         ThreadClient threadClient(getGlobalServiceContext()->getService());
         doTTLPassForTest(Date_t::now());
@@ -1037,6 +1098,8 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    ASSERT_EQ(getTTLDeletedDocuments(), nDocs + initTTLDeletedDocuments);
+    ASSERT_EQ(getTTLDeletedKeys(), nDocs + initTTLDeletedKeys);
     ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
 }
 
