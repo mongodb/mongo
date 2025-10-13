@@ -29,32 +29,11 @@
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
+#include "mongo/db/query/random_utils.h"
+
 namespace mongo::join_ordering {
 
 namespace {
-
-// Helper for generating pseudo-random order of vector. Used by the graph traversal code to get
-// random order of neighbors to explore.
-class PseudoRandomGenerator {
-public:
-    PseudoRandomGenerator(int seed) {
-        gen = std::mt19937(seed);
-    }
-
-    template <typename T>
-    void shuffleVector(std::vector<T>& vec) {
-        // Implement Fisher–Yates shuffle manually to make the algorithm deterministic as
-        // std::shuffle has platform-specific implementations.
-        for (std::size_t i = vec.size(); i > 1; --i) {
-            std::size_t j = (gen() + 1) % i;
-            std::swap(vec[i - 1], vec[j]);
-        }
-    }
-
-private:
-    std::mt19937 gen;
-};
-
 class ReorderContext {
 public:
     ReorderContext(const JoinGraph& joinGraph, const std::vector<ResolvedPath>& resolvedPaths)
@@ -110,7 +89,7 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
     const JoinGraph& joinGraph,
     const std::vector<ResolvedPath>& resolvedPaths,
     int seed) {
-    PseudoRandomGenerator rand(seed);
+    random_utils::PseudoRandomGenerator rand(seed);
     ReorderContext ctx(joinGraph, resolvedPaths);
 
     // Set of nodes we have already visited

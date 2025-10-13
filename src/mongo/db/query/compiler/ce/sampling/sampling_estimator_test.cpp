@@ -32,9 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
-#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
@@ -45,6 +42,7 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/random_utils.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -1328,6 +1326,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
 
 namespace {
 std::vector<BSONObj> createDocumentsForNDVTesting(int num) {
+    random_utils::PseudoRandomGenerator gen(0);
     std::vector<BSONObj> docs;
     for (int i = 0; i < num; i++) {
         // These fields are uniformly distributed.
@@ -1335,47 +1334,50 @@ std::vector<BSONObj> createDocumentsForNDVTesting(int num) {
                                  << i % 2 << "e" << 1);
         docs.push_back(obj);
     }
+    gen.shuffleVector(docs);
     return docs;
 }
 
+void assertBetween(CardinalityEstimate actual, double min, double max) {
+    ASSERT_GTE(actual.toDouble(), min);
+    ASSERT_LTE(actual.toDouble(), max);
+}
+
 void makeNDVAssertions(SamplingEstimatorForTesting& estimator, const size_t sampleSize) {
+    // For the purposes of safe assertions, we must generate a stable sample.
+    RAIIServerParameterControllerForTest knobController("internalQuerySamplingBySequentialScan",
+                                                        true);
     estimator.generateSample(ce::NoProjection{});
 
     // We know the true NDV for each of these fields; see 'createDocumentsForNDVTesting' for
-    // details.
-
-    // All unique values. The estimator result for this one can vary a lot based on how many
-    // duplicate documents there are in the sample. The problem is worse when the sample is too
-    // small (here, 1 or 2%). TODO SERVER-111585: Should we try to account for this in
-    // NDV estimates?
+    // details. In most of the cases below, we allow for a 20% buffer.
     auto ndvId = estimator.estimateNDV({"_id"});
-    if (sampleSize > 100) {
-        ASSERT_GT(ndvId.toDouble(), 2500);  // true value is 5,000.
-    } else {
-        ASSERT_GT(ndvId.toDouble(), 1000);
-    }
-
-    // Some unique values. Again, the estimator results can vary a lot for fields with many unique
-    // values.
     auto ndvA = estimator.estimateNDV({"a"});
+    auto ndvB = estimator.estimateNDV({"b"});
+    auto ndvC = estimator.estimateNDV({"c"});
+    auto ndvD = estimator.estimateNDV({"d"});
+    auto ndvE = estimator.estimateNDV({"e"});
+    auto ndvNonexistent = estimator.estimateNDV({"nonexistent"});
+
+    // All unique values; true number is 5000.
+    assertBetween(ndvId, 4000, 6000);
+
+    // Some unique values. When the sample size is small (here, 1%-2%), we see a lot of unique
+    // values for A and B, causing us to overestimate the true number of unique values.
     if (sampleSize > 100) {
-        ASSERT_GT(ndvA.toDouble(), 500);  // true value is 1,000.
+        assertBetween(ndvA, 800, 1200);
+        assertBetween(ndvB, 80, 120);
     } else {
-        ASSERT_GT(ndvA.toDouble(), 200);
+        assertBetween(ndvA, 800, 5000);
+        assertBetween(ndvB, 80, 200);
     }
 
-    auto ndvB = estimator.estimateNDV({"b"});
-    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvB, 100));
-    auto ndvC = estimator.estimateNDV({"c"});
-    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvC, 10));
-    auto ndvD = estimator.estimateNDV({"d"});
-    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvD, 2));
+    assertBetween(ndvC, 8, 12);
+    assertBetween(ndvD, 1.6, 2.4);
 
     // Single unique value.
-    auto ndvE = estimator.estimateNDV({"e"});
-    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvE, 1));
-    auto ndvNonexistent = estimator.estimateNDV({"nonexistent"});
-    ASSERT(estimator.assertEstimateInConfidenceInterval(ndvNonexistent, 1));
+    assertBetween(ndvE, .8, 1.2);
+    assertBetween(ndvNonexistent, .8, 1.2);
 }
 }  // namespace
 

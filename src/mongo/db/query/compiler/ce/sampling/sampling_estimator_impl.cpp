@@ -839,7 +839,19 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
                 _topLevelSampleFieldNames.contains(fieldName.front()));
     }
 
+    // Obtain the NDV for the sample. If this is equal to the sample size, don't bother with NR
+    // iteration, since it is likely to diverge. The best guess is that each element in the
+    // collection is unique.
     size_t sampleNDV = countNDV(fieldNames, _sample);
+    if (sampleNDV == _sampleSize) {
+        LOGV2_DEBUG(11228302,
+                    5,
+                    "SamplingCE NDV is equal to the sample size, outputting collection size",
+                    "fieldName"_attr = fieldName.fullPath(),
+                    "sampleNDV"_attr = sampleNDV,
+                    "collectionCard"_attr = _collectionCard);
+        return _collectionCard;
+    }
 
     CardinalityEstimate estimate = newtonRaphsonNDV(sampleNDV, _sampleSize);
     LOGV2_DEBUG(11158506,

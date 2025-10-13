@@ -43,7 +43,9 @@ TEST(ComputeNDV, EnsureNewtonRaphsonNDVDoesNotThrow) {
                   "Testing Newton Raphson NDV with",
                   "sampleSize"_attr = sampleSize,
                   "sampleNDV"_attr = sampleNDV);
-            ASSERT_GTE(newtonRaphsonNDV(sampleNDV, sampleSize).toDouble(), sampleNDV);
+            auto res = newtonRaphsonNDV(sampleNDV, sampleSize).toDouble();
+            LOGV2(11228301, "Newton Raphson NDV result", "res"_attr = res);
+            ASSERT_GTE(res, sampleNDV);
         }
     }
 }

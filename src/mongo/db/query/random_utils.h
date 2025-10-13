@@ -37,4 +37,30 @@ namespace mongo::random_utils {
  */
 PseudoRandom& getRNG();
 
+/**
+ * Helper for generating pseudo-random order of vector.
+ *
+ * For example, used in testing with a fixed seed to ensure a consistent random order that is
+ * platform-independent.
+ */
+class PseudoRandomGenerator {
+public:
+    PseudoRandomGenerator(int seed) {
+        gen = std::mt19937(seed);
+    }
+
+    template <typename T>
+    void shuffleVector(std::vector<T>& vec) {
+        // Implement Fisher-Yates shuffle manually to make the algorithm deterministic as
+        // std::shuffle has platform-specific implementations.
+        for (std::size_t i = vec.size(); i > 1; --i) {
+            std::size_t j = (gen() + 1) % i;
+            std::swap(vec[i - 1], vec[j]);
+        }
+    }
+
+private:
+    std::mt19937 gen;
+};
+
 }  // namespace mongo::random_utils

@@ -102,6 +102,7 @@ mongo_cc_library(
     deps = [
         ":join_ordering",
         ":solution_storage",
+        "//src/mongo/db/query:random_utils",
     ],
 )
 

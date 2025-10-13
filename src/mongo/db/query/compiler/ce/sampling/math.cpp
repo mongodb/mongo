@@ -67,17 +67,30 @@ CardinalityEstimate newtonRaphsonNDV(size_t sampleNDV, size_t sampleSize) {
                 x > 0);
         double deriv = methodOfMomentsDerivative(x, sampleSize);
 
-        // Can't continue when the denominator is zero. This can happen when sampleNDV = sampleSize.
-        if (deriv == 0) {
+        // Can't continue when the denominator is zero or very close to it. This can happen when
+        // sampleNDV is very close to sampleSize.
+        if (deriv <= EPSILON) {
             LOGV2_DEBUG(11158511,
                         5,
-                        "Hit zero derivative",
+                        "Derivative approached zero",
                         "sampleNDV"_attr = sampleNDV,
-                        "sampleSize"_attr = sampleSize);
+                        "sampleSize"_attr = sampleSize,
+                        "deriv"_attr = deriv);
             break;
         }
 
         h = methodOfMoments(x, sampleSize, sampleNDV) / deriv;
+        if (h > x) {
+            LOGV2_DEBUG(11228300,
+                        5,
+                        "Reached a divergent scenario",
+                        "sampleNDV"_attr = sampleNDV,
+                        "sampleSize"_attr = sampleSize,
+                        "h"_attr = h,
+                        "x"_attr = x,
+                        "deriv"_attr = deriv);
+            break;
+        }
 
         // x(n+1) = x(n) - f(x) / f'(x)
         x = x - h;
