@@ -243,7 +243,8 @@ public:
         OperationContext* opCtx,
         CollectionIterator& collIterator,
         int64_t minBytesPerMarker,
-        std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
+        std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        TickSource* tickSource = globalSystemTickSource());
 
     // Creates the initial set of markers by sampling the collection. The set of markers
     // returned will have approximate metrics. The metrics of each marker will be equal and contain

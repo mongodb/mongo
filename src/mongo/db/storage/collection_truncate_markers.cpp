@@ -192,11 +192,14 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
     OperationContext* opCtx,
     CollectionIterator& collectionIterator,
     int64_t minBytesPerMarker,
-    std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime) {
+    std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+    TickSource* tickSource) {
     auto startTime = curTimeMicros64();
+    const int64_t numRecordsTotal = collectionIterator.numRecords();
     LOGV2_INFO(7393212,
                "Scanning collection to determine where to place markers for truncation",
-               "uuid"_attr = collectionIterator.getRecordStore()->uuid());
+               "uuid"_attr = collectionIterator.getRecordStore()->uuid(),
+               "numRecords"_attr = numRecordsTotal);
 
     int64_t numRecords = 0;
     int64_t dataSize = 0;
@@ -204,6 +207,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
     int64_t currentBytes = 0;
 
     std::deque<Marker> markers;
+    Timer lastProgressTimer(tickSource);
 
     while (auto nextRecord = collectionIterator.getNext()) {
         const auto& [rId, doc] = *nextRecord;
@@ -224,6 +228,17 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 
         numRecords++;
         dataSize += doc.objsize();
+
+        const int samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
+        if (samplingLogIntervalSeconds > 0 &&
+            lastProgressTimer.elapsed() >= Seconds(samplingLogIntervalSeconds)) {
+            LOGV2(11212203,
+                  "Collection scanning progress",
+                  "uuid"_attr = collectionIterator.getRecordStore()->uuid(),
+                  "completed"_attr = numRecords,
+                  "total"_attr = numRecordsTotal);
+            lastProgressTimer.reset();
+        }
 
         // Force a call to next() only every ~ 1 second to simulate slowness.
         if (MONGO_unlikely(gUseSlowCollectionTruncateMarkerScanning)) {
