@@ -428,10 +428,8 @@ access_control:
     jira: Server Security
   files:
     - src/mongo/db/auth/
-    - src/mongo/db/cluster_auth_mode_option.idl
     - src/mongo/db/commands/authentication*
     - src/mongo/db/commands/user_management*
-    - src/mongo/db/keyfile_option.idl
     - src/mongo/db/modules/enterprise/src/kerberos
     - src/mongo/db/modules/enterprise/src/ldap
     - src/mongo/db/modules/enterprise/src/sasl
@@ -947,8 +945,17 @@ server_parameters:
     slack: server-security
     jira: Server Security
   files:
-    - src/mongo/db/server_options*
     - src/mongo/db/server_parameter*
+
+server_options:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/server_options*
+    - src/mongo/unittest/integration_test_main.cpp
+    - src/mongo/db/cluster_auth_mode_option.idl
+    - src/mongo/db/keyfile_option.idl
 
 # This module doesn't really exist. It's files are only compiled on windows, and we don't
 # run the mod_scanner on a windows build. However, it is needed to ensure that all first-party

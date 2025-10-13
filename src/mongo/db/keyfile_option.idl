@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: pub
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/server_options.h"

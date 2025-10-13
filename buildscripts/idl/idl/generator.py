@@ -3206,7 +3206,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 bound = getattr(param.validator, pred)
                 if bound is not None:
                     self._writer.write_line(
-                        "ret->addBound<idl_server_parameter_detail::%s>(%s);"
+                        "ret->addBound<idl_server_parameter_bounds::%s>(%s);"
                         % (pred.upper(), _get_expression(bound))
                     )
 

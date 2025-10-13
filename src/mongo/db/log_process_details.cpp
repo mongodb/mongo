@@ -61,6 +61,16 @@ bool is32bit() {
     return (sizeof(int*) == 4);
 }
 
+void printCommandLineOpts(std::ostream* os) {
+    if (os) {
+        *os << fmt::format("Options set by command line: {}",
+                           tojson(serverGlobalParams.parsedOpts, ExtendedRelaxedV2_0_0, true))
+            << std::endl;
+    } else {
+        LOGV2(21951, "Options set by command line", "options"_attr = serverGlobalParams.parsedOpts);
+    }
+}
+
 }  // namespace
 
 void logProcessDetails(std::ostream* os) {

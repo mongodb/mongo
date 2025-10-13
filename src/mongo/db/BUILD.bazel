@@ -1700,7 +1700,6 @@ mongo_cc_library(
         "read_write_concern_provenance.cpp",
         "server_options.cpp",
         "server_parameter.cpp",
-        "server_parameter_with_storage.cpp",
         "shutdown_in_progress_quiesce_info.cpp",
         "tenant_id.cpp",
         "version_context.cpp",

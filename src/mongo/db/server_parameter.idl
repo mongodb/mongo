@@ -35,6 +35,7 @@ imports:
 
 enums:
     SetAtOption:
+        mod_visibility: pub
         description: "SetAt option value"
         type: string
         values:
@@ -45,6 +46,7 @@ enums:
 # {getParameter: <options>}
 structs:
     GetParameterOptions:
+        mod_visibility: pub
         description: "Optional flags to pass to {getParameter: options, ...}"
         fields:
             showDetails:

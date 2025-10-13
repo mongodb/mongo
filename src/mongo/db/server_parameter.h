@@ -51,7 +51,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
@@ -76,7 +76,7 @@ namespace mongo {
 /**
  * How and when a given Server Parameter may be set/modified.
  */
-enum class ServerParameterType {
+enum class MONGO_MOD_PUB ServerParameterType {
     /**
      * May not be set at any time.
      * Used as a means to read out current state, similar to ServerStatus.
@@ -110,12 +110,7 @@ enum class ServerParameterType {
     kClusterWide,
 };
 
-class ServerParameterSet;
-
-class OperationContext;
-
-template <typename U>
-using TenantIdMap = std::map<boost::optional<TenantId>, U>;
+class MONGO_MOD_PUB OperationContext;
 
 class MONGO_MOD_OPEN ServerParameter {
 private:
@@ -421,7 +416,7 @@ private:
     Atomic<EnableState> _state = EnableState::enabled;
 };
 
-class ServerParameterSet {
+class MONGO_MOD_PUB ServerParameterSet {
 public:
     using Map = ServerParameter::Map;
 
@@ -475,12 +470,12 @@ private:
     Map _map;
 };
 
-void registerServerParameter(std::unique_ptr<ServerParameter>);
+MONGO_MOD_PUB void registerServerParameter(std::unique_ptr<ServerParameter>);
 
 /**
  * Proxy instance for deprecated aliases of set parameters.
  */
-class IDLServerParameterDeprecatedAlias : public ServerParameter {
+class MONGO_MOD_PUB IDLServerParameterDeprecatedAlias : public ServerParameter {
 public:
     IDLServerParameterDeprecatedAlias(StringData name, ServerParameter* sp);
 
@@ -503,10 +498,8 @@ private:
     ServerParameter* _sp;
 };
 
-namespace idl_server_parameter_detail {
-
 template <typename T>
-inline StatusWith<T> coerceFromString(StringData str) {
+MONGO_MOD_PUB inline StatusWith<T> coerceFromString(StringData str) {
     T value;
     Status status = NumberParser{}(str, &value);
     if (!status.isOK()) {
@@ -516,7 +509,7 @@ inline StatusWith<T> coerceFromString(StringData str) {
 }
 
 template <>
-inline StatusWith<bool> coerceFromString<bool>(StringData str) {
+MONGO_MOD_PUB inline StatusWith<bool> coerceFromString<bool>(StringData str) {
     if ((str == "1") || (str == "true")) {
         return true;
     }
@@ -527,17 +520,18 @@ inline StatusWith<bool> coerceFromString<bool>(StringData str) {
 }
 
 template <>
-inline StatusWith<std::string> coerceFromString<std::string>(StringData str) {
+MONGO_MOD_PUB inline StatusWith<std::string> coerceFromString<std::string>(StringData str) {
     return std::string{str};
 }
 
 template <>
-inline StatusWith<std::vector<std::string>> coerceFromString<std::vector<std::string>>(
-    StringData str) {
+MONGO_MOD_PUB inline StatusWith<std::vector<std::string>>
+coerceFromString<std::vector<std::string>>(StringData str) {
     std::vector<std::string> v;
     str::splitStringDelim(std::string{str}, &v, ',');
     return v;
 }
 
-}  // namespace idl_server_parameter_detail
+template <typename U>
+using TenantIdMap MONGO_MOD_PUB = std::map<boost::optional<TenantId>, U>;
 }  // namespace mongo

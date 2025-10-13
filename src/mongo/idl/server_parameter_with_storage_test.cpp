@@ -81,8 +81,7 @@ void doStorageTest(StringData name,
 
     // Check type coersion.
     for (const auto& v : valid) {
-        element_type typedVal =
-            uassertStatusOK(idl_server_parameter_detail::coerceFromString<element_type>(v));
+        element_type typedVal = uassertStatusOK(coerceFromString<element_type>(v));
 
         // setFromString() API.
         ASSERT_OK(param.setFromString(v, boost::none));
@@ -100,7 +99,7 @@ void doStorageTest(StringData name,
     }
     for (const auto& v : invalid) {
         ASSERT_NOT_OK(param.setFromString(v, boost::none));
-        ASSERT_NOT_OK(idl_server_parameter_detail::coerceFromString<element_type>(v));
+        ASSERT_NOT_OK(coerceFromString<element_type>(v));
     }
 
     // Check onUpdate is invoked.
@@ -118,8 +117,7 @@ void doStorageTest(StringData name,
     // Check failed onUpdate does not block value being set.
     param.setOnUpdate([](const element_type&) { return Status(ErrorCodes::BadValue, "Go away"); });
     for (const auto& v : valid) {
-        auto typedVal =
-            uassertStatusOK(idl_server_parameter_detail::coerceFromString<element_type>(v));
+        auto typedVal = uassertStatusOK(coerceFromString<element_type>(v));
         ASSERT_NOT_OK(param.setFromString(v, boost::none));
         ASSERT_EQ_OR_NAN(param.getValue(boost::none), typedVal);
     }
@@ -178,8 +176,8 @@ TEST(ServerParameterWithStorage, StorageTest) {
 }
 
 TEST(ServerParameterWithStorage, BoundsTest) {
-    using idl_server_parameter_detail::GT;
-    using idl_server_parameter_detail::LT;
+    using idl_server_parameter_bounds::GT;
+    using idl_server_parameter_bounds::LT;
 
     int val;
     IDLServerParameterWithStorage<SPT::kStartupOnly, int> param("BoundsTest", val);

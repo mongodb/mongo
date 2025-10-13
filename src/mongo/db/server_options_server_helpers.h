@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 
@@ -44,7 +45,7 @@ namespace mongo {
  * Constraints in the Environment.  See the "validate" function in the Environment class for
  * more details.
  */
-Status validateServerOptions(const optionenvironment::Environment& params);
+MONGO_MOD_PUB Status validateServerOptions(const optionenvironment::Environment& params);
 
 /**
  * Canonicalize server options for the given environment.
@@ -52,7 +53,7 @@ Status validateServerOptions(const optionenvironment::Environment& params);
  * For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
  * merged into "net.wireObjectCheck".
  */
-Status canonicalizeServerOptions(optionenvironment::Environment* params);
+MONGO_MOD_PUB Status canonicalizeServerOptions(optionenvironment::Environment* params);
 
 /**
  * Sets up the global server state necessary to be able to store the server options, based on how
@@ -61,18 +62,13 @@ Status canonicalizeServerOptions(optionenvironment::Environment* params);
  * For example, saves the current working directory in serverGlobalParams.cwd so that relative paths
  * in server options can be interpreted correctly.
  */
-Status setupServerOptions(const std::vector<std::string>& args);
+MONGO_MOD_PUB Status setupServerOptions(const std::vector<std::string>& args);
 
 /**
  * Store the given parsed params in global server state.
  *
  * For example, sets the serverGlobalParams.port variable based on the net.port config parameter.
  */
-Status storeServerOptions(const optionenvironment::Environment& params);
-
-/**
- * Write to `os`, or to LOGV2 if null.
- */
-void printCommandLineOpts(std::ostream* os);
+MONGO_MOD_PUB Status storeServerOptions(const optionenvironment::Environment& params);
 
 }  // namespace mongo

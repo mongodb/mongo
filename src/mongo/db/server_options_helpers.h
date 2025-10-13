@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/value.h"
@@ -42,11 +43,6 @@
 #include <vector>
 
 namespace mongo {
-
-namespace optionenvironment {
-class OptionSection;
-class Environment;
-}  // namespace optionenvironment
 
 namespace moe = mongo::optionenvironment;
 
