@@ -9,6 +9,8 @@
  * @tags: [
  * requires_fcv_80,
  * requires_getmore,
+ * # TODO SERVER-111930 Support recording query stats for updates with simple ID query
+ * known_query_shape_computation_problem,
  * ]
  */
 

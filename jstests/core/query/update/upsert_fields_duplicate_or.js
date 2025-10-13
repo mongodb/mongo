@@ -1,4 +1,8 @@
-// @tags: [requires_fcv_73]
+// @tags: [
+//   requires_fcv_73,
+//   # TODO SERVER-111930 Support recording query stats for updates with simple ID query
+//   known_query_shape_computation_problem,
+// ]
 
 // Tests to ensure that duplicate fields on the same path in $or conditions are deduplicated.
 // Can be merged back into upsert_fields.js in 8.0 or later once it no longer needs to be excluded
