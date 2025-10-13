@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
@@ -71,7 +72,37 @@ namespace {
 const auto getMaintainerThread =
     ServiceContext::declareDecoration<std::unique_ptr<OplogCapMaintainerThread>>();
 
+// Cumulative number of times the thread has been interrupted
+AtomicWord<int64_t> interruptCount;
+
 MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
+MONGO_FAIL_POINT_DEFINE(hangBeforeOplogSampling);
+
+class OplogTruncateMarkersServerStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    /**
+     * <ServerStatusSection>
+     */
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    /**
+     * <ServerStatusSection>
+     */
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        BSONObjBuilder builder;
+        builder.append("interruptCount", interruptCount.load());
+        return builder.obj();
+    }
+};
+
+auto oplogTruncateMarkersStats =
+    *ServerStatusSectionBuilder<OplogTruncateMarkersServerStatusSection>("oplogTruncationThread")
+         .forShard();
 
 }  // namespace
 
@@ -153,22 +184,9 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             }
             rs->reclaimOplog(opCtx);
         }
-    } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {
-        LOGV2_DEBUG(5929700,
-                    1,
-                    "Caught an InterruptedDueToStorageChange exception, "
-                    "but this thread can safely continue",
-                    "error"_attr = e.toStatus());
-    } catch (const DBException& ex) {
-        if (!opCtx->checkForInterruptNoAssert().isOK()) {
-            LOGV2_DEBUG(9064301,
-                        1,
-                        "Oplog cap maintainer thread was interrupted, but can safely continue",
-                        "error"_attr = ex);
-            return false;
-        }
-
-        LOGV2_FATAL_NOTRACE(6761100, "Error in OplogCapMaintainerThread", "error"_attr = ex);
+    } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+        LOGV2(11212204, "OplogCapMaintainerThread interrupted", "reason"_attr = ex.reason());
+        interruptCount.fetchAndAdd(1);
     } catch (const std::exception& e) {
         LOGV2_FATAL_NOTRACE(22243, "Error in OplogCapMaintainerThread", "error"_attr = e.what());
     } catch (...) {
@@ -216,13 +234,17 @@ void OplogCapMaintainerThread::run() {
                 }
             }
 
-            boost::optional<AutoGetOplogFastPath> oplogRead;
+            if (MONGO_unlikely(hangBeforeOplogSampling.shouldFail())) {
+                LOGV2(11212200, "Hanging due to 'hangBeforeSampling' fail point");
+                hangBeforeOplogSampling.pauseWhileSet(_uniqueCtx->get());
+            }
 
             // Need the oplog to have been created first before we proceed.
             do {
                 // Create the initial set of truncate markers as part of this thread before we
                 // attempt to delete excess markers. Ensure that the oplog has been created as part
                 // of restart before we attempt to create markers.
+                boost::optional<AutoGetOplogFastPath> oplogRead;
                 oplogRead.emplace(_uniqueCtx->get(),
                                   OplogAccessMode::kRead,
                                   Date_t::max(),
@@ -243,16 +265,9 @@ void OplogCapMaintainerThread::run() {
                 sleepFor(Milliseconds(100));
                 LOGV2_DEBUG(10621109, 1, "OplogCapMaintainerThread is active");
             } while (true);
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-            LOGV2_DEBUG(9468100,
-                        1,
-                        "Interrupted due to shutdown. OplogCapMaintainerThread Exiting!",
-                        "error"_attr = e.what());
-            return;
-        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>&) {
-            LOGV2_DEBUG(10167201,
-                        1,
-                        "Interrupted due to storage change. OplogCapMaintainerThread Exiting!");
+        } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+            LOGV2(11212201, "OplogCapMaintainerThread interrupted", "reason"_attr = ex.reason());
+            interruptCount.fetchAndAdd(1);
             return;
         }
     }
@@ -294,7 +309,7 @@ void OplogCapMaintainerThread::run() {
 
 
 void OplogCapMaintainerThread::shutdown(const Status& reason) {
-    LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread");
+    LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread", "reason"_attr = reason);
 
     {
         stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
