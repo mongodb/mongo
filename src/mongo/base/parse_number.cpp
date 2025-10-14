@@ -131,11 +131,10 @@ inline StringData _extractBase(StringData stringValue, int inputBase, int* outpu
     }
 }
 
-inline StatusWith<uint64_t> parseMagnitudeFromStringWithBase(uint64_t base,
-                                                             StringData wholeString,
-                                                             StringData magnitudeStr,
-                                                             const char** end,
-                                                             bool allowTrailingText) {
+StatusWith<uint64_t> _parseMagnitude(StringData magnitudeStr,
+                                     uint64_t base,
+                                     const char** end,
+                                     bool allowTrailingText) {
     uint64_t n = 0;
     size_t charsConsumed = 0;
     for (char digitChar : magnitudeStr) {
@@ -166,13 +165,13 @@ StringData removeLeadingWhitespace(StringData s) {
         s.begin(), std::find_if_not(s.begin(), s.end(), [](char c) { return ctype::isSpace(c); })));
 }
 
-template <typename NumberType>
-Status parseNumberFromStringHelper(StringData s,
-                                   NumberType* result,
-                                   const char** endptr,
-                                   const NumberParser& parser) {
+template <std::integral NumberType>
+Status _parseNumber(StringData s,
+                    NumberType* result,
+                    const char** endptr,
+                    const NumberParser& parser) {
     MONGO_STATIC_ASSERT(sizeof(NumberType) <= sizeof(uint64_t));
-    typedef ::std::numeric_limits<NumberType> limits;
+    using Limits = std::numeric_limits<NumberType>;
 
     if (endptr)
         *endptr = s.data();
@@ -180,44 +179,52 @@ Status parseNumberFromStringHelper(StringData s,
     if (parser._base == 1 || parser._base < 0 || parser._base > 36)
         return Status(ErrorCodes::BadValue, "Invalid parser._base");
 
-    if (parser._skipLeadingWhitespace) {
+    if (parser._skipLeadingWhitespace)
         s = removeLeadingWhitespace(s);
-    }
 
-    // Separate the magnitude from modifiers such as sign and parser._base prefixes such as "0x"
     bool isNegative = false;
-    int base = 0;
-    StringData magnitudeStr = _extractBase(_extractSign(s, &isNegative), parser._base, &base);
-    if (isNegative && !limits::is_signed)
-        return Status(ErrorCodes::FailedToParse, "Negative value");
-    if (magnitudeStr.empty())
-        return Status(ErrorCodes::FailedToParse, "No digits");
+    s = _extractSign(s, &isNegative);
+    if constexpr (!Limits::is_signed)
+        if (isNegative)
+            return Status(ErrorCodes::FailedToParse, "Negative value");
 
-    auto status =
-        parseMagnitudeFromStringWithBase(base, s, magnitudeStr, endptr, parser._allowTrailingText);
+    int base = 0;
+    s = _extractBase(s, parser._base, &base);
+
+    if (s.empty())
+        return Status(ErrorCodes::FailedToParse, "No digits");
+    auto status = _parseMagnitude(s, base, endptr, parser._allowTrailingText);
     if (!status.isOK())
         return status.getStatus();
     uint64_t magnitude = status.getValue();
 
-    // The range of 2's complement integers is from -(max + 1) to +max.
-    const uint64_t maxMagnitude = uint64_t(limits::max()) + (isNegative ? 1u : 0u);
-    if (magnitude > maxMagnitude)
-        return Status(ErrorCodes::Overflow, "Overflow");
+    if constexpr (Limits::is_signed || Limits::digits < 64) {
+        uint64_t max = Limits::max();
+        if constexpr (Limits::is_signed)
+            if (isNegative)
+                max += 1;  // accept range [-(max+1), max]
+        if (magnitude > max)
+            return Status(ErrorCodes::Overflow, "Overflow");
+    }
 
-#pragma warning(push)
-// C4146: unary minus operator applied to unsigned type, result still unsigned
-#pragma warning(disable : 4146)
-    *result = NumberType(isNegative ? -magnitude : magnitude);
-#pragma warning(pop)
-
+    if constexpr (Limits::is_signed)
+        if (isNegative)
+#ifdef _MSC_VER
+#pragma "warning(push)"
+#pragma "warning(disable : 4146)"  // unary minus operator applied to unsigned type
+#endif
+            magnitude = -magnitude;
+#ifdef _MSC_VER
+#pragma "warning(pop)"
+#endif
+    *result = NumberType(magnitude);
     return Status::OK();
 }
 
-template <>
-Status parseNumberFromStringHelper<double>(StringData stringValue,
-                                           double* result,
-                                           const char** endptr,
-                                           const NumberParser& parser) {
+Status _parseNumber(StringData stringValue,
+                    double* result,
+                    const char** endptr,
+                    const NumberParser& parser) {
     if (endptr)
         *endptr = stringValue.data();
     if (parser._base != 0) {
@@ -273,11 +280,10 @@ Status parseNumberFromStringHelper<double>(StringData stringValue,
     return Status::OK();
 }
 
-template <>
-Status parseNumberFromStringHelper<Decimal128>(StringData stringValue,
-                                               Decimal128* result,
-                                               const char** endptr,
-                                               const NumberParser& parser) {
+Status _parseNumber(StringData stringValue,
+                    Decimal128* result,
+                    const char** endptr,
+                    const NumberParser& parser) {
     if (endptr)
         *endptr = stringValue.data();  // same behavior as strtod: if unable to parse, set end to
                                        // be the beginning of input str
@@ -320,8 +326,7 @@ Status parseNumberFromStringHelper<Decimal128>(StringData stringValue,
 
 #define DEFINE_NUMBER_PARSER_OPERATOR(type)                                                      \
     Status NumberParser::operator()(StringData stringValue, type* result, char** endPtr) const { \
-        return parseNumberFromStringHelper(                                                      \
-            stringValue, result, const_cast<const char**>(endPtr), *this);                       \
+        return _parseNumber(stringValue, result, const_cast<const char**>(endPtr), *this);       \
     }
 
 DEFINE_NUMBER_PARSER_OPERATOR(long)
