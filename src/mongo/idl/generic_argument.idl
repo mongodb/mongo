@@ -79,6 +79,9 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "stable"
+
+            # Common across all commands that target a database resource.
+            # Typical commands will require appropriate privileges on the specified database.
             # The IDL compiler injects this directly into command requests, so we ignore it here.
             # $db:
             #     type: database_name
@@ -201,6 +204,8 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Optionally encodes ClientMetadata (see src/mongo/rpc/metadata/client_metadata.h).
+            # These are diagnostic and statistical tags, not meant to have functional effects.
             $client:
                 type: object_owned
                 cpp_name: "dollarClient"
