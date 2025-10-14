@@ -4,3 +4,4 @@ inject ~= 4.3.1
 GitPython ~= 3.1.7
 pydantic ~= 1.8.2
 structlog ~= 19.2.0
+typer ~= 0.9.4

@@ -16,3 +16,16 @@ buildvariants:
       - devprod_coverity
     tasks:
       - name: publish-sast-report
+
+  - name: upload-sbom-if-changed
+    display_name: "Upload SBOM if changed"
+    allowed_requesters: ["commit", "patch"]
+    activate: true
+    paths:
+      - "sbom.json"
+    tags: []
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    tasks:
+      - name: upload_sbom_via_silkbomb_if_changed
