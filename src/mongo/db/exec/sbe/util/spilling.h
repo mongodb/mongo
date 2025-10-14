@@ -111,52 +111,29 @@ public:
     bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out);
 
     auto getCursor(OperationContext* opCtx) {
-        switchToSpilling(opCtx);
-        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
         return _spillTable->getCursor(opCtx);
     }
 
     void resetCursor(OperationContext* opCtx, std::unique_ptr<SpillTable::Cursor>& cursor) {
-        switchToSpilling(opCtx);
-        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
         cursor.reset();
     }
 
     auto saveCursor(OperationContext* opCtx, std::unique_ptr<SpillTable::Cursor>& cursor) {
-        switchToSpilling(opCtx);
-        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
-
         cursor->save();
         cursor->detachFromOperationContext();
     }
 
     auto restoreCursor(OperationContext* opCtx, std::unique_ptr<SpillTable::Cursor>& cursor) {
-        switchToSpilling(opCtx);
-        ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
-
         cursor->reattachToOperationContext(opCtx);
-        return cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
+        return cursor->restore();
     }
 
     int64_t storageSize(OperationContext* opCtx);
 
-    void saveState();
-    void restoreState();
-
     void updateSpillStorageStatsForOperation(OperationContext* opCtx);
 
 private:
-    void switchToSpilling(OperationContext* opCtx);
-    void switchToOriginal(OperationContext* opCtx);
-
     std::unique_ptr<SpillTable> _spillTable;
-
-    std::unique_ptr<RecoveryUnit> _originalUnit;
-    WriteUnitOfWork::RecoveryUnitState _originalState =
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
-
-    std::unique_ptr<RecoveryUnit> _spillingUnit;
-    WriteUnitOfWork::RecoveryUnitState _spillingState;
 
     size_t _counter{0};
 };

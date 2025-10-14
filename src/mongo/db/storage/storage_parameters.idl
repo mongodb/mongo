@@ -295,11 +295,6 @@ feature_flags:
         cpp_varname: feature_flags::gStorageEngineInterruptibility
         default: true
         fcv_gated: false
-    featureFlagCreateSpillKVEngine:
-        description: "When enabled, create a second storage engine instance that is used for creating SpillTables."
-        cpp_varname: feature_flags::gFeatureFlagCreateSpillKVEngine
-        default: true
-        fcv_gated: false
     featureFlagReplicateLocalCatalogIdentifiers:
         description: >-
             Enable replication of local catalog identifiers across replica set nodes, ensuring the

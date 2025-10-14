@@ -453,24 +453,6 @@ void LookupHashTable::reset(bool fromClose) {
     _totalSpilledBytes = 0;
 }
 
-void LookupHashTable::doSaveState() {
-    if (_recordStoreHt) {
-        _recordStoreHt->saveState();
-    }
-    if (_recordStoreBuf) {
-        _recordStoreBuf->saveState();
-    }
-}
-
-void LookupHashTable::doRestoreState() {
-    if (_recordStoreHt) {
-        _recordStoreHt->restoreState();
-    }
-    if (_recordStoreBuf) {
-        _recordStoreBuf->restoreState();
-    }
-}
-
 void LookupHashTable::forceSpill() {
     if (!_memoryHt) {
         LOGV2_DEBUG(9916001, 2, "HashLookupStage has finished its execution");

@@ -125,9 +125,6 @@ protected:
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doDetachFromOperationContext() override;
 
-    void doSaveState() override;
-    void doRestoreState() override;
-
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
         return;
     }

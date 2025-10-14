@@ -136,14 +136,6 @@ void HashLookupUnwindStage::doDetachFromOperationContext() {
     _hashTable.doDetachFromOperationContext();
 }
 
-void HashLookupUnwindStage::doSaveState() {
-    _hashTable.doSaveState();
-}
-
-void HashLookupUnwindStage::doRestoreState() {
-    _hashTable.doRestoreState();
-}
-
 void HashLookupUnwindStage::reset(bool fromClose) {
     _outerKeyOpen = false;
     // Also resets the memory threshold if the knob changes between re-open calls.

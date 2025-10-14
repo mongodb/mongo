@@ -37,13 +37,11 @@ namespace mongo {
 /**
  * Manages the lifetime of a temporary RecordStore. Unless keep() is called, the managed RecordStore
  * will be dropped after destruction.
- *
- * TODO (SERVER-106716): Make this no longer derive from SpillTable.
  */
-class TemporaryRecordStore : public SpillTable {
+class TemporaryRecordStore {
 public:
-    explicit TemporaryRecordStore(std::unique_ptr<RecordStore> rs)
-        : SpillTable(nullptr, std::move(rs)) {}
+    explicit TemporaryRecordStore(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)) {}
+    virtual ~TemporaryRecordStore() {}
 
     // Not copyable.
     TemporaryRecordStore(const TemporaryRecordStore&) = delete;
@@ -66,6 +64,7 @@ public:
     }
 
 protected:
+    std::unique_ptr<RecordStore> _rs;
     bool _keep = false;
 };
 }  // namespace mongo

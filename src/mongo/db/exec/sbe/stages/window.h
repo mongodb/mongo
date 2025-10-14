@@ -108,9 +108,6 @@ public:
 
 
 protected:
-    void doSaveState() override;
-    void doRestoreState() override;
-
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
         return;
     }

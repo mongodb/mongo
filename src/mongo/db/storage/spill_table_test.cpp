@@ -51,7 +51,6 @@ class SpillTableTest : public StorageEngineTest {
 protected:
     SpillTableTest()
         : StorageEngineTest(StorageEngineTest::Options{}
-                                .setParameter("featureFlagCreateSpillKVEngine", true)
                                 .setParameter("spillWiredTigerCacheSizeMinMB", kCacheSizeMB)
                                 .setParameter("spillWiredTigerCacheSizeMaxMB", kCacheSizeMB)) {}
 };

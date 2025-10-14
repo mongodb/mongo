@@ -116,17 +116,6 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
                                          participateInTrialRunTracking());
 }
 
-void WindowStage::doSaveState() {
-    if (_recordStore) {
-        _recordStore->saveState();
-    }
-}
-void WindowStage::doRestoreState() {
-    if (_recordStore) {
-        _recordStore->restoreState();
-    }
-}
-
 size_t WindowStage::getLastRowId() {
     return _lastRowId;
 }
@@ -162,12 +151,6 @@ void WindowStage::spill() {
             "Exceeded memory limit for $setWindowFields, but didn't allow external spilling;"
             " pass allowDiskUse:true to opt in",
             _allowDiskUse);
-
-    // Ensure there is sufficient disk space for spilling
-    if (!feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
-        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
-    }
 
     // Create spilled record storage if not created.
     if (!_recordStore) {

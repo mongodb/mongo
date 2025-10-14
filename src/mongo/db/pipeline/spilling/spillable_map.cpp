@@ -83,11 +83,6 @@ void SpillableDocumentMapImpl::spillToDisk() {
         return;
     }
 
-    if (!feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
-        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
-    }
-
     if (_diskMap == nullptr) {
         initDiskMap();
     }
@@ -101,12 +96,10 @@ void SpillableDocumentMapImpl::spillToDisk() {
     writer.flush();
     _diskMapSize += writer.writtenRecords();
 
-    _stats.updateSpillingStats(
-        1,
-        writer.writtenBytes(),
-        writer.writtenRecords(),
-        static_cast<uint64_t>(_diskMap->storageSize(
-            *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+    _stats.updateSpillingStats(1,
+                               writer.writtenBytes(),
+                               writer.writtenRecords(),
+                               static_cast<uint64_t>(_diskMap->storageSize()));
     CurOp::get(_expCtx->getOperationContext())
         ->updateSpillStorageStats(_diskMap->computeOperationStatisticsSinceLastCall());
 }
@@ -129,8 +122,7 @@ RecordId SpillableDocumentMapImpl::computeKey(const Value& id) const {
 }
 
 void SpillableDocumentMapImpl::updateStorageSizeStat() {
-    _stats.updateSpilledDataStorageSize(_diskMap->storageSize(
-        *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
+    _stats.updateSpilledDataStorageSize(_diskMap->storageSize());
 }
 
 template <bool IsConst>
@@ -263,8 +255,7 @@ auto SpillableDocumentMapImpl::IteratorImpl<IsConst>::getCurrentDocument() -> re
 template <bool IsConst>
 void SpillableDocumentMapImpl::IteratorImpl<IsConst>::restoreDiskIt() {
     _diskIt->reattachToOperationContext(_map->_expCtx->getOperationContext());
-    bool restoreResult = _diskIt->restore(
-        *shard_role_details::getRecoveryUnit(_map->_expCtx->getOperationContext()));
+    bool restoreResult = _diskIt->restore();
     tassert(2398004, "Unable to restore disk cursor", restoreResult);
 }
 

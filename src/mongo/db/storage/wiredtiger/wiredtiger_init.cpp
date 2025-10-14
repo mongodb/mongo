@@ -165,31 +165,26 @@ public:
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
-        std::unique_ptr<SpillWiredTigerKVEngine> spillWiredTigerKVEngine;
-        if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
-            boost::system::error_code ec;
-            boost::filesystem::remove_all(params.getSpillDbPath(), ec);
-            if (ec) {
-                LOGV2_WARNING(10380300,
-                              "Failed to clear dbpath of the internal WiredTiger instance",
-                              "error"_attr = ec.message());
-            }
-
-            WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
-                getSpillWiredTigerConfigFromStartupOptions();
-            spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
-                std::string{getCanonicalName()},
-                params.getSpillDbPath().string(),
-                &opCtx->fastClockSource(),
-                std::move(wtConfig),
-                SpillWiredTigerExtensions::get(opCtx->getServiceContext()));
-
-            std::call_once(spillWiredTigerServerStatusSectionFlag, [] {
-                *ServerStatusSectionBuilder<SpillWiredTigerServerStatusSection>(
-                     std::string{SpillWiredTigerServerStatusSection::kServerStatusSectionName})
-                     .forShard();
-            });
+        boost::system::error_code ec;
+        boost::filesystem::remove_all(params.getSpillDbPath(), ec);
+        if (ec) {
+            LOGV2_WARNING(10380300,
+                          "Failed to clear dbpath of the internal WiredTiger instance",
+                          "error"_attr = ec.message());
         }
+
+        auto spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
+            std::string{getCanonicalName()},
+            params.getSpillDbPath().string(),
+            &opCtx->fastClockSource(),
+            getSpillWiredTigerConfigFromStartupOptions(),
+            SpillWiredTigerExtensions::get(opCtx->getServiceContext()));
+
+        std::call_once(spillWiredTigerServerStatusSectionFlag, [] {
+            *ServerStatusSectionBuilder<SpillWiredTigerServerStatusSection>(
+                 std::string{SpillWiredTigerServerStatusSection::kServerStatusSectionName})
+                 .forShard();
+        });
 
         // We're using the WT engine; register the ServerStatusSection for it.
         // Only do so once; even if we re-create the StorageEngine for FCBIS. The section is

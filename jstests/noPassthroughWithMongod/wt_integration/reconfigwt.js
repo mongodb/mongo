@@ -3,7 +3,6 @@
 // Start our own instance of mongod so that are settings tests
 // do not cause issues for other tests
 //
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let ss = db.serverStatus();
 
@@ -26,9 +25,14 @@ if (ss.storageEngine.name !== "wiredTiger") {
         // http://source.wiredtiger.com/develop/struct_w_t___c_o_n_n_e_c_t_i_o_n.html#a579141678af06217b22869cbc604c6d4
         assert.commandWorked(reconfigure("eviction_target=81"));
         assert.eq("eviction_target=81", admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
+        assert.commandWorked(reconfigure("eviction_dirty_target=19"));
+        assert.eq("eviction_dirty_target=19", admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
+        assert.commandWorked(reconfigure("eviction_dirty_trigger=20"));
+        assert.eq("eviction_dirty_trigger=20", admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
+        assert.commandWorked(reconfigure("eviction_updates_trigger=0"));
+        assert.eq("eviction_updates_trigger=0", admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
         assert.commandWorked(reconfigure("cache_size=81M"));
         assert.eq("cache_size=81M", admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
-        assert.commandWorked(reconfigure("eviction_dirty_target=19")); // must be lower than eviction_dirty_trigger (default 20)
         assert.commandWorked(reconfigure("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)"));
 
         // Negative tests - bad input to mongod
@@ -44,10 +48,7 @@ if (ss.storageEngine.name !== "wiredTiger") {
     }
 
     runTestForParam("wiredTigerEngineRuntimeConfig");
-    // TODO (SERVER-106716): Remove the feature flag check.
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "FeatureFlagCreateSpillKVEngine")) {
-        runTestForParam("spillWiredTigerEngineRuntimeConfig");
-    }
+    runTestForParam("spillWiredTigerEngineRuntimeConfig");
 
     MongoRunner.stopMongod(conn);
 }

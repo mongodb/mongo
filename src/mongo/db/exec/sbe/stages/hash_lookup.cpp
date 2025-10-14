@@ -159,14 +159,6 @@ void HashLookupStage::doDetachFromOperationContext() {
     _hashTable.doDetachFromOperationContext();
 }
 
-void HashLookupStage::doSaveState() {
-    _hashTable.doSaveState();
-}
-
-void HashLookupStage::doRestoreState() {
-    _hashTable.doRestoreState();
-}
-
 void HashLookupStage::reset(bool fromClose) {
     // Also resets the memory threshold if the knob changes between re-open calls.
     _hashTable.reset(fromClose);

@@ -412,10 +412,6 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
 
 class StorageEngineReconcileTest : public StorageEngineTest {
 protected:
-    StorageEngineReconcileTest()
-        : StorageEngineTest(
-              StorageEngineTest::Options{}.setParameter("featureFlagCreateSpillKVEngine", true)) {}
-
     UUID collectionUUID = UUID::gen();
     UUID buildUUID = UUID::gen();
     std::string resumableIndexFileName = "foo";

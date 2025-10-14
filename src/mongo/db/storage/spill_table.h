@@ -54,7 +54,7 @@ class SpillTable {
 public:
     class Cursor {
     public:
-        Cursor(RecoveryUnit* ru, std::unique_ptr<SeekableRecordCursor> cursor);
+        Cursor(RecoveryUnit& ru, std::unique_ptr<SeekableRecordCursor> cursor);
 
         boost::optional<Record> seekExact(const RecordId& id);
 
@@ -66,19 +66,12 @@ public:
 
         void save();
 
-        bool restore(RecoveryUnit& ru);
+        bool restore();
 
     private:
-        RecoveryUnit* _ru;  // TODO (SERVER-106716): Make this a reference.
+        RecoveryUnit& _ru;
         std::unique_ptr<SeekableRecordCursor> _cursor;
     };
-
-    /**
-     * Creates a spill table using the given recovery unit and record store.
-     *
-     * TODO (SERVER-106716): Remove this constructor.
-     */
-    SpillTable(std::unique_ptr<RecoveryUnit> ru, std::unique_ptr<RecordStore> rs);
 
     /**
      * Creates a spill table using the given recovery unit and record store. If the available disk
@@ -107,16 +100,12 @@ public:
 
     /**
      * Returns the storage size on disk of the spill table.
-     *
-     * TODO (SERVER-106716): Remove the RecoveryUnit parameter.
      */
-    int64_t storageSize(RecoveryUnit& ru) const;
+    int64_t storageSize() const;
 
     /**
      * Inserts the specified records into the underlying RecordStore by copying the provided record
-     * data.
-     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
-     * WriteUnitOfWork.
+     * data. This should not be explicitly called in a WriteUnitOfWork.
      */
     Status insertRecords(OperationContext* opCtx, std::vector<Record>* records);
 
@@ -130,16 +119,12 @@ public:
 
     /**
      * Updates the record with id 'rid', replacing its contents with those described by
-     * 'data' and 'len'.
-     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
-     * WriteUnitOfWork.
+     * 'data' and 'len'. This should not be explicitly called in a WriteUnitOfWork.
      */
     Status updateRecord(OperationContext* opCtx, const RecordId& rid, const char* data, int len);
 
     /**
-     * Deletes the record with id 'rid'.
-     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
-     * WriteUnitOfWork.
+     * Deletes the record with id 'rid'. This should not be explicitly called in a WriteUnitOfWork.
      */
     void deleteRecord(OperationContext* opCtx, const RecordId& rid);
 
@@ -152,9 +137,7 @@ public:
     std::unique_ptr<Cursor> getCursor(OperationContext*, bool forward = true) const;
 
     /**
-     * Removes all records.
-     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
-     * WriteUnitOfWork.
+     * Removes all records. This should not be explicitly called in a WriteUnitOfWork.
      */
     Status truncate(OperationContext* opCtx);
 
@@ -162,9 +145,7 @@ public:
      * Removes all records in the range [minRecordId, maxRecordId] inclusive of both. The hint*
      * arguments serve as a hint to the record store of how much data will be truncated. This is
      * necessary to avoid reading the data between the two RecordIds in order to update numRecords
-     * and dataSize correctly.
-     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
-     * WriteUnitOfWork.
+     * and dataSize correctly. This should not be explicitly called in a WriteUnitOfWork.
      */
     Status rangeTruncate(OperationContext* opCtx,
                          const RecordId& minRecordId = RecordId(),
@@ -177,7 +158,7 @@ public:
 protected:
     std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;
-    StorageEngine* _storageEngine{nullptr};  // TODO (SERVER-106716): Make this a reference.
+    StorageEngine& _storageEngine;
 
 private:
     Status _checkDiskSpace() const;

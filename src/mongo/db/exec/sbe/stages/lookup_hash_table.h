@@ -189,9 +189,6 @@ public:
      */
     size_t bufferValueOrSpill(value::MaterializedRow& value);
 
-    void doSaveState();
-    void doRestoreState();
-
     void forceSpill();
 
     const HashLookupStats* getHashLookupStats() const {

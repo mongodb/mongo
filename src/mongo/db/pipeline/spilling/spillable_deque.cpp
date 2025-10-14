@@ -143,19 +143,16 @@ void SpillableDeque::spillToDisk() {
     // Write final batch.
     writer.flush();
 
-    _stats.updateSpillingStats(
-        1,
-        writer.writtenBytes(),
-        writer.writtenRecords(),
-        static_cast<uint64_t>(_diskCache->storageSize(
-            *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+    _stats.updateSpillingStats(1,
+                               writer.writtenBytes(),
+                               writer.writtenRecords(),
+                               static_cast<uint64_t>(_diskCache->storageSize()));
     CurOp::get(_expCtx->getOperationContext())
         ->updateSpillStorageStats(_diskCache->computeOperationStatisticsSinceLastCall());
 }
 
 void SpillableDeque::updateStorageSizeStat() {
-    _stats.updateSpilledDataStorageSize(_diskCache->storageSize(
-        *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
+    _stats.updateSpilledDataStorageSize(_diskCache->storageSize());
 }
 
 Document SpillableDeque::readDocumentFromDiskById(int desired) {

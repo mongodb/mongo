@@ -44,7 +44,7 @@
 
 namespace mongo {
 
-SpillTable::Cursor::Cursor(RecoveryUnit* ru, std::unique_ptr<SeekableRecordCursor> cursor)
+SpillTable::Cursor::Cursor(RecoveryUnit& ru, std::unique_ptr<SeekableRecordCursor> cursor)
     : _ru(ru), _cursor(std::move(cursor)) {}
 
 boost::optional<Record> SpillTable::Cursor::seekExact(const RecordId& id) {
@@ -57,15 +57,11 @@ boost::optional<Record> SpillTable::Cursor::next() {
 
 void SpillTable::Cursor::detachFromOperationContext() {
     _cursor->detachFromOperationContext();
-    if (_ru) {
-        _ru->setOperationContext(nullptr);
-    }
+    _ru.setOperationContext(nullptr);
 }
 
 void SpillTable::Cursor::reattachToOperationContext(OperationContext* opCtx) {
-    if (_ru) {
-        _ru->setOperationContext(opCtx);
-    }
+    _ru.setOperationContext(opCtx);
     _cursor->reattachToOperationContext(opCtx);
 }
 
@@ -73,8 +69,8 @@ void SpillTable::Cursor::save() {
     _cursor->save();
 }
 
-bool SpillTable::Cursor::restore(RecoveryUnit& ru) {
-    return _cursor->restore(_ru ? *_ru : ru);
+bool SpillTable::Cursor::restore() {
+    return _cursor->restore(_ru);
 }
 
 SpillTable::DiskState::DiskState(DiskSpaceMonitor& monitor, int64_t thresholdBytes)
@@ -100,9 +96,6 @@ bool SpillTable::DiskState::full() const {
     return _full.load();
 }
 
-SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru, std::unique_ptr<RecordStore> rs)
-    : _ru(std::move(ru)), _rs(std::move(rs)), _storageEngine(nullptr) {}
-
 SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru,
                        std::unique_ptr<RecordStore> rs,
                        StorageEngine& storageEngine,
@@ -110,7 +103,7 @@ SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru,
                        int64_t thresholdBytes)
     : _ru(std::move(ru)),
       _rs(std::move(rs)),
-      _storageEngine(&storageEngine),
+      _storageEngine(storageEngine),
       _diskState(boost::in_place_init, diskMonitor, thresholdBytes) {
     // Abandon the snapshot right away in case the recovery unit was given to us with a snapshot
     // already open from creating the table.
@@ -118,10 +111,6 @@ SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru,
 }
 
 SpillTable::~SpillTable() {
-    if (!_storageEngine) {
-        return;
-    }
-
     // As an optimization, truncate the table before dropping it so that the checkpoint taken at
     // shutdown never has to do the work to write the data to disk.
     try {
@@ -136,7 +125,7 @@ SpillTable::~SpillTable() {
               "error"_attr = exceptionToStatus());
     }
 
-    _storageEngine->dropSpillTable(*_ru, ident());
+    _storageEngine.dropSpillTable(*_ru, ident());
 }
 
 StringData SpillTable::ident() const {
@@ -151,12 +140,7 @@ long long SpillTable::numRecords() const {
     return _rs->numRecords();
 }
 
-int64_t SpillTable::storageSize(RecoveryUnit& ru) const {
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        return _rs->storageSize(ru);
-    }
-
+int64_t SpillTable::storageSize() const {
     _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
     return _rs->storageSize(*_ru);
 }
@@ -164,13 +148,6 @@ int64_t SpillTable::storageSize(RecoveryUnit& ru) const {
 Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* records) {
     if (auto status = _checkDiskSpace(); !status.isOK()) {
         return status;
-    }
-
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        std::vector<Timestamp> timestamps(records->size());
-        return _rs->insertRecords(
-            opCtx, *shard_role_details::getRecoveryUnit(opCtx), records, timestamps);
     }
 
     _ru->setOperationContext(opCtx);
@@ -233,11 +210,6 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
 }
 
 bool SpillTable::findRecord(OperationContext* opCtx, const RecordId& rid, RecordData* out) const {
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        return _rs->findRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), rid, out);
-    }
-
     _ru->setOperationContext(opCtx);
     _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
     ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
@@ -251,12 +223,6 @@ Status SpillTable::updateRecord(OperationContext* opCtx,
                                 int len) {
     if (auto status = _checkDiskSpace(); !status.isOK()) {
         return status;
-    }
-
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        return _rs->updateRecord(
-            opCtx, *shard_role_details::getRecoveryUnit(opCtx), rid, data, len);
     }
 
     _ru->setOperationContext(opCtx);
@@ -281,12 +247,6 @@ Status SpillTable::updateRecord(OperationContext* opCtx,
 void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
     uassertStatusOK(_checkDiskSpace());
 
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        _rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), rid);
-        return;
-    }
-
     _ru->setOperationContext(opCtx);
     _ru->setIsolation(RecoveryUnit::Isolation::snapshot);
     ON_BLOCK_EXIT([this] {
@@ -303,26 +263,15 @@ void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
 
 std::unique_ptr<SpillTable::Cursor> SpillTable::getCursor(OperationContext* opCtx,
                                                           bool forward) const {
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        return std::make_unique<SpillTable::Cursor>(
-            _ru.get(), _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward));
-    }
-
     _ru->setOperationContext(opCtx);
     _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
 
-    return std::make_unique<SpillTable::Cursor>(_ru.get(), _rs->getCursor(opCtx, *_ru, forward));
+    return std::make_unique<SpillTable::Cursor>(*_ru, _rs->getCursor(opCtx, *_ru, forward));
 }
 
 Status SpillTable::truncate(OperationContext* opCtx) {
     if (auto status = _checkDiskSpace(); !status.isOK()) {
         return status;
-    }
-
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        return _rs->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
 
     _ru->setOperationContext(opCtx);
@@ -352,16 +301,6 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
         return status;
     }
 
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        return _rs->rangeTruncate(opCtx,
-                                  *shard_role_details::getRecoveryUnit(opCtx),
-                                  minRecordId,
-                                  maxRecordId,
-                                  hintDataSizeIncrement,
-                                  hintNumRecordsIncrement);
-    }
-
     _ru->setOperationContext(opCtx);
     _ru->setIsolation(RecoveryUnit::Isolation::snapshot);
     ON_BLOCK_EXIT([this] {
@@ -387,10 +326,6 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
 }
 
 std::unique_ptr<StorageStats> SpillTable::computeOperationStatisticsSinceLastCall() {
-    // TODO (SERVER-106716): Remove this case.
-    if (!_ru) {
-        return nullptr;
-    }
     return _ru->computeOperationStatisticsSinceLastCall();
 }
 
