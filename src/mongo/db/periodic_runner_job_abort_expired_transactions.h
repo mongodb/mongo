@@ -32,6 +32,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <memory>
@@ -46,7 +47,7 @@ namespace mongo {
  * The job will run every (transactionLifetimeLimitSeconds/2) seconds, or at most once per second
  * and at least once per minute.
  */
-class PeriodicThreadToAbortExpiredTransactions {
+class MONGO_MOD_PUB PeriodicThreadToAbortExpiredTransactions {
 public:
     static PeriodicThreadToAbortExpiredTransactions& get(ServiceContext* serviceContext);
 

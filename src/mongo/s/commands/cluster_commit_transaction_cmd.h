@@ -33,6 +33,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

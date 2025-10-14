@@ -30,6 +30,7 @@
 
 global:
     cpp_namespace: "mongo::feature_flags"
+    mod_visibility: pub
 
 imports:
     - "mongo/db/basic_types.idl"

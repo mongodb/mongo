@@ -33,6 +33,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -52,12 +53,12 @@ namespace mongo {
  * isReplSetMemberOrMongos needs to be true if the command contains a transaction number, otherwise
  * this function will throw.
  */
-OperationSessionInfoFromClient initializeOperationSessionInfo(
-    OperationContext* opCtx,
-    const boost::optional<TenantId>& validatedTenantId,
-    const OperationSessionInfoFromClientBase& osi,
-    bool requiresAuth,
-    bool attachToOpCtx,
-    bool isReplSetMemberOrMongos);
+MONGO_MOD_PUB OperationSessionInfoFromClient
+initializeOperationSessionInfo(OperationContext* opCtx,
+                               const boost::optional<TenantId>& validatedTenantId,
+                               const OperationSessionInfoFromClientBase& osi,
+                               bool requiresAuth,
+                               bool attachToOpCtx,
+                               bool isReplSetMemberOrMongos);
 
 }  // namespace mongo

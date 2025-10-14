@@ -31,9 +31,10 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class SessionsCollection;
 
@@ -78,4 +79,4 @@ private:
     OperationContextSession _operationContextSession;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

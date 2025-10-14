@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: pub
 
 server_parameters:
     logicalSessionRefreshMillis:

@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -46,7 +47,7 @@ namespace mongo {
  * local error versus a remote error, which is important for transaction machinery to correctly
  * handle the error.
  */
-class TransactionParticipantFailedUnyieldInfo final : public ErrorExtraInfo {
+class MONGO_MOD_PUB TransactionParticipantFailedUnyieldInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TransactionParticipantFailedUnyield;
     static constexpr StringData kOriginalErrorFieldName = "originalError"_sd;

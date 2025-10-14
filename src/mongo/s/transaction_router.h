@@ -51,6 +51,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
@@ -69,7 +70,7 @@ namespace mongo {
 /**
  * Keeps track of the transaction state. A session is in use when it is being used by a request.
  */
-class TransactionRouter {
+class MONGO_MOD_PUB TransactionRouter {
     struct PrivateState;
     struct ObservableState;
 
@@ -104,7 +105,7 @@ public:
      * cannot be changed without restarting the transactions that may have already been begun on
      * every participant, i.e. clearing the current participant list.
      */
-    struct SharedTransactionOptions {
+    struct MONGO_MOD_PRIVATE SharedTransactionOptions {
         // Set for all distributed transactions.
         TxnNumberAndRetryCounter txnNumberAndRetryCounter;
         APIParameters apiParameters;
@@ -168,7 +169,7 @@ public:
 
     // Container for timing stats for the current transaction. Includes helpers for calculating some
     // metrics like transaction duration.
-    struct TimingStats {
+    struct MONGO_MOD_PRIVATE TimingStats {
         /**
          * Returns the duration of the transaction. The transaction start time must have been set
          * before this can be called.

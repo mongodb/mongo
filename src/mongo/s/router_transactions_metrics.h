@@ -37,6 +37,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <map>
@@ -101,7 +102,8 @@ public:
     std::int64_t getTotalRequestsTargeted() const;
     void incrementTotalRequestsTargeted();
 
-    const CommitStats& getCommitTypeStats_forTest(TransactionRouter::CommitType commitType) const;
+    MONGO_MOD_PRIVATE const CommitStats& getCommitTypeStats_forTest(
+        TransactionRouter::CommitType commitType) const;
     void incrementCommitInitiated(TransactionRouter::CommitType commitType);
     void incrementCommitSuccessful(TransactionRouter::CommitType commitType,
                                    Microseconds durationMicros);

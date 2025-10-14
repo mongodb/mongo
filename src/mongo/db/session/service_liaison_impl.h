@@ -37,6 +37,7 @@
 #include "mongo/db/session/session_killer.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
@@ -59,7 +60,7 @@ namespace mongo {
  * periodic runner for this mongos. The time will be returned from the
  * system clock.
  */
-class ServiceLiaisonImpl : public ServiceLiaison {
+class MONGO_MOD_PUB ServiceLiaisonImpl : public ServiceLiaison {
 public:
     using GetOpenCursorsFn = unique_function<LogicalSessionIdSet(OperationContext*)>;
 

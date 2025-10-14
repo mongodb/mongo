@@ -31,6 +31,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/transport/client_transport_observer.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -38,7 +39,8 @@ namespace mongo {
  * Cleans up open cursors and in-progress transactions upon disconnect for clients that
  * are considered bound to the operation state.
  */
-class ClientTransportObserverMongos final : public transport::ClientTransportObserver {
+class MONGO_MOD_PUB ClientTransportObserverMongos final
+    : public transport::ClientTransportObserver {
     void onClientDisconnect(Client* client) final;
 };
 

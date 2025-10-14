@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <string>
@@ -49,7 +50,7 @@ inline StringMap<std::string> clusterCommandTranslations = {
     {"insert", "clusterInsert"},
     {"update", "clusterUpdate"}};
 
-inline BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
+MONGO_MOD_PUB inline BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
     auto cmdName = cmdObj.firstElement().fieldNameStringData();
     auto newNameIt = clusterCommandTranslations.find(cmdName);
     uassert(6349501,

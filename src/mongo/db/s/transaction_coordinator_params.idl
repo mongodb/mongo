@@ -27,6 +27,7 @@
 
 global:
     cpp_namespace: mongo
+    mod_visibility: private
 
 server_parameters:
     coordinateCommitReturnImmediatelyAfterPersistingDecision:

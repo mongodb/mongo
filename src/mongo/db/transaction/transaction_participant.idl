@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: pub
     cpp_includes:
         - "mongo/db/transaction/transaction_participant.h"
 

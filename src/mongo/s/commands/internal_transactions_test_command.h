@@ -38,6 +38,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

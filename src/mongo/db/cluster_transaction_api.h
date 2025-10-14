@@ -37,13 +37,14 @@
 #include "mongo/rpc/message.h"
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::txn_api::details {
 
 /**
  * Behaviors for running cluster commands from a non-router process, ie mongod.
  */
-class ClusterSEPTransactionClientBehaviors : public SEPTransactionClientBehaviors {
+class MONGO_MOD_PUB ClusterSEPTransactionClientBehaviors : public SEPTransactionClientBehaviors {
 public:
     ClusterSEPTransactionClientBehaviors(ServiceContext* service) {}
 

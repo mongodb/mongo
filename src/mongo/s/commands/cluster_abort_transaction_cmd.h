@@ -34,6 +34,7 @@
 #include "mongo/db/transaction_validation.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
