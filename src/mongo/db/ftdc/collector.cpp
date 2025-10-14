@@ -64,7 +64,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
-
 namespace {
 
 auto getCurrentDate(OperationContext* opCtx) {
@@ -73,7 +72,8 @@ auto getCurrentDate(OperationContext* opCtx) {
 
 }  // namespace
 
-std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
+std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
+    Client* client, std::vector<std::pair<std::string, int>>& sectionSizes) {
     BSONObjBuilder builder;
     // If there are no collectors, just return an empty BSONObj so that that are caller knows we did
     // not collect anything
@@ -97,7 +97,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     // aggregation which are AllowedOnSecondary::kOptIn.
     ReadPreferenceSetting::get(opCtx.get()) = ReadPreferenceSetting{ReadPreference::Nearest};
 
-    _collect(opCtx.get(), &builder);
+    _collect(opCtx.get(), &builder, sectionSizes);
 
     const auto endDate = getCurrentDate(opCtx.get());
     builder.appendDate(kFTDCCollectEndField, endDate);
@@ -246,7 +246,10 @@ void AsyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> c
     _collectors.push_back(std::move(collector));
 }
 
-void AsyncFTDCCollectorCollection::_collect(OperationContext* opCtx, BSONObjBuilder* builder) {
+void AsyncFTDCCollectorCollection::_collect(
+    OperationContext* opCtx,
+    BSONObjBuilder* builder,
+    std::vector<std::pair<std::string, int>>& sectionSizes) {
     _collectorCache->refresh(opCtx, builder);
 }
 
@@ -255,7 +258,9 @@ void SyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> co
     _collectors.emplace_back(std::move(collector));
 }
 
-void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx, BSONObjBuilder* builder) {
+void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
+                                           BSONObjBuilder* builder,
+                                           std::vector<std::pair<std::string, int>>& sectionSizes) {
     for (auto& collector : _collectors) {
         // Skip collection if this collector has no data to return
         if (!collector->hasData()) {
@@ -264,17 +269,19 @@ void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx, BSONObjBuild
 
         try {
             BSONObjBuilder subObjBuilder(builder->subobjStart(collector->name()));
-
             // Add a Date_t before and after each BSON is collected so that we can track timing of
             // the collector.
             subObjBuilder.appendDate(kFTDCCollectStartField, getCurrentDate(opCtx));
             collector->collect(opCtx, subObjBuilder);
             subObjBuilder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx));
+            sectionSizes.emplace_back(collector->name(), subObjBuilder.len());
         } catch (...) {
             LOGV2_ERROR(9761500,
                         "Collector threw an error",
                         "error"_attr = exceptionToStatus(),
-                        "collector"_attr = collector->name());
+                        "collector"_attr = collector->name(),
+                        "size"_attr = builder->len());
+            sectionSizes.emplace_back(collector->name(), builder->len());
             throw;
         }
 

@@ -157,13 +157,16 @@ public:
      *    "end" : Date_t,      <- Time at which all collecting ended
      * }
      */
-    std::tuple<BSONObj, Date_t> collect(Client* client);
+    std::tuple<BSONObj, Date_t> collect(Client* client,
+                                        std::vector<std::pair<std::string, int>>& sectionSizes);
 
 protected:
     FTDCCollectorCollection() = default;
 
 private:
-    virtual void _collect(OperationContext* opCtx, BSONObjBuilder* builder) = 0;
+    virtual void _collect(OperationContext* opCtx,
+                          BSONObjBuilder* builder,
+                          std::vector<std::pair<std::string, int>>& sectionSizes) = 0;
 };
 
 class SampleCollectorCache {
@@ -256,7 +259,9 @@ public:
     }
 
 private:
-    void _collect(OperationContext* opCtx, BSONObjBuilder* builder) override;
+    void _collect(OperationContext* opCtx,
+                  BSONObjBuilder* builder,
+                  std::vector<std::pair<std::string, int>>& sectionsSize) override;
 
     std::vector<std::unique_ptr<FTDCCollectorInterface>> _collectors;
 
@@ -278,7 +283,9 @@ public:
     }
 
 private:
-    void _collect(OperationContext* opCtx, BSONObjBuilder* builder) override;
+    void _collect(OperationContext* opCtx,
+                  BSONObjBuilder* builder,
+                  std::vector<std::pair<std::string, int>>& sectionsSize) override;
 
 private:
     // collection of collectors
