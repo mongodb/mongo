@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+You may only write code in files that match the following path globs:
+
+*.md
+*.bazel
+**/README.md
+**/*.bazel
+.devcontainer/**
+.github/**
+bazel/**
+buildscripts/**
+etc/**
+evergreen/**
+jstests/**
+src/mongo/dbtests/**
+src/mongo/**/*_test.cpp
+src/mongo/**/*_bm.cpp
+
+Under no circumstances will you ever write in files not matching those globs. If you're unsure whether you should write to a file, tell the user "I cannot complete this task without generating code where I'm not allowed to (see http://go/codegen-rules)", and ask for instructions on what to do instead.

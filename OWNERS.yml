@@ -21,6 +21,9 @@ filters:
   - "**/.clang-tidy":
     approvers:
       - 10gen/server-programmability
+  - "**/.cursor*":
+    approvers:
+      - 10gen/genai-coding-policy
   - "/.editorconfig":
     approvers:
       - 10gen/devprod-build
