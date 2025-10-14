@@ -39,6 +39,7 @@
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
+#include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -50,7 +51,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace mongo::extension::sdk {
 
 namespace {
 
@@ -71,7 +72,6 @@ const extension::host_connector::AggStageParseNodeHandle& asParse(const Variant&
     return std::get<extension::host_connector::AggStageParseNodeHandle>(v);
 }
 
-static constexpr std::string_view kNoOpName = "$noOp";
 static constexpr std::string_view kDesugarToEmptyName = "$desugarToEmpty";
 static constexpr std::string_view kCountingName = "$counting";
 static constexpr std::string_view kNestedDesugaringName = "$nestedDesugaring";
@@ -90,75 +90,15 @@ public:
     }
 };
 
-class NoOpLogicalAggStage : public extension::sdk::LogicalAggStage {
+class DesugarToEmptyParseNode : public sdk::AggStageParseNode {
 public:
-    NoOpLogicalAggStage() {}
-};
-
-class NoOpAstNode : public extension::sdk::AggStageAstNode {
-public:
-    NoOpAstNode() : extension::sdk::AggStageAstNode(kNoOpName) {}
-
-    std::unique_ptr<extension::sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<NoOpLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<extension::sdk::AggStageAstNode> make() {
-        return std::make_unique<NoOpAstNode>();
-    }
-};
-
-class NoOpParseNode : public extension::sdk::AggStageParseNode {
-public:
-    NoOpParseNode() : extension::sdk::AggStageParseNode(kNoOpName) {}
-
-    static constexpr size_t kExpansionSize = 1;
-
-    size_t getExpandedSize() const override {
-        return kExpansionSize;
-    }
-
-    std::vector<extension::sdk::VariantNode> expand() const override {
-        std::vector<extension::sdk::VariantNode> expanded;
-        expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(NoOpAstNode::make()));
-        return expanded;
-    }
-
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
-        return std::make_unique<NoOpParseNode>();
-    }
-};
-
-class NoOpStageDescriptor : public extension::sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(kNoOpName);
-
-    NoOpStageDescriptor()
-        : extension::sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kDesugar) {}
-
-    std::unique_ptr<extension::sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
-        return std::make_unique<NoOpParseNode>();
-    }
-
-    static inline std::unique_ptr<extension::sdk::AggStageDescriptor> make() {
-        return std::make_unique<NoOpStageDescriptor>();
-    }
-};
-
-class DesugarToEmptyParseNode : public extension::sdk::AggStageParseNode {
-public:
-    DesugarToEmptyParseNode() : extension::sdk::AggStageParseNode(kDesugarToEmptyName) {}
+    DesugarToEmptyParseNode() : sdk::AggStageParseNode(kDesugarToEmptyName) {}
 
     size_t getExpandedSize() const override {
         return 0;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
+    std::vector<sdk::VariantNode> expand() const override {
         return {};
     }
 
@@ -166,16 +106,16 @@ public:
         return BSONObj();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<DesugarToEmptyParseNode>();
     }
 };
 
-class CountingAst final : public extension::sdk::AggStageAstNode {
+class CountingAst final : public sdk::AggStageAstNode {
 public:
     static int alive;
 
-    CountingAst() : extension::sdk::AggStageAstNode(kCountingName) {
+    CountingAst() : sdk::AggStageAstNode(kCountingName) {
         ++alive;
     }
 
@@ -183,21 +123,21 @@ public:
         --alive;
     }
 
-    std::unique_ptr<extension::sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<NoOpLogicalAggStage>();
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<shared_test_stages::NoOpLogicalAggStage>();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageAstNode> make() {
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<CountingAst>();
     }
 };
 
-class CountingParse final : public extension::sdk::AggStageParseNode {
+class CountingParse final : public sdk::AggStageParseNode {
 public:
     static constexpr size_t kExpansionSize = 1;
     static int alive;
 
-    CountingParse() : extension::sdk::AggStageParseNode(kCountingName) {
+    CountingParse() : sdk::AggStageParseNode(kCountingName) {
         ++alive;
     }
 
@@ -209,10 +149,10 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
-        std::vector<extension::sdk::VariantNode> expanded;
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
         return expanded;
     }
 
@@ -220,17 +160,17 @@ public:
         return BSONObj();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<CountingParse>();
     }
 };
 
-int CountingParse::alive = 0;
-int CountingAst::alive = 0;
+inline int CountingParse::alive = 0;
+inline int CountingAst::alive = 0;
 
-class NestedDesugaringParseNode final : public extension::sdk::AggStageParseNode {
+class NestedDesugaringParseNode final : public sdk::AggStageParseNode {
 public:
-    NestedDesugaringParseNode() : extension::sdk::AggStageParseNode(kNestedDesugaringName) {}
+    NestedDesugaringParseNode() : sdk::AggStageParseNode(kNestedDesugaringName) {}
 
     static constexpr size_t kExpansionSize = 2;
 
@@ -238,12 +178,11 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
-        std::vector<extension::sdk::VariantNode> expanded;
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(CountingAst::make()));
-        expanded.emplace_back(
-            new extension::sdk::ExtensionAggStageParseNode(CountingParse::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
         return expanded;
     }
 
@@ -251,16 +190,15 @@ public:
         return BSONObj();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<NestedDesugaringParseNode>();
     }
 };
 
-class GetExpandedSizeLessThanActualExpansionSizeParseNode final
-    : public extension::sdk::AggStageParseNode {
+class GetExpandedSizeLessThanActualExpansionSizeParseNode final : public sdk::AggStageParseNode {
 public:
     GetExpandedSizeLessThanActualExpansionSizeParseNode()
-        : extension::sdk::AggStageParseNode(kGetExpandedSizeLessName) {}
+        : sdk::AggStageParseNode(kGetExpandedSizeLessName) {}
 
     static constexpr size_t kExpansionSize = 2;
 
@@ -268,12 +206,11 @@ public:
         return kExpansionSize - 1;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
-        std::vector<extension::sdk::VariantNode> expanded;
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(CountingAst::make()));
-        expanded.emplace_back(
-            new extension::sdk::ExtensionAggStageParseNode(CountingParse::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
         return expanded;
     }
 
@@ -281,16 +218,15 @@ public:
         return BSONObj();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<GetExpandedSizeLessThanActualExpansionSizeParseNode>();
     }
 };
 
-class GetExpandedSizeGreaterThanActualExpansionSizeParseNode final
-    : public extension::sdk::AggStageParseNode {
+class GetExpandedSizeGreaterThanActualExpansionSizeParseNode final : public sdk::AggStageParseNode {
 public:
     GetExpandedSizeGreaterThanActualExpansionSizeParseNode()
-        : extension::sdk::AggStageParseNode(kGetExpandedSizeGreaterName) {}
+        : sdk::AggStageParseNode(kGetExpandedSizeGreaterName) {}
 
     static constexpr size_t kExpansionSize = 2;
 
@@ -298,12 +234,11 @@ public:
         return kExpansionSize + 1;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
-        std::vector<extension::sdk::VariantNode> expanded;
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(CountingAst::make()));
-        expanded.emplace_back(
-            new extension::sdk::ExtensionAggStageParseNode(CountingParse::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
         return expanded;
     }
 
@@ -311,14 +246,14 @@ public:
         return BSONObj();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<GetExpandedSizeGreaterThanActualExpansionSizeParseNode>();
     }
 };
 
-class NameMismatchParseNode : public extension::sdk::AggStageParseNode {
+class NameMismatchParseNode : public sdk::AggStageParseNode {
 public:
-    NameMismatchParseNode() : extension::sdk::AggStageParseNode("$nameB") {}
+    NameMismatchParseNode() : sdk::AggStageParseNode("$nameB") {}
 
     static constexpr size_t kExpansionSize = 1;
 
@@ -326,10 +261,11 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
-        std::vector<extension::sdk::VariantNode> expanded;
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> expanded;
         expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(NoOpAstNode::make()));
+        expanded.emplace_back(
+            new sdk::ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make()));
         return expanded;
     }
 
@@ -337,23 +273,23 @@ public:
         return BSONObj();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<NameMismatchParseNode>();
     }
 };
 
-class NameMismatchStageDescriptor : public extension::sdk::AggStageDescriptor {
+class NameMismatchStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string("$nameA");
 
     NameMismatchStageDescriptor()
-        : extension::sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kDesugar) {}
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kDesugar) {}
 
-    std::unique_ptr<extension::sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         return std::make_unique<NameMismatchParseNode>();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageDescriptor> make() {
+    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
         return std::make_unique<NameMismatchStageDescriptor>();
     }
 };
@@ -387,7 +323,7 @@ public:
 };
 
 TEST_F(AggStageTest, CountingParseExpansionSucceedsTest) {
-    auto countingParseNode = new extension::sdk::ExtensionAggStageParseNode(CountingParse::make());
+    auto countingParseNode = new ExtensionAggStageParseNode(CountingParse::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{countingParseNode};
 
     auto expanded = handle.expand();
@@ -398,8 +334,7 @@ TEST_F(AggStageTest, CountingParseExpansionSucceedsTest) {
 }
 
 TEST_F(AggStageTest, NestedExpansionSucceedsTest) {
-    auto nestedDesugarParseNode =
-        new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
+    auto nestedDesugarParseNode = new ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
 
     auto expanded = handle.expand();
@@ -425,8 +360,7 @@ TEST_F(AggStageTest, HandlesPreventMemoryLeaksOnSuccess) {
     CountingAst::alive = 0;
     CountingParse::alive = 0;
 
-    auto nestedDesugarParseNode =
-        new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
+    auto nestedDesugarParseNode = new ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
 
     {
         auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
@@ -446,8 +380,7 @@ TEST_F(AggStageTest, HandlesPreventMemoryLeaksOnFailure) {
     CountingAst::alive = 0;
     CountingParse::alive = 0;
 
-    auto nestedDesugarParseNode =
-        new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
+    auto nestedDesugarParseNode = new ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
 
     auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
 
@@ -473,8 +406,7 @@ TEST_F(AggStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
     CountingAst::alive = 0;
     CountingParse::alive = 0;
 
-    auto nestedDesugarParseNode =
-        new extension::sdk::ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
+    auto nestedDesugarParseNode = new ExtensionAggStageParseNode(NestedDesugaringParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{nestedDesugarParseNode};
 
     auto failExpand = globalFailPointRegistry().find("failVariantNodeConversion");
@@ -494,8 +426,7 @@ TEST_F(AggStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
 }
 
 DEATH_TEST_F(AggStageTest, EmptyDesugarExpansionFails, "11113803") {
-    auto emptyDesugarParseNode =
-        new extension::sdk::ExtensionAggStageParseNode(DesugarToEmptyParseNode::make());
+    auto emptyDesugarParseNode = new ExtensionAggStageParseNode(DesugarToEmptyParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{emptyDesugarParseNode};
 
     [[maybe_unused]] auto expanded = handle.expand();
@@ -503,8 +434,7 @@ DEATH_TEST_F(AggStageTest, EmptyDesugarExpansionFails, "11113803") {
 
 DEATH_TEST_F(AggStageTest, GetExpandedSizeLessThanActualExpansionSizeFails, "11113802") {
     auto getExpandedSizeLessThanActualExpansionSizeParseNode =
-        new extension::sdk::ExtensionAggStageParseNode(
-            GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
+        new ExtensionAggStageParseNode(GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{
         getExpandedSizeLessThanActualExpansionSizeParseNode};
 
@@ -512,9 +442,8 @@ DEATH_TEST_F(AggStageTest, GetExpandedSizeLessThanActualExpansionSizeFails, "111
 }
 
 DEATH_TEST_F(AggStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails, "11113802") {
-    auto getExpandedSizeGreaterThanActualExpansionSizeParseNode =
-        new extension::sdk::ExtensionAggStageParseNode(
-            GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
+    auto getExpandedSizeGreaterThanActualExpansionSizeParseNode = new ExtensionAggStageParseNode(
+        GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{
         getExpandedSizeGreaterThanActualExpansionSizeParseNode};
 
@@ -522,8 +451,8 @@ DEATH_TEST_F(AggStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails, "
 }
 
 DEATH_TEST_F(AggStageTest, DescriptorAndParseNodeNameMismatchFails, "11217602") {
-    auto descriptor = std::make_unique<extension::sdk::ExtensionAggStageDescriptor>(
-        NameMismatchStageDescriptor::make());
+    auto descriptor =
+        std::make_unique<ExtensionAggStageDescriptor>(NameMismatchStageDescriptor::make());
     auto handle = extension::host_connector::AggStageDescriptorHandle{descriptor.get()};
 
     BSONObj stageBson = BSON(NameMismatchStageDescriptor::kStageName << BSONObj());
@@ -531,7 +460,8 @@ DEATH_TEST_F(AggStageTest, DescriptorAndParseNodeNameMismatchFails, "11217602") 
 }
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217600") {
-    auto noOpParseNode = new extension::sdk::ExtensionAggStageParseNode(NoOpParseNode::make());
+    auto noOpParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
     auto handle = TestParseNodeVTableHandle{noOpParseNode};
 
     auto vtable = handle.vtable();
@@ -540,7 +470,8 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217600"
 };
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977601") {
-    auto noOpParseNode = new extension::sdk::ExtensionAggStageParseNode(NoOpParseNode::make());
+    auto noOpParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
     auto handle = TestParseNodeVTableHandle{noOpParseNode};
 
     auto vtable = handle.vtable();
@@ -549,7 +480,8 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "109
 };
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
-    auto noOpParseNode = new extension::sdk::ExtensionAggStageParseNode(NoOpParseNode::make());
+    auto noOpParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
     auto handle = TestParseNodeVTableHandle{noOpParseNode};
 
     auto vtable = handle.vtable();
@@ -558,7 +490,8 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "1
 };
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602") {
-    auto noOpParseNode = new extension::sdk::ExtensionAggStageParseNode(NoOpParseNode::make());
+    auto noOpParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
     auto handle = TestParseNodeVTableHandle{noOpParseNode};
 
     auto vtable = handle.vtable();
@@ -567,7 +500,8 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602")
 };
 
 TEST_F(AggStageTest, NoOpAstNodeTest) {
-    auto noOpAggStageAstNode = new extension::sdk::ExtensionAggStageAstNode(NoOpAstNode::make());
+    auto noOpAggStageAstNode =
+        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
     auto handle = extension::host_connector::AggStageAstNodeHandle{noOpAggStageAstNode};
 
     [[maybe_unused]] auto logicalStageHandle = handle.bind();
@@ -575,7 +509,7 @@ TEST_F(AggStageTest, NoOpAstNodeTest) {
 
 DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableGetName, "11217601") {
     auto noOpAstNode =
-        std::make_unique<extension::sdk::ExtensionAggStageAstNode>(NoOpAstNode::make());
+        std::make_unique<ExtensionAggStageAstNode>(shared_test_stages::NoOpAggStageAstNode::make());
     auto handle = TestAstNodeVTableHandle{noOpAstNode.release()};
 
     auto vtable = handle.vtable();
@@ -584,7 +518,8 @@ DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableGetName, "11217601") {
 };
 
 DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableBind, "11113700") {
-    auto noOpAstNode = new extension::sdk::ExtensionAggStageAstNode(NoOpAstNode::make());
+    auto noOpAstNode =
+        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
     auto handle = TestAstNodeVTableHandle{noOpAstNode};
 
     auto vtable = handle.vtable();
@@ -592,19 +527,18 @@ DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableBind, "11113700") {
     handle.assertVTableConstraints(vtable);
 };
 
-class SimpleQueryShapeParseNode : public extension::sdk::AggStageParseNode {
+class SimpleQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
     static constexpr StringData kStageName = "$simpleQueryShape";
     static constexpr StringData kStageSpec = "mongodb";
 
-    SimpleQueryShapeParseNode()
-        : extension::sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
+    SimpleQueryShapeParseNode() : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
+    std::vector<sdk::VariantNode> expand() const override {
         return {};
     }
 
@@ -612,7 +546,7 @@ public:
         return BSON(kStageName << kStageSpec);
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<SimpleQueryShapeParseNode>();
     }
 };
@@ -629,25 +563,25 @@ TEST_F(AggStageTest, SimpleComputeQueryShapeSucceeds) {
         queryShape);
 }
 
-class IdentifierQueryShapeParseNode : public extension::sdk::AggStageParseNode {
+class IdentifierQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
     static constexpr StringData kStageName = "$identifierQueryShape";
     static constexpr StringData kIndexFieldName = "index";
     static constexpr StringData kIndexValue = "identifier";
 
     IdentifierQueryShapeParseNode()
-        : extension::sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
+        : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
+    std::vector<sdk::VariantNode> expand() const override {
         return {};
     }
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        extension::sdk::QueryShapeOptsHandle ctxHandle(ctx);
+        sdk::QueryShapeOptsHandle ctxHandle(ctx);
         BSONObjBuilder builder;
 
         builder.append(kIndexFieldName, ctxHandle.serializeIdentifier(std::string(kIndexValue)));
@@ -655,7 +589,7 @@ public:
         return BSON(kStageName << builder.obj());
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<IdentifierQueryShapeParseNode>();
     }
 
@@ -665,8 +599,7 @@ public:
 };
 
 TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation) {
-    auto parseNode =
-        new extension::sdk::ExtensionAggStageParseNode(IdentifierQueryShapeParseNode::make());
+    auto parseNode = new ExtensionAggStageParseNode(IdentifierQueryShapeParseNode::make());
 
     auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
@@ -679,8 +612,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation
 }
 
 TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) {
-    auto parseNode =
-        new extension::sdk::ExtensionAggStageParseNode(IdentifierQueryShapeParseNode::make());
+    auto parseNode = new ExtensionAggStageParseNode(IdentifierQueryShapeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
@@ -696,11 +628,12 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) 
 }
 
 TEST_F(AggStageTest, DesugarToEmptyDescriptorParseTest) {
-    auto descriptor =
-        std::make_unique<extension::sdk::ExtensionAggStageDescriptor>(NoOpStageDescriptor::make());
+    auto descriptor = std::make_unique<ExtensionAggStageDescriptor>(
+        shared_test_stages::NoOpAggStageDescriptor::make());
     auto handle = extension::host_connector::AggStageDescriptorHandle{descriptor.get()};
 
-    BSONObj stageBson = BSON(NoOpStageDescriptor::kStageName << BSONObj());
+    BSONObj stageBson =
+        BSON(shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
     auto parseNodeHandle = handle.parse(stageBson);
 
     auto expanded = parseNodeHandle.expand();
@@ -710,25 +643,25 @@ TEST_F(AggStageTest, DesugarToEmptyDescriptorParseTest) {
         std::holds_alternative<extension::host_connector::AggStageAstNodeHandle>(expanded[0]));
 }
 
-class FieldPathQueryShapeParseNode : public extension::sdk::AggStageParseNode {
+class FieldPathQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
     static constexpr StringData kStageName = "$fieldPathQueryShape";
     static constexpr StringData kSingleFieldPath = "simpleField";
     static constexpr StringData kNestedFieldPath = "nested.Field.Path";
 
     FieldPathQueryShapeParseNode()
-        : extension::sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
+        : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
+    std::vector<sdk::VariantNode> expand() const override {
         return {};
     }
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        extension::sdk::QueryShapeOptsHandle ctxHandle(ctx);
+        sdk::QueryShapeOptsHandle ctxHandle(ctx);
         BSONObjBuilder builder;
 
         builder.append(kSingleFieldPath,
@@ -739,7 +672,7 @@ public:
         return BSON(kStageName << builder.obj());
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<FieldPathQueryShapeParseNode>();
     }
 
@@ -749,8 +682,7 @@ public:
 };
 
 TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation) {
-    auto parseNode =
-        new extension::sdk::ExtensionAggStageParseNode(FieldPathQueryShapeParseNode::make());
+    auto parseNode = new ExtensionAggStageParseNode(FieldPathQueryShapeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
@@ -765,8 +697,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation)
 }
 
 TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
-    auto parseNode =
-        new extension::sdk::ExtensionAggStageParseNode(FieldPathQueryShapeParseNode::make());
+    auto parseNode = new ExtensionAggStageParseNode(FieldPathQueryShapeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
@@ -792,7 +723,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
         queryShape);
 }
 
-class LiteralQueryShapeParseNode : public extension::sdk::AggStageParseNode {
+class LiteralQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
     static constexpr StringData kStageName = "$literalQueryShape";
     static constexpr StringData kStringField = "str";
@@ -804,19 +735,18 @@ public:
     static constexpr StringData kDateField = "date";
     static const Date_t kDateValue;
 
-    LiteralQueryShapeParseNode()
-        : extension::sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
+    LiteralQueryShapeParseNode() : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;
     }
 
-    std::vector<extension::sdk::VariantNode> expand() const override {
+    std::vector<sdk::VariantNode> expand() const override {
         return {};
     }
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        extension::sdk::QueryShapeOptsHandle ctxHandle(ctx);
+        sdk::QueryShapeOptsHandle ctxHandle(ctx);
 
         // Build a BSON object for the spec and keep the memory in scope across the calls to
         // serialize literal.
@@ -836,7 +766,7 @@ public:
         return BSON(kStageName << builder.obj());
     }
 
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<LiteralQueryShapeParseNode>();
     }
 
@@ -844,12 +774,12 @@ public:
         return "REDACT_" + std::string{sd};
     }
 };
-const BSONObj LiteralQueryShapeParseNode::kObjectValue = BSON("hi" << "mongodb");
-const Date_t LiteralQueryShapeParseNode::kDateValue = Date_t::fromMillisSinceEpoch(1000);
+
+inline const BSONObj LiteralQueryShapeParseNode::kObjectValue = BSON("hi" << "mongodb");
+inline const Date_t LiteralQueryShapeParseNode::kDateValue = Date_t::fromMillisSinceEpoch(1000);
 
 TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
-    auto parseNode =
-        new extension::sdk::ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
+    auto parseNode = new ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
@@ -870,8 +800,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
 }
 
 TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
-    auto parseNode =
-        new extension::sdk::ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
+    auto parseNode = new ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
@@ -888,8 +817,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
 }
 
 TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValues) {
-    auto parseNode =
-        new extension::sdk::ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
+    auto parseNode = new ExtensionAggStageParseNode(LiteralQueryShapeParseNode::make());
     auto handle = extension::host_connector::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
@@ -907,4 +835,4 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
 
 }  // namespace
 
-}  // namespace mongo
+}  // namespace mongo::extension::sdk

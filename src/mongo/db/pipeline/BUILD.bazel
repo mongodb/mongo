@@ -1702,6 +1702,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/extension/host:extension_loader",
         "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/extension/sdk/tests:shared_test_stages",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",

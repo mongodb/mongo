@@ -35,11 +35,11 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
-namespace mongo {
+namespace mongo::extension {
 
 class DocumentSourceExtensionTest;
 
-namespace extension::host {
+namespace host {
 
 /**
  * A DocumentSource implementation for an extension aggregation stage. DocumentSourceExtension is a
@@ -183,7 +183,7 @@ private:
      * tests. This is because the parserMap is not thread safe, so modifying it at runtime is
      * unsafe.
      */
-    friend class mongo::DocumentSourceExtensionTest;
+    friend class mongo::extension::DocumentSourceExtensionTest;
     static void unregisterParser_forTest(const std::string& name);
 
     DocumentSourceExtension(StringData name,
@@ -211,5 +211,5 @@ private:
     const mongo::extension::host_connector::AggStageDescriptorHandle _staticDescriptor;
     mongo::extension::host_connector::AggStageParseNodeHandle _parseNode;
 };
-}  // namespace extension::host
-}  // namespace mongo
+}  // namespace host
+}  // namespace mongo::extension
