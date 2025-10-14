@@ -97,14 +97,6 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     // aggregation which are AllowedOnSecondary::kOptIn.
     ReadPreferenceSetting::get(opCtx.get()) = ReadPreferenceSetting{ReadPreference::Nearest};
 
-    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
-    if (ru) {
-        // Set the cache max wait timeout very low as we do not want any FTDC operation to
-        // get blocked on cache eviction. 1 is a magic number that opts this thread out of
-        // all optional eviction without any waiting.
-        ru->setCacheMaxWaitTimeout(Milliseconds(1));
-    }
-
     _collect(opCtx.get(), &builder);
 
     const auto endDate = getCurrentDate(opCtx.get());
@@ -154,7 +146,7 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
             collector.updatedValue = std::move(future).semi();
 
             stdx::lock_guard lk(_mutex);
-            _pool->schedule([opCtx, it, promise = std::move(promise)](Status) mutable {
+            _pool->schedule([it, promise = std::move(promise)](Status) mutable {
                 BSONObjBuilder collectorBuilder;
                 auto& collector = it->second;
                 auto client = collector.clientStrand->bind();
@@ -172,14 +164,6 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
                     // such as aggregation which are AllowedOnSecondary::kOptIn.
                     ReadPreferenceSetting::get(collectionOpCtx) =
                         ReadPreferenceSetting{ReadPreference::Nearest};
-
-                    auto ru = shard_role_details::getRecoveryUnit(opCtx);
-                    if (ru) {
-                        // Set the cache max wait timeout very low as we do not want any FTDC
-                        // operation to get blocked on cache eviction. 1 is a magic number that opts
-                        // this thread out of all optional eviction without any waiting.
-                        ru->setCacheMaxWaitTimeout(Milliseconds(1));
-                    }
 
                     collectorBuilder.appendDate(kFTDCCollectStartField,
                                                 getCurrentDate(collectionOpCtx));
@@ -286,7 +270,6 @@ void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx, BSONObjBuild
             subObjBuilder.appendDate(kFTDCCollectStartField, getCurrentDate(opCtx));
             collector->collect(opCtx, subObjBuilder);
             subObjBuilder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx));
-
         } catch (...) {
             LOGV2_ERROR(9761500,
                         "Collector threw an error",

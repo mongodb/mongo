@@ -1005,11 +1005,7 @@ std::unique_ptr<WiredTigerSession> WiredTigerUtil::getStatisticsSession(
 
     // Obtain a session that can be used during shut down, potentially before the storage engine
     // itself shuts down.
-    auto session = std::make_unique<WiredTigerSession>(&engine.getConnection(), handler, permit);
-    // Configure the session to avoid being coopted into cache eviction. We never want to block stat
-    // fetching on workload issues.
-    session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
-    return session;
+    return std::make_unique<WiredTigerSession>(&engine.getConnection(), handler, permit);
 }
 
 bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngineBase& engine,
