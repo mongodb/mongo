@@ -32,6 +32,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "configureBackgroundTask",
     "mergeChunks",
     "testCommandFeatureFlaggedOnLatestFCV",
+    "testCommandFeatureFlaggedOnLatestFCV82",
     "getChangeStreamState", // Removed in v8.3
     "setChangeStreamState", // Removed in v8.3
 ];
