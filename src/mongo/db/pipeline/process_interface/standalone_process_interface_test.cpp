@@ -32,10 +32,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -71,11 +72,53 @@ public:
     SupportingUniqueIndex hasSupportingIndexForFields{SupportingUniqueIndex::Full};
 };
 
-class ProcessInterfaceStandaloneTest : public AggregationContextFixture {
-public:
+class ProcessInterfaceStandaloneTest : public ShardServerTestFixture {
+protected:
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "testDB1");
+    const StringData coll = "testColl";
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, coll);
+
+    OperationContext* opCtx() {
+        return operationContext();
+    }
+
+    boost::intrusive_ptr<ExpressionContextForTest> getExpCtx() {
+        return _expCtx;
+    }
+
+    void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+        const auto unshardedCollectionMetadata = CollectionMetadata::UNTRACKED();
+        AutoGetCollection coll(opCtx, nss, MODE_IX);
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+            ->setFilteringMetadata(opCtx, unshardedCollectionMetadata);
+    }
+
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+        _expCtx = make_intrusive<ExpressionContextForTest>(opCtx(), nss);
+    }
+
+    void createTimeseriesCollection() {
+        createTestCollection(
+            opCtx(),
+            nss,
+            BSON("create" << coll << "timeseries" << BSON("timeField" << "timestamp")));
+
+        NamespaceString underlyingNss = nss;
+        auto viewDefinition = CollectionCatalog::get(opCtx())->lookupView(opCtx(), nss);
+        if (viewDefinition) {
+            underlyingNss = viewDefinition->viewOn();
+        }
+
+        installUnshardedCollectionMetadata(opCtx(), underlyingNss);
+    }
+
     auto makeProcessInterface() {
         return std::make_unique<MongoProcessInterfaceForTest>(nullptr);
     }
+
+private:
+    boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
 };
 
 TEST_F(ProcessInterfaceStandaloneTest,
@@ -103,6 +146,20 @@ TEST_F(ProcessInterfaceStandaloneTest,
     ASSERT(chunkVersion);
     ASSERT_EQ(*chunkVersion, *targetCollectionPlacementVersion);
     ASSERT_EQ(supportingUniqueIndex, MongoProcessInterface::SupportingUniqueIndex::Full);
+}
+
+TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfOnTimeseriesCollection) {
+    auto expCtx = getExpCtx();
+    auto targetCollectionPlacementVersion =
+        boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
+    auto processInterface = makeProcessInterface();
+    expCtx->setFromRouter(true);
+    createTimeseriesCollection();
+
+    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+                           expCtx, {{"_id"}}, targetCollectionPlacementVersion, nss),
+                       AssertionException,
+                       1074330);
 }
 
 TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfJoinFieldsAreNotSentFromMongos) {

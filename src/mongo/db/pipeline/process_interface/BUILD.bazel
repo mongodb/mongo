@@ -356,8 +356,6 @@ mongo_cc_unit_test(
     srcs = [
         "mongos_process_interface_test.cpp",
         "shardsvr_process_interface_test.cpp",
-        "standalone_process_interface.h",
-        "standalone_process_interface_test.cpp",
         "//src/mongo/s/query/exec:sharded_agg_test_fixture.h",
     ],
     tags = ["mongo_unittest_first_group"],
@@ -373,5 +371,19 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/s:sharding_mongos_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "standalone_process_interface_test",
+    srcs = [
+        "standalone_process_interface.h",
+        "standalone_process_interface_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":mongod_process_interfaces",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/s:shard_server_test_fixture",
     ],
 )

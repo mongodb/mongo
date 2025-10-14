@@ -1125,6 +1125,22 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
             "Unexpected target chunk version specified",
             !targetCollectionPlacementVersion || expCtx->getFromRouter());
 
+    // Skip these checks if the target collection is a timeseries collection since they cannot have
+    // unique indexes. We can safely use the kPretendUnsharded placement concern here because we're
+    // only checking if the type of the collection is timeseries, which can't change unless the
+    // collection is dropped and recreated.
+    auto* opCtx = expCtx->getOperationContext();
+    const auto acquisition = acquireCollectionOrViewMaybeLockFree(
+        opCtx,
+        CollectionOrViewAcquisitionRequest(outputNs,
+                                           PlacementConcern::kPretendUnsharded,
+                                           repl::ReadConcernArgs::get(opCtx),
+                                           AcquisitionPrerequisites::kRead));
+    uassert(1074330,
+            "Cannot find index to verify that join fields will be unique: Timeseries collections "
+            "cannot have unique indexes ",
+            acquisition.getCollectionType() != query_shape::CollectionType::kTimeseries);
+
     if (!fieldPaths) {
         uassert(51124, "Expected fields to be provided from router", !expCtx->getFromRouter());
         return {std::set<FieldPath>{"_id"},
