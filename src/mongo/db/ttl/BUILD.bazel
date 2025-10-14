@@ -31,11 +31,12 @@ idl_generator(
 mongo_cc_library(
     name = "ttl_d",
     srcs = [
-        "ttl.cpp",
+        "ttl_monitor.cpp",
         ":ttl_gen",
     ],
     hdrs = [
         "ttl.h",
+        "ttl_monitor.h",
     ],
     deps = [
         ":ttl_collection_cache",

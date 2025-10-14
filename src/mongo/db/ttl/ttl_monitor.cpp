@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/ttl/ttl_monitor.h"
 
-#include "mongo/db/ttl/ttl.h"
-
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/admission/execution_admission_context.h"
@@ -76,6 +73,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/ttl/ttl.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/db/ttl/ttl_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -85,7 +83,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/admission_context.h"
@@ -99,21 +96,15 @@
 
 #include <cstdint>
 #include <limits>
-#include <mutex>
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 namespace mongo {
 
+namespace {
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 
@@ -133,7 +124,6 @@ auto& ttlDeletedKeys = *MetricBuilder<Counter64>{"ttl.deletedKeys"};
 // users must manually modify the secondary index to utilize automatic TTL deletion.
 auto& ttlInvalidTTLIndexSkips = *MetricBuilder<Counter64>{"ttl.invalidTTLIndexSkips"};
 
-namespace {
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
 
 // TODO (SERVER-64506): support change streams' pre- and post-images.
