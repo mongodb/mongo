@@ -263,7 +263,7 @@ BSONObj UpsertStage::_produceNewDocumentForInsert() {
 
     auto newDocument = _doc.getObject();
     if (!DocumentValidationSettings::get(opCtx()).isInternalValidationDisabled()) {
-        uassert(17420,
+        uassert(ErrorCodes::BSONObjectTooLarge,
                 str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
                 newDocument.objsize() <= BSONObjMaxUserSize);
     }

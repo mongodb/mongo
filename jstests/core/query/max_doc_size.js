@@ -79,7 +79,7 @@ assert.commandFailedWithCode(
         ordered: true,
         updates: [{q: {_id: objectId}, u: {_id: objectId, x: largerThanMaxString}, upsert: true}],
     }),
-    17420,
+    ErrorCodes.BSONObjectTooLarge,
 );
 
 coll = db.getCollection(collNamePrefix + "update_over_size_limit");
@@ -91,5 +91,5 @@ assert.commandFailedWithCode(
         ordered: true,
         updates: [{q: {_id: objectId}, u: {$set: {x: largerThanMaxString}}}],
     }),
-    [17419, ErrorCodes.BSONObjectTooLarge],
+    ErrorCodes.BSONObjectTooLarge,
 );

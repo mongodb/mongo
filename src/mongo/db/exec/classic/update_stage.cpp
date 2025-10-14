@@ -322,7 +322,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
 
             newObj = _doc.getObject();
             if (!DocumentValidationSettings::get(opCtx()).isInternalValidationDisabled()) {
-                uassert(17419,
+                uassert(ErrorCodes::BSONObjectTooLarge,
                         str::stream() << "Resulting document after update is larger than "
                                       << BSONObjMaxUserSize,
                         newObj.objsize() <= BSONObjMaxUserSize);
