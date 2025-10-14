@@ -22,7 +22,11 @@ declare class DB {
     getCollection(name): DBCollection
     commandHelp(name)
     runReadCommand()
-    runCommand(obj, extra, queryOptions)
+    runCommand<Req extends Partial<Commands[keyof Commands]["req"]>>(
+      command: GenericArguments & Req,
+      extra: object,
+      queryOptions: object,
+    ): GenericReplyFieldsAnd<GetResponseType<Req>>
     adminCommand(obj, extra)
     aggregate(pipeline, aggregateOptions)
     createCollection(name, opt)

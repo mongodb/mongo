@@ -343,3 +343,6 @@ etc/trimmed_system_perf.yml
 /version_expansions.yml
 /engflow.*
 /.bazelrc.evergreen
+
+# Generated Typescript type declarations from IDLs
+src/mongo/shell/*_gen.d.ts

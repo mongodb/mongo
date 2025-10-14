@@ -80,3 +80,22 @@ py_binary(
     main = "run_tests.py",
     visibility = ["//visibility:public"],
 )
+
+py_binary(
+    name = "gen_dts",
+    srcs = [
+        "gen_dts.py",
+    ] + glob(["idl/*.py"]),
+    main = "gen_dts.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "pymongo",
+            group = "core",
+        ),
+    ],
+)
