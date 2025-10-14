@@ -167,10 +167,13 @@ public:
 
     StageConstraints constraints(PipelineSplitState pipeState) const override;
 
-    Value serialize(const SerializationOptions& opts) const override;
+    Value serialize(const SerializationOptions& opts) const override = 0;
 
     // This method is invoked by extensions to register descriptor.
     static void registerStage(host_connector::AggStageDescriptorHandle descriptor);
+
+    // Declare DocumentSourceExtension to be pure virtual.
+    ~DocumentSourceExtension() override = 0;
 
 private:
     static void registerStage(const std::string& name,
@@ -186,8 +189,9 @@ private:
     friend class mongo::extension::DocumentSourceExtensionTest;
     static void unregisterParser_forTest(const std::string& name);
 
+protected:
     DocumentSourceExtension(StringData name,
-                            boost::intrusive_ptr<ExpressionContext> exprCtx,
+                            const boost::intrusive_ptr<ExpressionContext>& exprCtx,
                             Id id,
                             BSONObj rawStage,
                             mongo::extension::host_connector::AggStageDescriptorHandle descriptor);
@@ -205,12 +209,6 @@ private:
 
     ExtensionBase extensionBase() const;
 
-    // Do not support copy or move.
-    DocumentSourceExtension(const DocumentSourceExtension&) = delete;
-    DocumentSourceExtension(DocumentSourceExtension&&) = delete;
-    DocumentSourceExtension& operator=(const DocumentSourceExtension&) = delete;
-    DocumentSourceExtension& operator=(DocumentSourceExtension&&) = delete;
-
     /**
      * NB : Here we keep a copy of the stage name to service getSourceName().
      * It is tempting to rely on the name which is provided by the _staticDescriptor, however, that
@@ -222,7 +220,16 @@ private:
     const Id _id;
     BSONObj _raw_stage;
     const mongo::extension::host_connector::AggStageDescriptorHandle _staticDescriptor;
-    mongo::extension::host_connector::AggStageParseNodeHandle _parseNode;
+    const mongo::extension::host_connector::AggStageParseNodeHandle _parseNode;
+
+private:
+    // Do not support copy or move.
+    DocumentSourceExtension(const DocumentSourceExtension&) = delete;
+    DocumentSourceExtension(DocumentSourceExtension&&) = delete;
+    DocumentSourceExtension& operator=(const DocumentSourceExtension&) = delete;
+    DocumentSourceExtension& operator=(DocumentSourceExtension&&) = delete;
 };
+
 }  // namespace host
+
 }  // namespace mongo::extension

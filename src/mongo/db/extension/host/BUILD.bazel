@@ -4,6 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "document_source_extension_test.cpp",
+    "document_source_extension_optimizable_test.cpp",
 ])
 
 exports_files(
@@ -21,6 +22,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "document_source_extension.h",
+        "document_source_extension_optimizable.h",
         "extension_stage.h",
         "host_portal.h",
     ],

@@ -31,6 +31,7 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
@@ -101,6 +102,7 @@ void DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHa
         };
     }();
 
+    // TODO SERVER-112178: Add case for DocumentSourceExtensionExpandable.
     switch (descriptor.getType()) {
         case MongoExtensionAggStageType::kNoOp:
             registerStage(nameAsString, id, descriptor);
@@ -127,7 +129,7 @@ void DocumentSourceExtension::registerStage(const std::string& name,
         [id, descriptor](BSONElement specElem,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
             -> boost::intrusive_ptr<DocumentSource> {
-            return boost::intrusive_ptr(new DocumentSourceExtension(
+            return boost::intrusive_ptr(new DocumentSourceExtensionOptimizable(
                 specElem.fieldNameStringData(), expCtx, id, specElem.wrap(), descriptor));
         });
 }
@@ -138,7 +140,7 @@ void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) 
 
 DocumentSourceExtension::DocumentSourceExtension(
     StringData name,
-    boost::intrusive_ptr<ExpressionContext> exprCtx,
+    const boost::intrusive_ptr<ExpressionContext>& exprCtx,
     Id id,
     BSONObj rawStage,
     host_connector::AggStageDescriptorHandle staticDescriptor)
@@ -155,12 +157,6 @@ const char* DocumentSourceExtension::getSourceName() const {
 
 DocumentSource::Id DocumentSourceExtension::getId() const {
     return id;
-}
-
-Value DocumentSourceExtension::serialize(const SerializationOptions& opts) const {
-    // TODO We need to call into the plugin here when we want to serialize for query shape, or
-    // if optimizations change the shape of the stage definition.
-    return Value(_raw_stage);
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
@@ -191,5 +187,7 @@ DocumentSourceExtension::DocumentSourceExtension(const ExtensionBase& extensionB
 DocumentSourceExtension::ExtensionBase DocumentSourceExtension::extensionBase() const {
     return ExtensionBase{_stageName, getExpCtx(), _id, _raw_stage, _staticDescriptor};
 }
+
+DocumentSourceExtension::~DocumentSourceExtension() = default;
 
 }  // namespace mongo::extension::host
