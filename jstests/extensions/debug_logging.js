@@ -16,9 +16,12 @@ function checkLogs(db, debugLogLevel) {
     // The severity is "D<logLevel>", for example "D3" for a debug log with level 3.
     const debugLog = {s: "D" + String(debugLogLevel), c: "EXTENSION-MONGOT", id: 11134100};
     const matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, debugLog)];
-    // Make sure there is at most one matching log line.
-    assert.lte(matchingLogLines.length, 1);
-    return matchingLogLines.length == 1;
+    // Parse() is called twice - once when the LiteParsed stage is created, and once when the full
+    // DocumentSource stage is created. Log lines are printed in both cases.
+    const parseCallCount = 2;
+    // Make sure there is at most one matching log line per parse call.
+    assert.lte(matchingLogLines.length, parseCallCount);
+    return matchingLogLines.length == parseCallCount;
 }
 
 function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog}) {

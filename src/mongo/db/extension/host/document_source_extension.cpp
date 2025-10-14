@@ -30,21 +30,57 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
 
 ALLOCATE_DOCUMENT_SOURCE_ID(extension, DocumentSourceExtension::id);
 
-stdx::unordered_set<NamespaceString> DocumentSourceExtension::LiteParsed::getInvolvedNamespaces()
-    const {
-    return stdx::unordered_set<NamespaceString>();
-}
+std::list<std::unique_ptr<LiteParsedDocumentSource>>
+DocumentSourceExtension::LiteParsedExpandable::expandImpl() {
+    std::list<std::unique_ptr<LiteParsedDocumentSource>> outExpanded;
+    auto expanded = _parseNode.expand();
 
-PrivilegeVector DocumentSourceExtension::LiteParsed::requiredPrivileges(
-    bool isMongos, bool bypassDocumentValidation) const {
-    // TODO SERVER-109056 Support getting required privileges from extensions.
-    return {};
+    for (auto& variantNodeHandle : expanded) {
+        std::visit(
+            [&](auto&& handle) {
+                using H = std::decay_t<decltype(handle)>;
+
+                // Case 1: Parse node handle
+                //   a) Host-allocated parse node: convert directly to a host
+                //      LiteParsedDocumentSource using the host-provided BSON spec. No recursion in
+                //      this branch.
+                //   b) Extension-allocated parse node: Instantiate a LiteParsedExpandable and
+                //      splice the results of its expansion recursively.
+                if constexpr (std::is_same_v<H, host_connector::AggStageParseNodeHandle>) {
+                    auto stageName = handle.getName();
+                    if (host::HostAggStageParseNode::isHostAllocated(*handle.get())) {
+                        const auto& spec =
+                            static_cast<host::HostAggStageParseNode*>(handle.get())->getBsonSpec();
+                        outExpanded.emplace_back(
+                            LiteParsedDocumentSource::parse(_nss, spec, _options));
+                    } else {
+                        auto liteParsed =
+                            std::make_unique<DocumentSourceExtension::LiteParsedExpandable>(
+                                std::string(stageName), std::move(handle), _nss, _options);
+                        auto children = liteParsed->expandImpl();
+                        outExpanded.splice(outExpanded.end(), children);
+                    }
+                }
+                // Case 2: AST node handle. Wrap in LiteParsedExpanded and append directly to the
+                // expanded result.
+                else if constexpr (std::is_same_v<H, host_connector::AggStageAstNodeHandle>) {
+                    auto stageName = handle.getName();
+                    outExpanded.emplace_back(
+                        std::make_unique<DocumentSourceExtension::LiteParsedExpanded>(
+                            std::string(stageName), std::move(handle)));
+                }
+            },
+            variantNodeHandle);
+    }
+
+    return outExpanded;
 }
 
 // static
@@ -52,6 +88,18 @@ void DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHa
     auto nameStringData = descriptor.getName();
     auto id = DocumentSource::allocateId(nameStringData);
     auto nameAsString = std::string(nameStringData);
+
+    using LiteParseFn = std::function<std::unique_ptr<LiteParsedDocumentSource>(
+        const NamespaceString&, const BSONElement&, const LiteParserOptions&)>;
+
+    auto parser = [&]() -> LiteParseFn {
+        return [descriptor](const NamespaceString& nss,
+                            const BSONElement& spec,
+                            const LiteParserOptions& opts) {
+            return DocumentSourceExtension::LiteParsedExpandable::parse(
+                descriptor, nss, spec, opts);
+        };
+    }();
 
     switch (descriptor.getType()) {
         case MongoExtensionAggStageType::kNoOp:
@@ -63,13 +111,9 @@ void DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHa
                           << "Received unknown stage type while registering extension stage: "
                           << descriptor.getType());
     };
-    // TODO SERVER-109558 Call the correct version of DocumentSourceExtension::LiteParsed::parse or
-    // the correct desugar parse function based on the descriptor type.
-    // TODO SERVER-109558 We probably need to implement some kind of parser or registration macro
-    // so that we can call the correct desugared stage parser, since there is no
-    // DocumentSourceExtension::LiteParsedDesugar::parse.
+
     LiteParsedDocumentSource::registerParser(nameAsString,
-                                             DocumentSourceExtension::LiteParsed::parse,
+                                             std::move(parser),
                                              AllowedWithApiStrict::kAlways,
                                              AllowedWithClientType::kAny);
 }

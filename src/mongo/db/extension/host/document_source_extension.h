@@ -30,6 +30,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
@@ -47,26 +48,94 @@ namespace extension::host {
 class DocumentSourceExtension : public DocumentSource {
 public:
     /**
-     * A LiteParsedDocumentSource implementation for source and transformation extension stages.
+     * A LiteParsedDocumentSource implementation for extension stages mapping to an
+     * AggStageParseNode.
      */
-    class LiteParsed : public LiteParsedDocumentSource {
+    class LiteParsedExpandable : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec,
-                                                 const LiteParserOptions& options) {
-            return std::make_unique<LiteParsed>(spec.fieldName(), spec.Obj());
+        static std::unique_ptr<LiteParsedDocumentSource> parse(
+            host_connector::AggStageDescriptorHandle descriptor,
+            const NamespaceString& nss,
+            const BSONElement& spec,
+            const LiteParserOptions& options) {
+            auto parseNode = descriptor.parse(spec.wrap());
+            return std::make_unique<LiteParsedExpandable>(
+                spec.fieldName(), std::move(parseNode), nss, options);
         }
 
-        LiteParsed(std::string stageName, BSONObj spec)
-            : LiteParsedDocumentSource(std::move(stageName)), _ownedSpec(spec.getOwned()) {}
+        LiteParsedExpandable(std::string stageName,
+                             host_connector::AggStageParseNodeHandle parseNode,
+                             const NamespaceString& nss,
+                             const LiteParserOptions& options)
+            : LiteParsedDocumentSource(std::move(stageName)),
+              _parseNode(std::move(parseNode)),
+              _nss(nss),
+              _options(options) {
+            _expanded = expand();
+        }
 
-        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override;
+        /**
+         * Return the pre-computed expanded pipeline.
+         */
+        const std::list<std::unique_ptr<LiteParsedDocumentSource>>& getExpandedPipeline() const {
+            return _expanded;
+        }
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
+            return stdx::unordered_set<NamespaceString>();
+        }
 
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const override;
+                                           bool bypassDocumentValidation) const override {
+            // TODO SERVER-109056 Support getting required privileges from extensions.
+            return {};
+        }
 
-        const BSONObj& originalStageBson() const {
-            return _ownedSpec;
+        bool isInitialSource() const override {
+            // TODO SERVER-109056 isInitialSource() value should be inherited from the first
+            // stage in the LiteParsedExpandable's expanded pipeline.
+            return false;
+        }
+
+        /**
+         * requiresAuthzChecks() is overriden to false because requiredPrivileges() returns an empty
+         * vector and has no authz checks by default.
+         */
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
+
+    private:
+        std::list<std::unique_ptr<LiteParsedDocumentSource>> expand() {
+            // TODO SERVER-109558 Implement depth validation and cycle checking.
+            return expandImpl();
+        }
+
+        std::list<std::unique_ptr<LiteParsedDocumentSource>> expandImpl();
+
+        host_connector::AggStageParseNodeHandle _parseNode;
+        NamespaceString _nss;
+        LiteParserOptions _options;
+        std::list<std::unique_ptr<LiteParsedDocumentSource>> _expanded;
+    };
+
+    /**
+     * A LiteParsedDocumentSource implementation for extension stages mapping to an
+     * AggStageAstNode.
+     */
+    class LiteParsedExpanded : public LiteParsedDocumentSource {
+    public:
+        LiteParsedExpanded(std::string stageName, host_connector::AggStageAstNodeHandle astNode)
+            : LiteParsedDocumentSource(std::move(stageName)), _astNode(std::move(astNode)) {}
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
+            return stdx::unordered_set<NamespaceString>();
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override {
+            // TODO SERVER-109056 Support getting required privileges from extensions.
+            return {};
         }
 
         bool isInitialSource() const override {
@@ -82,51 +151,8 @@ public:
             return false;
         }
 
-    protected:
-        // Note that this BSON object must be an owned copy belonging to the LiteParsed document
-        // source.
-        BSONObj _ownedSpec;
-    };
-
-    /**
-     * A LiteParsedDocumentSource implementation for desugar extension stages. A derived class
-     * should implement a parse() function that passes into the LiteParsedDesugar constructor a
-     * function of type signature DesugaredPipelineInitializerType that returns the desugared
-     * LiteParsedDocumentSource pipeline representation of the stage.
-     *
-     * See the following example:
-     *
-     * class FooDesugar : LiteParsedDesugar {
-     *   static std::unique_ptr<LiteParsedDesugar> parse(...) {
-     *       return std::make_unique<LiteParsedDesugar>(
-     *                                          spec.fieldName(),
-     *                                          spec.Obj().getOwned(),
-     *                                          Deferred<DesugaredPipelineInitializerType>{[](BSONObj
-     * spec) {
-     *                                              // Create desugared pipeline from spec.
-     *                                                  return
-     * std::list<LiteParsedDocSrcPtr>();
-     *                                              }});
-     *   }
-     * };
-     */
-    class LiteParsedDesugar : public LiteParsed {
-    public:
-        using LiteParsedDocSrcPtr = std::unique_ptr<LiteParsedDocumentSource>;
-        using DesugaredPipelineInitializerType = std::function<std::list<LiteParsedDocSrcPtr>()>;
-
-        LiteParsedDesugar(std::string stageName,
-                          BSONObj ownedSpec,
-                          Deferred<DesugaredPipelineInitializerType> init)
-            : LiteParsed(std::move(stageName), std::move(ownedSpec)),
-              _desugaredPipeline(std::move(init)) {}
-
-        const std::list<LiteParsedDocSrcPtr>& getDesugaredPipeline() const {
-            return _desugaredPipeline.get();
-        }
-
     private:
-        Deferred<DesugaredPipelineInitializerType> _desugaredPipeline;
+        host_connector::AggStageAstNodeHandle _astNode;
     };
 
     const char* getSourceName() const override;
