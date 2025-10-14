@@ -407,12 +407,22 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
 
     WT_STATP_CONN_SET(
       session, stats, eviction_maximum_page_size, __wt_atomic_load64(&evict->evict_max_page_size));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_page_size_per_checkpoint,
+      __wt_atomic_load64(&evict->evict_max_page_size_per_checkpoint));
     WT_STATP_CONN_SET(
       session, stats, eviction_maximum_milliseconds, __wt_atomic_load64(&evict->evict_max_ms));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_milliseconds_per_checkpoint,
+      __wt_atomic_load64(&evict->evict_max_ms_per_checkpoint));
     WT_STATP_CONN_SET(
       session, stats, eviction_reentry_hs_eviction_milliseconds, evict->reentry_hs_eviction_ms);
-    WT_STATP_CONN_SET(
-      session, stats, eviction_maximum_gen_gap, __wt_atomic_load64(&evict->evict_max_gen_gap));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_unvisited_gen_gap,
+      __wt_atomic_load64(&evict->evict_max_unvisited_gen_gap));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_unvisited_gen_gap_per_checkpoint,
+      __wt_atomic_load64(&evict->evict_max_unvisited_gen_gap_per_checkpoint));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_visited_gen_gap,
+      __wt_atomic_load64(&evict->evict_max_visited_gen_gap));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_visited_gen_gap_per_checkpoint,
+      __wt_atomic_load64(&evict->evict_max_visited_gen_gap_per_checkpoint));
     WT_STATP_CONN_SET(session, stats, eviction_state, __wt_atomic_load32(&evict->flags));
     WT_STATP_CONN_SET(session, stats, eviction_aggressive_set, evict->evict_aggressive_score);
     WT_STATP_CONN_SET(session, stats, eviction_empty_score, evict->evict_empty_score);

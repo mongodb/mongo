@@ -37,30 +37,71 @@ echo `pwd`
 
 curdir=`pwd`
 
-# FIXME-WT-11788: Remove the -Wno-reserved-identifier flag once the violation of the standard
-# C11 7.1.3 has been addressed.
-flags="-DCMAKE_TOOLCHAIN_FILE=$curdir/cmake/toolchains/gcc.cmake -DCMAKE_C_FLAGS=\"-Werror -Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wno-declaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2 -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wno-reserved-identifier -Wno-unused-parameter -Wpointer-arith -Wredundant-decls -Wshadow -Wundef -Wunused -Wwrite-strings -O -fno-strict-aliasing -Wuninitialized\"
--DCMAKE_TOOLCHAIN_FILE=$curdir/cmake/toolchains/clang.cmake -DCMAKE_C_FLAGS=\"-Wall -Werror -Qunused-arguments -Wno-self-assign -Wno-parentheses-equality -Wno-array-bounds\""
+compilers=(
+    "-DCMAKE_TOOLCHAIN_FILE=$curdir/cmake/toolchains/mongodbtoolchain_stable_gcc.cmake"
+    "-DCMAKE_TOOLCHAIN_FILE=$curdir/cmake/toolchains/mongodbtoolchain_stable_clang.cmake"
+)
 
-options="-DHAVE_DIAGNOSTIC=1
--DENABLE_SHARED=0 -DENABLE_STATIC=1
--DENABLE_STATIC=0 -DENABLE_PYTHON=1
--DENABLE_SNAPPY=1 -DENABLE_ZLIB=1 -DENABLE_LZ4=1
--DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1
--DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1
--DENABLE_STRICT=1 -DENABLE_STATIC=1 -DENABLE_SHARED=0 -DWITH_PIC=1"
+options=(
+    "-DHAVE_DIAGNOSTIC=ON"
+    "-DENABLE_SHARED=OFF -DENABLE_STATIC=ON"
+    "-DENABLE_STATIC=OFF -DENABLE_PYTHON=ON"
+    "-DENABLE_SNAPPY=ON -DENABLE_ZLIB=ON -DENABLE_LZ4=ON"
+    "-DHAVE_BUILTIN_EXTENSION_LZ4=ON -DHAVE_BUILTIN_EXTENSION_SNAPPY=ON -DHAVE_BUILTIN_EXTENSION_ZLIB=ON"
+    "-DHAVE_DIAGNOSTIC=ON -DENABLE_PYTHON=ON"
+    "-DENABLE_STATIC=ON -DENABLE_SHARED=OFF -DWITH_PIC=ON"
+)
+
+always="-DENABLE_STRICT=ON -DENABLE_COLORIZE_OUTPUT=OFF"
 
 saved_IFS=$IFS
 cr_IFS="
 "
 
+# Function to discover compiler path using a temporary CMake project
+discover_compiler() {
+    local toolchain_file="$1"
+    local temp_dir=$(mktemp -d)
+    local cmake_file="$temp_dir/CMakeLists.txt"
+    local original_dir=$(pwd)
+
+    # Create temporary CMake project
+    cat > "$cmake_file" << 'EOF'
+cmake_minimum_required(VERSION 3.10)
+project(CompilerPath)
+# Write the compiler path to a file
+file(WRITE ${CMAKE_BINARY_DIR}/compiler_path.txt "${CMAKE_C_COMPILER}")
+EOF
+
+    # Change to temp directory and run CMake
+    cd "$temp_dir"
+    if eval $CMAKE_BIN "$toolchain_file" -B . -S . > /dev/null 2>&1; then
+        if [ -f "./compiler_path.txt" ]; then
+            discovered_compiler=$(cat "./compiler_path.txt")
+            # Clean up
+            cd "$original_dir"
+            rm -rf "$temp_dir"
+            echo "$discovered_compiler"
+            return 0
+        fi
+    fi
+
+    # Clean up on failure
+    cd "$original_dir"
+    rm -rf "$temp_dir"
+    return 1
+}
+
 # This function may alter the current directory on failure
 BuildTest() {
-        echo "Building: $1, $2"
+        local toolchain="$1"
+        local options="$2"
+        local compiler_path="$3"
+        echo "Building: $toolchain, $options"
         rm -rf ./build || return 1
         mkdir build || return 1
         cd ./build
-        eval $CMAKE_BIN "$1" "$2" \
+        eval $CMAKE_BIN "$toolchain" "$options" \
                  -DCMAKE_INSTALL_PREFIX="$insdir" -G $GENERATOR ../. || return 1
         eval $GENERATOR_CMD $PARALLEL || return 1
         if [ "$GENERATOR" == "Unix\ Makefiles" ]; then
@@ -69,11 +110,11 @@ BuildTest() {
             $GENERATOR_CMD examples/c/all > /dev/null || return 1
         fi
         eval $GENERATOR_CMD install || return 1
-        (echo $2 | grep "ENABLE_SHARED=0") && wt_build="--static" || wt_build=""
+        (echo $options | grep "ENABLE_SHARED=OFF") && wt_build="--static" || wt_build=""
         cflags=`pkg-config wiredtiger $wt_build --cflags --libs`
-        [ "$1"  == *"clang.cmake"* ] && compiler="clang" || compiler="cc"
-        echo $compiler -o ./smoke ../examples/c/ex_smoke.c $cflags
-        $compiler -o ./smoke ../examples/c/ex_smoke.c  $cflags|| return 1
+
+        echo $compiler_path -o ./smoke ../examples/c/ex_smoke.c $cflags
+        $compiler_path -o ./smoke ../examples/c/ex_smoke.c  $cflags|| return 1
         LD_LIBRARY_PATH="$insdir/lib:$insdir/lib64" ./smoke || return 1
         return 0
 }
@@ -82,13 +123,18 @@ ecode=0
 insdir=`pwd`/installed
 export PKG_CONFIG_PATH="$insdir/lib/pkgconfig:$insdir/lib64/pkgconfig"
 IFS="$cr_IFS"
-for flag in $flags ; do
-        for option in $options ; do
+for compiler in "${compilers[@]}" ; do
+        # Discover compiler path once per toolchain
+        compiler_path=$(discover_compiler "$compiler")
+        echo "Using compiler: $compiler_path for toolchain: $compiler"
+
+        for option in "${options[@]}" ; do
                cd "$curdir"
                IFS="$saved_IFS"
-               if ! BuildTest "$flag" "$option" "$@"; then
+               option="$option $always"
+               if ! BuildTest "$compiler" "$option" "$compiler_path" "$@"; then
                        ecode=1
-                       echo "*** ERROR: $flag, $option"
+                       echo "*** ERROR: $compiler, $option"
                fi
                IFS="$cr_IFS"
        done

@@ -1790,7 +1790,7 @@ retry:
         }
 
         /* Skip read-only btrees if we are not looking for clean pages. */
-        if (!F_ISSET(evict, WT_EVICT_CACHE_CLEAN) && F_ISSET(btree, WT_BTREE_READONLY)) {
+        if (F_ISSET(btree, WT_BTREE_READONLY) && !F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_read_only);
             continue;
         }
@@ -2636,9 +2636,21 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, u_int max_en
          * statistic here during the walk and not at __evict_page because the evict_pass_gen is
          * reset here.
          */
-        const uint64_t gen_gap = __wt_atomic_load64(&evict->evict_pass_gen) - page->evict_pass_gen;
-        if (gen_gap > __wt_atomic_load64(&evict->evict_max_gen_gap))
-            __wt_atomic_store64(&evict->evict_max_gen_gap, gen_gap);
+        if (page->evict_pass_gen == 0) {
+            const uint64_t gen_gap =
+              __wt_atomic_load64(&evict->evict_pass_gen) - page->cache_create_gen;
+            if (gen_gap > __wt_atomic_load64(&evict->evict_max_unvisited_gen_gap))
+                __wt_atomic_store64(&evict->evict_max_unvisited_gen_gap, gen_gap);
+            if (gen_gap > __wt_atomic_load64(&evict->evict_max_unvisited_gen_gap_per_checkpoint))
+                __wt_atomic_store64(&evict->evict_max_unvisited_gen_gap_per_checkpoint, gen_gap);
+        } else {
+            const uint64_t gen_gap =
+              __wt_atomic_load64(&evict->evict_pass_gen) - page->evict_pass_gen;
+            if (gen_gap > __wt_atomic_load64(&evict->evict_max_visited_gen_gap))
+                __wt_atomic_store64(&evict->evict_max_visited_gen_gap, gen_gap);
+            if (gen_gap > __wt_atomic_load64(&evict->evict_max_visited_gen_gap_per_checkpoint))
+                __wt_atomic_store64(&evict->evict_max_visited_gen_gap_per_checkpoint, gen_gap);
+        }
 
         page->evict_pass_gen = __wt_atomic_load64(&evict->evict_pass_gen);
 

@@ -1252,40 +1252,6 @@ __cell_kv_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_KV *unpack_kv)
 }
 
 /*
- * __cell_delta_window_cleanup --
- *     Clean up delta cells loaded from a previous run.
- */
-static WT_INLINE void
-__cell_delta_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_DELTA_LEAF *unpack_delta)
-{
-    WT_TIME_WINDOW *tw;
-
-    if (unpack_delta != NULL) {
-        tw = &unpack_delta->tw;
-        if (tw->start_txn != WT_TXN_NONE) {
-            tw->start_txn = WT_TXN_NONE;
-            F_SET(unpack_delta, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
-        }
-        if (tw->stop_txn != WT_TXN_MAX) {
-            tw->stop_txn = WT_TXN_NONE;
-            F_SET(unpack_delta, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
-
-            /*
-             * The combination of stop timestamp being WT_TS_MAX while the stop transaction not
-             * being WT_TXN_MAX is possible only for the non-timestamped tables. In this scenario
-             * there shouldn't be any timestamp value as part of durable stop timestamp other than
-             * the default value WT_TS_NONE.
-             */
-            if (tw->stop_ts == WT_TS_MAX && !WT_TIME_WINDOW_HAS_STOP_PREPARE(tw)) {
-                tw->stop_ts = WT_TS_NONE;
-                WT_ASSERT(session, tw->durable_stop_ts == WT_TS_NONE);
-            }
-        } else
-            WT_ASSERT(session, tw->stop_ts == WT_TS_MAX && !WT_TIME_WINDOW_HAS_STOP_PREPARE(tw));
-    }
-}
-
-/*
  * __cell_redo_page_del_cleanup --
  *     Redo the window cleanup logic on a page_del structure after the write generations have been
  *     bumped. Note: the name of this function is abusive (there are no cells involved) but as the
@@ -1389,18 +1355,6 @@ __cell_unpack_window_cleanup_kv(
 }
 
 /*
- * __cell_unpack_window_cleanup_delta --
- *     Clean up delta cells loaded from a previous run.
- */
-static WT_INLINE void
-__cell_unpack_window_cleanup_delta(
-  WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK_DELTA_LEAF *unpack_delta)
-{
-    if (__cell_unpack_window_need_cleanup(session, dsk->write_gen))
-        __cell_delta_window_cleanup(session, unpack_delta);
-}
-
-/*
  * __wt_cell_unpack_addr --
  *     Unpack an address WT_CELL into a structure.
  */
@@ -1457,77 +1411,23 @@ __wt_cell_unpack_kv(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL
 }
 
 /*
- * __wt_cell_unpack_delta_leaf --
- *     Unpack a leaf delta cell into a structure.
+ * __wt_cell_unpack_delta_leaf_value --
+ *     Unpack a leaf delta value cell into a structure.
  */
 static WT_INLINE void
-__wt_cell_unpack_delta_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
-  WT_DELTA_CELL_LEAF *cell, WT_CELL_UNPACK_DELTA_LEAF *unpack)
+__wt_cell_unpack_delta_leaf_value(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
+  WT_CELL *value_cell, WT_CELL_UNPACK_DELTA_LEAF_KV *unpack)
 {
     WT_DECL_RET;
-    uint64_t v;
-    const uint8_t *p;
 
-    v = 0;
+    /* Unpack the value. */
+    __wt_cell_unpack_kv(session, dsk, value_cell, &unpack->delta_value);
 
-    unpack->flags = cell->__chunk[0];
-    p = (uint8_t *)&cell->__chunk[1];
+    /* Extract the delta metadata and then the actual delta value from the custom value format. */
+    ret = __wt_struct_unpack(session, unpack->delta_value.data, unpack->delta_value.size,
+      WT_DELTA_LEAF_VALUE_FORMAT, &unpack->delta_value_data, &unpack->flags);
 
-    if (F_ISSET(unpack, WT_DELTA_LEAF_IS_DELETE)) {
-        ret = __wt_vunpack_uint(&p, 0, &v);
-        WT_ASSERT(session, ret == 0);
-        unpack->key_size = (uint32_t)v;
-        unpack->key = p;
-        unpack->__len = (uint32_t)WT_PTRDIFF(p + unpack->key_size, &cell->__chunk[0]);
-    } else {
-        WT_TIME_WINDOW_INIT(&unpack->tw);
-
-        if (F_ISSET(unpack, WT_DELTA_LEAF_HAS_START_TXN_ID)) {
-            ret = __wt_vunpack_uint(&p, 0, &unpack->tw.start_txn);
-            WT_ASSERT(session, ret == 0);
-        }
-
-        if (F_ISSET(unpack, WT_DELTA_LEAF_HAS_START_TS)) {
-            ret = __wt_vunpack_uint(&p, 0, &unpack->tw.start_ts);
-            WT_ASSERT(session, ret == 0);
-        }
-
-        if (F_ISSET(unpack, WT_DELTA_LEAF_HAS_START_DURABLE_TS)) {
-            ret = __wt_vunpack_uint(&p, 0, &unpack->tw.durable_start_ts);
-            WT_ASSERT(session, ret == 0);
-        }
-
-        if (F_ISSET(unpack, WT_DELTA_LEAF_HAS_STOP_TXN_ID)) {
-            ret = __wt_vunpack_uint(&p, 0, &unpack->tw.stop_txn);
-            WT_ASSERT(session, ret == 0);
-        }
-
-        if (F_ISSET(unpack, WT_DELTA_LEAF_HAS_STOP_TS)) {
-            ret = __wt_vunpack_uint(&p, 0, &unpack->tw.stop_ts);
-            WT_ASSERT(session, ret == 0);
-        }
-
-        if (F_ISSET(unpack, WT_DELTA_LEAF_HAS_STOP_DURABLE_TS)) {
-            ret = __wt_vunpack_uint(&p, 0, &unpack->tw.durable_stop_ts);
-            WT_ASSERT(session, ret == 0);
-        }
-
-        ret = __wt_vunpack_uint(&p, 0, &v);
-        WT_ASSERT(session, ret == 0);
-        unpack->key_size = (uint32_t)v;
-        ret = __wt_vunpack_uint(&p, 0, &v);
-        WT_ASSERT(session, ret == 0);
-        unpack->value_size = (uint32_t)v;
-
-        unpack->key = p;
-        p += unpack->key_size;
-        unpack->value = p;
-        unpack->__len = (uint32_t)WT_PTRDIFF(p + unpack->value_size, &cell->__chunk[0]);
-
-        __cell_unpack_window_cleanup_delta(session, dsk, unpack);
-    }
-
-    WT_UNUSED(ret); /* Avoid "unused variable" warnings in non-debug builds. */
+    WT_ASSERT_ALWAYS(session, ret == 0, "Failed to decode the delta leaf value.");
 }
 
 /*
@@ -1643,8 +1543,11 @@ __wt_page_cell_data_ref_kv(
         uint32_t __i;                                                                           \
         uint8_t *__cell;                                                                        \
         for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-             __cell += (unpack).__len, --__i) {                                                 \
-            __wt_cell_unpack_delta_leaf(session, dsk, (WT_DELTA_CELL_LEAF *)__cell, &(unpack));
+             __i -= 2) {                                                                        \
+            __wt_cell_unpack_kv(session, dsk, (WT_CELL *)__cell, &(unpack)->delta_key);         \
+            __cell += (unpack)->delta_key.__len;                                                \
+            __wt_cell_unpack_delta_leaf_value(session, dsk, (WT_CELL *)__cell, unpack);         \
+            __cell += (unpack)->delta_value.__len;
 
 #define WT_CELL_FOREACH_ADDR(session, dsk, unpack)                                              \
     do {                                                                                        \

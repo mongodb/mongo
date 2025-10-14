@@ -18,19 +18,29 @@ struct __wt_evict {
     uint64_t app_evicts; /* Pages evicted by user threads */
 
     wt_shared uint64_t evict_max_page_size; /* Largest page seen at eviction */
-    wt_shared uint64_t evict_max_ms;        /* Longest milliseconds spent at a single eviction */
-    uint64_t reentry_hs_eviction_ms;        /* Total milliseconds spent inside a nested eviction */
-    struct timespec stuck_time;             /* Stuck time */
+    wt_shared uint64_t
+      evict_max_page_size_per_checkpoint; /* Largest page seen at eviction per checkpoint */
+    wt_shared uint64_t evict_max_ms;      /* Longest milliseconds spent at a single eviction */
+    wt_shared uint64_t
+      evict_max_ms_per_checkpoint;   /* Longest milliseconds spent at a single eviction */
+    uint64_t reentry_hs_eviction_ms; /* Total milliseconds spent inside a nested eviction */
+    struct timespec stuck_time;      /* Stuck time */
 
     /*
      * Read information.
      */
-    uint64_t read_gen;                    /* Current page read generation */
-    uint64_t read_gen_oldest;             /* Oldest read generation the eviction
-                                           * server saw in its last queue load */
-    uint64_t evict_pass_gen;              /* Number of eviction passes */
-    wt_shared uint64_t evict_max_gen_gap; /* Maximum gap between page and connection evict pass
-                                             generation */
+    uint64_t read_gen;                              /* Current page read generation */
+    uint64_t read_gen_oldest;                       /* Oldest read generation the eviction
+                                                     * server saw in its last queue load */
+    uint64_t evict_pass_gen;                        /* Number of eviction passes */
+    wt_shared uint64_t evict_max_unvisited_gen_gap; /* Maximum gap between page and connection evict
+                                             pass generation of unvisited pages */
+    wt_shared uint64_t evict_max_unvisited_gen_gap_per_checkpoint; /* Maximum gap between page and
+                                             connection evict pass generation of unvisited pages */
+    wt_shared uint64_t evict_max_visited_gen_gap; /* Maximum gap between page and connection evict
+                                             pass generation of visited pages */
+    wt_shared uint64_t evict_max_visited_gen_gap_per_checkpoint; /* Maximum gap between page and
+                                             connection evict pass generation of visited pages */
     /*
      * Eviction thread information.
      */

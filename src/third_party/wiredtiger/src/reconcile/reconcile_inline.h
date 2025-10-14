@@ -521,3 +521,24 @@ __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT
         }
     }
 }
+
+/*
+ * __wti_rec_get_row_leaf_key --
+ *     Get the delta key
+ */
+static WT_INLINE int
+__wti_rec_get_row_leaf_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WTI_RECONCILE *r,
+  WT_INSERT *ins, WT_ROW *rip, WT_ITEM *key)
+{
+    WT_DECL_RET;
+
+    if (ins == NULL) {
+        WT_WITH_BTREE(session, btree, ret = __wt_row_leaf_key(session, r->page, rip, key, false));
+        WT_RET(ret);
+    } else {
+        key->data = WT_INSERT_KEY(ins);
+        key->size = WT_INSERT_KEY_SIZE(ins);
+    }
+
+    return (0);
+}
