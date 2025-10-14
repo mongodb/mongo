@@ -120,6 +120,24 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &rhel8_debug_aubsan_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test
+        variant: &rhel8_debug_aubsan_compile_variant_name rhel8-debug-aubsan-compile
+      - name: archive_jstestshell
+        variant: *rhel8_debug_aubsan_compile_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: rhel8-debug-aubsan-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_debug_aubsan_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
@@ -132,7 +150,7 @@ variables:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: linux-debug-aubsan-compile-required
+    #   variant: rhel8-debug-aubsan-compile
 
   # If you add anything to san_options, make sure the appropriate changes are
   # also made in bazel.
@@ -261,13 +279,19 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8g-8xlarge
 
-  - <<: *generic_linux_compile_params
+  - <<: *generic_linux_compile_params_m8g
     name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
     display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Enterprise Compile"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     expansions:
-      <<: *generic_linux_compile_expansions
       san_options: *aubsan_options
+      has_packages: false
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-8xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-8xlarge
       bazel_compile_flags: >-
         --config=dbg_aubsan
         --opt=on
@@ -278,6 +302,46 @@ buildvariants:
       download_mongot_release: true
       evergreen_remote_exec: on
       compile_variant: *linux-debug-aubsan-compile-required
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_aubsan
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: compile_jstestshell_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+
+  # This needs to be RHEL8 since it's used for multiversion testing
+  - <<: *generic_linux_compile_params
+    name: &rhel8-debug-aubsan-compile rhel8-debug-aubsan-compile
+    display_name: "RHEL 8 x86_64 {A,UB}SAN Enterprise Compile"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    expansions:
+      <<: *generic_linux_compile_expansions
+      activate: false
+      san_options: *aubsan_options
+      bazel_compile_flags: >-
+        --config=dbg_aubsan
+        --opt=on
+        --fission=no
+        --jobs=800
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: on
+      compile_variant: *rhel8-debug-aubsan-compile
       test_flags: >-
         --excludeWithAnyTags=incompatible_aubsan
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
@@ -334,9 +398,9 @@ buildvariants:
     tags: ["required"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-large
+      - amazon2023-arm64-latest-medium-m8g
     expansions:
-      <<: *aubsan-lite-required-expansions
+      <<: *aubsan-lite-required-expansions-m8g
       # To force disable feature flags even on the all feature flags variant, please use this file:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       # The '{maxRoundsWithoutProgressParameter: 20}' is needed here to work around failures in
@@ -351,7 +415,7 @@ buildvariants:
       - name: jsCore_txns
       - name: jsCore_wildcard_indexes_gen
 
-  - <<: *linux_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
@@ -381,7 +445,7 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - <<: *linux_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-roll-back-incremental-feature-flags
     display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (roll back incremental feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
@@ -415,7 +479,7 @@ buildvariants:
         distros:
           - rhel8.8-large
 
-  - <<: *linux_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-experimental
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental"
     tags: ["suggested"]
@@ -657,7 +721,7 @@ buildvariants:
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
 
-  - <<: *linux_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-classic-engine
     display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Classic Engine)"
     tags: ["suggested"]

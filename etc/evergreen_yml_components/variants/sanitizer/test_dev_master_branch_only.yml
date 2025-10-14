@@ -18,6 +18,24 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &rhel8_debug_aubsan_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test
+        variant: &rhel8_debug_aubsan_compile_variant_name rhel8-debug-aubsan-compile
+      - name: archive_jstestshell
+        variant: *rhel8_debug_aubsan_compile_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: rhel8-debug-aubsan-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_debug_aubsan_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
@@ -30,7 +48,7 @@ variables:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: linux-debug-aubsan-compile-required
+    #   variant: rhel8-debug-aubsan-compile
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
@@ -101,7 +119,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &aubsan-lite-required-expansions
-    compile_variant: *linux_debug_aubsan_compile_variant_name
+    compile_variant: *rhel8_debug_aubsan_compile_variant_name
     lang_environment: LANG=C
     san_options: *aubsan_options
     resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
@@ -458,7 +476,7 @@ buildvariants:
     tasks:
       - name: .concurrency !.no_txns !.kill_terminate
 
-  - <<: *linux_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
@@ -496,7 +514,7 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - <<: *linux_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-experimental-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental (all feature flags)"
     tags: ["suggested"]
@@ -518,7 +536,7 @@ buildvariants:
       - name: .random_multiversion_ds
       - name: .watchdog
 
-  - <<: *linux_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-non-rollback-feature-flags
     display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all non-rollback feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
