@@ -293,7 +293,7 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
         # Run it.
         # NOTE: We *do not* add any redirections here; caller controls logging completely.
-        if eval "$cmd"; then
+        if eval $env "$cmd"; then
             RET=0
             break
         else
