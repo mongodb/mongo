@@ -1688,7 +1688,22 @@ functions:
   "run benchmark tests":
     - *f_expansions_write
     - *configure_evergreen_api_credentials
-    - *determine_task_timeout
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: mongo
+        expansion_name: github_token_mongo_temp
+    - command: subprocess.exec
+      params:
+        binary: "bash"
+        args:
+          - "-c"
+          - |
+            echo "github_token_mongo: ${github_token_mongo_temp}" >> github_expansions.yml
+    - command: expansions.update
+      params:
+        file: github_expansions.yml
+    - *f_expansions_write
     - *update_task_timeout_expansions
     - *f_expansions_write
     - *update_task_timeout

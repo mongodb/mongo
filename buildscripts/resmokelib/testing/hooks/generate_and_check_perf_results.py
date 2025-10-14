@@ -11,11 +11,13 @@ from typing import Any, Dict, List, Optional
 import requests
 import tenacity
 import yaml
+from github import Github
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.errors import CedarReportError, ServerFailure
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
+from buildscripts.util.expansions import get_expansion
 
 THRESHOLD_LOCATION = "etc/performance_thresholds.yml"
 SEP_BENCHMARKS_PROJECT = "mongodb-mongo-master"
@@ -24,6 +26,15 @@ GET_TIMESERIES_URL = (
     "https://performance-monitoring-api.corp.mongodb.com/time_series/?summarized_executions=false"
 )
 MAINLINE_REQUESTERS = frozenset(["git_tag_request", "gitter_request"])
+OVERRIDE_APPROVERS = frozenset(
+    [
+        "brad-devlugt",  # Brad de Vlugt
+        "alicedoherty",  # Alice Doherty
+        "samanca",  # Amirsaman Memaripour
+        "hilldani",  # Daniel Hill,
+    ]
+)
+THRESHOLD_OVERRIDE_COMMENT = "perf threshold check override"
 
 
 class BoundDirection(str, Enum):
@@ -322,8 +333,10 @@ class GenerateAndCheckPerfResults(interface.Hook):
                     return value
                 break
 
-        self.logger.info(f"No base commit value found for test {test_name}, measurement {measurement} on variant {variant} in project {project} for commit {base_commit}. \
-                         Using value from latest successful run instead")
+        self.logger.info(
+            f"No base commit value found for test {test_name}, measurement {measurement} on variant {variant} in project {project} for commit {base_commit}. \
+                         Using value from latest successful run instead"
+        )
 
         # If no base commit value is found, use the latest successful run's value, which is the latest element added to the data array
         latest_run = time_series[0]["data"][-1]
@@ -353,6 +366,7 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
         super().__init__(logger, test_name, description, base_test_name, hook)
         self.thresholds_to_check: List["IndividualMetricThreshold"] = thresholds_to_check
         self.reported_metrics: Dict[ReportedMetric, CedarMetric] = reported_metrics
+        self.github: Github = Github(get_expansion("github_token_mongo"))
 
     def run_test(self):
         """
@@ -401,7 +415,52 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                 self.logger.info(
                     f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has passed the threshold check. The reported value of {reported_metric.value} is within the threshold limit of {metric_to_check.threshold_limit} from the base commit value of {metric_to_check.value}."
                 )
+
         if any_metric_has_failed:
+            # If this in the merge queue, check to see if an override comment was made by an authorized user.
+            if _config.EVERGREEN_REQUESTER == "github_merge_queue":
+                github_pr_number = int(get_expansion("github_pr_number", 0))
+                if not github_pr_number:
+                    raise ServerFailure(
+                        "Missing 'github_pr_number' expansion, cannot determine PR to check for threshold check override."
+                    )
+
+                pr = self.github.get_repo("10gen/mongo").get_pull(github_pr_number)
+                self.logger.info(f"Checking PR #{pr.number} for threshold check override comments.")
+
+                # Generals comments made on the main PR thread, not on a specific line of code - most likely to be used
+                for comment in pr.get_issue_comments():
+                    if (
+                        THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
+                        and comment.user.login in OVERRIDE_APPROVERS
+                    ):
+                        self.logger.info(
+                            f"Found override comment by {comment.user.login}, skipping failure for threshold check."
+                        )
+                        return
+
+                # Comments made on a specific line of code in the PR
+                for comment in pr.get_review_comments():
+                    if (
+                        THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
+                        and comment.user.login in OVERRIDE_APPROVERS
+                    ):
+                        self.logger.info(
+                            f"Found override comment by {comment.user.login}, skipping failure for threshold check."
+                        )
+                        return
+
+                # Comments made on individual commits associated with the PR - least likely to be used, but checking just in case
+                for comment in pr.get_comments():
+                    if (
+                        THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
+                        and comment.user.login in OVERRIDE_APPROVERS
+                    ):
+                        self.logger.info(
+                            f"Found override comment by {comment.user.login}, skipping failure for threshold check."
+                        )
+                        return
+
             raise ServerFailure(
                 f"One or more of the metrics reported by this task have failed the threshold check. These thresholds can be found in {THRESHOLD_LOCATION}."
                 " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
