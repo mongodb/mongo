@@ -210,12 +210,12 @@ Status _parseNumber(StringData s,
     if constexpr (Limits::is_signed)
         if (isNegative)
 #ifdef _MSC_VER
-#pragma "warning(push)"
-#pragma "warning(disable : 4146)"  // unary minus operator applied to unsigned type
+#pragma warning(push)
+#pragma warning(disable : 4146)  // unary minus operator applied to unsigned type
 #endif
             magnitude = -magnitude;
 #ifdef _MSC_VER
-#pragma "warning(pop)"
+#pragma warning(pop)
 #endif
     *result = NumberType(magnitude);
     return Status::OK();
