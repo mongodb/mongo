@@ -42,13 +42,13 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "timeseries_extended_range",
-    srcs = [
-        "timeseries_constants.h",
-        "timeseries_extended_range.cpp",
-        "//src/mongo/db/local_catalog/ddl:create_command_validation.h",
-    ],
+    srcs = ["timeseries_extended_range.cpp"],
     hdrs = [
         "timeseries_extended_range.h",
+    ],
+    private_hdrs = [
+        ":timeseries_constants.h",
+        "//src/mongo/db/local_catalog/ddl:create_command_validation.h",
     ],
     deps = [
         ":timeseries_options",  # TODO(SERVER-93876): Remove.
@@ -154,12 +154,6 @@ mongo_cc_library(
         "timeseries_dotted_path_support.cpp",
         "timeseries_index_schema_conversion_functions.cpp",
         "timeseries_update_delete_util.cpp",
-        "//src/mongo/db/matcher:extensions_callback_real.h",
-        "//src/mongo/db/pipeline:document_source_coll_stats.h",
-        "//src/mongo/db/pipeline:document_source_index_stats.h",
-        "//src/mongo/db/pipeline:document_source_internal_convert_bucket_index_stats.h",
-        "//src/mongo/db/pipeline:document_source_internal_unpack_bucket.h",
-        "//src/mongo/db/query/write_ops:parsed_writes_common.h",
     ],
     hdrs = [
         "timeseries_commands_conversion_helper.h",
@@ -167,6 +161,14 @@ mongo_cc_library(
         "timeseries_index_schema_conversion_functions.h",
         "timeseries_request_util.h",
         "timeseries_update_delete_util.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/matcher:extensions_callback_real.h",
+        "//src/mongo/db/pipeline:document_source_coll_stats.h",
+        "//src/mongo/db/pipeline:document_source_index_stats.h",
+        "//src/mongo/db/pipeline:document_source_internal_convert_bucket_index_stats.h",
+        "//src/mongo/db/pipeline:document_source_internal_unpack_bucket.h",
+        "//src/mongo/db/query/write_ops:parsed_writes_common.h",
     ],
     deps = [
         ":bucket_compression",
@@ -202,13 +204,13 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "timeseries_write_util",
-    srcs = [
-        "timeseries_write_util.cpp",
-        "//src/mongo/db/query:explain.h",
-        "//src/mongo/db/query/write_ops:update_request.h",
-    ],
+    srcs = ["timeseries_write_util.cpp"],
     hdrs = [
         "timeseries_write_util.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/query/write_ops:update_request.h",
+        "//src/mongo/db/query:explain.h",
     ],
     deps = [
         ":bucket_compression",

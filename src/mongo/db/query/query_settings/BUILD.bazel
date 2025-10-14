@@ -74,17 +74,19 @@ mongo_cc_library(
     name = "query_settings_service",
     srcs = [
         "query_settings_backfill.cpp",
-        "query_settings_backfill.h",
         "query_settings_cluster_parameter_impl.cpp",
         "query_settings_manager.cpp",
-        "query_settings_manager.h",
         "query_settings_service.cpp",
         "query_settings_usage_tracker.cpp",
-        "query_settings_usage_tracker.h",
         ":query_settings_cluster_parameter_gen",
     ],
     hdrs = [
         "query_settings_service.h",
+    ],
+    private_hdrs = [
+        ":query_settings_backfill.h",
+        ":query_settings_manager.h",
+        ":query_settings_usage_tracker.h",
     ],
     deps = [
         ":query_settings",

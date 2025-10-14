@@ -31,7 +31,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
-#include "mongo/db/query/compiler/stats/stats_gen.h"
+#include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
 

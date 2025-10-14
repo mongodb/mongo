@@ -303,7 +303,6 @@ mongo_cc_library(
         "//src/mongo/platform:shared_library.h",
         "//src/mongo/platform:source_location.h",
         "//src/mongo/platform:stack_locator.h",
-        "//src/mongo/platform:stack_locator_pthread_getattr_np.cpp",
         "//src/mongo/platform:strcasestr.h",
         "//src/mongo/platform:strnlen.h",
         "//src/mongo/platform:waitable_atomic.h",

@@ -109,7 +109,7 @@ BOOST_LIB_HEADERS = glob([
     "libs/**/*.ipp",
     "libs/**/*.hpp",
     "libs/**/*.h",
-])
+]) + BOOST_HEADERS
 
 BOOST_DEFINES = [
     "BOOST_BIND_GLOBAL_PLACEHOLDERS",
@@ -120,9 +120,10 @@ BOOST_LIB_INCLUDES = ["."] + glob(
     exclude_directories = 0,
 )
 
-filegroup(
+mongo_cc_library(
     name = "headers",
-    srcs = BOOST_HEADERS,
+    hdrs = BOOST_LIB_HEADERS,
+    includes = ["."] + BOOST_LIB_INCLUDES,
 )
 
 mongo_cc_library(

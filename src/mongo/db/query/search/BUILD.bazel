@@ -80,17 +80,19 @@ mongo_cc_library(
         ":internal_search_cluster_parameters_gen",
         ":internal_search_mongot_remote_spec_gen",
         ":search_query_view_spec_gen",
-        "//src/mongo/db/exec/agg:exec_pipeline.h",
-        "//src/mongo/db/exec/agg:pipeline_builder.h",
-        "//src/mongo/db/pipeline:catalog_resource_handle.h",
-        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
-        "//src/mongo/db/pipeline:shard_role_transaction_resources_stasher_for_pipeline.h",
-        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
-        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
     ],
     hdrs = [
         "mongot_cursor.h",
         "mongot_cursor_getmore_strategy.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/exec/agg:exec_pipeline.h",
+        "//src/mongo/db/exec/agg:pipeline_builder.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
+        "//src/mongo/db/pipeline:catalog_resource_handle.h",
+        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
+        "//src/mongo/db/pipeline:shard_role_transaction_resources_stasher_for_pipeline.h",
     ],
     deps = [
         ":mongot_options",  # TODO(SERVER-93876): Remove.
@@ -244,6 +246,8 @@ mongo_cc_unit_test(
     srcs = [
         "mongot_cursor_helpers_test.cpp",
         "mongot_cursor_test.cpp",
+    ],
+    private_hdrs = [
         "//src/mongo/executor:pinned_connection_task_executor_test_fixture.h",
         "//src/mongo/executor:task_executor_cursor_test_fixture.h",
         "//src/mongo/transport:test_fixtures.h",

@@ -2,6 +2,12 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
 # Like the C++ SDK, we should do our best to minimize the dependencies of this connector layer so
 # that it can be mostly self-contained.
 mongo_cc_library(

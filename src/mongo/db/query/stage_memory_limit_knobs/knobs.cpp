@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
-#include "mongo/db/query/stage_memory_limit_knobs/knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/stage_memory_limit_knobs_gen.h"
 
 namespace mongo {
 

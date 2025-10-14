@@ -65,7 +65,6 @@ mongo_cc_library(
         "wildcard_key_generator.cpp",
         "wildcard_validation.cpp",
         "//src/mongo/db/local_catalog:index_descriptor.cpp",
-        "//src/mongo/db/storage/kv:kv_engine.h",
     ],
     hdrs = [
         "2d_access_method.h",
@@ -88,6 +87,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:index_path_projection.h",
         "//src/mongo/db/local_catalog:index_descriptor.h",
     ],
+    private_hdrs = ["//src/mongo/db/storage/kv:kv_engine.h"],
     deps = [
         ":expression_params",
         ":multikey_paths",

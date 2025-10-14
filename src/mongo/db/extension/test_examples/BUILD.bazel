@@ -3,6 +3,12 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
 # This sets up the valid extension targets to use in the top level `dist-test`
 # and `extensions` targets. Using Bazel's transition system, this rule ensures
 # that the extensions are built with the correct configuration. All extensions

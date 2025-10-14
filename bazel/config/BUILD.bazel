@@ -2999,3 +2999,19 @@ selects.config_setting_group(
         ":build_enterprise_enabled",
     ],
 )
+
+# --------------------------------------
+# all_headers
+# --------------------------------------
+
+bool_flag(
+    name = "all_headers",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "all_headers_enabled",
+    flag_values = {
+        "//bazel/config:all_headers": "True",
+    },
+)

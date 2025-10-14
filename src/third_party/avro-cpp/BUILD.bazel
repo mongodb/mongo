@@ -19,9 +19,7 @@ mongo_cc_library(
         exclude = [
             "dist/impl/avrogencpp.cc",  # Code generator tool with heavy boost deps
         ],
-    ) + [
-        "//src/third_party/boost:headers",  # For boost headers
-    ],
+    ),
     hdrs = glob([
         "dist/include/avro/*.hh",
         "dist/include/avro/buffer/*.hh",
@@ -50,8 +48,6 @@ mongo_cc_library(
         "//src/mongo/util:boost_assert_shim",  # Required when using boost headers
         "//src/third_party/boost:boost_program_options",  # For boost/program_options.hpp
         "//src/third_party/boost:boost_iostreams",  # For boost/iostreams/*
-        # Note: Other boost headers (algorithm, any, utility, etc.) are header-only
-        # and should be available through the boost libraries above
         # Note: Snappy and zstd are optional compression codecs
     ],
     # Optional: Add linkopts if needed

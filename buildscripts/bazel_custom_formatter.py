@@ -332,6 +332,359 @@ def validate_bazel_groups(generate_report, fix):
                 put_report(report)
 
 
+def validate_idl_naming(generate_report: bool, fix: bool) -> None:
+    """
+    Enforce:
+      idl_generator(
+        name = "<stem>_gen",
+        src  = "<stem>.idl" | ":gen_target"  # where gen_target produces exactly one .idl
+      )
+    Single `bazel query --output=xml`, parse in-process. Also resolves src labels to generators.
+    """
+    import xml.etree.ElementTree as ET
+
+    bazel_bin = install_bazel(".")
+    qopts = [
+        "--implicit_deps=False",
+        "--tool_deps=False",
+        "--include_aspects=False",
+        "--bes_backend=",
+        "--bes_results_url=",
+    ]
+
+    # One narrowed query: only rules created by the idl_generator macro
+    try:
+        proc = subprocess.run(
+            [
+                bazel_bin,
+                "query",
+                "attr(generator_function, idl_generator, //src/...)",
+                "--output=xml",
+            ]
+            + qopts,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        print("BAZEL ERROR (narrowed xml):")
+        print(exc.stdout)
+        print(exc.stderr)
+        sys.exit(exc.returncode)
+
+    root = ET.fromstring(proc.stdout)
+    failures: list[tuple[str, str]] = []
+
+    def _val(rule, kind, attr):
+        n = rule.find(f'./{kind}[@name="{attr}"]')
+        return n.get("value") if n is not None else None
+
+    # Prepass: map rule label -> outputs so we can resolve src labels that generate an .idl
+    outputs_by_rule: dict[str, list[str]] = {}
+    for r in root.findall(".//rule"):
+        rname = r.get("name")
+        if not rname:
+            continue
+        outs = [n.get("name") for n in r.findall("./rule-output") if n.get("name")]
+        outputs_by_rule[rname] = outs
+
+    for rule in root.findall(".//rule"):
+        # Already narrowed, but keep the sentinel check cheap
+        if _val(rule, "string", "generator_function") != "idl_generator":
+            continue
+
+        rlabel = rule.get("name") or ""
+        if not (rlabel.startswith("//") and ":" in rlabel):
+            failures.append((rlabel or "<unknown>", "Malformed idl_generator rule label"))
+            continue
+        pkg, name = rlabel[2:].split(":", 1)
+
+        # Resolve src from label/string/srcs list
+        src_val = _val(rule, "label", "src") or _val(rule, "string", "src")
+        if not src_val:
+            srcs_vals = []
+            for lst in rule.findall('./list[@name="srcs"]'):
+                srcs_vals += [n.get("value") for n in lst.findall("./label") if n.get("value")]
+                srcs_vals += [n.get("value") for n in lst.findall("./string") if n.get("value")]
+            if len(srcs_vals) == 1:
+                src_val = srcs_vals[0]
+            else:
+                failures.append(
+                    (rlabel, f"'src'/'srcs' must have exactly one entry, got: {srcs_vals}")
+                )
+                continue
+
+        src = src_val.replace("\\", "/")
+        src_base: str | None = None
+
+        if src.startswith("//"):
+            spkg, sname = src[2:].split(":")
+            if spkg != pkg:
+                failures.append((rlabel, f"'src' must be in same package '{pkg}', got '{src}'"))
+            if sname.endswith(".idl"):
+                src_base = os.path.basename(sname)
+            else:
+                idl_outs = [o for o in outputs_by_rule.get(src, []) if o.endswith(".idl")]
+                if len(idl_outs) != 1:
+                    failures.append(
+                        (
+                            rlabel,
+                            f"'src' '{src}' must produce exactly one .idl, got: {idl_outs or outputs_by_rule.get(src, [])}",
+                        )
+                    )
+                    continue
+                src_base = os.path.basename(idl_outs[0].split(":", 1)[1])
+
+        elif src.startswith(":"):
+            sname = src[1:]
+            if sname.endswith(".idl"):
+                src_base = os.path.basename(sname)
+            else:
+                abs_label = f"//{pkg}:{sname}"
+                idl_outs = [o for o in outputs_by_rule.get(abs_label, []) if o.endswith(".idl")]
+                if len(idl_outs) != 1:
+                    failures.append(
+                        (
+                            rlabel,
+                            f"'src' '{src}' must produce exactly one .idl, got: {idl_outs or outputs_by_rule.get(abs_label, [])}",
+                        )
+                    )
+                    continue
+                src_base = os.path.basename(idl_outs[0].split(":", 1)[1])
+
+        else:
+            if src.startswith("../") or "/../" in src:
+                failures.append((rlabel, f"'src' must be within package '{pkg}', got '{src}'"))
+            src_base = os.path.basename(src)
+
+        if not (src_base and src_base.endswith(".idl")):
+            failures.append((rlabel, f"'src' must resolve to a .idl file, got: {src_base or src}"))
+            continue
+
+        if not name.endswith("_gen"):
+            failures.append((rlabel, "Target name must end with '_gen'"))
+
+        stem_from_name = name[:-4] if name.endswith("_gen") else name
+        stem_from_src = src_base[:-4]
+        if stem_from_name != stem_from_src:
+            failures.append(
+                (
+                    rlabel,
+                    f"Stem mismatch: name '{name}' vs src '{src_base}'. "
+                    f"Expected src basename '{stem_from_name}.idl'.",
+                )
+            )
+
+    if failures:
+        for lbl, msg in failures:
+            print(f"IDL naming violation: {lbl}: {msg}")
+            if generate_report:
+                report = make_report(lbl, msg, 1)
+                try_combine_reports(report)
+                put_report(report)
+
+    # print(time.time() - start)
+    if fix and failures:
+        sys.exit(1)
+
+
+def validate_private_headers(generate_report: bool, fix: bool) -> None:
+    """
+    Fast header linter/fixer using concurrent buildozer reads:
+      buildozer print label srcs //<scope>:%<macro>
+
+    - Lints if any header appears anywhere in the printed block (including select()/glob()).
+    - Auto-fixes ONLY concrete items in the first [...] (top-level list).
+    - Fails the run if a non-concrete header is detected (select()/glob()).
+    """
+    import re
+    import subprocess
+    import sys
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from shlex import split as shlex_split
+
+    # ---- Config ----
+    HEADER_EXTS = (".h", ".hh", ".hpp", ".hxx")
+    HEADER_RE = re.compile(r"\.(h|hh|hpp|hxx)\b")
+    PUBLIC_KEEP = {
+        "//src/mongo/platform:basic.h",
+        "//src/mongo/platform:windows_basic.h",
+    }
+    SCOPE = "//src/mongo/..."  # limit to your subtree
+    MACRO_SELECTORS = [
+        "%mongo_cc_library",
+        "%mongo_cc_binary",
+        "%mongo_cc_unit_test",
+        "%mongo_cc_benchmark",
+        "%mongo_cc_integration_test",
+        "%mongo_cc_fuzzer_test",
+        "%mongo_cc_extension_shared_library",
+    ]
+    SKIP_SUFFIXES = ("_shared_archive", "_hdrs_wrap")
+    SKIP_PKG_SUBSTR = "/third_party/"
+    # If True, exit(1) whenever a header is found only via select()/glob()
+    FAIL_ON_STRUCTURED = True
+
+    buildozer = download_buildozer()
+
+    def _run_print(selector: str) -> tuple[str, str]:
+        """Run one buildozer print invocation; return (selector, stdout)."""
+        try:
+            out = subprocess.run(
+                [buildozer, "print label srcs", f"{SCOPE}:{selector}"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            return selector, out
+        except subprocess.CalledProcessError as exc:
+            # surface error and keep going (treated as empty output)
+            print(f"BUILDOZER ERROR (print label srcs) for selector {selector}:", file=sys.stderr)
+            print(exc.stdout, file=sys.stderr)
+            print(exc.stderr, file=sys.stderr)
+            return selector, ""
+
+    # 1) Run all macro prints concurrently
+    outputs: list[str] = []
+    with ThreadPoolExecutor(max_workers=min(4, max(1, len(MACRO_SELECTORS)))) as ex:
+        futs = [ex.submit(_run_print, sel) for sel in MACRO_SELECTORS]
+        for fut in as_completed(futs):
+            _, stdout = fut.result()
+            if stdout:
+                outputs.append(stdout)
+
+    if not outputs:
+        return
+
+    combined = "\n".join(outputs)
+
+    # 2) Parse into target blocks: start at lines beginning with //src/mongo...
+    target_line_re = re.compile(r"^//src/mongo/[^:\s\[]+:[^\s\[]+")
+    lines = combined.splitlines()
+    blocks: list[tuple[str, list[str]]] = []
+    cur_target: str | None = None
+    cur_buf: list[str] = []
+
+    def flush():
+        nonlocal cur_target, cur_buf
+        if cur_target is not None:
+            blocks.append((cur_target, cur_buf))
+        cur_target, cur_buf = None, []
+
+    for line in lines:
+        if target_line_re.match(line):
+            flush()
+            cur_target = line.split()[0]
+            cur_buf = [line]
+        elif cur_target is not None:
+            cur_buf.append(line)
+    flush()
+
+    failures: list[tuple[str, str]] = []
+    fixes: list[tuple[str, str]] = []  # (cmd, target)
+    structured_fail_found = False  # to enforce FAIL_ON_STRUCTURED
+
+    def pkg_of(label: str) -> str:
+        return label[2:].split(":", 1)[0]
+
+    def normalize_token(pkg: str, tok: str) -> str | None:
+        t = tok.strip().strip(",")
+        if not t:
+            return None
+        if t.startswith(("select(", "glob(")):
+            return None
+        if t.startswith("//"):
+            return t
+        if t.startswith(":"):
+            return f"//{pkg}:{t[1:]}"
+        # bare filename/path → pkg-local
+        if not any(ch in t for ch in " []{}:\t\n"):
+            return f"//{pkg}:{t}"
+        return None
+
+    for target, buf in blocks:
+        if target.endswith(SKIP_SUFFIXES) or SKIP_PKG_SUBSTR in target:
+            continue
+
+        text = "\n".join(buf)
+
+        # quick lint: any .h* anywhere?
+        if not HEADER_RE.search(text):
+            continue
+
+        # first [...] only (top-level list)
+        m = re.search(r"\[(.*?)\]", text, flags=re.DOTALL)
+        top_tokens: list[str] = []
+        if m:
+            inner = m.group(1).replace("\n", " ").strip()
+            if inner:
+                try:
+                    top_tokens = shlex_split(inner)
+                except ValueError:
+                    top_tokens = inner.split()
+
+        pkg = pkg_of(target)
+        concrete_headers: list[str] = []
+        for tok in top_tokens:
+            norm = normalize_token(pkg, tok)
+            if not norm:
+                continue
+            if norm in PUBLIC_KEEP:
+                continue
+            base = norm.split(":", 1)[1]
+            if base.endswith(HEADER_EXTS):
+                concrete_headers.append(norm)
+
+        structured_has_hdr = False
+        if not concrete_headers:
+            # If there were headers somewhere but none in first [...], we assume select()/glob()
+            structured_has_hdr = True
+
+        if not concrete_headers and not structured_has_hdr:
+            continue
+
+        canon_target = target.replace("_with_debug", "")
+
+        parts = []
+        if concrete_headers:
+            parts.append(f"concrete headers: {concrete_headers}")
+        if structured_has_hdr:
+            parts.append("headers via select()/glob() (not auto-fixed)")
+            structured_fail_found = True
+
+        msg = f"{canon_target} has headers in srcs: " + "; ".join(parts)
+        print(msg)
+        failures.append((canon_target, msg))
+
+        if fix and concrete_headers:
+            for h in concrete_headers:
+                fixes.append((f"add private_hdrs {h}", canon_target))
+                fixes.append((f"remove srcs {h}", canon_target))
+
+    # 3) Apply fixes (dedupe)
+    if fix and fixes:
+        seen = set()
+        for cmd, tgt in fixes:
+            key = (cmd, tgt)
+            if key in seen:
+                continue
+            seen.add(key)
+            subprocess.run([buildozer, cmd, tgt])
+
+    # 4) CI reports
+    if failures and generate_report:
+        for tlabel, msg in failures:
+            report = make_report(tlabel, msg, 1)
+            try_combine_reports(report)
+            put_report(report)
+
+    # 5) Failing rules
+    # - Always fail if any violation and not fixing (your existing behavior)
+    # - Also fail if we saw non-concrete (structured) headers anywhere (requested)
+    if (failures and not fix) or (structured_fail_found and FAIL_ON_STRUCTURED):
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -340,6 +693,8 @@ def main():
     args = parser.parse_args()
     validate_clang_tidy_configs(args.generate_report, args.fix)
     validate_bazel_groups(args.generate_report, args.fix)
+    validate_idl_naming(args.generate_report, args.fix)
+    validate_private_headers(args.generate_report, args.fix)
 
 
 if __name__ == "__main__":

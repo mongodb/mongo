@@ -38,8 +38,6 @@ mongo_cc_library(
     srcs = [
         "query_shape.cpp",
         "shape_helpers.cpp",
-        "//src/mongo/db/query:count_request.h",
-        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_util.h",
     ],
     hdrs = [
         "agg_cmd_shape.h",
@@ -52,6 +50,10 @@ mongo_cc_library(
     header_deps = [
         ":query_shape_hash",
     ],
+    private_hdrs = [
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_util.h",
+        "//src/mongo/db/query:count_request.h",
+    ],
     deps = [
         ":query_shape_common",
         "//src/mongo:base",
@@ -63,14 +65,14 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "update_cmd_shape",
-    srcs = [
-        "update_cmd_shape.cpp",
-        "//src/mongo/db/query:count_request.h",
-        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_util.h",
-    ],
+    srcs = ["update_cmd_shape.cpp"],
     hdrs = [
         "let_shape_component.h",
         "update_cmd_shape.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_util.h",
+        "//src/mongo/db/query:count_request.h",
     ],
     deps = [
         ":query_shape_common",

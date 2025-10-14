@@ -99,7 +99,6 @@ mongo_cc_library(
         "//src/mongo/transport/asio:asio_tcp_fast_open.cpp",
         "//src/mongo/transport/asio:asio_transport_layer.cpp",
         "//src/mongo/transport/asio:asio_utils.cpp",
-        "//src/mongo/util:strong_weak_finish_line.h",
     ] + select({
         "@platforms//os:linux": [
             "//src/mongo/transport/asio:asio_networking_baton.cpp",
@@ -116,6 +115,7 @@ mongo_cc_library(
         "//src/mongo/transport/asio:asio_transport_layer.h",
         "//src/mongo/transport/asio:asio_utils.h",
     ],
+    private_hdrs = ["//src/mongo/util:strong_weak_finish_line.h"],
     deps = [
         ":service_executor",  # TODO(SERVER-93876): Remove.
         ":session_manager",
@@ -353,9 +353,9 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "service_entry_point_test_fixture",
-    srcs = [
-        "service_entry_point_test_fixture.cpp",
-        "service_entry_point_test_fixture.h",
+    srcs = ["service_entry_point_test_fixture.cpp"],
+    private_hdrs = [
+        ":service_entry_point_test_fixture.h",
         "//src/mongo/db/storage:storage_engine_mock.h",
     ],
     deps = [
@@ -372,13 +372,13 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "transport_layer_integration_test_fixture",
-    srcs = [
-        "test_fixtures.h",
-        "transport_layer_integration_test_fixture.cpp",
-        "transport_layer_mock.h",
-    ],
+    srcs = ["transport_layer_integration_test_fixture.cpp"],
     hdrs = [
         "transport_layer_integration_test_fixture.h",
+    ],
+    private_hdrs = [
+        ":test_fixtures.h",
+        ":transport_layer_mock.h",
     ],
     deps = [
         "//src/mongo/client:async_client",
@@ -398,20 +398,22 @@ mongo_cc_unit_test(
         "message_compressor_registry_test.cpp",
         "proxy_protocol_header_parser_test.cpp",
         "service_executor_test.cpp",
-        "session_manager_common_mock.h",
         "session_manager_test.cpp",
         "session_workflow_test.cpp",
-        "session_workflow_test_util.h",
-        "test_fixtures.h",
         "transport_layer_manager_test.cpp",
         "//src/mongo/transport/asio:asio_transport_layer_test.cpp",
         "//src/mongo/transport/asio:asio_utils_test.cpp",
-        "//src/mongo/unittest:join_thread.h",
     ] + select({
         "@platforms//os:linux": ["session_manager_common_test.cpp"],
         "//conditions:default": [],
     }),
     data = ["//jstests/libs:test_pem_files"],
+    private_hdrs = [
+        ":session_manager_common_mock.h",
+        ":session_workflow_test_util.h",
+        ":test_fixtures.h",
+        "//src/mongo/unittest:join_thread.h",
+    ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":message_compressor",
@@ -467,10 +469,10 @@ mongo_cc_benchmark(
 
 mongo_cc_benchmark(
     name = "session_workflow_bm",
-    srcs = [
-        "session_workflow_bm.cpp",
-        "session_workflow_test_util.h",
-        "test_fixtures.h",
+    srcs = ["session_workflow_bm.cpp"],
+    private_hdrs = [
+        ":session_workflow_test_util.h",
+        ":test_fixtures.h",
         "//src/mongo/unittest:join_thread.h",
     ],
     tags = ["second_half_bm"],

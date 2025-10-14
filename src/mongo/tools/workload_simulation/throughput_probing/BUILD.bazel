@@ -13,10 +13,12 @@ mongo_cc_binary(
     name = "throughput_probing_simulator",
     srcs = [
         "throughput_probing_simulator.cpp",
-        "throughput_probing_simulator.h",
         "ticketed_workload_driver.cpp",
-        "ticketed_workload_driver.h",
         "workloads.cpp",
+    ],
+    private_hdrs = [
+        ":throughput_probing_simulator.h",
+        ":ticketed_workload_driver.h",
     ],
     deps = [
         "//src/mongo:base",

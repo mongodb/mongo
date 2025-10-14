@@ -42,8 +42,8 @@ mongo_cc_unit_test(
         "expression_restorer_test.cpp",
         "expression_simplifier_test.cpp",
         "rewrite_expr_test.cpp",
-        "//src/mongo/db/query/compiler/rewrites/boolean_simplification:bitset_test_util.h",
     ],
+    private_hdrs = ["//src/mongo/db/query/compiler/rewrites/boolean_simplification:bitset_test_util.h"],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":matcher_rewrites",

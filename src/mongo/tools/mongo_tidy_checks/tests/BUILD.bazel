@@ -51,7 +51,6 @@ tests = [
         srcs = [
             test + ".cpp",
             "tidy_check_headers",
-            "//src/third_party/boost:headers",
         ],
         # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
         # to see.

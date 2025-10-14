@@ -107,8 +107,8 @@ mongo_cc_unit_test(
         "collator_factory_mock_test.cpp",
         "collator_interface_icu_test.cpp",
         "collator_interface_mock_test.cpp",
-        "//src/mongo/bson:bsonobj_comparator.h",
     ],
+    private_hdrs = ["//src/mongo/bson:bsonobj_comparator.h"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":collator_factory_mock",

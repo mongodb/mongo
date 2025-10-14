@@ -2,6 +2,12 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
 mongo_cc_unit_test(
     name = "host_aggregation_stage_test",
     srcs = [

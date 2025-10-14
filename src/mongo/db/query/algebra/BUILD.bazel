@@ -11,9 +11,9 @@ exports_files(
 
 mongo_cc_library(
     name = "algebra",
-    srcs = [
-        "operator.h",
-        "polyvalue.h",
+    private_hdrs = [
+        ":operator.h",
+        ":polyvalue.h",
     ],
 )
 

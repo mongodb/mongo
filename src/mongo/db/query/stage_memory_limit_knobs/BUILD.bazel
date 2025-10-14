@@ -11,7 +11,7 @@ exports_files(
 
 idl_generator(
     name = "stage_memory_limit_knobs_gen",
-    src = "knobs.idl",
+    src = "stage_memory_limit_knobs.idl",
     hdrs = [
         "knobs_protector.h",
     ],

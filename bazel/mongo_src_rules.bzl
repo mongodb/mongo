@@ -12,6 +12,7 @@ load(
     "get_copts",
     "get_linkopts",
 )
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("@poetry//:dependencies.bzl", "dependency")
@@ -236,7 +237,7 @@ RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES = select({
 
 MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/abseil-cpp:absl_base",
-    "//src/third_party/boost:boost_system",
+    "//src/third_party/boost:headers",
     "//src/third_party/croaring:croaring",
     "//src/third_party/fmt:fmt",
     "//src/third_party/libstemmer_c:stemmer",
@@ -348,6 +349,92 @@ def tidy_config_filegroup():
             visibility = ["//visibility:public"],
         )
 
+def _all_headers_label_for_pkg(pkg):
+    if pkg.startswith("src/mongo/db/modules/enterprise"):
+        return ["//src/mongo/db/modules/enterprise/.auto_header:all_headers"]
+    elif pkg.startswith("src/mongo/db/modules/atlas"):
+        return ["//src/mongo/db/modules/atlas/.auto_header:all_headers"]
+    else:
+        return ["//bazel/auto_header/.auto_header:all_headers"]
+
+def _maybe_all_headers(name, hdrs, srcs, private_hdrs):
+    pkg = native.package_name()
+    if not (pkg.startswith("src/mongo") or "third_party" in pkg):
+        return hdrs, srcs + private_hdrs
+
+    # 1) Wrap user-provided (possibly configurable) hdrs into a helper filegroup.
+    #    This isolates any select(...) inside the filegroup's srcs where it's legal.
+    hdr_wrap = name + "_hdrs_wrap"
+    native.filegroup(
+        name = hdr_wrap,
+        srcs = hdrs,  # hdrs may already have select(...) — that's fine here
+        visibility = ["//visibility:private"],
+    )
+
+    # 2) Always-on config header (added outside the select to avoid duplication)
+    mongo_cfg_hdr = ["//src/mongo:mongo_config_header"]
+
+    # 3) Select between the per-package all_headers filegroup and the wrapped hdrs.
+    #    IMPORTANT: both branches are *plain label lists* -> no nested selects.
+    final_hdrs = (
+        mongo_cfg_hdr +
+        select({
+            "//bazel/config:all_headers_enabled": _all_headers_label_for_pkg(pkg),
+            "//conditions:default": [":" + hdr_wrap],
+        })
+    )
+
+    # 4) For srcs: include private_hdrs only when NOT all_headers.
+    #    Again, wrap the potentially-configurable list in a filegroup.
+    if private_hdrs:
+        priv_wrap = name + "_private_hdrs_wrap"
+        native.filegroup(
+            name = priv_wrap,
+            srcs = private_hdrs,
+            visibility = ["//visibility:private"],
+        )
+        extra_srcs = select({
+            "//bazel/config:all_headers_enabled": [],
+            "//conditions:default": [":" + priv_wrap],
+        })
+    else:
+        extra_srcs = []
+
+    final_srcs = srcs + extra_srcs
+    return final_hdrs, final_srcs
+
+def _binary_srcs_with_all_headers(name, srcs, private_hdrs):
+    pkg = native.package_name()
+    if not (pkg.startswith("src/mongo") or "third_party" in pkg):
+        return srcs + private_hdrs
+
+    # Always include the config header via srcs
+    mongo_cfg_hdr = ["//src/mongo:mongo_config_header"]
+
+    # Wrap private_hdrs so any select(...) inside is contained.
+    if private_hdrs:
+        priv_wrap = name + "_private_hdrs_wrap"
+        native.filegroup(
+            name = priv_wrap,
+            srcs = private_hdrs,
+            visibility = ["//visibility:private"],
+        )
+        maybe_priv = select({
+            "//bazel/config:all_headers_enabled": [],
+            "//conditions:default": [":" + priv_wrap],
+        })
+    else:
+        maybe_priv = []
+
+    # Add the per-package all_headers only when all_headers mode is on.
+    # Both branches are plain lists → no nested selects.
+    all_hdrs_branch = select({
+        "//bazel/config:all_headers_enabled": _all_headers_label_for_pkg(pkg),
+        "//conditions:default": [],
+    })
+
+    return srcs + mongo_cfg_hdr + maybe_priv + all_hdrs_branch
+
 def mongo_cc_library(
         name,
         srcs = [],
@@ -356,6 +443,7 @@ def mongo_cc_library(
         deps = [],
         cc_deps = [],
         header_deps = [],
+        private_hdrs = [],
         testonly = False,
         visibility = None,
         data = [],
@@ -436,7 +524,9 @@ def mongo_cc_library(
         deps += TCMALLOC_DEPS
 
     if native.package_name().startswith("src/mongo"):
-        hdrs = hdrs + ["//src/mongo:mongo_config_header"]
+        if "third_party" not in native.package_name():
+            hdrs, srcs = _maybe_all_headers(name, hdrs, srcs, private_hdrs)
+
         if name != "boost_assert_shim" and name != "mongoca" and name != "cyrus_sasl_windows_test_plugin":
             deps += MONGO_GLOBAL_SRC_DEPS
         features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
@@ -676,6 +766,7 @@ def _mongo_cc_binary_and_test(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         testonly = False,
         visibility = None,
         data = [],
@@ -701,7 +792,8 @@ def _mongo_cc_binary_and_test(
         This can be configured via //config/bazel:linkstatic.""")
 
     if native.package_name().startswith("src/mongo"):
-        srcs = srcs + ["//src/mongo:mongo_config_header"]
+        if "third_party" not in native.package_name():
+            srcs = _binary_srcs_with_all_headers(name, srcs, private_hdrs)
         deps += MONGO_GLOBAL_SRC_DEPS
         features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
@@ -874,6 +966,7 @@ def mongo_cc_binary(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         testonly = False,
         visibility = None,
         data = [],
@@ -927,6 +1020,7 @@ def mongo_cc_binary(
         srcs,
         deps,
         header_deps,
+        private_hdrs,
         testonly,
         visibility,
         data,
@@ -952,6 +1046,7 @@ def mongo_cc_test(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         visibility = None,
         data = [],
         tags = [],
@@ -1020,6 +1115,7 @@ def mongo_cc_test(
         srcs,
         deps,
         header_deps,
+        private_hdrs,
         True,
         visibility,
         data,
@@ -1051,6 +1147,7 @@ def mongo_cc_unit_test(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         visibility = ["//visibility:public"],
         data = [],
         tags = [],
@@ -1071,6 +1168,7 @@ def mongo_cc_unit_test(
         srcs = srcs,
         deps = deps + ([] if has_custom_mainline else ["//src/mongo/unittest:unittest_main"]),
         header_deps = header_deps,
+        private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
         tags = tags + ["mongo_unittest"],
@@ -1181,6 +1279,11 @@ idl_generator_rule = rule(
             allow_files = True,
             default = [],
         ),
+    },
+    outputs = {
+        # These create addressable file labels:
+        "gen_hdr": "%{name}.h",
+        "gen_src": "%{name}.cpp",
     },
     doc = "Generates header/source files from IDL files.",
     toolchains = ["@bazel_tools//tools/python:toolchain_type"],
@@ -1414,6 +1517,7 @@ def mongo_cc_benchmark(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         visibility = None,
         data = [],
         tags = [],
@@ -1434,6 +1538,7 @@ def mongo_cc_benchmark(
         srcs = srcs,
         deps = deps + ([] if has_custom_mainline else ["//src/mongo/unittest:benchmark_main"]),
         header_deps = header_deps,
+        private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
         tags = tags + ["mongo_benchmark"],
@@ -1455,6 +1560,7 @@ def mongo_cc_integration_test(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         visibility = None,
         data = [],
         tags = [],
@@ -1475,6 +1581,7 @@ def mongo_cc_integration_test(
         srcs = srcs,
         deps = deps + ([] if has_custom_mainline else ["//src/mongo/unittest:integration_test_main"]),
         header_deps = header_deps,
+        private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
         tags = tags + ["mongo_integration_test"],
@@ -1496,6 +1603,7 @@ def mongo_cc_fuzzer_test(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         visibility = None,
         data = [],
         tags = [],
@@ -1516,6 +1624,7 @@ def mongo_cc_fuzzer_test(
         srcs = srcs,
         deps = deps,
         header_deps = header_deps,
+        private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
         tags = tags + ["mongo_fuzzer_test"],
@@ -1545,6 +1654,7 @@ def mongo_cc_extension_shared_library(
         srcs = [],
         deps = [],
         header_deps = [],
+        private_hdrs = [],
         visibility = None,
         data = [],
         tags = [],
@@ -1567,6 +1677,7 @@ def mongo_cc_extension_shared_library(
             "//src/mongo/db/extension/sdk:sdk_cpp",
         ],
         header_deps = header_deps,
+        private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
         tags = tags,

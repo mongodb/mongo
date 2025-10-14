@@ -17,12 +17,14 @@ mongo_cc_library(
     srcs = [
         "connection_string.cpp",
         "mongo_uri.cpp",
-        "//src/mongo/db/auth:sasl_command_constants.h",
-        "//src/mongo/util:dns_name.h",
     ],
     hdrs = [
         "connection_string.h",
         "mongo_uri.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/auth:sasl_command_constants.h",
+        "//src/mongo/util:dns_name.h",
     ],
     deps = [
         "//src/mongo/util:dns_query",
@@ -598,11 +600,13 @@ mongo_cc_unit_test(
         "server_ping_monitor_test.cpp",
         "streamable_replica_set_monitor_discovery_time_processor_test.cpp",
         "streamable_replica_set_monitor_error_handler_test.cpp",
-        "//src/mongo/util:executor_test_util.h",
-        "//src/mongo/util:future_test_utils.h",
     ],
     data = [
         "//src/mongo/client/mongo_uri_tests:test_data",
+    ],
+    private_hdrs = [
+        "//src/mongo/util:executor_test_util.h",
+        "//src/mongo/util:future_test_utils.h",
     ],
     tags = ["mongo_unittest_fourth_group"],
     target_compatible_with = select({

@@ -9,6 +9,12 @@ exports_files([
     "single_table_access.h",
 ])
 
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
 mongo_cc_library(
     name = "join_ordering",
     srcs = [

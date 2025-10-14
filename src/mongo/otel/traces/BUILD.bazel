@@ -2,6 +2,12 @@ load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
 OTEL_TARGET_COMPATIBLE_WITH = select({
     "//bazel/config:build_otel_enabled": [],
     "//conditions:default": ["@platforms//:incompatible"],
@@ -31,8 +37,8 @@ idl_generator(
 mongo_cc_library(
     name = "tracing_base",
     hdrs = [
-        "span/span.h",
         "trace_initialization.h",
+        "//src/mongo/otel/traces/span:span.h",
     ],
 )
 
@@ -64,16 +70,16 @@ mongo_cc_library(
     name = "tracing_internal",
     srcs = [
         "bson_text_map_carrier.cpp",
-        "span/span.cpp",
-        "span/span_telemetry_context_impl.cpp",
         "trace_initialization.cpp",
         "trace_settings_gen",
         "tracing_utils.cpp",
+        "//src/mongo/otel/traces/span:span.cpp",
+        "//src/mongo/otel/traces/span:span_telemetry_context_impl.cpp",
     ],
     hdrs = [
         "bson_text_map_carrier.h",
-        "span/span_telemetry_context_impl.h",
         "tracing_utils.h",
+        "//src/mongo/otel/traces/span:span_telemetry_context_impl.h",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
@@ -96,11 +102,11 @@ mongo_cc_unit_test(
     srcs = [
         "bson_text_map_carrier_test.cpp",
         "mock_exporter.cpp",
-        "mock_exporter.h",
-        "span/span_telemetry_context_impl_test.cpp",
-        "span/span_test.cpp",
         "trace_initialization_test.cpp",
+        "//src/mongo/otel/traces/span:span_telemetry_context_impl_test.cpp",
+        "//src/mongo/otel/traces/span:span_test.cpp",
     ],
+    private_hdrs = [":mock_exporter.h"],
     tags = [
         "mongo_unittest_fourth_group",
         "tracing_test",

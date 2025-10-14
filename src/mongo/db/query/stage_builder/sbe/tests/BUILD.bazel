@@ -47,7 +47,6 @@ mongo_cc_unit_test(
         "type_checker_test.cpp",
         "value_lifetime_test.cpp",
         "vectorizer_test.cpp",
-        "//src/mongo/db/exec:shard_filterer_mock.h",
         "//src/mongo/db/query/stage_builder:classic_stage_builder_test.cpp",
     ],
     data = [
@@ -58,6 +57,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/test_output/query/stage_builder/sbe/sbe_timeseries_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/search_sbe_stage_builder_test:test_data",
     ],
+    private_hdrs = ["//src/mongo/db/exec:shard_filterer_mock.h"],
     tags = [
         "mongo_unittest_fourth_group",
     ],

@@ -16,15 +16,17 @@ mongo_cc_library(
         "bitset_tree.cpp",
         "petrick.cpp",
         "quine_mccluskey.cpp",
-        "//src/mongo/util:dynamic_bitset.h",
-        "//src/mongo/util:inlined_storage.h",
-        "//src/mongo/util:stream_utils.h",
     ],
     hdrs = [
         "bitset_algebra.h",
         "bitset_tree.h",
         "petrick.h",
         "quine_mccluskey.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/util:dynamic_bitset.h",
+        "//src/mongo/util:inlined_storage.h",
+        "//src/mongo/util:stream_utils.h",
     ],
     deps = [
         "//src/mongo/db:mongohasher",
@@ -35,11 +37,11 @@ mongo_cc_unit_test(
     name = "boolean_simplification_test",
     srcs = [
         "bitset_algebra_test.cpp",
-        "bitset_test_util.h",
         "bitset_tree_test.cpp",
         "petrick_test.cpp",
         "quine_mccluskey_test.cpp",
     ],
+    private_hdrs = [":bitset_test_util.h"],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":boolean_simplification",

@@ -145,9 +145,9 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "plan_ranking_utils",
-    srcs = [
-        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.cpp",
-        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.h",
+    srcs = ["//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.cpp"],
+    private_hdrs = [
+        ":plan_ranking_utils.h",
         "//src/mongo/dbtests:dbtests.h",
     ],
     deps = [

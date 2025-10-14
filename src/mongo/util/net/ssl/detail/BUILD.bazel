@@ -1,0 +1,16 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.hpp",
+        "*.ipp",
+    ]),
+)
+
+filegroup(
+    name = "detail",
+    srcs = glob([
+        "*.hpp",
+        "*.ipp",
+    ]),
+)

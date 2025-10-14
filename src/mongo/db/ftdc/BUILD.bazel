@@ -195,10 +195,10 @@ mongo_cc_unit_test(
         "file_writer_test.cpp",
         "ftdc_prctl_test.cpp",
         "ftdc_test.cpp",
-        "ftdc_test.h",
         "ftdc_util_test.cpp",
         "metadata_compressor_test.cpp",
     ],
+    private_hdrs = [":ftdc_test.h"],
     tags = ["mongo_unittest_second_group"],
     deps = [
         ":ftdc",

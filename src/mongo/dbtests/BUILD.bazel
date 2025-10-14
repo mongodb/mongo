@@ -138,19 +138,15 @@ mongo_cc_binary(
         "rollbacktests.cpp",
         "socktests.cpp",
         "storage_debug_util.cpp",
-        "storage_debug_util.h",
         "threadedtests.cpp",
         "updatetests.cpp",
         "validate_tests.cpp",
         "wildcard_access_method_test.cpp",
         "wildcard_multikey_persistence_test.cpp",
-        "//src/mongo/db:session_manager_mongod.h",
         "//src/mongo/db/local_catalog:catalogtests.cpp",
         "//src/mongo/db/local_catalog:indexcatalogtests.cpp",
         "//src/mongo/dbtests/index_builds:index_access_method_test.cpp",
         "//src/mongo/dbtests/index_builds:multikey_paths_test.cpp",
-        "//src/mongo/idl:server_parameter_test_controller.h",
-        "//src/mongo/util:embedded_builder.h",
     ] + select({
         "//bazel/config:js_engine_mozjs": [
             "jstests.cpp",
@@ -158,6 +154,12 @@ mongo_cc_binary(
         ],
         "//conditions:default": [],
     }),
+    private_hdrs = [
+        ":storage_debug_util.h",
+        "//src/mongo/db:session_manager_mongod.h",
+        "//src/mongo/idl:server_parameter_test_controller.h",
+        "//src/mongo/util:embedded_builder.h",
+    ],
     tags = ["dbtest"],
     deps = [
         "deps_shim",

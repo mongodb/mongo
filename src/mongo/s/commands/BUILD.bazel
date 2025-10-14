@@ -343,9 +343,7 @@ mongo_cc_unit_test(
     srcs = [
         "document_shard_key_update_test.cpp",
         "//src/mongo/db/local_catalog:cluster_validate_db_metadata_cmd_test.cpp",
-        "//src/mongo/db/session:logical_session_cache_noop.h",
         "//src/mongo/db/sharding_environment:cluster_command_test_fixture.cpp",
-        "//src/mongo/db/sharding_environment:cluster_command_test_fixture.h",
         "//src/mongo/s/commands/query_cmd:cluster_aggregate_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_bulk_write_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_bulk_write_uwe_test.cpp",
@@ -357,6 +355,10 @@ mongo_cc_unit_test(
         "//src/mongo/s/commands/query_cmd:cluster_insert_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_profile_cmd_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_update_test.cpp",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/session:logical_session_cache_noop.h",
+        "//src/mongo/db/sharding_environment:cluster_command_test_fixture.h",
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [

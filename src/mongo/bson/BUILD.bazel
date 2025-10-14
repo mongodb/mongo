@@ -54,8 +54,10 @@ mongo_cc_unit_test(
         "oid_test.cpp",
         "ordering_test.cpp",
         "simple_bsonobj_comparator_test.cpp",
-        "//src/mongo/bson:bsonelement_comparator.h",
-        "//src/mongo/bson:bsonobj_comparator.h",
+    ],
+    private_hdrs = [
+        ":bsonelement_comparator.h",
+        ":bsonobj_comparator.h",
     ],
     tags = [
         "mongo_unittest_first_group",
@@ -87,8 +89,8 @@ mongo_cc_fuzzer_test(
     srcs = [
         "bson_validate_fuzzer.cpp",
         "bson_validate_old.cpp",
-        "bson_validate_old.h",
     ],
+    private_hdrs = [":bson_validate_old.h"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",

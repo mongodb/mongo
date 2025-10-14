@@ -46,10 +46,8 @@ idl_generator(
 
 mongo_cc_library(
     name = "cluster_server_parameter_server_status",
-    srcs = [
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_server_status.cpp",
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_server_status.h",
-    ],
+    srcs = ["//src/mongo/db/cluster_parameters:cluster_server_parameter_server_status.cpp"],
+    private_hdrs = ["//src/mongo/db/cluster_parameters:cluster_server_parameter_server_status.h"],
     deps = [
         "//src/mongo/bson:bson_validate",
         "//src/mongo/db:server_base",
@@ -248,8 +246,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_server_status_test.cpp",
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_test_gen",
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_test_util.cpp",
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_test_util.h",
     ],
+    private_hdrs = ["//src/mongo/db/cluster_parameters:cluster_server_parameter_test_util.h"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":cluster_parameter_synchronization_helpers",
@@ -283,15 +281,10 @@ mongo_cc_unit_test(
     srcs = [
         "command_generic_argument_test.cpp",
         "config_option_test.cpp",
-        "config_option_test.h",
         "feature_flag_test.cpp",
         "idl_test.cpp",
-        "idl_test.h",
-        "idl_test_types.h",
         "server_parameter_specialized_test.cpp",
-        "server_parameter_specialized_test.h",
         "server_parameter_with_storage_test.cpp",
-        "server_parameter_with_storage_test.h",
         ":config_option_no_init_test_gen",
         ":config_option_test_gen",
         ":server_parameter_specialized_test_gen",
@@ -299,6 +292,13 @@ mongo_cc_unit_test(
         ":server_parameter_with_storage_test_structs_gen",
         ":unittest_gen",
         ":unittest_import_gen",
+    ],
+    private_hdrs = [
+        ":config_option_test.h",
+        ":idl_test.h",
+        ":idl_test_types.h",
+        ":server_parameter_specialized_test.h",
+        ":server_parameter_with_storage_test.h",
         "//src/mongo/db/repl:collection_bulk_loader.h",
         "//src/mongo/db/repl:storage_interface.h",
         "//src/mongo/util/cmdline_utils:censor_cmdline_test.h",

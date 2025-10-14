@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/compiler/stats/stats_gen.h"
+#include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>

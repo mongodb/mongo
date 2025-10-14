@@ -11,12 +11,10 @@ exports_files(
 
 mongo_cc_library(
     name = "index_catalog_mock",
-    srcs = [
-        "index_catalog_entry_mock.h",
-    ],
     hdrs = [
         "index_catalog_mock.h",
     ],
+    private_hdrs = [":index_catalog_entry_mock.h"],
     deps = [
     ],
 )
@@ -61,7 +59,6 @@ mongo_cc_library(
         "collection_options.cpp",
         "collection_options_gen",
         "collection_options_validation.cpp",
-        "//src/mongo/db/local_catalog/ddl:create_command_validation.h",
     ],
     hdrs = [
         "clustered_collection_util.h",
@@ -69,6 +66,7 @@ mongo_cc_library(
         "collection_options_validation.h",
         "//src/mongo/db/index:index_constants.h",
     ],
+    private_hdrs = ["//src/mongo/db/local_catalog/ddl:create_command_validation.h"],
     deps = [
         # TODO(SERVER-93876): Technically only requires `//src/mongo/db:common`.
         "//src/mongo/crypto:encrypted_field_config",
@@ -484,7 +482,6 @@ mongo_cc_library(
         "rename_collection.cpp",
         "unique_collection_name.cpp",
         "//src/mongo/db/collection_crud:capped_utils.cpp",
-        "//src/mongo/db/op_observer:batched_write_policy.h",
     ],
     hdrs = [
         "backwards_compatible_collection_options_util.h",
@@ -502,6 +499,7 @@ mongo_cc_library(
         "unique_collection_name.h",
         "//src/mongo/db/collection_crud:capped_utils.h",
     ],
+    private_hdrs = ["//src/mongo/db/op_observer:batched_write_policy.h"],
     deps = [
         ":cannot_convert_index_to_unique_info",
         ":collection_options",

@@ -35,11 +35,11 @@ mongo_cc_library(
 
 mongo_cc_unit_test(
     name = "query_solution_test",
-    srcs = [
-        "query_solution_test.cpp",
+    srcs = ["query_solution_test.cpp"],
+    private_hdrs = [
+        "//src/mongo/db/query/collation:collator_interface_mock.h",
         "//src/mongo/db/query:query_test_service_context.h",
         "//src/mongo/db/query:wildcard_test_utils.h",
-        "//src/mongo/db/query/collation:collator_interface_mock.h",
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [

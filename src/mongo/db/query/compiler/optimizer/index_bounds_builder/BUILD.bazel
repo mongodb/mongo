@@ -40,9 +40,7 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "index_bounds_builder_test_fixture",
-    srcs = [
-        "index_bounds_builder_test_fixture.h",
-    ],
+    private_hdrs = [":index_bounds_builder_test_fixture.h"],
     deps = [
         ":index_bounds_builder",
         "//src/mongo/db/pipeline:expression_context_for_test",

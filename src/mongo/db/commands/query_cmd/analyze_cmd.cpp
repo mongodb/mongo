@@ -53,7 +53,7 @@
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
-#include "mongo/db/query/compiler/stats/stats_gen.h"
+#include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"

@@ -3,6 +3,7 @@
 *.sh text eol=lf
 **/third_party/**/* rules-lint-ignored=true
 **/third_party/**/BUILD.bazel rules-lint-ignored=false
+**/.auto_header/**/* rules-lint-ignored=true
 external rules-lint-ignored=true
 **/*.tpl.h rules-lint-ignored=true
 **/*.tpl.cpp rules-lint-ignored=true

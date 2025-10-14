@@ -58,12 +58,10 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "sorter_test_utils",
-    srcs = [
-        "sorter_test_utils.h",
-    ],
     hdrs = [
         "sorter_test_utils.h",
     ],
+    private_hdrs = [":sorter_test_utils.h"],
     deps = [
         ":sorter_base",
         "//src/mongo/db/storage:encryption_hooks",

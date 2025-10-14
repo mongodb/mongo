@@ -30,6 +30,7 @@ buildvariants:
       evergreen_remote_exec: on
     tasks:
       - name: hydrate_bazel_profile_TG
+      - name: hydrate_all_headers_TG
       - name: .clang_tidy
 
   - name: &workstation_bazel_cache_hydration_x86_64 workstation_bazel_cache_hydration_x86_64

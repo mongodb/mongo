@@ -1,8 +1,13 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test", "mongo_cc_unit_test")
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test", "mongo_cc_unit_test")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
 
 mongo_cc_library(
     name = "mongor_lib",
@@ -62,19 +67,21 @@ mongo_cc_unit_test(
     name = "mongor-test",
     srcs = [
         "config_handler_test.cpp",
-        "mini_mock.h",
         "performance_reporter_test.cpp",
         "replay_command_executor_test.cpp",
         "replay_command_test.cpp",
         "replay_test_server.cpp",
-        "replay_test_server.h",
-        "session_handler.h",
         "session_handler_test.cpp",
         "session_scheduler_test.cpp",
         "session_simulator_test.cpp",
         "test_packet.cpp",
-        "test_packet.h",
         "traffic_reader_test.cpp",
+    ],
+    private_hdrs = [
+        ":mini_mock.h",
+        ":replay_test_server.h",
+        ":session_handler.h",
+        ":test_packet.h",
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [

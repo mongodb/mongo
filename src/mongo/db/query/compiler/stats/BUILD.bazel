@@ -10,8 +10,8 @@ exports_files(
 )
 
 idl_generator(
-    name = "stats_gen_for_histograms",
-    src = "stats.idl",
+    name = "stats_for_histograms_gen",
+    src = "stats_for_histograms.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -23,7 +23,7 @@ mongo_cc_library(
         "ce_histogram.cpp",
         "scalar_histogram.cpp",
         "value_utils.cpp",
-        ":stats_gen_for_histograms",
+        ":stats_for_histograms_gen",
     ],
     hdrs = [
         "ce_histogram.h",
@@ -150,9 +150,9 @@ mongo_cc_unit_test(
     name = "stats_cache_test",
     srcs = [
         "stats_cache_loader_mock.cpp",
-        "stats_cache_loader_mock.h",
         "stats_cache_test.cpp",
     ],
+    private_hdrs = [":stats_cache_loader_mock.h"],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":stats",
@@ -230,8 +230,8 @@ mongo_cc_unit_test(
     srcs = [
         "stats_cache_loader_test.cpp",
         "stats_cache_loader_test_fixture.cpp",
-        "stats_cache_loader_test_fixture.h",
     ],
+    private_hdrs = [":stats_cache_loader_test_fixture.h"],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         "//src/mongo/db:multitenancy",

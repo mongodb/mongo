@@ -3,13 +3,14 @@ package(default_visibility = ["//visibility:public"])
 exports_files(
     glob([
         "*.hpp",
+        "*.ipp",
     ]),
 )
 
 filegroup(
     name = "ssl",
     srcs = glob([
-        "**/*.hpp",
-        "**/*.ipp",
+        "*.hpp",
+        "*.ipp",
     ]),
 )

@@ -17,18 +17,11 @@ mongo_cc_library(
         "death_test.cpp",
         "golden_test.cpp",
         "inline_auto_update.cpp",
+        "log_capture.cpp",
         "matcher.cpp",
         "stringify.cpp",
         "temp_dir.cpp",
         "unittest.cpp",
-        "log_capture.cpp",
-
-        # Note: Only used here and for the corresponding test. consider moving.
-        "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
-        "//src/mongo/db/exec/mutable_bson:mutable_bson_test_utils.h",
-        "//src/mongo/db/exec/mutable_bson:document.h",
-        "//src/mongo/db/exec/mutable_bson:const_element.h",
-        "//src/mongo/logv2:log_capture_backend.h",
     ],
     hdrs = [
         "assert.h",
@@ -46,6 +39,13 @@ mongo_cc_library(
         "temp_dir.h",
         "thread_assertion_monitor.h",
         "unittest.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
+        "//src/mongo/db/exec/mutable_bson:const_element.h",
+        "//src/mongo/db/exec/mutable_bson:document.h",
+        "//src/mongo/db/exec/mutable_bson:mutable_bson_test_utils.h",
+        "//src/mongo/logv2:log_capture_backend.h",
     ],
     deps = [
         ":golden_test_base",
@@ -94,10 +94,8 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "task_executor_proxy",
-    srcs = [
-        "task_executor_proxy.cpp",
-        "task_executor_proxy.h",
-    ],
+    srcs = ["task_executor_proxy.cpp"],
+    private_hdrs = [":task_executor_proxy.h"],
     deps = [
         "//src/mongo/executor:task_executor_interface",
     ],
@@ -160,8 +158,8 @@ mongo_cc_library(
     srcs = [
         "benchmark_main.cpp",
         "benchmark_options_gen",
-        "log_test.h",
     ],
+    private_hdrs = [":log_test.h"],
     tags = ["benchmarks"],
     deps = [
         # benchmark_main must not be made to depend on additional libraries.

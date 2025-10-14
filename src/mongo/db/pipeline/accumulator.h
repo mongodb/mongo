@@ -38,7 +38,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/compiler/stats/stats_gen.h"
+#include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/platform/decimal128.h"

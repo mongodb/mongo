@@ -37,13 +37,11 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "hello_response",
-    srcs = [
-        "hello_response.cpp",
-        "//src/mongo/db/repl:optime_with.h",
-    ],
+    srcs = ["hello_response.cpp"],
     hdrs = [
         "hello_response.h",
     ],
+    private_hdrs = ["//src/mongo/db/repl:optime_with.h"],
     deps = [
         "//src/mongo/db/repl:optime",
         "//src/mongo/rpc:metadata",

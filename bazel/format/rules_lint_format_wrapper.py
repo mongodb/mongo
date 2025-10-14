@@ -4,7 +4,12 @@ import pathlib
 import subprocess
 from typing import List, Union
 
-from buildscripts.bazel_custom_formatter import validate_bazel_groups, validate_clang_tidy_configs
+from buildscripts.bazel_custom_formatter import (
+    validate_bazel_groups,
+    validate_clang_tidy_configs,
+    validate_idl_naming,
+    validate_private_headers,
+)
 
 
 def _git_distance(args: list) -> int:
@@ -206,6 +211,8 @@ def main() -> int:
     if files_to_format_contains_bazel_file(files_to_format):
         validate_clang_tidy_configs(generate_report=True, fix=not args.check)
         validate_bazel_groups(generate_report=True, fix=not args.check)
+        validate_idl_naming(generate_report=True, fix=not args.check)
+        validate_private_headers(generate_report=True, fix=not args.check)
 
     if files_to_format != "all":
         files_to_format = [str(file) for file in files_to_format if os.path.isfile(file)]

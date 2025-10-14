@@ -11,12 +11,7 @@ exports_files(
 
 mongo_cc_library(
     name = "mongoca",
-    srcs = [
-        "CustomAction.cpp",
-        "targetver.h",
-        "//src/mongo/platform:compiler.h",
-        "//src/mongo/util:scopeguard.h",
-    ],
+    srcs = ["CustomAction.cpp"],
     copts = select({
         "//bazel/config:dbg_enabled": [
             "/MTd",
@@ -31,6 +26,11 @@ mongo_cc_library(
         "Advapi32.lib",
     ],
     linkshared = True,
+    private_hdrs = [
+        ":targetver.h",
+        "//src/mongo/platform:compiler.h",
+        "//src/mongo/util:scopeguard.h",
+    ],
     # We don't want any special allocator here either.
     skip_global_deps = [
         "allocator",

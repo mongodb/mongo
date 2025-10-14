@@ -24,9 +24,9 @@ mongo_cc_library(
     name = "test_commands_enabled",
     srcs = [
         "test_commands_enabled.cpp",
-        "test_commands_enabled.h",
         ":test_commands_enabled_gen",
     ],
+    private_hdrs = [":test_commands_enabled.h"],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -45,9 +45,9 @@ mongo_cc_library(
     name = "buildinfo_common",
     srcs = [
         "buildinfo_common.cpp",
-        "buildinfo_common.h",
         ":buildinfo_common_gen",
     ],
+    private_hdrs = [":buildinfo_common.h"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:commands",
@@ -1214,7 +1214,6 @@ mongo_cc_unit_test(
         "profile_cmd_test.cpp",
         "set_profiling_filter_globally_cmd_test.cpp",
         "//src/mongo/db/cluster_parameters:set_cluster_parameter_invocation_test.cpp",
-        "//src/mongo/db/commands:db_command_test_fixture.h",
         "//src/mongo/db/commands/query_cmd:aggregation_execution_state_test.cpp",
         "//src/mongo/db/commands/query_cmd:explain_test.cpp",
         "//src/mongo/db/commands/query_cmd:external_data_source_commands_test.cpp",
@@ -1223,7 +1222,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/commands/query_cmd:run_aggregate_test.cpp",
         "//src/mongo/db/commands/server_status:server_status_command_test.cpp",
         "//src/mongo/db/commands/server_status:server_status_metric_test.cpp",
-        "//src/mongo/db/local_catalog:collection_mock.h",
         "//src/mongo/db/local_catalog/ddl:create_command_test.cpp",
         "//src/mongo/db/local_catalog/ddl:list_collections_filter_test.cpp",
     ] + select({
@@ -1232,6 +1230,10 @@ mongo_cc_unit_test(
             "//src/mongo/db/commands/query_cmd:mr_test.cpp",
         ],
     }),
+    private_hdrs = [
+        ":db_command_test_fixture.h",
+        "//src/mongo/db/local_catalog:collection_mock.h",
+    ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":cluster_server_parameter_commands_invocation",

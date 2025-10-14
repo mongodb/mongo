@@ -30,8 +30,8 @@ mongo_cc_unit_test(
     srcs = [
         "doc_validation_error_json_schema_test.cpp",
         "doc_validation_error_test.cpp",
-        "doc_validation_error_test.h",
     ],
+    private_hdrs = [":doc_validation_error_test.h"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":doc_validation",

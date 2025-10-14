@@ -356,8 +356,8 @@ mongo_cc_unit_test(
     srcs = [
         "mongos_process_interface_test.cpp",
         "shardsvr_process_interface_test.cpp",
-        "//src/mongo/s/query/exec:sharded_agg_test_fixture.h",
     ],
+    private_hdrs = ["//src/mongo/s/query/exec:sharded_agg_test_fixture.h"],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":mongos_process_interface",
@@ -376,10 +376,8 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "standalone_process_interface_test",
-    srcs = [
-        "standalone_process_interface.h",
-        "standalone_process_interface_test.cpp",
-    ],
+    srcs = ["standalone_process_interface_test.cpp"],
+    private_hdrs = [":standalone_process_interface.h"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":mongod_process_interfaces",

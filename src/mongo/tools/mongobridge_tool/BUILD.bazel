@@ -22,11 +22,13 @@ mongo_cc_binary(
     srcs = [
         "bridge.cpp",
         "bridge_commands.cpp",
-        "bridge_commands.h",
         "mongobridge_options.cpp",
-        "mongobridge_options.h",
         "mongobridge_options_gen",
         "mongobridge_options_init.cpp",
+    ],
+    private_hdrs = [
+        ":bridge_commands.h",
+        ":mongobridge_options.h",
     ],
     tags = [
         "dist_test",

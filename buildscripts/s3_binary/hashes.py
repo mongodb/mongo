@@ -18,4 +18,9 @@ S3_SHA256_HASHES = {
     "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-apple-darwin.tar.gz": "34aa37643e30dcb81a3c0e011c3a8df552465ea7580ba92ca727a3b7c6de25d1",
     "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-pc-windows-msvc.zip": "9d10e1282c5f695b2130cf593d55e37266513fc6d497edc4a30a6ed6d8ba4067",
     "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-unknown-linux-musl.tar.gz": "39a1cd878962ebc88322b4f6d33cae2292454563028f93a3f1f8ce58e3025b07",
+    "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-darwin-amd64": "e3936d70c47bf8439797aa2c6c1ddff868424ff6bc418fc8501e819a2d58ccad",
+    "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-darwin-arm64": "14134aadba85ab2cfe4494d0f44253145f897b77a23fd4d7df2cb4929b53c786",
+    "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-linux-amd64": "9f48273b6c780a5f4f084ef30bc67d98cbd7d10c55c4605cf3a6ee29b741af87",
+    "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-linux-arm64": "d0fc407937b8a8aec44f3a80b4a08219ba61dde234590358abb168b44478d493",
+    "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-windows-amd64.exe": "fd3d4853da7a319a604e1cb03ede88cbf584edd12b89a0991871fb4d9cd3ba5b",
 }

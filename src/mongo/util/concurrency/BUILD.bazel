@@ -129,10 +129,8 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "lock_free_read_list_test",
-    srcs = [
-        "lock_free_read_list_test.cpp",
-        "//src/mongo/unittest:join_thread.h",
-    ],
+    srcs = ["lock_free_read_list_test.cpp"],
+    private_hdrs = ["//src/mongo/unittest:join_thread.h"],
     tags = ["mongo_unittest_second_group"],
     deps = [],
 )
@@ -149,10 +147,8 @@ mongo_cc_benchmark(
 
 mongo_cc_benchmark(
     name = "ticketholder_bm",
-    srcs = [
-        "ticketholder_bm.cpp",
-        "//src/mongo/util:latency_distribution.h",
-    ],
+    srcs = ["ticketholder_bm.cpp"],
+    private_hdrs = ["//src/mongo/util:latency_distribution.h"],
     tags = [
         "second_half_bm",
     ],

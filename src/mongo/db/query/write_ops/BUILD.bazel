@@ -137,14 +137,16 @@ mongo_cc_library(
     srcs = [
         "write_ops.cpp",
         ":write_ops_gen",
-        "//src/mongo/db/update:update_oplog_entry_serialization.h",
-        "//src/mongo/db/update:update_oplog_entry_version.h",
     ],
     hdrs = [
         "write_ops.h",
     ],
     header_deps = [
         "//src/mongo/db/global_catalog:sharding_catalog_client",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/update:update_oplog_entry_serialization.h",
+        "//src/mongo/db/update:update_oplog_entry_version.h",
     ],
     deps = [
         "//src/mongo:base",

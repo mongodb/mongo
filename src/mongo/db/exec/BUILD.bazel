@@ -108,8 +108,6 @@ mongo_cc_library(
         "inclusion_projection_executor.cpp",
         "projection_executor_builder.cpp",
         "projection_node.cpp",
-        "//src/mongo/base:exact_cast.h",
-        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_path_tracking_visitor.h",
     ],
     hdrs = [
         "add_fields_projection_executor.h",
@@ -117,6 +115,10 @@ mongo_cc_library(
         "inclusion_projection_executor.h",
         "projection_executor_builder.h",
         "projection_node.h",
+    ],
+    private_hdrs = [
+        "//src/mongo/base:exact_cast.h",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_path_tracking_visitor.h",
     ],
     deps = [
         "//src/mongo/db:query_expressions",
@@ -202,7 +204,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/expression:evaluate_string_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_test_helpers.cpp",
-        "//src/mongo/db/exec/expression:evaluate_test_helpers.h",
         "//src/mongo/db/exec/expression:evaluate_trigonometric_test.cpp",
         "//src/mongo/db/exec/matcher:matcher_expr_test.cpp",
         "//src/mongo/db/exec/matcher:matcher_geo_test.cpp",
@@ -211,6 +212,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/matcher:matcher_serialization_test.cpp",
         "//src/mongo/db/exec/matcher:matcher_test.cpp",
         "//src/mongo/db/exec/timeseries:bucket_unpacker_test.cpp",
+    ],
+    private_hdrs = [
+        "//src/mongo/db/exec/expression:evaluate_test_helpers.h",
         "//src/mongo/db/pipeline:document_source_test_optimizations.h",
     ],
     tags = ["mongo_unittest_fourth_group"],

@@ -106,10 +106,12 @@ mongo_cc_library(
     ],
     hdrs = [
         "boost_assert_shim.h",
-        "//src/third_party/boost:headers",
     ],
     copts = [
         "-Isrc/third_party/boost",
+    ],
+    deps = [
+        "//src/third_party/boost:headers",
     ],
 )
 
@@ -558,10 +560,8 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "pcre_wrapper",
-    srcs = [
-        "pcre.cpp",
-        "pcre.h",
-    ],
+    srcs = ["pcre.cpp"],
+    private_hdrs = [":pcre.h"],
     deps = [
         "//src/mongo:base",
         "//src/third_party/pcre2",
@@ -570,10 +570,8 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "pcre_util",
-    srcs = [
-        "pcre_util.cpp",
-        "pcre_util.h",
-    ],
+    srcs = ["pcre_util.cpp"],
+    private_hdrs = [":pcre_util.h"],
     deps = [
         ":pcre_wrapper",
         "//src/mongo:base",
@@ -582,10 +580,8 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "procparser",
-    srcs = [
-        "procparser.cpp",
-        "procparser.h",
-    ],
+    srcs = ["procparser.cpp"],
+    private_hdrs = [":procparser.h"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -598,10 +594,7 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "processinfo",
-    srcs = [
-        "processinfo.cpp",
-        "processinfo.h",
-    ] + select({
+    srcs = ["processinfo.cpp"] + select({
         "@platforms//os:{}".format(os): ["processinfo_{}.cpp".format(os)]
         for os in [
             "freebsd",
@@ -613,6 +606,7 @@ mongo_cc_library(
     } | {
         "//conditions:default": ["processinfo_unknown.cpp"],
     }),
+    private_hdrs = [":processinfo.h"],
     deps = [
         ":pcre_wrapper",
         "//src/mongo:base",
@@ -848,16 +842,16 @@ mongo_cc_unit_test(
 
 mongo_cc_binary(
     name = "pretty_printer_test_program",
-    srcs = [
-        "pretty_printer_test_program.cpp",
+    srcs = ["pretty_printer_test_program.cpp"],
+    private_hdrs = [
+        "//src/mongo/db/auth:cluster_auth_mode.h",
+        "//src/mongo/db/repl:optime.h",
         "//src/mongo/db:database_name.h",
         "//src/mongo/db:database_name_reserved.h",
         "//src/mongo/db:namespace_string.h",
         "//src/mongo/db:namespace_string_reserved.h",
         "//src/mongo/db:server_options.h",
         "//src/mongo/db:tenant_id.h",
-        "//src/mongo/db/auth:cluster_auth_mode.h",
-        "//src/mongo/db/repl:optime.h",
         "//src/mongo/util/net:cidr.h",
         "//src/mongo/util/version:releases.h",
     ],
@@ -945,7 +939,6 @@ mongo_cc_unit_test(
         "dynamic_bitset_test.cpp",
         "dynamic_catch_test.cpp",
         "errno_util_test.cpp",
-        "executor_test_util.h",
         "fail_point_test.cpp",
         "fixed_string_test.cpp",
         "functional_test.cpp",
@@ -957,7 +950,6 @@ mongo_cc_unit_test(
         "future_test_promise_int.cpp",
         "future_test_promise_void.cpp",
         "future_test_shared_future.cpp",
-        "future_test_utils.h",
         "future_test_valid.cpp",
         "future_util_test.cpp",
         "hierarchical_acquisition_test.cpp",
@@ -968,7 +960,6 @@ mongo_cc_unit_test(
         "interruptible_test.cpp",
         "invalidating_lru_cache_test.cpp",
         "itoa_test.cpp",
-        "latency_distribution.h",
         "latency_distribution_test.cpp",
         "lockable_adapter_test.cpp",
         "log_with_sampling_test.cpp",
@@ -993,7 +984,6 @@ mongo_cc_unit_test(
         "scoped_unlock_test.cpp",
         "secure_zero_memory_test.cpp",
         "shared_buffer_test.cpp",
-        "sort.h",
         "static_immortal_test.cpp",
         "str_test.cpp",
         "string_map_test.cpp",
@@ -1004,11 +994,17 @@ mongo_cc_unit_test(
         "time_support_test.cpp",
         "timer_test.cpp",
         "util_sort_test.cpp",
-        "//src/mongo/unittest:join_thread.h",
     ] + select({
         "@platforms//os:linux": ["procparser_test.cpp"],
         "//conditions:default": [],
     }),
+    private_hdrs = [
+        ":executor_test_util.h",
+        ":future_test_utils.h",
+        ":latency_distribution.h",
+        ":sort.h",
+        "//src/mongo/unittest:join_thread.h",
+    ],
     tags = [
         "mongo_unittest_fourth_group",
         "server-programmability",
@@ -1047,10 +1043,10 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "signal_handlers_test",
     srcs = [
-        "fixed_string.h",
         "signal_handlers_asynchronous_test.cpp",
         "signal_handlers_synchronous_test.cpp",
     ],
+    private_hdrs = [":fixed_string.h"],
     tags = ["mongo_unittest_first_group"],
     target_compatible_with = select({
         "@platforms//os:windows": ["@platforms//:incompatible"],
@@ -1273,9 +1269,7 @@ mongo_cc_unit_test(
 
 mongo_cc_library(
     name = "stacktrace_test_helpers",
-    srcs = [
-        "stacktrace_test_helpers.h",
-    ],
+    private_hdrs = [":stacktrace_test_helpers.h"],
 )
 
 mongo_cc_unit_test(
@@ -1284,8 +1278,8 @@ mongo_cc_unit_test(
         "stacktrace_libunwind_deadlock_test.cpp",
         "stacktrace_libunwind_test.cpp",
         "stacktrace_libunwind_test_functions.cpp",
-        "stacktrace_libunwind_test_functions.h",
     ],
+    private_hdrs = [":stacktrace_libunwind_test_functions.h"],
     tags = [
         "mongo_unittest_fourth_group",
         "server-programmability",
@@ -1316,9 +1310,7 @@ mongo_cc_unit_test(
 
 mongo_cc_library(
     name = "packaged_task",
-    srcs = [
-        "packaged_task.h",
-    ],
+    private_hdrs = [":packaged_task.h"],
 )
 
 py_binary(
@@ -1332,9 +1324,9 @@ mongo_cc_library(
     srcs = [
         "varint.cpp",
         "varint_details.cpp",
-        "varint_details.h",
     ],
     hdrs = ["varint.h"],
+    private_hdrs = [":varint_details.h"],
     deps = [
         "//src/mongo:base",
     ],

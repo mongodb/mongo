@@ -16,6 +16,7 @@ buildvariants:
       resmoke_jobs_max: 6
     tasks:
       - name: compile_test_serial_TG
+      - name: hydrate_all_headers_TG
       - name: run_bazel_compiledb
       - name: run_unit_tests_8_way_split_TG
       - name: audit

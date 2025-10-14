@@ -195,7 +195,6 @@ mongo_cc_library(
         "index_build_interceptor.cpp",
         "skipped_record_tracker.cpp",
         ":index_build_interceptor_gen",
-        "//src/mongo/db/index:index_access_method.h",
     ],
     hdrs = [
         "duplicate_key_tracker.h",
@@ -203,6 +202,7 @@ mongo_cc_library(
         "skipped_record_tracker.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
+    private_hdrs = ["//src/mongo/db/index:index_access_method.h"],
     deps = [
         ":index_builds_common",
         ":two_phase_index_build_knobs_idl",

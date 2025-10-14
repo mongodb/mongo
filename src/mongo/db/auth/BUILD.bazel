@@ -66,11 +66,13 @@ mongo_cc_library(
     name = "address_restriction",
     srcs = [
         "address_restriction.cpp",
-        "address_restriction.h",
-        "restriction.h",
-        "restriction_environment.h",
-        "restriction_set.h",
         ":address_restriction_gen",
+    ],
+    private_hdrs = [
+        ":address_restriction.h",
+        ":restriction.h",
+        ":restriction_environment.h",
+        ":restriction_set.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -133,7 +135,6 @@ mongo_cc_library(
         "authorization_session_impl.cpp",
         "authz_session_external_state.cpp",
         ":authorization_manager_impl_parameters_gen",
-        "//src/mongo/db/auth:user_request_x509.h",
     ],
     hdrs = [
         "authorization_manager_impl.h",
@@ -142,6 +143,7 @@ mongo_cc_library(
         "authz_session_external_state.h",
         "resource_pattern_search_list.h",
     ],
+    private_hdrs = [":user_request_x509.h"],
     deps = [
         ":address_restriction",
         ":auth",
@@ -455,7 +457,6 @@ mongo_cc_library(
         "authorization_manager.cpp",
         "authorization_manager_factory.cpp",
         "authorization_router.cpp",
-        "//src/mongo/util/concurrency:thread_pool.h",
     ],
     hdrs = [
         "authorization_backend_interface.h",
@@ -464,6 +465,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:authentication_commands.h",
         "//src/mongo/util:sequence_util.h",
     ],
+    private_hdrs = ["//src/mongo/util/concurrency:thread_pool.h"],
     deps = [
         "auth_options",
         "cluster_auth_mode",
@@ -738,7 +740,6 @@ mongo_cc_library(
         "sasl_mechanism_registry.cpp",
         "sasl_plain_server_conversation.cpp",
         "sasl_scram_server_conversation.cpp",
-        "//src/mongo/crypto:mechanism_scram.h",
     ] + select({
         "//bazel/config:ssl_enabled": [
             "sasl_x509_server_conversation.cpp",
@@ -759,6 +760,7 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+    private_hdrs = ["//src/mongo/crypto:mechanism_scram.h"],
     deps = [
         # TODO(SERVER-93876): Remove all except authorization_manager_global.
         "//src/mongo/base:secure_allocator",
@@ -853,14 +855,12 @@ mongo_cc_unit_test(
         "authentication_session_test.cpp",
         "authorization_contract_test.cpp",
         "authorization_manager_test.cpp",
-        "authorization_router_impl_for_test.h",
         "authorization_session_test.cpp",
         "builtin_roles_test.cpp",
         "oauth_discovery_factory_test.cpp",
         "privilege_parser_test.cpp",
         "resolve_role_option_test.cpp",
         "resource_pattern_search_list_test.cpp",
-        "restriction_mock.h",
         "restriction_test.cpp",
         "sasl_authentication_session_test.cpp",
         "sasl_mechanism_registry_test.cpp",
@@ -875,6 +875,10 @@ mongo_cc_unit_test(
     }),
     data = [
         "//jstests/libs:test_pem_files",
+    ],
+    private_hdrs = [
+        ":authorization_router_impl_for_test.h",
+        ":restriction_mock.h",
     ],
     tags = [
         # Segfaults in sandbox

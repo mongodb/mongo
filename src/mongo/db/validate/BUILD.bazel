@@ -80,12 +80,14 @@ mongo_cc_library(
     srcs = [
         "collection_validation.cpp",
         "index_consistency.cpp",
-        "index_consistency.h",
         "validate_adaptor.cpp",
-        "validate_adaptor.h",
     ],
     hdrs = [
         "collection_validation.h",
+    ],
+    private_hdrs = [
+        ":index_consistency.h",
+        ":validate_adaptor.h",
     ],
     deps = [
         ":validate_results",
