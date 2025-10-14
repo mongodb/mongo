@@ -323,8 +323,6 @@ GetNextResult InternalDensifyStage::handleNeedGen(Document currentDoc,
     // 31st, adding 1 month to February 28th would return March 28th, which is outside of the
     // range). This will only ever happen at the start of the range. Therefore, it is safe to assume
     // that if the value generated is below the range, the correct value is the start of the range.
-    // TODO SERVER-99860: This solution may need to be overwritten depending on conclusions from
-    // this ticket.
     if (_rangeDensifyStart && nextValToGenerate < _rangeDensifyStart) {
         nextValToGenerate = *_rangeDensifyStart;
     }
