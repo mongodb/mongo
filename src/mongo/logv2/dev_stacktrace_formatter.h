@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,26 +27,40 @@
  *    it in the license file.
  */
 
+
 #pragma once
 
-#include <boost/log/attributes/attribute_name.hpp>
+#include "mongo/logv2/constants.h"
+#include "mongo/logv2/json_formatter.h"
+#include "mongo/logv2/log_format.h"
+#include "mongo/logv2/plain_formatter.h"
+#include "mongo/platform/atomic_word.h"
 
-namespace mongo::logv2::attributes {
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
 
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& tenant();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& service();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& id();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
-const boost::log::attribute_name& truncation();
-const boost::log::attribute_name& userassert();
-const boost::log::attribute_name& devStacktrace();
+namespace mongo::logv2 {
 
-}  // namespace mongo::logv2::attributes
+/**
+ * This is used for dev stacktraces which bypass structured logging. LOGV2 sinks
+ * are by default configured to use the JSONFormatter. We need to be able to choose
+ * PlainFormatter for our dev stacktraces, and JSONFormatter for everything else.
+ *
+ * This class is only expected to be used when the bazel flag `dev_stacktrace` is
+ * enabled.
+ */
+class DevStacktraceFormatter {
+public:
+    DevStacktraceFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB,
+                           LogTimestampFormat timestampFormat)
+        : _plainFormatter(PlainFormatter(maxAttributeSizeKB)),
+          _jsonFormatter(JSONFormatter(maxAttributeSizeKB, timestampFormat)) {}
+
+    void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
+
+private:
+    PlainFormatter _plainFormatter;
+    JSONFormatter _jsonFormatter;
+};
+
+}  // namespace mongo::logv2

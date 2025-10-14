@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,24 +29,18 @@
 
 #pragma once
 
-#include <boost/log/attributes/attribute_name.hpp>
+#include "mongo/base/string_data.h"
 
-namespace mongo::logv2::attributes {
+namespace mongo::logv2 {
 
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& tenant();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& service();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& id();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
-const boost::log::attribute_name& truncation();
-const boost::log::attribute_name& userassert();
-const boost::log::attribute_name& devStacktrace();
+/**
+ * This is used for dev stacktraces which bypass structured logging. LOGV2 sinks
+ * are by default configured to use the JSONFormatter. We need use PlainFormatter
+ * to output the message.
+ *
+ * This function is only expected to be used when the bazel flag `dev_stacktrace`
+ * is enabled.
+ */
+void plainLogBypass(StringData message);
 
-}  // namespace mongo::logv2::attributes
+}  // namespace mongo::logv2

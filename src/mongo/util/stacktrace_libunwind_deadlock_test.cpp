@@ -133,7 +133,7 @@ TEST(DlIteratePhdrDeadlockTest, DeadlockExists) {
 TEST(DlIteratePhdrDeadlockTest, NormalStacktrace) {
     ConcurrentPhdrIteration iter;
     iter.wait();
-    getStackTrace();
+    stack_trace_detail::getStructuredStackTrace();
     iter.resume();
 }
 

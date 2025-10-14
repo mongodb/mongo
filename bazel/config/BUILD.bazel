@@ -19,6 +19,7 @@ load(
     "dbg_level",
     "debug_symbols",
     "detect_odr_violations",
+    "dev_stacktrace",
     "disable_streams",
     "disable_warnings_as_errors",
     "dtlto",
@@ -1717,6 +1718,24 @@ config_setting(
     name = "separate_debug_enabled",
     flag_values = {
         "//bazel/config:separate_debug": "True",
+    },
+)
+
+# --------------------------------------
+# dev_stacktrace options
+# --------------------------------------
+
+dev_stacktrace(
+    name = "dev_stacktrace",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "dev_stacktrace_enabled",
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {
+        "//bazel/config:dev_stacktrace": "True",
+        "//bazel/config:release": "False",
     },
 )
 

@@ -127,3 +127,6 @@
 
 // Defined if the build includes disaggregated storage
 @mongo_config_disagg_storage@
+
+// Defined if using prettier dev stacktraces
+@mongo_config_dev_stacktrace@
