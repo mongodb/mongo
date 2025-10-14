@@ -428,3 +428,16 @@ buildvariants:
   - name: .serverless
   - name: unittest_shell_hang_analyzer_gen
   - name: .watchdog
+
+- name: upload-sbom-if-changed
+  display_name: "Upload SBOM if changed"
+  allowed_requesters: ["commit"]
+  activate: true
+  paths:
+    - "sbom.json"
+  tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
+  run_on:
+    - rhel8.8-small
+  stepback: false
+  tasks:
+    - name: upload_sbom_via_silkbomb_if_changed

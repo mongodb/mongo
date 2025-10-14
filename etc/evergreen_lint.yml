@@ -95,6 +95,9 @@ rules:
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/et.yaml
           - assigned_to_jira_team_streams
+
+          # https://github.com/10gen/mothra/blob/main/mothra/teams/security.yaml
+          - assigned_to_jira_team_platsec_server
         min_num_of_tags: 1
         max_num_of_tags: 1
 

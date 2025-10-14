@@ -1280,6 +1280,63 @@ tasks:
         JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
         JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
 
+- name: upload_sbom_via_silkbomb_if_changed
+  allowed_requesters: ["commit"]
+  tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
+  exec_timeout_secs: 600 # 10 minute timeout
+  commands:
+    - command: manifest.load
+    - func: "git get project and add git tag"
+    - func: "f_expansions_write"
+    - func: "kill processes"
+    - func: "cleanup environment"
+    - func: "set up venv"
+    - func: "upload pip requirements"
+    - command: ec2.assume_role
+      display_name: Assume Silkbomb IAM role
+      params:
+        role_arn: arn:aws:iam::119629040606:role/silkbomb
+    - command: shell.exec
+      display_name: Write temporary AWS credentials to Silkbomb environment file
+      params:
+        silent: true
+        shell: bash
+        include_expansions_in_env:
+          [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
+        script: |
+          cat << EOF > ${workdir}/silkbomb.env
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+          EOF
+    - command: ec2.assume_role
+      display_name: Assume DevProd Platforms ECR readonly IAM role
+      params:
+        role_arn: arn:aws:iam::901841024863:role/ecr-role-evergreen-ro
+    - command: subprocess.exec
+      params:
+        binary: bash
+        include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - github_token
+        args:
+          - "./src/evergreen/run_python_script.sh"
+          - "evergreen/functions/upload_sbom_via_silkbomb.py"
+          - "--run"
+        env:
+          REQUESTER: ${requester}
+          BRANCH_NAME: ${branch_name}
+          GITHUB_ORG: ${github_org}
+          GITHUB_REPO: ${github_repo}
+          CONTAINER_COMMAND: podman # podman or docker
+          CONTAINER_IMAGE: 901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/silkbomb:2.0
+          CONTAINER_ENV_FILES: ${workdir}/silkbomb.env
+          WORKING_DIR: ${workdir}
+          SBOM_REPO_PATH: sbom.json
+          LOCAL_REPO_PATH: src
+
 - name: version_burn_in_gen
   run_on: ubuntu2404-medium
   tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
