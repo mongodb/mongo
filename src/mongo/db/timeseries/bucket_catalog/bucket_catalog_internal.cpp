@@ -1168,6 +1168,15 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const StringDataComparator* comparator,
                                        Bucket& bucket,
                                        ExecutionStatsController& stats) {
+    // Note: These are a series of sequential checks that determine whether we need to rollover,
+    // it is important that checks only return if they determine that a rollover is necessary.
+    // If a check cannot determine that a rollover is necessary it must fall through to the next
+    // without returning RolloverReason::kNone until the end of the function.  This was the cause
+    // of a previous issue where skipping size-based rollover due to large bucket measurements
+    // would also bypass all remaining checks, causing mixed schema data to erroneously be
+    // added to buckets.
+
+    // Check rollover based on time range
     auto bucketTime = bucket.minTime;
     if (time - bucketTime >= Seconds(*timeseriesOptions.getBucketMaxSpanSeconds())) {
         return RolloverReason::kTimeForward;
@@ -1175,6 +1184,8 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
     if (time < bucketTime) {
         return RolloverReason::kTimeBackward;
     }
+
+    // Check rollover based on measurement count
     if (bucket.numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
         return RolloverReason::kCount;
     }
@@ -1185,6 +1196,7 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
         getCacheDerivedBucketMaxSize(storageCacheSizeBytes, numberOfActiveBuckets);
 
     // We restrict the ceiling of the bucket max size under cache pressure.
+    // This is based on server parameters 'timeSeriesBucketMaxSize' and 'timeSeriesBucketMinCount'.
     int32_t absoluteMaxSize =
         std::min(Bucket::kLargeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
     if (bucket.size + sizesToBeAdded.total() > effectiveMaxSize) {
@@ -1214,9 +1226,14 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
             return RolloverReason::kCachePressure;
         }
     }
+
+    // If we are inserting data of a different type, we need to rollover to prevent
+    // creating a bucket with mixed schema data.
     if (schemaIncompatible(bucket, doc, timeseriesOptions.getMetaField(), comparator)) {
         return RolloverReason::kSchemaChange;
     }
+
+    // No rollover
     return RolloverReason::kNone;
 }
 
