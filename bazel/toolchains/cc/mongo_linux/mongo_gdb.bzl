@@ -55,7 +55,11 @@ def _gdb_download(ctx):
             "--target=" + pythonhome + "/lib/python" + python3_version + "/site-packages",
         ])
         if result.return_code != 0:
-            fail("Failed to install python module: " + result.stderr)
+            if ctx.getenv("CI"):
+                fail("Failed to install python module:\n" + result.stdout + "\n" + result.stderr)
+            else:
+                print("Failed to install python module:\n" + result.stdout + "\n" + result.stderr)
+                print("This means some pretty printer functions will not work while debugging.")
 
         python_env = """{
         "PYTHONPATH": "%s/lib/python3.10",
