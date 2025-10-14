@@ -691,12 +691,13 @@ protected:
             numTargetedSpills = 1;
         }
 
-
-        LOGV2_INFO(8203700,
-                   "Merging spills",
-                   "currentNumSpills"_attr = this->_iters.size(),
-                   "targetNumSpills"_attr = numTargetedSpills,
-                   "parallelNumSpills"_attr = numParallelSpills);
+        if (this->_iters.size() > numTargetedSpills) {
+            LOGV2_INFO(8203700,
+                       "Merging spills",
+                       "currentNumSpills"_attr = this->_iters.size(),
+                       "targetNumSpills"_attr = numTargetedSpills,
+                       "parallelNumSpills"_attr = numParallelSpills);
+        }
 
         std::vector<std::shared_ptr<Iterator>> iterators;
         while (this->_iters.size() > numTargetedSpills) {
