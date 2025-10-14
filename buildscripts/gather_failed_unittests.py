@@ -59,9 +59,9 @@ def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_li
     # Search both in the top level remote exec shellscript wrapper output directory, and in the
     # binary output directory.
     failed_tests += [
-        failed_test.replace("_remote_exec", "")
+        failed_test.replace("_ci_wrapper", "")
         for failed_test in failed_tests
-        if "_remote_exec" in failed_test
+        if "_ci_wrapper" in failed_test
     ]
     for failed_test in failed_tests:
         full_binary_path = bazel_bin_dir / failed_test

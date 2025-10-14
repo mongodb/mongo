@@ -414,7 +414,7 @@ common:remote_test --remote_download_outputs=minimal
 common:remote_test --test_output=summary
 common:remote_test --modify_execution_info=^(CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=-no-remote-cache
 common:remote_test --remote_download_regex=.*(TestLogs.*|report.*\.json$|\.core$|data_archives.*\.tgz$) # Resmoke TestLogs directory, report, core dumps, and data directory archives.
-test:remote_test --test_timeout=600
+test:remote_test --test_timeout=660 # Allow extra 60s for coredump on abort
 test:remote_test --test_tag_filters=-incompatible_with_bazel_remote_test
 
 # Coverage

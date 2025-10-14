@@ -854,11 +854,11 @@ def _mongo_cc_binary_and_test(
         )
 
         native.sh_test(
-            name = name + "_remote_exec",
+            name = name + "_ci_wrapper",
             srcs = [
                 "//bazel:test_wrapper",
             ],
-            tags = original_tags + ["remote_exec_test"],
+            tags = original_tags + ["wrapper_target"],
             args = [
                 "$(location " + name + ")",
             ],
