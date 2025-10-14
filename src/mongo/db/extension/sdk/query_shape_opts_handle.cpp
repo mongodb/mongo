@@ -42,7 +42,7 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
     const std::function<MongoExtensionStatus*(const MongoExtensionHostQueryShapeOpts*,
                                               const MongoExtensionByteView*,
                                               ::MongoExtensionByteBuf**)>& apiFunc,
-    const std::function<T(const VecByteBufHandle&)>& transformBufferToReturn) const {
+    const std::function<T(MongoExtensionByteView)>& transformViewToReturn) const {
     assertValid();
 
     ::MongoExtensionByteBuf* buf;
@@ -55,31 +55,31 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
 
     // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
     // into a string to be returned.
-    VecByteBufHandle ownedBuf{static_cast<VecByteBuf*>(buf)};
-    return transformBufferToReturn(ownedBuf);
+    ExtensionByteBufHandle ownedBuf{buf};
+    return transformViewToReturn(ownedBuf.getByteView());
 }
 
 
 std::string QueryShapeOptsHandle::serializeIdentifier(const std::string& identifier) const {
     auto byteView = stringViewAsByteView(identifier);
 
-    auto transformBufferToReturn = [](const VecByteBufHandle& buf) {
-        return std::string(byteViewAsStringView(buf.getByteView()));
+    auto transformViewToReturn = [](MongoExtensionByteView bv) {
+        return std::string(byteViewAsStringView(bv));
     };
 
     return serializeUsingOptsHelper<std::string>(
-        &byteView, vtable().serialize_identifier, transformBufferToReturn);
+        &byteView, vtable().serialize_identifier, transformViewToReturn);
 }
 
 std::string QueryShapeOptsHandle::serializeFieldPath(const std::string& fieldPath) const {
     auto byteView = stringViewAsByteView(fieldPath);
 
-    auto transformBufferToReturn = [](const VecByteBufHandle& buf) {
-        return std::string(byteViewAsStringView(buf.getByteView()));
+    auto transformViewToReturn = [](MongoExtensionByteView bv) {
+        return std::string(byteViewAsStringView(bv));
     };
 
     return serializeUsingOptsHelper<std::string>(
-        &byteView, vtable().serialize_field_path, transformBufferToReturn);
+        &byteView, vtable().serialize_field_path, transformViewToReturn);
 }
 
 void QueryShapeOptsHandle::appendLiteral(BSONObjBuilder& builder,
@@ -92,13 +92,13 @@ void QueryShapeOptsHandle::appendLiteral(BSONObjBuilder& builder,
     // We return a bool from this function to conform to the `serializeUsingOptsHelper` template
     // structure. It would be ideal to return something like void() or void_t() but that does not
     // exist.
-    auto transformBufferToReturn = [&](const VecByteBufHandle& buf) {
-        BSONElement element(reinterpret_cast<const char*>(buf.getByteView().data));
+    auto transformViewToReturn = [&](MongoExtensionByteView bv) {
+        BSONElement element(reinterpret_cast<const char*>(bv.data));
         builder.appendAs(element, fieldName);
         return true;
     };
 
-    serializeUsingOptsHelper<bool>(&byteView, vtable().serialize_literal, transformBufferToReturn);
+    serializeUsingOptsHelper<bool>(&byteView, vtable().serialize_literal, transformViewToReturn);
 }
 
 }  // namespace mongo::extension::sdk

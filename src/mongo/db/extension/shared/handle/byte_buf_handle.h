@@ -39,13 +39,13 @@
 namespace mongo::extension {
 
 /**
- * VecByteBufHandle is an owned handle wrapper around a VecByteBuf.
- * Typically this is a handle around a VecByteBuf allocated by the host whose ownership
- * has been transferred to the extension.
+ * ExtensionByteBufHandle is an owned handle wrapper around a
+ * MongoExtensionByteBuf.
  */
-class VecByteBufHandle : public OwnedHandle<VecByteBuf> {
+class ExtensionByteBufHandle : public OwnedHandle<::MongoExtensionByteBuf> {
 public:
-    VecByteBufHandle(VecByteBuf* buf) : OwnedHandle<VecByteBuf>(buf) {
+    ExtensionByteBufHandle(::MongoExtensionByteBuf* byteBufPtr)
+        : OwnedHandle<::MongoExtensionByteBuf>(byteBufPtr) {
         _assertValidVTable();
     }
 
@@ -65,18 +65,9 @@ public:
         return byteViewAsStringView(vtable().get_view(get()));
     }
 
-    /**
-     * Destroy VecByteBuf and free all associated resources.
-     */
-    void destroy() const {
-        assertValid();
-        vtable().destroy(get());
-    }
-
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10806301, "VecByteBuf 'get_view' is null", vtable.get_view != nullptr);
-        tassert(10806302, "VecByteBuf 'destroy' is null", vtable.destroy != nullptr);
+        tassert(10806301, "ByteBuf 'get_view' is null", vtable.get_view != nullptr);
     };
 };
 }  // namespace mongo::extension

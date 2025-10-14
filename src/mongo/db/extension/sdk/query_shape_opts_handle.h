@@ -76,8 +76,8 @@ private:
 
     /**
      * A templated helper function for vtable functions that take a byte view and populate a byte
-     * buf output. The `transformBufferToReturn` callback receives the buffer that was populated
-     * through the API boundary and transforms it into an object of type T.
+     * buf output. The `transformViewToReturn` callback receives read-only byte view extracted
+     * from the populated buffer and transforms it into an object of type T.
      */
     template <typename T>
     T serializeUsingOptsHelper(
@@ -85,7 +85,7 @@ private:
         const std::function<MongoExtensionStatus*(const MongoExtensionHostQueryShapeOpts*,
                                                   const MongoExtensionByteView*,
                                                   ::MongoExtensionByteBuf**)>& apiFunc,
-        const std::function<T(const VecByteBufHandle&)>& transformBufferToReturn) const;
+        const std::function<T(MongoExtensionByteView)>& transformViewToReturn) const;
 };
 
 }  // namespace mongo::extension::sdk

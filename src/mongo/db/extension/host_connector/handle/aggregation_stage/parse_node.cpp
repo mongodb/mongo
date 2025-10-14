@@ -51,7 +51,7 @@ BSONObj AggStageParseNodeHandle::getQueryShape(const SerializationOptions& opts)
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
-    VecByteBufHandle ownedBuf{static_cast<VecByteBuf*>(buf)};
+    ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
 }
 

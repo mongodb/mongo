@@ -33,29 +33,22 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-#include <memory>
-#include <vector>
-
 namespace mongo::extension {
 namespace {
 
 TEST(VecByteBufTest, EmptyCtorHasEmptyView) {
-    auto buf = std::make_unique<VecByteBuf>();
-    VecByteBufHandle handle{buf.get()};
-    (void)buf.release();
-
+    auto buf = new VecByteBuf();
+    ExtensionByteBufHandle handle{buf};
     auto sv = handle.getStringView();
     ASSERT_EQ(sv.size(), 0U);
 }
 
 TEST(VecByteBufTest, AssignFromRawBytesCopiesAndIsStable) {
     const uint8_t bytes[] = {1, 2, 3, 4, 5};
+    auto buf = new VecByteBuf();
+    buf->assign(bytes, sizeof(bytes));
 
-    auto buf = std::make_unique<VecByteBuf>();
-    VecByteBufHandle handle{buf.get()};
-    (void)buf.release();
-    handle.get()->assign(bytes, sizeof(bytes));
-
+    ExtensionByteBufHandle handle{buf};
     auto sv = handle.getStringView();
     ASSERT_EQ(sv.size(), sizeof(bytes));
     ASSERT_EQ(std::memcmp(sv.data(), bytes, sizeof(bytes)), 0);
@@ -63,18 +56,15 @@ TEST(VecByteBufTest, AssignFromRawBytesCopiesAndIsStable) {
 
 TEST(VecByteBufTest, AssignToZeroClearsBuffer) {
     const uint8_t bytes[] = {9, 8, 7};
+    auto buf = new VecByteBuf(bytes, sizeof(bytes));
+    buf->assign(nullptr, 0);
 
-    auto buf = std::make_unique<VecByteBuf>(bytes, sizeof(bytes));
-    VecByteBufHandle handle{buf.get()};
-    (void)buf.release();
-    ASSERT_FALSE(handle.getStringView().empty());
-
-    handle.get()->assign(nullptr, 0);
+    ExtensionByteBufHandle handle{buf};
     ASSERT_TRUE(handle.getStringView().empty());
 }
 
 TEST(VecByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
-    VecByteBufHandle handle{nullptr};
+    ExtensionByteBufHandle handle{nullptr};
     {
         // Build a BSONObj with a short lifetime for its owner.
         BSONObjBuilder bob;
@@ -82,40 +72,53 @@ TEST(VecByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
         auto original = bob.obj();
 
         // Initialize the byte buffer from the BSONObj while 'original' is alive.
-        auto buf = std::make_unique<VecByteBuf>(original);
-        VecByteBufHandle tmp{buf.get()};
-        (void)buf.release();
+        ExtensionByteBufHandle tmp{new VecByteBuf(original)};
         handle = std::move(tmp);
     }
 
     // 'original' and 'bob' have gone and out of scope and are destroyed here. Buffer must remain
-    // valid after its source is gone.
-    auto bv = handle.getByteView();
-
-    // Reconstruct BSON from the buffer bytes and verify.
-    BSONObj roundTrip = bsonObjFromByteView(bv);
+    // valid after its source is gone. Reconstruct BSON from the buffer bytes and verify.
+    auto roundTrip = bsonObjFromByteView(handle.getByteView());
     ASSERT_EQ(roundTrip.getIntField("x"), 42);
 }
 
-TEST(VecByteBufTest, RoundTripAndDestroyWorks) {
+TEST(VecByteBufTest, RoundTripBSONWorks) {
     const auto doc = BSON("a" << 1 << "b" << BSON("c" << true));
+    auto buf = new VecByteBuf(doc);
+    ExtensionByteBufHandle handle{buf};
 
-    auto buf = std::make_unique<VecByteBuf>(doc);
-    VecByteBufHandle handle{buf.get()};
-    (void)buf.release();
-
-    auto bv = handle.getByteView();
-    auto from = bsonObjFromByteView(bv);
+    auto from = bsonObjFromByteView(handle.getByteView());
     ASSERT_EQ(from.toString(), doc.toString());
 }
 
 DEATH_TEST(VecByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
-    auto buf = std::make_unique<VecByteBuf>();
-    VecByteBufHandle handle{buf.get()};
-    (void)buf.release();
-
-    handle.get()->assign(nullptr, 4);
+    VecByteBuf buf;
+    buf.assign(nullptr, 4);
 }
+
+class ExtensionByteBufVTableTest : public unittest::Test {
+public:
+    // This special handle class is only used within this fixture so that we can unit test the
+    // assertVTableConstraints functionality of the handle.
+    class TestExtensionByteBufVTableHandle : public ExtensionByteBufHandle {
+    public:
+        TestExtensionByteBufVTableHandle(::MongoExtensionByteBuf* byteBufPtr)
+            : ExtensionByteBufHandle(byteBufPtr) {};
+
+        void assertVTableConstraints(const VTable_t& vtable) {
+            _assertVTableConstraints(vtable);
+        }
+    };
+};
+
+DEATH_TEST_F(ExtensionByteBufVTableTest, InvalidExtensionByteBufVTableFailsGetView, "10806301") {
+    auto buf = new VecByteBuf();
+    auto handle = TestExtensionByteBufVTableHandle{buf};
+
+    auto vtable = handle.vtable();
+    vtable.get_view = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
 
 }  // namespace
 }  // namespace mongo::extension
