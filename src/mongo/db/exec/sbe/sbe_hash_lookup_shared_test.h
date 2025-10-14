@@ -119,11 +119,11 @@ protected:
         printHashLookupStats(stream, stats);
     }
     static void printHashLookupStats(std::ostream& stream, const HashLookupStats* stats) {
-        stream << "dsk:" << stats->usedDisk << std::endl;
-        stream << "htRecs:" << stats->spillingHtStats.getSpilledRecords() << std::endl;
-        stream << "htIndices:" << stats->spillingHtStats.getSpilledBytes() << std::endl;
-        stream << "buffRecs:" << stats->spillingBuffStats.getSpilledRecords() << std::endl;
-        stream << "buffBytes:" << stats->spillingBuffStats.getSpilledBytes() << std::endl;
+        stream << "dsk:" << stats->usedDisk << '\n';
+        stream << "htRecs:" << stats->spillingHtStats.getSpilledRecords() << '\n';
+        stream << "htIndices:" << stats->spillingHtStats.getSpilledBytes() << '\n';
+        stream << "buffRecs:" << stats->spillingBuffStats.getSpilledRecords() << '\n';
+        stream << "buffBytes:" << stats->spillingBuffStats.getSpilledBytes() << '\n';
     }
 };
 }  // namespace mongo::sbe

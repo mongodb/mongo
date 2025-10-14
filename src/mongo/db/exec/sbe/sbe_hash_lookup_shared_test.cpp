@@ -47,8 +47,7 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     // Execute the stage normally.
     std::stringstream firstStream;
     StageResultsPrinters::make(firstStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string firstStr = firstStream.str();
-    stream << "--- First Stats" << std::endl;
+    stream << "--- First Stats\n";
     printHashLookupStats(stream, stage);
     auto* stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto firstPeakTrackedMemBytes = stats->peakTrackedMemBytes;
@@ -66,9 +65,8 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->open(true);
     std::stringstream secondStream;
     StageResultsPrinters::make(secondStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string secondStr = secondStream.str();
-    ASSERT_EQ(firstStr, secondStr);
-    stream << "--- Second Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), secondStream.view());
+    stream << "--- Second Stats\n";
     printHashLookupStats(stream, stage);
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto secondPeakTrackedMemBytes = stats->peakTrackedMemBytes;
@@ -84,9 +82,8 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->open(false);
     std::stringstream thirdStream;
     StageResultsPrinters::make(thirdStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string thirdStr = thirdStream.str();
-    ASSERT_EQ(firstStr, thirdStr);
-    stream << "--- Third Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), thirdStream.view());
+    stream << "--- Third Stats\n";
     printHashLookupStats(stream, stage);
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto thirdPeakTrackedMemBytes = stats->peakTrackedMemBytes;
@@ -108,11 +105,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->open(true);
     std::stringstream fourthStream;
     StageResultsPrinters::make(fourthStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string fourthStr = fourthStream.str();
-    ASSERT_EQ(firstStr, fourthStr);
-    stream << "--- Fourth Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), fourthStream.view());
+    stream << "--- Fourth Stats\n";
     printHashLookupStats(stream, stage);
-    stream << std::endl;
+    stream << '\n';
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto fourthPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -123,11 +119,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->open(false);
     std::stringstream fifthStream;
     StageResultsPrinters::make(fifthStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string fifthStr = fifthStream.str();
-    ASSERT_EQ(firstStr, fifthStr);
-    stream << "--- Fifth Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), fifthStream.view());
+    stream << "--- Fifth Stats\n";
     printHashLookupStats(stream, stage);
-    stream << std::endl;
+    stream << '\n';
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto fifthPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -138,11 +133,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->open(true);
     std::stringstream sixthStream;
     StageResultsPrinters::make(sixthStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string sixthStr = sixthStream.str();
-    ASSERT_EQ(firstStr, sixthStr);
-    stream << "--- Sixth Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), sixthStream.view());
+    stream << "--- Sixth Stats\n";
     printHashLookupStats(stream, stage);
-    stream << std::endl;
+    stream << '\n';
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto sixthPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -150,7 +144,6 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
 
     stage->close();
 
-    stream << "-- OUTPUT ";
-    stream << firstStr;
+    stream << "-- OUTPUT " << firstStream.view();
 }  // prepareAndEvalStageWithReopen
 }  // namespace mongo::sbe

@@ -32,22 +32,15 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/exec/sbe/makeobj_spec.h"
-#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/fts/fts_matcher.h"
-#include "mongo/db/fts/fts_query_impl.h"
-#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/pcre.h"
-#include "mongo/util/pcre_util.h"
 
 #include <algorithm>
 #include <cstdint>
