@@ -106,8 +106,12 @@ auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
     };
 
     // Because the OID timestamp is only 4 bytes, we can't convert larger dates
-    invariant(rhs.date().toMillisSinceEpoch() >= 0LL);
-    invariant(rhs.date().toMillisSinceEpoch() <= max32BitEpochMillis);
+    const auto millisSinceEpoch = rhs.date().toMillisSinceEpoch();
+    tassert(11177900,
+            fmt::format("Expected rhs to be in the [0,{}] range, but found {}",
+                        max32BitEpochMillis,
+                        millisSinceEpoch),
+            0LL <= millisSinceEpoch && millisSinceEpoch <= max32BitEpochMillis);
 
     // An ObjectId consists of a 4-byte timestamp, as well as a unique value and a counter, thus
     // two ObjectIds initialized with the same date will have different values. To ensure that we
@@ -289,7 +293,7 @@ private:
 class TimePredicateMutableWalker {
 public:
     TimePredicateMutableWalker(TimePredicateVisitor* visitor) : _visitor{visitor} {
-        invariant(_visitor);
+        tassert(11177902, "visitor must not be null", _visitor);
     }
 
     void preVisit(MatchExpression* expr) {
