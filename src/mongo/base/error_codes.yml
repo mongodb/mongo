@@ -962,6 +962,11 @@ error_codes:
       name: StreamProcessorStartupRetryableError,
       categories: [StreamProcessorRetryableError],
     }
+  - {
+      code: 469,
+      name: SchemaRegistryConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
