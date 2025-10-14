@@ -366,6 +366,7 @@ void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationCont
     // cached last no-holes oplog entry. This is important so that
     // refreshOplogTruncateAfterPointIfPrimary always returns the latest oplog entry without
     // skipping it.
+    stdx::lock_guard<stdx::mutex> lk(_refreshOplogTruncateAfterPointMutex);
     _lastNoHolesOplogTimestamp = boost::none;
     _lastNoHolesOplogOpTimeAndWallTime = boost::none;
 }
