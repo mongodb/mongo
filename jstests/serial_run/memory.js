@@ -1,4 +1,8 @@
 // @tags: [requires_fast_memory]
+const conn = MongoRunner.runMongod({});
+assert.neq(null, conn, "unable to start mongod");
+const db = conn.getDB("memory_test");
+
 let col = db.memoryTest;
 
 let buildInfo = assert.commandWorked(db.adminCommand("buildInfo"));
@@ -64,3 +68,5 @@ doWhereTest(10);
 doWhereTest(loopNum);
 doWhereTest(loopNum);
 doWhereTest(loopNum);
+
+MongoRunner.stopMongod(conn);

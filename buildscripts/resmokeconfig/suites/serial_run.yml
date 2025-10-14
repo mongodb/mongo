@@ -9,16 +9,6 @@ selector:
     - jstests/serial_run/allow_partial_results_with_maxTimeMS.js
 
 executor:
-  archive:
-    hooks:
-      - ValidateCollections
-  config: {}
-  hooks:
-    - class: ValidateCollections
-    - class: CleanEveryN
-      n: 1
-  fixture:
-    class: MongoDFixture
-    mongod_options:
-      set_parameters:
-        enableTestCommands: 1
+  config:
+    shell_options:
+      nodb: ""

@@ -1,4 +1,7 @@
 // Attempt to build 63 indexes simultaneously
+const conn = MongoRunner.runMongod({});
+assert.neq(null, conn, "unable to start mongod");
+const db = conn.getDB("index_multi");
 
 Random.setRandomSeed();
 
@@ -149,3 +152,5 @@ for (var i in specs) {
 }
 
 print("SUCCESS!");
+
+MongoRunner.stopMongod(conn);
