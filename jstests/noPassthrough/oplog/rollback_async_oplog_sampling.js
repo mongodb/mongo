@@ -83,3 +83,7 @@ assert.soon(() => {
 
 rollbackTest.transitionToSteadyStateOperations();
 rollbackTest.stop();
+
+// Make sure shutdown interrupted the OplogCapMaintainerThread.
+const subStr = "11212204.*OplogCapMaintainerThread interrupted.*at shutdown";
+assert(rawMongoProgramOutput(subStr).search(subStr) !== -1);
