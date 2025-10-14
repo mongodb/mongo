@@ -41,9 +41,7 @@ namespace mongo {
 struct SearchIndexParams {
     static Status onValidateHost(StringData str, const boost::optional<TenantId>&);
     std::string host = "";
-    // The search index server doesn't support our authentication protocol at this time,
-    // so this is `true` by default.
-    bool skipAuthToSearchIndexServer = true;
+    bool skipAuthToSearchIndexServer = false;
 };
 
 extern SearchIndexParams globalSearchIndexParams;
