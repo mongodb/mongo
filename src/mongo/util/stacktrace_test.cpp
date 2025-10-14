@@ -36,6 +36,22 @@
 #include <fmt/ranges.h>  // IWYU pragma: keep
 // IWYU pragma: no_include "syscall.h"
 // IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/stacktrace_test_helpers.h"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -53,26 +69,6 @@
 #include <set>
 #include <thread>
 #include <vector>
-
-/** `sigaltstack` was introduced in glibc-2.12 in 2010. */
-#if !defined(_WIN32)
-#define HAVE_SIGALTSTACK
-#endif
-#include "mongo/base/parse_number.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/json.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/pcre.h"
-#include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/stacktrace_test_helpers.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -463,7 +459,7 @@ TEST(StackTrace, MetadataGeneratorFunctionMeasure) {
 }
 #endif  // _WIN32
 
-#ifdef HAVE_SIGALTSTACK
+#if MONGO_HAS_SIGALTSTACK
 extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
 
 class StackTraceSigAltStackTest : public unittest::Test {
@@ -563,7 +559,7 @@ extern "C" void stackTraceSigAltStackBacktraceAction(int sig, siginfo_t*, void*)
 TEST_F(StackTraceSigAltStackTest, Backtrace) {
     StackTraceSigAltStackTest::tryHandler(stackTraceSigAltStackBacktraceAction);
 }
-#endif  // HAVE_SIGALTSTACK
+#endif  // MONGO_HAS_SIGALTSTACK
 
 class JsonTest : public unittest::Test {
 public:
