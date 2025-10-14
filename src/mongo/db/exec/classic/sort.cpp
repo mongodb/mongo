@@ -140,6 +140,11 @@ PlanStage::StageState SortStageDefault::unspool(WorkingSetID* out) {
         member->metadata().setSortKey(std::move(key), _sortKeyGen.isSingleElementKey());
     }
 
+    // Ensure isEOF flag is up-to-date if the query has a limit.
+    if (_sortExecutor.hasLimit() && !_sortExecutor.hasNext()) {
+        _memoryTracker.set(0);
+    }
+
     return PlanStage::ADVANCED;
 }
 
@@ -189,6 +194,11 @@ PlanStage::StageState SortStageSimple::unspool(WorkingSetID* out) {
 
     if (_addSortKeyMetadata) {
         member->metadata().setSortKey(std::move(key), _sortKeyGen.isSingleElementKey());
+    }
+
+    // Ensure isEOF flag is up-to-date if the query has a limit.
+    if (_sortExecutor.hasLimit() && !_sortExecutor.hasNext()) {
+        _memoryTracker.set(0);
     }
 
     return PlanStage::ADVANCED;

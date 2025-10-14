@@ -419,6 +419,13 @@ bool getFirstBatch(const AggExState& aggExState,
         responseBuilder.append(nextDoc);
     }
 
+    // If the plan executor is EOF but hasn't actually returned the IS_EOF return code yet, then we
+    // can still avoid returning an open cursor to the client. Batch size 0 is an exception because
+    // it is treated as an explicit request to establish the cursor without iterating it.
+    if (batchSize > 0 && exec.isEOF() && !expCtx->isTailable()) {
+        doRegisterCursor = false;
+    }
+
     if (doRegisterCursor) {
         // For empty batches, or in the case where the final result was added to the batch rather
         // than being stashed, we update the PBRT to ensure that it is the most recent available.

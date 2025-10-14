@@ -292,7 +292,11 @@ public:
             ++count;
             last = current.getOwned();
 
-            peakMemBytes = checkMemoryTracking(memoryTracker, peakMemBytes);
+            if (exec->isEOF()) {
+                ASSERT_EQUALS(memoryTracker.inUseTrackedMemoryBytes(), 0);
+            } else {
+                peakMemBytes = checkMemoryTracking(memoryTracker, peakMemBytes);
+            }
         }
         ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         checkCount(count);

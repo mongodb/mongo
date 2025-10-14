@@ -284,6 +284,7 @@ selector:
     - jstests/core/query/comment_field.js
     # Time-series buckets processing may have different cursor behavior.
     - jstests/core/query/cursor/getmore_invalidated_cursors.js
+    - jstests/core/query/cursor/limit_batch_size.js
     # For inserts on time-series collections, mongod does _not_ replace empty timestamp values
     # with the current time.
     - jstests/core/write/empty_ts/empty_ts.js

@@ -52,8 +52,7 @@ LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
                 participateInTrialRunTracking),
       _limitExpr(std::move(limit)),
       _skipExpr(std::move(skip)),
-      _current(0),
-      _isEOF(false) {
+      _current(0) {
     tassert(
         11094721, "Expecting either limit or skip expression specified", _limitExpr || _skipExpr);
     _children.emplace_back(std::move(input));
@@ -85,7 +84,7 @@ void LimitSkipStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     _commonStats.opens++;
-    _isEOF = false;
+    _commonStats.isEOF = false;
     _children[0]->open(reOpen);
 
     _limit = _runLimitOrSkipCode(_limitCode.get());
@@ -94,19 +93,21 @@ void LimitSkipStage::open(bool reOpen) {
     _specificStats.skip = _skip;
 
     if (_skip) {
-        for (_current = 0; _current < *_skip && !_isEOF; _current++) {
-            _isEOF = _children[0]->getNext() == PlanState::IS_EOF;
+        for (_current = 0; _current < *_skip && !_commonStats.isEOF; _current++) {
+            _commonStats.isEOF = _children[0]->getNext() == PlanState::IS_EOF;
         }
     }
     _current = 0;
+    _commonStats.isEOF = _commonStats.isEOF || (_limit && _current >= *_limit);
 }
 PlanState LimitSkipStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_isEOF || (_limit && _current++ == *_limit)) {
+    if (_commonStats.isEOF) {
         return trackPlanState(PlanState::IS_EOF);
     }
 
+    _commonStats.isEOF = (_limit && ++_current >= *_limit);
     return trackPlanState(_children[0]->getNext());
 }
 void LimitSkipStage::close() {

@@ -152,6 +152,12 @@ public:
         if (_outputIt && _outputIt->more()) {
             _outputData = _outputIt->next();
 
+            // Ensure isEOF flag is up-to-date if the query has a limit.
+            if (_stage._specificStats.limit != std::numeric_limits<size_t>::max() &&
+                !_outputIt->more()) {
+                _stage._commonStats.isEOF = true;
+            }
+
             return _stage.trackPlanState(PlanState::ADVANCED);
         } else {
             return _stage.trackPlanState(PlanState::IS_EOF);
