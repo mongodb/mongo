@@ -2,4 +2,10 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
+      - 10gen/server-replication-reviewers
+  - "fcv_changes_close_connections.js":
+    approvers:
       - 10gen/server-fcv
+  - "read_after_optime.js":
+    approvers:
+      - 10gen/server-replication-reviewers

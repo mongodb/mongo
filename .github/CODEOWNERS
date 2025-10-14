@@ -679,7 +679,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/query/**/boolean_expression_simplification.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/core/query/**/noop_writes.js @10gen/query-execution-write-exec @svc-auto-approve-bot
 /jstests/core/query/**/write_change_stream_pit_preimage.js @10gen/query-execution-change-streams @svc-auto-approve-bot
-/jstests/core/query/**/read_after_optime.js @10gen/server-replication-reviewers @svc-auto-approve-bot
 /jstests/core/query/release_memory/* @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/api/OWNERS.yml
@@ -1420,7 +1419,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthroughWithMongod/query/sbe/**/* @10gen/query-execution-sbe @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/repl/OWNERS.yml
-/jstests/noPassthroughWithMongod/repl/**/* @10gen/server-fcv @svc-auto-approve-bot
+/jstests/noPassthroughWithMongod/repl/**/* @10gen/server-replication-reviewers @svc-auto-approve-bot
+/jstests/noPassthroughWithMongod/repl/**/fcv_changes_close_connections.js @10gen/server-fcv @svc-auto-approve-bot
+/jstests/noPassthroughWithMongod/repl/**/read_after_optime.js @10gen/server-replication-reviewers @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/timeseries/OWNERS.yml
 /jstests/noPassthroughWithMongod/timeseries/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
