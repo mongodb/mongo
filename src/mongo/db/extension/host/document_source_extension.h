@@ -192,6 +192,19 @@ private:
                             BSONObj rawStage,
                             mongo::extension::host_connector::AggStageDescriptorHandle descriptor);
 
+    // Struct that simplifies DocumentSourceExtension construction for sub-classes.
+    struct ExtensionBase {
+        std::string name;
+        boost::intrusive_ptr<ExpressionContext> exprCtx;
+        Id id;
+        BSONObj rawStage;
+        host_connector::AggStageDescriptorHandle descriptor;
+    };
+
+    explicit DocumentSourceExtension(const ExtensionBase& extensionBase);
+
+    ExtensionBase extensionBase() const;
+
     // Do not support copy or move.
     DocumentSourceExtension(const DocumentSourceExtension&) = delete;
     DocumentSourceExtension(DocumentSourceExtension&&) = delete;

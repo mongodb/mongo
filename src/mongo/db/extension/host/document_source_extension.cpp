@@ -181,4 +181,15 @@ StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeSta
     return constraints;
 }
 
+DocumentSourceExtension::DocumentSourceExtension(const ExtensionBase& extensionBase)
+    : DocumentSourceExtension(extensionBase.name,
+                              extensionBase.exprCtx,
+                              extensionBase.id,
+                              extensionBase.rawStage,
+                              extensionBase.descriptor) {}
+
+DocumentSourceExtension::ExtensionBase DocumentSourceExtension::extensionBase() const {
+    return ExtensionBase{_stageName, getExpCtx(), _id, _raw_stage, _staticDescriptor};
+}
+
 }  // namespace mongo::extension::host
