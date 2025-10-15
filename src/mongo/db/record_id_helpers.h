@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -41,13 +40,11 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_format.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-class Timestamp;
-class RecordId;
-
-namespace record_id_helpers {
+namespace MONGO_MOD_PUBLIC record_id_helpers {
 
 /**
  * Converts Timestamp to a RecordId in an unspecified manor that is safe to use as the key to
@@ -103,5 +100,5 @@ RecordId maxRecordId(KeyFormat keyFormat);
  */
 bool isReserved(const RecordId& id);
 
-}  // namespace record_id_helpers
+}  // namespace MONGO_MOD_PUBLIC record_id_helpers
 }  // namespace mongo

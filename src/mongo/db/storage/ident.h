@@ -31,11 +31,11 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
-#include "mongo/util/uuid.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Every collection / index persisted by the server has a corresponding table in the storage engine.
@@ -46,13 +46,12 @@ namespace mongo {
 class Ident {
 public:
     explicit Ident(StringData ident) : _ident(std::string{ident}) {}
-    virtual ~Ident() = default;
 
     const std::string& getIdent() const {
         return _ident;
     }
 
-protected:
+private:
     const std::string _ident;
 };
 
@@ -160,4 +159,4 @@ std::string createDBNamePathComponent(const DatabaseName& dbName);
 
 }  // namespace ident
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

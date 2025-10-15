@@ -30,11 +30,12 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class SnapshotId {
-    static const uint64_t kNullId = 0;
+    static constexpr uint64_t kNullId = 0;
 
 public:
     SnapshotId() : _id(kNullId) {}
@@ -111,4 +112,4 @@ private:
     SnapshotId _id;
     T _value;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

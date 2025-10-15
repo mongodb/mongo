@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 
 #include <array>
@@ -61,9 +62,8 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-namespace mongo {
-
-namespace details {
+namespace MONGO_MOD_PUBLIC mongo {
+namespace MONGO_MOD_FILE_PRIVATE record_id_details {
 class RecordIdChecks;
 }
 
@@ -77,7 +77,7 @@ class alignas(int64_t) RecordId {
     // users of the class.
 
     // Class used for static assertions that can only happen when RecordId is completely defined.
-    friend class details::RecordIdChecks;
+    friend class record_id_details::RecordIdChecks;
 
 public:
     // This set of constants define the boundaries of the 'normal' id ranges for the int64_t format.
@@ -601,13 +601,13 @@ private:
     };
 };
 
-namespace details {
+namespace record_id_details {
 // Various assertions of RecordId that can only happen when the type is completely defined.
 class RecordIdChecks {
     static_assert(sizeof(RecordId) == RecordId::kTargetSizeInBytes);
     static_assert(std::alignment_of_v<RecordId> == std::alignment_of_v<int64_t>);
 };
-}  // namespace details
+}  // namespace record_id_details
 
 inline StringBuilder& operator<<(StringBuilder& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';
@@ -617,4 +617,4 @@ inline std::ostream& operator<<(std::ostream& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

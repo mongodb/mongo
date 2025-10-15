@@ -32,12 +32,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
-#include <set>
-#include <string>
-
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * This class is for use with storage engines that track record store sizes in catalog metadata.
  *
@@ -133,4 +131,4 @@ public:
      */
     static bool isSet(ServiceContext*);
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -34,14 +34,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <variant>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 enum class IncludeDuplicateRecordId { kOff, kOn };
 
@@ -109,4 +109,4 @@ private:
     boost::optional<RecordId> _duplicateRid;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

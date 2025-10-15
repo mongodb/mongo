@@ -31,21 +31,16 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
-
-class Collection;
-class CollectionPtr;
-class Database;
-class OperationContext;
-class FindCommandRequest;
-class CollectionAcquisition;
-
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * db helpers are helper functions and classes that let us easily manipulate the local
  * database instance in-proc.
@@ -211,4 +206,4 @@ struct Helpers {
                                       BSONObj& result);
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

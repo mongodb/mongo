@@ -32,16 +32,14 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
 
 #include <boost/filesystem/operations.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * The DiskSpaceMonitor is a periodic job that observes at the remaining disk space for the database
@@ -104,4 +102,4 @@ private:
 
     int64_t _actionId = 0;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

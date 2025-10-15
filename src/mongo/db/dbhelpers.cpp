@@ -30,7 +30,6 @@
 
 #include "mongo/db/dbhelpers.h"
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
@@ -45,9 +44,7 @@
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -68,9 +65,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <set>
 #include <string>
 #include <utility>
 

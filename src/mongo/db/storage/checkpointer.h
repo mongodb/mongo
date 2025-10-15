@@ -30,21 +30,18 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 
-namespace mongo {
-
-class KVEngine;
-class OperationContext;
-class ServiceContext;
-class Timestamp;
-
-class Checkpointer : public BackgroundJob {
+namespace MONGO_MOD_PUBLIC mongo {
+class Checkpointer final : public BackgroundJob {
 public:
     Checkpointer()
         : BackgroundJob(false /* deleteSelf */),
@@ -109,4 +106,4 @@ private:
     bool _triggerCheckpoint;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

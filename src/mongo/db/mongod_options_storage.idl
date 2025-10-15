@@ -36,6 +36,7 @@ global:
         source: [yaml, cli, ini]
         initializer:
             register: addMongodStorageOptions
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

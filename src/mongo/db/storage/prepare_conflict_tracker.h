@@ -31,9 +31,10 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * The PrepareConflictTracker tracks if a read operation encounters a prepare conflict. If it
@@ -102,4 +103,4 @@ private:
     AtomicWord<int64_t> _thisOpPrepareConflictDuration{0};
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

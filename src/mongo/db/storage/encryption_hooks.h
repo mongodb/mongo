@@ -32,26 +32,20 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/data_protector.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <boost/filesystem/path.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace boost {
-namespace filesystem {
-class path;
-}  // namespace filesystem
-}  // namespace boost
-
 namespace mongo {
-class DataProtector;
-class ServiceContext;
-
-class EncryptionHooks {
+class MONGO_MOD_OPEN EncryptionHooks {
 public:
     static void set(ServiceContext* service, std::unique_ptr<EncryptionHooks> custHooks);
 

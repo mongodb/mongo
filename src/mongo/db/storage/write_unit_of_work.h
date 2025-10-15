@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <iosfwd>
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class OperationContext;
 
@@ -129,4 +131,4 @@ private:
 
 std::ostream& operator<<(std::ostream& os, WriteUnitOfWork::RecoveryUnitState state);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
