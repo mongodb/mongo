@@ -61,7 +61,7 @@
   "moduleExtensions": {
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "wrUpV169g2K/B2XhHtikVJ7WDTbk2yt8p6LsJ7WH4xY=",
+        "bzlTransitiveDigest": "A/FPPRf/KXUGPg32SRiN/n2uOcgul1q2lPU3/Nz3Cvg=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -197,7 +197,7 @@
     },
     "//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl%setup_mongo_windows_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "n/VGK3QrOp2/taYQt3Q22FFqBudHACXuKRmYzyoG0Ic=",
+        "bzlTransitiveDigest": "dHLyfzMhaUTIIP7LsjQxVGJHz6n+z1RfQNYH+/O+1Iw=",
         "usagesDigest": "n0o7oj+Qsfc72uhUPqYhsJpUeTzxSeQBSih56V3nmlw=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

@@ -1,6 +1,27 @@
 # General starlark utility functions
 load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP")
 
+def write_target_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".gen_source_list")
+    ctx.actions.write(
+        out,
+        "//" + ctx.label.package + ":" + ctx.attr.target_name,
+    )
+    return [
+        DefaultInfo(
+            files = depset([out]),
+        ),
+    ]
+
+write_target = rule(
+    write_target_impl,
+    attrs = {
+        "target_name": attr.string(
+            doc = "the name of the target to record",
+        ),
+    },
+)
+
 def retry_download_and_extract(ctx, tries, **kwargs):
     sleep_time = 1
     for attempt in range(tries):

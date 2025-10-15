@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "windows_rc")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -908,6 +908,13 @@ mongo_cc_library(
     }),
 )
 
+windows_rc(
+    name = "mongos_res",
+    src = "mongos.rc",
+    icon = "//src/mongo/db:mongo.ico",
+    manifest_in = "mongos.manifest.in",
+)
+
 mongo_cc_binary(
     name = "mongos",
     srcs = [
@@ -924,7 +931,6 @@ mongo_cc_binary(
         "devcore",
         "dist_test",
     ],
-    #+ env.WindowsResourceFile("mongos.rc"),
     deps = [
         # NOTE: Do not add new deps here unless required by the linker to
         # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
@@ -932,6 +938,7 @@ mongo_cc_binary(
         # dep of mongos_initializers.
         "mongos_main",
         "//src/mongo/db:server_base",
+        "mongos_res",
     ],
 )
 

@@ -36,6 +36,16 @@ load(
     "with_feature_set",
 )
 
+# The values are populated from the following link:
+#    https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt?view=msvc-170
+# For future versions, please add it in the map.
+MIN_VER_MAP = {
+    "10": {
+        "win": "0x0A00",
+        "ddi": "0x0A000000",
+    },
+}
+
 all_compile_actions = [
     ACTION_NAMES.c_compile,
     ACTION_NAMES.cpp_compile,
@@ -85,25 +95,15 @@ all_link_actions = [
 ]
 
 def get_windows_mimimun_version_feature(ctx):
-    # The values are populated from the following link:
-    #    https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt?view=msvc-170
-    # For future versions, please add it in the map.
-    min_ver_map = {
-        "10": {
-            "win": "0x0A00",
-            "ddi": "0x0A000000",
-        },
-    }
-
     if BuildSettingInfo not in ctx.attr.windows_version_minimal:
         fail("windows_version_minimal attribute value is not a build flag.")
 
     ver = ctx.attr.windows_version_minimal[BuildSettingInfo].value
-    if ver not in min_ver_map:
-        error_msg = "Windows mininum version {} does not exist. These are the minimum versions that are supported: {}".format(ver, min_ver_map.keys())
+    if ver not in MIN_VER_MAP:
+        error_msg = "Windows mininum version {} does not exist. These are the minimum versions that are supported: {}".format(ver, MIN_VER_MAP.keys())
         fail(error_msg)
 
-    min_ver = min_ver_map[ver]
+    min_ver = MIN_VER_MAP[ver]
     return feature(
         name = "windows_version_minimum",
         enabled = True,
