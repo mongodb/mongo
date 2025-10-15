@@ -597,15 +597,14 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - name: enterprise-rhel8-debug-tsan-required
-    display_name: "! TSAN Enterprise RHEL 8 DEBUG Essential"
+  - name: &enterprise-rhel8-debug-tsan-required enterprise-rhel8-debug-tsan-required
+    display_name: "! Amazon Linux 2023 arm64 TSAN Enterprise Essential"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-large
+      - amazon2023-arm64-latest-m8g-2xlarge
     stepback: false
     expansions:
-      <<: *enterprise-rhel8-debug-tsan-expansions-template
       evergreen_remote_exec: on
       test_flags: >-
         --excludeWithAnyTags=tsan_incompatible
@@ -615,20 +614,38 @@ buildvariants:
         --fission=no
         --jobs=1600
         --remote_execution_priority=3
+      additional_package_targets: >-
+        archive-mongocryptd-stripped
+        archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      compile_variant: *enterprise-rhel8-debug-tsan-required
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      build_mongot: true
+      download_mongot_release: true
+      # Avoid starting too many mongod's under TSAN build.
+      resmoke_jobs_factor: 0.3
+      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
     tasks:
       - name: compile_test_parallel_core_stream_TG
         distros:
-          - rhel8.8-xlarge
-      - name: run_unit_tests_8_way_split_TG
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_jstestshell_TG
       - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel8-debug-tsan-large-distro-name
+          - amazon2023-arm64-latest-m8g-8xlarge
       - name: .development_critical !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - *enterprise-rhel8-debug-tsan-large-distro-name
+          - amazon2023-arm64-latest-m8g-8xlarge
 
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: enterprise-rhel8-debug-tsan
