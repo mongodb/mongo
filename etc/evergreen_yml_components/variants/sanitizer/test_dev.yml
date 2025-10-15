@@ -254,7 +254,7 @@ variables:
 buildvariants:
   - <<: *generic_linux_compile_params_m8g
     name: &linux-arm64-debug-compile-required linux-arm64-debug-compile-required # TODO: replace with Sanitizer.
-    display_name: "! Amazon Linux 2023 arm64 DEBUG Compile"
+    display_name: "! Amazon Linux 2023 arm64 GCC DEBUG Compile"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     stepback: false
     expansions:
@@ -366,7 +366,7 @@ buildvariants:
 
   - <<: *linux_arm64_debug_compile_variant_dependency
     name: linux-64-debug-required
-    display_name: "! Amazon Linux 2023 arm64 DEBUG"
+    display_name: "! Amazon Linux 2023 arm64 GCC DEBUG"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
