@@ -46,7 +46,9 @@
 
 #include <boost/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+MONGO_MOD_PUB;
+
+namespace mongo {
 
 /**
  * SemiFuture<T> is logically a possibly-deferred StatusWith<T> (or Status when T is void).
@@ -1252,13 +1254,11 @@ auto makeReadyFutureWith(Func&& func) -> Future<FutureContinuationResult<Func&&>
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
-}  // namespace MONGO_MOD_PUB mongo
 
 //
 // Implementations of methods that couldn't be defined in the class due to ordering requirements.
-// In a separate namespace block since they shouldn't be marked with MONGO_MOD_PUB.
 //
-namespace mongo {
+
 template <typename T>
 template <typename UniqueFunc>
 auto ExecutorFuture<T>::_wrapCBHelper(ExecutorPtr exec, UniqueFunc&& func) {

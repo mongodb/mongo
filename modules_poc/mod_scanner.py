@@ -236,9 +236,20 @@ DETAIL_REGEX = re.compile(r"(detail|internal)s?$")
 @dataclass
 class GetVisibilityResult:
     attr: str
-    alt: str | None
-    parent: DecoratedCursor | None  # only None for UNKNOWN
-    non_ns_parent: DecoratedCursor | None
+    alt: str = None
+    parent: DecoratedCursor = None
+    non_ns_parent: DecoratedCursor = None
+
+    def __post_init__(self):
+        if self.attr == "use_replacement":
+            assert self.alt
+        else:
+            assert self.alt is None
+
+        # use or needs replacement decls need parent and non_ns_parent to file jira tickets.
+        if self.attr.endswith("_replacement"):
+            assert self.parent
+            assert self.non_ns_parent
 
 
 def get_visibility(
@@ -260,7 +271,8 @@ def get_visibility(
     if c.kind != CursorKind.NAMESPACE:
         last_non_ns_parent = c
     is_internal_namespace = c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.search(c.spelling)
-    in_complete_header = normpath_for_file(c) in complete_headers
+    normpath = normpath_for_file(c)
+    in_complete_header = normpath in complete_headers
 
     # ideally this would be in an if c.has_attrs() block, but that seems to not work in all cases.
     # TODO: try again when on a newer clang. Also might be worth seeing if we can narrow down
@@ -319,32 +331,69 @@ def get_visibility(
     if in_complete_header:
         # details and internal namespaces
         if is_internal_namespace:
-            return GetVisibilityResult("private", None, c, last_non_ns_parent)
+            return GetVisibilityResult("private")
 
         if c.spelling.endswith("_forTest"):
-            return GetVisibilityResult("file_private", None, c, last_non_ns_parent)
+            return GetVisibilityResult("file_private")
 
         if not scanning_parent:
             # TODO consider making PROTECTED also default to module private
             if c.access_specifier == AccessSpecifier.PRIVATE:
-                return GetVisibilityResult("private", None, c, last_non_ns_parent)
+                return GetVisibilityResult("private")
 
     if c.normalized_parent:
-        parent_vis = get_visibility(
+        return get_visibility(
             c.normalized_parent, scanning_parent=True, last_non_ns_parent=last_non_ns_parent
         )
-    else:
-        parent_vis = GetVisibilityResult("UNKNOWN", None, None, None)  # break recursion
 
-    # Apply low-priority defaults that defer to parent's visibility
-    if not scanning_parent and parent_vis.attr == "UNKNOWN" and in_complete_header:
-        return GetVisibilityResult("private", None, c, last_non_ns_parent)
+    # At top level: break recursion
+    default_vis = "private" if in_complete_header else "UNKNOWN"
+    default_vis = file_level_visibility.get(normpath, default_vis)
+    assert default_vis not in ("needs_replacement", "use_replacement", "open")
+    return GetVisibilityResult(default_vis)
 
-    return parent_vis
+
+def try_extract_file_level_visibility(c: Cursor) -> str | None:
+    # Standalone attribute statements are represented as UNEXPOSED_DECL with only ANNOTATE_ATTR children.
+    if c.kind != CursorKind.UNEXPOSED_DECL:
+        return None
+
+    children = list(c.get_children())
+    if not children or not all(child.kind == CursorKind.ANNOTATE_ATTR for child in children):
+        return None
+
+    terms = children[0].spelling.split("::")
+    if not (len(terms) >= 3 and terms.pop(0) == "mongo" and terms.pop(0) == "mod"):
+        return None
+
+    if len(children) > 1:
+        perr_exit(
+            pretty_location(c) + ": File-level visibility attribute must be a standalone statement"
+        )
+
+    attr = terms.pop(0)
+
+    # In particular, (needs|use)_replacement are not allowed. This is important because we don't track
+    # the source of visibility as well for file-level attributes, so we won't be able to generate the
+    # jira tickets for the unfortunately public cases.
+    if attr not in ("public", "parent_private", "file_private"):
+        perr_exit(
+            pretty_location(c)
+            + f": Only PUBLIC, PARENT_PRIVATE, and FILE_PRIVATE are allowed for file-level visibility, not {attr}"
+        )
+
+    if terms:  # No additional terms allowed
+        perr_exit(
+            pretty_location(c)
+            + ": File-level visibility attributes cannot have additional parameters"
+        )
+
+    return attr
 
 
 complete_headers = set[str]()
 incomplete_headers = set[str]()
+file_level_visibility = dict[str, str]()
 
 
 def make_vis_from(c: DecoratedCursor | None):
@@ -373,8 +422,8 @@ class Decl:
     spelling: str
     visibility: str
     alt: str
-    vis_from: dict[str, str]
-    vis_from_non_ns: dict[str, str]
+    vis_from: dict[str, str] | None
+    vis_from_non_ns: dict[str, str] | None
     sem_par: str
     lex_par: str
     used_from: dict[str, set[str]] = dataclasses.field(default_factory=dict, compare=False)
@@ -599,6 +648,13 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
         # "Hidden friend" definitions *are* traversed.
         if c.kind == CursorKind.FRIEND_DECL and not child.is_definition():
             return
+
+        if try_extract_file_level_visibility(child):
+            perr_exit(
+                pretty_location(child)
+                + ":ERROR: File-level visibility attribute must be at top level, not inside another declaration.\n"
+                + f"   Declaration nested inside {pretty_location(c)}"
+            )
 
         assert child != c
         assert ref is None or child != ref or ref.kind == CursorKind.OVERLOADED_DECL_REF
@@ -929,6 +985,34 @@ def main():
     #         continue
     #     find_decls(mod_for_file(top_level.location.file), top_level)
     # timer.mark("found decls")
+
+    first_decl = dict[str, Cursor]()  # normpath -> first seen decl
+    for top_level in tu.cursor.get_children():
+        file_path = normpath_for_file(top_level)
+        if file_path is None:  # no location or third-party file
+            continue
+
+        if file_path not in first_decl:
+            first_decl[file_path] = top_level
+
+        default_vis = try_extract_file_level_visibility(top_level)
+        if default_vis is None:
+            continue
+
+        if top_level != first_decl[file_path]:
+            perr_exit(
+                f"{pretty_location(top_level)}:ERROR: File-level visibility attribute must be the first declaration in the file\n"
+                + f"  First declaration was at: {pretty_location(first_decl[file_path])}"
+            )
+
+        if file_path not in complete_headers:
+            perr_exit(
+                f"{pretty_location(top_level)}:ERROR: File-level visibility attribute only allowed in headers that directly include "
+                + '"mongo/util/modules.h"'
+            )
+
+        file_level_visibility[file_path] = default_vis
+    timer.mark("checked file-level visibility")
 
     for top_level in tu.cursor.get_children():
         if "src/mongo/" not in top_level.location.file.name:
