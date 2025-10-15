@@ -1461,7 +1461,7 @@ bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& rem
         !kCursorAlreadyDeadCodes.count(remote.status.code());
 }
 
-stdx::shared_future<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
+SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_killCompleteInfo) {

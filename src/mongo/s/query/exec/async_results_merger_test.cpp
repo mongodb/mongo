@@ -429,8 +429,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardUnsortedShardReceivesErrorBetweenReadyA
     ASSERT_EQ(statusWithNext.getStatus().reason(), "bad thing happened");
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseAfterReceivingAllResults) {
@@ -515,7 +514,7 @@ TEST_F(AsyncResultsMergerTest, MultipleShardsUnsortedCloseWhileRequestsInFlight)
     ASSERT_EQ(1, arm.use_count());
 
     // Discard all outstanding unconsumed results.
-    arm->kill(operationContext());
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseWithMoreResultsPending) {
@@ -1389,8 +1388,7 @@ TEST_F(AsyncResultsMergerTest, SortedButNoSortKey) {
     ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::InternalError);
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, HasFirstBatch) {
@@ -1598,8 +1596,7 @@ TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
     ASSERT(!arm->nextReady().isOK());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, BadResponseReceivedFromShard) {
@@ -1631,8 +1628,7 @@ TEST_F(AsyncResultsMergerTest, BadResponseReceivedFromShard) {
     ASSERT(!statusWithNext.isOK());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
@@ -1667,8 +1663,7 @@ TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
     ASSERT_EQ(statusWithNext.getStatus().reason(), "bad thing happened");
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
@@ -1697,8 +1692,7 @@ TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, NextEventAfterTaskExecutorShutdown) {
@@ -1709,8 +1703,7 @@ TEST_F(AsyncResultsMergerTest, NextEventAfterTaskExecutorShutdown) {
 
     shutdownExecutor();
     ASSERT_EQ(ErrorCodes::ShutdownInProgress, arm->nextEvent().getStatus());
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, KillAfterTaskExecutorShutdownWithOutstandingBatches) {
@@ -1727,8 +1720,7 @@ TEST_F(AsyncResultsMergerTest, KillAfterTaskExecutorShutdownWithOutstandingBatch
 
     // Executor shuts down before a response is received.
     shutdownExecutor();
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 
     // Ensure that the executor finishes all of the outstanding callbacks before the ARM is freed.
     executor()->join();
@@ -1922,8 +1914,7 @@ TEST_F(AsyncResultsMergerTest, KillBeforeNext) {
     future.default_timed_get();
 
     // Kill should complete.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, KillBeforeNextWithTwoRemotes) {
@@ -1950,8 +1941,7 @@ TEST_F(AsyncResultsMergerTest, KillBeforeNextWithTwoRemotes) {
     future.default_timed_get();
 
     // Kill should complete.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, TailableBasic) {
@@ -1998,8 +1988,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
     ASSERT_FALSE(arm->remotesExhausted());
 
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
@@ -2026,8 +2015,7 @@ TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
     ASSERT_FALSE(arm->remotesExhausted());
 
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, TailableExhaustedCursor) {
@@ -2361,9 +2349,9 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsFalse) {
     auto statusWithNext = arm->nextReady();
     ASSERT(!statusWithNext.isOK());
     ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::MaxTimeMSExpired);
+
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, AllowPartialResultsOnMaxTimeMSExpiredThenLateData) {
@@ -2431,8 +2419,7 @@ TEST_F(AsyncResultsMergerTest, ReturnsErrorOnRetriableError) {
     ASSERT_FALSE(arm->partialResultsReturned());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestIncludesMaxTimeMS) {
@@ -2590,8 +2577,8 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
     std::vector<CursorResponse> responses;
     responses.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{});
     scheduleNetworkResponses(std::move(responses));
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting) {
@@ -2952,8 +2939,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestWithoutTailableCantHaveMaxTi
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestWithoutAwaitDataCantHaveMaxTime) {
@@ -2964,8 +2950,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestWithoutAwaitDataCantHaveMaxT
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, ShardCanErrorInBetweenReadyAndNextEvent) {
@@ -2983,8 +2968,7 @@ TEST_F(AsyncResultsMergerTest, ShardCanErrorInBetweenReadyAndNextEvent) {
     ASSERT_EQ(ErrorCodes::BadValue, arm->nextEvent().getStatus());
 
     // Required to kill the 'arm' on error before destruction.
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, KillShouldNotWaitForRemoteCommandsBeforeSchedulingKillCursors) {
@@ -3225,7 +3209,8 @@ TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipantsEvenIfKilled) {
     auto addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
     ASSERT_FALSE(addedShard);
     arm->reattachToOperationContext(operationContext());
-    arm->kill(operationContext());
+    arm->kill(operationContext()).wait();
+
     // We now have killed the ARM. Additional participants should be processed.
     addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
     ASSERT(addedShard);
@@ -3289,8 +3274,7 @@ TEST_F(AsyncResultsMergerTest, ShouldNotScheduleGetMoresWithoutAnOperationContex
     ASSERT_FALSE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
 
-    auto killFuture = arm->kill(operationContext());
-    killFuture.wait();
+    arm->kill(operationContext()).wait();
 }
 
 TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
@@ -3318,8 +3302,7 @@ TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
         scheduleNetworkResponses(std::move(responses));
 
         // Kill the ARM.
-        auto killFuture = arm->kill(operationContext());
-        killFuture.wait();
+        arm->kill(operationContext()).wait();
 
         return cmd;
     };

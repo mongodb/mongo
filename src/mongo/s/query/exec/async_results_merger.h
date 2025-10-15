@@ -48,11 +48,11 @@
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
@@ -396,7 +396,7 @@ public:
      * currently attached. This is so that a killing thread may call this method with its own
      * operation context.
      */
-    stdx::shared_future<void> kill(OperationContext* opCtx);
+    SharedSemiFuture<void> kill(OperationContext* opCtx);
 
     /**
      * Returns remote metrics aggregated in this ARM without reseting the local counts.
@@ -916,24 +916,20 @@ private:
     // Handles the promise/future mechanism used to cleanly shut down the ARM. This avoids race
     // conditions in cases where the underlying TaskExecutor is simultaneously being torn down.
     struct CompletePromiseFuture {
-        CompletePromiseFuture() : _future(_promise.get_future()) {}
-
-        // Multiple calls to the method that creates the promise (i.e., kill()) can
-        // be made and each must return a future that will be notified when the ARM has been cleaned
-        // up.
-        stdx::shared_future<void> getFuture() {
-            return _future;
+        // Multiple calls to the method that creates the promise (i.e., kill()) can be made and each
+        // must return a future that will be notified when the ARM has been cleaned up.
+        SharedSemiFuture<void> getFuture() {
+            return _promise.getFuture();
         }
 
         // Called by the ARM when all outstanding requests have run. Notifies all threads
         // waiting on shared futures that the ARM has been cleaned up.
         void signalFutures() {
-            _promise.set_value();
+            _promise.emplaceValue();
         }
 
     private:
-        std::promise<void> _promise;  // NOLINT needs audit
-        std::shared_future<void> _future;
+        SharedPromise<void> _promise;
     };
 
     boost::optional<CompletePromiseFuture> _killCompleteInfo;
