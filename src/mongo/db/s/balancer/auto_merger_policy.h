@@ -39,6 +39,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <cstdint>

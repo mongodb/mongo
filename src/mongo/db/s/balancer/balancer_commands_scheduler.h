@@ -42,6 +42,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 

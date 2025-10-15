@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

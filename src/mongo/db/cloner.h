@@ -40,6 +40,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <memory>
@@ -142,7 +143,7 @@ private:
     bool shouldUseRawDataOperations(const VersionContext& vCtx);
 };
 
-class Cloner {
+class MONGO_MOD_PUBLIC Cloner {
 
 public:
     Cloner(std::unique_ptr<ClonerImpl> clonerImpl) : _clonerImpl(std::move(clonerImpl)) {}

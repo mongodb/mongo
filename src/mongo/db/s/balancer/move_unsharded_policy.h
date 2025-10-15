@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/balancer/actions_stream_policy.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 

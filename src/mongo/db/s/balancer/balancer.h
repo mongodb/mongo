@@ -48,6 +48,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -73,7 +74,7 @@ class Status;
  * there is an imbalance by checking the difference in chunks between the most and least
  * loaded shards. It would issue a request for a chunk migration per round, if it found so.
  */
-class Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
+class MONGO_MOD_PUBLIC Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
     Balancer(const Balancer&) = delete;
     Balancer& operator=(const Balancer&) = delete;
 
@@ -99,7 +100,7 @@ public:
      * Any code in this call must not try to acquire any locks or to wait on operations, which
      * acquire locks.
      */
-    void initiate(OperationContext* opCtx);
+    MONGO_MOD_PRIVATE void initiate(OperationContext* opCtx);
 
     /**
      * Invoked when this node which is currently serving as a 'PRIMARY' steps down and is invoked
@@ -113,7 +114,7 @@ public:
      * The joinTermination() method must be called afterwards in order to wait for the main
      * balancer thread to terminate and to allow initiateBalancer to be called again.
      */
-    void requestTermination();
+    MONGO_MOD_PRIVATE void requestTermination();
 
     /**
      * Invoked when a node on its way to becoming a primary finishes draining and is about to
@@ -122,14 +123,14 @@ public:
      *
      * This must not be called while holding any locks!
      */
-    void joinTermination();
+    MONGO_MOD_PRIVATE void joinTermination();
 
     /**
      * Potentially blocking method, which will return immediately if the balancer is not running a
      * balancer round and will block until the current round completes otherwise. If the operation
      * context's deadline is exceeded, it will throw an ExceededTimeLimit exception.
      */
-    void joinCurrentRound(OperationContext* opCtx);
+    MONGO_MOD_PRIVATE void joinCurrentRound(OperationContext* opCtx);
 
     /**
      * Blocking call, which requests the balancer to move a range to the specified location
@@ -139,15 +140,15 @@ public:
      * NOTE: This call disregards the balancer enabled/disabled status and will proceed with the
      *       move regardless.
      */
-    void moveRange(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const ConfigsvrMoveRange& request,
-                   bool issuedByRemoteUser);
+    MONGO_MOD_PRIVATE void moveRange(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const ConfigsvrMoveRange& request,
+                                     bool issuedByRemoteUser);
 
     /**
      * Appends the runtime state of the balancer instance to the specified builder.
      */
-    void report(OperationContext* opCtx, BSONObjBuilder* builder);
+    MONGO_MOD_PRIVATE void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Informs the balancer that a setting that affects it changed.
@@ -164,8 +165,8 @@ public:
      * Returns if a given collection is draining due to a removed shard, has chunks on an invalid
      * zone or the number of chunks is imbalanced across the cluster
      */
-    BalancerCollectionStatusResponse getBalancerStatusForNs(OperationContext* opCtx,
-                                                            const NamespaceString& nss);
+    MONGO_MOD_PRIVATE BalancerCollectionStatusResponse
+    getBalancerStatusForNs(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     static constexpr int kMaxOutstandingStreamingOperations = 50;

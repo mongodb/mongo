@@ -39,6 +39,7 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <unordered_set>
 #include <vector>
