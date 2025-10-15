@@ -160,9 +160,6 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     // queryableBackupMode.
     BSONObj overrideShardIdentity;
 
-    // True if the current binary version is an LTS Version.
-    static constexpr bool kIsLTSBinaryVersion = false;
-
 #ifdef MONGO_CONFIG_GRPC
     int grpcPort = DefaultGRPCServerPort;
     int grpcServerMaxThreads = 1000;
