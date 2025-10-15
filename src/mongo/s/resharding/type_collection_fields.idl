@@ -132,3 +132,7 @@ structs:
             performVerification:
                 type: optionalBool
                 description: "Whether to perform data comparison verification."
+            telemetryContext:
+                type: object_owned
+                optional: true
+                description: "Tracing context for this resharding operation."

@@ -215,6 +215,9 @@ structs:
                 type: ReshardingMetricsTimeInterval
                 description: Start and end times for the critical section.
                 optional: true
+            telemetryContext:
+                type: object_owned
+                optional: true
 
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
@@ -274,6 +277,9 @@ structs:
             phaseDurations:
                 type: object_owned
                 description: "Time spent in each phase so far."
+                optional: true
+            telemetryContext:
+                type: object_owned
                 optional: true
 
     ReshardingApproxCopySize:

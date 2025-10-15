@@ -187,6 +187,9 @@ structs:
             demoMode:
                 type: optionalBool
                 description: >-
-                    "When set to true, overrides reshardingMinimumOperationDurationMillis 
-                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0 
+                    "When set to true, overrides reshardingMinimumOperationDurationMillis
+                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0
                     for quick demo of reshardCollection operation"
+            telemetryContext:
+                type: object_owned
+                optional: true
