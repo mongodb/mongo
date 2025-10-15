@@ -328,3 +328,4 @@ executor:
         enableTestCommands: 1
         featureFlagTimeseriesUpdatesSupport: true
         performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert: true
+        performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency: 100

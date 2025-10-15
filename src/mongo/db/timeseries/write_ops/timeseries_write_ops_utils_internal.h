@@ -117,6 +117,7 @@ mongo::write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<
  * Builds insert command request, as above, but expects StmtId's in WriteBatch.
  */
 mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
+    OperationContext* opCtx,
     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs);
 

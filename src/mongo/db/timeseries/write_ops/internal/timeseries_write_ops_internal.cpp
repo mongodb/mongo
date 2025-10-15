@@ -206,10 +206,11 @@ TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
         return {status->first, status->second};
     }
     return getTimeseriesSingleWriteResult(
-        write_ops_exec::performInserts(opCtx,
-                                       write_ops_utils::makeTimeseriesInsertOpFromBatch(batch, nss),
-                                       /*preConditions=*/boost::none,
-                                       OperationSource::kTimeseriesInsert),
+        write_ops_exec::performInserts(
+            opCtx,
+            write_ops_utils::makeTimeseriesInsertOpFromBatch(opCtx, batch, nss),
+            /*preConditions=*/boost::none,
+            OperationSource::kTimeseriesInsert),
         request);
 }
 

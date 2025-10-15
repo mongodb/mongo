@@ -14,7 +14,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 TestData.testingDiagnosticsEnabled = false;
 
 const rst = new ReplSetTest({nodes: 1});
-rst.startSet();
+rst.startSet({
+    setParameter: {performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency: 100},
+});
 rst.initiate();
 
 const testDB = rst.getPrimary().getDB(jsTestName());

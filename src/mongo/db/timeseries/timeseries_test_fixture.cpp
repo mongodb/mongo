@@ -136,6 +136,7 @@ void TimeseriesTestFixture::setUp() {
 
     // Enables us to do data integrity checks on reopening and insert.
     gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.store(true);
+    gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency.store(100);
     gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening.store(true);
 
     // Create all collections with meta fields.
