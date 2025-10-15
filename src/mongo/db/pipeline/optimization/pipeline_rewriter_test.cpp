@@ -31,6 +31,8 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -63,7 +65,8 @@ void runTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     };
 
     auto pipeline = makePipeline(input);
-    PipelineRewriteEngine engine{{*pipeline}};
+    PipelineRewriteEngine engine{{*pipeline},
+                                 static_cast<size_t>(internalQueryMaxPipelineRewrites.load())};
 
     engine.applyRules();
 
@@ -99,6 +102,17 @@ TEST_F(PipelineRewriteEngineTest, RespectPriority) {
                         {"REMOVE_MATCH", alwaysTrue, erase, 2.0});
 
     runTest(getExpCtx(), {"{$match: {a: 1}}"}, {});
+}
+
+TEST_F(PipelineRewriteEngineTest, RespectMaxRewritesQueryKnob) {
+    RAIIServerParameterControllerForTest controller("internalQueryMaxPipelineRewrites", 2);
+
+    REGISTER_TEST_RULES(DocumentSourceMatch,
+                        {"CRASH_WHEN_RUN", alwaysTrue, shouldNeverRun, 1.0},
+                        {"NOOP1", alwaysTrue, noop, 2.0},
+                        {"NOOP2", alwaysTrue, noop, 3.0});
+
+    runTest(getExpCtx(), {"{$match: {a: 1}}"}, {"{$match: {a: 1}}"});
 }
 
 TEST_F(PipelineRewriteEngineTest, ApplySingleRuleInPlace) {

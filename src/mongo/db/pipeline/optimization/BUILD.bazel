@@ -33,5 +33,6 @@ mongo_cc_unit_test(
         ":pipeline_rewriter",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

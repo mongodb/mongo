@@ -520,6 +520,17 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalQueryMaxPipelineRewrites:
+        description: "Maximum number of pipeline rewrite rules to apply"
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxPipelineRewrites"
+        cpp_vartype: AtomicWord<int>
+        default: 1_000_000
+        validator:
+            gte: 0
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
     #
     # Query execution
     #

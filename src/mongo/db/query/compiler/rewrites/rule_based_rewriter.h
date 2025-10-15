@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/modules.h"
 
@@ -123,11 +124,11 @@ public:
      */
     template <std::derived_from<T> SubType>
     SubType& currentAs() {
-        return static_cast<SubType&>(current());
+        return checked_cast<SubType&>(current());
     }
     template <std::derived_from<T> SubType>
     const SubType& currentAs() const {
-        return static_cast<const SubType&>(current());
+        return checked_cast<const SubType&>(current());
     }
 
     void setEngine(RewriteEngine<SubClass>& engine) {
@@ -146,7 +147,8 @@ private:
 template <typename Context>
 class RewriteEngine final {
 public:
-    RewriteEngine(Context context) : _context(std::move(context)) {
+    RewriteEngine(Context context, size_t maxRewrites = std::numeric_limits<size_t>::max())
+        : _context(std::move(context)), _maxRewrites(maxRewrites) {
         _context.setEngine(*this);
     }
 
@@ -169,47 +171,84 @@ public:
             // rules.
             _context.enqueueRules();
 
-            bool doAdvance = true;
-            while (!_rules.empty() && _context.hasMore()) {
-                const auto rule = std::move(_rules.top());
-                _rules.pop();
-                const size_t rulesBefore = _rules.size();
-
-                LOGV2_DEBUG(11010013,
-                            5,
-                            "Trying to apply a rewrite rule",
-                            "rule"_attr = rule.name,
-                            "priority"_attr = rule.priority);
-
-                if (rule.precondition(_context)) {
-                    const bool shouldRequeueRules = rule.transform(_context);
-                    if (shouldRequeueRules) {
-                        tassert(11010015,
-                                "Should not add new rules from a rule that requires requeueing",
-                                rulesBefore == _rules.size());
-
-                        // Discard remaining rules because we changed position.
-                        clearRules();
-                        doAdvance = false;
-                        break;
-                    }
-                }
-            }
-
-            if (doAdvance) {
-                // Did not update position. Advance to the next element.
-                _context.advance();
+            NextAction nextAction = rewriteCurrentPosition();
+            switch (nextAction) {
+                case NextAction::Requeue:
+                    // Requeue rules that apply to the current element without advancing.
+                    break;
+                case NextAction::Advance:
+                    // Did not update position. Advance to the next element.
+                    _context.advance();
+                    break;
+                case NextAction::Bail:
+                    return;
             }
         }
     }
 
 private:
+    enum class NextAction {
+        Requeue,
+        Advance,
+        Bail,
+    };
+
+    /**
+     * Try to apply all rules in the queue to the current position.
+     */
+    NextAction rewriteCurrentPosition() {
+        while (!_rules.empty() && _context.hasMore()) {
+            if (_maxRewrites <= _rewritesApplied) {
+                LOGV2_DEBUG(11020801,
+                            5,
+                            "Reached the maximum number of rewrites applied",
+                            "limit"_attr = _maxRewrites);
+                return NextAction::Bail;
+            }
+
+            const auto rule = std::move(_rules.top());
+            _rules.pop();
+            const size_t rulesBefore = _rules.size();
+
+            LOGV2_DEBUG(11010013,
+                        5,
+                        "Trying to apply a rewrite rule",
+                        "rule"_attr = rule.name,
+                        "priority"_attr = rule.priority);
+
+            if (!rule.precondition(_context)) {
+                // Continue to the next applicable rule.
+                continue;
+            }
+
+            const bool shouldRequeueRules = rule.transform(_context);
+            _rewritesApplied++;
+
+            LOGV2_DEBUG(11206202, 5, "Applied rule", "rule"_attr = rule.name);
+
+            if (shouldRequeueRules) {
+                tassert(11010015,
+                        "Should not add new rules from a rule that requires requeueing",
+                        rulesBefore == _rules.size());
+
+                // Discard remaining rules and requeue because we changed position.
+                clearRules();
+                return NextAction::Requeue;
+            }
+        }
+
+        return NextAction::Advance;
+    }
+
     void clearRules() {
         _rules = {};
     }
 
     Context _context;
     std::priority_queue<Rule<Context>> _rules;
+
+    const size_t _maxRewrites;
+    size_t _rewritesApplied{0};
 };
 
 }  // namespace mongo::rule_based_rewrites

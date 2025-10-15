@@ -88,6 +88,9 @@ bool alwaysTrue(TestRewriteContext&) {
 }
 
 // Transforms
+bool noop(TestRewriteContext& ctx) {
+    return false;
+}
 bool shouldNeverRun(TestRewriteContext& ctx) {
     MONGO_UNREACHABLE;
 }
@@ -108,6 +111,56 @@ TEST(RuleBasedRewriterTest, RespectPrecondition) {
     }};
 
     ASSERT_DOES_NOT_THROW(engine.applyRules());
+}
+
+TEST(RuleBasedRewriterTest, RespectZeroOptimizationBudget) {
+    std::vector<std::string> strings = {{"hello"}};
+    RewriteEngine<TestRewriteContext> engine{
+        {
+            strings,
+            {{"NEVER_APPLIES", alwaysTrue, shouldNeverRun, 1}},
+        },
+        0 /*maxRewrites*/,
+    };
+
+    ASSERT_DOES_NOT_THROW(engine.applyRules());
+}
+
+TEST(RuleBasedRewriterTest, RespectNonZeroOptimizationBudget) {
+    std::vector<std::string> strings = {{"hello"}};
+    RewriteEngine<TestRewriteContext> engine{
+        {
+            strings,
+            {
+                {"NOOP1", alwaysTrue, noop, 3},
+                {"NOOP2", alwaysTrue, noop, 2},
+                {"NEVER_APPLIES", alwaysTrue, shouldNeverRun, 1},
+            },
+        },
+        2 /*maxRewrites*/,
+    };
+
+    ASSERT_DOES_NOT_THROW(engine.applyRules());
+}
+
+TEST(RuleBasedRewriterTest, ApplyAllRulesBeforeReachingOptimizationBudget) {
+    std::vector<std::string> strings = {{"hello"}};
+    RewriteEngine<TestRewriteContext> engine{
+        {
+            strings,
+            {
+                {"NOOP1", alwaysTrue, noop, 3},
+                {"NOOP2", alwaysTrue, noop, 2},
+                {"SHOULD_APPLY", alwaysTrue, upperCaseTransform, 1},
+            },
+        },
+        3 /*maxRewrites*/,
+    };
+
+    engine.applyRules();
+
+    ASSERT_EQ(strings.size(), 1U);
+    ASSERT_EQ(strings[0], "HELLO");
 }
 
 TEST(RuleBasedRewriterTest, ApplySingleRule) {
