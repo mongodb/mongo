@@ -627,6 +627,10 @@ last-continuous:
     ticket: SERVER-108341
   - test_file: jstests/core/txns/multi_statement_transaction_abort.js
     ticket: SERVER-84081
+  - test_file: jstests/change_streams/ddl_create_drop_index_events.js
+    ticket: SERVER-93153
+  - test_file: jstests/change_streams/resume_expanded_events.js
+    ticket: SERVER-93153
   suites: null
 last-lts:
   all:
@@ -1306,4 +1310,8 @@ last-lts:
     ticket: SERVER-108341
   - test_file: jstests/core/txns/multi_statement_transaction_abort.js
     ticket: SERVER-84081
+  - test_file: jstests/change_streams/ddl_create_drop_index_events.js
+    ticket: SERVER-93153
+  - test_file: jstests/change_streams/resume_expanded_events.js
+    ticket: SERVER-93153
   suites: null
