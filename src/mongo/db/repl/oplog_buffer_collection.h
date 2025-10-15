@@ -49,8 +49,8 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
-namespace MONGO_MOD_OPEN repl {
+namespace MONGO_MOD_PUB mongo {
+namespace repl {
 
 class StorageInterface;
 
@@ -59,7 +59,7 @@ class StorageInterface;
  * in startup() and removed in shutdown(). The documents will be popped and peeked in timestamp
  * order.
  */
-class OplogBufferCollection : public RandomAccessOplogBuffer {
+class MONGO_MOD_PARENT_PRIVATE OplogBufferCollection : public RandomAccessOplogBuffer {
 public:
     /**
      * Structure used to configure an instance of OplogBufferCollection.
@@ -239,5 +239,5 @@ private:
     bool _sizeIsValid = true;
 };
 
-}  // namespace MONGO_MOD_OPEN repl
-}  // namespace mongo
+}  // namespace repl
+}  // namespace MONGO_MOD_PUB mongo

@@ -33,7 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 
 class BSONObj;
 class BSONObjBuilder;
@@ -59,4 +59,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

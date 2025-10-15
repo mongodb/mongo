@@ -54,7 +54,7 @@ namespace repl {
 /**
  * Response structure for the replSetHeartbeat command.
  */
-class MONGO_MOD_PUB ReplSetHeartbeatResponse {
+class MONGO_MOD_PARENT_PRIVATE ReplSetHeartbeatResponse {
 public:
     /**
      * Initializes this ReplSetHeartbeatResponse from the contents of "doc".

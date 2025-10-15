@@ -41,12 +41,12 @@ namespace mongo {
 
 class Status;
 
-namespace MONGO_MOD_PUB repl {
+namespace repl {
 
 /**
  * Arguments to the update position command.
  */
-class UpdatePositionArgs {
+class MONGO_MOD_PARENT_PRIVATE UpdatePositionArgs {
 public:
     static const char kCommandFieldName[];
     static const char kUpdateArrayFieldName[];
@@ -110,5 +110,5 @@ private:
     std::vector<UpdateInfo> _updates;
 };
 
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 }  // namespace mongo

@@ -50,7 +50,7 @@ namespace repl {
  **/
 class MONGO_MOD_PUB MemberData {
 public:
-    class HeartbeatChanges {
+    class MONGO_MOD_PARENT_PRIVATE HeartbeatChanges {
     public:
         HeartbeatChanges(bool opTimeAdvanced, bool configChanged, bool memberStateChanged)
             : _opTimeAdvanced(opTimeAdvanced),

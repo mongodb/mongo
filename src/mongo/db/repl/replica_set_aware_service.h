@@ -124,7 +124,7 @@ namespace mongo {
 /**
  * Main API implemented by each ReplicaSetAwareService.
  */
-class MONGO_MOD_PUB ReplicaSetAwareInterface {
+class MONGO_MOD_PRIVATE ReplicaSetAwareInterface {
 public:
     /**
      * Called once during ReplicationCoordinator startup. A place to put startup logic such as

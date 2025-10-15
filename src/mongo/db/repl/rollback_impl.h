@@ -178,7 +178,7 @@ struct RollbackStats {
  * get closed and finding the common point should fail.
  *
  */
-class MONGO_MOD_PUB RollbackImpl : public Rollback {
+class MONGO_MOD_PARENT_PRIVATE RollbackImpl : public Rollback {
 public:
     /**
      * Used to indicate that the files we create with deleted documents are from rollback.
@@ -190,7 +190,7 @@ public:
      * A class with functions that get called throughout rollback. These can be overridden to
      * instrument this class for diagnostics and testing.
      */
-    class Listener {
+    class MONGO_MOD_PRIVATE Listener {
     public:
         virtual ~Listener() = default;
 

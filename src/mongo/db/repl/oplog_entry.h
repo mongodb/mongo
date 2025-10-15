@@ -66,7 +66,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_OPEN repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * The first oplog entry is a no-op with this message in its "msg" field.
@@ -998,5 +998,5 @@ bool operator==(const OplogEntry& lhs, const OplogEntry& rhs);
 
 std::ostream& operator<<(std::ostream& s, const ReplOperation& o);
 
-}  // namespace MONGO_MOD_OPEN repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

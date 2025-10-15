@@ -312,7 +312,7 @@ protected:
 
 // Utility class to allow easily scanning a collection.  Scans in forward order, returns
 // Status::CollectionIsEmpty when scan is exhausted.
-class MONGO_MOD_PUB CollectionReader {
+class MONGO_MOD_PARENT_PRIVATE CollectionReader {
 public:
     CollectionReader(OperationContext* opCtx, const NamespaceString& nss);
 

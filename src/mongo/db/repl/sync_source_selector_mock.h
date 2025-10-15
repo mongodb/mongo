@@ -45,7 +45,7 @@ namespace repl {
 /**
  * Mock implementation of SyncSourceSelector interface for testing.
  */
-class SyncSourceSelectorMock : public SyncSourceSelector {
+class MONGO_MOD_PARENT_PRIVATE SyncSourceSelectorMock : public SyncSourceSelector {
     SyncSourceSelectorMock(const SyncSourceSelectorMock&) = delete;
     SyncSourceSelectorMock& operator=(const SyncSourceSelectorMock&) = delete;
 

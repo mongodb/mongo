@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT OperationLoggerMock : public OperationLogger {
+class MONGO_MOD_PUB OperationLoggerMock : public OperationLogger {
     OperationLoggerMock(const OperationLoggerMock&) = delete;
     OperationLoggerMock& operator=(const OperationLoggerMock&) = delete;
 

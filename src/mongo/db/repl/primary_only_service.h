@@ -118,7 +118,7 @@ public:
      * implementations shouldn't have their Instance subclass extended this Instance class directly,
      * instead they should extend TypedInstance, defined below.
      */
-    class MONGO_MOD_OPEN Instance {
+    class MONGO_MOD_PUB Instance {
     public:
         virtual ~Instance() = default;
 

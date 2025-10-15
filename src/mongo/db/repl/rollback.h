@@ -41,7 +41,7 @@ namespace repl {
  * This class represents the interface BackgroundSync and ReplicationCoordinatorExternalState use to
  * interact with the rollback subsystem.
  */
-class MONGO_MOD_PUB Rollback {
+class MONGO_MOD_PRIVATE Rollback {
     Rollback(const Rollback&) = delete;
     Rollback& operator=(const Rollback&) = delete;
 

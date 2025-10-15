@@ -40,7 +40,7 @@
 #include <string>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 namespace repl {
 
 class MONGO_MOD_OPEN OplogInterface {
@@ -95,4 +95,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

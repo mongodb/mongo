@@ -135,7 +135,7 @@ public:
     void clearParticipantNewTermDates();
 
 
-    class ElectionMetricsSSS;
+    class MONGO_MOD_PRIVATE ElectionMetricsSSS;
 
 private:
     void _updateAverageCatchUpOps(WithLock lk);

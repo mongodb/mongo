@@ -60,7 +60,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_OPEN mongo {
+namespace MONGO_MOD_PUB mongo {
 class Collection;
 class CollectionPtr;
 class Database;
@@ -109,7 +109,7 @@ public:
     BSONObj doc;
 };
 
-namespace MONGO_MOD_OPEN repl {
+namespace repl {
 namespace internal {
 MONGO_MOD_NEEDS_REPLACEMENT Status
 insertDocumentsForOplog(OperationContext* opCtx,
@@ -365,5 +365,5 @@ auto writeConflictRetryWithLimit(OperationContext* opCtx,
                               dump ? repl::writeConflictRetryCountForDumpState.loadRelaxed() : 0);
 }
 
-}  // namespace MONGO_MOD_OPEN repl
-}  // namespace MONGO_MOD_OPEN mongo
+}  // namespace repl
+}  // namespace MONGO_MOD_PUB mongo

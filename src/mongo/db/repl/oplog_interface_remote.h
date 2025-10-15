@@ -49,7 +49,7 @@ namespace repl {
  * Reads oplog on remote server.
  */
 
-class MONGO_MOD_PUB OplogInterfaceRemote : public OplogInterface {
+class MONGO_MOD_PARENT_PRIVATE OplogInterfaceRemote : public OplogInterface {
 public:
     /**
      * Type of function to return a connection to the sync source.

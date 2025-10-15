@@ -68,7 +68,8 @@ class ReplicationCoordinator;
  * Data replicator external state implementation for testing.
  */
 
-class MONGO_MOD_PUB DataReplicatorExternalStateMock : public DataReplicatorExternalState {
+class MONGO_MOD_PARENT_PRIVATE DataReplicatorExternalStateMock
+    : public DataReplicatorExternalState {
 public:
     DataReplicatorExternalStateMock();
 

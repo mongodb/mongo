@@ -109,7 +109,7 @@ private:
  * A helper that provides a default implementation for the set of methods to create the
  * 'PrimaryOnlyService::Instance'.
  */
-class MONGO_MOD_OPEN DefaultPrimaryOnlyServiceInstance
+class MONGO_MOD_PRIVATE DefaultPrimaryOnlyServiceInstance
     : public repl::PrimaryOnlyService::TypedInstance<DefaultPrimaryOnlyServiceInstance> {
 public:
     ~DefaultPrimaryOnlyServiceInstance() override;

@@ -34,8 +34,8 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
-namespace mongo {
-namespace MONGO_MOD_OPEN repl {
+namespace MONGO_MOD_PUB mongo {
+namespace repl {
 
 /**
  * Oplog buffer backed by a bounded, in-memory queue that supports batched operations
@@ -98,5 +98,5 @@ private:
     std::list<OplogBatch<Value>> _queue;
 };
 
-}  // namespace MONGO_MOD_OPEN repl
-}  // namespace mongo
+}  // namespace repl
+}  // namespace MONGO_MOD_PUB mongo

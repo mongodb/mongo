@@ -106,7 +106,7 @@ public:
     /**
      * Class used to represent a unique Intent for a specific operation.
      */
-    class IntentToken {
+    class MONGO_MOD_PRIVATE IntentToken {
         friend class IntentRegistry;
         using idType = uint64_t;
 

@@ -32,7 +32,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 /**
  * No-op implementation of OpObserver interface.
@@ -286,4 +286,4 @@ public:
                          repl::OpTime& opTime) override {}
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

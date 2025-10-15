@@ -124,7 +124,7 @@ class UpdatePositionArgs;
  * with the rest of the system.  The public methods on ReplicationCoordinator are the public
  * API that the replication subsystem presents to the rest of the codebase.
  */
-class MONGO_MOD_OPEN ReplicationCoordinator : public SyncSourceSelector {
+class MONGO_MOD_PUB ReplicationCoordinator : public SyncSourceSelector {
     ReplicationCoordinator(const ReplicationCoordinator&) = delete;
     ReplicationCoordinator& operator=(const ReplicationCoordinator&) = delete;
 
@@ -1192,7 +1192,7 @@ public:
      * Use [reserve|release]ConfigWriteConcernTagChanges when executing a reconfig that
      * could potentially change read/write concern tags.
      */
-    class MONGO_MOD_OPEN WriteConcernTagChanges {
+    class MONGO_MOD_PUB WriteConcernTagChanges {
     public:
         WriteConcernTagChanges() = default;
         virtual ~WriteConcernTagChanges() = default;

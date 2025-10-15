@@ -41,7 +41,7 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 class BSONObjBuilder;
 
 namespace repl {
@@ -262,7 +262,7 @@ private:
  * class are compatible with other instances of this class that are *copies* of the original
  * instance.
  */
-class ReplSetTagConfig {
+class MONGO_MOD_PUB ReplSetTagConfig {
 public:
     /**
      * Finds or allocates a tag with the given "key" and "value" strings.
@@ -354,4 +354,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

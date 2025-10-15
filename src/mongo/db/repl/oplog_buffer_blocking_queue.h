@@ -43,8 +43,8 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
-namespace MONGO_MOD_OPEN repl {
+namespace MONGO_MOD_PUB mongo {
+namespace repl {
 
 /**
  * Oplog buffer backed by an in-memory blocking queue that supports point operations
@@ -108,5 +108,5 @@ private:
     const Options _options;
 };
 
-}  // namespace MONGO_MOD_OPEN repl
-}  // namespace mongo
+}  // namespace repl
+}  // namespace MONGO_MOD_PUB mongo

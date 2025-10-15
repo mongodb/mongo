@@ -129,7 +129,7 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
-    class OplogFetcherRestartDecisionInitialSyncer
+    class MONGO_MOD_PRIVATE OplogFetcherRestartDecisionInitialSyncer
         : public OplogFetcher::OplogFetcherRestartDecision {
 
     public:

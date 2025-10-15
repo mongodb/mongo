@@ -66,7 +66,7 @@ using OpTimeWithTerm = OpTimeWith<long long>;
  * dependencies on large sections of the server code and thus break the unit testability of
  * InitialSyncer should be moved here.
  */
-class MONGO_MOD_PUB DataReplicatorExternalState {
+class MONGO_MOD_PARENT_PRIVATE DataReplicatorExternalState {
     DataReplicatorExternalState(const DataReplicatorExternalState&) = delete;
     DataReplicatorExternalState& operator=(const DataReplicatorExternalState&) = delete;
 

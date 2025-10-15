@@ -109,7 +109,7 @@ private:
 /**
  * Stores a batch of oplog entries for oplog application.
  */
-class MONGO_MOD_PUB OplogApplierBatch : public OplogBatch<OplogEntry> {
+class MONGO_MOD_PARENT_PRIVATE OplogApplierBatch : public OplogBatch<OplogEntry> {
 public:
     OplogApplierBatch() : OplogBatch<OplogEntry>() {}
 

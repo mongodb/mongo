@@ -38,7 +38,7 @@
 #include <memory>
 #include <string>
 
-namespace MONGO_MOD_OPEN mongo {
+namespace mongo {
 
 class OperationContext;
 
@@ -48,7 +48,7 @@ namespace repl {
  * Scans local oplog collection in reverse natural order.
  */
 
-class OplogInterfaceLocal : public OplogInterface {
+class MONGO_MOD_PUB OplogInterfaceLocal : public OplogInterface {
 public:
     OplogInterfaceLocal(OperationContext* opCtx);
     std::string toString() const override;
@@ -62,4 +62,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_OPEN mongo
+}  // namespace mongo

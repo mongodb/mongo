@@ -51,7 +51,7 @@
 
 namespace mongo {
 namespace repl {
-class MONGO_MOD_PUB OplogFetcherMock : public OplogFetcher {
+class MONGO_MOD_PARENT_PRIVATE OplogFetcherMock : public OplogFetcher {
 public:
     explicit OplogFetcherMock(
         executor::TaskExecutor* executor,

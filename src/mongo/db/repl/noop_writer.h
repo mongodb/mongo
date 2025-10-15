@@ -46,7 +46,7 @@ namespace repl {
  * Once scheduled, the NoopWriter will periodically write a noop to the oplog if the replication
  * coordinator's optime has not changed since the last time it did a write.
  */
-class NoopWriter {
+class MONGO_MOD_PARENT_PRIVATE NoopWriter {
     NoopWriter(const NoopWriter&) = delete;
     NoopWriter& operator=(const NoopWriter&) = delete;
 

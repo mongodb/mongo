@@ -81,7 +81,7 @@ class MONGO_MOD_PUB ReplicationCoordinatorExternalStateImpl final
         const ReplicationCoordinatorExternalStateImpl&) = delete;
 
 public:
-    class ReplDurabilityToken : public JournalListener::Token {
+    class MONGO_MOD_PRIVATE ReplDurabilityToken : public JournalListener::Token {
     public:
         ReplDurabilityToken(OpTimeAndWallTime opTimeAndWallTime, bool isPrimary)
             : opTimeAndWallTime(opTimeAndWallTime), isPrimary(isPrimary) {}

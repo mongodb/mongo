@@ -60,7 +60,7 @@ class OplogApplier;
  * Consumes batches of oplog entries from the OplogBuffer to give to the oplog applier, freeing
  * up space for more operations to be fetched from a sync source and allocated onto the OplogBuffer.
  */
-class OplogApplierBatcher {
+class MONGO_MOD_PARENT_PRIVATE OplogApplierBatcher {
     OplogApplierBatcher(const OplogApplierBatcher&) = delete;
     OplogApplierBatcher& operator=(const OplogApplierBatcher&) = delete;
 
@@ -69,7 +69,7 @@ public:
      * Controls what can popped from the oplog buffer into a single batch of operations that can be
      * applied using OplogApplier::applyOplogBatch().
      */
-    class MONGO_MOD_PUB BatchLimits {
+    class MONGO_MOD_PARENT_PRIVATE BatchLimits {
     public:
         size_t bytes = 0;
         size_t ops = 0;

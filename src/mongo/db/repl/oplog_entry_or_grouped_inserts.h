@@ -101,7 +101,7 @@ struct MONGO_MOD_PUB ApplierOperation {
  * applyOplogEntryOrGroupedInserts. This class is immutable and can only be initialized using
  * either a single oplog entry or a range of grouped inserts.
  */
-class MONGO_MOD_OPEN OplogEntryOrGroupedInserts {
+class MONGO_MOD_PUB OplogEntryOrGroupedInserts {
 public:
     using ConstIterator = std::vector<ApplierOperation>::const_iterator;
 

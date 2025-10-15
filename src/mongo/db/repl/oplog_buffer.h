@@ -269,7 +269,7 @@ public:
     }
 };
 
-class MONGO_MOD_OPEN OplogBufferMetrics {
+class MONGO_MOD_PUB OplogBufferMetrics {
 public:
     OplogBuffer::Counters* getWriteBufferCounter() {
         return &_writeBufferCounter;

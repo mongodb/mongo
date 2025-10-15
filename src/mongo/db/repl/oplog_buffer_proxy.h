@@ -42,7 +42,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_OPEN mongo {
+namespace mongo {
 namespace repl {
 
 class StorageInterface;
@@ -51,7 +51,7 @@ class StorageInterface;
  * Oplog buffer proxy that caches front and back (most recently pushed) oplog entries in the target
  * oplog buffer.
  */
-class OplogBufferProxy : public OplogBuffer {
+class MONGO_MOD_PARENT_PRIVATE OplogBufferProxy : public OplogBuffer {
     OplogBufferProxy(const OplogBufferProxy&) = delete;
     OplogBufferProxy& operator=(const OplogBufferProxy&) = delete;
 
@@ -96,4 +96,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_OPEN mongo
+}  // namespace mongo

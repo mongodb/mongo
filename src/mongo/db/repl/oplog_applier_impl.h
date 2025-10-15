@@ -53,7 +53,7 @@
 
 #include <vector>
 
-namespace MONGO_MOD_OPEN mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -163,4 +163,4 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                        bool isDataConsistent);
 
 }  // namespace repl
-}  // namespace MONGO_MOD_OPEN mongo
+}  // namespace MONGO_MOD_PUB mongo

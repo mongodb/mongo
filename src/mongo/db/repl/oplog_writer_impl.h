@@ -40,7 +40,7 @@
 namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
-class OplogWriterStats {
+class MONGO_MOD_PRIVATE OplogWriterStats {
 public:
     void incrementBatchSize(uint64_t n);
     TimerStats& getBatches();

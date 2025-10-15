@@ -651,7 +651,7 @@ public:
      * the config and custom default write concern settings.
      * See base class fore more information.
      */
-    class WriteConcernTagChangesImpl : public WriteConcernTagChanges {
+    class MONGO_MOD_PRIVATE WriteConcernTagChangesImpl : public WriteConcernTagChanges {
     public:
         WriteConcernTagChangesImpl() = default;
         ~WriteConcernTagChangesImpl() override = default;

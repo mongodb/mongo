@@ -42,7 +42,7 @@ namespace MONGO_MOD_PUB repl {
 /**
  * Writes oplog entries to the oplog and/or the change collection.
  */
-class MONGO_MOD_OPEN OplogWriter {
+class MONGO_MOD_PUB OplogWriter {
     OplogWriter(const OplogWriter&) = delete;
     OplogWriter& operator=(const OplogWriter&) = delete;
 

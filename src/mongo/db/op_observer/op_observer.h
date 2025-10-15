@@ -170,7 +170,7 @@ struct IndexCollModInfo {
  * to perform the operation being observed are still held. These rules should apply for all observer
  * methods unless otherwise specified.
  */
-class MONGO_MOD_OPEN OpObserver {
+class MONGO_MOD_PUB OpObserver {
 public:
     using ApplyOpsOplogSlotAndOperationAssignment = TransactionOperations::ApplyOpsInfo;
 
@@ -775,7 +775,7 @@ private:
  * is cleared. It is intended for use as a scope object in `OpObserverRegistry` to manage
  * re-entrancy.
  */
-class OpObserver::ReservedTimes {
+class MONGO_MOD_PRIVATE OpObserver::ReservedTimes {
     ReservedTimes(const ReservedTimes&) = delete;
     ReservedTimes& operator=(const ReservedTimes&) = delete;
 

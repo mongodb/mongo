@@ -43,7 +43,7 @@ namespace repl {
  * An interface for the Initial Syncer that declares functions that are used by
  * ReplicationCoordinatorImpl for initial sync.
  */
-class InitialSyncerInterface {
+class MONGO_MOD_PARENT_PRIVATE InitialSyncerInterface {
 public:
     /**
      * Type of function to create a database client
