@@ -285,13 +285,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
@@ -320,13 +314,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     auto initTTLSubPasses = getTTLSubPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // No documents are removed, no passes are incremented.
     ASSERT_EQ(client.count(nss), 100);
@@ -356,13 +344,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
@@ -395,13 +377,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
@@ -429,13 +405,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
@@ -472,13 +442,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(now);
-    });
-    thread.join();
+    doTTLPassForTest(now);
 
     // Everything should be deleted.
     ASSERT_EQ(client.count(nss), 0);
@@ -515,13 +479,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(now);
-    });
-    thread.join();
+    doTTLPassForTest(now);
 
     // All documents remain after the TTL pass.
     ASSERT_EQ(client.count(nss), documents);
@@ -558,14 +516,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
     ASSERT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(now);
-    });
-    thread.join();
-
+    doTTLPassForTest(now);
     ASSERT_GTE(client.count(nss), documents - maxSpanSeconds + options.expireAfterSeconds.value());
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
@@ -600,14 +551,7 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedPrior1970Delete) {
     ASSERT_EQ(client.count(nss), 3);
 
     auto initTTLPasses = getTTLPasses();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(now);
-    });
-    thread.join();
-
+    doTTLPassForTest(now);
     // We should delete two documents, the one prior to 1970 and the other eligible doc.
     ASSERT_EQ(client.count(nss), 1);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
@@ -642,14 +586,7 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedAfter2038Delete) {
     ASSERT_EQ(client.count(nss), 2);
 
     const auto initTTLPasses = getTTLPasses();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(now);
-    });
-    thread.join();
-
+    doTTLPassForTest(now);
     // The document with time 1940 should remain.
     ASSERT_EQ(client.count(nss), 1);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
@@ -677,13 +614,7 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     const auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     const auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
-        // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // No documents are removed.
     ASSERT_EQ(client.count(nss), 100);
@@ -727,13 +658,7 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
 
-    stdx::thread thread([&]() {
-        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the
-        // current client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss0), 0);
@@ -1090,11 +1015,7 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     const auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     const auto initTTLDeletedKeys = getTTLDeletedKeys();
-    stdx::thread thread([&]() {
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
@@ -1121,11 +1042,7 @@ TEST_F(TTLTest, TTLMinDoubleFitsIntoInt32) {
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
-    stdx::thread thread([&]() {
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
@@ -1153,11 +1070,7 @@ TEST_F(TTLTest, TTLkExpireAfterSecondsForInactiveTTLIndexIsValid) {
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
-    stdx::thread thread([&]() {
-        ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest(Date_t::now());
-    });
-    thread.join();
+    doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
@@ -1188,11 +1101,7 @@ protected:
         const auto initTTLPasses = getTTLPasses();
         const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
 
-        stdx::thread thread([&]() {
-            ThreadClient threadClient(getGlobalServiceContext()->getService());
-            doTTLPassForTest(Date_t::now());
-        });
-        thread.join();
+        doTTLPassForTest(Date_t::now());
 
         // No documents are removed.
         ASSERT_EQ(client.count(nss), nDocs);
