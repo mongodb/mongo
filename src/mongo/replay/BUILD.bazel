@@ -34,6 +34,7 @@ mongo_cc_library(
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:traffic_reader",
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/util:stop_token",
         "//src/mongo/rpc:message",
         "//src/mongo/util:periodic_runner",
         "//src/mongo/util:periodic_runner_factory",

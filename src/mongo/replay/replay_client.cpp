@@ -29,37 +29,160 @@
 
 #include "mongo/replay/replay_client.h"
 
-#include "mongo/db/traffic_reader.h"
+#include "mongo/db/query/util/stop_token.h"
 #include "mongo/replay/recording_reader.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_config.h"
 #include "mongo/replay/session_handler.h"
-#include "mongo/stdx/future.h"
 #include "mongo/util/assert_util.h"
 
+#include <condition_variable>
 #include <exception>
+#include <mutex>
 #include <string>
 
 namespace mongo {
 
-void replayThread(const ReplayConfig& replayConfig) {
+/**
+ * Helper class for for applying a callable to a container of N elements,
+ * spawning a new thread for each element.
+ *
+ * e.g.,
+ *     std::vector<Task> vec{...};
+ *     Async::apply(vec, [](token stop_token, auto value) {
+ *          // Do something on a separate thread per task.
+ *     });
+ *
+ * Tasks receive a stop token, and will be requested to stop after any
+ * task throws an exception. Once all tasks have finished, either the
+ * apply call will return, or an exception from one of the tasks
+ * will be re-thrown.
+ *
+ */
+class Async {
+public:
+    Async() = default;
+    Async(const Async&) = delete;
+    Async(Async&&) = delete;
+
+    Async& operator=(const Async&) = delete;
+    Async& operator=(Async&&) = delete;
+
+    /**
+     * Apply a callable to each element of a container in a separate thread, passing the provided
+     * args to each.
+     *
+     * If any invocation results in an exception, signal all threads to stop, wait for them to exit,
+     * then rethrow the exception.
+     */
+    static void apply(auto container, auto callable) {
+        const auto taskCount = std::size(container);
+        std::vector<stdx::thread> instances;
+        instances.reserve(taskCount);
+
+        Async state;
+
+        for (auto&& task : container) {
+            state.started();
+            instances.push_back(stdx::thread([&]() {
+                try {
+                    callable(state.stop.get_token(), task);
+                    state.success();
+                } catch (...) {
+                    state.fail(std::current_exception());
+                }
+            }));
+        }
+
+        state.wait();
+
+        for (auto& instance : instances) {
+            if (instance.joinable()) {
+                instance.join();
+            }
+        }
+
+        state.maybeRethrow();
+    }
+
+private:
+    void started() {
+        auto lh = std::unique_lock(lock);
+        ++running;
+    }
+
+    void success() {
+        auto lh = std::unique_lock(lock);
+        --running;
+        cv.notify_all();
+    }
+
+    void fail(std::exception_ptr ptr) {
+        auto lh = std::unique_lock(lock);
+        --running;
+        if (!exception) {
+            exception = ptr;
+        }
+        cv.notify_all();
+    }
+
+    /**
+     * Wait until all threads exit.
+     *
+     * If any thread ends with an exception, signal all to stop, wait for all to exit.
+     */
+    void wait() {
+        auto lh = std::unique_lock(lock);
+
+        // Wait until an exception is reported, or all threads finish.
+        cv.wait(lh, [&]() { return exception || running == 0; });
+        if (exception) {
+            stop.request_stop();
+        }
+        // Wait for all threads to finish
+        cv.wait(lh, [&]() { return running == 0; });
+    }
+
+    void maybeRethrow() {
+        if (exception) {
+            std::rethrow_exception(exception);
+        }
+    }
+
+
+    mongo::stop_source stop;
+
+    std::mutex lock;
+    std::condition_variable cv;  // NOLINT
+    size_t running = 0;
+    std::exception_ptr exception = nullptr;
+};
+
+/**
+ * Consumes a collection of recording files from a _single_ node.
+ *
+ * Handles creation of threads to replay individual sessions contained within.
+ */
+void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfig) {
+    RecordingReader reader{replayConfig.recordingPath};
+    const auto bsonRecordedCommands = reader.processRecording();
+
+    uassert(ErrorCodes::ReplayClientInternalError,
+            "The list of recorded commands cannot be empty",
+            !bsonRecordedCommands.empty());
+
+    // create a new session handler for mananging the recording.
+    SessionHandler sessionHandler;
+
+    // setup recording and replaying starting time
+    auto firstCommand = bsonRecordedCommands[0];
+    sessionHandler.setStartTime(ReplayCommand{firstCommand}.fetchRequestTimestamp());
+
     try {
-
-        RecordingReader reader{replayConfig.recordingPath};
-        const auto bsonRecordedCommands = reader.processRecording();
-
-        uassert(ErrorCodes::ReplayClientInternalError,
-                "The list of recorded commands cannot be empty",
-                !bsonRecordedCommands.empty());
-
-        // create a new session handler for mananging the recording.
-        SessionHandler sessionHandler;
-
-        // setup recording and replaying starting time
-        auto firstCommand = bsonRecordedCommands[0];
-        sessionHandler.setStartTime(ReplayCommand{firstCommand}.fetchRequestTimestamp());
-
         for (const auto& bsonCommand : bsonRecordedCommands) {
+            if (stop.stop_requested()) {
+                return;
+            }
             ReplayCommand command{bsonCommand};
             if (command.isStartRecording()) {
                 // will associated the URI to a session task and run all the commands associated
@@ -73,30 +196,13 @@ void replayThread(const ReplayConfig& replayConfig) {
                 sessionHandler.onBsonCommand(replayConfig.mongoURI, command);
             }
         }
-
-    } catch (const DBException& ex) {
-        // If we have reached this point we have encountered a problem in the recording. Either a
-        // ill recording file or some connectivity issue.
-        // TODO SERVER-106495: report and record these errors.
-        tasserted(ErrorCodes::ReplayClientSessionSimulationError,
-                  "DBException in handleAsyncResponse, terminating due to:" + ex.toString());
     } catch (const std::exception& e) {
         tasserted(ErrorCodes::ReplayClientInternalError, e.what());
-    } catch (...) {
-        tasserted(ErrorCodes::ReplayClientInternalError, "Unknown error.");
     }
 }
 
 void ReplayClient::replayRecording(const ReplayConfigs& configs) {
-    std::vector<stdx::thread> instances;
-    for (const auto& config : configs) {
-        instances.push_back(stdx::thread(replayThread, std::ref(config)));
-    }
-    for (auto& instance : instances) {
-        if (instance.joinable()) {
-            instance.join();
-        }
-    }
+    Async::apply(configs, recordingDispatcher);
 }
 
 void ReplayClient::replayRecording(const std::string& recordingFileName, const std::string& uri) {
