@@ -54,7 +54,6 @@ mongo_cc_library(
         ":remote_command",
         ":task_executor_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/client:retry_strategy",
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -623,7 +622,6 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "network_executor_test",
     srcs = [
-        "async_multicaster_test.cpp",
         "async_rpc_test.cpp",
         "async_rpc_util_test.cpp",
         "connection_pool_test.cpp",
