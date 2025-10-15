@@ -136,14 +136,14 @@ void printCppTrace(StackTraceSink* sink) {
                 }
                 return f;
             });
+    static const bool shouldColor = supportsColor();
 
     cpptrace::formatter formatter;
-    if (sink == nullptr && supportsColor()) {
+    if (sink == nullptr && shouldColor) {
         formatter = baseFormat->colors(cpptrace::formatter::color_mode::always);
     } else {
         formatter = baseFormat->colors(cpptrace::formatter::color_mode::none);
     }
-
 
     std::ostringstream btss;
     btss << "BACKTRACE:\n";
@@ -151,7 +151,8 @@ void printCppTrace(StackTraceSink* sink) {
         auto&& frame = trace.frames[i];
         btss << "#" << i << " " << formatter.format(frame) << std::endl;
         if (frame.filename.find("src/mongo/") != std::string::npos && frame.line.has_value()) {
-            btss << cpptrace::get_snippet(frame.filename, frame.line.value(), frame.column, 2, true)
+            btss << cpptrace::get_snippet(
+                        frame.filename, frame.line.value(), frame.column, 2, shouldColor)
                  << "\n";
         }
     }

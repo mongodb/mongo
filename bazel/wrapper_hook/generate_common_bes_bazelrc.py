@@ -144,6 +144,7 @@ common --bes_keywords=client_system:cpu_count={cpu_count}
 common --bes_keywords=client_system:total_memory_gb={total_memory_gb}
 common --bes_keywords=client_system:available_memory_gb={available_memory_gb}
 common --bes_keywords=client_system:filesystem_type={filesystem_type}
+common --//bazel/config:dev_stacktrace={developer_build}
 """
 
     otel_parent_id = os.environ.get("otel_parent_id")
