@@ -534,6 +534,10 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
         _migrateThreadHandle.join();
     }
 
+    // Reset the cancellationSource at the start of every migration to avoid accumulating memory.
+    auto newCancellationSource = CancellationSource();
+    std::swap(_cancellationSource, newCancellationSource);
+
     _sessionMigration = std::make_unique<SessionCatalogMigrationDestination>(
         _nss, _fromShard, *_sessionId, _cancellationSource.token());
     ShardingStatistics::get(opCtx).countRecipientMoveChunkStarted.addAndFetch(1);
