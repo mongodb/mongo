@@ -174,7 +174,7 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &aubsan-lite-required-expansions
-    compile_variant: *linux_debug_aubsan_compile_variant_name
+    compile_variant: *rhel8_debug_aubsan_compile_variant_name
     lang_environment: LANG=C
     san_options: *aubsan_options
     resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
@@ -324,7 +324,7 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8g-8xlarge
 
-  # This needs to be RHEL8 since it's used for multiversion testing
+  # This needs to be RHEL8 since it's used for multiversion testing.
   - <<: *generic_linux_compile_params
     name: &rhel8-debug-aubsan-compile rhel8-debug-aubsan-compile
     display_name: "RHEL 8 x86_64 {A,UB}SAN Enterprise Compile"
