@@ -155,4 +155,20 @@ TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
     ASSERT_EQ(std::string(optimizable.getSourceName()),
               sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
 }
+
+TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecution) {
+    auto optimizable = host::DocumentSourceExtensionOptimizable(
+        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
+        getExpCtx(),
+        DocumentSource::allocateId(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName),
+        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true)),
+        host_connector::AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
+
+    // Test that an extension can provide its own implementation of serialize, that might change the
+    // raw spec provided.
+    ASSERT_BSONOBJ_EQ(optimizable.serialize(SerializationOptions()).getDocument().toBson(),
+                      BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName
+                           << "serializedForExecution"));
+}
+
 }  // namespace mongo::extension

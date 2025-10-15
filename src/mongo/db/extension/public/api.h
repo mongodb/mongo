@@ -255,6 +255,12 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      * Destroy `logicalStage` and free any related resources.
      */
     void (*destroy)(MongoExtensionLogicalAggStage* logicalStage);
+
+    /**
+     * Serialize `logicalStage` to be potentially sent across the wire to other execution nodes.
+     */
+    MongoExtensionStatus* (*serialize)(const MongoExtensionLogicalAggStage* logicalStage,
+                                       MongoExtensionByteBuf** output);
 } MongoExtensionLogicalAggStageVTable;
 
 /**

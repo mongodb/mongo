@@ -55,7 +55,7 @@ public:
         // fields are just quietly ignored.
         sdk::validateStageDefinition(stageBson, kStageName);
 
-        return std::make_unique<TestFooParseNode>();
+        return std::make_unique<TestFooParseNode>(stageBson);
     }
 };
 

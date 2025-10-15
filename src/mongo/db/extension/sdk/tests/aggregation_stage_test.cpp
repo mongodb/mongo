@@ -527,6 +527,33 @@ DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableBind, "11113700") {
     handle.assertVTableConstraints(vtable);
 };
 
+class SimpleSerializationLogicalStage : public LogicalAggStage {
+public:
+    static constexpr StringData kStageName = "$simpleSerialization";
+    static constexpr StringData kStageSpec = "mongodb";
+
+    SimpleSerializationLogicalStage() {}
+
+    BSONObj serialize() const override {
+        return BSON(kStageName << kStageSpec);
+    }
+
+    static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
+        return std::make_unique<SimpleSerializationLogicalStage>();
+    }
+};
+
+TEST(AggregationStageTest, SimpleSerializationSucceeds) {
+    auto logicalStage =
+        new extension::sdk::ExtensionLogicalAggStage(SimpleSerializationLogicalStage::make());
+    auto handle = extension::host_connector::LogicalAggStageHandle{logicalStage};
+
+    auto serialized = handle.serialize();
+    ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
+                           << SimpleSerializationLogicalStage::kStageSpec),
+                      serialized);
+}
+
 class SimpleQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
     static constexpr StringData kStageName = "$simpleQueryShape";

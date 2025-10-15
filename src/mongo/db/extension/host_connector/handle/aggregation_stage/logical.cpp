@@ -27,41 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/host_portal.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/logical.h"
 
-namespace sdk = mongo::extension::sdk;
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
-DEFAULT_LOGICAL_AST_PARSE(VectorSearch, "$vectorSearch")
+namespace mongo::extension::host_connector {
 
-/**
- * $vectorSearch is stage used to imitate overriding the existing $vectorSearch implementation
- * with an extension stage.
- */
-class VectorSearchStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(VectorSearchStageName);
+BSONObj LogicalAggStageHandle::serialize() const {
+    ::MongoExtensionByteBuf* buf;
+    invokeCAndConvertStatusToException([&]() { return vtable().serialize(get(), &buf); });
 
-    VectorSearchStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    tassert(11173700,
+            "Extension implementation of `serialize` encountered nullptr inside the output buffer.",
+            buf != nullptr);
 
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
+    // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
+    // BSONObj to return to the caller.
+    // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
+    ExtensionByteBufHandle ownedBuf{buf};
+    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+}
 
-        return std::make_unique<VectorSearchParseNode>(stageBson);
-    }
-};
-
-class VectorSearchExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<VectorSearchStageDescriptor>(portal);
-    }
-};
-
-REGISTER_EXTENSION(VectorSearchExtension)
-DEFINE_GET_EXTENSION()
+}  // namespace mongo::extension::host_connector

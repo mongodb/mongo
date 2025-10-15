@@ -38,6 +38,7 @@ extensions_with_config(
         ":parse_options_mongo_extension",
         ":test_options_mongo_extension",
         ":extension_errors_mongo_extension",
+        ":sharded_execution_serialization_mongo_extension",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -105,6 +106,17 @@ extensions_with_config(
         "logging",
         "extension_errors",
         "debug_logging",
+    ]
+]
+
+# Extensions under test_examples/observability/
+[
+    mongo_cc_extension_shared_library(
+        name = extension_name + "_mongo_extension",
+        srcs = ["observability/" + extension_name + ".cpp"],
+    )
+    for extension_name in [
+        "sharded_execution_serialization",
     ]
 ]
 

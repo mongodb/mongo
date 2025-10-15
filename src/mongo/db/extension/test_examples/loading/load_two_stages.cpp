@@ -50,7 +50,7 @@ public:
         mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
-        return std::make_unique<FooParseNode>();
+        return std::make_unique<FooParseNode>(stageBson);
     }
 };
 
@@ -65,7 +65,7 @@ public:
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
-        return std::make_unique<BarParseNode>();
+        return std::make_unique<BarParseNode>(stageBson);
     }
 };
 

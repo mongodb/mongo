@@ -52,7 +52,7 @@ public:
                    "Dummy assertion to test usage of the host services",
                    sdk::HostServicesHandle::getHostServices()->alwaysTrue_TEMPORARY());
 
-        return std::make_unique<TestFooForHostServicesAsapStageParseNode>();
+        return std::make_unique<TestFooForHostServicesAsapStageParseNode>(stageBson);
     }
 };
 

@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
@@ -45,7 +46,12 @@ public:
         _assertValidVTable();
     }
 
+    BSONObj serialize() const;
+
 protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {}
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            11173703, "ExtensionLogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
+    }
 };
 }  // namespace mongo::extension::host_connector

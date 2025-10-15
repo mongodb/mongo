@@ -12,6 +12,7 @@ mongo_cc_library(
     name = "aggregation_stage",
     srcs = [
         "ast_node.cpp",
+        "logical.cpp",
         "parse_node.cpp",
         "stage_descriptor.cpp",
     ],

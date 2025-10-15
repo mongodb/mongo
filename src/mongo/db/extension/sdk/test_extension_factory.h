@@ -29,29 +29,50 @@
 
 #define DEFAULT_LOGICAL_AST_PARSE(ExtensionName, StageNameStringView)                           \
     inline constexpr std::string_view ExtensionName##StageName = StageNameStringView;           \
-    class ExtensionName##LogicalStage : public sdk::LogicalAggStage {};                         \
+    class ExtensionName##LogicalStage : public sdk::LogicalAggStage {                           \
+    public:                                                                                     \
+        ExtensionName##LogicalStage(const ::mongo::BSONObj& rawSpec)                            \
+            : _rawSpec(rawSpec.getOwned()) {}                                                   \
+                                                                                                \
+        ::mongo::BSONObj serialize() const override {                                           \
+            return _rawSpec;                                                                    \
+        }                                                                                       \
+                                                                                                \
+    private:                                                                                    \
+        ::mongo::BSONObj _rawSpec;                                                              \
+    };                                                                                          \
     class ExtensionName##AstNode : public sdk::AggStageAstNode {                                \
     public:                                                                                     \
-        ExtensionName##AstNode() : sdk::AggStageAstNode(ExtensionName##StageName) {}            \
+        ExtensionName##AstNode(const ::mongo::BSONObj& rawSpec)                                 \
+            : sdk::AggStageAstNode(ExtensionName##StageName), _rawSpec(rawSpec.getOwned()) {}   \
+                                                                                                \
         std::unique_ptr<sdk::LogicalAggStage> bind() const override {                           \
-            return std::make_unique<ExtensionName##LogicalStage>();                             \
+            return std::make_unique<ExtensionName##LogicalStage>(_rawSpec);                     \
         };                                                                                      \
+                                                                                                \
+    private:                                                                                    \
+        ::mongo::BSONObj _rawSpec;                                                              \
     };                                                                                          \
     class ExtensionName##ParseNode : public sdk::AggStageParseNode {                            \
     public:                                                                                     \
-        ExtensionName##ParseNode() : sdk::AggStageParseNode(ExtensionName##StageName) {}        \
+        ExtensionName##ParseNode(const ::mongo::BSONObj& rawSpec)                               \
+            : sdk::AggStageParseNode(ExtensionName##StageName), _rawSpec(rawSpec.getOwned()) {} \
+                                                                                                \
         size_t getExpandedSize() const override {                                               \
             return 1;                                                                           \
         }                                                                                       \
         std::vector<sdk::VariantNode> expand() const override {                                 \
             std::vector<sdk::VariantNode> expanded;                                             \
             expanded.reserve(getExpandedSize());                                                \
-            expanded.emplace_back(                                                              \
-                new sdk::ExtensionAggStageAstNode(std::make_unique<ExtensionName##AstNode>())); \
+            expanded.emplace_back(new sdk::ExtensionAggStageAstNode(                            \
+                std::make_unique<ExtensionName##AstNode>(_rawSpec)));                           \
             return expanded;                                                                    \
         }                                                                                       \
-        mongo::BSONObj getQueryShape(                                                           \
+        ::mongo::BSONObj getQueryShape(                                                         \
             const ::MongoExtensionHostQueryShapeOpts* ctx) const override {                     \
-            return mongo::BSONObj();                                                            \
+            return _rawSpec;                                                                    \
         }                                                                                       \
+                                                                                                \
+    private:                                                                                    \
+        ::mongo::BSONObj _rawSpec;                                                              \
     };

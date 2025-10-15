@@ -67,7 +67,7 @@ public:
         int level = bsonSpec.getIntField(kDebugLogLevelField);
         sdk::HostServicesHandle::getHostServices()->logDebug("Test log message", 11134100, level);
 
-        return std::make_unique<DebugLogParseNode>();
+        return std::make_unique<DebugLogParseNode>(stageBson);
     }
 };
 

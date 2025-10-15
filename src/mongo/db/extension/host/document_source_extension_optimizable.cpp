@@ -27,41 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/host_portal.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 
-namespace sdk = mongo::extension::sdk;
+namespace mongo::extension::host {
 
-DEFAULT_LOGICAL_AST_PARSE(VectorSearch, "$vectorSearch")
-
-/**
- * $vectorSearch is stage used to imitate overriding the existing $vectorSearch implementation
- * with an extension stage.
- */
-class VectorSearchStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(VectorSearchStageName);
-
-    VectorSearchStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
-
-        return std::make_unique<VectorSearchParseNode>(stageBson);
+Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& opts) const {
+    if (!opts.isKeepingLiteralsUnchanged()) {
+        // TODO SERVER-111736 call into the ParseNode handle to serialize the query shape.
+    } else if (opts.isSerializingForExplain()) {
+        // TODO (no-ticket-yet) call into the ParseNode handle to serialize for explain.
+    } else {
+        // Serialize the stage for query execution.
+        return Value(_logicalStage.serialize());
     }
-};
+    return Value(_raw_stage);
+}
 
-class VectorSearchExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<VectorSearchStageDescriptor>(portal);
-    }
-};
-
-REGISTER_EXTENSION(VectorSearchExtension)
-DEFINE_GET_EXTENSION()
+}  // namespace mongo::extension::host

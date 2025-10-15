@@ -110,7 +110,9 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
                   sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
     auto serializedPipeline = parsedPipeline->serializeToBson();
     ASSERT_EQUALS(serializedPipeline.size(), 1u);
-    ASSERT_BSONOBJ_EQ(serializedPipeline[0], kValidSpec);
+    ASSERT_BSONOBJ_EQ(serializedPipeline[0],
+                      BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName
+                           << "serializedForExecution"));
 
     const auto* documentSourceExtension =
         dynamic_cast<const host::DocumentSourceExtension*>(stagePtr);

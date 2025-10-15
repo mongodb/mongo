@@ -72,7 +72,7 @@ public:
                        obj.getField("num").numberDouble() <= ExtensionOptions::max);
         }
 
-        return std::make_unique<CheckNumParseNode>();
+        return std::make_unique<CheckNumParseNode>(stageBson);
     }
 };
 

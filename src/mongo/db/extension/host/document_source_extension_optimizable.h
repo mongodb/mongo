@@ -47,11 +47,7 @@ public:
         : DocumentSourceExtension(name, expCtx, id, rawStage, staticDescriptor),
           _logicalStage(validateAndCreateLogicalStage()) {}
 
-    Value serialize(const SerializationOptions& opts) const override {
-        // TODO We need to call into the plugin here when we want to serialize for query shape, or
-        // if optimizations change the shape of the stage definition.
-        return Value(_raw_stage);
-    }
+    Value serialize(const SerializationOptions& opts) const override;
 
 private:
     const host_connector::LogicalAggStageHandle _logicalStage;

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 
 namespace mongo::extension::sdk::shared_test_stages {
@@ -45,6 +46,10 @@ static constexpr std::string_view kNoOpName = "$noOp";
 class NoOpLogicalAggStage : public sdk::LogicalAggStage {
 public:
     NoOpLogicalAggStage() {}
+
+    BSONObj serialize() const override {
+        return BSON(std::string(kNoOpName) << "serializedForExecution");
+    }
 };
 
 class NoOpAggStageAstNode : public sdk::AggStageAstNode {

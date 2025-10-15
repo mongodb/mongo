@@ -50,6 +50,7 @@ namespace mongo::extension::sdk {
 class LogicalAggStage {
 public:
     LogicalAggStage() = default;
+    virtual BSONObj serialize() const = 0;
     virtual ~LogicalAggStage() = default;
 };
 
@@ -62,7 +63,7 @@ public:
  *
  * This abstraction is required to ensure we maintain the public
  * ::MongoExtensionLogicalAggStage interface and layout as dictacted by the public API.
- * Any polymorphic bevahiour must be deferred to and implemented by the underlying
+ * Any polymorphic behavior must be deferred to and implemented by the underlying
  * LogicalAggStage.
  */
 class ExtensionLogicalAggStage final : public ::MongoExtensionLogicalAggStage {
@@ -71,12 +72,30 @@ public:
         : ::MongoExtensionLogicalAggStage{&VTABLE}, _stage(std::move(logicalStage)) {}
     ~ExtensionLogicalAggStage() = default;
 
+    const LogicalAggStage& getImpl() const noexcept {
+        return *_stage;
+    }
+
 private:
     static void _extDestroy(::MongoExtensionLogicalAggStage* extlogicalStage) noexcept {
         delete static_cast<ExtensionLogicalAggStage*>(extlogicalStage);
     }
 
-    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {.destroy = &_extDestroy};
+    static MongoExtensionStatus* _extSerialize(
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+
+            const auto& impl =
+                static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
+
+            *output = new VecByteBuf(impl.serialize());
+        });
+    }
+
+    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {.destroy = &_extDestroy,
+                                                                     .serialize = &_extSerialize};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

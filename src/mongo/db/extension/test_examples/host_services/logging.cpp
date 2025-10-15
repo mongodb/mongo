@@ -57,7 +57,7 @@ public:
                 kStageName + " stage spec is empty or not an object.",
                 11134000,
                 mongo::extension::MongoExtensionLogSeverityEnum::kError);
-            return std::make_unique<LogParseNode>();
+            return std::make_unique<LogParseNode>(stageBson);
         }
 
         mongo::BSONObj bsonSpec = stageBson.getField(kStageName).Obj();
@@ -97,7 +97,7 @@ public:
                                                             11134004);
         }
 
-        return std::make_unique<LogParseNode>();
+        return std::make_unique<LogParseNode>(stageBson);
     }
 };
 

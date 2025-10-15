@@ -58,7 +58,7 @@ public:
                    "Failed to parse " + kStageName + ", must have at least one field",
                    !stageBson.getField(kStageName).Obj().isEmpty());
 
-        return std::make_unique<TestBarParseNode>();
+        return std::make_unique<TestBarParseNode>(stageBson);
     }
 };
 

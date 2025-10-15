@@ -49,7 +49,7 @@ namespace sdk = mongo::extension::sdk;
         std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override { \
             sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);          \
                                                                                                  \
-            return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>();                       \
+            return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>(stageBson);              \
         }                                                                                        \
     };                                                                                           \
                                                                                                  \

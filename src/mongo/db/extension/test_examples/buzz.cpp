@@ -49,7 +49,7 @@ public:
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
-        return std::make_unique<TestBuzzParseNode>();
+        return std::make_unique<TestBuzzParseNode>(stageBson);
     }
 };
 
