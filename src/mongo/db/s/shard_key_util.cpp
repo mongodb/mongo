@@ -415,6 +415,7 @@ void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
 
 void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
                                                                       std::string* errMsg) const {
+    // shardCollection can only attempt to create a shard key index if the collection is empty.
     repl::ReadConcernArgs readConcern =
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
     FindCommandRequest findCommand(nss);
