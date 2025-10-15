@@ -186,7 +186,7 @@ sub_errors = [
         a checkpoint.'''),
     Error('WT_MODIFY_READ_UNCOMMITTED', -32012,
         "Read-uncommitted readers do not support reconstructing a record with modifies", '''
-        This sub-level error indicates that a reader with uncommitted isolation
+        This sub-level error indicates that a reader with uncommitted isolation 
         is trying to reconstruct a record with modifies. This is not supported.'''),
     Error('WT_CONFLICT_LIVE_RESTORE', -32013,
         "Conflict performing operation due to an in-progress live restore", '''
@@ -195,10 +195,7 @@ sub_errors = [
     Error('WT_CONFLICT_DISAGG', -32014,
         "Conflict with disaggregated storage", '''
         This sub-level error indicates that an operation or configuration conflicts with
-        disaggregated storage.'''),
-    Error('WT_DISAGG_BAD_LSN', -32015,
-        "Attempt to operate on a wrong LSN number", '''
-        This sub-level error indicates that an operation with a bad LSN number was attempted.'''),
+        disaggregated storage.'''),     
 ]
 
 # Update the #defines in the wiredtiger.h.in file.
@@ -272,7 +269,7 @@ wiredtiger_strerror(int error)
 
 /*
  * __wt_is_valid_sub_level_error --
- *\tReturn true if the provided error falls within the valid range for sub level error codes,
+ *\tReturn true if the provided error falls within the valid range for sub level error codes, 
  *\treturn false otherwise.
  */
 bool
@@ -295,7 +292,7 @@ for line in open(doc, 'r'):
         tfile.write(line)
     skip = check_write_document_errors(tfile, skip, 'ERR', errors)
     skip = check_write_document_errors(tfile, skip, 'SUB_ERR', sub_errors)
-
+    
 tfile.close()
 format_srcfile(tmp_file)
 compare_srcfile(tmp_file, doc)

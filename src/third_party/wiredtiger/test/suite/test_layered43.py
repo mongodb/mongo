@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, time, wiredtiger, wttest
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
@@ -35,14 +35,14 @@ from wiredtiger import stat
 #    Test disaggregated storage with block cache.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered43(wttest.WiredTigerTestCase):
+class test_layered43(wttest.WiredTigerTestCase, DisaggConfigMixin):
     nitems = 500
     key_to_update = 0
     num_updates = 10
 
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'precise_checkpoint=true,' \
+                     + 'precise_checkpoint=true,disaggregated=(page_log=palm),' \
                      + 'block_cache=(enabled=true,type="dram",size=256MB),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
@@ -55,8 +55,17 @@ class test_layered43(wttest.WiredTigerTestCase):
         ('layered', dict(prefix='layered:')),
         ('shared', dict(prefix='table:')),
     ])
+
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        DisaggConfigMixin.conn_extensions(self, extlist)
+
+    # Custom test case setup
     def early_setup(self):
         self.skipTest("FIXME-WT-15663: currently block cache is disabled.")
+        os.mkdir('kv_home')
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')

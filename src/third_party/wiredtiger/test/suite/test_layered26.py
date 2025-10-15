@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, time, wiredtiger, wttest
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered26.py
@@ -35,10 +35,10 @@ from wtscenario import make_scenarios
 #    component of the table.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered26(wttest.WiredTigerTestCase):
+class test_layered26(wttest.WiredTigerTestCase, DisaggConfigMixin):
     nitems = 5000
 
-    conn_base_config = 'precise_checkpoint=true,'
+    conn_base_config = 'precise_checkpoint=true,disaggregated=(page_log=palm),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
     session_create_config = 'key_format=S,value_format=S,'
@@ -48,6 +48,18 @@ class test_layered26(wttest.WiredTigerTestCase):
         ('layered-prefix', dict(prefix='layered:', table_config='')),
         ('layered-type', dict(prefix='table:', table_config='block_manager=disagg,type=layered,')),
     ])
+
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        DisaggConfigMixin.conn_extensions(self, extlist)
+
+    # Custom test case setup
+    def early_setup(self):
+        os.mkdir('follower')
+        os.mkdir('kv_home')
+        os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
     def test_layered26(self):
         # Avoid checkpoint error with precise checkpoint

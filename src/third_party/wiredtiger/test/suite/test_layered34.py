@@ -26,18 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, time, wiredtiger, wttest
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered34.py
 #    Test materialization frontier.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered34(wttest.WiredTigerTestCase):
+class test_layered34(wttest.WiredTigerTestCase, DisaggConfigMixin):
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'precise_checkpoint=true,disaggregated=(lose_all_my_data=true),'
+                     + 'precise_checkpoint=true,disaggregated=(page_log=palm,' \
+                     + 'lose_all_my_data=true),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
     create_session_config = 'key_format=S,value_format=S'
@@ -50,12 +51,22 @@ class test_layered34(wttest.WiredTigerTestCase):
         ('shared', dict(prefix='table:', table_config='block_manager=disagg,log=(enabled=false)')),
     ])
 
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        DisaggConfigMixin.conn_extensions(self, extlist)
+
+    # Custom test case setup
+    def early_setup(self):
+        os.mkdir('kv_home')
+
     # Test creating an empty table.
     def test_layered34(self):
         # Avoid checkpoint error with precise checkpoint
         self.conn.set_timestamp('stable_timestamp=1')
 
-        page_log = self.conn.get_page_log(self.vars.page_log)
+        page_log = self.conn.get_page_log('palm')
 
         # The node started as a follower, so step it up as the leader
         self.conn.reconfigure('disaggregated=(role="leader")')

@@ -342,7 +342,7 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
             ("layered",              "Layered tests already turn on the proper stuff"),
             ("live_restore",         "Live restore is not supported with disagg storage"),
             ("lsm",                  "LSM is not supported with tiering"),
-            ("modify_smoke_recover", "Copying WT dir doesn't copy the PALM/PALite directory"),
+            ("modify_smoke_recover", "Copying WT dir doesn't copy the PALM directory"),
             ("rollback_to_stable",   "Rollback to stable is not needed at startup"),
             ("test_backup",          "Can't backup a disagg table"),
             ("test_compact",         "Can't compact a disagg table"),
@@ -448,7 +448,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         #wttest.WiredTigerTestCase.tty('Disagg hook params={}'.format(params))
 
         self.disagg_config = ''
-        self.disagg_page_log = None
+        self.disagg_page_log = 'palm'
         self.disagg_role = 'leader'
         self.table_prefix = 'layered'
 
@@ -486,7 +486,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
             testcase.pr(f'>>>>layered tables: {testcase.layered_uris}<<<<<')
 
     def tableExists(self, name):
-        # TODO: for palm/palite will need to rummage in kv_home files.
+        # TODO: for palm will need to rummage in PALM files.
         return False
 
     def initialFileName(self, uri):
@@ -498,7 +498,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         result = wthooks.DisaggParameters()
         result.config = self.disagg_config
         result.role = self.disagg_role
-        result.page_log = self.disagg_page_log if self.disagg_page_log else WiredTigerTestCase.vars().page_log
+        result.page_log = self.disagg_page_log
         result.table_prefix = self.table_prefix
         return result
 

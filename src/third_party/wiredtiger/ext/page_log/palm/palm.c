@@ -934,7 +934,7 @@ err_no_rollback:
             ret = palm_kv_err(palm, session, EINVAL,                                           \
               "%s:%d: LSN arguments validation failed"                                         \
               ": %s != %s. Page details: table_id=%" PRIu64 ", page_id=%" PRIu64               \
-              ", flags=0x%" PRIx32 ", %s=%" PRIu64 ", %s=%" PRIu64,                            \
+              ", flags=0x%" PRIx64 ", %s=%" PRIu64 ", %s=%" PRIu64,                            \
               __func__, __LINE__, #a, #b, palm_handle->table_id, page_id, put_args->flags, #a, \
               (a), #b, (b));                                                                   \
             goto err;                                                                          \

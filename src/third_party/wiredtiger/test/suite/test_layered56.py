@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
@@ -35,14 +35,14 @@ from wiredtiger import stat
 # Test no page delta is generated on page split.
 
 @disagg_test_class
-class test_layered56(wttest.WiredTigerTestCase):
+class test_layered56(wttest.WiredTigerTestCase, DisaggConfigMixin):
     split = [
         ('page_split', dict(page_split=True)),
         ('page_no_split', dict(page_split=False)),
     ]
 
     conn_config = 'cache_size=10MB,transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(role="leader"),page_delta=(delta_pct=100,internal_page_delta=true,leaf_page_delta=true)'
+                     + 'disaggregated=(page_log=palm,role="leader"),page_delta=(delta_pct=100,internal_page_delta=true,leaf_page_delta=true)'
     disagg_storages = gen_disagg_storages('test_layered32', disagg_only = True)
 
     uri='layered:test_layered56'

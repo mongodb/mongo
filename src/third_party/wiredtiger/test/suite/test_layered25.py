@@ -26,20 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, time, wiredtiger, wttest
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered25.py
 #    Start without local files and test historical reads.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered25(wttest.WiredTigerTestCase):
+class test_layered25(wttest.WiredTigerTestCase, DisaggConfigMixin):
     nitems = 500
 
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'precise_checkpoint=true,'
+                     + 'precise_checkpoint=true,disaggregated=(page_log=palm),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
     create_session_config = 'key_format=S,value_format=S'
@@ -54,6 +54,16 @@ class test_layered25(wttest.WiredTigerTestCase):
     ])
 
     num_restarts = 0
+
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        DisaggConfigMixin.conn_extensions(self, extlist)
+
+    # Custom test case setup
+    def early_setup(self):
+        os.mkdir('kv_home')
 
     # Restart the node without local files
     def restart_without_local_files(self):
@@ -93,11 +103,15 @@ class test_layered25(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
             cursor[str(i)] = value_prefix1 + str(i)
+            if i % 250 == 0:
+                time.sleep(1)
         cursor.close()
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(timestamp1)}')
 
+        time.sleep(1)
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(timestamp1)}')
         self.session.checkpoint()
+        time.sleep(1)
 
         # Update data in the table with a different timestamp
         value_prefix2 = 'bbb'
@@ -106,12 +120,16 @@ class test_layered25(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
             cursor[str(i)] = value_prefix2 + str(i)
+            if i % 250 == 0:
+                time.sleep(1)
         cursor.close()
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(timestamp2)}')
 
+        time.sleep(1)
         self.conn.set_timestamp(f'oldest_timestamp={self.timestamp_str(1)}')
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(timestamp2)}')
         self.session.checkpoint()
+        time.sleep(1)
 
         # Check the data with the first timestamp
         self.session.begin_transaction(f'read_timestamp={self.timestamp_str(timestamp1)}')

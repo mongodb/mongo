@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 import time
@@ -37,7 +37,7 @@ import time
 # Tests that prefix and suffix compression are working properly for page deltas.
 
 @disagg_test_class
-class test_layered54(wttest.WiredTigerTestCase):
+class test_layered54(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     delta = [
         ('write_leaf_only', dict(delta_config='page_delta=(internal_page_delta=false,leaf_page_delta=true)', delta_type='leaf_only')),
@@ -46,7 +46,7 @@ class test_layered54(wttest.WiredTigerTestCase):
     ]
 
     conn_base_config = 'cache_size=32MB,transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'page_delta=(delta_pct=100),'
+                     + 'disaggregated=(page_log=palm),page_delta=(delta_pct=100),'
     disagg_storages = gen_disagg_storages('test_layered54', disagg_only = True)
 
     nrows = 1000
@@ -63,6 +63,10 @@ class test_layered54(wttest.WiredTigerTestCase):
 
     def conn_config(self):
         return self.conn_base_config + f'disaggregated=(role="leader"),{self.delta_config},'
+
+    # Load the storage store extension.
+    def conn_extensions(self, extlist):
+        DisaggConfigMixin.conn_extensions(self, extlist)
 
     def get_stat(self, stat, uri = None):
         if not uri:

@@ -27,15 +27,15 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered33.py
 #    Test delete on the ingest table.
 @disagg_test_class
-class test_layered33(wttest.WiredTigerTestCase):
+class test_layered33(wttest.WiredTigerTestCase, DisaggConfigMixin):
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(lose_all_my_data=true),'
+                     + 'disaggregated=(page_log=palm,lose_all_my_data=true),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
     format_values = [
@@ -45,6 +45,12 @@ class test_layered33(wttest.WiredTigerTestCase):
 
     disagg_storages = gen_disagg_storages('test_layered33', disagg_only = True)
     scenarios = make_scenarios(disagg_storages, format_values)
+
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        DisaggConfigMixin.conn_extensions(self, extlist)
 
     def value(self, v):
         if self.value_format == 'S':

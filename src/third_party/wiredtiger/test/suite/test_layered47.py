@@ -27,13 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import errno, os, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered47.py
 #    Test pruning of ingest tables on the follower during checkpoint pick-ups.
 @disagg_test_class
-class test_layered47(wttest.WiredTigerTestCase):
+class test_layered47(wttest.WiredTigerTestCase, DisaggConfigMixin):
     disagg_storages = gen_disagg_storages('test_layered47', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
@@ -41,7 +41,7 @@ class test_layered47(wttest.WiredTigerTestCase):
     nitems = 10
     timestamp = 2
 
-    conn_base_config = ''
+    conn_base_config = 'disaggregated=(page_log=palm),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower")'
 

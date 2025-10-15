@@ -26,16 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+import os, time, wiredtiger, wttest
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_layered21.py
 #    Test the basic ability to insert on a follower.
 @disagg_test_class
-class test_layered21(wttest.WiredTigerTestCase):
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+class test_layered21(wttest.WiredTigerTestCase, DisaggConfigMixin):
+    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
+                     + 'disaggregated=(page_log=palm),'
     def conn_config(self):
         return self.conn_base_config + f'disaggregated=(role="{self.initial_role}")'
 
@@ -48,6 +49,12 @@ class test_layered21(wttest.WiredTigerTestCase):
     ]
     disagg_storages = gen_disagg_storages('test_layered21', disagg_only = True)
     scenarios = make_scenarios(disagg_storages, role_scenarios)
+
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        DisaggConfigMixin.conn_extensions(self, extlist)
 
     # Test simple inserts to a leader/follower
     def test_insert_changing_roles(self):

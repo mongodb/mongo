@@ -671,21 +671,59 @@ err:
 }
 
 /*
- * __layered_table_manager_init --
+ * __layered_table_manager_thread_chk --
+ *     Check to decide if the layered table manager thread should continue running
+ */
+static bool
+__layered_table_manager_thread_chk(WT_SESSION_IMPL *session)
+{
+    if (!S2C(session)->layered_table_manager.leader)
+        return (false);
+    return (__wt_atomic_load32(&S2C(session)->layered_table_manager.state) ==
+      WT_LAYERED_TABLE_MANAGER_RUNNING);
+}
+
+/*
+ * __layered_table_manager_thread_run --
+ *     Entry function for a layered table manager thread. This is called repeatedly from the thread
+ *     group code so it does not need to loop itself.
+ */
+static int
+__layered_table_manager_thread_run(WT_SESSION_IMPL *session_shared, WT_THREAD *thread)
+{
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(session_shared);
+    session = thread->session;
+    WT_ASSERT(session, !WT_SESSION_IS_DEFAULT(session));
+
+    WT_STAT_CONN_SET(session, layered_table_manager_active, 1);
+
+    /* Right now we just sleep. In the future, do whatever we need to do here. */
+    __wt_sleep(1, 0);
+
+    WT_STAT_CONN_SET(session, layered_table_manager_active, 0);
+
+    return (0);
+}
+
+/*
+ * __layered_table_manager_start --
  *     Start the layered table manager thread
  */
 static int
-__layered_table_manager_init(WT_SESSION_IMPL *session)
+__layered_table_manager_start(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_LAYERED_TABLE_MANAGER *manager;
+    uint32_t session_flags;
 
     conn = S2C(session);
     manager = &conn->layered_table_manager;
 
-    WT_ASSERT_ALWAYS(
-      session, manager->init == false, "Layered table manager initialization conflict");
+    WT_ASSERT_ALWAYS(session, manager->state == WT_LAYERED_TABLE_MANAGER_OFF,
+      "Layered table manager initialization conflict");
 
     WT_RET(__wt_spin_init(session, &manager->layered_table_lock, "layered table manager"));
 
@@ -696,9 +734,17 @@ __layered_table_manager_init(WT_SESSION_IMPL *session)
     manager->entries_allocated_bytes =
       manager->open_layered_table_count * sizeof(WT_LAYERED_TABLE_MANAGER_ENTRY *);
 
+    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
+    WT_ERR(__wt_thread_group_create(session, &manager->threads, "layered-table-manager",
+      WT_LAYERED_TABLE_THREAD_COUNT, WT_LAYERED_TABLE_THREAD_COUNT, session_flags,
+      __layered_table_manager_thread_chk, __layered_table_manager_thread_run, NULL));
+
+    WT_STAT_CONN_SET(session, layered_table_manager_running, 1);
+    __wt_verbose_level(
+      session, WT_VERB_LAYERED, WT_VERBOSE_DEBUG_5, "%s", "__layered_table_manager_start");
     FLD_SET(conn->server_flags, WT_CONN_SERVER_LAYERED);
 
-    manager->init = true;
+    manager->state = WT_LAYERED_TABLE_MANAGER_RUNNING;
     return (0);
 
 err:
@@ -727,8 +773,8 @@ __wt_layered_table_manager_add_table(WT_SESSION_IMPL *session, uint32_t ingest_i
       "Adding a layered tree to tracking without the right dhandle context.");
     layered = (WT_LAYERED_TABLE *)session->dhandle;
 
-    WT_ASSERT_ALWAYS(
-      session, manager->init, "Adding a layered table, but the manager isn't initialized");
+    WT_ASSERT_ALWAYS(session, manager->state == WT_LAYERED_TABLE_MANAGER_RUNNING,
+      "Adding a layered table, but the manager isn't running");
     __wt_spin_lock(session, &manager->layered_table_lock);
 
     WT_ASSERT(session, manager->open_layered_table_count > 0);
@@ -809,7 +855,7 @@ __wt_layered_table_manager_remove_table(WT_SESSION_IMPL *session, uint32_t inges
     manager = &S2C(session)->layered_table_manager;
 
     /* Shutdown calls this redundantly - ignore cases when the manager is already closed. */
-    if (manager->init == false)
+    if (manager->state == WT_LAYERED_TABLE_MANAGER_OFF)
         return;
 
     __wt_spin_lock(session, &manager->layered_table_lock);
@@ -864,12 +910,17 @@ __wti_layered_table_manager_destroy(WT_SESSION_IMPL *session)
     __wt_verbose_level(
       session, WT_VERB_LAYERED, WT_VERBOSE_DEBUG_5, "%s", "__wti_layered_table_manager_destroy");
 
-    if (manager->init == false)
+    if (__wt_atomic_load32(&manager->state) == WT_LAYERED_TABLE_MANAGER_OFF)
         return (0);
 
-    __wt_spin_lock(session, &manager->layered_table_lock);
     /* Ensure other things that engage with the layered table server know it's gone. */
     FLD_CLR(conn->server_flags, WT_CONN_SERVER_LAYERED);
+
+    /* Let any running threads finish up. */
+    __wt_cond_signal(session, manager->threads.wait_cond);
+    __wt_writelock(session, &manager->threads.lock);
+
+    WT_RET(__wt_thread_group_destroy(session, &manager->threads));
 
     /* Close any cursors and free any related memory */
     for (i = 0; i < manager->open_layered_table_count; i++) {
@@ -880,9 +931,9 @@ __wti_layered_table_manager_destroy(WT_SESSION_IMPL *session)
     manager->open_layered_table_count = 0;
     manager->entries_allocated_bytes = 0;
 
-    manager->init = false;
+    manager->state = WT_LAYERED_TABLE_MANAGER_OFF;
+    WT_STAT_CONN_SET(session, layered_table_manager_running, 0);
 
-    __wt_spin_unlock(session, &manager->layered_table_lock);
     __wt_spin_destroy(session, &manager->layered_table_lock);
 
     return (0);
@@ -1216,7 +1267,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
 
     /* FIXME-WT-14965: Exit the function immediately if this check returns false. */
     if (__wt_conn_is_disagg(session)) {
-        WT_ERR(__layered_table_manager_init(session));
+        WT_ERR(__layered_table_manager_start(session));
 
         /* If we are starting as a primary, abandon a previous incomplete checkpoint. */
         if (leader) {
@@ -1880,7 +1931,7 @@ __layered_update_gc_ingest_tables_prune_timestamps(
     uri_alloc = 0;
     prune_timestamp = WT_TS_NONE;
 
-    WT_ASSERT(session, manager->init);
+    WT_ASSERT(session, manager->state == WT_LAYERED_TABLE_MANAGER_RUNNING);
 
     __wt_spin_lock(session, &manager->layered_table_lock);
 

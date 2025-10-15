@@ -28,15 +28,15 @@
 
 import wttest
 from eviction_util import eviction_util
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
 
 # Test we don't review obsolete time window for readonly btree in follower.
 @disagg_test_class
-class test_layered55(eviction_util, wttest.WiredTigerTestCase):
-    conn_base_config = 'cache_size=10MB,'
+class test_layered55(eviction_util, wttest.WiredTigerTestCase, DisaggConfigMixin):
+    conn_base_config = 'disaggregated=(page_log=palm),cache_size=10MB,'
 
     disagg_storages = gen_disagg_storages('test_layered55', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)

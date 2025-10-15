@@ -27,16 +27,16 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from test_layered23 import Oplog
 from wtscenario import make_scenarios
 
 # test_layered37.py
 # Test pinning the content in the ingest table
 @disagg_test_class
-class test_layered37(wttest.WiredTigerTestCase):
+class test_layered37(wttest.WiredTigerTestCase, DisaggConfigMixin):
     conn_base_config = ',create,cache_size=10GB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                 + 'disaggregated=(lose_all_my_data=true),'
+                 + 'disaggregated=(page_log=palm,lose_all_my_data=true),'
 
     disagg_storages = gen_disagg_storages('test_layered37', disagg_only = True)
 

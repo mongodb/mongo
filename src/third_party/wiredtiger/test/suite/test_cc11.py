@@ -39,7 +39,7 @@ class test_cc11(DisaggConfigMixin, test_cc_base):
     disagg_storages = gen_disagg_storages('test_cc11', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    conn_config = 'cache_size=10MB,page_delta=(delta_pct=100),disaggregated=(role="follower"),checkpoint_cleanup=[wait=1,file_wait_ms=0],'
+    conn_config = 'disaggregated=(page_log=palm),cache_size=10MB,page_delta=(delta_pct=100),disaggregated=(role="follower"),checkpoint_cleanup=[wait=1,file_wait_ms=0],'
 
     def test_cc11(self):
         # Create a table.

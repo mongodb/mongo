@@ -27,17 +27,18 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+import time
 import wiredtiger
 import wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered22.py
 # Test a secondary can perform reads and writes to the ingest component
 # of a layered table, without the stable component.
-@disagg_test_class
-class test_layered22(wttest.WiredTigerTestCase):
-    conn_base_config = 'transaction_sync=(enabled,method=fsync),'
+class test_layered22(wttest.WiredTigerTestCase, DisaggConfigMixin):
+    conn_base_config = 'transaction_sync=(enabled,method=fsync),' \
+                     + 'disaggregated=(page_log=palm),'
 
     disagg_storages = gen_disagg_storages('test_layered22', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
@@ -45,8 +46,29 @@ class test_layered22(wttest.WiredTigerTestCase):
     nitems = 10000
     uri = 'layered:test_layered22'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        extlist.extension('page_log', 'palm')
+
+    # Custom test case setup
+    def early_setup(self):
+        os.mkdir('follower')
+        # Create the home directory for the PALM k/v store, and share it with the follower.
+        os.mkdir('kv_home')
+        os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
+
     def conn_config(self):
         return self.conn_base_config + 'disaggregated=(role="follower"),'
+
+    # Load the storage store extension.
+    def conn_extensions(self, extlist):
+        DisaggConfigMixin.conn_extensions(self, extlist)
 
     def session_create_config(self):
         return 'key_format=S,value_format=S,'

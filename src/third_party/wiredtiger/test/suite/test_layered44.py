@@ -26,16 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, wiredtiger, wttest
-from helper_disagg import disagg_test_class
+import os, time, wiredtiger, wttest
+from helper_disagg import DisaggConfigMixin, disagg_test_class
 from wiredtiger import stat
 
 # test_layered44.py
 #    Ensure that we do not read any freed pages.
 @disagg_test_class
-class test_layered44(wttest.WiredTigerTestCase):
+class test_layered44(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
+                     + 'disaggregated=(page_log=palm),'
     conn_config = conn_base_config + 'disaggregated=(role="leader"),' + \
                   'verbose=[read:0,block:1],'
 
@@ -44,6 +45,19 @@ class test_layered44(wttest.WiredTigerTestCase):
     table_name = 'test_layered44'
     uri = "layered:" + table_name
     stable_uri = "file:" + table_name + ".wt_stable"
+
+    # Load the page log extension, which has object storage support
+    def conn_extensions(self, extlist):
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
+        extlist.extension('page_log', 'palm')
+
+    # Custom test case setup
+    def early_setup(self):
+        os.mkdir('follower')
+        # Create the home directory for the PALM k/v store, and share it with the follower.
+        os.mkdir('kv_home')
+        os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')

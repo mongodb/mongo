@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import errno, os, wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_verify_disagg.py
@@ -37,7 +37,7 @@ from wtscenario import make_scenarios
 #    (we already have an OpLog imitation in some tests for layered tables)
 
 @disagg_test_class
-class test_verify_disagg(wttest.WiredTigerTestCase):
+class test_verify_disagg(wttest.WiredTigerTestCase, DisaggConfigMixin):
     hs = [
         ('empty', dict(fill_hs=False)),
         ('populated', dict(fill_hs=True)),
@@ -48,7 +48,7 @@ class test_verify_disagg(wttest.WiredTigerTestCase):
     nitems = 10000
     timestamp = 2
 
-    conn_base_config = ''
+    conn_base_config = 'disaggregated=(page_log=palm),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower")'
 

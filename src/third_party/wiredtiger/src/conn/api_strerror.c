@@ -77,8 +77,6 @@ __wt_wiredtiger_error(int error)
           "restore");
     case WT_CONFLICT_DISAGG:
         return ("WT_CONFLICT_DISAGG: Conflict with disaggregated storage");
-    case WT_DISAGG_BAD_LSN:
-        return ("WT_DISAGG_BAD_LSN: Attempt to operate on a wrong LSN number");
     }
 
     /* Windows strerror doesn't support ENOTSUP. */

@@ -12,6 +12,7 @@ set(default_enable_iaa OFF)
 set(default_enable_debug_info ON)
 set(default_enable_static OFF)
 set(default_enable_shared ON)
+set(default_internal_sqlite3 ON)
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPER)
 
@@ -340,12 +341,6 @@ config_bool(
 )
 
 config_bool(
-    ENABLE_PALITE
-    "Build the PALite storage extension (mock implementation of the PALI)"
-    DEFAULT ON
-)
-
-config_bool(
     ENABLE_LLVM
     "Enable compilation of LLVM-based tools and executables i.e. xray & fuzzer."
     DEFAULT OFF
@@ -364,10 +359,17 @@ config_string(
     DEFAULT "3.8"   # Minimum version for partial indexes (used in PALite)
 )
 
+# Use system provided sqlite3 if available.
+find_package(SQLite3 ${SQLITE3_REQUIRED_VERSION} QUIET)
+
+if(SQLite3_FOUND)
+    set(default_internal_sqlite3 OFF)
+endif()
+
 config_bool(
-    USE_SYSTEM_SQLITE3
-    "Use system SQLite3 library. If OFF, WiredTiger will use the bundled SQLite3 library."
-    DEFAULT OFF
+    ENABLE_INTERNAL_SQLITE3
+    "Enable internal SQLite3 library. If disabled, the system SQLite3 library will be used."
+    DEFAULT ${default_internal_sqlite3}
 )
 
 set(default_optimize_level "-Og")

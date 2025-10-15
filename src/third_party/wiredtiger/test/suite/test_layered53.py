@@ -27,17 +27,17 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered53.py
 #    Check that we can create a checkpoint just to capture the stable timestamp update.
 @disagg_test_class
-class test_layered53(wttest.WiredTigerTestCase):
+class test_layered53(wttest.WiredTigerTestCase, DisaggConfigMixin):
     disagg_storages = gen_disagg_storages('test_layered53', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    conn_base_config = 'cache_size=10MB,statistics=(all),'
+    conn_base_config = 'disaggregated=(page_log=palm),cache_size=10MB,statistics=(all),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower")'
 

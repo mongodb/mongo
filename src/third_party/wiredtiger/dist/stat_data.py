@@ -583,6 +583,8 @@ conn_stats = [
     ##########################################
     # Layered table statistics
     ##########################################
+    LayeredStat('layered_table_manager_active', 'whether the layered table manager thread is currently busy doing work'),
+    LayeredStat('layered_table_manager_running', 'whether the layered table manager thread has been started'),
     LayeredStat('layered_table_manager_tables', 'the number of tables the layered table manager has open'),
 
     ##########################################
