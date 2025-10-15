@@ -30,8 +30,6 @@
 #include "mongo/util/observable_mutex_registry.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status/server_status.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {
@@ -40,29 +38,6 @@ MutexStats operator+(const MutexStats& lhs, const ObservableMutexRegistry::Stats
 }
 
 namespace {
-class ObservableMutexServerStatusSection : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    bool includeByDefault() const override {
-        return false;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& config) const override {
-        bool listAll = false;
-        if (config.isABSONObj()) {
-            auto obj = config.Obj();
-            listAll = obj.hasField("listAll") ? obj.getIntField("listAll") : false;
-        }
-
-        return ObservableMutexRegistry::get().report(listAll);
-    }
-};
-
-auto& observableMutexSection =
-    *ServerStatusSectionBuilder<ObservableMutexServerStatusSection>("lockContentionMetrics")
-         .forShard()
-         .forRouter();
 
 void serialize(BSONObjBuilder& bob, const MutexAcquisitionStats& stats) {
     bob.append(ObservableMutexRegistry::kTotalAcquisitionsFieldName,

@@ -9,8 +9,13 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Constant for expected field in the lockContentionMetrics response.
-const kSampleField = "ServiceContext::_mutex";
+// Constants for expected fields in the lockContentionMetrics response.
+const kSampleFields = [
+    "ServiceContext::_mutex",
+    "logv2::CompositeBackend::BackendTraits::_mutex",
+    "logv2::RamLog(global)::_mutex",
+    "logv2::RamLog(startupWarnings)::_mutex",
+];
 let checkNum = 1;
 
 function runServerStatus(conn, options) {
@@ -23,11 +28,24 @@ function runServerStatusAndAssert(conn, options, listAll) {
     jsTest.log.info(`Check ${checkNum++}: ` + tojson(resp));
     assert(resp);
 
-    const entry = resp[kSampleField];
-    assert(entry);
-    assert(entry["exclusive"]);
-    assert(entry["shared"]);
-    assert.eq(entry["mutexes"] != undefined, listAll);
+    let errors = [];
+    for (const field of kSampleFields) {
+        const entry = resp[field];
+        if (!entry) {
+            errors.push(`Missing field: ${field}`);
+            continue;
+        }
+        if (!entry["exclusive"]) {
+            errors.push(`Missing 'exclusive' in ${field}`);
+        }
+        if (!entry["shared"]) {
+            errors.push(`Missing 'shared' in ${field}`);
+        }
+        if ((entry["mutexes"] != undefined) !== listAll) {
+            errors.push(`'mutexes' presence mismatch in ${field}`);
+        }
+    }
+    assert.eq(errors, []);
 }
 
 function runTest(conn) {

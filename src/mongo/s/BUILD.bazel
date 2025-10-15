@@ -230,7 +230,6 @@ mongo_cc_library(
         "//src/mongo/s/client:shard_interface",
         "//src/mongo/s/query/exec:cluster_cursor_manager",
         "//src/mongo/util:caching",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:observable_mutex_registry",
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:thread_pool",
     ],
@@ -765,6 +764,7 @@ mongo_cc_library(
         "//src/mongo/util:clock_sources",
         "//src/mongo/util/net:http_client_impl",
         "//src/mongo/util:ntservice",
+        "//src/mongo/util:observable_mutex_server_status_section",
         "//src/mongo/util/options_parser",
         "//src/mongo/util/options_parser:options_parser_init",
         "//src/mongo/util:pin_code_segments",

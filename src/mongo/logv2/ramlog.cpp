@@ -33,9 +33,12 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/observable_mutex_registry.h"
 
 #include <map>
 #include <utility>
+
+#include <fmt/format.h>
 
 namespace mongo::logv2 {
 
@@ -50,6 +53,7 @@ RM* _named = NULL;
 
 RamLog::RamLog(StringData name, size_t maxLines, size_t maxSizeBytes)
     : _maxLines(maxLines), _maxSizeBytes(maxSizeBytes), _name(name) {
+    ObservableMutexRegistry::get().add(fmt::format("logv2::RamLog({})::_mutex", name), _mutex);
     _lines.resize(_maxLines);
     clear();
 }
@@ -57,7 +61,7 @@ RamLog::RamLog(StringData name, size_t maxLines, size_t maxSizeBytes)
 RamLog::~RamLog() {}
 
 void RamLog::write(const std::string& str) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     _totalLinesWritten++;
 
     if (0 == str.size()) {
@@ -112,7 +116,7 @@ void RamLog::trimIfNeeded(size_t newStr) {
 }
 
 void RamLog::clear() {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     _totalLinesWritten = 0;
     _firstLinePosition = 0;
     _lastLinePosition = 0;
@@ -129,12 +133,12 @@ StringData RamLog::getLine(size_t lineNumber) const {
         return "";
     }
 
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     return _lines[(lineNumber + _firstLinePosition) % _maxLines].c_str();
 }
 
 size_t RamLog::getLineCount() const {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
 
     if (_lastLinePosition < _firstLinePosition) {
         return (_maxLines - _firstLinePosition) + _lastLinePosition;
@@ -147,7 +151,7 @@ RamLog::LineIterator::LineIterator(RamLog* ramlog)
     : _ramlog(ramlog), _lock(ramlog->_mutex), _nextLineIndex(0) {}
 
 size_t RamLog::LineIterator::getTotalLinesWritten() {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_ramlog->_mutex);
+    stdx::lock_guard lk(_ramlog->_mutex);
 
     return _ramlog->_totalLinesWritten;
 }

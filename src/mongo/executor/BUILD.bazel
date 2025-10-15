@@ -458,7 +458,6 @@ mongo_cc_library(
         "//src/mongo/client:backoff_with_jitter",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:observable_mutex_registry",
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
     ],
 )

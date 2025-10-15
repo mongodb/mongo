@@ -1075,11 +1075,10 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
-    name = "observable_mutex_registry",
+    name = "observable_mutex_server_status_section",
     srcs = [
-        "observable_mutex_registry.cpp",
+        "observable_mutex_server_status_section.cpp",
     ],
-    hdrs = ["observable_mutex_registry.h"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -1099,7 +1098,7 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     deps = [
-        ":observable_mutex_registry",
+        "//src/mongo:base",
         "//src/mongo/util:clock_source_mock",
     ],
 )
