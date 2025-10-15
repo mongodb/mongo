@@ -90,6 +90,8 @@ void MultiplePoolsTicketingSystem::setConcurrentTransactions(OperationContext* o
 void MultiplePoolsTicketingSystem::appendStats(BSONObjBuilder& b) const {
     boost::optional<BSONObjBuilder> readStats;
     boost::optional<BSONObjBuilder> writeStats;
+    int32_t readOut = 0, readAvailable = 0, readTotalTickets = 0;
+    int32_t writeOut = 0, writeAvailable = 0, writeTotalTickets = 0;
 
     for (size_t i = 0; i < _holders.size(); ++i) {
         const auto priority = static_cast<AdmissionContext::Priority>(i);
@@ -105,29 +107,51 @@ void MultiplePoolsTicketingSystem::appendStats(BSONObjBuilder& b) const {
             ? kNormalPriorityName
             : kLowPriorityName;
         if (rw.read) {
+            readOut += rw.read->used();
+            readAvailable += rw.read->available();
+            readTotalTickets += rw.read->outof();
             if (!readStats.is_initialized()) {
                 readStats.emplace();
             }
-            rw.read->appendHolderdStats(readStats.value(), fieldName);
+            BSONObjBuilder bb(readStats->subobjStart(fieldName));
+            rw.read->appendTicketStats(bb);
+            rw.read->appendHolderStats(bb);
+            bb.done();
             if (priority == AdmissionContext::Priority::kNormal) {
-                rw.read->appendExemptStats(readStats.value(), kExemptPriorityName);
+                BSONObjBuilder bb(readStats->subobjStart(kExemptPriorityName));
+                rw.read->appendExemptStats(readStats.value());
+                bb.done();
             }
         }
         if (rw.write) {
+            writeOut += rw.write->used();
+            writeAvailable += rw.write->available();
+            writeTotalTickets += rw.write->outof();
             if (!writeStats.is_initialized()) {
                 writeStats.emplace();
             }
-            rw.write->appendHolderdStats(writeStats.value(), fieldName);
+            BSONObjBuilder bb(writeStats->subobjStart(fieldName));
+            rw.write->appendTicketStats(bb);
+            rw.write->appendHolderStats(bb);
+            bb.done();
             if (priority == AdmissionContext::Priority::kNormal) {
-                rw.write->appendExemptStats(writeStats.value(), kExemptPriorityName);
+                BSONObjBuilder bb(writeStats->subobjStart(kExemptPriorityName));
+                rw.write->appendExemptStats(writeStats.value());
+                bb.done();
             }
         }
     }
     if (readStats.is_initialized()) {
+        readStats->append("out", readOut);
+        readStats->append("available", readAvailable);
+        readStats->append("totalTickets", readTotalTickets);
         readStats->done();
         b.append("read", readStats->obj());
     }
     if (writeStats.is_initialized()) {
+        writeStats->appendNumber("out", writeOut);
+        writeStats->appendNumber("available", writeAvailable);
+        writeStats->appendNumber("totalTickets", writeTotalTickets);
         writeStats->done();
         b.append("write", writeStats->obj());
     }

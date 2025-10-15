@@ -274,28 +274,24 @@ void TicketHolder::_updatePeakUsed() {
     }
 }
 
-void TicketHolder::appendExemptStats(BSONObjBuilder& b, StringData fieldName) const {
-    BSONObjBuilder bb(b.subobjStart(fieldName));
-    _appendQueueStats(bb, _exemptStats);
-    bb.done();
+void TicketHolder::appendExemptStats(BSONObjBuilder& b) const {
+    _appendQueueStats(b, _exemptStats);
 }
 
-void TicketHolder::appendHolderdStats(BSONObjBuilder& b, StringData fieldName) const {
-    b.append("out", used());
-    b.append("available", available());
-    b.append("totalTickets", outof());
-
-    BSONObjBuilder bb(b.subobjStart(fieldName));
-    _appendQueueStats(bb, _holderStats);
-
+void TicketHolder::appendHolderStats(BSONObjBuilder& b) const {
+    _appendQueueStats(b, _holderStats);
     b.append("totalDelinquentAcquisitions",
              _delinquencyStats.totalDelinquentAcquisitions.loadRelaxed());
     b.append("totalAcquisitionDelinquencyMillis",
              _delinquencyStats.totalAcquisitionDelinquencyMillis.loadRelaxed());
     b.append("maxAcquisitionDelinquencyMillis",
              _delinquencyStats.maxAcquisitionDelinquencyMillis.loadRelaxed());
+}
 
-    bb.done();
+void TicketHolder::appendTicketStats(BSONObjBuilder& b) const {
+    b.append("out", used());
+    b.append("available", available());
+    b.append("totalTickets", outof());
 }
 
 void TicketHolder::_appendQueueStats(BSONObjBuilder& b, const QueueStats& stats) const {

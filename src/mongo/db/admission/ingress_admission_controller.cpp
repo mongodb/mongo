@@ -81,8 +81,17 @@ void IngressAdmissionController::setMaxQueueDepth(std::int32_t newMaxQueueDepth)
 }
 
 void IngressAdmissionController::appendStats(BSONObjBuilder& b) const {
-    _ticketHolder->appendHolderdStats(b, kNormalPriorityName);
-    _ticketHolder->appendExemptStats(b, kExemptPriorityName);
+    _ticketHolder->appendTicketStats(b);
+    {
+        BSONObjBuilder bb(b.subobjStart(kNormalPriorityName));
+        _ticketHolder->appendHolderStats(bb);
+        bb.done();
+    }
+    {
+        BSONObjBuilder bb(b.subobjStart(kExemptPriorityName));
+        _ticketHolder->appendExemptStats(b);
+        bb.done();
+    }
 }
 
 Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try {

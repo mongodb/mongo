@@ -184,14 +184,19 @@ public:
     void setPeakUsed_forTest(int32_t used);
 
     /**
-     * Append TicketHolder statistics to the provided builder at the specified field.
+     * Appends all queue and delinquency stats.
      */
-    void appendHolderdStats(BSONObjBuilder& b, StringData fieldName) const;
+    void appendHolderStats(BSONObjBuilder& b) const;
+
+    /**
+     * Appends number of tickets available, out and total.
+     */
+    void appendTicketStats(BSONObjBuilder& b) const;
 
     /**
      * Append TicketHolder exempt statistics.
      */
-    void appendExemptStats(BSONObjBuilder& b, StringData fieldName) const;
+    void appendExemptStats(BSONObjBuilder& b) const;
 
     /**
      * Bumps the delinquency counters associated with this queue. This intended to be called when

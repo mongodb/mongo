@@ -150,16 +150,34 @@ public:
 
     long long operator[](StringData field) const {
         BSONObjBuilder bob;
-        _holder->appendHolderdStats(bob, kNormalPriorityName);
-        _holder->appendExemptStats(bob, kExemptPriorityName);
+        _holder->appendTicketStats(bob);
+        {
+            BSONObjBuilder bb(bob.subobjStart(kNormalPriorityName));
+            _holder->appendHolderStats(bob);
+            bb.done();
+        }
+        {
+            BSONObjBuilder bb(bob.subobjStart(kExemptPriorityName));
+            _holder->appendExemptStats(bob);
+            bb.done();
+        }
         auto stats = bob.obj();
         return stats[field].numberLong();
     }
 
     BSONObj getStats() const {
         BSONObjBuilder bob;
-        _holder->appendHolderdStats(bob, kNormalPriorityName);
-        _holder->appendExemptStats(bob, kExemptPriorityName);
+        _holder->appendTicketStats(bob);
+        {
+            BSONObjBuilder bb(bob.subobjStart(kNormalPriorityName));
+            _holder->appendHolderStats(bob);
+            bb.done();
+        }
+        {
+            BSONObjBuilder bb(bob.subobjStart(kExemptPriorityName));
+            _holder->appendExemptStats(bob);
+            bb.done();
+        }
         return bob.obj();
     }
 

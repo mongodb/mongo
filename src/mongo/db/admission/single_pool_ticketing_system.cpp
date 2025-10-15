@@ -63,16 +63,34 @@ void SinglePoolTicketingSystem::appendStats(BSONObjBuilder& b) const {
     invariant(_writeTicketHolder, "Writer TicketHolder is not present in the TicketingSystem");
     invariant(_readTicketHolder, "Reader TicketHolder is not present in the TicketingSystem");
     {
-        BSONObjBuilder bbb(b.subobjStart("write"));
-        _writeTicketHolder->appendHolderdStats(bbb, kNormalPriorityName);
-        _writeTicketHolder->appendExemptStats(bbb, kExemptPriorityName);
-        bbb.done();
+        BSONObjBuilder bb(b.subobjStart("write"));
+        _writeTicketHolder->appendTicketStats(bb);
+        {
+            BSONObjBuilder bbb(bb.subobjStart(kNormalPriorityName));
+            _writeTicketHolder->appendHolderStats(bbb);
+            bbb.done();
+        }
+        {
+            BSONObjBuilder bbb(bb.subobjStart(kExemptPriorityName));
+            _writeTicketHolder->appendExemptStats(bbb);
+            bbb.done();
+        }
+        bb.done();
     }
     {
-        BSONObjBuilder bbb(b.subobjStart("read"));
-        _readTicketHolder->appendHolderdStats(bbb, kNormalPriorityName);
-        _readTicketHolder->appendExemptStats(bbb, kExemptPriorityName);
-        bbb.done();
+        BSONObjBuilder bb(b.subobjStart("read"));
+        _readTicketHolder->appendTicketStats(bb);
+        {
+            BSONObjBuilder bbb(bb.subobjStart(kNormalPriorityName));
+            _readTicketHolder->appendHolderStats(bbb);
+            bbb.done();
+        }
+        {
+            BSONObjBuilder bbb(bb.subobjStart(kExemptPriorityName));
+            _readTicketHolder->appendExemptStats(bbb);
+            bbb.done();
+        }
+        bb.done();
     }
 }
 
