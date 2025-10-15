@@ -27,6 +27,42 @@ test({$map: {input: "$mixed", as: "var", in: "$$var.a"}}, [1, null, 2, null]); /
 
 test({$map: {input: "$null", as: "var", in: "$$var"}}, null);
 
+// Nested behavior with two named variables.
+test(
+    {
+        $map: {
+            input: "$simple",
+            as: "outer",
+            in: {$map: {input: "$simple", as: "inner", in: {$add: ["$$inner", "$$outer"]}}},
+        },
+    },
+    [
+        [2, 3, 4, 5],
+        [3, 4, 5, 6],
+        [4, 5, 6, 7],
+        [5, 6, 7, 8],
+    ],
+);
+
+// Nested behavior for shadowing variables.
+test({$map: {input: "$simple", in: {$map: {input: "$simple", in: "$$this"}}}}, [
+    [1, 2, 3, 4],
+    [1, 2, 3, 4],
+    [1, 2, 3, 4],
+    [1, 2, 3, 4],
+]);
+
+// Nested behavior with named inner variable and default outer variable.
+test({$map: {input: "$simple", as: "outer", in: {$map: {input: "$simple", in: {$add: ["$$this", "$$outer"]}}}}}, [
+    [2, 3, 4, 5],
+    [3, 4, 5, 6],
+    [4, 5, 6, 7],
+    [5, 6, 7, 8],
+]);
+
+// can't use default if 'as' is defined
+assertErrorCode(t, {$map: {input: "$simple", as: "value", in: "$$this"}}, 40324);
+
 // can't set ROOT
 assertErrorCode(t, {$project: {a: {$map: {input: "$simple", as: "ROOT", in: "$$ROOT"}}}}, ErrorCodes.FailedToParse);
 

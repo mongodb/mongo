@@ -110,6 +110,14 @@ feature_flags:
         version: 8.1
         fcv_gated: true
 
+    featureFlagExposeArrayIndexInMapFilterReduce:
+        description:
+            "Feature flag to enable referencing array indices in $map, $filter, and $reduce
+            expressions."
+        cpp_varname: gFeatureFlagExposeArrayIndexInMapFilterReduce
+        default: false
+        fcv_gated: true
+
     featureFlagBinDataConvertNumeric:
         description: "Feature flag to enable extended BinData support for int, double and long in $convert."
         cpp_varname: gFeatureFlagBinDataConvertNumeric

@@ -2936,6 +2936,29 @@ TEST_F(PipelineOptimizationTest,
 }
 
 TEST_F(PipelineOptimizationTest,
+       FeatureMatchElemMatchValueOnArrayFieldCanNotSplitAcrossRenameWithMapAndAddFields) {
+    // The $addFields simply maps an array of objects to one containing their inner 'elementField'
+    // scalar values . The $match stage on the reshaped array should not be swapped with $project to
+    // preserve the original $elemMatch semantics.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagExposeArrayIndexInMapFilterReduce", true);
+    std::string pipeline = R"(
+[
+    {
+        $addFields: {
+            "reshapedArray": {
+                $map: {input: '$arrayField', as: 'iter', arrayIndexAs: 'index', in : "$$iter.elementField"}
+            },
+            _id: { "$const": false }
+        }
+    },
+    {$match: {"reshapedArray": {$elemMatch: {$eq: 1}}}}
+]
+        )";
+    assertPipelineOptimizesAndSerializesTo(pipeline, pipeline);
+}
+
+TEST_F(PipelineOptimizationTest,
        MatchElemMatchValueOnArrayFieldCanNotSplitAcrossRenameWithDottedProject) {
     // The $project stage maps a dotted field path to a simple non-dotted one which is then matched
     // upon. Expect no swap to be happen as it might affect the result of the query due to
@@ -2994,6 +3017,55 @@ TEST_F(PipelineOptimizationTest,
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST_F(PipelineOptimizationTest,
+       FeatureMatchElemMatchObjectOnArrayFieldCanNotSplitAcrossRenameWithMapAndProject) {
+    // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' but the dependency tracker reports
+    // the 'd' for $elemMatch as a modified dependency and so $match cannot be swapped with
+    // $project.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagExposeArrayIndexInMapFilterReduce", true);
+    std::string inputPipe = R"(
+[
+    {
+        $project: {
+            d: {
+                $map: {input: '$a', as: 'iter', arrayIndexAs: 'index', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
+        }
+    },
+    {$match: {d: {$elemMatch: {e: 1, f: 1}}}}
+]
+        )";
+    std::string outputPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: "$a", as: "iter", arrayIndexAs: "index", in : {e: "$$iter.b", f: "$$iter.c"}}
+            }
+        }
+    },
+    {$match: {d: {$elemMatch: {$and: [{e: {$eq: 1}}, {f: {$eq: 1}}]}}}}
+]
+        )";
+    std::string serializedPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: '$a', as: 'iter', arrayIndexAs: 'index', in : {e: '$$iter.b', f: '$$iter.c'}}
+            }
+        }
+    },
+    {$match: {d: {$elemMatch: {e: 1, f: 1}}}}
+]
+        )";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 // TODO SERVER-74298 The $match can be swapped with $project after renaming.
 TEST_F(PipelineOptimizationTest, MatchEqObjectCanNotSplitAcrossRenameWithMapAndProject) {
     // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' but the dependency tracker reports
@@ -3030,6 +3102,53 @@ TEST_F(PipelineOptimizationTest, MatchEqObjectCanNotSplitAcrossRenameWithMapAndP
             _id: true,
             d: {
                 $map: {input: '$a', as: 'i', in : {e: '$$i.b', f: '$$i.c'}}
+            }
+        }
+    },
+    {$match: {d: {$eq: {e: 1, f: 1}}}}
+]
+        )";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST_F(PipelineOptimizationTest, FeatureMatchEqObjectCanNotSplitAcrossRenameWithMapAndProject) {
+    // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' but the dependency tracker reports
+    // the 'd' for $eq as a modified dependency and so $match cannot be swapped with $project.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagExposeArrayIndexInMapFilterReduce", true);
+    std::string inputPipe = R"(
+[
+    {
+        $project: {
+            d: {
+                $map: {input: '$a', as: 'i', arrayIndexAs: 'index', in : {e: '$$i.b', f: '$$i.c'}}
+            }
+        }
+    },
+    {$match: {d: {$eq: {e: 1, f: 1}}}}
+]
+        )";
+    std::string outputPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: "$a", as: "i", arrayIndexAs: "index", in : {e: "$$i.b", f: "$$i.c"}}
+            }
+        }
+    },
+    {$match: {d: {$eq: {e: 1, f: 1}}}}
+]
+        )";
+    std::string serializedPipe = R"(
+[
+    {
+        $project: {
+            _id: true,
+            d: {
+                $map: {input: '$a', as: 'i', arrayIndexAs: 'index', in : {e: '$$i.b', f: '$$i.c'}}
             }
         }
     },

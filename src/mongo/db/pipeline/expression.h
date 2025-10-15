@@ -2102,6 +2102,8 @@ public:
     ExpressionFilter(ExpressionContext* expCtx,
                      std::string varName,
                      Variables::Id varId,
+                     const boost::optional<std::string>& idxName,
+                     const boost::optional<Variables::Id>& idxId,
                      boost::intrusive_ptr<Expression> input,
                      boost::intrusive_ptr<Expression> cond,
                      boost::intrusive_ptr<Expression> limit = nullptr);
@@ -2116,6 +2118,10 @@ public:
 
     Variables::Id getVariableId() const {
         return _varId;
+    }
+
+    const boost::optional<Variables::Id>& getIndexVariableId() const {
+        return _idxId;
     }
 
     bool hasLimit() const {
@@ -2138,6 +2144,8 @@ public:
         return make_intrusive<ExpressionFilter>(getExpressionContext(),
                                                 _varName,
                                                 _varId,
+                                                _idxName,
+                                                _idxId,
                                                 cloneChild(_kInput),
                                                 cloneChild(_kCond),
                                                 _limit ? cloneChild(*_limit) : nullptr);
@@ -2153,6 +2161,14 @@ private:
     std::string _varName;
     // The id of the variable to set.
     Variables::Id _varId;
+    // The name of the variable provided in the 'arrayIndexAs' argument, boost::none if not
+    // provided.
+    boost::optional<std::string> _idxName;
+    // The ID of the variable that represents the array index, boost::none if the feature is not
+    // enabled.
+    // TODO(SERVER-90514): make this non-optional when the feature flag is removed.
+    boost::optional<Variables::Id> _idxId;
+
     // The optional expression determining how many elements should be present in the result array.
     boost::optional<size_t> _limit;
 
@@ -2596,10 +2612,12 @@ class ExpressionMap final : public Expression {
 public:
     ExpressionMap(
         ExpressionContext* expCtx,
-        const std::string& varName,              // name of variable to set
-        Variables::Id varId,                     // id of variable to set
-        boost::intrusive_ptr<Expression> input,  // yields array to iterate
-        boost::intrusive_ptr<Expression> each);  // yields results to be added to output array
+        const std::string& varName,                   // name of variable to set
+        Variables::Id varId,                          // id of variable to set
+        const boost::optional<std::string>& idxName,  // name of index to set
+        const boost::optional<Variables::Id>& idxId,  // id of index to set
+        boost::intrusive_ptr<Expression> input,       // yields array to iterate
+        boost::intrusive_ptr<Expression> each);       // yields results to be added to output array
 
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(const SerializationOptions& options = {}) const final;
@@ -2617,6 +2635,10 @@ public:
         return visitor->visit(this);
     }
 
+    const boost::optional<Variables::Id>& getIndexVariableId() const {
+        return _idxId;
+    }
+
     const Expression* getInput() const {
         return _children[_kInput].get();
     }
@@ -2630,8 +2652,13 @@ public:
     }
 
     boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionMap>(
-            getExpressionContext(), _varName, _varId, cloneChild(_kInput), cloneChild(_kEach));
+        return make_intrusive<ExpressionMap>(getExpressionContext(),
+                                             _varName,
+                                             _varId,
+                                             _idxName,
+                                             _idxId,
+                                             cloneChild(_kInput),
+                                             cloneChild(_kEach));
     }
 
 private:
@@ -2639,6 +2666,12 @@ private:
     static constexpr size_t _kEach = 1;
     std::string _varName;
     Variables::Id _varId;
+    // Name of the variable provided in the 'arrayIndexAs' argument, boost::none if not provided.
+    boost::optional<std::string> _idxName;
+    // ID of the variable that represents the array index, boost::none if the feature is not
+    // enabled.
+    // TODO(SERVER-90514): make this non-optional when the feature flag is removed.
+    boost::optional<Variables::Id> _idxId;
 
     template <typename H>
     friend class ExpressionHashVisitor;
@@ -3073,11 +3106,15 @@ public:
                      boost::intrusive_ptr<Expression> input,
                      boost::intrusive_ptr<Expression> initial,
                      boost::intrusive_ptr<Expression> in,
+                     const boost::optional<std::string>& idxName,
+                     const boost::optional<Variables::Id>& idxId,
                      Variables::Id thisVar,
                      Variables::Id valueVar)
         : Expression(expCtx, {std::move(input), std::move(initial), std::move(in)}),
           _thisVar(thisVar),
-          _valueVar(valueVar) {
+          _valueVar(valueVar),
+          _idxName(std::move(idxName)),
+          _idxId(idxId) {
         expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
@@ -3094,6 +3131,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    const boost::optional<Variables::Id>& getIndexVariableId() const {
+        return _idxId;
     }
 
     const Expression* getInput() const {
@@ -3125,6 +3166,8 @@ public:
                                                 cloneChild(_kInput),
                                                 cloneChild(_kInitial),
                                                 cloneChild(_kIn),
+                                                _idxName,
+                                                _idxId,
                                                 _thisVar,
                                                 _valueVar);
     }
@@ -3136,6 +3179,12 @@ private:
 
     Variables::Id _thisVar;
     Variables::Id _valueVar;
+    // Name of the variable provided in the 'arrayIndexAs' argument, boost::none if not provided.
+    boost::optional<std::string> _idxName;
+    // ID of the variable that represents the array index, boost::none if the feature is not
+    // enabled.
+    // TODO(SERVER-90514): make this non-optional when the feature flag is removed.
+    boost::optional<Variables::Id> _idxId;
 
     const size_t _accumulatedValueDepthCheckInterval =
         gInternalReduceAccumulatedValueDepthCheckInterval.load();

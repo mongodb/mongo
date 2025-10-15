@@ -1,7 +1,6 @@
 // Test $filter aggregation expression.
 
 import "jstests/libs/query/sbe_assert_error_override.js";
-
 import {assertArrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 function runAndAssert(filterSpec, expectedResult) {
@@ -16,6 +15,11 @@ function runAndAssertThrows(filterSpec, expectedErrorCode) {
 
 let coll = db.agg_filter_expr;
 coll.drop();
+
+function test(expression, expected) {
+    var result = coll.aggregate({$project: {_id: 0, res: expression}}).toArray();
+    assert.eq(result, [{res: expected}]);
+}
 
 assert.commandWorked(
     coll.insert([
@@ -437,3 +441,26 @@ filterDoc = {
     $filter: {input: "$a", cond: {$or: [{$lt: ["$$this", 0]}, {$ln: "$$this"}]}},
 };
 runAndAssert(filterDoc, expectedResults);
+
+// Nested behavior with two named variables.
+test(
+    {
+        $filter: {
+            input: [[-3, 1, 2], [2, 3], [1], [-12, -3]],
+            as: "outer",
+            cond: {$ne: [0, {$size: {$filter: {input: "$$outer", as: "inner", cond: {$gte: ["$$inner", 0]}}}}]},
+        },
+    },
+    [[-3, 1, 2], [2, 3], [1]],
+);
+
+// Nested behavior for shadowing variables.
+test(
+    {
+        $filter: {
+            input: [[-3, 1, 2], [2, 3], [1], [-12, -3]],
+            cond: {$ne: [0, {$size: {$filter: {input: "$$this", cond: {$gte: ["$$this", 0]}}}}]},
+        },
+    },
+    [[-3, 1, 2], [2, 3], [1]],
+);
