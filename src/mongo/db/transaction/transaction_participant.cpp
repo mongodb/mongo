@@ -2143,7 +2143,9 @@ void TransactionParticipant::Participant::shutdown(OperationContext* opCtx) {
 APIParameters TransactionParticipant::Participant::getAPIParameters(OperationContext* opCtx) const {
     // If we have are in a retryable write, use the API parameters that the client passed in with
     // the write, instead of the first write's API parameters.
-    if (o().txnResourceStash && !o().txnState.isInRetryableWriteMode()) {
+    // TODO (SERVER-106429): Revisit the decision for prepared transactions.
+    if (o().txnResourceStash && !o().txnState.isInRetryableWriteMode() &&
+        !o().txnState.isPrepared()) {
         return o().txnResourceStash->getAPIParameters();
     }
     return APIParameters::get(opCtx);
