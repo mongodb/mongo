@@ -156,3 +156,15 @@ server_parameters:
         default: 120
         validator: {gte: 0}
         redact: false
+
+    proxyProtocolMaximumPendingConnections:
+        description: >-
+            Decides the maximum number of connections accepted from the proxy port that are yet to 
+            provide the proxy protocol header. Once the server reaches this threshold, it will 
+            reject new connections accepted from the proxy port.
+        set_at: [startup, runtime]
+        cpp_varname: gProxyProtocolMaximumPendingConnections
+        cpp_vartype: Atomic<int32_t>
+        default: 100
+        validator: {gte: 0}
+        redact: false
