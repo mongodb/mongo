@@ -540,6 +540,9 @@ public:
         return find(std::move(findRequest), readPref, ExhaustMode::kOff);
     }
 
+    bool isAuthenticated() const {
+        return _isClientAuthenticated.load();
+    }
     /**
      * Issues a find command described by 'findRequest' and the given read preference. Rather than
      * returning a cursor to the caller, iterates the cursor under the hood and calls the provided
@@ -757,6 +760,8 @@ private:
     Timestamp _lastOperationTime;
 
     ClientAPIVersionParameters _apiParameters;
+
+    AtomicWord<bool> _isClientAuthenticated = {false};
 };  // DBClientBase
 
 BSONElement getErrField(const BSONObj& result);

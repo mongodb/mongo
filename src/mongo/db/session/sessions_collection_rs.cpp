@@ -38,6 +38,7 @@
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
@@ -82,7 +83,7 @@ auto SessionsCollectionRS::_makePrimaryConnection(OperationContext* opCtx) {
     auto conn = std::make_unique<ScopedDbConnection>(res.toString());
 
     // Make a connection to the primary, auth, then send
-    if (auth::isInternalAuthSet()) {
+    if (auth::isInternalAuthSet() && !conn->get()->isAuthenticated()) {
         conn->get()->authenticateInternalUser();
     }
 

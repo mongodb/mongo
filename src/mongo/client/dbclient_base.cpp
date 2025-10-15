@@ -409,6 +409,7 @@ void DBClientBase::_auth(const BSONObj& params) {
 
     HostAndPort remote(getServerAddress());
     auth::authenticateClient(params, remote, clientName, _makeAuthRunCommandHook()).get();
+    _isClientAuthenticated.store(true);
 }
 
 void DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
@@ -439,6 +440,7 @@ void DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBehav
                                          _makeAuthRunCommandHook(),
                                          authProvider)
             .get();
+        _isClientAuthenticated.store(true);
     } catch (const DBException& e) {
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20117,
@@ -474,6 +476,7 @@ void DBClientBase::auth(const DatabaseName& dbname, StringData username, StringD
 
 void DBClientBase::logout(const DatabaseName& dbName, BSONObj& info) {
     runCommand(dbName, BSON("logout" << 1), info);
+    _isClientAuthenticated.store(false);
 }
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
