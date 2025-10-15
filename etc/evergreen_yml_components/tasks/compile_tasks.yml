@@ -1467,7 +1467,7 @@ task_groups:
 
   - <<: *compile_task_group_template
     name: run_unit_tests_TG
-    max_hosts: -1
+    max_hosts: 1
     tasks:
       - unit_tests
       - unit_tests_remote_exec_incompatible

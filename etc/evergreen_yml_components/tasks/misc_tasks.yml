@@ -1051,6 +1051,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+      - name: unit_tests
     commands:
       - command: timeout.update
         params:
