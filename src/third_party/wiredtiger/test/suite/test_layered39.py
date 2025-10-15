@@ -31,15 +31,15 @@ import platform
 import time
 import wiredtiger
 import wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered39.py
 # Ensure that we don't evict pages ahead of the materialization frontier
 @disagg_test_class
-class test_layered39(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered39(wttest.WiredTigerTestCase):
     conn_base_config = 'cache_size=75MB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),transaction_sync=(enabled,method=fsync),' \
-                     + 'disaggregated=(page_log=palm,lose_all_my_data=true),'
+                     + 'disaggregated=(lose_all_my_data=true),'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
     disagg_storages = gen_disagg_storages('test_layered39', disagg_only = True)
@@ -63,7 +63,7 @@ class test_layered39(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         # The node started as a follower, so step it up as the leader
         self.conn.reconfigure('disaggregated=(role="leader")')
-        page_log = self.conn.get_page_log('palm')
+        page_log = self.conn.get_page_log(self.vars.page_log)
 
         # The cache is sized for this workload so that it results in a lot of eviction. Ensure that
         # we only evict pages that have been materialized.

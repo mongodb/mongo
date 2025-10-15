@@ -30,14 +30,14 @@
 #   Test dupicate key return values.
 
 import wttest, wiredtiger
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered41.py
 #    Test duplicate key.
 @disagg_test_class
-class test_layered41(wttest.WiredTigerTestCase, DisaggConfigMixin):
-    conn_base_config = ',disaggregated=(page_log=palm),'
+class test_layered41(wttest.WiredTigerTestCase):
+    conn_base_config = ','
 
     create_session_config = 'key_format=S,value_format=S'
 

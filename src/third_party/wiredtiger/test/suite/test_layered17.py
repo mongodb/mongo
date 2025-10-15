@@ -26,20 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, time, wiredtiger, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, wiredtiger, wttest
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered17.py
 #    Check timestamps.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered17(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered17(wttest.WiredTigerTestCase):
     nitems = 500
 
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'precise_checkpoint=true,disaggregated=(page_log=palm),'
+                     + 'precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     create_session_config = 'key_format=S,value_format=S'
@@ -52,23 +52,6 @@ class test_layered17(wttest.WiredTigerTestCase, DisaggConfigMixin):
         ('layered-type', dict(prefix='table:', table_config='block_manager=disagg,type=layered')),
         ('shared', dict(prefix='table:', table_config='block_manager=disagg,log=(enabled=false)')),
     ])
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ignoreStdoutPattern('WT_VERB_RTS')
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        DisaggConfigMixin.conn_extensions(self, extlist)
-
-    # Custom test case setup
-    def early_setup(self):
-        os.mkdir('follower')
-        # Create the home directory for the PALM k/v store, and share it with the follower.
-        os.mkdir('kv_home')
-        os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
     # Test timestamps
     def test_layered17(self):
@@ -89,15 +72,11 @@ class test_layered17(wttest.WiredTigerTestCase, DisaggConfigMixin):
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
             cursor[str(i)] = value_prefix1 + str(i)
-            if i % 250 == 0:
-                time.sleep(1)
         cursor.close()
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(timestamp1)}')
 
-        time.sleep(1)
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(timestamp1)}')
         self.session.checkpoint()
-        time.sleep(1)
 
         # Check the timestamps
         _, _, checkpoint_timestamp, _ = self.disagg_get_complete_checkpoint_ext()
@@ -126,15 +105,11 @@ class test_layered17(wttest.WiredTigerTestCase, DisaggConfigMixin):
         for i in range(self.nitems):
             if i % 50 == 0:
                 cursor[str(i)] = value_prefix2 + str(i)
-            if i % 250 == 0:
-                time.sleep(1)
         cursor.close()
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(timestamp2)}')
 
-        time.sleep(1)
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(timestamp2)}')
         self.session.checkpoint()
-        time.sleep(1)
 
         # Check the timestamps
         _, _, checkpoint_timestamp, _ = self.disagg_get_complete_checkpoint_ext()
@@ -164,16 +139,12 @@ class test_layered17(wttest.WiredTigerTestCase, DisaggConfigMixin):
         for i in range(self.nitems):
             if i % 25 == 0:
                 cursor[str(i)] = value_prefix3 + str(i)
-            if i % 250 == 0:
-                time.sleep(1)
         cursor.close()
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(timestamp3)}')
 
-        time.sleep(1)
         stable_timestamp3 = (timestamp2 + timestamp3) // 2
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(stable_timestamp3)}')
         self.session.checkpoint()
-        time.sleep(1)
 
         # Check the timestamps
         _, _, checkpoint_timestamp, _ = self.disagg_get_complete_checkpoint_ext()

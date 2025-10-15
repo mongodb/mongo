@@ -28,17 +28,17 @@
 
 import wttest
 from wiredtiger import stat
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # Test we can evict on the follower without setting page materialization frontier
 
 @disagg_test_class
-class test_layered50(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered50(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered50', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    conn_base_config = 'disaggregated=(page_log=palm),cache_size=10MB,,statistics=(all),'
+    conn_base_config = 'cache_size=10MB,,statistics=(all),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower")'
 

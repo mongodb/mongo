@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import random, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 import time
@@ -37,7 +37,7 @@ import time
 # Test that we write internal page deltas to the page log extension.
 
 @disagg_test_class
-class test_layered32(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered32(wttest.WiredTigerTestCase):
 
     delta = [
         ('write_leaf_only', dict(delta_config='page_delta=(internal_page_delta=false,leaf_page_delta=true)', delta_type='leaf_only')),
@@ -47,7 +47,7 @@ class test_layered32(wttest.WiredTigerTestCase, DisaggConfigMixin):
     ]
 
     conn_base_config = 'cache_size=5G,transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm),page_delta=(delta_pct=100),'
+                     + 'page_delta=(delta_pct=100),'
     disagg_storages = gen_disagg_storages('test_layered32', disagg_only = True)
 
     nrows = 1000
@@ -64,10 +64,6 @@ class test_layered32(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     def conn_config(self):
         return self.conn_base_config + f'disaggregated=(role="leader"),{self.delta_config},'
-
-    # Load the storage store extension.
-    def conn_extensions(self, extlist):
-        DisaggConfigMixin.conn_extensions(self, extlist)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')

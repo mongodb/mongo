@@ -27,17 +27,17 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # Test we don't revome the user tombstones from the ingest table until they are included in a checkpoint.
 
 @disagg_test_class
-class test_layered49(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered49(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered49', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    conn_base_config = 'disaggregated=(page_log=palm),cache_size=10MB,'
+    conn_base_config = 'cache_size=10MB,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower")'
 

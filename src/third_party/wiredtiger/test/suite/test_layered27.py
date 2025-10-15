@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import platform, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from test_layered23 import Oplog
 from wtscenario import make_scenarios
 
@@ -35,9 +35,9 @@ from wtscenario import make_scenarios
 # Test draining the ingest table
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered27(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered27(wttest.WiredTigerTestCase):
     conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                 + 'disaggregated=(page_log=palm),'
+                 + ''
 
     sizes = [
         ('small', dict(multiplier=1)),

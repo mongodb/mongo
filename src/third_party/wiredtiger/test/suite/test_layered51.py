@@ -27,17 +27,17 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # Test throw an error if logging is configured for layered table
 
 @disagg_test_class
-class test_layered51(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered51(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered50', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    conn_config = 'disaggregated=(page_log=palm),disaggregated=(role="leader")'
+    conn_config = 'disaggregated=(role="leader")'
 
     def test_create_logged(self):
         uri = "layered:test_layered51"

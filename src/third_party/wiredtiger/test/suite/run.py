@@ -91,7 +91,7 @@ Options:\n\
   -z      | --zstd               run the zstd tests\n\
 \n\
 Variables, via name=value, default listed in brackets:\n\
-  page_log=[palm]                the Page and Log interface (PALI) implementation used\n\
+  page_log=[palite]              the Page and Log interface (PALI) implementation used\n\
                                  for disaggregated storage tests\n\
 \n\
 Tests:\n\
@@ -164,7 +164,7 @@ def parse_int_list(str):
 def verify_command_line_vars(vars):
     # The list of allowed variables, with defaults. Matches the usage message.
     vars_allowed = {
-        'page_log' : 'palm'
+        'page_log' : 'palite'
     }
 
     for name in vars:

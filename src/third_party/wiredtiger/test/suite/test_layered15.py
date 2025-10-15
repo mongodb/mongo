@@ -26,19 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, time, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, wttest
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered15.py
 #    Start without local files.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered15(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered15(wttest.WiredTigerTestCase):
     nitems = 500
 
     conn_config = 'log=(enabled=true),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                + 'disaggregated=(page_log=palm,role="follower"),'
+                + 'disaggregated=(role="follower"),'
 
     create_session_config = 'key_format=S,value_format=S'
 
@@ -55,16 +55,6 @@ class test_layered15(wttest.WiredTigerTestCase, DisaggConfigMixin):
     scenarios = make_scenarios(disagg_storages)
 
     num_restarts = 0
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        DisaggConfigMixin.conn_extensions(self, extlist)
-
-    # Custom test case setup
-    def early_setup(self):
-        os.mkdir('kv_home')
 
     # Restart the node without local files
     def restart_without_local_files(self):
@@ -137,13 +127,9 @@ class test_layered15(wttest.WiredTigerTestCase, DisaggConfigMixin):
             cursor = self.session.open_cursor(uri, None, None)
             for i in range(self.nitems):
                 cursor[str(i)] = value_prefix + str(i)
-                if i % 250 == 0:
-                    time.sleep(1)
             cursor.close()
 
-        time.sleep(1)
         self.session.checkpoint()
-        time.sleep(1)
         checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
 
         # Ensure that the shared metadata table has all the expected URIs
@@ -192,8 +178,6 @@ class test_layered15(wttest.WiredTigerTestCase, DisaggConfigMixin):
             for i in range(self.nitems):
                 if i % 10 == 0:
                     cursor[str(i)] = value_prefix2 + str(i)
-                if i % 250 == 0:
-                    time.sleep(1)
             cursor.close()
 
         # Ensure that the leader sees its own writes before a checkpoint
@@ -214,9 +198,7 @@ class test_layered15(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Ensure that the shared metadata table has all the expected URIs
         self.check_shared_metadata(self.all_uris)
 
-        time.sleep(1)
         self.session.checkpoint()
-        time.sleep(1)
         checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
 
         # Ensure that the shared metadata table has all the expected URIs after the checkpoint

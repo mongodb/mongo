@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest, helper_disagg
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 def disagg_ignore_expected_output(testcase):
@@ -40,11 +40,11 @@ logdir = "log"
 # test_layered46.py
 #    Test deleting local files on restart.
 @disagg_test_class
-class test_layered46(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered46(wttest.WiredTigerTestCase):
 
     conn_config = (
         "statistics=(all),statistics_log=(wait=1,json=true,on_close=true),"
-        + "disaggregated=(page_log=palm,lose_all_my_data=true),"
+        + "disaggregated=(lose_all_my_data=true),"
         + f"log=(enabled=true,path={logdir}),"
     )
 
@@ -60,12 +60,6 @@ class test_layered46(wttest.WiredTigerTestCase, DisaggConfigMixin):
     def wiredtiger_open(self, *args, **kwargs):
         os.makedirs(logdir, exist_ok=True)
         return super().wiredtiger_open(*args, **kwargs)
-
-    # Load the page log extension, which has object storage support.
-    def conn_extensions(self, extlist):
-        if os.name == "nt":
-            extlist.skip_if_missing = True
-        DisaggConfigMixin.conn_extensions(self, extlist)
 
     def test_layered46(self):
         self.conn.reconfigure('disaggregated=(role="leader")')

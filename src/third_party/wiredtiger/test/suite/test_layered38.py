@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import platform, wttest, wiredtiger
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from test_layered23 import Oplog
 from wtscenario import make_scenarios
 
@@ -35,9 +35,9 @@ from wtscenario import make_scenarios
 # Test garbage collecting redundant content in the ingest table
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered38(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered38(wttest.WiredTigerTestCase):
     conn_base_config = ',create,cache_size=10GB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                 + 'disaggregated=(page_log=palm,lose_all_my_data=true),precise_checkpoint=true,'
+                 + 'disaggregated=(lose_all_my_data=true),precise_checkpoint=true,'
 
     disagg_storages = gen_disagg_storages('test_layered38', disagg_only = True)
 

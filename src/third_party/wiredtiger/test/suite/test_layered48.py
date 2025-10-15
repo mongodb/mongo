@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, random, string, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
@@ -35,14 +35,14 @@ from wiredtiger import stat
 #    Ensure overflow keys and values are not being generated in disaggregated storage.
 
 @disagg_test_class
-class test_layered48(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered48(wttest.WiredTigerTestCase):
     nitems = 500
     key_to_update = 0
     num_updates = 10
 
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'precise_checkpoint=true,disaggregated=(page_log=palm),'
+                     + 'precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     create_session_config = 'key_format=S,value_format=S,leaf_key_max=256,leaf_value_max=256'
@@ -54,19 +54,6 @@ class test_layered48(wttest.WiredTigerTestCase, DisaggConfigMixin):
         ('layered', dict(prefix='layered:')),
         ('shared', dict(prefix='table:')),
     ])
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        DisaggConfigMixin.conn_extensions(self, extlist)
-
-    # Custom test case setup
-    def early_setup(self):
-        os.mkdir('follower')
-        # Create the home directory for the PALM k/v store, and share it with the follower.
-        os.mkdir('kv_home')
-        os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')

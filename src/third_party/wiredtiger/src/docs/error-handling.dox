@@ -158,6 +158,9 @@ running live restore in the system.
 This sub-level error indicates that an operation or configuration conflicts with disaggregated
 storage.
 
+@par \c WT_DISAGG_BAD_LSN
+This sub-level error indicates that an operation with a bad LSN number was attempted.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

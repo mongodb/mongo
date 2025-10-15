@@ -27,21 +27,20 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered31.py
 #    Extra tests for follower picking up new checkpoints.
 @disagg_test_class
-class test_layered31(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered31(wttest.WiredTigerTestCase):
     nitems = 500
 
     # The keys in this test are integer values less than nitems that have been "stringized".
     # Make an array of the keys in sort order so we can verify the results from scanning.
     keys_in_order = sorted([str(k) for k in range(nitems)])
 
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm),'
+    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     create_session_config = 'key_format=S,value_format=S'
@@ -51,12 +50,6 @@ class test_layered31(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     disagg_storages = gen_disagg_storages('test_layered31', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        DisaggConfigMixin.conn_extensions(self, extlist)
 
     # Reset a cursor on the follower.  Generally, the test will open a layered: uri,
     # and a reset is a signal have the cursor move to the next checkpoint. This works

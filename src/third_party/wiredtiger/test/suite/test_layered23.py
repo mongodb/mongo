@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest, wiredtiger
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wiredtiger import stat
 
 # test_layered23.py
@@ -284,9 +284,8 @@ class Oplog(object):
             f' lookup - (table,k) -> list of (ts,value)={self._lookup}'
 
 @disagg_test_class
-class test_layered23(wttest.WiredTigerTestCase, DisaggConfigMixin):
-    conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                 + 'disaggregated=(page_log=palm),'
+class test_layered23(wttest.WiredTigerTestCase):
+    conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 

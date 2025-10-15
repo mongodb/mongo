@@ -53,6 +53,35 @@ __block_disagg_read_checksum_err(WT_SESSION_IMPL *session, const char *name, uin
 }
 
 /*
+ * __block_disagg_check_lsn_frontier --
+ *     Check that the LSN is not ahead of the materialization frontier.
+ *
+ * FIXME-WT-15760: make sure last_materialized_lsn is properly updated on secondaries.
+ */
+static int
+__block_disagg_check_lsn_frontier(WT_SESSION_IMPL *session, uint64_t lsn)
+{
+    uint64_t last_materialized_lsn;
+
+    WT_ACQUIRE_READ(
+      last_materialized_lsn, S2C(session)->disaggregated_storage.last_materialized_lsn);
+    if (last_materialized_lsn != WT_DISAGG_LSN_NONE &&
+      /*
+       * FIXME-WT-15759 last_materialized_lsn = 0 means it's not initialized yet but we're reading
+       * something.
+       */
+      lsn > last_materialized_lsn) {
+        WT_RET_SUB_MSG(session, EINVAL, WT_DISAGG_BAD_LSN,
+          "Attempted to read page with LSN %" PRIu64
+          " ahead of the materialization frontier at "
+          "LSN %" PRIu64,
+          lsn, last_materialized_lsn);
+        return (EINVAL);
+    }
+    return (0);
+}
+
+/*
  * __block_disagg_read_multiple --
  *     Read a full page along with its deltas, into multiple buffers. The page is referenced by a
  *     page id, checkpoint id pair.
@@ -84,6 +113,8 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
       "page_id %" PRIu64 ", flags %" PRIx64 ", lsn %" PRIu64 ", base_lsn %" PRIu64 ", size %" PRIu32
       ", checksum %" PRIx32,
       page_id, flags, lsn, base_lsn, size, checksum);
+
+    WT_RET(__block_disagg_check_lsn_frontier(session, lsn));
 
     WT_STAT_CONN_INCR(session, disagg_block_get);
     WT_STAT_CONN_INCR(session, block_read);

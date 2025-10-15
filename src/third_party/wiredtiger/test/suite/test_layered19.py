@@ -27,31 +27,28 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_disagg import DisaggConfigMixin, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
 # test_layered19.py
 # Test adjustable consecutive deltas
 
-class test_layered19(wttest.WiredTigerTestCase, DisaggConfigMixin):
+@disagg_test_class
+class test_layered19(wttest.WiredTigerTestCase):
     uris = [
         ('layered', dict(uri='layered:test_layered19')),
         ('btree', dict(uri='file:test_layered19')),
     ]
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'page_delta=(max_consecutive_delta=1),disaggregated=(page_log=palm),'
+                     + 'page_delta=(max_consecutive_delta=1),'
     disagg_storages = gen_disagg_storages('test_layered19', disagg_only = True)
 
     nitems = 1000
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(disagg_storages, uris)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ignoreStdoutPattern('WT_VERB_RTS')
 
     def session_create_config(self):
         # The delta percentage of 200 is an arbitrary large value, intended to produce
@@ -64,10 +61,6 @@ class test_layered19(wttest.WiredTigerTestCase, DisaggConfigMixin):
     def conn_config(self):
         return self.conn_base_config + 'disaggregated=(role="leader"),'
 
-    # Load the storage store extension.
-    def conn_extensions(self, extlist):
-        DisaggConfigMixin.conn_extensions(self, extlist)
-
     def test_layered_read_write(self):
         self.session.create(self.uri, self.session_create_config())
 
@@ -78,38 +71,23 @@ class test_layered19(wttest.WiredTigerTestCase, DisaggConfigMixin):
         for i in range(self.nitems):
             cursor[str(i)] = value1
 
-        # XXX
-        # Inserted timing delays before checkpoint, apparently needed because of the
-        # layered table watcher implementation
-        import time
-        time.sleep(1.0)
         self.session.checkpoint()
 
         for i in range(self.nitems):
             if i % 10 == 0:
                 cursor[str(i)] = value2
 
-        # XXX
-        # Inserted timing delays around reopen, apparently needed because of the
-        # layered table watcher implementation
-        import time
-        time.sleep(1.0)
         self.session.checkpoint()
 
         for i in range(self.nitems):
             if i % 10 == 0:
                 cursor[str(i)] = value2
 
-        # XXX
-        # Inserted timing delays around reopen, apparently needed because of the
-        # layered table watcher implementation
-        time.sleep(1.0)
         self.session.checkpoint()
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
         self.reopen_conn(config = follower_config)
-        time.sleep(1.0)
 
         cursor = self.session.open_cursor(self.uri, None, None)
 

@@ -158,6 +158,14 @@
         __wt_session_set_last_error(session, v, sub_v, __VA_ARGS__); \
         return (__ret);                                              \
     } while (0)
+#define WT_RET_SUB_MSG(session, v, sub_v, ...)                       \
+    do {                                                             \
+        int __ret = (v);                                             \
+        __wt_error_log_add_helper(#v, __ret, sub_v);                 \
+        __wt_err(session, __ret, __VA_ARGS__);                       \
+        __wt_session_set_last_error(session, v, sub_v, __VA_ARGS__); \
+        return (__ret);                                              \
+    } while (0)
 #define WT_RET_TEST(a, v)                              \
     do {                                               \
         if (a) {                                       \

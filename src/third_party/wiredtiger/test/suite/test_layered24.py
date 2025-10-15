@@ -29,30 +29,19 @@
 import os
 import wiredtiger
 import wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class
+from helper_disagg import disagg_test_class
 
 # test_layered24.py
 #    Ensure a secondary that drops a table does not fall back to reading
 #    the stable table.
 @disagg_test_class
-class test_layered24(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered24(wttest.WiredTigerTestCase):
     uri = "layered:test_layered24"
 
-    conn_base_config = "disaggregated=(page_log=palm),"
+    conn_base_config = ""
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     nitems = 10000
-
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('page_log', 'palm')
-
-    def early_setup(self):
-        os.mkdir("follower")
-        # Create the home directory for the PALM k/v store, and share it with the follower.
-        os.mkdir('kv_home')
-        os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
     def test_layered24(self):
         session_config = 'key_format=S,value_format=S'
