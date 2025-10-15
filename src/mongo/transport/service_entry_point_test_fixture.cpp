@@ -44,16 +44,15 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/telemetry_context_serialization.h"
-
-#ifdef MONGO_CONFIG_OTEL
-#include "mongo/otel/traces/span/span_telemetry_context_impl.h"
-#endif
-
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/service_entry_point.h"
+
+#ifdef MONGO_CONFIG_OTEL
+#include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#endif
 
 namespace mongo {
 
@@ -626,6 +625,6 @@ void ServiceEntryPointTestFixture::testTelemetryContextNotSetWhenNotInRequest() 
     auto retrievedCtx = holder.get();
     ASSERT_EQ(retrievedCtx, nullptr);
 }
-#endif
+#endif  // MONGO_CONFIG_OTEL
 
 }  // namespace mongo

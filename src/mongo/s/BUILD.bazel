@@ -612,6 +612,7 @@ mongo_cc_library(
         "//src/mongo/executor:connection_pool_executor",
         "//src/mongo/executor:scoped_task_executor",
         "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/otel:telemetry_context_metadata_hook",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/rpc:metadata",
         "//src/mongo/rpc:metadata_impersonated_user",

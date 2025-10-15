@@ -924,6 +924,7 @@ mongo_cc_library(
         "//src/mongo/executor:scoped_task_executor",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/otel:telemetry_context_metadata_hook",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/concurrency:thread_pool",
     ],

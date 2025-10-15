@@ -47,6 +47,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/telemetry_context_metadata_hook.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
@@ -359,6 +360,10 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
 
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
+#ifdef MONGO_CONFIG_OTEL
+    hookList->addHook(
+        std::make_unique<otel::TelemetryContextMetadataHook>(opCtx->getServiceContext()));
+#endif
 
     stdx::lock_guard lk(_mutex);
     if (_state == State::kShutdown) {

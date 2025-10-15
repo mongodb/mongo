@@ -103,10 +103,14 @@ mongo_cc_unit_test(
         "bson_text_map_carrier_test.cpp",
         "mock_exporter.cpp",
         "trace_initialization_test.cpp",
+        "//src/mongo/otel:telemetry_context_metadata_hook_test.cpp",
         "//src/mongo/otel/traces/span:span_telemetry_context_impl_test.cpp",
         "//src/mongo/otel/traces/span:span_test.cpp",
     ],
-    private_hdrs = [":mock_exporter.h"],
+    private_hdrs = [
+        ":mock_exporter.h",
+        ":otel_test_fixture.h",
+    ],
     tags = [
         "mongo_unittest_fourth_group",
         "tracing_test",
@@ -115,7 +119,9 @@ mongo_cc_unit_test(
     deps = [
         ":tracing",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/otel",
+        "//src/mongo/otel:telemetry_context_metadata_hook",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )
