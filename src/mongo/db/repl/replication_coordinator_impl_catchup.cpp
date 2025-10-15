@@ -277,6 +277,10 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         serverGlobalParams.validateFeaturesAsPrimary.store(false);
         result = (newState.removed() || newState.rollback()) ? kActionRollbackOrRemoved
                                                              : kActionSteppedDown;
+
+        // Waiter lists should be empty on rollback/stepdown.
+        invariant(replicationWaiterListMetric.get() == 0);
+        invariant(opTimeWaiterListMetric.get() == 0);
     } else {
         result = kActionFollowerModeStateChange;
     }
