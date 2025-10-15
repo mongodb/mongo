@@ -423,7 +423,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
 
     std::string timeField = "t";
     int maxSpanSeconds = 20;
-    int documents = maxSpanSeconds;
+    int documents = maxSpanSeconds + 1;
     CollectionOptions options;
     options.expireAfterSeconds = 1;
     options.timeseries = TimeseriesOptions(timeField);
@@ -449,7 +449,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 
     // For a (timeseries) clustered collection without additional indexes, 0 keys deleted is valid.
-    // In this case, it is known that there are 2 timeseries buckets, corresponding to 2 documents.
+    // In this case, the number of documents deleted is the number of timeseries buckets (i.e. 2)
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + 2);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 }
