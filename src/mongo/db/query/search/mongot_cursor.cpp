@@ -193,53 +193,6 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
     rcr.sslMode = globalMongotParams.sslMode;
     return rcr;
 }
-// TODO SERVER-91594 makeTaskExecutorCursorForExplain() can be removed when mongot will always
-// return a cursor.
-std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const executor::RemoteCommandRequest& command,
-    std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    std::unique_ptr<executor::TaskExecutorCursorGetMoreStrategy> getMoreStrategy,
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
-    // We may potentially query an older version of mongot that doesn't return a cursor object. This
-    // causes an error within makeTaskExecutorCursor() as it expects a cursor. We catch that error
-    // here and then create a dummy TEC to continue execution.
-    try {
-        return makeTaskExecutorCursor(
-            expCtx->getOperationContext(),
-            taskExecutor,
-            command,
-            {shouldPinConnection(), std::move(getMoreStrategy), std::move(yieldPolicy)},
-            makeRetryOnNetworkErrorPolicy());
-    } catch (ExceptionFor<ErrorCodes::IDLFailedToParse>&) {
-        auto nss = expCtx->getNamespaceString();
-        BSONObjBuilder createdResponse;
-        createdResponse.append("ok", 1);
-
-        // Note that we do not query mongot here to obtain the explain object for the created cursor
-        // response. This is because the command could include the protocolVersion, and if we happen
-        // to query a version of mongot that does return cursors, we would not be able to easily
-        // obtain the explain object from the response. As there is no explain object on this
-        // created cursor response, the explain object will be obtained during
-        // serializeWithoutMergePipeline() of DocumentSourceInternalSearchMongotRemote.
-        BSONObjBuilder cursor =
-            BSONObjBuilder(createdResponse.subobjStart(CursorInitialReply::kCursorFieldName));
-        cursor.append(AnyCursor::kCursorIdFieldName, CursorId(0));
-        cursor.append(AnyCursor::kNsFieldName,
-                      NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
-        cursor.append(AnyCursor::kFirstBatchFieldName, BSONArray());
-        cursor.doneFast();
-        auto cursorResponse = CursorResponse::parseFromBSON(std::move(createdResponse.obj()));
-
-        return std::make_unique<executor::TaskExecutorCursor>(
-            taskExecutor,
-            nullptr,
-            uassertStatusOK(std::move(cursorResponse)),
-            command,
-            executor::TaskExecutorCursorOptions(shouldPinConnection()));
-    }
-    MONGO_UNREACHABLE;
-}
 
 std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -252,18 +205,12 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     std::unique_ptr<executor::TaskExecutorCursor> initialCursor;
     std::vector<std::unique_ptr<executor::TaskExecutorCursor>> additionalCursors;
 
-    if (expCtx->getExplain()) {
-        initialCursor = makeTaskExecutorCursorForExplain(
-            expCtx, command, taskExecutor, std::move(getMoreStrategy), std::move(yieldPolicy));
-
-    } else {
-        initialCursor = makeTaskExecutorCursor(
-            expCtx->getOperationContext(),
-            taskExecutor,
-            command,
-            {shouldPinConnection(), std::move(getMoreStrategy), std::move(yieldPolicy)},
-            makeRetryOnNetworkErrorPolicy());
-    }
+    initialCursor = makeTaskExecutorCursor(
+        expCtx->getOperationContext(),
+        taskExecutor,
+        command,
+        {shouldPinConnection(), std::move(getMoreStrategy), std::move(yieldPolicy)},
+        makeRetryOnNetworkErrorPolicy());
 
     additionalCursors = initialCursor->releaseAdditionalCursors();
     cursors.push_back(std::move(initialCursor));

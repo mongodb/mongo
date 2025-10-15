@@ -194,48 +194,6 @@ function runExplainTest(verbosity) {
         const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
         const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
 
-        // TODO SERVER-91594: setUpMongotReturnExplain() can be removed when mongot always
-        // returns a cursor alongside explain for execution stats.
-        {
-            setUpMongotReturnExplain({
-                searchCmd: vectorSearchCmd,
-                mongotMock: s0Mongot,
-            });
-            setUpMongotReturnExplain({
-                searchCmd: vectorSearchCmd,
-                mongotMock: s1Mongot,
-            });
-            // When querying an older version of mongot for explain, the query is sent twice. This
-            // uses a different cursorId than the default one for setUpMongotReturnExplain() so the
-            // mock will return the response correctly.
-            setUpMongotReturnExplain({
-                searchCmd: vectorSearchCmd,
-                mongotMock: s0Mongot,
-                cursorId: NumberLong(124),
-            });
-            setUpMongotReturnExplain({
-                searchCmd: vectorSearchCmd,
-                mongotMock: s1Mongot,
-                cursorId: NumberLong(124),
-            });
-
-            const result = coll.explain(verbosity).aggregate(pipeline);
-            getShardedMongotStagesAndValidateExplainExecutionStats({
-                result,
-                stageType: "$vectorSearch",
-                expectedNumStages: 2,
-                verbosity,
-                nReturnedList: [NumberLong(0), NumberLong(0)],
-                expectedExplainContents,
-            });
-            getShardedMongotStagesAndValidateExplainExecutionStats({
-                result,
-                stageType: "$_internalSearchIdLookup",
-                expectedNumStages: 2,
-                verbosity,
-                nReturnedList: [NumberLong(0), NumberLong(0)],
-            });
-        }
         {
             setUpMongotReturnExplainAndCursor({
                 mongotMock: s0Mongot,

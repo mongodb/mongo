@@ -133,10 +133,7 @@ function runExplainTest(verbosity) {
             },
         ];
         const pipeline = [{$searchMeta: searchQuery}];
-        // TODO SERVER-91594: setUpMongotReturnExplain() should only be run for 'queryPlanner'
-        // verbosity when mongot always returns a cursor for execution stats. Remove the logic for
-        // non "queryPlanner" verbosities from this block of code.
-        {
+        if (verbosity == "queryPlanner") {
             stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
             setUpMongotReturnExplain({
                 searchCmd,
@@ -146,24 +143,6 @@ function runExplainTest(verbosity) {
                 searchCmd,
                 mongotMock: s1Mongot,
             });
-            if (verbosity != "queryPlanner") {
-                // When querying an older version of mongot for explain, the query is sent twice.
-                // The second query doesn't include the protocolVersion. This uses a different
-                // cursorId than the default one for setUpMongotReturnExplain() so the mock will
-                // return the response correctly.
-                delete searchCmd.intermediate;
-                setUpMongotReturnExplain({
-                    searchCmd,
-                    mongotMock: s0Mongot,
-                    cursorId: NumberLong(124),
-                });
-                setUpMongotReturnExplain({
-                    searchCmd,
-                    mongotMock: s1Mongot,
-                    cursorId: NumberLong(124),
-                });
-                searchCmd.intermediate = protocolVersion;
-            }
             const result = coll.explain(verbosity).aggregate(pipeline);
             getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
@@ -174,8 +153,7 @@ function runExplainTest(verbosity) {
                 expectedExplainContents,
             });
             verifyShardsPartExplainOutput({result, searchType: "$searchMeta", metaPipeline, protocolVersion});
-        }
-        if (verbosity != "queryPlanner") {
+        } else {
             {
                 stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
 

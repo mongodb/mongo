@@ -133,53 +133,6 @@ function runExplainTest(verbosity) {
                 },
             },
         ];
-        // TODO SERVER-91594: setUpMongotReturnExplain() can be removed when mongot always
-        // returns a cursor alongside explain for execution stats.
-        {
-            stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
-            setUpMongotReturnExplain({
-                searchCmd,
-                mongotMock: s0Mongot,
-            });
-            setUpMongotReturnExplain({
-                searchCmd,
-                mongotMock: s1Mongot,
-            });
-            // When querying an older version of mongot for explain, the query is sent twice.
-            // The second query doesn't include the protocolVersion. This uses a different cursorId
-            // than the default one for setUpMongotReturnExplain() so the mock will return the
-            // response correctly.
-            delete searchCmd.intermediate;
-            setUpMongotReturnExplain({
-                searchCmd,
-                mongotMock: s0Mongot,
-                cursorId: NumberLong(124),
-            });
-            setUpMongotReturnExplain({
-                searchCmd,
-                mongotMock: s1Mongot,
-                cursorId: NumberLong(124),
-            });
-            searchCmd.intermediate = protocolVersion;
-
-            const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
-            getShardedMongotStagesAndValidateExplainExecutionStats({
-                result,
-                stageType: "$_internalSearchMongotRemote",
-                expectedNumStages: 2,
-                verbosity,
-                nReturnedList: [NumberLong(0), NumberLong(0)],
-                expectedExplainContents,
-            });
-            getShardedMongotStagesAndValidateExplainExecutionStats({
-                result,
-                stageType: "$_internalSearchIdLookup",
-                expectedNumStages: 2,
-                verbosity,
-                nReturnedList: [NumberLong(0), NumberLong(0)],
-            });
-            verifyShardsPartExplainOutput({result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
-        }
         {
             stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
 

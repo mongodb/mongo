@@ -57,24 +57,11 @@ function runExplainTest(verbosity) {
         optimizationFlags: {omitSearchDocumentResults: true},
     });
     const pipeline = [{$searchMeta: searchQuery}];
-    {
-        // TODO SERVER-91594: setUpMongotReturnExplain() should only be run for 'queryPlanner'
-        // verbosity when mongot always returns a cursor for execution stats. Remove the extra
-        // setUpMongotReturnExplain() for non "queryPlanner" verbosities.
+    if (verbosity == "queryPlanner") {
         setUpMongotReturnExplain({
             mongotMock: mongotmock,
             searchCmd,
         });
-        if (verbosity != "queryPlanner") {
-            // When querying an older version of mongot for explain, the query is sent twice.
-            // This uses a different cursorId than the default one for setUpMongotReturnExplain() so
-            // the mock will return the response correctly.
-            setUpMongotReturnExplain({
-                searchCmd,
-                mongotMock: mongotmock,
-                cursorId: NumberLong(124),
-            });
-        }
         const result = coll.explain(verbosity).aggregate(pipeline);
         getMongotStagesAndValidateExplainExecutionStats({
             result,
@@ -83,10 +70,7 @@ function runExplainTest(verbosity) {
             nReturned: NumberLong(0),
             explainObject,
         });
-    }
-    // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is
-    // removed.
-    if (verbosity != "queryPlanner") {
+    } else {
         setUpMongotReturnExplainAndCursor({
             mongotMock: mongotmock,
             coll,

@@ -59,36 +59,6 @@ function runExplainTest(verbosity) {
     });
     const pipeline = [{$search: searchQuery}];
 
-    // TODO SERVER-91594: Test for setUpMongotReturnExplain() can be removed when mongot always
-    // returns a cursor.
-    {
-        setUpMongotReturnExplain({
-            searchCmd,
-            mongotMock: mongotmock,
-        });
-        // When querying an older version of mongot for explain, the query is sent twice.
-        // This uses a different cursorId than the default one for setUpMongotReturnExplain() so
-        // the mock will return the response correctly.
-        setUpMongotReturnExplain({
-            searchCmd,
-            mongotMock: mongotmock,
-            cursorId: NumberLong(124),
-        });
-        const result = coll.explain(verbosity).aggregate(pipeline);
-        getMongotStagesAndValidateExplainExecutionStats({
-            result,
-            stageType: "$_internalSearchMongotRemote",
-            verbosity,
-            nReturned: NumberLong(0),
-            explainObject,
-        });
-        getMongotStagesAndValidateExplainExecutionStats({
-            result,
-            stageType: "$_internalSearchIdLookup",
-            verbosity,
-            nReturned: NumberLong(0),
-        });
-    }
     {
         setUpMongotReturnExplainAndCursor({
             mongotMock: mongotmock,
