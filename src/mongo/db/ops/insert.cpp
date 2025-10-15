@@ -109,7 +109,7 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
         // already been validated for size on the source cluster, and were successfully inserted
         // into the source oplog.
         if (doc.objsize() > BSONObjMaxUserSize && !gAllowDocumentsGreaterThanMaxUserSize)
-            return StatusWith<BSONObj>(ErrorCodes::BadValue,
+            return StatusWith<BSONObj>(ErrorCodes::BSONObjectTooLarge,
                                        str::stream() << "object to insert too large"
                                                      << ". size in bytes: " << doc.objsize()
                                                      << ", max size: " << BSONObjMaxUserSize);

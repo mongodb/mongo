@@ -665,6 +665,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
     const BSONObj& measurementDoc,
     bucket_catalog::CombineWithInsertsFromOtherClients combine,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     bucket_catalog::InsertContext& insertContext,
     const Date_t& time) {
     boost::optional<bucket_catalog::BucketId> uncompressedBucketId{boost::none};
@@ -677,6 +678,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                                                   bucketsColl->getDefaultCollator(),
                                                   measurementDoc,
                                                   combine,
+                                                  allowQueryBasedReopening,
                                                   insertContext,
                                                   time);
         if (!swResult.isOK()) {
@@ -1030,6 +1032,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
         int32_t compressedSizeDelta;
         auto intermediates = batch->measurementMap.intermediate(compressedSizeDelta);
         batch->sizes.uncommittedVerifiedSize = compressedSizeDelta;
+
         bucketToInsert =
             makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
 
@@ -1132,6 +1135,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                     measurementDoc,
                     combine,
                     compressAndWriteBucketFunc,
+                    bucket_catalog::AllowQueryBasedReopening::kAllow,
                     std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
                     std::get<Date_t>(insertContextAndDate.getValue()));
                 if (!result.isOK()) {
@@ -1196,17 +1200,45 @@ void makeWriteRequest(OperationContext* opCtx,
                       std::vector<write_ops::InsertCommandRequest>* insertOps,
                       std::vector<write_ops::UpdateCommandRequest>* updateOps) {
     if (batch->numPreviouslyCommittedMeasurements == 0) {
-        insertOps->push_back(
-            makeTimeseriesInsertOp(batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
-        return;
+        try {
+            insertOps->push_back(makeTimeseriesInsertOp(
+                batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
+            return;
+        } catch (const DBException& ex) {
+            if (ex.toStatus() == ErrorCodes::BSONObjectTooLarge) {
+                LOGV2_WARNING(10856500,
+                              "Ordered time-series bucket insert is too large.",
+                              "statusMsg"_attr = ex.toStatus().reason());
+                auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+                timeseries::bucket_catalog::markBucketInsertTooLarge(
+                    bucketCatalog, batch->bucketId.collectionUUID);
+            }
+            throw;
+        }
     }
-    if (batch->generateCompressedDiff) {
-        updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
-            opCtx, batch, bucketsNs, std::move(stmtIds[batch.get()])));
-    } else {
-        updateOps->push_back(makeTimeseriesUpdateOp(
-            opCtx, batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
+
+    try {
+        if (batch->generateCompressedDiff) {
+            updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
+                opCtx, batch, bucketsNs, std::move(stmtIds[batch.get()])));
+        } else {
+            updateOps->push_back(makeTimeseriesUpdateOp(
+                opCtx, batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
+        }
+    } catch (const DBException& ex) {
+        if (ex.toStatus() == ErrorCodes::BSONObjectTooLarge) {
+            LOGV2_WARNING(10856501,
+                          "Ordered time-series bucket update is too large.",
+                          "statusMsg"_attr = ex.toStatus().reason(),
+                          "compressed"_attr = batch->generateCompressedDiff);
+            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+            timeseries::bucket_catalog::markBucketUpdateTooLarge(bucketCatalog,
+                                                                 batch->bucketId.collectionUUID);
+        }
+        throw;
     }
+
+    return;
 }
 
 TimeseriesBatches insertIntoBucketCatalogForUpdate(
@@ -1353,8 +1385,17 @@ void commitTimeseriesBucketsAtomically(
             }
 
             TimeseriesStmtIds emptyStmtIds = {};
-            makeWriteRequest(
-                opCtx, batch, metadata, emptyStmtIds, bucketsNs, &insertOps, &updateOps);
+            try {
+                makeWriteRequest(
+                    opCtx, batch, metadata, emptyStmtIds, bucketsNs, &insertOps, &updateOps);
+
+            } catch (const DBException& ex) {
+                if (ex.toStatus() == ErrorCodes::BSONObjectTooLarge) {
+                    abortStatus = ex.toStatus();
+                    return;
+                }
+                throw;
+            }
 
             // Starts tracking the newly inserted bucket in the main bucket catalog as a direct
             // write to prevent other writers from modifying it.

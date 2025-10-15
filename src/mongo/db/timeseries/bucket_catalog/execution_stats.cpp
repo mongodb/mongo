@@ -243,6 +243,16 @@ void ExecutionStatsController::incNumFailedDecompressBuckets(long long increment
     _globalStats->numFailedDecompressBuckets.fetchAndAddRelaxed(increment);
 }
 
+void ExecutionStatsController::incNumBucketDocumentsTooLargeInsert(long long increment) {
+    _collectionStats->numBucketDocumentsTooLargeInsert.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketDocumentsTooLargeInsert.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketDocumentsTooLargeUpdate(long long increment) {
+    _collectionStats->numBucketDocumentsTooLargeUpdate.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketDocumentsTooLargeUpdate.fetchAndAddRelaxed(increment);
+}
+
 void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder) {
     builder.appendNumber("numActiveBuckets", stats.numActiveBuckets.load());
     builder.appendNumber("numBucketInserts", stats.numBucketInserts.load());
@@ -289,6 +299,10 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketQueriesFailed", stats.numBucketQueriesFailed.load());
     builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
     builder.appendNumber("numDuplicateBucketsReopened", stats.numDuplicateBucketsReopened.load());
+    builder.appendNumber("numBucketDocumentsTooLargeInsert",
+                         stats.numBucketDocumentsTooLargeInsert.load());
+    builder.appendNumber("numBucketDocumentsTooLargeUpdate",
+                         stats.numBucketDocumentsTooLargeUpdate.load());
 
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -338,6 +352,8 @@ void addCollectionExecutionCounters(ExecutionStatsController& stats,
     stats.incNumBucketQueriesFailed(collStats.numBucketQueriesFailed.load());
     stats.incNumBucketReopeningsFailed(collStats.numBucketReopeningsFailed.load());
     stats.incNumDuplicateBucketsReopened(collStats.numDuplicateBucketsReopened.load());
+    stats.incNumBucketDocumentsTooLargeInsert(collStats.numBucketDocumentsTooLargeInsert.load());
+    stats.incNumBucketDocumentsTooLargeUpdate(collStats.numBucketDocumentsTooLargeUpdate.load());
 
     // TODO(SERVER-70605): Remove these.
     stats.incNumBytesUncompressed(collStats.numBytesUncompressed.load());

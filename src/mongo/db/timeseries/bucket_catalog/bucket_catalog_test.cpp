@@ -336,6 +336,7 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
                      _getCollator(nss),
                      doc,
                      combine,
+                     AllowQueryBasedReopening::kAllow,
                      std::get<bucket_catalog::InsertContext>(insertContextAndTime),
                      std::get<Date_t>(insertContextAndTime));
 }

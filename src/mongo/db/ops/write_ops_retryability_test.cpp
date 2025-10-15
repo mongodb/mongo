@@ -356,7 +356,7 @@ TEST_F(WriteOpsRetryability, PerformOrderedInsertsStopsAtBadDoc) {
     ASSERT_EQ(2, result.results.size());
     ASSERT_TRUE(result.results[0].isOK());
     ASSERT_FALSE(result.results[1].isOK());
-    ASSERT_EQ(ErrorCodes::BadValue, result.results[1].getStatus());
+    ASSERT_EQ(ErrorCodes::BSONObjectTooLarge, result.results[1].getStatus());
 }
 
 TEST_F(WriteOpsRetryability, PerformUnorderedInsertsContinuesAtBadDoc) {
@@ -390,7 +390,7 @@ TEST_F(WriteOpsRetryability, PerformUnorderedInsertsContinuesAtBadDoc) {
     ASSERT_TRUE(result.results[0].isOK());
     ASSERT_FALSE(result.results[1].isOK());
     ASSERT_TRUE(result.results[2].isOK());
-    ASSERT_EQ(ErrorCodes::BadValue, result.results[1].getStatus());
+    ASSERT_EQ(ErrorCodes::BSONObjectTooLarge, result.results[1].getStatus());
 }
 
 using FindAndModifyRetryability = MockReplCoordServerFixture;

@@ -2140,10 +2140,26 @@ Status performAtomicTimeseriesWrites(
 
     for (auto& op : insertOps) {
         invariant(op.getDocuments().size() == 1);
+        auto doc = op.getDocuments().front();
 
+        // Since this bypasses the usual write path, size validation is needed.
+        if (MONGO_unlikely(doc.objsize() > BSONObjMaxUserSize)) {
+            // This block isn't expected to be hit on v8.0 because the object
+            // would have failed BSON construction via exception earlier in the write
+            // path. Keeping this here for completeness.
+            LOGV2_WARNING(10856504,
+                          "Ordered time-series bucket insert is too large.",
+                          "bucketSize"_attr = doc.objsize());
+            timeseries::bucket_catalog::markBucketInsertTooLarge(
+                timeseries::bucket_catalog::BucketCatalog::get(opCtx->getServiceContext()),
+                coll.uuid());
+
+            return {ErrorCodes::BSONObjectTooLarge,
+                    "Ordered time-series bucket insert is too large"};
+        }
         inserts.emplace_back(op.getStmtIds() ? *op.getStmtIds()
                                              : std::vector<StmtId>{kUninitializedStmtId},
-                             op.getDocuments().front(),
+                             doc,
                              slot ? *(*slot)++ : OplogSlot{});
     }
 
@@ -2198,6 +2214,24 @@ Status performAtomicTimeseriesWrites(
             args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
         } else {
             invariant(false, "Unexpected update type");
+        }
+
+        // Since this bypasses the usual write path, size validation is needed.
+        if (MONGO_unlikely(updated.objsize() > BSONObjMaxUserSize)) {
+            // This block isn't expected to be hit on v8.0 because the object
+            // would have failed BSON construction via exception earlier in the write
+            // path. Keeping this here for completeness.
+            LOGV2_WARNING(
+                10856505,
+                "Ordered time-series bucket update is too large. Will internally retry write on "
+                "a new bucket.",
+                "bucketSize"_attr = updated.objsize());
+            timeseries::bucket_catalog::markBucketUpdateTooLarge(
+                timeseries::bucket_catalog::BucketCatalog::get(opCtx->getServiceContext()),
+                coll.uuid());
+
+            return {ErrorCodes::BSONObjectTooLarge,
+                    "Ordered time-series bucket update is too large"};
         }
 
         if (slot) {
@@ -2709,49 +2743,115 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
-        const auto output =
-            performTimeseriesInsert(opCtx, metadata, std::move(stmtIds), request, batch);
-        if (auto error = write_ops_exec::generateError(
-                opCtx, output.result.getStatus(), start + index, errors->size())) {
-            bool canContinue = output.canContinue;
-            // Automatically attempts to retry on DuplicateKey error.
-            if (error->getStatus().code() == ErrorCodes::DuplicateKey &&
-                retryAttemptsForDup[index]++ < gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
-                docsToRetry->push_back(index);
-                canContinue = true;
-            } else {
-                errors->emplace_back(std::move(*error));
+        try {
+            const auto output =
+                performTimeseriesInsert(opCtx, metadata, std::move(stmtIds), request, batch);
+            if (auto error = write_ops_exec::generateError(
+                    opCtx, output.result.getStatus(), start + index, errors->size())) {
+                bool canContinue = output.canContinue;
+                // Automatically attempts to retry on DuplicateKey error.
+                if (error->getStatus().code() == ErrorCodes::DuplicateKey &&
+                    retryAttemptsForDup[index]++ < gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
+                    docsToRetry->push_back(index);
+                    canContinue = true;
+                } else {
+                    if (output.result.getStatus() == ErrorCodes::BSONObjectTooLarge) {
+                        // This block isn't expected to be hit on v8.0 because the object
+                        // would have failed BSON construction via exception earlier in the write
+                        // path. Keeping this here for completeness.
+                        LOGV2_WARNING(10856506,
+                                      "Unordered time-series bucket insert is too large.",
+                                      "statusMsg"_attr = output.result.getStatus().reason(),
+                                      "canContinue"_attr = canContinue);
+                        timeseries::bucket_catalog::markBucketInsertTooLarge(
+                            bucketCatalog, batch->bucketId.collectionUUID);
+                    }
+                    errors->emplace_back(std::move(*error));
+                }
+                abort(bucketCatalog, batch, output.result.getStatus());
+                return canContinue;
             }
-            abort(bucketCatalog, batch, output.result.getStatus());
-            return canContinue;
+
+            invariant(output.result.getValue().getN() == 1,
+                      str::stream() << "Expected 1 insertion of document with _id '" << docId
+                                    << "', but found " << output.result.getValue().getN() << ".");
+        } catch (const DBException& ex) {
+            if (ex.toStatus() == ErrorCodes::BSONObjectTooLarge) {
+                LOGV2_WARNING(10856502,
+                              "Unordered time-series bucket insert is too large.",
+                              "statusMsg"_attr = ex.toStatus().reason());
+                auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+                timeseries::bucket_catalog::markBucketInsertTooLarge(
+                    bucketCatalog, batch->bucketId.collectionUUID);
+                auto error = write_ops_exec::generateError(
+                    opCtx, ex.toStatus(), start + index, errors->size());
+                errors->emplace_back(std::move(*error));
+                abort(bucketCatalog, batch, ex.toStatus());
+
+                return false;
+            }
+            throw;
         }
 
-        invariant(output.result.getValue().getN() == 1,
-                  str::stream() << "Expected 1 insertion of document with _id '" << docId
-                                << "', but found " << output.result.getValue().getN() << ".");
     } else {
-        auto op = batch->generateCompressedDiff
-            ? timeseries::makeTimeseriesCompressedDiffUpdateOp(
-                  opCtx, batch, nss, std::move(stmtIds))
-            : timeseries::makeTimeseriesUpdateOp(opCtx, batch, nss, metadata, std::move(stmtIds));
-        auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
+        try {
+            auto op = batch->generateCompressedDiff
+                ? timeseries::makeTimeseriesCompressedDiffUpdateOp(
+                      opCtx, batch, nss, std::move(stmtIds))
+                : timeseries::makeTimeseriesUpdateOp(
+                      opCtx, batch, nss, metadata, std::move(stmtIds));
+            auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
 
-        if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
-            output.result.getStatus().code() == ErrorCodes::WriteConflict ||
-            output.result.getStatus().code() == ErrorCodes::TemporarilyUnavailable) {
-            abort(bucketCatalog,
-                  batch,
-                  output.result.isOK()
-                      ? Status{ErrorCodes::WriteConflict, "Could not update non-existent bucket"}
-                      : output.result.getStatus());
-            docsToRetry->push_back(index);
-            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-            return true;
-        } else if (auto error = write_ops_exec::generateError(
-                       opCtx, output.result.getStatus(), start + index, errors->size())) {
-            errors->emplace_back(std::move(*error));
-            abort(bucketCatalog, batch, output.result.getStatus());
-            return output.canContinue;
+            if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
+                output.result.getStatus().code() == ErrorCodes::WriteConflict ||
+                output.result.getStatus().code() == ErrorCodes::TemporarilyUnavailable) {
+                abort(bucketCatalog,
+                      batch,
+                      output.result.isOK() ? Status{ErrorCodes::WriteConflict,
+                                                    "Could not update non-existent bucket"}
+                                           : output.result.getStatus());
+                docsToRetry->push_back(index);
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+                return true;
+            } else if (auto error = write_ops_exec::generateError(
+                           opCtx, output.result.getStatus(), start + index, errors->size())) {
+                if (output.result.getStatus() == ErrorCodes::BSONObjectTooLarge) {
+                    // This block isn't expected to be hit on v8.0 because the object
+                    // would have failed BSON construction via exception earlier in the write
+                    // path. Keeping this here for completeness.
+                    LOGV2_WARNING(10856507,
+                                  "Unordered time-series bucket update is too large.",
+                                  "statusMsg"_attr = output.result.getStatus().reason());
+                    timeseries::bucket_catalog::markBucketUpdateTooLarge(
+                        bucketCatalog, batch->bucketId.collectionUUID);
+                    errors->emplace_back(std::move(*error));
+                    abort(bucketCatalog, batch, output.result.getStatus());
+
+                    return false;
+                }
+                errors->emplace_back(std::move(*error));
+                abort(bucketCatalog, batch, output.result.getStatus());
+                return output.canContinue;
+            }
+        } catch (const DBException& ex) {
+            if (ex.toStatus() == ErrorCodes::BSONObjectTooLarge) {
+                LOGV2_WARNING(10856503,
+                              "Unordered time-series bucket update is too large.",
+                              "statusMsg"_attr = ex.toStatus().reason());
+                auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+                timeseries::bucket_catalog::markBucketUpdateTooLarge(
+                    bucketCatalog, batch->bucketId.collectionUUID);
+                auto error = write_ops_exec::generateError(
+                    opCtx, ex.toStatus(), start + index, errors->size());
+                errors->emplace_back(std::move(*error));
+                abort(bucketCatalog, batch, ex.toStatus());
+
+                return false;
+            }
+
+            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+            abort(bucketCatalog, batch, ex.toStatus());
+            throw;
         }
     }
 
@@ -2781,19 +2881,19 @@ std::shared_ptr<timeseries::bucket_catalog::WriteBatch>& extractFromPair(
     return pair.first;
 }
 
-bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
-                                       const write_ops::InsertCommandRequest& request,
-                                       TimeseriesBatches& batches,
-                                       TimeseriesStmtIds&& stmtIds,
-                                       boost::optional<repl::OpTime>* opTime,
-                                       boost::optional<OID>* electionId) {
+Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
+                                         const write_ops::InsertCommandRequest& request,
+                                         TimeseriesBatches& batches,
+                                         TimeseriesStmtIds&& stmtIds,
+                                         boost::optional<repl::OpTime>* opTime,
+                                         boost::optional<OID>* electionId) {
     hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
     auto batchesToCommit = timeseries::determineBatchesToCommit(batches, extractFromPair);
     if (batchesToCommit.empty()) {
-        return true;
+        return Status::OK();
     }
 
     Status abortStatus = Status::OK();
@@ -2845,7 +2945,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             // inserts. Therefore, do not set the failed operation status on the operation sharding
             // state here, as it will be set during the unordered insert attempt.
             abortStatus = ex.toStatus();
-            return false;
+            return ex.toStatus();
         }
 
         for (auto batch : batchesToCommit) {
@@ -2854,10 +2954,19 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 prepareCommit(bucketCatalog, request.getNamespace(), batch, collator);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
-                return false;
+                return prepareCommitStatus;
             }
-            timeseries::makeWriteRequest(
-                opCtx, batch, metadata, stmtIds, nss, &insertOps, &updateOps);
+
+            try {
+                timeseries::makeWriteRequest(
+                    opCtx, batch, metadata, stmtIds, nss, &insertOps, &updateOps);
+            } catch (const DBException& ex) {
+                if (ex.toStatus() == ErrorCodes::BSONObjectTooLarge) {
+                    abortStatus = ex.toStatus();
+                    return ex.toStatus();
+                }
+                throw;
+            }
         }
 
         hangTimeseriesInsertBeforeWrite.pauseWhileSet();
@@ -2868,7 +2977,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 timeseries::bucket_catalog::resetBucketOIDCounter();
             }
             abortStatus = result;
-            return false;
+            return result;
         }
 
         timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
@@ -2898,14 +3007,14 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             "Encountered corrupt bucket while performing insert, will retry on a new bucket",
             "bucketId"_attr = ex->bucketId());
         abortStatus = ex.toStatus();
-        return false;
+        return ex.toStatus();
     } catch (const DBException& ex) {
         abortStatus = ex.toStatus();
         throw;
     }
 
     batchGuard.dismiss();
-    return true;
+    return Status::OK();
 }
 
 // For sharded time-series collections, we need to use the granularity from the config
@@ -3082,6 +3191,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
                         size_t start,
                         size_t numDocs,
                         const std::vector<size_t>& indices,
+                        timeseries::BucketReopeningPermittance reopening,
                         std::vector<write_ops::WriteError>* errors,
                         bool* containsRetry) {
     hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
@@ -3176,7 +3286,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
             bucketsColl,
             timeSeriesOptions,
             measurementDoc,
-            timeseries::BucketReopeningPermittance::kAllowed,
+            reopening,
             canCombineTimeseriesInsertWithOtherClients(opCtx, request),
             compressAndWriteBucketFunc);
 
@@ -3246,25 +3356,33 @@ insertIntoBucketCatalog(OperationContext* opCtx,
  * Returns true on success, false otherwise, filling out errors as appropriate on failure as well
  * as containsRetry which is used at a higher layer to report a retry count metric.
  */
-bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
-                                              const write_ops::InsertCommandRequest& request,
-                                              std::vector<write_ops::WriteError>* errors,
-                                              boost::optional<repl::OpTime>* opTime,
-                                              boost::optional<OID>* electionId,
-                                              bool* containsRetry) {
-    auto [_, batches, stmtIds, numInserted] = insertIntoBucketCatalog(
-        opCtx, request, 0, request.getDocuments().size(), {}, errors, containsRetry);
+Status performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
+                                                const write_ops::InsertCommandRequest& request,
+                                                std::vector<write_ops::WriteError>* errors,
+                                                boost::optional<repl::OpTime>* opTime,
+                                                boost::optional<OID>* electionId,
+                                                bool* containsRetry) {
+    auto [_, batches, stmtIds, numInserted] =
+        insertIntoBucketCatalog(opCtx,
+                                request,
+                                0,
+                                request.getDocuments().size(),
+                                {},
+                                timeseries::BucketReopeningPermittance::kAllowed,
+                                errors,
+                                containsRetry);
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-    if (!commitTimeseriesBucketsAtomically(
-            opCtx, request, batches, std::move(stmtIds), opTime, electionId)) {
-        return false;
+    auto commitResult = commitTimeseriesBucketsAtomically(
+        opCtx, request, batches, std::move(stmtIds), opTime, electionId);
+    if (!commitResult.isOK()) {
+        return commitResult;
     }
 
     getTimeseriesBatchResults(opCtx, batches, 0, batches.size(), true, errors, opTime, electionId);
 
-    return true;
+    return Status::OK();
 }
 
 /**
@@ -3281,13 +3399,14 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     size_t start,
     size_t numDocs,
     const std::vector<size_t>& indices,
+    const timeseries::BucketReopeningPermittance bucketReopening,
     std::vector<write_ops::WriteError>* errors,
     boost::optional<repl::OpTime>* opTime,
     boost::optional<OID>* electionId,
     bool* containsRetry,
     absl::flat_hash_map<int, int>& retryAttemptsForDup) {
-    auto [optUuid, batches, bucketStmtIds, _] =
-        insertIntoBucketCatalog(opCtx, request, start, numDocs, indices, errors, containsRetry);
+    auto [optUuid, batches, bucketStmtIds, _] = insertIntoBucketCatalog(
+        opCtx, request, start, numDocs, indices, bucketReopening, errors, containsRetry);
 
     tassert(9213700,
             "Timeseries insert did not find bucket collection UUID, but staged inserts in "
@@ -3379,14 +3498,16 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     return docsToRetry;
 }
 
-void performUnorderedTimeseriesWritesWithRetries(OperationContext* opCtx,
-                                                 const write_ops::InsertCommandRequest& request,
-                                                 size_t start,
-                                                 size_t numDocs,
-                                                 std::vector<write_ops::WriteError>* errors,
-                                                 boost::optional<repl::OpTime>* opTime,
-                                                 boost::optional<OID>* electionId,
-                                                 bool* containsRetry) {
+void performUnorderedTimeseriesWritesWithRetries(
+    OperationContext* opCtx,
+    const write_ops::InsertCommandRequest& request,
+    size_t start,
+    size_t numDocs,
+    timeseries::BucketReopeningPermittance bucketReopening,
+    std::vector<write_ops::WriteError>* errors,
+    boost::optional<repl::OpTime>* opTime,
+    boost::optional<OID>* electionId,
+    bool* containsRetry) {
     std::vector<size_t> docsToRetry;
     absl::flat_hash_map<int, int> retryAttemptsForDup;
     do {
@@ -3395,6 +3516,7 @@ void performUnorderedTimeseriesWritesWithRetries(OperationContext* opCtx,
                                                        start,
                                                        numDocs,
                                                        docsToRetry,
+                                                       bucketReopening,
                                                        errors,
                                                        opTime,
                                                        electionId,
@@ -3415,8 +3537,9 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       boost::optional<repl::OpTime>* opTime,
                                       boost::optional<OID>* electionId,
                                       bool* containsRetry) {
-    if (performOrderedTimeseriesWritesAtomically(
-            opCtx, request, errors, opTime, electionId, containsRetry)) {
+    auto result = performOrderedTimeseriesWritesAtomically(
+        opCtx, request, errors, opTime, electionId, containsRetry);
+    if (result.isOK()) {
         if (!errors->empty()) {
             invariant(errors->size() == 1);
             return errors->front().getIndex();
@@ -3428,8 +3551,12 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
     // measurement one by one, first clear 'errors' so the retry starts with a clean state.
     errors->clear();
     for (size_t i = 0; i < request.getDocuments().size(); ++i) {
+        timeseries::BucketReopeningPermittance bucketReopening =
+            result.code() == ErrorCodes::BSONObjectTooLarge
+            ? timeseries::BucketReopeningPermittance::kDisallowed
+            : timeseries::BucketReopeningPermittance::kAllowed;
         performUnorderedTimeseriesWritesWithRetries(
-            opCtx, request, i, 1, errors, opTime, electionId, containsRetry);
+            opCtx, request, i, 1, bucketReopening, errors, opTime, electionId, containsRetry);
         if (!errors->empty()) {
             return i;
         }
@@ -3507,14 +3634,16 @@ write_ops::InsertCommandReply performTimeseriesWrites(
         baseReply.setN(performOrderedTimeseriesWrites(
             opCtx, request, &errors, &opTime, &electionId, &containsRetry));
     } else {
-        performUnorderedTimeseriesWritesWithRetries(opCtx,
-                                                    request,
-                                                    0,
-                                                    request.getDocuments().size(),
-                                                    &errors,
-                                                    &opTime,
-                                                    &electionId,
-                                                    &containsRetry);
+        performUnorderedTimeseriesWritesWithRetries(
+            opCtx,
+            request,
+            0,
+            request.getDocuments().size(),
+            timeseries::BucketReopeningPermittance::kAllowed,
+            &errors,
+            &opTime,
+            &electionId,
+            &containsRetry);
         baseReply.setN(request.getDocuments().size() - errors.size());
     }
 

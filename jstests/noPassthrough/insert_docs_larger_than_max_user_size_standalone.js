@@ -20,7 +20,8 @@ const bsonMaxInternalSize = bsonMaxUserSize + (16 * 1024);
 
 // Trying to insert an object that is the maximum size will fail.
 let obj = {x: 'x'.repeat(bsonMaxUserSize)};
-assert.commandFailedWithCode(coll.insert(obj), ErrorCodes.BadValue, "object to insert too large");
+assert.commandFailedWithCode(
+    coll.insert(obj), ErrorCodes.BSONObjectTooLarge, "object to insert too large");
 
 // The string value in the field is a number of bytes smaller than the max, to account for other
 // data in the BSON object. This value below will create an object very close to the maximum user
@@ -66,7 +67,7 @@ conn = rst.start(0, {
 });
 oplog = conn.getDB("local").getCollection('oplog.rs');
 assert.commandFailedWithCode(
-    oplog.insert(lastOplogEntry), ErrorCodes.BadValue, "object to insert too large");
+    oplog.insert(lastOplogEntry), ErrorCodes.BSONObjectTooLarge, "object to insert too large");
 rst.stop(0, undefined /* signal */, undefined /* opts */, {forRestart: true});
 
 // Restart as standalone with the 'allowDocumentsGreaterThanMaxUserSize' server parameter enabled to

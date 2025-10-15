@@ -102,6 +102,12 @@ struct InsertContext {
 
 
 /**
+ * Mode enum to control whether getReopeningCandidate() will allow query-based
+ * reopening of buckets when attempting to accommodate a new measurement.
+ */
+enum class AllowQueryBasedReopening { kAllow, kDisallow };
+
+/**
  * Whether to allow inserts to be batched together with those from other clients.
  */
 enum class CombineWithInsertsFromOtherClients {
@@ -275,6 +281,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                    const StringDataComparator* comparator,
                                    const BSONObj& doc,
                                    CombineWithInsertsFromOtherClients combine,
+                                   AllowQueryBasedReopening allowQueryBasedReopening,
                                    InsertContext& insertContext,
                                    const Date_t& time);
 
@@ -395,6 +402,20 @@ void freeze(BucketCatalog&,
             const StringDataComparator* comparator,
             const UUID& collectionUUID,
             const BSONObj& bucket);
+
+/**
+ * Increments an FTDC counter.
+ * Denotes an event where a generated time-series bucket document for insert exceeded the BSON
+ * size limit.
+ */
+void markBucketInsertTooLarge(BucketCatalog& catalog, const UUID& collectionUUID);
+
+/**
+ * Increments an FTDC counter.
+ * Denotes an event where a generated time-series bucket document for update exceeded the BSON
+ * size limit.
+ */
+void markBucketUpdateTooLarge(BucketCatalog& catalog, const UUID& collectionUUID);
 
 /**
  * Extracts the BucketId from a bucket document.

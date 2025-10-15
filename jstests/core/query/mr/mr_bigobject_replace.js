@@ -10,6 +10,7 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
+//   multiversion_incompatible,
 // ]
 
 /**
@@ -66,11 +67,11 @@ function runTest(testOptions) {
     const kCannotReduceLargeObjCode = 31392;
     assert.commandFailedWithCode(
         res,
-        [ErrorCodes.BadValue, ErrorCodes.Interrupted, kCannotReduceLargeObjCode],
+        [ErrorCodes.BSONObjectTooLarge, ErrorCodes.Interrupted, kCannotReduceLargeObjCode],
         "creating a document larger than 16MB didn't fail");
-    // If we see 'BadValue', make sure the message indicates it's the kind of error we were
-    // expecting.
-    if (res.code === ErrorCodes.BadValue) {
+    // If we see 'BSONObjectTooLarge', make sure the message indicates it's the kind of error we
+    // were expecting.
+    if (res.code === ErrorCodes.BSONObjectTooLarge) {
         assert.lte(
             0,
             res.errmsg.indexOf("object to insert too large"),

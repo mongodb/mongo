@@ -14,6 +14,7 @@
  *   requires_fcv_80,
  *   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
  *   assumes_balancer_off,
+ *   multiversion_incompatible,
  * ]
  */
 import {
@@ -236,7 +237,7 @@ cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 // our default time limit, so we allow that possibility.
 try {
     cursorEntryValidator(res.cursor.firstBatch[1],
-                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.BadValue});
+                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.BSONObjectTooLarge});
 } catch {
     cursorEntryValidator(res.cursor.firstBatch[1],
                          {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});
@@ -270,7 +271,7 @@ cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 // our default time limit, so we allow that possibility.
 try {
     cursorEntryValidator(res.cursor.firstBatch[1],
-                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.BadValue});
+                         {ok: 0, n: 0, idx: 1, code: ErrorCodes.BSONObjectTooLarge});
 } catch {
     cursorEntryValidator(res.cursor.firstBatch[1],
                          {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});

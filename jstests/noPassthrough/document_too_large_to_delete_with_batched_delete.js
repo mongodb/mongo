@@ -67,7 +67,7 @@ function tests(conn, isStandalone) {
             assert.commandWorked(testDb.c.insert({_id: "X".repeat(r)}));
         }
         if (idLen >= minIdErrorLen) {
-            assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+            assert.commandFailedWithCode(res, ErrorCodes.BSONObjectTooLarge);
         } else if (isStandalone) {
             assert.commandWorked(res);
         } else {

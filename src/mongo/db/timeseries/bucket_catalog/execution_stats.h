@@ -78,6 +78,8 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketQueriesFailed;
     AtomicWord<long long> numBucketReopeningsFailed;
     AtomicWord<long long> numDuplicateBucketsReopened;
+    AtomicWord<long long> numBucketDocumentsTooLargeInsert;
+    AtomicWord<long long> numBucketDocumentsTooLargeUpdate;
 
     // TODO SERVER-70605: Remove the metrics below.
     AtomicWord<long long> numBytesUncompressed;
@@ -132,6 +134,8 @@ public:
     void incNumCompressedBuckets(long long increment = 1);
     void incNumUncompressedBuckets(long long increment = 1);
     void incNumFailedDecompressBuckets(long long increment = 1);
+    void incNumBucketDocumentsTooLargeInsert(long long increment = 1);
+    void incNumBucketDocumentsTooLargeUpdate(long long increment = 1);
 
 private:
     shared_tracked_ptr<ExecutionStats> _collectionStats;

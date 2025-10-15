@@ -281,6 +281,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                    const StringDataComparator* comparator,
                                    const BSONObj& doc,
                                    CombineWithInsertsFromOtherClients combine,
+                                   AllowQueryBasedReopening allowQueryBasedReopening,
                                    InsertContext& insertContext,
                                    const Date_t& time) {
     // Save the catalog era value from before we make any further checks. This guarantees that we
@@ -307,14 +308,14 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
     // If there are no open buckets for our measurement that we can use, we return a
     // reopeningContext to try reopening a closed bucket from disk.
     if (!bucket) {
-        return getReopeningContext(opCtx,
-                                   catalog,
-                                   stripe,
-                                   stripeLock,
-                                   insertContext,
-                                   catalogEra,
-                                   internal::AllowQueryBasedReopening::kAllow,
-                                   time);
+        return internal::getReopeningContext(opCtx,
+                                             catalog,
+                                             stripe,
+                                             stripeLock,
+                                             insertContext,
+                                             catalogEra,
+                                             allowQueryBasedReopening,
+                                             time);
     }
 
     auto insertionResult = insertIntoBucket(opCtx,
@@ -366,16 +367,18 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
         }
     }
 
-    return getReopeningContext(opCtx,
-                               catalog,
-                               stripe,
-                               stripeLock,
-                               insertContext,
-                               catalogEra,
-                               (*reason == RolloverReason::kTimeBackward)
-                                   ? internal::AllowQueryBasedReopening::kAllow
-                                   : internal::AllowQueryBasedReopening::kDisallow,
-                               time);
+    return internal::getReopeningContext(
+        opCtx,
+        catalog,
+        stripe,
+        stripeLock,
+        insertContext,
+        catalogEra,
+        (*reason == RolloverReason::kTimeBackward &&
+         allowQueryBasedReopening == AllowQueryBasedReopening::kAllow)
+            ? AllowQueryBasedReopening::kAllow
+            : AllowQueryBasedReopening::kDisallow,
+        time);
 }
 
 StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
@@ -771,6 +774,16 @@ void freeze(BucketCatalog& catalog,
             const UUID& collectionUUID,
             const BSONObj& bucket) {
     freeze(catalog, extractBucketId(catalog, options, comparator, collectionUUID, bucket));
+}
+
+void markBucketInsertTooLarge(BucketCatalog& catalog, const UUID& collectionUUID) {
+    internal::getOrInitializeExecutionStats(catalog, collectionUUID)
+        .incNumBucketDocumentsTooLargeInsert();
+}
+
+void markBucketUpdateTooLarge(BucketCatalog& catalog, const UUID& collectionUUID) {
+    internal::getOrInitializeExecutionStats(catalog, collectionUUID)
+        .incNumBucketDocumentsTooLargeUpdate();
 }
 
 BucketId extractBucketId(BucketCatalog& bucketCatalog,

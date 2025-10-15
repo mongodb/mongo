@@ -82,7 +82,7 @@ const testWriteOplogDocumentKey = ({sharded, inTransaction}) => {
 
     performWrites(function largeInsert(coll) {
         const largeDoc = {_id: 'x'.repeat(16 * 1024 * 1024), a: 0};
-        assert.commandFailedWithCode(coll.insert(largeDoc), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(coll.insert(largeDoc), ErrorCodes.BSONObjectTooLarge);
     });
 };
 
