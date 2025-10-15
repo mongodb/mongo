@@ -37,12 +37,12 @@ namespace mongo::query_stats {
 // Estimated overhead for BSON document header, EOO, and potential subobject field names.
 const size_t kBSONOverhead = 100;
 
-BSONObj QueryStatsEntry::toBSON(bool buildSubsections) const {
+BSONObj QueryStatsEntry::toBSON(bool buildSubsections, bool includeWriteMetrics) const {
     // Pad not only for the overhead of the BSON structure itself, but also for the
-    // sub-structures it contains. We have 3 sub-structures at the top level:
-    // cursorStats, queryExecStats, queryPlannerStats.
+    // sub-structures it contains. We have 4 sub-structures at the top level:
+    // cursorStats, queryExecStats, queryPlannerStats, and writesStats.
     // Pad an additional 500 bytes to account for any potential supplemental metrics.
-    BSONObjBuilder builder{sizeof(QueryStatsEntry) + (kBSONOverhead * 4) + 500};
+    BSONObjBuilder builder{sizeof(QueryStatsEntry) + (kBSONOverhead * 5) + 500};
     builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
     builder.append("execCount", (long long)execCount);
     totalExecMicros.appendTo(builder, "totalExecMicros");
@@ -52,6 +52,10 @@ BSONObj QueryStatsEntry::toBSON(bool buildSubsections) const {
     cursorStats.toBSON(builder, buildSubsections);
     queryExecStats.toBSON(builder, buildSubsections);
     queryPlannerStats.toBSON(builder, buildSubsections);
+
+    if (includeWriteMetrics) {
+        writesStats.toBSON(builder);
+    }
 
     builder.append("firstSeenTimestamp", firstSeenTimestamp);
     builder.append("latestSeenTimestamp", latestSeenTimestamp);
@@ -128,4 +132,13 @@ void CursorEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsecti
     }
 }
 
+void WritesEntry::toBSON(BSONObjBuilder& queryStatsBuilder) const {
+    BSONObjBuilder writesBuilder{sizeof(WritesEntry) + kBSONOverhead};
+    nMatched.appendTo(writesBuilder, "nMatched");
+    nUpserted.appendTo(writesBuilder, "nUpserted");
+    nModified.appendTo(writesBuilder, "nModified");
+    nDeleted.appendTo(writesBuilder, "nDeleted");
+    nInserted.appendTo(writesBuilder, "nInserted");
+    queryStatsBuilder.append("writes", writesBuilder.obj());
+}
 }  // namespace mongo::query_stats

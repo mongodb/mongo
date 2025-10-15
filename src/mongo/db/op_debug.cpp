@@ -1305,6 +1305,11 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setFromMultiPlanner(additiveMetrics.fromMultiPlanner);
     metrics.setFromPlanCache(additiveMetrics.fromPlanCache.value_or(false));
 
+    metrics.setNMatched(additiveMetrics.nMatched.value_or(0));
+    metrics.setNModified(additiveMetrics.nModified.value_or(0));
+    metrics.setNInserted(additiveMetrics.ninserted.value_or(0));
+    metrics.setNDeleted(additiveMetrics.ndeleted.value_or(0));
+    metrics.setNUpserted(additiveMetrics.nUpserted.value_or(0));
     return metrics;
 }
 
@@ -1443,6 +1448,11 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     readingTime = readingTime.value_or(Microseconds(0)) + metrics.readingTime;
     clusterWorkingTime = clusterWorkingTime.value_or(Milliseconds(0)) + metrics.clusterWorkingTime;
     cpuNanos = cpuNanos.value_or(Nanoseconds(0)) + metrics.cpuNanos;
+    nMatched = nMatched.value_or(0) + metrics.nMatched;
+    nModified = nModified.value_or(0) + metrics.nModified;
+    ninserted = ninserted.value_or(0) + metrics.nInserted;
+    ndeleted = ndeleted.value_or(0) + metrics.nDeleted;
+    nUpserted = nUpserted.value_or(0) + metrics.nUpserted;
 
     delinquentAcquisitions = delinquentAcquisitions.value_or(0) + metrics.delinquentAcquisitions;
     totalAcquisitionDelinquency =
@@ -1489,7 +1499,12 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         metrics.getHasSortStage(),
         metrics.getUsedDisk(),
         metrics.getFromMultiPlanner(),
-        metrics.getFromPlanCache()});
+        metrics.getFromPlanCache(),
+        static_cast<uint64_t>(metrics.getNMatched()),
+        static_cast<uint64_t>(metrics.getNUpserted()),
+        static_cast<uint64_t>(metrics.getNModified()),
+        static_cast<uint64_t>(metrics.getNDeleted()),
+        static_cast<uint64_t>(metrics.getNInserted())});
 }
 
 void OpDebug::AdditiveMetrics::aggregateStorageStats(const StorageStats& stats) {

@@ -252,6 +252,12 @@ following way:
   query operation, including getMores.
 - `metrics.overdueInterruptApproxMaxMillis`: Maximum time in milliseconds that checkForInterrupt was
   delayed for a sampled query operation, including getMores.
+- `metrics.writes`: Contains the metrics relevant to writes.
+- `metrics.writes.nMatched`: The number of documents selected for update.
+- `metrics.writes.nUpserted`: The number of documents inserted by an upsert.
+- `metrics.writes.nModified`: The number of existing documents updated.
+- `metrics.writes.nDeleted`: The number of documents deleted.
+- `metrics.writes.nInserted`: The number of documents inserted (excluding upserts).
 
 #### Permissions
 

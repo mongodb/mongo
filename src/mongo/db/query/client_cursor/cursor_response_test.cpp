@@ -64,7 +64,12 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
     maxAcquisitionDelinquencyMillis: {"$numberLong": "0"},
     numInterruptChecks: {"$numberLong": "0"},
-    overdueInterruptApproxMaxMillis: {"$numberLong": "0"}
+    overdueInterruptApproxMaxMillis: {"$numberLong": "0"},
+    nMatched: {"$numberLong": "0"},
+    nUpserted: {"$numberLong": "0"},
+    nModified: {"$numberLong": "0"},
+    nDeleted: {"$numberLong": "0"},
+    nInserted: {"$numberLong": "0"}
 })");
 
 static const std::string defaultNssStr = "db.coll";
@@ -320,6 +325,11 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(metrics.getMaxAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(metrics.getNumInterruptChecks(), 0);
     ASSERT_EQ(metrics.getOverdueInterruptApproxMaxMillis(), 0);
+    ASSERT_EQ(metrics.getNMatched(), 0);
+    ASSERT_EQ(metrics.getNUpserted(), 0);
+    ASSERT_EQ(metrics.getNModified(), 0);
+    ASSERT_EQ(metrics.getNDeleted(), 0);
+    ASSERT_EQ(metrics.getNInserted(), 0);
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorMetricsWrongType) {
@@ -355,7 +365,12 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsIncomplete) {
                                    CursorMetrics::kFromMultiPlannerFieldName,
                                    CursorMetrics::kFromPlanCacheFieldName,
                                    CursorMetrics::kCpuNanosFieldName,
-                                   CursorMetrics::kNumInterruptChecksFieldName};
+                                   CursorMetrics::kNumInterruptChecksFieldName,
+                                   CursorMetrics::kNMatchedFieldName,
+                                   CursorMetrics::kNUpsertedFieldName,
+                                   CursorMetrics::kNModifiedFieldName,
+                                   CursorMetrics::kNDeletedFieldName,
+                                   CursorMetrics::kNInsertedFieldName};
     for (auto fieldName : fields) {
         auto badMetrics = metrics.copy().removeField(fieldName);
         auto badCursor = makeCursorBSON(badMetrics);
@@ -938,7 +953,12 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
                           true /* fromMultiPlanner */,
                           false /* fromPlanCache */,
                           -1 /* cpuNanos */,
-                          15 /* numInterruptChecks */);
+                          15 /* numInterruptChecks */,
+                          1 /* nMatched */,
+                          0 /* nUpserted */,
+                          1 /* nModified */,
+                          0 /* nDeleted */,
+                          0 /* nInserted */);
 
     auto pbrToken = BSON("n" << 1);
     builder.setPostBatchResumeToken(pbrToken);
@@ -973,6 +993,11 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_EQ(parsedMetrics->getMaxAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(parsedMetrics->getNumInterruptChecks(), 15);
     ASSERT_EQ(parsedMetrics->getOverdueInterruptApproxMaxMillis(), 0);
+    ASSERT_EQ(parsedMetrics->getNMatched(), 1);
+    ASSERT_EQ(parsedMetrics->getNUpserted(), 0);
+    ASSERT_EQ(parsedMetrics->getNModified(), 1);
+    ASSERT_EQ(parsedMetrics->getNDeleted(), 0);
+    ASSERT_EQ(parsedMetrics->getNInserted(), 0);
 
     ASSERT_TRUE(response.getPartialResultsReturned());
     ASSERT_TRUE(response.getInvalidated());

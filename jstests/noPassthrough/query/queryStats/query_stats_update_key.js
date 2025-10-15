@@ -67,7 +67,7 @@ withQueryStatsEnabled(collName, (coll) => {
     }
 
     if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "QueryStatsUpdateCommand")) {
-        jsTest.log.info("Skipping update key validation becaause feature flag is not set.");
+        jsTest.log.info("Skipping update key validation because feature flag is not set.");
         return;
     }
 

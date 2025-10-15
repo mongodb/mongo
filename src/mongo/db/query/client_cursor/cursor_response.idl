@@ -114,6 +114,26 @@ structs:
                 type: long
                 stability: unstable
                 default: 0
+            nMatched:
+                description: "The number of documents selected for update."
+                type: long
+                stability: unstable
+            nUpserted:
+                description: "The number of documents inserted by an upsert."
+                type: long
+                stability: unstable
+            nModified:
+                description: "The number of existing documents updated."
+                type: long
+                stability: unstable
+            nDeleted:
+                description: "The number of documents deleted."
+                type: long
+                stability: unstable
+            nInserted:
+                description: "The number of documents inserted (excluding upserts)."
+                type: long
+                stability: unstable
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

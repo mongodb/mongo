@@ -471,6 +471,14 @@ export function getQueryPlannerMetrics(metrics) {
     };
 }
 
+export function getWriteMetrics(metrics) {
+    // When featureFlagQueryStatsUpdateCommand is enabled, new write-related metrics would be
+    // nested inside "writes" section.
+    const writeMetricsSectionName = "writes";
+    assert(metrics.hasOwnProperty(writeMetricsSectionName), "Expected 'writes' field in metrics");
+    return metrics[writeMetricsSectionName];
+}
+
 export function assertAggregatedMetric(metrics, metricName, {sum, min, max, sumOfSq}) {
     assert.docEq(
         {
@@ -497,7 +505,7 @@ export function assertAggregatedBoolean(metrics, metricName, {trueCount, falseCo
 
 export function assertAggregatedMetricsSingleExec(
     results,
-    {docsExamined, keysExamined, usedDisk, hasSortStage, fromPlanCache, fromMultiPlanner},
+    {docsExamined, keysExamined, usedDisk, hasSortStage, fromPlanCache, fromMultiPlanner, writes},
 ) {
     {
         // Need to check if new format is used.
@@ -505,6 +513,16 @@ export function assertAggregatedMetricsSingleExec(
         const numericMetric = (x) => ({sum: x, min: x, max: x, sumOfSq: x ** 2});
         assertAggregatedMetric(queryStatSection, "docsExamined", numericMetric(docsExamined));
         assertAggregatedMetric(queryStatSection, "keysExamined", numericMetric(keysExamined));
+
+        if (writes) {
+            const {nMatched, nUpserted, nModified, nDeleted, nInserted} = writes;
+            const writesSection = getWriteMetrics(results.metrics);
+            assertAggregatedMetric(writesSection, "nMatched", numericMetric(nMatched));
+            assertAggregatedMetric(writesSection, "nUpserted", numericMetric(nUpserted));
+            assertAggregatedMetric(writesSection, "nModified", numericMetric(nModified));
+            assertAggregatedMetric(writesSection, "nDeleted", numericMetric(nDeleted));
+            assertAggregatedMetric(writesSection, "nInserted", numericMetric(nInserted));
+        }
     }
 
     {

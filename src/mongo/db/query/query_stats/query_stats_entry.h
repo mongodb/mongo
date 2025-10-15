@@ -116,6 +116,35 @@ struct QueryPlannerEntry {
     AggregatedBool fromPlanCache;
 };
 
+struct WritesEntry {
+    void toBSON(BSONObjBuilder& queryStatsBuilder) const;
+
+    /**
+     * Aggregates the number of documents selected by an update command.
+     */
+    AggregatedMetric<uint64_t> nMatched;
+
+    /**
+     * Aggregates the number of documents inserted by an upsert.
+     */
+    AggregatedMetric<uint64_t> nUpserted;
+
+    /**
+     * Aggregates the number of existing documents updated.
+     */
+    AggregatedMetric<uint64_t> nModified;
+
+    /**
+     * Aggregates the number of documents deleted.
+     */
+    AggregatedMetric<uint64_t> nDeleted;
+
+    /**
+     * Aggregates the number of documents inserted (excluding upserts).
+     */
+    AggregatedMetric<uint64_t> nInserted;
+};
+
 /**
  * The value stored in the query stats store. It contains a Key representing this "kind" of
  * query, and some metrics about that shape. This class is responsible for knowing its size and
@@ -127,7 +156,7 @@ struct QueryStatsEntry {
     QueryStatsEntry(std::unique_ptr<const Key> key_)
         : firstSeenTimestamp(Date_t::now()), key(std::move(key_)) {}
 
-    BSONObj toBSON(bool buildSubsections = false) const;
+    BSONObj toBSON(bool buildSubsections = false, bool includeWriteMetrics = false) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -190,10 +219,15 @@ struct QueryStatsEntry {
     void addSupplementalStats(std::unique_ptr<SupplementalStatsEntry> metric);
 
     /**
-     *  Supplemental metrics. The data structure is not allocated and the pointer is null if
+     * Supplemental metrics. The data structure is not allocated and the pointer is null if
      * optional metrics are not collected.
      */
     clonable_ptr<SupplementalStatsMap> supplementalStatsMap;
+
+    /**
+     * Metrics related to writes.
+     */
+    WritesEntry writesStats;
 };
 
 }  // namespace mongo::query_stats

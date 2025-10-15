@@ -1528,30 +1528,36 @@ TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowDoubleTest) {
     SumOfSquaresOverflowTest<double>();
 }
 
-void verifyQueryStatsBSON(QueryStatsEntry& qse,
-                          bool useSubsections = false,
-                          long long lastExecutionMicros = 0LL,
-                          long long execCount = 0LL,
-                          BSONObj hasSortStage = boolMetricBson(0, 0),
-                          BSONObj usedDisk = boolMetricBson(0, 0)) {
+struct QueryStatsBSONParams {
+    bool useSubsections = false;
+    bool includeWriteMetrics = false;
+    long long lastExecutionMicros = 0LL;
+    long long execCount = 0LL;
+    BSONObj hasSortStage = boolMetricBson(0, 0);
+    BSONObj usedDisk = boolMetricBson(0, 0);
+    BSONObj nMatched = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj nModified = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+};
+
+void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& params = {}) {
     const BSONObj emptyIntMetric = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObjBuilder testBuilder{};
-    testBuilder.appendNumber("lastExecutionMicros", lastExecutionMicros)
-        .appendNumber("execCount", execCount)
+    testBuilder.appendNumber("lastExecutionMicros", params.lastExecutionMicros)
+        .appendNumber("execCount", params.execCount)
         .append("totalExecMicros", emptyIntMetric)
         .append("cpuNanos", emptyIntMetric)
         .append("workingTimeMillis", emptyIntMetric);
 
     BSONObjBuilder* subsectionBuilder = &testBuilder;
     BSONObjBuilder cursorSection{};
-    if (useSubsections) {
+    if (params.useSubsections) {
         subsectionBuilder = &cursorSection;
     }
 
     subsectionBuilder->append("firstResponseExecMicros", emptyIntMetric);
 
     BSONObjBuilder queryExecSection{};
-    if (useSubsections) {
+    if (params.useSubsections) {
         testBuilder.append("cursor", subsectionBuilder->obj());
         subsectionBuilder = &queryExecSection;
     }
@@ -1568,24 +1574,38 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse,
         .append("overdueInterruptApproxMaxMillis", emptyIntMetric);
 
     BSONObjBuilder queryPlannerSection{};
-    if (useSubsections) {
+    if (params.useSubsections) {
         testBuilder.append("queryExec", subsectionBuilder->obj());
         subsectionBuilder = &queryPlannerSection;
     }
 
-    subsectionBuilder->append("hasSortStage", hasSortStage)
-        .append("usedDisk", usedDisk)
+    subsectionBuilder->append("hasSortStage", params.hasSortStage)
+        .append("usedDisk", params.usedDisk)
         .append("fromMultiPlanner", boolMetricBson(0, 0))
         .append("fromPlanCache", boolMetricBson(0, 0));
 
-    if (useSubsections) {
+    if (params.useSubsections) {
         testBuilder.append("queryPlanner", subsectionBuilder->obj());
+    }
+
+    // TODO SERVER-109623 Remove includeWriteMetrics once all versions support the new write
+    // metrics.
+    if (params.includeWriteMetrics) {
+        BSONObjBuilder writeSection{};
+        writeSection.append("nMatched", params.nMatched)
+            .append("nUpserted", emptyIntMetric)
+            .append("nModified", params.nModified)
+            .append("nDeleted", emptyIntMetric)
+            .append("nInserted", emptyIntMetric);
+
+        testBuilder.append("writes", writeSection.obj());
     }
 
     testBuilder.append("firstSeenTimestamp", qse.firstSeenTimestamp)
         .append("latestSeenTimestamp", Date_t());
 
-    ASSERT_BSONOBJ_EQ(qse.toBSON(useSubsections), testBuilder.obj());
+    ASSERT_BSONOBJ_EQ(qse.toBSON(params.useSubsections, params.includeWriteMetrics),
+                      testBuilder.obj());
 }
 
 TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
@@ -1614,38 +1634,50 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
         };
         auto query1 = BSON("query" << 1 << "xEquals" << 42);
 
-        // Collect some metrics
+        // Collect some metrics.
         {
             auto metrics = collectMetricsBase(query1);
             metrics->execCount += 1;
             metrics->lastExecutionMicros += 123456;
         }
 
-        // Verify the serialization works correctly
+        // Verify the serialization works correctly.
         {
             auto qse = getMetrics(query1);
-            verifyQueryStatsBSON(
-                qse, useSubsections, 123456LL /* lastExecutionMicros */, 1LL /* execCount */);
+            verifyQueryStatsBSON(qse,
+                                 {
+                                     .useSubsections = useSubsections,
+                                     .includeWriteMetrics = false,
+                                     .lastExecutionMicros = 123456LL,
+                                     .execCount = 1LL,
+                                 });
         }
 
-        // Collect some metrics again but with booleans
+        // Collect some metrics again but with booleans and write metrics.
         {
             auto metrics = collectMetricsBase(query1);
             metrics->execCount += 1;
             metrics->lastExecutionMicros += 123456;
             metrics->queryPlannerStats.usedDisk.aggregate(true);
             metrics->queryPlannerStats.hasSortStage.aggregate(false);
+            metrics->writesStats.nMatched.aggregate(1);
+            metrics->writesStats.nModified.aggregate(1);
         }
 
-        // With some boolean metrics
+        // With some boolean and write metrics.
         {
             auto qse2 = getMetrics(query1);
             verifyQueryStatsBSON(qse2,
-                                 useSubsections,
-                                 246912LL /* lastExecutionMicros */,
-                                 2LL /* execCount */,
-                                 boolMetricBson(0, 1) /* hasSortStage */,
-                                 boolMetricBson(1, 0) /* usedDisk */);
+                                 {
+                                     .useSubsections = useSubsections,
+                                     .includeWriteMetrics = true,
+                                     .lastExecutionMicros = 246912LL,
+                                     .execCount = 2LL,
+                                     .hasSortStage = boolMetricBson(0, 1),
+                                     .usedDisk = boolMetricBson(1, 0),
+                                     .nMatched = intMetricBson(1, 1, 1, 1),
+                                     .nModified = intMetricBson(1, 1, 1, 1),
+                                 });
         }
     }
 }

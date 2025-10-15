@@ -287,6 +287,14 @@ void updateQueryPlannerStatistics(QueryPlannerEntry& queryPlannerEntryToUpdate,
     queryPlannerEntryToUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
 }
 
+void updateWriteStatistics(WritesEntry& writeEntryToUpdate, const QueryStatsSnapshot& snapshot) {
+    writeEntryToUpdate.nMatched.aggregate(snapshot.nMatched);
+    writeEntryToUpdate.nUpserted.aggregate(snapshot.nUpserted);
+    writeEntryToUpdate.nModified.aggregate(snapshot.nModified);
+    writeEntryToUpdate.nDeleted.aggregate(snapshot.nDeleted);
+    writeEntryToUpdate.nInserted.aggregate(snapshot.nInserted);
+}
+
 void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
                       QueryStatsEntry& toUpdate,
                       const QueryStatsSnapshot& snapshot,
@@ -301,6 +309,7 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     updateCursorStatistics(toUpdate.cursorStats, snapshot);
     updateQueryExecStatistics(toUpdate.queryExecStats, snapshot);
     updateQueryPlannerStatistics(toUpdate.queryPlannerStats, snapshot);
+    updateWriteStatistics(toUpdate.writesStats, snapshot);
 
     for (auto& supplementalStatsEntry : supplementalStats) {
         toUpdate.addSupplementalStats(std::move(supplementalStatsEntry));
@@ -477,6 +486,11 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         metrics.usedDisk,
         metrics.fromMultiPlanner,
         metrics.fromPlanCache.value_or(false),
+        static_cast<uint64_t>(metrics.nMatched.value_or(0)),
+        static_cast<uint64_t>(metrics.nUpserted.value_or(0)),
+        static_cast<uint64_t>(metrics.nModified.value_or(0)),
+        static_cast<uint64_t>(metrics.ndeleted.value_or(0)),
+        static_cast<uint64_t>(metrics.ninserted.value_or(0)),
     };
 
     return snapshot;

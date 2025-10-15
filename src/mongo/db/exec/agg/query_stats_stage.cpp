@@ -190,13 +190,20 @@ boost::optional<Document> QueryStatsStage::toDocument(
                       "queryStatsFailToReparseQueryShape fail point is enabled");
         }
 
+        bool includeWriteMetrics =
+            feature_flags::gFeatureFlagQueryStatsUpdateCommand
+                .isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(pExpCtx->getOperationContext()),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         bool useQueryStatsWithSubsectionsFormat =
             feature_flags::gFeatureFlagQueryStatsMetricsSubsections.isEnabled();
-        return Document{{"key", std::move(queryStatsKey)},
-                        {"keyHash", keyHash},
-                        {"queryShapeHash", queryShapeHash},
-                        {"metrics", queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat)},
-                        {"asOf", partitionReadTime}};
+        return Document{
+            {"key", std::move(queryStatsKey)},
+            {"keyHash", keyHash},
+            {"queryShapeHash", queryShapeHash},
+            {"metrics",
+             queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat, includeWriteMetrics)},
+            {"asOf", partitionReadTime}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();
         const auto& hash = absl::HashOf(key);

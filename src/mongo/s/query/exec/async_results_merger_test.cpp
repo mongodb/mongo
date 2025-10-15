@@ -3363,8 +3363,12 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               true /* fromMultiPlanner */,
                               true /* fromPlanCache */,
                               37 /*cpuNanos */,
-                              3 /* numInterruptChecks */
-        );
+                              3 /* numInterruptChecks */,
+                              1 /* nMatched */,
+                              0 /* nUpserted */,
+                              1 /* nModified */,
+                              0 /* nDeleted */,
+                              0 /* nInserted */);
         metrics.setDelinquentAcquisitions(3);
         metrics.setTotalAcquisitionDelinquencyMillis(100);
         metrics.setMaxAcquisitionDelinquencyMillis(80);
@@ -3396,6 +3400,11 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquency, Milliseconds(80));
         ASSERT_EQ(remoteMetrics.numInterruptChecks, 3);
         ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(100));
+        ASSERT_EQ(remoteMetrics.nMatched, 1);
+        ASSERT_EQ(remoteMetrics.nUpserted, 0);
+        ASSERT_EQ(remoteMetrics.nModified, 1);
+        ASSERT_EQ(remoteMetrics.nDeleted, 0);
+        ASSERT_EQ(remoteMetrics.nInserted, 0);
     }
 
     // Schedule a second response.
@@ -3410,8 +3419,12 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               true /* fromMultiPlanner */,
                               false /* fromPlanCache */,
                               121 /*cpuNanos */,
-                              2 /* numInterruptChecks */
-        );
+                              2 /* numInterruptChecks */,
+                              2 /* nMatched */,
+                              1 /* nUpserted */,
+                              2 /* nModified */,
+                              1 /* nDeleted */,
+                              1 /* nInserted */);
         metrics.setDelinquentAcquisitions(2);
         metrics.setTotalAcquisitionDelinquencyMillis(150);
         metrics.setMaxAcquisitionDelinquencyMillis(120);
@@ -3441,6 +3454,11 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquency, Milliseconds(120));
         ASSERT_EQ(remoteMetrics.numInterruptChecks, 5);
         ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(200));
+        ASSERT_EQ(remoteMetrics.nMatched, 3);
+        ASSERT_EQ(remoteMetrics.nUpserted, 1);
+        ASSERT_EQ(remoteMetrics.nModified, 3);
+        ASSERT_EQ(remoteMetrics.nDeleted, 1);
+        ASSERT_EQ(remoteMetrics.nInserted, 1);
     }
 
     {
@@ -3459,6 +3477,11 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquency, Milliseconds(0));
         ASSERT_EQ(remoteMetrics.numInterruptChecks, 0);
         ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(0));
+        ASSERT_EQ(remoteMetrics.nMatched, 0);
+        ASSERT_EQ(remoteMetrics.nUpserted, 0);
+        ASSERT_EQ(remoteMetrics.nModified, 0);
+        ASSERT_EQ(remoteMetrics.nDeleted, 0);
+        ASSERT_EQ(remoteMetrics.nInserted, 0);
     }
 
     // Read the EOF

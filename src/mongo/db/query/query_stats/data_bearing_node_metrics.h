@@ -63,6 +63,12 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     bool fromMultiPlanner : 1 = false;
     bool fromPlanCache : 1 = true;
 
+    uint64_t nMatched = 0;
+    uint64_t nUpserted = 0;
+    uint64_t nModified = 0;
+    uint64_t nDeleted = 0;
+    uint64_t nInserted = 0;
+
     /**
      * Adds the fields from the given object into the fields of this object using addition (in the
      * case of numeric metrics) or conjunction/disjunction (in the case of boolean metrics).
@@ -85,6 +91,11 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         usedDisk = usedDisk || other.usedDisk;
         fromMultiPlanner = fromMultiPlanner || other.fromMultiPlanner;
         fromPlanCache = fromPlanCache && other.fromPlanCache;
+        nMatched += other.nMatched;
+        nUpserted += other.nUpserted;
+        nModified += other.nModified;
+        nDeleted += other.nDeleted;
+        nInserted += other.nInserted;
     }
 
     void add(const boost::optional<DataBearingNodeMetrics>& other) {
@@ -115,6 +126,11 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         usedDisk = usedDisk || metrics.getUsedDisk();
         fromMultiPlanner = fromMultiPlanner || metrics.getFromMultiPlanner();
         fromPlanCache = fromPlanCache && metrics.getFromPlanCache();
+        nMatched += metrics.getNMatched();
+        nUpserted += metrics.getNUpserted();
+        nModified += metrics.getNModified();
+        nDeleted += metrics.getNDeleted();
+        nInserted += metrics.getNInserted();
     }
 };
 

@@ -280,6 +280,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.maxAcquisitionDelinquency = Milliseconds(300);
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
+    additiveMetrics.nMatched = 1;
+    additiveMetrics.nUpserted = 0;
+    additiveMetrics.nModified = 1;
+    additiveMetrics.ndeleted = 0;
+    additiveMetrics.ninserted = 0;
+
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -291,7 +297,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
                                 9 /* cpuNanos */,
-                                3 /* numInterruptChecks */);
+                                3 /* numInterruptChecks */,
+                                1 /* nMatched */,
+                                0 /* nUpserted */,
+                                1 /* nModified */,
+                                0 /* nDeleted */,
+                                0 /* nInserted */);
     cursorMetrics.setDelinquentAcquisitions(3);
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
     cursorMetrics.setMaxAcquisitionDelinquencyMillis(200);
@@ -312,6 +323,11 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquency, Milliseconds(300));
     ASSERT_EQ(*additiveMetrics.numInterruptChecks, 5);
     ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(200));
+    ASSERT_EQ(*additiveMetrics.nMatched, 2);
+    ASSERT_EQ(*additiveMetrics.nUpserted, 0);
+    ASSERT_EQ(*additiveMetrics.nModified, 2);
+    ASSERT_EQ(*additiveMetrics.ndeleted, 0);
+    ASSERT_EQ(*additiveMetrics.ninserted, 0);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
@@ -330,7 +346,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
                                 -1 /* cpuNanos */,
-                                3 /* numInterruptChecks */);
+                                3 /* numInterruptChecks */,
+                                1 /* nMatched */,
+                                0 /* nUpserted */,
+                                1 /* nModified */,
+                                0 /* nDeleted */,
+                                0 /* nInserted */);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
     ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(-2));
@@ -353,7 +374,12 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
                                 10 /* cpuNanos */,
-                                3 /* numInterruptChecks */);
+                                3 /* numInterruptChecks */,
+                                1 /* nMatched */,
+                                0 /* nUpserted */,
+                                1 /* nModified */,
+                                0 /* nDeleted */,
+                                0 /* nInserted */);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 

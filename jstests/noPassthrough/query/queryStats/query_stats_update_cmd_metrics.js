@@ -37,6 +37,19 @@ withQueryStatsEnabled(collName, (coll) => {
     if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "QueryStatsUpdateCommand")) {
         const batch = getQueryStats(testDB.getMongo(), {collName: coll.getName()});
         assert.eq(batch, [], "expect no query stats for update when feature flag is off");
+
+        // Running a non-update command with the feature flag off should still record query stats,
+        // but without write metrics.
+        const countCommandObj = {count: coll.getName(), query: {v: 1000}};
+        assert.commandWorked(testDB.runCommand(countCommandObj));
+        const countEntry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
+        assert.eq(countEntry.key.queryShape.command, "count");
+        assert(
+            !countEntry.metrics.hasOwnProperty("writes"),
+            "Expected no 'writes' field for non-write operation when feature flag is off. " +
+                "Found metrics: " +
+                tojson(countEntry.metrics),
+        );
         return;
     }
 
@@ -50,6 +63,7 @@ withQueryStatsEnabled(collName, (coll) => {
         usedDisk: false,
         fromMultiPlanner: false,
         fromPlanCache: false,
+        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0},
     });
     assertExpectedResults({
         results: firstEntry,
