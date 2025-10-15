@@ -474,6 +474,8 @@ last-continuous:
       ticket: SERVER-95570
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
+    - test_file: jstests/sharding/txn_lookup_hits_migration_conflict_all_colls_local.js
+      ticket: SERVER-107535
     - test_file: jstests/change_streams/events_containing_version_literals.js
       ticket: SERVER-111406
   suites: null
@@ -1007,6 +1009,8 @@ last-lts:
       ticket: SERVER-95570
     - test_file: jstests/aggregation/expressions/reduce_overflow.js
       ticket: SERVER-102364
+    - test_file: jstests/sharding/txn_lookup_hits_migration_conflict_all_colls_local.js
+      ticket: SERVER-107535
     - test_file: jstests/change_streams/events_containing_version_literals.js
       ticket: SERVER-111406
   suites: null

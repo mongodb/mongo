@@ -58,6 +58,8 @@ protected:
         int numAttempts{0};
     };
 
+    void _initTxnRouterIfNeeded(OperationContext* opCtx);
+
     ServiceContext* const _service;
 };
 
@@ -76,6 +78,8 @@ public:
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
+        _initTxnRouterIfNeeded(opCtx);
+
         while (true) {
             auto cdb = _getRoutingInfo(opCtx);
             try {
@@ -170,6 +174,8 @@ private:
     template <typename F>
     auto _routeImpl(OperationContext* opCtx, StringData comment, F&& work) {
         RoutingRetryInfo retryInfo{std::string{comment}};
+        _initTxnRouterIfNeeded(opCtx);
+
         while (true) {
             try {
                 return std::forward<F>(work)();
@@ -198,6 +204,8 @@ public:
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
+        _initTxnRouterIfNeeded(opCtx);
+
         while (true) {
             stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
             for (const auto& nss : _targetedNamespaces) {
