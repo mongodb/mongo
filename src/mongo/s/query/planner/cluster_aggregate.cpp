@@ -184,7 +184,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     boost::optional<UUID> uuid,
     ResolvedNamespaceMap resolvedNamespaces,
     bool hasChangeStream,
-    boost::optional<ExplainOptions::Verbosity> verbosity) {
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    ExpressionContextCollationMatchesDefault collationMatchesDefault) {
 
     std::unique_ptr<CollatorInterface> collation;
     if (!collationObj.isEmpty()) {
@@ -208,6 +209,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                         .inRouter(true)
                         .collUUID(uuid)
                         .canBeRejected(canBeRejected)
+                        .collationMatchesDefault(collationMatchesDefault)
                         .build();
 
     if (!(cri && cri->hasRoutingTable()) && collationObj.isEmpty()) {
@@ -416,8 +418,9 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // collation, and since collectionless aggregations generally run on the 'admin'
     // database, the standard logic would attempt to resolve its non-existent UUID and
     // collation by sending a specious 'listCollections' command to the config servers.
-    auto collationObj = hasChangeStream
-        ? request.getCollation().value_or(BSONObj())
+    auto [collationObj, collationMatchesDefault] = hasChangeStream
+        ? std::pair(request.getCollation().value_or(BSONObj()),
+                    ExpressionContextCollationMatchesDefault::kYes)
         : cluster_aggregation_planner::getCollation(opCtx,
                                                     cri,
                                                     nsStruct.executionNss,
@@ -437,7 +440,8 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                               boost::none /* uuid */,
                               resolveInvolvedNamespaces(involvedNamespaces),
                               hasChangeStream,
-                              verbosity);
+                              verbosity,
+                              collationMatchesDefault);
 
     // If the routing table exists, then the collection is tracked in the router role and we can
     // validate if it is timeseries. If the collection is untracked, this validation will happen in

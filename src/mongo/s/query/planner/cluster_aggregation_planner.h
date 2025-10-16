@@ -75,7 +75,8 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
                                             ClusterClientCursorParams&&);
 
 /**
- *  Returns the collation for aggregation targeting 'nss' with the following semantics:
+ *  Returns the collation and if the collation matches the collection's collation for aggregation
+ * targeting 'nss' with the following semantics:
  *  - Return 'collation' if the aggregation is collectionless.
  *  - If 'nss' is tracked, we return 'collation' if it is non-empty. If it is empty, we return the
  * collection default collation if there is one and the simple collation otherwise.
@@ -88,11 +89,12 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
  * unsharded collections are tracked in the sharding catalog as unsplittable along with their
  * collation.
  */
-BSONObj getCollation(OperationContext* opCtx,
-                     const boost::optional<CollectionRoutingInfo>& cri,
-                     const NamespaceString& nss,
-                     const BSONObj& collation,
-                     bool requiresCollationForParsingUnshardedAggregate);
+std::pair<BSONObj, ExpressionContextCollationMatchesDefault> getCollation(
+    OperationContext* opCtx,
+    const boost::optional<CollectionRoutingInfo>& cri,
+    const NamespaceString& nss,
+    const BSONObj& collation,
+    bool requiresCollationForParsingUnshardedAggregate);
 
 /**
  * This structure contains information for targeting an aggregation pipeline in a sharded cluster.

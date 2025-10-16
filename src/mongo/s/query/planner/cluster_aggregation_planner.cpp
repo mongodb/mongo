@@ -962,33 +962,54 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                    requestQueryStatsFromRemotes);
 }
 
-BSONObj getCollation(OperationContext* opCtx,
-                     const boost::optional<CollectionRoutingInfo>& cri,
-                     const NamespaceString& nss,
-                     const BSONObj& collation,
-                     bool requiresCollationForParsingUnshardedAggregate) {
-    // If this is a collectionless aggregation or if the user specified an explicit collation,
-    // we immediately return the user-defined collation if one exists, or an empty BSONObj
-    // otherwise.
-    if (nss.isCollectionlessAggregateNS() || !collation.isEmpty() || !cri) {
-        return collation;
+std::pair<BSONObj, ExpressionContextCollationMatchesDefault> getCollation(
+    OperationContext* opCtx,
+    const boost::optional<CollectionRoutingInfo>& cri,
+    const NamespaceString& nss,
+    const BSONObj& collation,
+    bool requiresCollationForParsingUnshardedAggregate) {
+
+    // If this is a collectionless aggregation, we immediately return the user-defined collation if
+    // one exists, or an empty BSONObj otherwise.
+    if (nss.isCollectionlessAggregateNS() || !cri) {
+        return {collation, ExpressionContextCollationMatchesDefault::kYes};
     }
 
     // If the target collection is untracked, we will contact the primary shard to discover this
     // information if it is necessary for pipeline parsing. Otherwise, we infer the collation once
     // the command is executed on the primary shard.
     if (!cri->hasRoutingTable()) {
-        return requiresCollationForParsingUnshardedAggregate
-            ? getUntrackedCollectionCollation(opCtx, *cri, nss)
-            : BSONObj();
+        if (!collation.isEmpty()) {
+            return {collation, ExpressionContextCollationMatchesDefault::kNo};
+        }
+        if (requiresCollationForParsingUnshardedAggregate) {
+            return {getUntrackedCollectionCollation(opCtx, *cri, nss),
+                    ExpressionContextCollationMatchesDefault::kYes};
+        }
+        return {BSONObj(), ExpressionContextCollationMatchesDefault::kYes};
     }
 
-    // Return the default collator if one exists, otherwise return the simple collation.
+    // If the collection is tracked and has a collation, check if the user-defined and collection
+    // collation match. Return the collection collation if the user-defined collation is empty.
+    // Return the user-defined collation if the collations do not match
     if (auto defaultCollator = cri->getChunkManager().getDefaultCollator()) {
-        return defaultCollator->getSpec().toBSON();
+        if (collation.isEmpty()) {
+            return {defaultCollator->getSpec().toBSON(),
+                    ExpressionContextCollationMatchesDefault::kYes};
+        }
+        const bool collationsMatch = CollatorInterface::collatorsMatch(
+            defaultCollator, getUserCollator(opCtx, collation).get());
+        return {collation,
+                collationsMatch ? ExpressionContextCollationMatchesDefault::kYes
+                                : ExpressionContextCollationMatchesDefault::kNo};
     }
 
-    return CollationSpec::kSimpleSpec;
+    // There is no collection collation, return the user-defined collation.
+    if (!collation.isEmpty()) {
+        return {collation, ExpressionContextCollationMatchesDefault::kNo};
+    }
+
+    return {CollationSpec::kSimpleSpec, ExpressionContextCollationMatchesDefault::kYes};
 }
 
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,

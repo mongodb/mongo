@@ -111,7 +111,7 @@ auto makeExpressionContext(OperationContext* opCtx,
     // necessary for mapReduce commands because we will always be merging on the _id field. As such,
     // the collection default collation has no impact on the selection of fields to merge on.
     const auto requiresCollationForParsingUnshardedAggregate = false;
-    auto collationObj =
+    auto [collationObj, collationMatchesDefault] =
         cluster_aggregation_planner::getCollation(opCtx,
                                                   cri,
                                                   nss,
@@ -157,6 +157,7 @@ auto makeExpressionContext(OperationContext* opCtx,
             .explain(verbosity)
             .runtimeConstants(runtimeConstants)
             .inRouter(true)
+            .collationMatchesDefault(collationMatchesDefault)
             .build();
     if (!cri.hasRoutingTable() && collationObj.isEmpty()) {
         expCtx->setIgnoreCollator();
