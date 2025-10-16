@@ -36,7 +36,7 @@ def make_task(compile_variant: str, additional_dependencies: set[str], push: str
 
     commands = [
         BuiltInCommand("manifest.load", {}),
-        FunctionCall("git get project and add git tag"),
+        FunctionCall("git get streams project and add git tag"),
         FunctionCall("f_expansions_write"),
         FunctionCall("set up venv"),
         FunctionCall("fetch binaries"),
