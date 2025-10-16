@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/query/stage_builder/sbe/abt/reference_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::stage_builder::abt_lower {
 

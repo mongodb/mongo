@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::stage_builder {
 

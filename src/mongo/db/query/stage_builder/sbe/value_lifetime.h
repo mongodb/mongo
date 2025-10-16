@@ -32,6 +32,7 @@
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::stage_builder {
 

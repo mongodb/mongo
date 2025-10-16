@@ -29,19 +29,9 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/query/algebra/polyvalue.h"
-#include "mongo/db/query/bson_typemask.h"
-#include "mongo/db/query/stage_builder/sbe/abt_defs.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 
-#include <algorithm>
 #include <cstddef>
-#include <cstdint>
-#include <iterator>
-#include <limits>
-#include <numeric>
-
 
 namespace mongo::stage_builder {
 abt::ABT makeVariable(abt::ProjectionName var) {

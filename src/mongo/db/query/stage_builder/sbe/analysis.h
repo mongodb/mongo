@@ -31,11 +31,11 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/util/field_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>

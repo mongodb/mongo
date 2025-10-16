@@ -33,6 +33,7 @@
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <list>

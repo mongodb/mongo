@@ -35,9 +35,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/preallocated_container_pool.h"
@@ -65,9 +63,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/shared_buffer_fragment.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #include <algorithm>
 

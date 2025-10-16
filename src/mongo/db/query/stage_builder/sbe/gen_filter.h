@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/stage_builder/sbe/analysis.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::stage_builder {
 class PlanStageSlots;

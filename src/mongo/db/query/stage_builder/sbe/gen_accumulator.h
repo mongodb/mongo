@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>

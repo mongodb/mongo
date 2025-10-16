@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
+#include "mongo/util/modules.h"
 
 
 namespace mongo::stage_builder::abt_lower {

@@ -30,8 +30,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_coll_scan.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -44,11 +42,9 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 #include <cstddef>
 #include <tuple>

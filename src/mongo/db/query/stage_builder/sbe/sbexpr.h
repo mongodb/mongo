@@ -32,11 +32,10 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
+#include "mongo/util/modules.h"
 
 #include <variant>
 #include <vector>

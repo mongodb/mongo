@@ -39,6 +39,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

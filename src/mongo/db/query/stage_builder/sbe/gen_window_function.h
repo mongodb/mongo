@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/window_function/window_function_statement.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::stage_builder {
 struct WindowOpInfo;

@@ -31,8 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
-
-#include <memory>
+#include "mongo/util/modules.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>

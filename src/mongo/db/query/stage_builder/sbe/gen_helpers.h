@@ -45,13 +45,13 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>

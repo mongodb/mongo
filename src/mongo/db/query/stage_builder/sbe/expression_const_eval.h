@@ -35,6 +35,7 @@
 #include "mongo/db/query/stage_builder/sbe/abt/reference_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <vector>

@@ -29,14 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
-#include "mongo/db/query/stage_builder/sbe/sbexpr.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 #include <vector>

@@ -30,11 +30,6 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/collection_helpers.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
@@ -45,14 +40,12 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
-#include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder/sbe/analysis.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/db/query/stage_builder/stage_builder.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -63,7 +56,6 @@
 #include <string>
 #include <type_traits>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>

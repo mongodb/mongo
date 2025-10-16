@@ -50,14 +50,10 @@
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
-#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
-#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
-#include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
@@ -70,7 +66,6 @@
 #include <iterator>
 #include <limits>
 #include <map>
-#include <numeric>
 #include <stack>
 #include <string>
 #include <utility>

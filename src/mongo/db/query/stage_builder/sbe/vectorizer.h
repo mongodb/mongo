@@ -34,6 +34,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 
