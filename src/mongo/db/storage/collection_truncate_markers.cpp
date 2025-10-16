@@ -236,6 +236,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
                   "Collection scanning progress",
                   "uuid"_attr = collectionIterator.getRecordStore()->uuid(),
                   "completed"_attr = numRecords,
+                  "scanned kb"_attr = dataSize / 1024,
+                  "markers"_attr = markers.size(),
                   "total"_attr = numRecordsTotal);
             lastProgressTimer.reset();
         }
