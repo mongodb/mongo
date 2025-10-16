@@ -7,6 +7,8 @@
  *  requires_sharding,
  *  uses_transactions,
  *  assumes_stable_shard_list,
+ *  # TODO (SERVER-103880) Remove this tag once getMore is supported in stepdown scenarios.
+ *  requires_getmore,
  * ]
  */
 

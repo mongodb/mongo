@@ -10,6 +10,8 @@
  *   # In a multitenancy environment the catalog will always return tenant-prefixed entries, and the
  *   # override we use in the multitenancy suites hecks for the absence of this prefix.
  *   simulate_mongoq_incompatible,
+ *   # TODO (SERVER-103880) Remove this tag once getMore is supported in stepdown scenarios.
+ *   requires_getmore,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
