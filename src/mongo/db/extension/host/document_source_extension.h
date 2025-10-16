@@ -40,6 +40,7 @@ namespace mongo::extension {
 class DocumentSourceExtensionTest;
 
 namespace host {
+using LiteParsedList = std::list<std::unique_ptr<LiteParsedDocumentSource>>;
 
 /**
  * A DocumentSource implementation for an extension aggregation stage. DocumentSourceExtension is a
@@ -53,6 +54,8 @@ public:
      */
     class LiteParsedExpandable : public LiteParsedDocumentSource {
     public:
+        inline static constexpr int kMaxExpansionDepth = 10;
+
         static std::unique_ptr<LiteParsedDocumentSource> parse(
             host_connector::AggStageDescriptorHandle descriptor,
             const NamespaceString& nss,
@@ -77,7 +80,7 @@ public:
         /**
          * Return the pre-computed expanded pipeline.
          */
-        const std::list<std::unique_ptr<LiteParsedDocumentSource>>& getExpandedPipeline() const {
+        const LiteParsedList& getExpandedPipeline() const {
             return _expanded;
         }
 
@@ -106,17 +109,40 @@ public:
         }
 
     private:
-        std::list<std::unique_ptr<LiteParsedDocumentSource>> expand() {
-            // TODO SERVER-109558 Implement depth validation and cycle checking.
-            return expandImpl();
-        }
+        /**
+         * Carries per-invocation validation state for recursive expansion performed by
+         * LiteParsedExpandable. The state is instantiated at the top-level expand() and passed by
+         * reference to recursive expandImpl() calls.
+         */
+        struct ExpansionState {
+            // Tracker for the current expansion depth. This is only incremented when expansion
+            // results in an ExtensionParseNode that requires further expansion.
+            int currDepth = 0;
 
-        std::list<std::unique_ptr<LiteParsedDocumentSource>> expandImpl();
+            // Ordered container of stageNames along the current expansion path.
+            std::vector<std::string> expansionPath;
+
+            // Tracker for seen stageNames. Provides O(1) cycle checking.
+            stdx::unordered_set<std::string> seenStages;
+        };
+
+        /**
+         * RAII frame that enforces recursive expansion depth constraints and cycle checking,
+         * unwinding on exit.
+         */
+        class ExpansionValidationFrame;
+
+        LiteParsedList expand();
+        static LiteParsedList expandImpl(
+            const host_connector::AggStageParseNodeHandle& parseNodeHandle,
+            ExpansionState& state,
+            const NamespaceString& nss,
+            const LiteParserOptions& options);
 
         host_connector::AggStageParseNodeHandle _parseNode;
         NamespaceString _nss;
         LiteParserOptions _options;
-        std::list<std::unique_ptr<LiteParsedDocumentSource>> _expanded;
+        LiteParsedList _expanded;
     };
 
     /**

@@ -41,6 +41,7 @@
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::extension {
@@ -568,6 +569,257 @@ TEST_F(DocumentSourceExtensionTest, extensionBaseSucceeds) {
                   extension::sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
     ASSERT_TRUE(init.exprCtx.get() == stagePtr->getExpCtx().get());
     ASSERT_BSONOBJ_EQ(init.rawStage, kValidSpec);
+}
+
+namespace {
+static constexpr std::string_view kDepthLeafName = "$depthLeaf";
+static constexpr std::string_view kAdjCycleName = "$adjacentCycle";
+static constexpr std::string_view kNodeAName = "$nodeA";
+static constexpr std::string_view kNodeBName = "$nodeB";
+static constexpr std::string_view kTopSameNameChildren = "$topSameNameChildren";
+
+// Leaf AST used by several tests
+class DepthLeafAstNode : public sdk::AggStageAstNode {
+public:
+    DepthLeafAstNode() : sdk::AggStageAstNode(kDepthLeafName) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+    }
+};
+
+// Helper to ensure each recursive stage used for depth checking has a unique name.
+static std::string_view makeRecursiveDepthName(int remaining) {
+    static thread_local std::string buf;
+    buf = str::stream() << "$depthChain#" << remaining;
+    return std::string_view{buf.data(), buf.size()};
+}
+
+// Depth chain builder that emits a single recursive child until depth = 0, at which it ends by
+// emitting a leaf AST.
+class DepthChainParseNode : public sdk::AggStageParseNode {
+public:
+    DepthChainParseNode(int remaining)
+        : sdk::AggStageParseNode(makeRecursiveDepthName(remaining)), _remaining(remaining) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> out;
+        out.reserve(1);
+        if (_remaining > 0) {
+            out.emplace_back(new sdk::ExtensionAggStageParseNode(
+                std::make_unique<DepthChainParseNode>(_remaining - 1)));
+        } else {
+            out.emplace_back(
+                new sdk::ExtensionAggStageAstNode(std::make_unique<DepthLeafAstNode>()));
+        }
+        return out;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return {};
+    }
+
+private:
+    int _remaining;
+};
+
+// Adjacent cycle where a stage expands into itself: A -> A
+class AdjacentCycleParseNode : public sdk::AggStageParseNode {
+public:
+    AdjacentCycleParseNode() : sdk::AggStageParseNode(kAdjCycleName) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> out;
+        out.reserve(1);
+        out.emplace_back(
+            new sdk::ExtensionAggStageParseNode(std::make_unique<AdjacentCycleParseNode>()));
+        return out;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return {};
+    }
+};
+
+// Non-adjacent cycle where a stage expands into a stage that then expands into itself: A -> B -> A
+class NodeAParseNode : public sdk::AggStageParseNode {
+public:
+    NodeAParseNode() : sdk::AggStageParseNode(kNodeAName) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<sdk::VariantNode> expand() const override;
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return {};
+    }
+};
+
+class NodeBParseNode : public sdk::AggStageParseNode {
+public:
+    NodeBParseNode() : sdk::AggStageParseNode(kNodeBName) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<sdk::VariantNode> expand() const override;
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return {};
+    }
+};
+
+std::vector<sdk::VariantNode> NodeAParseNode::expand() const {
+    std::vector<sdk::VariantNode> out;
+    out.reserve(1);
+    out.emplace_back(new sdk::ExtensionAggStageParseNode(std::make_unique<NodeBParseNode>()));
+    return out;
+}
+
+std::vector<sdk::VariantNode> NodeBParseNode::expand() const {
+    std::vector<sdk::VariantNode> out;
+    out.reserve(1);
+    out.emplace_back(new sdk::ExtensionAggStageParseNode(std::make_unique<NodeAParseNode>()));
+    return out;
+}
+
+// Expands into siblings with the same stage name. They are expanded on separate paths, so this must
+// succeed.
+class TopSameNameChildrenParseNode : public sdk::AggStageParseNode {
+public:
+    TopSameNameChildrenParseNode() : sdk::AggStageParseNode(kTopSameNameChildren) {}
+
+    size_t getExpandedSize() const override {
+        return 2;
+    }
+
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> out;
+        out.reserve(2);
+        out.emplace_back(new sdk::ExtensionAggStageParseNode(
+            std::make_unique<sdk::shared_test_stages::NoOpAggStageParseNode>()));
+        out.emplace_back(new sdk::ExtensionAggStageParseNode(
+            std::make_unique<sdk::shared_test_stages::NoOpAggStageParseNode>()));
+        return out;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return {};
+    }
+};
+}  // namespace
+
+TEST_F(DocumentSourceExtensionTest, ExpandToMaxDepthSucceeds) {
+    // Chain length 10 -> exactly hits kMaxExpansionDepth (default 10) on deepest frame.
+    auto depth = host::DocumentSourceExtension::LiteParsedExpandable::kMaxExpansionDepth;
+    auto* rootParseNode =
+        new sdk::ExtensionAggStageParseNode(std::make_unique<DepthChainParseNode>(depth));
+    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+
+    host::DocumentSourceExtension::LiteParsedExpandable lp(
+        std::string(makeRecursiveDepthName(depth)),
+        std::move(rootHandle),
+        _nss,
+        LiteParserOptions{});
+
+    const auto& expanded = lp.getExpandedPipeline();
+    // Final expansion produces exactly one AST leaf.
+    ASSERT_EQUALS(expanded.size(), 1);
+    auto* leaf =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
+    ASSERT_TRUE(leaf != nullptr);
+    ASSERT_EQ(leaf->getParseTimeName(), std::string(kDepthLeafName));
+}
+
+DEATH_TEST_F(DocumentSourceExtensionTest, ExpandExceedsMaxDepthFails, "10955800") {
+    auto depth = host::DocumentSourceExtension::LiteParsedExpandable::kMaxExpansionDepth + 1;
+    auto* rootParseNode =
+        new sdk::ExtensionAggStageParseNode(std::make_unique<DepthChainParseNode>(depth));
+    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+
+    [[maybe_unused]] host::DocumentSourceExtension::LiteParsedExpandable lp(
+        std::string(makeRecursiveDepthName(depth)),
+        std::move(rootHandle),
+        _nss,
+        LiteParserOptions{});
+}
+
+TEST_F(DocumentSourceExtensionTest, ExpandAdjacentCycleFails) {
+    auto* rootParseNode =
+        new sdk::ExtensionAggStageParseNode(std::make_unique<AdjacentCycleParseNode>());
+    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+
+    ASSERT_THROWS_WITH_CHECK(
+        [&] {
+            [[maybe_unused]] host::DocumentSourceExtension::LiteParsedExpandable lp(
+                std::string(kAdjCycleName), std::move(rootHandle), _nss, LiteParserOptions{});
+        }(),
+        AssertionException,
+        [](const AssertionException& ex) {
+            ASSERT_EQ(ex.code(), 10955801);
+            ASSERT_STRING_CONTAINS(ex.reason(),
+                                   str::stream()
+                                       << "Cycle detected during stage expansion for stage "
+                                       << std::string(kAdjCycleName));
+            ASSERT_STRING_CONTAINS(ex.reason(), "$adjacentCycle -> $adjacentCycle");
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+}
+
+TEST_F(DocumentSourceExtensionTest, ExpandNonAdjacentCycleFails) {
+    auto* rootParseNode = new sdk::ExtensionAggStageParseNode(std::make_unique<NodeAParseNode>());
+    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+
+    ASSERT_THROWS_WITH_CHECK(
+        [&] {
+            [[maybe_unused]] host::DocumentSourceExtension::LiteParsedExpandable lp(
+                std::string(kNodeAName), std::move(rootHandle), _nss, LiteParserOptions{});
+        }(),
+        AssertionException,
+        [](const AssertionException& ex) {
+            ASSERT_EQ(ex.code(), 10955801);
+            ASSERT_STRING_CONTAINS(ex.reason(),
+                                   str::stream()
+                                       << "Cycle detected during stage expansion for stage "
+                                       << std::string(kNodeBName));
+            ASSERT_STRING_CONTAINS(ex.reason(), "$nodeB -> $nodeA -> $nodeB");
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+}
+
+TEST_F(DocumentSourceExtensionTest, ExpandSameStageOnDifferentBranchesSucceeds) {
+    auto* rootParseNode =
+        new sdk::ExtensionAggStageParseNode(std::make_unique<TopSameNameChildrenParseNode>());
+    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+
+    host::DocumentSourceExtension::LiteParsedExpandable lp(
+        std::string(kTopSameNameChildren), std::move(rootHandle), _nss, LiteParserOptions{});
+
+    const auto& expanded = lp.getExpandedPipeline();
+    ASSERT_EQUALS(expanded.size(), 2);
+
+    auto it0 = expanded.begin();
+    auto it1 = std::next(expanded.begin(), 1);
+
+    auto* first = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it0->get());
+    auto* second = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it1->get());
+    ASSERT_TRUE(first != nullptr);
+    ASSERT_TRUE(second != nullptr);
+
+    // Both leaves are the NoOp leaf from NoOpAggStageParseNode.
+    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
+    ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
 }
 
 }  // namespace mongo::extension
