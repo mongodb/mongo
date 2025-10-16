@@ -18,6 +18,7 @@ mongo_cc_library(
         "byte_buf.h",
         "byte_buf_utils.h",
         "extension_status.h",
+        "get_next_result.h",
     ],
     deps = [
         "//src/mongo:base",

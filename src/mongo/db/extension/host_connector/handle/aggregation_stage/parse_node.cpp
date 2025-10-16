@@ -29,7 +29,6 @@
 #include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
 
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
-#include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/fail_point.h"

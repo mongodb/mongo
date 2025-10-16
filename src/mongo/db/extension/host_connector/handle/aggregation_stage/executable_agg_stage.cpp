@@ -26,51 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/executable_agg_stage.h"
 
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/logical.h"
-#include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/shared/byte_buf_utils.h"
-#include "mongo/db/extension/shared/handle/handle.h"
-#include "mongo/util/modules.h"
-
-#include <absl/base/nullability.h>
+#include "mongo/db/extension/shared/extension_status.h"
 
 namespace mongo::extension::host_connector {
 
-/**
- * AggStageAstNodeHandle is an owned handle wrapper around a
- * MongoExtensionAggStageAstNode.
- */
-class AggStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggStageAstNode> {
-public:
-    AggStageAstNodeHandle(::MongoExtensionAggStageAstNode* ptr)
-        : OwnedHandle<::MongoExtensionAggStageAstNode>(ptr) {
-        _assertValidVTable();
-    }
+ExtensionGetNextResult ExecAggStageHandle::getNext() {
+    ::MongoExtensionGetNextResult result{};
+    invokeCAndConvertStatusToException([&]() { return vtable().get_next(get(), &result); });
 
-    /**
-     * Returns a StringData containing the name of this aggregation stage.
-     */
-    StringData getName() const {
-        auto stringView = byteViewAsStringView(vtable().get_name(get()));
-        return StringData{stringView.data(), stringView.size()};
-    }
+    return convertCRepresentationToGetNextResult(&result);
+}
 
-    /**
-     * Returns a logical stage with the stage's runtime implementation of the optimization
-     * interface.
-     *
-     * On success, the logical stage is returned and belongs to the caller.
-     * On failure, the error triggers an assertion.
-     *
-     */
-    LogicalAggStageHandle bind() const;
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
-        tassert(11113700, "AggStageAstNode 'bind' is null", vtable.bind != nullptr);
-    }
-};
 }  // namespace mongo::extension::host_connector

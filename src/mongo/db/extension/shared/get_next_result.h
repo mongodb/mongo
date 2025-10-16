@@ -28,49 +28,34 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/logical.h"
-#include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/shared/byte_buf_utils.h"
-#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
-#include <absl/base/nullability.h>
-
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
 /**
- * AggStageAstNodeHandle is an owned handle wrapper around a
- * MongoExtensionAggStageAstNode.
+ * GetNextCode contains all possible ::MongoExtensionGetNextResultCode values.
  */
-class AggStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggStageAstNode> {
-public:
-    AggStageAstNodeHandle(::MongoExtensionAggStageAstNode* ptr)
-        : OwnedHandle<::MongoExtensionAggStageAstNode>(ptr) {
-        _assertValidVTable();
+enum class GetNextCode { kAdvanced, kEOF, kPauseExecution };
+
+/**
+ * ExtensionGetNextResult contains methods to set the state of the ExtensionGetNextResult to reflect
+ * that of an advanced, paused execution, or eof state. Wrapper for a getNext() result that maps to
+ * an ExtensionGetNextResult.
+ */
+struct ExtensionGetNextResult {
+    GetNextCode code;
+    boost::optional<BSONObj> res;
+
+    static ExtensionGetNextResult advanced(BSONObj obj) {
+        return {GetNextCode::kAdvanced, boost::optional<BSONObj>(std::move(obj))};
     }
-
-    /**
-     * Returns a StringData containing the name of this aggregation stage.
-     */
-    StringData getName() const {
-        auto stringView = byteViewAsStringView(vtable().get_name(get()));
-        return StringData{stringView.data(), stringView.size()};
+    static ExtensionGetNextResult pauseExecution() {
+        return {GetNextCode::kPauseExecution, boost::none};
     }
-
-    /**
-     * Returns a logical stage with the stage's runtime implementation of the optimization
-     * interface.
-     *
-     * On success, the logical stage is returned and belongs to the caller.
-     * On failure, the error triggers an assertion.
-     *
-     */
-    LogicalAggStageHandle bind() const;
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
-        tassert(11113700, "AggStageAstNode 'bind' is null", vtable.bind != nullptr);
+    static ExtensionGetNextResult eof() {
+        return {GetNextCode::kEOF, boost::none};
     }
 };
-}  // namespace mongo::extension::host_connector
+
+}  // namespace mongo::extension

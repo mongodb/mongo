@@ -109,7 +109,7 @@ TEST(HostAstNodeTest, IsNotHostAllocated) {
     ASSERT_FALSE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
 }
 
-DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217601") {
+DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsGetName, "11217601") {
     auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
     auto handle = TestHostAstNodeVTableHandle{noOpAstNode.release()};
 
@@ -118,7 +118,7 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsGetName, "1121760
     handle.assertVTableConstraints(vtable);
 }
 
-DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsBind, "11113700") {
+DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsBind, "11113700") {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
         std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
             "$_internalSearchIdLookup", BSONObj())));
@@ -128,6 +128,7 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidParseNodeVTableFailsBind, "11113700")
     vtable.bind = nullptr;
     handle.assertVTableConstraints(vtable);
 }
+
 
 DEATH_TEST(HostAstNodeTest, HostBindUnimplemented, "11133600") {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));

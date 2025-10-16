@@ -78,15 +78,14 @@ public:
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(
-            11217600, "ExtensionAggStageParseNode 'get_name' is null", vtable.get_name != nullptr);
-        tassert(10977601,
-                "ExtensionAggStageParseNode 'get_query_shape' is null",
+        tassert(11217600, "AggStageParseNode 'get_name' is null", vtable.get_name != nullptr);
+        tassert(10977600,
+                "AggStageParseNode 'get_query_shape' is null",
                 vtable.get_query_shape != nullptr);
         tassert(11113800,
-                "ExtensionAggStageParseNode 'get_expanded_size' is null",
+                "AggStageParseNode 'get_expanded_size' is null",
                 vtable.get_expanded_size != nullptr);
-        tassert(10977602, "ExtensionAggStageParseNode 'expand' is null", vtable.expand != nullptr);
+        tassert(10977601, "AggStageParseNode 'expand' is null", vtable.expand != nullptr);
     }
 
 private:
@@ -98,5 +97,4 @@ private:
         return vtable().get_expanded_size(get());
     }
 };
-
 }  // namespace mongo::extension::host_connector

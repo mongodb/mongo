@@ -34,15 +34,18 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host_connector/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/host_connector/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
+#include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 #include <memory>
 #include <string>
@@ -469,7 +472,7 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217600"
     handle.assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977601") {
+DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
     auto noOpParseNode =
         new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
     auto handle = TestParseNodeVTableHandle{noOpParseNode};
@@ -489,7 +492,7 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "1
     handle.assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602") {
+DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977601") {
     auto noOpParseNode =
         new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
     auto handle = TestParseNodeVTableHandle{noOpParseNode};
@@ -507,15 +510,15 @@ TEST_F(AggStageTest, NoOpAstNodeTest) {
     [[maybe_unused]] auto logicalStageHandle = handle.bind();
 }
 
-DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableGetName, "11217601") {
+DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableFailsGetName, "11217601") {
     auto noOpAstNode =
-        std::make_unique<ExtensionAggStageAstNode>(shared_test_stages::NoOpAggStageAstNode::make());
-    auto handle = TestAstNodeVTableHandle{noOpAstNode.release()};
+        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
+    auto handle = TestAstNodeVTableHandle{noOpAstNode};
 
     auto vtable = handle.vtable();
     vtable.get_name = nullptr;
     handle.assertVTableConstraints(vtable);
-};
+}
 
 DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableBind, "11113700") {
     auto noOpAstNode =
@@ -525,7 +528,7 @@ DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableBind, "11113700") {
     auto vtable = handle.vtable();
     vtable.bind = nullptr;
     handle.assertVTableConstraints(vtable);
-};
+}
 
 class SimpleSerializationLogicalStage : public LogicalAggStage {
 public:
@@ -892,6 +895,191 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
 
     ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
 }
+
+class NoOpExtensionExecAggStage : public extension::sdk::ExecAggStage {
+public:
+    extension::ExtensionGetNextResult getNext() override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<NoOpExtensionExecAggStage>();
+    }
+};
+
+class ValidExtensionExecAggStage : public extension::sdk::ExecAggStage {
+public:
+    extension::ExtensionGetNextResult getNext() override {
+        if (_results.empty()) {
+            return extension::ExtensionGetNextResult::eof();
+        }
+        if (_results.size() == 2) {
+            // The result at the front of the queue is removed so that the size doesn't stay at 2.
+            // This needs to be done so that the EOF case can be tested. Note that the behavior of
+            // removing from the results queue for a "pause execution" state does not accurately
+            // represent a "paused execution" state in a getNext() function.
+            _results.pop_front();
+            return extension::ExtensionGetNextResult::pauseExecution();
+        } else {
+            auto result = extension::ExtensionGetNextResult::advanced(_results.front());
+            _results.pop_front();
+            return result;
+        }
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<ValidExtensionExecAggStage>();
+    }
+
+private:
+    std::deque<BSONObj> _results = {
+        BSON("$meow" << "adithi"), BSON("$meow" << "josh"), BSON("$meow" << "cedric")};
+};
+
+class InvalidExtensionExecAggStageAdvancedState : public extension::sdk::ExecAggStage {
+public:
+    extension::ExtensionGetNextResult getNext() override {
+        return {.code = extension::GetNextCode::kAdvanced, .res = boost::none};
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<InvalidExtensionExecAggStageAdvancedState>();
+    }
+
+private:
+    std::deque<BSONObj> _results = {};
+};
+
+class InvalidExtensionExecAggStagePauseExecutionState : public extension::sdk::ExecAggStage {
+public:
+    extension::ExtensionGetNextResult getNext() override {
+        return {.code = extension::GetNextCode::kPauseExecution,
+                .res = boost::make_optional(BSON("$dog" << "I should not exist"))};
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<InvalidExtensionExecAggStagePauseExecutionState>();
+    }
+
+private:
+    std::deque<BSONObj> _results = {};
+};
+
+class InvalidExtensionExecAggStageEofState : public extension::sdk::ExecAggStage {
+public:
+    extension::ExtensionGetNextResult getNext() override {
+        return {.code = extension::GetNextCode::kEOF,
+                .res = boost::make_optional(BSON("$dog" << "I should not exist"))};
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<InvalidExtensionExecAggStageEofState>();
+    }
+
+private:
+    std::deque<BSONObj> _results = {};
+};
+
+class InvalidExtensionExecAggStageGetNextCode : public extension::sdk::ExecAggStage {
+public:
+    extension::ExtensionGetNextResult getNext() override {
+        return {.code = static_cast<const GetNextCode>(10), .res = boost::none};
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<InvalidExtensionExecAggStageGetNextCode>();
+    }
+
+private:
+    std::deque<BSONObj> _results = {};
+};
+
+class ExecAggStageVTableTest : public unittest::Test {
+public:
+    // This special handle class is only used within this fixture so that we can unit test the
+    // assertVTableConstraints functionality of the handle.
+    class TestExecAggStageVTableHandle : public extension::host_connector::ExecAggStageHandle {
+    public:
+        TestExecAggStageVTableHandle(absl::Nonnull<::MongoExtensionExecAggStage*> execAggStage)
+            : extension::host_connector::ExecAggStageHandle(execAggStage) {};
+
+        void assertVTableConstraints(const VTable_t& vtable) {
+            _assertVTableConstraints(vtable);
+        }
+    };
+};
+
+DEATH_TEST_F(ExecAggStageVTableTest, InvalidExecAggStageVTableFailsGetNext, "10956800") {
+    auto noOpExecAggStage =
+        new extension::sdk::ExtensionExecAggStage(NoOpExtensionExecAggStage::make());
+    auto handle = TestExecAggStageVTableHandle{noOpExecAggStage};
+
+    auto vtable = handle.vtable();
+    vtable.get_next = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
+
+TEST(AggregationStageTest, ValidExecAggStageVTableGetNextSucceeds) {
+    auto validExecAggStage =
+        new extension::sdk::ExtensionExecAggStage(ValidExtensionExecAggStage::make());
+    auto handle = extension::host_connector::ExecAggStageHandle{validExecAggStage};
+
+    auto getNext = handle.getNext();
+    ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+    ASSERT_BSONOBJ_EQ(BSON("$meow" << "adithi"), getNext.res.get());
+
+    getNext = handle.getNext();
+    ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
+    ASSERT_EQ(boost::none, getNext.res);
+
+    getNext = handle.getNext();
+    ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+    ASSERT_BSONOBJ_EQ(BSON("$meow" << "cedric"), getNext.res.get());
+
+    getNext = handle.getNext();
+    ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
+    ASSERT_EQ(boost::none, getNext.res);
+};
+
+DEATH_TEST_F(AggStageTest, InvalidExtensionGetNextResultAdvanced, "10956801") {
+    auto invalidExtensionExecAggStageAdvancedState = new extension::sdk::ExtensionExecAggStage(
+        InvalidExtensionExecAggStageAdvancedState::make());
+    auto handle =
+        extension::host_connector::ExecAggStageHandle{invalidExtensionExecAggStageAdvancedState};
+    [[maybe_unused]] auto getNext = handle.getNext();
+};
+
+DEATH_TEST_F(AggStageTest, InvalidExtensionGetNextResultPauseExecution, "10956802") {
+    auto invalidExtensionExecAggStagePauseExecutionState =
+        new extension::sdk::ExtensionExecAggStage(
+            InvalidExtensionExecAggStagePauseExecutionState::make());
+    auto handle = extension::host_connector::ExecAggStageHandle{
+        invalidExtensionExecAggStagePauseExecutionState};
+    [[maybe_unused]] auto getNext = handle.getNext();
+};
+
+DEATH_TEST_F(AggStageTest, InvalidExtensionGetNextResultEOF, "10956805") {
+    auto invalidExtensionExecAggStageEofState =
+        new extension::sdk::ExtensionExecAggStage(InvalidExtensionExecAggStageEofState::make());
+    auto handle =
+        extension::host_connector::ExecAggStageHandle{invalidExtensionExecAggStageEofState};
+    [[maybe_unused]] auto getNext = handle.getNext();
+};
+
+DEATH_TEST_F(AggStageTest, InvalidMongoExtensionGetNextResultCode, "10956803") {
+    ::MongoExtensionGetNextResult result = {
+        .code = static_cast<::MongoExtensionGetNextResultCode>(10), .result = nullptr};
+    [[maybe_unused]] auto converted =
+        extension::host_connector::convertCRepresentationToGetNextResult(&result);
+};
+
+DEATH_TEST_F(AggStageTest, InvalidGetNextCode, "10956804") {
+    auto invalidExtensionExecAggStageGetNextCode =
+        new extension::sdk::ExtensionExecAggStage(InvalidExtensionExecAggStageGetNextCode::make());
+    auto handle =
+        extension::host_connector::ExecAggStageHandle{invalidExtensionExecAggStageGetNextCode};
+    [[maybe_unused]] auto getNext = handle.getNext();
+};
 
 }  // namespace
 

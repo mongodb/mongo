@@ -413,6 +413,67 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
 } MongoExtensionAggStageAstNodeVTable;
 
 /**
+ * Code indicating the result of a getNext() call.
+ */
+typedef enum MongoExtensionGetNextResultCode : uint8_t {
+    /**
+     * getNext() yielded a document.
+     */
+    kAdvanced = 0,
+
+    /**
+     * getNext() and the document stream was exhausted. Subsequent calls will not yield any more
+     * documents.
+     */
+    kEOF = 1,
+
+    /**
+     * getNext() did not yield a document, but may yield another document in the future.
+     */
+    kPauseExecution = 2,
+} MongoExtensionGetNextResultCode;
+
+/**
+ * MongoExtensionGetNextResult is a container used to fetch results from an
+ * ExecutableStage's get_next() function. Callers of ExecutableStage::get_next() are responsible for
+ * instantiating this struct and passing the corresponding pointer to the function invocation.
+ */
+typedef struct MongoExtensionGetNextResult {
+    MongoExtensionGetNextResultCode code;
+    MongoExtensionByteBuf* result;
+} MongoExtensionGetNextResult;
+
+/**
+ * MongoExtensionExecAggStage is the abstraction representing the executable phase of
+ * a stage by the extension.
+ */
+typedef struct MongoExtensionExecAggStage {
+    const struct MongoExtensionExecAggStageVTable* const vtable;
+} MongoExtensionExecAggStage;
+
+/**
+ * Virtual function table for MongoExtensionExecAggStage.
+ */
+typedef struct MongoExtensionExecAggStageVTable {
+    /**
+     * Destroys object and frees related resources.
+     */
+    void (*destroy)(MongoExtensionExecAggStage* execAggStage);
+
+    /**
+     * Pulls the next result from the stage executor.
+     * On success:
+     *    - Updates the provided MongoExtensionGetNextResult with a result code
+     *      indicating whether or not a document has been returned by the function.
+     *    - If the result code indicates a document is available, populates
+     *      MongoExtensionGetNextResult's ByteBuf pointer with the resulting document as
+     *      a byte buffer. Ownership of the buffer is transferred to the Host.
+     */
+    MongoExtensionStatus* (*get_next)(MongoExtensionExecAggStage* execAggStage,
+                                      MongoExtensionGetNextResult* getNextResult);
+} MongoExtensionExecAggStageVTable;
+
+/**
  * MongoExtensionHostPortal serves as the entry point for extensions to integrate with the
  * server. It exposes a function pointer, registerStageDescriptor, which allows extensions to
  * register custom aggregation stages.
