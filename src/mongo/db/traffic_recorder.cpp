@@ -34,7 +34,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -44,10 +43,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/platform/atomic_word.h"
@@ -63,16 +60,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <fstream>  // IWYU pragma: keep
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
 
+#include <absl/crc/crc32c.h>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
+#include <fmt/ostream.h>
 
 namespace mongo {
 
@@ -149,11 +146,10 @@ void TrafficRecorder::Recording::run() {
                                                 std::ios_base::app | std::ios_base::out);
 
         // The calculator calculates the checksum of each recording for integrity check.
-        SorterChecksumCalculator checksumCalculator = {SorterChecksumVersion::v2};
-        auto writeChecksum = [&checksumOut, &checksumCalculator](const std::string& recordingFile) {
-            auto checkSumVal = checksumCalculator.hexdigest();
-            checksumOut << recordingFile << "\t" << checkSumVal << std::endl;
-            checksumCalculator.reset();
+        absl::crc32c_t checksum;
+        auto writeChecksum = [&checksumOut, &checksum](const std::string& recordingFile) {
+            fmt::print(checksumOut, "{}\t{:x}\n", recordingFile, static_cast<uint32_t>(checksum));
+            checksum = {};
         };
 
         // This function guarantees to open a new recording file. Force the thread to sleep for
@@ -219,9 +215,10 @@ void TrafficRecorder::Recording::run() {
                     }
 
                     out.write(db.getCursor().data(), db.size());
-                    checksumCalculator.addData(db.getCursor().data(), db.size());
+                    absl::ExtendCrc32c(checksum, {db.getCursor().data(), db.size()});
                     out.write(toWrite.buf(), toWrite.size());
-                    checksumCalculator.addData(toWrite.buf(), toWrite.size());
+                    absl::ExtendCrc32c(checksum,
+                                       {toWrite.buf(), static_cast<size_t>(toWrite.size())});
                 }
             }
         } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
