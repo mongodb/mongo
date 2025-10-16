@@ -53,7 +53,8 @@ double calculateBurstSize(double refreshRate, double burstCapacitySecs) {
 
 }  // namespace
 
-struct RateLimiter::RateLimiterPrivate {
+class RateLimiter::RateLimiterPrivate {
+public:
     RateLimiterPrivate(double r, double b, int64_t m, TickSource* clock, std::string n)
         // Initialize the token bucket with one "burst" of tokens. The third parameter to
         // tokenBucket's constructor ("zeroTime") is interpreted as a number of seconds from the
@@ -68,6 +69,64 @@ struct RateLimiter::RateLimiterPrivate {
           tickSource(clock),
           tokenBucket{r, b, nowInSeconds() - b / r} {}
 
+    /*
+     * Used to protect all calls into the token bucket that do not require modification of the
+     * bucket instance.
+     *
+     * Functions are thin wrappers around correspondingly-named functions in folly/TokenBucket.h.
+     * Please refer to TokenBucket.h for function comments.
+     */
+    class ReadScopedTokenBucket {
+    public:
+        ReadScopedTokenBucket(folly::TokenBucket& tb, WriteRarelyRWMutex& m)
+            : _l(m.readLock()), _tb(tb) {}
+
+        bool consume(double c, double n) {
+            return _tb.consume(c, n);
+        }
+
+        boost::optional<double> consumeWithBorrowNonBlocking(double c, double n) {
+            return _tb.consumeWithBorrowNonBlocking(c, n);
+        }
+
+        double available(double n) {
+            return _tb.available(n);
+        }
+
+        double balance(double n) {
+            return _tb.balance(n);
+        }
+
+        void returnTokens(double tk) {
+            _tb.returnTokens(tk);
+        }
+
+    private:
+        WriteRarelyRWMutex::ReadLock _l;
+        folly::TokenBucket& _tb;
+    };
+
+    /*
+     * Used to protect all calls into the token bucket that require modification of the bucket
+     * instance.
+     *
+     * Functions are thin wrappers around correspondingly-named functions in folly/TokenBucket.h.
+     * Please refer to TokenBucket.h for function comments.
+     */
+    class WriteScopedTokenBucket {
+    public:
+        WriteScopedTokenBucket(folly::TokenBucket& tb, WriteRarelyRWMutex& m)
+            : _l(m.writeLock()), _tb(tb) {}
+
+        void reset(double rt, double b) {
+            _tb.reset(rt, b);
+        }
+
+    private:
+        WriteRarelyRWMutex::WriteLock _l;
+        folly::TokenBucket& _tb;
+    };
+
     Stats stats;
 
     Atomic<int64_t> maxQueueDepth;
@@ -78,6 +137,14 @@ struct RateLimiter::RateLimiterPrivate {
     TickSource* tickSource;
     WriteRarelyRWMutex rwMutex;
     folly::TokenBucket tokenBucket;
+
+    ReadScopedTokenBucket readScopedTokenBucket() {
+        return {tokenBucket, rwMutex};
+    }
+
+    WriteScopedTokenBucket writeScopedTokenBucket() {
+        return {tokenBucket, rwMutex};
+    }
 
     Status enqueue() {
         const auto maxDepth = maxQueueDepth.loadRelaxed();
@@ -129,9 +196,9 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     if (MONGO_unlikely(hangInRateLimiter.shouldFail())) {
         waitForTokenSecs = 60 * 60;  // 1 hour
     } else {
-        auto lk = _impl->rwMutex.readLock();
-        waitForTokenSecs =
-            _impl->tokenBucket.consumeWithBorrowNonBlocking(1.0, _impl->nowInSeconds()).value_or(0);
+        waitForTokenSecs = _impl->readScopedTokenBucket()
+                               .consumeWithBorrowNonBlocking(1.0, _impl->nowInSeconds())
+                               .value_or(0);
     }
 
     if (auto napTime = doubleToMillis(waitForTokenSecs); napTime > Milliseconds{0}) {
@@ -139,10 +206,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
         // don't advance the mock clock before the sleep deadline is calculated.
         Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + napTime;
         if (auto status = _impl->enqueue(); !status.isOK()) {
-            {
-                auto lk = _impl->rwMutex.readLock();
-                _impl->tokenBucket.returnTokens(1.0);
-            }
+            _impl->readScopedTokenBucket().returnTokens(1.0);
             _impl->stats.rejectedAdmissions.incrementRelaxed();
             return status;
         }
@@ -165,10 +229,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
                         "Interrupted while waiting in rate limiter queue",
                         "rateLimiterName"_attr = _impl->name,
                         "exception"_attr = e.toString());
-            {
-                auto lk = _impl->rwMutex.readLock();
-                _impl->tokenBucket.returnTokens(1.0);
-            }
+            _impl->readScopedTokenBucket().returnTokens(1.0);
             return e.toStatus().withContext(
                 fmt::format("Interrupted while waiting in rate limiter queue. rateLimiterName={}",
                             _impl->name));
@@ -184,7 +245,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
 Status RateLimiter::tryAcquireToken() {
     _impl->stats.attemptedAdmissions.incrementRelaxed();
 
-    if (!_impl->tokenBucket.consume(1.0, _impl->nowInSeconds())) {
+    if (!_impl->readScopedTokenBucket().consume(1.0, _impl->nowInSeconds())) {
         _impl->stats.rejectedAdmissions.incrementRelaxed();
         return Status{kRejectedErrorCode,
                       fmt::format("Rate limiter '{}' rate exceeded", _impl->name)};
@@ -206,8 +267,7 @@ void RateLimiter::updateRateParameters(double refreshRatePerSec, double burstCap
                         _impl->name),
             burstCapacitySecs > 0.0);
     auto burstSize = calculateBurstSize(refreshRatePerSec, burstCapacitySecs);
-    auto lk = _impl->rwMutex.writeLock();
-    _impl->tokenBucket.reset(refreshRatePerSec, burstSize);
+    _impl->writeScopedTokenBucket().reset(refreshRatePerSec, burstSize);
 }
 
 void RateLimiter::setMaxQueueDepth(int64_t maxQueueDepth) {
@@ -238,13 +298,11 @@ void RateLimiter::appendStats(BSONObjBuilder* bob) const {
 }
 
 double RateLimiter::tokensAvailable() const {
-    auto lk = _impl->rwMutex.readLock();
-    return _impl->tokenBucket.available(_impl->nowInSeconds());
+    return _impl->readScopedTokenBucket().available(_impl->nowInSeconds());
 }
 
 double RateLimiter::tokenBalance() const {
-    auto lk = _impl->rwMutex.readLock();
-    return _impl->tokenBucket.balance(_impl->nowInSeconds());
+    return _impl->readScopedTokenBucket().balance(_impl->nowInSeconds());
 }
 
 int64_t RateLimiter::queued() const {
