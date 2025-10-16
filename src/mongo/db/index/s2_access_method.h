@@ -87,8 +87,8 @@ private:
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
      *
-     * This function ignores the 'multikeyPaths' pointer because text indexes don't support tracking
-     * path-level multikey information.
+     * This function ignores the 'multikeyMetadataKeys' pointer since those are only used for
+     * wildcard indexes.
      *
      * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. This
      * function resizes 'multikeyPaths' to have the same number of elements as the index key pattern

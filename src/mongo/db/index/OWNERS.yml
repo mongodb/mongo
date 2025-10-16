@@ -36,16 +36,10 @@ filters:
   - "multikey_paths*":
     approvers:
       - 10gen/query-execution-write-exec
-  - "2d_common*":
+  - "2d_*":
     approvers:
       - 10gen/query-integration-features
-  - "2d_key_generator*":
-    approvers:
-      - 10gen/query-integration-features
-  - "s2_common*":
-    approvers:
-      - 10gen/query-integration-features
-  - "s2*key_generator*":
+  - "s2_*":
     approvers:
       - 10gen/query-integration-features
   - "wildcard_access_method*":

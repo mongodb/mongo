@@ -2031,10 +2031,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/index/**/expression_params* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/index/**/wildcard_validation* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/index/**/multikey_paths* @10gen/query-execution-write-exec @svc-auto-approve-bot
-/src/mongo/db/index/**/2d_common* @10gen/query-integration-features @svc-auto-approve-bot
-/src/mongo/db/index/**/2d_key_generator* @10gen/query-integration-features @svc-auto-approve-bot
-/src/mongo/db/index/**/s2_common* @10gen/query-integration-features @svc-auto-approve-bot
-/src/mongo/db/index/**/s2*key_generator* @10gen/query-integration-features @svc-auto-approve-bot
+/src/mongo/db/index/**/2d_* @10gen/query-integration-features @svc-auto-approve-bot
+/src/mongo/db/index/**/s2_* @10gen/query-integration-features @svc-auto-approve-bot
 /src/mongo/db/index/**/wildcard_access_method* @10gen/query-execution-write-exec @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/index_builds/OWNERS.yml
