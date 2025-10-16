@@ -92,7 +92,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
             allowDiskUse: false,
         },
         stageName: stageName,
-        expectedNumGetMores: 5,
+        expectedNumGetMores: 4,
     });
 }
 
