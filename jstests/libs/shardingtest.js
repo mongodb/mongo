@@ -288,6 +288,10 @@ export class ShardingTest {
         // We wait until a primary has been chosen since startSet can return without having elected
         // one. This can cause issues that expect a functioning replicaset once this method returns.
         this.configRS.waitForPrimary();
+        // We also wait for all secondaries to catch up with the primary, to ensure nodes complete any
+        // rollback that may have been triggered after becoming secondary. Rollback causes nodes to
+        // close connections, which can interfere with subsequent operations.
+        this.configRS.awaitReplication();
     }
 
     restartAllShards(opts) {
@@ -297,6 +301,10 @@ export class ShardingTest {
             // elected one. This can cause issues that expect a functioning replicaset once this
             // method returns.
             rs.test.waitForPrimary();
+        // We also wait for all secondaries to catch up with the primary, to ensure nodes complete any
+        // rollback that may have been triggered after becoming secondary. Rollback causes nodes to
+        // close connections, which can interfere with subsequent operations.
+            rs.test.awaitReplication();
         });
     }
 
