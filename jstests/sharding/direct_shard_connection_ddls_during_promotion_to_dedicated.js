@@ -9,7 +9,7 @@
  * ]
  */
 
-import {before, beforeEach, afterEach, describe, it} from "jstests/libs/mochalite.js";
+import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -17,16 +17,64 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const testCommands = [
     {
+        name: "createCollection",
+        execute: (db) => db.runCommand({create: "testColl1"}),
+    },
+    {
+        name: "renameCollection",
+        execute: (db) =>
+            db.getSiblingDB("admin").runCommand({renameCollection: "testDB.testColl1", to: "testDB.testColl1Renamed"}),
+    },
+    {
+        name: "implicitCollectionCreation",
+        execute: (db) =>
+            db.runCommand({
+                insert: "implicitColl0",
+                documents: [{z: 1}],
+            }),
+    },
+    // TODO(SERVER-112424): Enable testing of cloneCollectionAsCapped
+    //{
+    //    name: "cloneCollectionAsCapped",
+    //    execute: (db) => db.runCommand(
+    //        {cloneCollectionAsCapped: "implicitColl0", toCollection: "implicitColl0Capped", size:
+    //        100000}),
+    //},
+    {
+        name: "convertToCapped",
+        execute: (db) => db.runCommand({convertToCapped: "testColl1Renamed", size: 10000}),
+    },
+    {
+        name: "collMod",
+        execute: (db) => db.runCommand({collMod: "testColl1Renamed", cappedSize: 100000}),
+    },
+    {
         name: "dropCollection",
-        execute: (db) => db.runCommand({drop: "testColl"}),
+        execute: (db) => db.runCommand({drop: "testColl1Renamed"}),
+    },
+    {
+        name: "createIndexes",
+        execute: (db) =>
+            db.runCommand({
+                createIndexes: "testColl0",
+                indexes: [{key: {x: 1}, name: "x_1"}],
+            }),
+    },
+    {
+        name: "dropIndexes",
+        execute: (db) => db.runCommand({dropIndexes: "testColl0", index: "x_1"}),
+    },
+    {
+        name: "dropDatabase",
+        execute: (db) => db.runCommand({dropDatabase: 1}),
     },
     {
         name: "applyOps with DDL operation",
-        execute: (db) => db.runCommand({applyOps: [{op: "c", ns: "testDB.$cmd", o: {create: "testColl"}}]}),
+        execute: (db) => db.runCommand({applyOps: [{op: "c", ns: "testDB.$cmd", o: {create: "testColl0"}}]}),
     },
     {
         name: "applyOps with CRUD operation",
-        execute: (db) => db.runCommand({applyOps: [{op: "i", ns: "testDB.testColl", o: {_id: 1, x: 1}}]}),
+        execute: (db) => db.runCommand({applyOps: [{op: "i", ns: "testDB.testColl0", o: {_id: 1, x: 1}}]}),
     },
 ];
 
@@ -42,7 +90,11 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
 
         this.createRegularUser = function (conn, db, user, pwd) {
             assert(conn.getDB("admin").auth("admin", "x"), "Authentication failed");
-            conn.getDB(db).createUser({user: user, pwd: pwd, roles: ["dbOwner"]});
+            conn.getDB(db).createUser({
+                user: user,
+                pwd: pwd,
+                roles: ["dbOwner", {role: "dbAdminAnyDatabase", db: "admin"}],
+            });
             const userDirectConnection = new Mongo(conn.host);
             var testDBDirectConnection = userDirectConnection.getDB(db);
             assert(testDBDirectConnection.auth(user, pwd), "Authentication failed");
@@ -68,15 +120,8 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Creating new user with dbOwner permissions on replica set");
         this.testDBDirectConnection = this.createRegularUser(this.rs.getPrimary(), "testDB", "user", "x");
 
-        jsTest.log.info("Granting dbAdminAnyDatabase with applyOps privileges to user");
-        assert(this.cluster.getDB("admin").auth("admin", "x"), "Authentication failed");
-        this.rs
-            .getPrimary()
-            .getDB("testDB")
-            .grantRolesToUser("user", [{role: "dbAdminAnyDatabase", db: "admin"}]);
-
         jsTest.log.info("Inserting data on the replica set");
-        assert.commandWorked(this.testDBDirectConnection.testColl.insertOne({x: 1}));
+        assert.commandWorked(this.testDBDirectConnection.testColl0.insertOne({x: 1}));
     });
 
     afterEach(function () {
@@ -135,7 +180,7 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Starting parallel shell for running direct DDL operation");
         const dropCmdParallelShell = startParallelShell(() => {
             assert(db.getSiblingDB("testDB").auth("user", "x"), "Authentication failed");
-            assert(db.getSiblingDB("testDB").testColl.drop());
+            assert(db.getSiblingDB("testDB").testColl0.drop());
             db.getSiblingDB("testDB").logout();
         }, this.rs.getPrimary().port);
 
