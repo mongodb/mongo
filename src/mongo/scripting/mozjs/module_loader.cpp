@@ -438,11 +438,6 @@ JSString* ModuleLoader::fileAsString(JSContext* cx, JS::HandleString pathnameStr
     }
 
     size_t len = static_cast<size_t>(fo);
-    if (len < 0) {
-        JS_ReportErrorUTF8(cx, "can't read length of %s", pathname.get());
-        return nullptr;
-    }
-
     JS::UniqueChars buf(js_pod_malloc<char>(len));
     if (!buf) {
         JS_ReportOutOfMemory(cx);
