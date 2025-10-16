@@ -9,7 +9,7 @@ evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 evergreen_workdir=$(realpath ${evergreen_dir}/../..)
 mkdir -p ${evergreen_workdir}/bin
-export PATH=$PATH:${evergreen_workdir}/bin
+export PATH=${evergreen_workdir}/bin:$PATH
 unset evergreen_workdir
 
 function timeout_and_retry {
