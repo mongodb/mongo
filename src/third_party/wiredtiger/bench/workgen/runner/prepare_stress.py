@@ -128,7 +128,7 @@ log_table = Table(log_name)
 # Read operation with read_timestamp_lag
 ops = Operation(Operation.OP_SEARCH, tables[0],Key(Key.KEYGEN_PARETO, 0, ParetoOptions(1)))
 ops = txn(ops, 'read_timestamp')
-ops.transaction.read_timestamp_lag = 2
+ops.transaction.read_timestamp_lag = 30
 ops = op_multi_table(ops, tables, False)
 ops = op_log_like(ops, log_table, 0)
 thread0 = Thread(ops)

@@ -26,16 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, time, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, wttest
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered40.py
 #    Test layered table metadata has logging disabled.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered40(wttest.WiredTigerTestCase, DisaggConfigMixin):
-    conn_config = 'log=(enabled=true),disaggregated=(page_log=palm,role="leader"),'
+class test_layered40(wttest.WiredTigerTestCase):
+    conn_config = 'log=(enabled=true),disaggregated=(role="leader"),'
 
     create_session_config = 'key_format=S,value_format=S'
 
@@ -43,12 +43,6 @@ class test_layered40(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     disagg_storages = gen_disagg_storages('test_layered40', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
-
-    # Load the page log extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        DisaggConfigMixin.conn_extensions(self, extlist)
 
     # Ensure that the metadata cursor has all the expected URIs.
     def check_metadata_cursor(self):

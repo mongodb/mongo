@@ -34,7 +34,6 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare42(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare42'
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_prepare_insert_rollback(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
@@ -109,7 +108,6 @@ class test_prepare42(test_prepare_preserve_prepare_base):
         cursor.set_key(20)
         self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_prepare_insert_rollback_with_globally_visible_stop_point(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))

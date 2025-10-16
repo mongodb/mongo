@@ -26,20 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, time, wiredtiger, wttest
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+import os, os.path, shutil, wiredtiger, wttest
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered36.py
 #    Test creating missing stable tables.
 @wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
-class test_layered36(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered36(wttest.WiredTigerTestCase):
     nitems = 500
 
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'precise_checkpoint=true,disaggregated=(page_log=palm),'
+                     + 'precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="follower")'
 
     create_session_config = 'key_format=S,value_format=S'

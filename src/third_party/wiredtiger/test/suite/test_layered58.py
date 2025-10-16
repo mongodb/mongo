@@ -28,17 +28,17 @@
 
 import random, string, wttest
 from wiredtiger import stat
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered58.py
 #    Test cursor walk with delta.
 @disagg_test_class
-class test_layered58(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered58(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered58', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    conn_config = 'disaggregated=(page_log=palm),cache_size=10MB,statistics=(all),disaggregated=(role="leader")'
+    conn_config = 'cache_size=10MB,statistics=(all),disaggregated=(role="leader")'
 
     nitems = 100
 

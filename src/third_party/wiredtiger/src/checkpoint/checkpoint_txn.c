@@ -1199,7 +1199,9 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     /* Reset the statistics tracked per checkpoint. */
     __wt_atomic_store64(&evict->evict_max_unvisited_gen_gap_per_checkpoint, 0);
     __wt_atomic_store64(&evict->evict_max_visited_gen_gap_per_checkpoint, 0);
-    __wt_atomic_store64(&evict->evict_max_page_size_per_checkpoint, 0);
+    __wt_atomic_store64(&evict->evict_max_clean_page_size_per_checkpoint, 0);
+    __wt_atomic_store64(&evict->evict_max_dirty_page_size_per_checkpoint, 0);
+    __wt_atomic_store64(&evict->evict_max_updates_page_size_per_checkpoint, 0);
     __wt_atomic_store64(&evict->evict_max_ms_per_checkpoint, 0);
     evict->reentry_hs_eviction_ms = 0;
     __wt_atomic_store32(&conn->heuristic_controls.obsolete_tw_btree_count, 0);

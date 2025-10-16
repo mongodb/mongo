@@ -91,7 +91,6 @@ class test_prepare31(test_prepare_preserve_prepare_base):
         self.assertEqual(rec_time_window_prepared, expected_value)
         stat_cursor.close()
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_skip_aborted_prepare_update_if_stable_rollback_timestamp(self):
         self.setup_initial_data(self.uri)
 
@@ -107,7 +106,6 @@ class test_prepare31(test_prepare_preserve_prepare_base):
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
         }, self.uri)
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_skip_aborted_prepare_update_if_prepare_timestamp_not_stable(self):
         self.setup_initial_data(self.uri)
 
@@ -120,7 +118,6 @@ class test_prepare31(test_prepare_preserve_prepare_base):
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
         }, self.uri)
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_write_prepare_update_if_rollback_timestamp_not_stable(self):
         self.setup_initial_data(self.uri)
 

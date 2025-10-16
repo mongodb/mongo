@@ -54,7 +54,7 @@ assert ret == 0, ret
 opread = Operation(Operation.OP_SEARCH, table)
 read_txn = txn(opread, 'read_timestamp')
 # read_timestamp_lag is the lag to the read_timestamp from current time
-read_txn.transaction.read_timestamp_lag = 2
+read_txn.transaction.read_timestamp_lag = 30
 treader = Thread(read_txn)
 
 opwrite = Operation(Operation.OP_INSERT, table)
@@ -77,9 +77,9 @@ workload = Workload(context, 30 * twriter + 30 * tupdate + 30 * treader)
 workload.options.run_time = 50
 workload.options.report_interval=500
 # read_timestamp_lag - Number of seconds lag to the oldest_timestamp from current time.
-workload.options.oldest_timestamp_lag=30
+workload.options.oldest_timestamp_lag=40
 # read_timestamp_lag - Number of seconds lag to the stable_timestamp from current time.
-workload.options.stable_timestamp_lag=10
+workload.options.stable_timestamp_lag=20
 # timestamp_advance is the number of seconds to wait before moving oldest and stable timestamp.
 workload.options.timestamp_advance=1
 print('transactional prepare workload:')

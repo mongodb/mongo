@@ -31,7 +31,7 @@ from wiredtiger import stat
 
 # test_eviction05.py
 #
-# Test that eviction max stats per database run are not reset after a checkpoint.
+# Test that eviction max page size stats for clean, dirty, and updates are set properly and eviction max stats per database run are not reset after a checkpoint.
 @wttest.skip_for_hook("disagg", "Fails due to evict a page.")
 class test_eviction05(wttest.WiredTigerTestCase):
 
@@ -45,36 +45,60 @@ class test_eviction05(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return val
 
-    def test_eviction(self):
+    def test_eviction_page_size_stats(self):
         uri = 'table:test_eviction05'
 
         # Create a table.
         self.session.create(uri, 'key_format=i,value_format=S')
-        session2 = self.conn.open_session()
-        cursor2 = session2.open_cursor(uri)
+        session = self.conn.open_session()
+        cursor = session.open_cursor(uri)
 
         # Insert a key 1 and commit the transaction.
-        session2.begin_transaction()
-        cursor2[1] = '20'
-        session2.commit_transaction()
-        cursor2.close()
+        session.begin_transaction()
+        cursor[1] = '20'
+        session.commit_transaction()
+        cursor.close()
 
-        # Set the key to 1 in the evict the page.
+        # Set the key to 1 and evict the page.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
         evict_cursor.set_key(1)
         self.assertEqual(evict_cursor.search(), 0)
         self.assertEqual(evict_cursor.reset(), 0)
         evict_cursor.close()
 
+        # Check that updates page stat was incremented
+        self.assertGreater(self.get_stat(stat.conn.eviction_maximum_updates_page_size_per_checkpoint), 0)
+
+        # Check that dirty page stat was incremented
+        self.assertGreater(self.get_stat(stat.conn.eviction_maximum_dirty_page_size_per_checkpoint), 0)
+
+        # Check that clean page stat was not incremented
+        self.assertEqual(self.get_stat(stat.conn.eviction_maximum_clean_page_size_per_checkpoint), 0)
+
+        # read the clean page back into cache and evict it again
+        cursor_read = self.session.open_cursor(uri)
+        cursor_read.set_key(1)
+        self.assertEqual(cursor_read.search(), 0)
+        cursor_read.close()
+
+        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+        evict_cursor.set_key(1)
+        self.assertEqual(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.reset(), 0)
+        evict_cursor.close()
+
+        # Check that clean page stat was incremented
+        self.assertGreater(self.get_stat(stat.conn.eviction_maximum_clean_page_size_per_checkpoint), 0)
+
         self.assertGreater(self.get_stat(stat.conn.eviction_maximum_page_size), 0)
-        self.assertGreater(self.get_stat(stat.conn.eviction_maximum_page_size_per_checkpoint), 0)
 
         # Run a checkpoint and verify that eviction max stats per database run are not reset.
         self.session.checkpoint()
 
         self.assertGreater(self.get_stat(stat.conn.eviction_maximum_page_size), 0)
-        self.assertEqual(self.get_stat(stat.conn.eviction_maximum_page_size_per_checkpoint), 0)
-
+        self.assertEqual(self.get_stat(stat.conn.eviction_maximum_clean_page_size_per_checkpoint), 0)
+        self.assertEqual(self.get_stat(stat.conn.eviction_maximum_dirty_page_size_per_checkpoint), 0)
+        self.assertEqual(self.get_stat(stat.conn.eviction_maximum_updates_page_size_per_checkpoint), 0)
 
 if __name__ == '__main__':
     wttest.run()

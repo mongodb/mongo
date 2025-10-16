@@ -951,15 +951,13 @@ copy_cell_restart:
              * recovering, all transaction ids are reset to WT_TXN_NONE, so we cannot compare the
              * transaction ids.
              */
-            if (tw->start_txn == tw->stop_txn) {
+            if (tw->start_txn == tw->stop_txn && temp_stop_ts == WT_TS_NONE) {
                 /*
                  * This is a special case where both transaction start and stop are in prepared
-                 * state.
-                 */
-                WT_ASSERT(session, temp_stop_ts == WT_TS_NONE);
-                /*
-                 * The prepared record is written with the preserve prepared config enabled. The
-                 * same prepared id is packed to WT_CELL_TS_DURABLE_START.
+                 * state. The prepared record is written with the preserve prepared config enabled.
+                 * The same prepared id is packed to WT_CELL_TS_DURABLE_START. Since temp_stop_ts
+                 * here stores the difference between start_prepared_id and stop_prepared_id,
+                 * temp_stop_ts must be 0.
                  */
                 if (temp_durable_start_ts != WT_TS_NONE) {
                     WT_ASSERT(session, temp_durable_stop_ts == WT_TS_NONE);
@@ -1001,7 +999,7 @@ copy_cell_restart:
                       "Read prepared record with no prepared id when preserve prepared is "
                       "enabled.");
             } else {
-                WT_ASSERT(session, tw->start_ts == WT_TXN_NONE);
+                WT_ASSERT(session, tw->start_ts == WT_TS_NONE);
                 /*
                  * This case happens when only transaction start is prepared, and there is no
                  * transaction stop. In this case, we store the prepare ts in WT_CELL_TS_START.

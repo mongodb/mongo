@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdatomic.h>
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
@@ -111,7 +112,7 @@ typedef struct {
     /*
      * Keep the number of references to this page log.
      */
-    uint32_t reference_count;
+    atomic_uint reference_count;
 
     uint32_t cache_size_mb;            /* Size of cache in megabytes */
     uint32_t delay_ms;                 /* Average length of delay when simulated */
@@ -524,11 +525,17 @@ palm_add_reference(WT_PAGE_LOG *page_log)
     palm = (PALM *)page_log;
 
     /*
-     * Missing reference or overflow?
+     * Check for missing reference or overflow before increment. Use CAS instead of fetch_add to
+     * avoid race conditions.
      */
-    if (palm->reference_count == 0 || palm->reference_count + 1 == 0)
-        return (EINVAL);
-    ++palm->reference_count;
+    do {
+        unsigned int cur_count = atomic_load(&palm->reference_count);
+        /* Missing reference or overflow? */
+        if (cur_count == 0 || cur_count + 1 == 0)
+            return (EINVAL);
+        if (atomic_compare_exchange_strong(&palm->reference_count, &cur_count, cur_count + 1))
+            break;
+    } while (true);
     return (0);
 }
 
@@ -934,7 +941,7 @@ err_no_rollback:
             ret = palm_kv_err(palm, session, EINVAL,                                           \
               "%s:%d: LSN arguments validation failed"                                         \
               ": %s != %s. Page details: table_id=%" PRIu64 ", page_id=%" PRIu64               \
-              ", flags=0x%" PRIx64 ", %s=%" PRIu64 ", %s=%" PRIu64,                            \
+              ", flags=0x%" PRIx32 ", %s=%" PRIu64 ", %s=%" PRIu64,                            \
               __func__, __LINE__, #a, #b, palm_handle->table_id, page_id, put_args->flags, #a, \
               (a), #b, (b));                                                                   \
             goto err;                                                                          \
@@ -1241,7 +1248,9 @@ palm_terminate(WT_PAGE_LOG *storage, WT_SESSION *session)
     ret = 0;
     palm = (PALM *)storage;
 
-    if (--palm->reference_count != 0)
+    uint32_t old_ref_count = atomic_fetch_sub(&palm->reference_count, 1);
+    /* Do the cleanup for the last reference. */
+    if (old_ref_count != 1)
         return (0);
 
     /*
@@ -1307,7 +1316,10 @@ palm_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     /*
      * The first reference is implied by the call to add_page_log.
      */
-    palm->reference_count = 1;
+    if (!atomic_compare_exchange_strong(&palm->reference_count, &(unsigned int){0}, 1)) {
+        ret = palm_err(palm, NULL, EINVAL, "reference count init twice");
+        goto err;
+    }
 
     /* Turn on verification by default, as PALM is used primarily for testing. */
     palm->verify = true;

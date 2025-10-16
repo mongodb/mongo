@@ -853,6 +853,17 @@ wts_close(WT_CONNECTION **connp)
     testutil_check(conn->close(conn, GV(WIREDTIGER_LEAK_MEMORY) ? "leak_memory" : NULL));
 }
 
+/*
+ * wts_reopen --
+ *     Reopen the database.
+ */
+void
+wts_reopen(void)
+{
+    wts_close(&g.wts_conn);
+    wts_open(g.home, &g.wts_conn, false);
+}
+
 struct stats_args {
     FILE *fp;
     WT_SESSION *session;

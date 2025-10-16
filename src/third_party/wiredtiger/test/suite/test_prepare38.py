@@ -35,7 +35,6 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare38(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare38'
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_open(self):
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)

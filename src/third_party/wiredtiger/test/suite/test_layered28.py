@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, time, wiredtiger, wttest
+import os, wiredtiger, wttest
 from helper_disagg import disagg_test_class
 from wiredtiger import stat
 
@@ -36,15 +36,9 @@ from wiredtiger import stat
 class test_layered28(wttest.WiredTigerTestCase):
     uri_base = "test_layered28"
     conn_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),disaggregated=(role="leader"),' \
-                + 'disaggregated=(page_log=palm),file_manager=(close_scan_interval=1)'
+                + 'file_manager=(close_scan_interval=1)'
 
     uri = "layered:" + uri_base
-
-    # Load the directory store extension, which has object storage support
-    def conn_extensions(self, extlist):
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('page_log', 'palm')
 
     # Test simple create and drop
     def test_create_drop(self):
@@ -68,7 +62,3 @@ class test_layered28(wttest.WiredTigerTestCase):
         custom_session.checkpoint()
         custom_session.drop(self.uri, "")
         custom_session.close()
-
-        time.sleep(2)
-
-

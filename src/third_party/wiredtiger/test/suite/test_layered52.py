@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import random, wttest, wiredtiger
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
 import time
@@ -38,12 +38,12 @@ import time
 # to the page log extension.
 
 @disagg_test_class
-class test_layered51(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered51(wttest.WiredTigerTestCase):
 
     uri = 'file:test_layered51'
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm),page_delta=(delta_pct=100),'
+                     + 'page_delta=(delta_pct=100),'
     disagg_storages = gen_disagg_storages('test_layered51', disagg_only = True)
 
     # Make scenarios for different cloud service providers

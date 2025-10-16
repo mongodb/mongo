@@ -354,12 +354,14 @@ conn_stats = [
     EvictStat('eviction_internal_pages_queued', 'internal pages queued for eviction'),
     EvictStat('eviction_internal_pages_seen', 'internal pages seen by eviction walk'),
     EvictStat('eviction_interupted_by_app', 'application requested eviction interrupt'),
+    EvictStat('eviction_maximum_clean_page_size_per_checkpoint', 'maximum clean page size seen at eviction per checkpoint', 'no_clear,no_scale,size'),
+    EvictStat('eviction_maximum_dirty_page_size_per_checkpoint', 'maximum dirty page size seen at eviction per checkpoint', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_milliseconds', 'maximum milliseconds spent at a single eviction', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_milliseconds_per_checkpoint', 'maximum milliseconds spent at a single eviction per checkpoint', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_page_size', 'maximum page size seen at eviction', 'no_clear,no_scale,size'),
-    EvictStat('eviction_maximum_page_size_per_checkpoint', 'maximum page size seen at eviction per checkpoint', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_unvisited_gen_gap', 'maximum gap between unvisited page and connection evict pass generation seen at eviction', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_unvisited_gen_gap_per_checkpoint', 'maximum gap between unvisited page and connection evict pass generation seen at eviction per checkpoint', 'no_clear,no_scale,size'),
+    EvictStat('eviction_maximum_updates_page_size_per_checkpoint', 'maximum updates page size seen at eviction per checkpoint', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_visited_gen_gap', 'maximum gap between visited page and connection evict pass generation seen at eviction', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_visited_gen_gap_per_checkpoint', 'maximum gap between visited page and connection evict pass generation seen at eviction per checkpoint', 'no_clear,no_scale,size'),
     EvictStat('eviction_pages_already_queued', 'pages seen by eviction walk that are already queued'),
@@ -583,8 +585,6 @@ conn_stats = [
     ##########################################
     # Layered table statistics
     ##########################################
-    LayeredStat('layered_table_manager_active', 'whether the layered table manager thread is currently busy doing work'),
-    LayeredStat('layered_table_manager_running', 'whether the layered table manager thread has been started'),
     LayeredStat('layered_table_manager_tables', 'the number of tables the layered table manager has open'),
 
     ##########################################

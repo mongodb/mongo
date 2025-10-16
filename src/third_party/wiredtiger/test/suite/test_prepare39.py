@@ -46,7 +46,8 @@ class test_prepare39(test_prepare_preserve_prepare_base):
         session.checkpoint()
         count = 0
         # Check the history store file value.
-        cursor = session.open_cursor("file:WiredTigerHS.wt", None, 'checkpoint=WiredTigerCheckpoint')
+        cursor = session.open_cursor("file:WiredTigerSharedHS.wt_stable" if 'disagg' in self.hook_names
+                                     else "file:WiredTigerHS.wt", None, 'checkpoint=WiredTigerCheckpoint')
         for _, _, hs_start_ts, _, hs_stop_ts, _, type, value in cursor:
             # check that the update type is WT_UPDATE_STANDARD
             self.assertEqual(type, 3)
@@ -66,7 +67,6 @@ class test_prepare39(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor.get_value(), expected_value)
         self.session.rollback_transaction()
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_hs_rollback_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -150,7 +150,8 @@ class test_prepare39(test_prepare_preserve_prepare_base):
         conn_backup = self.wiredtiger_open(self.home)
         backup_session = conn_backup.open_session(self.session_config)
         backup_session.begin_transaction('read_timestamp='+ self.timestamp_str(10))
-        cursor = backup_session.open_cursor("file:WiredTigerHS.wt", None,None)
+        cursor = backup_session.open_cursor("file:WiredTigerSharedHS.wt_stable" if 'disagg' in self.hook_names
+                                     else "file:WiredTigerHS.wt", None, None)
         count = 0
         for _, _, hs_start_ts, _, hs_stop_ts, _, type, value in cursor:
             # WT_UPDATE_STANDARD

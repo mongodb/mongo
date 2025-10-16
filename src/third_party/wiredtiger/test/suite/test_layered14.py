@@ -28,16 +28,15 @@
 
 import wttest
 import wiredtiger
-from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered14.py
 # Simple testing for layered random cursor
 @disagg_test_class
-class test_layered14(wttest.WiredTigerTestCase, DisaggConfigMixin):
+class test_layered14(wttest.WiredTigerTestCase):
 
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm),'
+    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
     disagg_storages = gen_disagg_storages('test_layered14', disagg_only = True)
     uri = "layered:test_layered14"
     nitems = 1000
@@ -46,10 +45,6 @@ class test_layered14(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     def conn_config(self):
         return self.conn_base_config + 'disaggregated=(role="leader")'
-
-    # Load the storage store extension.
-    def conn_extensions(self, extlist):
-        DisaggConfigMixin.conn_extensions(self, extlist)
 
     def test_layered_random_cursor(self):
         self.session.create(self.uri, "key_format=S,value_format=S")
@@ -60,11 +55,6 @@ class test_layered14(wttest.WiredTigerTestCase, DisaggConfigMixin):
         for i in range(self.nitems):
             cursor[str(i)] = value1
 
-        # XXX
-        # Inserted timing delays around reopen, apparently needed because of the
-        # layered table watcher implementation
-        import time
-        time.sleep(1.0)
         self.session.checkpoint()
 
         for i in range(self.nitems, 2 * self.nitems):
@@ -76,15 +66,9 @@ class test_layered14(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.assertEqual(random_cursor.next(), 0)
         random_cursor.close()
 
-        # XXX
-        # Inserted timing delays around reopen, apparently needed because of the
-        # layered table watcher implementation
-        import time
-        time.sleep(1.0)
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
         self.reopen_conn(config = follower_config)
-        time.sleep(1.0)
 
         random_cursor = self.session.open_cursor(self.uri, None, "next_random=true")
         self.assertEqual(random_cursor.next(), 0)

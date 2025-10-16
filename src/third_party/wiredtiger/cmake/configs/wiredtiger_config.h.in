@@ -30,10 +30,14 @@
 /* libsodium support automatically loaded. */
 #cmakedefine HAVE_BUILTIN_EXTENSION_SODIUM 1
 
+/* Define to 1 for call logging. */
+#cmakedefine HAVE_CALL_LOG 1
+
 /* Define to 1 for diagnostic tests. */
 #cmakedefine HAVE_DIAGNOSTIC 1
 
-#cmakedefine HAVE_CALL_LOG 1
+/* Define to 1 to enable the error log. */
+#cmakedefine HAVE_ERROR_LOG 1
 
 /* Define to 1 for ref tracking */
 #cmakedefine HAVE_REF_TRACK 1
@@ -60,8 +64,8 @@
 /* define 1 to to switch code that exists in both inline function and macro versions to use the inline versions. */
 #cmakedefine INLINE_FUNCTIONS_INSTEAD_OF_MACROS 0
 
-/* 
- * Define to 1 for unit testing assertions. 
+/*
+ * Define to 1 for unit testing assertions.
  * This overrides normal abort logic and should be used *only* when unit testing assertions.
  */
 #cmakedefine HAVE_UNITTEST_ASSERTS 0

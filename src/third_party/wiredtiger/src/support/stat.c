@@ -1997,6 +1997,8 @@ static const char *const __stats_connection_desc[] = {
   "cache: leaf pages split during eviction",
   "cache: locate a random in-mem ref by examining all entries on the root page",
   "cache: maximum bytes configured",
+  "cache: maximum clean page size seen at eviction per checkpoint",
+  "cache: maximum dirty page size seen at eviction per checkpoint",
   "cache: maximum gap between unvisited page and connection evict pass generation seen at eviction",
   "cache: maximum gap between unvisited page and connection evict pass generation seen at eviction "
   "per checkpoint",
@@ -2006,7 +2008,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: maximum milliseconds spent at a single eviction",
   "cache: maximum milliseconds spent at a single eviction per checkpoint",
   "cache: maximum page size seen at eviction",
-  "cache: maximum page size seen at eviction per checkpoint",
+  "cache: maximum updates page size seen at eviction per checkpoint",
   "cache: modified page evict attempts by application threads",
   "cache: modified page evict failures by application threads",
   "cache: modified pages evicted",
@@ -2318,8 +2320,6 @@ static const char *const __stats_connection_desc[] = {
   "layered: how many log applications the layered table manager skipped on this tree",
   "layered: how many previously-applied LSNs the layered table manager skipped on this tree",
   "layered: the number of tables the layered table manager has open",
-  "layered: whether the layered table manager thread has been started",
-  "layered: whether the layered table manager thread is currently busy doing work",
   "live-restore: number of bytes copied from the source to the destination",
   "live-restore: number of files remaining for migration completion",
   "live-restore: number of reads from the source database",
@@ -2978,6 +2978,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_split_leaf = 0;
     stats->cache_eviction_random_sample_inmem_root = 0;
     /* not clearing cache_bytes_max */
+    /* not clearing eviction_maximum_clean_page_size_per_checkpoint */
+    /* not clearing eviction_maximum_dirty_page_size_per_checkpoint */
     /* not clearing eviction_maximum_unvisited_gen_gap */
     /* not clearing eviction_maximum_unvisited_gen_gap_per_checkpoint */
     /* not clearing eviction_maximum_visited_gen_gap */
@@ -2985,7 +2987,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing eviction_maximum_milliseconds */
     /* not clearing eviction_maximum_milliseconds_per_checkpoint */
     /* not clearing eviction_maximum_page_size */
-    /* not clearing eviction_maximum_page_size_per_checkpoint */
+    /* not clearing eviction_maximum_updates_page_size_per_checkpoint */
     stats->eviction_app_dirty_attempt = 0;
     stats->eviction_app_dirty_fail = 0;
     stats->cache_eviction_dirty = 0;
@@ -3291,8 +3293,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->layered_table_manager_logops_skipped = 0;
     stats->layered_table_manager_skip_lsn = 0;
     stats->layered_table_manager_tables = 0;
-    stats->layered_table_manager_running = 0;
-    stats->layered_table_manager_active = 0;
     stats->live_restore_bytes_copied = 0;
     /* not clearing live_restore_work_remaining */
     stats->live_restore_source_read_count = 0;
@@ -3987,6 +3987,10 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_random_sample_inmem_root +=
       WT_STAT_CONN_READ(from, cache_eviction_random_sample_inmem_root);
     to->cache_bytes_max += WT_STAT_CONN_READ(from, cache_bytes_max);
+    to->eviction_maximum_clean_page_size_per_checkpoint +=
+      WT_STAT_CONN_READ(from, eviction_maximum_clean_page_size_per_checkpoint);
+    to->eviction_maximum_dirty_page_size_per_checkpoint +=
+      WT_STAT_CONN_READ(from, eviction_maximum_dirty_page_size_per_checkpoint);
     to->eviction_maximum_unvisited_gen_gap +=
       WT_STAT_CONN_READ(from, eviction_maximum_unvisited_gen_gap);
     to->eviction_maximum_unvisited_gen_gap_per_checkpoint +=
@@ -3999,8 +4003,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_maximum_milliseconds_per_checkpoint +=
       WT_STAT_CONN_READ(from, eviction_maximum_milliseconds_per_checkpoint);
     to->eviction_maximum_page_size += WT_STAT_CONN_READ(from, eviction_maximum_page_size);
-    to->eviction_maximum_page_size_per_checkpoint +=
-      WT_STAT_CONN_READ(from, eviction_maximum_page_size_per_checkpoint);
+    to->eviction_maximum_updates_page_size_per_checkpoint +=
+      WT_STAT_CONN_READ(from, eviction_maximum_updates_page_size_per_checkpoint);
     to->eviction_app_dirty_attempt += WT_STAT_CONN_READ(from, eviction_app_dirty_attempt);
     to->eviction_app_dirty_fail += WT_STAT_CONN_READ(from, eviction_app_dirty_fail);
     to->cache_eviction_dirty += WT_STAT_CONN_READ(from, cache_eviction_dirty);
@@ -4357,8 +4361,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, layered_table_manager_logops_skipped);
     to->layered_table_manager_skip_lsn += WT_STAT_CONN_READ(from, layered_table_manager_skip_lsn);
     to->layered_table_manager_tables += WT_STAT_CONN_READ(from, layered_table_manager_tables);
-    to->layered_table_manager_running += WT_STAT_CONN_READ(from, layered_table_manager_running);
-    to->layered_table_manager_active += WT_STAT_CONN_READ(from, layered_table_manager_active);
     to->live_restore_bytes_copied += WT_STAT_CONN_READ(from, live_restore_bytes_copied);
     to->live_restore_work_remaining += WT_STAT_CONN_READ(from, live_restore_work_remaining);
     to->live_restore_source_read_count += WT_STAT_CONN_READ(from, live_restore_source_read_count);

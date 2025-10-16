@@ -407,8 +407,12 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
 
     WT_STATP_CONN_SET(
       session, stats, eviction_maximum_page_size, __wt_atomic_load64(&evict->evict_max_page_size));
-    WT_STATP_CONN_SET(session, stats, eviction_maximum_page_size_per_checkpoint,
-      __wt_atomic_load64(&evict->evict_max_page_size_per_checkpoint));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_clean_page_size_per_checkpoint,
+      __wt_atomic_load64(&evict->evict_max_clean_page_size_per_checkpoint));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_dirty_page_size_per_checkpoint,
+      __wt_atomic_load64(&evict->evict_max_dirty_page_size_per_checkpoint));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_updates_page_size_per_checkpoint,
+      __wt_atomic_load64(&evict->evict_max_updates_page_size_per_checkpoint));
     WT_STATP_CONN_SET(
       session, stats, eviction_maximum_milliseconds, __wt_atomic_load64(&evict->evict_max_ms));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_milliseconds_per_checkpoint,

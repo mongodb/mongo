@@ -36,7 +36,6 @@ class test_prepare41(test_prepare_preserve_prepare_base):
     conn_config = 'precise_checkpoint=true,preserve_prepared=true,statistics=(all)'
     uri = 'table:test_prepare41'
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_prepare_update(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -92,7 +91,6 @@ class test_prepare41(test_prepare_preserve_prepare_base):
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(25))
         self.assertEqual(cursor[20], 'b' + 'a' * 99)
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_prepare_delete(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))

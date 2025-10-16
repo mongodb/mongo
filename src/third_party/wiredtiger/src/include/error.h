@@ -13,10 +13,6 @@
 #define WT_DEBUG_POINT ((void *)(uintptr_t)0xdeadbeef)
 #define WT_DEBUG_BYTE (0xab)
 
-#ifdef HAVE_DIAGNOSTIC
-#define WT_HAVE_ERROR_LOG
-#endif
-
 /* In DIAGNOSTIC mode, yield in places where we want to encourage races (except for with
  * antithesis). */
 #if defined HAVE_DIAGNOSTIC && defined NON_BARRIER_DIAGNOSTIC_YIELDS && !defined ENABLE_ANTITHESIS
@@ -45,7 +41,7 @@
 #define __wt_set_return(session, error) \
     __wt_set_return_func(session, __PRETTY_FUNCTION__, __LINE__, error, #error)
 
-#ifdef WT_HAVE_ERROR_LOG
+#ifdef HAVE_ERROR_LOG
 #define __wt_error_log_add_helper(expr, error, suberror) \
     WT_IGNORE_RET(                                       \
       __wt_error_log_add(__FILE__, __PRETTY_FUNCTION__, __LINE__, expr, error, suberror))
@@ -68,7 +64,7 @@
     {                                 \
     }
 #define WT_ERROR_LOG_ADD(expr) (expr)
-#endif /* WT_HAVE_ERROR_LOG */
+#endif /* HAVE_ERROR_LOG */
 
 /* Set "ret" and branch-to-err-label tests. */
 #define WT_ERR(a)                                        \
