@@ -804,6 +804,7 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc,
+    PhaseTransitionFn phaseTransitionFn,
     boost::optional<Status> abortReason) {
     // If the coordinator needs to abort and isn't in kInitializing, additional collections need to
     // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
@@ -815,19 +816,6 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     if (coordinatorDoc.getState() > CoordinatorStateEnum::kQuiesced) {
         return coordinatorDoc;
     }
-
-    ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
-    // If a user resharding ID was provided, move the coordinator doc to "quiesced" rather than
-    // "done".
-    if (coordinatorDoc.getUserReshardingUUID()) {
-        updatedCoordinatorDoc.setState(CoordinatorStateEnum::kQuiesced);
-        updatedCoordinatorDoc.setQuiescePeriodEnd(
-            opCtx->fastClockSource().now() +
-            Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis));
-    } else {
-        updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
-    }
-    emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     const auto tagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
         coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())));
@@ -848,12 +836,13 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
 
         removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     }
+
+    ReshardingCoordinatorDocument updatedCoordinatorDoc;
     ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx,
-        updatedCoordinatorDoc.getSourceNss(),
+        coordinatorDoc.getSourceNss(),
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Remove entry for this resharding operation from config.reshardingOperations
-            writeToCoordinatorStateNss(opCtx, metrics, updatedCoordinatorDoc, txnNumber);
+            updatedCoordinatorDoc = phaseTransitionFn(opCtx, txnNumber);
 
             // Remove the resharding fields from the config.collections entry
             updateConfigCollectionsForOriginalNss(
@@ -861,7 +850,6 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
         },
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
-    metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
     return updatedCoordinatorDoc;
 }
 

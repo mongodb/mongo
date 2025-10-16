@@ -620,18 +620,11 @@ ExecutorFuture<void> ReshardingCoordinator::_quiesce(
                             "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
                 if (!_ctHolder->isSteppingOrShuttingDown()) {
                     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                    ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
-                    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
                     resharding::executeMetadataChangesInTxn(
-                        opCtx.get(),
-                        [&updatedCoordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
-                            resharding::writeToCoordinatorStateNss(
-                                opCtx,
-                                nullptr /* metrics have already been freed */
-                                ,
-                                updatedCoordinatorDoc,
-                                txnNumber);
+                        opCtx.get(), [this](OperationContext* opCtx, TxnNumber txnNumber) {
+                            _coordinatorDao.removeCoordinatorDocument(opCtx, txnNumber);
                         });
+
                     LOGV2_DEBUG(7760406,
                                 1,
                                 "Resharding coordinator removed state doc after quiesce",
@@ -1730,12 +1723,33 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
 
 void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx, boost::optional<Status> abortReason) {
-    auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-        opCtx,
-        _metrics.get(),
+    auto coordinatorDoc =
         resharding::tryGetCoordinatorDoc(opCtx, _coordinatorDoc.getReshardingUUID())
-            .value_or(_coordinatorDoc),
-        abortReason);
+            .value_or(_coordinatorDoc);
+
+    // If a user resharding ID was provided, move the coordinator doc to "quiesced."
+    // Otherwise, remove entry from config.reshardingOperations.
+    resharding::PhaseTransitionFn phaseTransitionFn;
+    if (coordinatorDoc.getUserReshardingUUID()) {
+        phaseTransitionFn = [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
+            auto updatedDocument = _coordinatorDao.transitionToQuiescedPhase(
+                opCtx, resharding::getCurrentTime(), abortReason, txnNumber);
+            return updatedDocument;
+        };
+    } else {
+        phaseTransitionFn = [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
+            _coordinatorDao.removeCoordinatorDocument(opCtx, txnNumber);
+
+            // Return the updated doc to refresh in-memory state and trigger additional cleanup
+            // logic.
+            auto updatedDocument = coordinatorDoc;
+            updatedDocument.setState(CoordinatorStateEnum::kDone);
+            return updatedDocument;
+        };
+    }
+
+    auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+        opCtx, _metrics.get(), coordinatorDoc, std::move(phaseTransitionFn), abortReason);
 
     // Update in-memory coordinator doc.
     installCoordinatorDocOnStateTransition(opCtx, updatedCoordinatorDoc);
