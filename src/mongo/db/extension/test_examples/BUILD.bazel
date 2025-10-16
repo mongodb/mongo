@@ -29,8 +29,6 @@ extensions_with_config(
         # null_chars_string_input.js will break as not all stages from $listMqlEntities
         # will have a null character test. To resolve this, ensure that these new stages
         # are added to the "skips" list in that test.
-
-        # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
         ":bar_mongo_extension",
         ":foo_mongo_extension",
         ":logging_mongo_extension",
@@ -66,8 +64,6 @@ extensions_with_config(
         "foo",
         "foo_v2",
         "bar",
-        # TODO SERVER-109108: Remove this entry when the buzz extension is no longer needed.
-        "buzz",
     ]
 ]
 

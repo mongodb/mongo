@@ -253,4 +253,15 @@ stdx::unordered_map<std::string, ExtensionConfig> ExtensionLoader::getLoadedExte
 
     return result;
 }
+
+bool ExtensionLoader::isLoaded(const std::string& name) {
+    return loadedExtensions.contains(name);
+}
+
+void ExtensionLoader::unload_forTest(const std::string& name) {
+    if (isLoaded(name)) {
+        loadedExtensions.erase(loadedExtensions.find(name));
+    }
+}
+
 }  // namespace mongo::extension::host

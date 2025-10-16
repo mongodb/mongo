@@ -42,6 +42,8 @@ class DocumentSourceExtensionTest;
 namespace host {
 using LiteParsedList = std::list<std::unique_ptr<LiteParsedDocumentSource>>;
 
+class LoadExtensionsTest;
+
 /**
  * A DocumentSource implementation for an extension aggregation stage. DocumentSourceExtension is a
  * facade around handles to extension API objects.
@@ -207,12 +209,13 @@ private:
                               host_connector::AggStageDescriptorHandle descriptor);
 
     /**
-     * Give access to DocumentSourceExtensionTest to unregister parser.
+     * Give access to DocumentSourceExtensionTest/LoadExtensionsTest to unregister parser.
      * unregisterParser_forTest is only meant to be used in the context of unit
      * tests. This is because the parserMap is not thread safe, so modifying it at runtime is
      * unsafe.
      */
     friend class mongo::extension::DocumentSourceExtensionTest;
+    friend class mongo::extension::host::LoadExtensionsTest;
     static void unregisterParser_forTest(const std::string& name);
 
 protected:

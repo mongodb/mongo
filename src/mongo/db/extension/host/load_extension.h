@@ -83,6 +83,19 @@ public:
     static stdx::unordered_map<std::string, ExtensionConfig> getLoadedExtensions();
 
     /**
+     * Returns true if an extension with the given name is loaded.
+     */
+    static bool isLoaded(const std::string& name);
+
+    /**
+     * Unload the extension with the given name if it has been loaded.
+     *
+     * We do not gracefully support extension unloading at runtime, so this should only be called in
+     * tests.
+     */
+    static void unload_forTest(const std::string& name);
+
+    /**
      * Central path for all extension configuration files. Also holds
      * aggregation_stage_stub_parsers.json.
      */

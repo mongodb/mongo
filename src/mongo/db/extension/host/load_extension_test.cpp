@@ -46,8 +46,8 @@ static const std::filesystem::path runFilesDir = std::getenv("RUNFILES_DIR");
 static const std::filesystem::path kExtensionDirectory =
     "_main/src/mongo/db/extension/test_examples";
 
-static std::filesystem::path getExtensionPath(const std::string& extensionName) {
-    return runFilesDir / kExtensionDirectory / extensionName;
+static std::filesystem::path getExtensionPath(const std::string& extensionFileName) {
+    return runFilesDir / kExtensionDirectory / extensionFileName;
 }
 
 static ExtensionConfig makeEmptyExtensionConfig(const std::string& extensionFileName) {
@@ -57,11 +57,21 @@ static ExtensionConfig makeEmptyExtensionConfig(const std::string& extensionFile
 
 class LoadExtensionsTest : public unittest::Test {
 protected:
+    LoadExtensionsTest() : expCtx(make_intrusive<ExpressionContextForTest>()) {}
+
     static inline const std::string kTestFooStageName = "$testFoo";
     static inline const std::string kTestFooLibExtensionPath = "libfoo_mongo_extension.so";
-    static inline const std::string kTestBarLibExtensionPath = "libbar_mongo_extension.so";
-    // TODO SERVER-109108: Remove this when we can use only libfoo_mongo_extension.so.
-    static inline const std::string kTestBuzzLibExtensionPath = "libbuzz_mongo_extension.so";
+
+    void tearDown() override {
+        host::DocumentSourceExtension::unregisterParser_forTest(kTestFooStageName);
+        ExtensionLoader::unload_forTest("foo");
+    }
+
+    ExtensionConfig makeTestFooConfig() {
+        return makeEmptyExtensionConfig(kTestFooLibExtensionPath);
+    }
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
 
 private:
     RAIIServerParameterControllerForTest _featureFlag{"featureFlagExtensionsAPI", true};
@@ -74,17 +84,16 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
     ASSERT(!runFilesDir.empty());
 
     // Test that various non-existent extension cases fail with the proper error code.
-    ASSERT_THROWS_CODE(ExtensionLoader::load("src", ExtensionConfig{.sharedLibraryPath = "src/"}),
+    ASSERT_THROWS_CODE(ExtensionLoader::load("src", makeEmptyExtensionConfig("src/")),
                        AssertionException,
                        10615500);
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load("notanextension",
-                              ExtensionConfig{.sharedLibraryPath = "notanextension"}),
+        ExtensionLoader::load("notanextension", makeEmptyExtensionConfig("notanextension")),
         AssertionException,
         10615500);
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(
-            "extension", ExtensionConfig{.sharedLibraryPath = "path/to/nonexistent/extension.so"}),
+        ExtensionLoader::load("extension",
+                              makeEmptyExtensionConfig("path/to/nonexistent/extension.so")),
         AssertionException,
         10615500);
 
@@ -162,26 +171,22 @@ DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullInitialize, "10930101") {
                           makeEmptyExtensionConfig("libnull_initialize_function_bad_extension.so"));
 }
 
-// TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between
-// tests.
 TEST_F(LoadExtensionsTest, RepetitivelyLoadingTheSameExtensionFails) {
     // We should be able to load the extension once.
-    const auto config = makeEmptyExtensionConfig(kTestBuzzLibExtensionPath);
-    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("buzz", config));
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("foo", makeTestFooConfig()));
 
     // We should not be able to load the extension twice.
-    ASSERT_THROWS_CODE(ExtensionLoader::load("buzz", config), AssertionException, 10845400);
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load("foo", makeTestFooConfig()), AssertionException, 10845400);
 }
 
 // Tests successful extension loading and verifies stage registration works in pipelines.
 // The libfoo_mongo_extension.so adds a "$testFoo" stage for testing.
 TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
-    ASSERT_DOES_NOT_THROW(
-        ExtensionLoader::load("foo", makeEmptyExtensionConfig(kTestFooLibExtensionPath)));
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("foo", makeTestFooConfig()));
 
     // Verify the initialization function registered a stage.
     BSONObj stageSpec = BSON(kTestFooStageName << BSONObj());
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     auto sourceList = DocumentSource::parse(expCtx, stageSpec);
     ASSERT_EQUALS(sourceList.size(), 1U);
@@ -205,18 +210,16 @@ TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
 
 // Tests that extension initialization properly populates the parser map before and after loading.
 TEST_F(LoadExtensionsTest, InitializationFunctionPopulatesParserMap) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("foo", makeTestFooConfig()));
+
     BSONObj stageSpec = BSON(kTestFooStageName << BSONObj());
 
-    // Since the extension might already be loaded by previous tests, just verify it works.
-    ASSERT_DOES_NOT_THROW({
-        auto sourceList = DocumentSource::parse(expCtx, stageSpec);
-        ASSERT_EQUALS(sourceList.size(), 1U);
+    auto sourceList = DocumentSource::parse(expCtx, stageSpec);
+    ASSERT_EQUALS(sourceList.size(), 1U);
 
-        auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
-        ASSERT_TRUE(extensionStage != nullptr);
-        ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string(kTestFooStageName));
-    });
+    auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
+    ASSERT_TRUE(extensionStage != nullptr);
+    ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string(kTestFooStageName));
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterSucceeds) {
@@ -246,10 +249,9 @@ DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullStageDescriptor, "10596400") {
                           makeEmptyExtensionConfig("libnull_stage_descriptor_bad_extension.so"));
 }
 
-TEST(LoadExtensionTest, LoadExtensionTwoStagesSucceeds) {
+TEST_F(LoadExtensionsTest, LoadExtensionTwoStagesSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
         "loadTwoStages", makeEmptyExtensionConfig("libload_two_stages_mongo_extension.so")));
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     std::vector<BSONObj> pipeline = {BSON("$foo" << BSONObj()), BSON("$bar" << BSONObj())};
     auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
@@ -272,11 +274,10 @@ TEST_F(LoadExtensionsTest, LoadExtensionInvokeHostServicesAsapSucceeds) {
         makeEmptyExtensionConfig("libinvoke_host_services_asap_mongo_extension.so")));
 }
 
-TEST(LoadExtensionTest, LoadHighestCompatibleVersionSucceeds) {
+TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
         "loadHighestCompatibleVersion",
         makeEmptyExtensionConfig("libload_highest_compatible_version_mongo_extension.so")));
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     std::vector<BSONObj> pipeline = {BSON("$extensionV3" << BSONObj())};
     auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
@@ -299,53 +300,45 @@ TEST(LoadExtensionTest, LoadHighestCompatibleVersionSucceeds) {
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
-    {
-        const auto extOptions = YAML::Load("optionA: true\n");
-        const ExtensionConfig config = {
-            .sharedLibraryPath = getExtensionPath("libtest_options_mongo_extension.so").string(),
-            .extOptions = extOptions};
-        ASSERT_DOES_NOT_THROW(ExtensionLoader::load("test_options", config));
-        auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto extOptions = YAML::Load("optionA: true\n");
+    const ExtensionConfig config = {
+        .sharedLibraryPath = getExtensionPath("libtest_options_mongo_extension.so").string(),
+        .extOptions = extOptions};
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("test_options", config));
 
-        std::vector<BSONObj> pipeline = {BSON("$optionA" << BSONObj())};
-        auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
-        ASSERT_TRUE(parsedPipeline != nullptr);
-        ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+    std::vector<BSONObj> pipeline = {BSON("$optionA" << BSONObj())};
+    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    ASSERT_TRUE(parsedPipeline != nullptr);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
-        auto stage =
-            dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
-        ASSERT_TRUE(stage != nullptr);
-        ASSERT_EQUALS(std::string(stage->getSourceName()), "$optionA");
+    auto stage = dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    ASSERT_TRUE(stage != nullptr);
+    ASSERT_EQUALS(std::string(stage->getSourceName()), "$optionA");
 
-        // Assert that $optionB is unavailable.
-        pipeline = {BSON("$optionB" << BSONObj())};
-        ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
-    }
+    // Assert that $optionB is unavailable.
+    pipeline = {BSON("$optionB" << BSONObj())};
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
-    {
-        const auto extOptions = YAML::Load("checkMax: true\nmax: 10");
-        const ExtensionConfig config = {
-            .sharedLibraryPath = getExtensionPath("libparse_options_mongo_extension.so").string(),
-            .extOptions = extOptions};
-        ASSERT_DOES_NOT_THROW(ExtensionLoader::load("parse_options", config));
-        auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto extOptions = YAML::Load("checkMax: true\nmax: 10");
+    const ExtensionConfig config = {
+        .sharedLibraryPath = getExtensionPath("libparse_options_mongo_extension.so").string(),
+        .extOptions = extOptions};
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("parse_options", config));
 
-        std::vector<BSONObj> pipeline = {BSON("$checkNum" << BSON("num" << 9))};
-        auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
-        ASSERT_TRUE(parsedPipeline != nullptr);
-        ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+    std::vector<BSONObj> pipeline = {BSON("$checkNum" << BSON("num" << 9))};
+    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    ASSERT_TRUE(parsedPipeline != nullptr);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
-        auto stage =
-            dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
-        ASSERT_TRUE(stage != nullptr);
-        ASSERT_EQUALS(std::string(stage->getSourceName()), "$checkNum");
+    auto stage = dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    ASSERT_TRUE(stage != nullptr);
+    ASSERT_EQUALS(std::string(stage->getSourceName()), "$checkNum");
 
-        // Assert that parsing fails when the provided num is greater than max 10.
-        pipeline = {BSON("$checkNum" << BSON("num" << 11))};
-        ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 10999106);
-    }
+    // Assert that parsing fails when the provided num is greater than the specified max of 10.
+    pipeline = {BSON("$checkNum" << BSON("num" << 11))};
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 10999106);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionConfigErrors) {
@@ -370,8 +363,6 @@ TEST_F(LoadExtensionsTest, LoadStubParser) {
         "loaded.";
     registerStubParser("$stub", errorMsg);
 
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
-
     // Verify that attempting to parse a pipeline with the $stub stage fails with the proper error
     // message.
     std::vector<BSONObj> pipeline = {BSON("$stub" << BSONObj()), BSON("$limit" << 1)};
@@ -383,8 +374,6 @@ TEST_F(LoadExtensionsTest, LoadStubParserSilentlySkipsIfExists) {
     // Register stub parsers for $match. This should silently skip the registration since $match is
     // already registered.
     registerStubParser("$match", "This should not work since $match is already registered.");
-
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     std::vector<BSONObj> pipeline = {BSON("$match" << BSON("x" << 1))};
     ASSERT_DOES_NOT_THROW(Pipeline::parse(pipeline, expCtx));
@@ -399,10 +388,8 @@ TEST_F(LoadExtensionsTest, LoadStubParserSilentlySkipsIfExists) {
  */
 class ExtensionErrorsTest : public LoadExtensionsTest {
 public:
-    ExtensionErrorsTest() : expCtx(make_intrusive<ExpressionContextForTest>()) {}
-
     void setUp() override {
-        if (ExtensionLoader::getLoadedExtensions().contains("extension_errors")) {
+        if (ExtensionLoader::isLoaded("extension_errors")) {
             return;
         }
         const auto config = makeEmptyExtensionConfig(kTestExtensionErrorsLibExtensionPath);
@@ -412,8 +399,6 @@ public:
 protected:
     static inline const std::string kTestExtensionErrorsLibExtensionPath =
         "libextension_errors_mongo_extension.so";
-
-    boost::intrusive_ptr<ExpressionContext> expCtx;
 };
 
 TEST_F(ExtensionErrorsTest, ExtensionUasserts) {
