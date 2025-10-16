@@ -76,8 +76,9 @@ public:
     void appendStats(BSONObjBuilder* bob) const;
 
 private:
+    bool _isAuthorizationExempt(Client* client);
+
     admission::RateLimiter _rateLimiter;
-    VersionedValue<CIDRList>::Snapshot _ingressRequestRateLimiterExemptions;
 };
 
 }  // namespace mongo

@@ -42,7 +42,7 @@ const testExemptIPsFromRateLimit = (rateExemptConn, exemptClient, nonExemptClien
     assert.eq(finalRateLimiterStats.successfulAdmissions - initialRateLimiterStats.successfulAdmissions, 1);
     assert.eq(finalRateLimiterStats.rejectedAdmissions - initialRateLimiterStats.rejectedAdmissions, 2);
     assert.eq(finalRateLimiterStats.attemptedAdmissions - initialRateLimiterStats.attemptedAdmissions, 3);
-    assert.eq(finalRateLimiterStats.exemptedAdmissions - initialRateLimiterStats.exemptedAdmissions, 2);
+    assert.gt(finalRateLimiterStats.exemptedAdmissions - initialRateLimiterStats.exemptedAdmissions, 2);
 };
 
 const nonExemptIP = get_ipaddr();

@@ -161,9 +161,9 @@ function testRateLimiterUnauthenticated(noAuthClient, exemptConn) {
     const finalExempt = finalRateLimiterStats.exemptedAdmissions;
     const finalAvailableTokens = finalRateLimiterStats.totalAvailableTokens;
 
-    // Check that we added as much exempt requests as the amount of ping we ran. As no requests
-    // should be rate limited, running a command should only increment the exempt counter.
-    assert.eq(finalExempt - initialExempt, amountOfPing);
+    // Check that we added as much exempt requests as the amount of ping we ran, plus a few from the exempted client.
+    // As no requests should be rate limited, running a command should only increment the exempt counter.
+    assert.gt(finalExempt - initialExempt, amountOfPing);
 
     // Check that we didn't affect the amount of available tokens while running pings.
     assert.eq(finalAvailableTokens - initialAvailableTokens, 0);

@@ -34,6 +34,7 @@
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/cidr_range_list_parameter.h"
 #include "mongo/util/decorable.h"
 
@@ -46,7 +47,8 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(ingressRequestRateLimiterFractionalRateOverride);
 
-VersionedValue<CIDRList> ingressRequestRateLimiterExemptions;
+VersionedValue<CIDRList> ingressRequestRateLimiterIPExemptions;
+VersionedValue<std::vector<std::string>> ingressRequestRateLimiterAppExemptions;
 
 const auto getIngressRequestRateLimiter =
     ServiceContext::declareDecoration<boost::optional<IngressRequestRateLimiter>>();
@@ -55,25 +57,127 @@ const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
     "InitIngressRequestRateLimiter", [](ServiceContext* ctx) {
         getIngressRequestRateLimiter(ctx).emplace();
     }};
+
+class ClientAdmissionControlState {
+public:
+    static bool isExempted(Client*);
+
+private:
+    template <typename T>
+    using Snapshot = VersionedValue<T>::Snapshot;
+
+    bool _areSnapshotsCurrent() const {
+        return ingressRequestRateLimiterIPExemptions.isCurrent(_ipExemptions) &&
+            ingressRequestRateLimiterAppExemptions.isCurrent(_appExemptions);
+    }
+
+    bool _isConnectionExempt(Client* client) {
+        ingressRequestRateLimiterIPExemptions.refreshSnapshot(_ipExemptions);
+        return _ipExemptions && client->session()->isExemptedByCIDRList(*_ipExemptions);
+    }
+
+    bool _isApplicationExempt(Client* client) {
+        const auto clientMetadata = ClientMetadata::get(client);
+        if (!clientMetadata) {
+            return false;
+        }
+
+        // Don't refresh the client's snapshot of app exemptions until we've seen the client
+        // metadata, to ensure that we don't cache an outdated exempted status based on non-existent
+        // client metadata.
+        ingressRequestRateLimiterAppExemptions.refreshSnapshot(_appExemptions);
+        if (!_appExemptions) {
+            return false;
+        }
+
+        const auto& driverName = clientMetadata->getDriverName();
+        const auto& applicationName = clientMetadata->getApplicationName();
+        for (auto& appExemption : *_appExemptions) {
+            if (driverName.starts_with(appExemption) || applicationName.starts_with(appExemption)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool _isExempted(Client* client) {
+        if (MONGO_unlikely(!_exempted.has_value() || !_areSnapshotsCurrent())) {
+            _exempted = _isConnectionExempt(client) || _isApplicationExempt(client);
+        }
+        return *_exempted;
+    }
+
+    Snapshot<CIDRList> _ipExemptions;
+    Snapshot<std::vector<std::string>> _appExemptions;
+    boost::optional<bool> _exempted;
+};
+
+const auto getAdmissionControlState = Client::declareDecoration<ClientAdmissionControlState>();
+
+bool ClientAdmissionControlState::isExempted(Client* client) {
+    return getAdmissionControlState(client)._isExempted(client);
+}
+
+std::shared_ptr<std::vector<std::string>> parseApplicationExemptionList(const BSONObj& b) {
+    IDLParserContext ctx("ApplicationExemptionListParameters");
+    const auto params = ApplicationExemptionListParameters::parse(b, ctx);
+
+    auto apps = std::make_shared<std::vector<std::string>>();
+    for (const auto& app : params.getAppNames()) {
+        apps->emplace_back(std::string{app});
+    }
+
+    return apps;
+}
+
 }  // namespace
 
 
 // TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
-void IngressRequestRateLimiterExemptions::append(OperationContext*,
-                                                 BSONObjBuilder* bob,
-                                                 StringData name,
-                                                 const boost::optional<TenantId>&) {
-    transport::appendCIDRRangeListParameter(ingressRequestRateLimiterExemptions, bob, name);
+void IngressRequestRateLimiterIPExemptions::append(OperationContext*,
+                                                   BSONObjBuilder* bob,
+                                                   StringData name,
+                                                   const boost::optional<TenantId>&) {
+    transport::appendCIDRRangeListParameter(ingressRequestRateLimiterIPExemptions, bob, name);
 }
 
-Status IngressRequestRateLimiterExemptions::set(const BSONElement& value,
-                                                const boost::optional<TenantId>&) {
-    return transport::setCIDRRangeListParameter(ingressRequestRateLimiterExemptions, value.Obj());
+Status IngressRequestRateLimiterIPExemptions::set(const BSONElement& value,
+                                                  const boost::optional<TenantId>&) {
+    return transport::setCIDRRangeListParameter(ingressRequestRateLimiterIPExemptions, value.Obj());
 }
 
-Status IngressRequestRateLimiterExemptions::setFromString(StringData str,
-                                                          const boost::optional<TenantId>&) {
-    return transport::setCIDRRangeListParameter(ingressRequestRateLimiterExemptions, fromjson(str));
+Status IngressRequestRateLimiterIPExemptions::setFromString(StringData str,
+                                                            const boost::optional<TenantId>&) {
+    return transport::setCIDRRangeListParameter(ingressRequestRateLimiterIPExemptions,
+                                                fromjson(str));
+}
+
+void IngressRequestRateLimiterAppExemptions::append(OperationContext*,
+                                                    BSONObjBuilder* bob,
+                                                    StringData name,
+                                                    const boost::optional<TenantId>&) {
+    auto snapshot = ingressRequestRateLimiterAppExemptions.makeSnapshot();
+
+    if (snapshot) {
+        BSONArrayBuilder bb(bob->subarrayStart(name));
+        for (const auto& appName : *snapshot) {
+            bb << appName;
+        }
+    } else {
+        *bob << name << BSONNULL;
+    }
+}
+
+Status IngressRequestRateLimiterAppExemptions::set(const BSONElement& value,
+                                                   const boost::optional<TenantId>&) {
+    ingressRequestRateLimiterAppExemptions.update(parseApplicationExemptionList(value.Obj()));
+    return Status::OK();
+}
+
+Status IngressRequestRateLimiterAppExemptions::setFromString(StringData str,
+                                                             const boost::optional<TenantId>&) {
+    ingressRequestRateLimiterAppExemptions.update(parseApplicationExemptionList(fromjson(str)));
+    return Status::OK();
 }
 
 IngressRequestRateLimiter::IngressRequestRateLimiter()
@@ -97,24 +201,13 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
     // The rate limiter applies only requests when the client is authenticated to prevent DoS
     // attacks caused by many unauthenticated requests. In the case auth is disabled, all
     // requests will be subject to rate limiting.
-    const auto isAuthorizationExempt = [&] {
-        if (!AuthorizationSession::exists(client)) {
-            return true;
-        }
+    if (_isAuthorizationExempt(client)) {
+        _rateLimiter.recordExemption();
+        return Status::OK();
+    }
 
-        const auto authorizationSession = AuthorizationSession::get(client);
-        return !authorizationSession->shouldIgnoreAuthChecks() &&
-            !authorizationSession->isAuthenticated();
-    };
-
-    const auto isConnectionExempt = [&] {
-        ingressRequestRateLimiterExemptions.refreshSnapshot(_ingressRequestRateLimiterExemptions);
-
-        return _ingressRequestRateLimiterExemptions &&
-            client->session()->isExemptedByCIDRList(*_ingressRequestRateLimiterExemptions);
-    };
-
-    if (isAuthorizationExempt() || isConnectionExempt()) {
+    // TODO SERVER-112549 Move _isAuthorizationExempt into  ClientAdmissionControlState.
+    if (ClientAdmissionControlState::isExempted(client)) {
         _rateLimiter.recordExemption();
         return Status::OK();
     }
@@ -170,5 +263,15 @@ void IngressRequestRateLimiter::appendStats(BSONObjBuilder* bob) const {
     bob->append(rateLimiterStats.getField("attemptedAdmissions"));
     bob->append(rateLimiterStats.getField("totalAvailableTokens"));
 }
+
+bool IngressRequestRateLimiter::_isAuthorizationExempt(Client* client) {
+    if (!AuthorizationSession::exists(client)) {
+        return true;
+    }
+
+    const auto authorizationSession = AuthorizationSession::get(client);
+    return !authorizationSession->shouldIgnoreAuthChecks() &&
+        !authorizationSession->isAuthenticated();
+};
 
 }  // namespace mongo

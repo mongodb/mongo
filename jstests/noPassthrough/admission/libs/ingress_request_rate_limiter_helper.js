@@ -32,10 +32,7 @@ export const kConfigLogsAndFailPointsForRateLimiterTests = {
         mode: "alwaysOn",
         data: {rate: kSlowestRefreshRateSecs},
     }),
-    "failpoint.skipRateLimiterForTestClient": tojson({
-        mode: "alwaysOn",
-        data: {exemptAppName: kRateLimiterExemptAppName},
-    }),
+    ingressRequestRateLimiterApplicationExemptions: {appNames: [kRateLimiterExemptAppName]},
 };
 
 const kUser = "admin";

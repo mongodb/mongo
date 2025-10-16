@@ -146,6 +146,7 @@ ClientMetadata::ClientMetadata(BSONObj doc) {
         } else if (name == kDriver) {
             isobj(kDriver, e);
             uassertStatusOK(validateDriverDocument(e.Obj()));
+            _driverName = std::string{e.Obj()[kName].checkAndGetStringData()};
             foundDriver = true;
         } else if (name == kOperatingSystem) {
             isobj(kOperatingSystem, e);
@@ -387,6 +388,10 @@ Status ClientMetadata::serializePrivate(StringData driverName,
 
 StringData ClientMetadata::getApplicationName() const {
     return StringData(_appName);
+}
+
+StringData ClientMetadata::getDriverName() const {
+    return StringData(_driverName);
 }
 
 const BSONObj& ClientMetadata::getDocument() const {
