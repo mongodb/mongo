@@ -847,20 +847,7 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithName(StringData targe
     tassert(10706507,
             "attempting to modify a frozen pipeline in 'Pipeline::popFrontWithName()'",
             !_frozen);
-    return popFrontWithNameAndCriteria(targetStageName, nullptr);
-}
-
-boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
-    StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate) {
-    tassert(10706508,
-            "attempting to modify a frozen pipeline in 'Pipeline::popFrontWithNameAndCriteria()'",
-            !_frozen);
     if (_sources.empty() || _sources.front()->getSourceName() != targetStageName) {
-        return nullptr;
-    }
-    const auto& targetStage = _sources.front();
-
-    if (predicate && !predicate(targetStage.get())) {
         return nullptr;
     }
 
@@ -879,7 +866,6 @@ void Pipeline::appendPipeline(std::unique_ptr<Pipeline> otherPipeline) {
     constexpr bool alreadyOptimized = false;
     validateCommon(alreadyOptimized);
 }
-
 
 std::unique_ptr<Pipeline> Pipeline::makePipeline(
     const std::vector<BSONObj>& rawPipeline,

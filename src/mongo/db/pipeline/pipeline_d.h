@@ -80,12 +80,8 @@ class Pipeline;
 struct PlanSummaryStats;
 
 /**
- * PipelineD is an extension of the Pipeline class, but with additional material that references
- * symbols that are not available in mongos, where the remainder of the Pipeline class also
- * functions.  PipelineD is a friend of Pipeline so that it can have equal access to Pipeline's
- * members.
- *
- * See the friend declaration in Pipeline.
+ * PipelineD contains additional static methods that modify a 'Pipeline' that are not available in
+ * mongos, where the remainder of the Pipeline class also functions.
  */
 class PipelineD {
 public:
@@ -183,7 +179,7 @@ public:
     static bool isSearchPresentAndEligibleForSbe(const Pipeline* pipeline);
 
 private:
-    PipelineD();  // does not exist:  prevent instantiation
+    PipelineD() = delete;  // does not exist: prevent instantiation
 
     /**
      * Build a PlanExecutor and prepare callback to create a generic DocumentSourceCursor for

@@ -606,14 +606,14 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         // unpacking will be done by the 'UnpackTimeseriesBucket' PlanStage if the backup plan
         // (Top-K sort plan) was chosen, and by the 'SampleFromTimeseriesBucket' PlanStage if the
         // ARHASH plan was chosen.
-        DocumentSourceContainer& sources = pipeline->_sources;
-        sources.erase(sources.begin());
+        pipeline->popFront();
+
         // We can push down the $sample source into the PlanStage layer if the chosen strategy uses
         // ARHASH sampling on unsharded collections. For sharded collections, we cannot erase
         // $sample because we need to preserve the sort metadata (the $sortKey field) for the merge
         // cursor on mongos.
         if (isStorageOptimizedSample && !isSharded) {
-            sources.erase(sources.begin());
+            pipeline->popFront();
         }
     }
 
@@ -681,22 +681,19 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutor(
     ExecShardFilterPolicy shardFilterPolicy) {
     auto expCtx = pipeline->getContext();
 
-    // We will be modifying the source vector as we go.
-    DocumentSourceContainer& sources = pipeline->_sources;
-
     // We skip the 'requiresInputDocSource' check in the case of pushing $search down into SBE,
     // as $search has 'requiresInputDocSource' as false.
     bool skipRequiresInputDocSourceCheck = isSearchPresentAndEligibleForSbe(pipeline);
 
-    if (!skipRequiresInputDocSourceCheck && !sources.empty() &&
-        !sources.front()->constraints().requiresInputDocSource) {
+    if (!skipRequiresInputDocSourceCheck && !pipeline->empty() &&
+        !pipeline->peekFront()->constraints().requiresInputDocSource) {
         return {};
     }
 
-    if (!sources.empty()) {
+    if (!pipeline->empty()) {
         // Try to inspect if the DocumentSourceSample or a DocumentSourceInternalUnpackBucket stage
         // can be optimized for sampling backed by a storage engine supplied random cursor.
-        auto&& [sampleStage, unpackBucketStage] = extractSampleUnpackBucket(sources);
+        auto&& [sampleStage, unpackBucketStage] = extractSampleUnpackBucket(pipeline->getSources());
 
         // Optimize an initial $sample stage if possible.
         if (collections.hasMainCollection() && sampleStage) {
@@ -714,7 +711,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutor(
     // If the first stage is $geoNear, prepare a special DocumentSourceGeoNearCursor stage;
     // otherwise, create a generic DocumentSourceCursor.
     const auto geoNearStage =
-        sources.empty() ? nullptr : dynamic_cast<DocumentSourceGeoNear*>(sources.front().get());
+        pipeline->empty() ? nullptr : dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
     if (geoNearStage) {
         return buildInnerQueryExecutorGeoNear(collections, nss, aggRequest, pipeline);
     } else if (search_helpers::isSearchPipeline(pipeline) ||
@@ -1721,7 +1718,6 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     // pushed down into the query executor.
     pipeline->optimizePipeline();
 
-    DocumentSourceContainer& sources = pipeline->_sources;
     auto expCtx = pipeline->getContext();
 
     // Look for an initial match. This works whether we got an initial query or not. If not, it
@@ -1739,13 +1735,12 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     // We avoid performing further optimizations on change stream MatchExpressions to avoid
     // causing lifetime issues to the BSONObj included in the relevant MatchExpressions.
     if (!queryObj.isEmpty()) {
-        auto firstStage = sources.front();
-        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(firstStage.get())) {
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())) {
             if (!isChangeStream) {
                 leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(matchStage);
                 isTextQuery = matchStage->isTextQuery();
             }
-            sources.pop_front();
+            pipeline->popFront();
         } else {
             // A $geoNear stage, the only other stage that can produce an initial query, is also
             // a valid initial stage. However, we should be in buildInnerQueryExecutorGeoNear()
@@ -1758,7 +1753,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
 
     // If this is a query on a time-series collection we might need to keep it fully classic to
     // ensure no perf regressions until we implement the corresponding scenarios fully in SBE.
-    SortAndUnpackInPipeline su = findUnpackAndSort(pipeline->_sources);
+    SortAndUnpackInPipeline su = findUnpackAndSort(pipeline->getSources());
     // Do not double-optimize the sort.
     auto sort = (su.sort && su.sort->isBoundedSortStage()) ? nullptr : su.sort;
     auto unpack = su.unpack;
@@ -1875,10 +1870,9 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
                           << nss.toStringForErrorMsg() << " does not exist",
             collection);
 
-    DocumentSourceContainer& sources = pipeline->_sources;
     auto expCtx = pipeline->getContext();
-    const auto geoNearStage = dynamic_cast<DocumentSourceGeoNear*>(sources.front().get());
-    tassert(9911900, "", geoNearStage);
+    const auto geoNearStage = dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
+    tassert(9911900, "expecting $geoNear as first pipeline stage", geoNearStage);
 
     // If the user specified a "key" field, use that field to satisfy the "near" query. Otherwise,
     // look for a geo-indexed field in 'collection' that can.
@@ -1921,8 +1915,9 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
                                                               distanceMultiplier);
             pipeline->addInitialSource(std::move(cursor));
         };
+
     // Remove the initial $geoNear; it will be replaced by $geoNearCursor.
-    sources.pop_front();
+    pipeline->popFront();
     return {std::move(exec), std::move(attachExecutorCallback), {}};
 }
 
@@ -1976,9 +1971,10 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
         bool unsupportedStage = false;
         bool seenSort = false;
         bool seenUnpack = false;
-        auto iter = pipeline->_sources.begin();
-        auto unpackIter = pipeline->_sources.end();
-        for (; !unsupportedStage && iter != pipeline->_sources.end() && !seenSort; ++iter) {
+        auto& sources = pipeline->getSources();
+        auto iter = sources.begin();
+        auto unpackIter = sources.end();
+        for (; !unsupportedStage && iter != sources.end() && !seenSort; ++iter) {
             const auto* source = iter->get();
             auto sourceId = source->getId();
             if (sourceId == DocumentSourceSort::id) {
@@ -2022,6 +2018,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
                 unsupportedStage = true;
             }
         }
+
         if (!unsupportedStage && seenSort) {
             auto [indexSortOrderAgree, indexOrderedByMinTime] = *agree;
             // This is safe because we have seen a sort so we must have at least one stage to the
@@ -2034,33 +2031,29 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
                 unpack->setIncludeMaxTimeAsMetadata();
             }
 
-            if (indexSortOrderAgree) {
-                pipeline->_sources.insert(iter,
-                                          DocumentSourceSort::createBoundedSort(
-                                              sort->getSortKeyPattern(),
-                                              (indexOrderedByMinTime ? DocumentSourceSort::kMin
-                                                                     : DocumentSourceSort::kMax),
-                                              0,
-                                              sort->getLimit(),
-                                              sort->shouldSetSortKeyMetadata(),
-                                              expCtx));
-            } else {
-                // Since the sortPattern and the direction of the index don't agree we must use the
-                // offset to get an estimate on the bounds of the bucket.
-                pipeline->_sources.insert(
-                    iter,
-                    DocumentSourceSort::createBoundedSort(
-                        sort->getSortKeyPattern(),
-                        (indexOrderedByMinTime ? DocumentSourceSort::kMin
-                                               : DocumentSourceSort::kMax),
-                        static_cast<long long>((indexOrderedByMinTime)
-                                                   ? unpack->getBucketMaxSpanSeconds()
-                                                   : -unpack->getBucketMaxSpanSeconds()) *
-                            1000,
-                        sort->getLimit(),
-                        sort->shouldSetSortKeyMetadata(),
-                        expCtx));
+            sources.insert(
+                iter,
+                DocumentSourceSort::createBoundedSort(
+                    sort->getSortKeyPattern(),
+                    (indexOrderedByMinTime ? DocumentSourceSort::kMin : DocumentSourceSort::kMax),
+                    [&]() -> long long {
+                        if (indexSortOrderAgree) {
+                            return 0;
+                        } else {
+                            // Since the sortPattern and the direction of the index don't agree we
+                            // must use the offset to get an estimate on the bounds of the bucket.
+                            return static_cast<long long>(
+                                       (indexOrderedByMinTime)
+                                           ? unpack->getBucketMaxSpanSeconds()
+                                           : -unpack->getBucketMaxSpanSeconds()) *
+                                1000;
+                        }
+                    }(),
+                    sort->getLimit(),
+                    sort->shouldSetSortKeyMetadata(),
+                    expCtx));
 
+            if (!indexSortOrderAgree) {
                 /**
                  * We wish to create the following predicate to avoid returning incorrect
                  * results in the unlikely event bucketMaxSpanSeconds changes under us.
@@ -2097,16 +2090,15 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
                                 Value{static_cast<long long>(unpack->getBucketMaxSpanSeconds()) *
                                       1000}))),
                     expCtx);
-                pipeline->_sources.insert(
-                    unpackIter, make_intrusive<DocumentSourceMatch>(std::move(match), expCtx));
+                sources.insert(unpackIter,
+                               make_intrusive<DocumentSourceMatch>(std::move(match), expCtx));
             }
+
             // Ensure we're erasing the sort source.
             tassert(6434901,
                     "we must erase a $sort stage and replace it with a bounded sort stage",
-                    strncmp((*iter)->getSourceName(),
-                            DocumentSourceSort::kStageName.data(),
-                            DocumentSourceSort::kStageName.length()) == 0);
-            pipeline->_sources.erase(iter);
+                    (*iter)->getId() == DocumentSourceSort::id);
+            sources.erase(iter);
         }
     }
 }

@@ -450,15 +450,21 @@ public:
     }
 
     /**
+     * Returns a pointer to the first stage of the pipeline, or a nullptr if the pipeline is empty.
+     */
+    DocumentSource* peekFront() const;
+
+    /**
      * Removes and returns the first stage of the pipeline. Returns nullptr if the pipeline is
      * empty.
      */
     boost::intrusive_ptr<DocumentSource> popFront();
 
     /**
-     * Returns a pointer to the first stage of the pipeline, or a nullptr if the pipeline is empty.
+     * Removes and returns the first stage of the pipeline if its name is 'targetStageName'.
+     * Returns nullptr if there is no first stage with that name.
      */
-    DocumentSource* peekFront() const;
+    boost::intrusive_ptr<DocumentSource> popFrontWithName(StringData targetStageName);
 
     /**
      * Removes and returns the last stage of the pipeline. Returns nullptr if the pipeline is empty.
@@ -468,21 +474,7 @@ public:
     /**
      * Adds the given stage to the end of the pipeline.
      */
-    void pushBack(boost::intrusive_ptr<DocumentSource>);
-
-    /**
-     * Removes and returns the first stage of the pipeline if its name is 'targetStageName'.
-     * Returns nullptr if there is no first stage with that name.
-     */
-    boost::intrusive_ptr<DocumentSource> popFrontWithName(StringData targetStageName);
-
-    /**
-     * Removes and returns the first stage of the pipeline if its name is 'targetStageName' and the
-     * given 'predicate' function, if present, returns 'true' when called with a pointer to the
-     * stage. Returns nullptr if there is no first stage which meets these criteria.
-     */
-    boost::intrusive_ptr<DocumentSource> popFrontWithNameAndCriteria(
-        StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate);
+    void pushBack(boost::intrusive_ptr<DocumentSource> newStage);
 
     /**
      * Appends another pipeline to the existing pipeline.
@@ -499,15 +491,6 @@ public:
      * initial source as the first stage, which is illegal for $facet pipelines.
      */
     void validateCommon(bool alreadyOptimized) const;
-
-    /**
-     * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists
-     * because of linkage requirements. Pipeline needs to function in mongod and mongos. PipelineD
-     * contains extra functionality required in mongod, and which can't appear in mongos because the
-     * required symbols are unavailable for linking there. Consider PipelineD to be an extension of
-     * this class for mongod only.
-     */
-    friend class PipelineD;
 
     /**
      * For commands that return multiple pipelines, this value will contain the type of pipeline.
@@ -580,6 +563,9 @@ private:
         const MakePipelineOptions& opts,
         const NamespaceString& originalNs);
 
+    /**
+     * Contains the 'DocumentSources' managed by this instance.
+     */
     DocumentSourceContainer _sources;
 
     PipelineSplitState _splitState = PipelineSplitState::kUnsplit;
