@@ -50,6 +50,10 @@ public:
     BSONObj serialize() const override {
         return BSON(std::string(kNoOpName) << "serializedForExecution");
     }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
 };
 
 class NoOpAggStageAstNode : public sdk::AggStageAstNode {

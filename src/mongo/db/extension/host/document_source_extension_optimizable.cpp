@@ -35,7 +35,7 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
     if (!opts.isKeepingLiteralsUnchanged()) {
         // TODO SERVER-111736 call into the ParseNode handle to serialize the query shape.
     } else if (opts.isSerializingForExplain()) {
-        // TODO (no-ticket-yet) call into the ParseNode handle to serialize for explain.
+        return Value(_logicalStage.explain(*opts.verbosity));
     } else {
         // Serialize the stage for query execution.
         return Value(_logicalStage.serialize());

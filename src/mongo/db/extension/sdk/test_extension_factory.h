@@ -37,6 +37,9 @@
         ::mongo::BSONObj serialize() const override {                                           \
             return _rawSpec;                                                                    \
         }                                                                                       \
+        ::mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {   \
+            return _rawSpec;                                                                    \
+        }                                                                                       \
                                                                                                 \
     private:                                                                                    \
         ::mongo::BSONObj _rawSpec;                                                              \

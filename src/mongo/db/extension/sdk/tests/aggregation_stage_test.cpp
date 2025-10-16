@@ -538,6 +538,10 @@ public:
         return BSON(kStageName << kStageSpec);
     }
 
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON(kStageName << verbosity);
+    }
+
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
         return std::make_unique<SimpleSerializationLogicalStage>();
     }
@@ -552,6 +556,35 @@ TEST(AggregationStageTest, SimpleSerializationSucceeds) {
     ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                            << SimpleSerializationLogicalStage::kStageSpec),
                       serialized);
+}
+
+TEST(AggregationStageTest, Explain) {
+    auto logicalStage =
+        new extension::sdk::ExtensionLogicalAggStage(SimpleSerializationLogicalStage::make());
+    auto handle = extension::host_connector::LogicalAggStageHandle{logicalStage};
+
+    // Test that different verbosity levels can be passed through to the extension implementation
+    // correctly.
+    {
+        auto output = handle.explain(ExplainOptions::Verbosity::kQueryPlanner);
+        ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
+                               << ::MongoExtensionExplainVerbosity::kQueryPlanner),
+                          output);
+    }
+
+    {
+        auto output = handle.explain(ExplainOptions::Verbosity::kExecStats);
+        ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
+                               << ::MongoExtensionExplainVerbosity::kExecStats),
+                          output);
+    }
+
+    {
+        auto output = handle.explain(ExplainOptions::Verbosity::kExecAllPlans);
+        ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
+                               << ::MongoExtensionExplainVerbosity::kExecAllPlans),
+                          output);
+    }
 }
 
 class SimpleQueryShapeParseNode : public sdk::AggStageParseNode {

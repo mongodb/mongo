@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
@@ -48,10 +49,16 @@ public:
 
     BSONObj serialize() const;
 
+    /**
+     * Collects explain output at the specified verbosity from this logical stage.
+     */
+    BSONObj explain(ExplainOptions::Verbosity verbosity) const;
+
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(
             11173703, "ExtensionLogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
+        tassert(11239401, "ExtensionLogicalAggStage 'explain' is null", vtable.explain != nullptr);
     }
 };
 }  // namespace mongo::extension::host_connector

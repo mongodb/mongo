@@ -51,6 +51,7 @@ class LogicalAggStage {
 public:
     LogicalAggStage() = default;
     virtual BSONObj serialize() const = 0;
+    virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
     virtual ~LogicalAggStage() = default;
 };
 
@@ -94,8 +95,23 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {.destroy = &_extDestroy,
-                                                                     .serialize = &_extSerialize};
+    static ::MongoExtensionStatus* _extExplain(
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionExplainVerbosity verbosity,
+        ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+
+            const auto& impl =
+                static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
+
+            // Allocate a buffer on the heap. Ownership is transferred to the caller.
+            *output = new VecByteBuf(impl.explain(verbosity));
+        });
+    };
+
+    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
+        .destroy = &_extDestroy, .serialize = &_extSerialize, .explain = &_extExplain};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

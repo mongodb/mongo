@@ -46,6 +46,10 @@ public:
     BSONObj serialize() const override {
         return BSON("$shardedExecutionSerialization" << BSON(kShardedAssertFlagFieldName << true));
     }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
 };
 
 class ShardedExecutionSerializationAstNode : public sdk::AggStageAstNode {

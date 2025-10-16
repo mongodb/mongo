@@ -191,6 +191,25 @@ typedef struct MongoExtensionHostQueryShapeOptsVTable {
 } MongoExtensionHostQueryShapeOptsVTable;
 
 /**
+ * Possible explain verbosity levels.
+ */
+typedef enum MongoExtensionExplainVerbosity : uint32_t {
+    /**
+     * Display basic information about the pipeline that would run.
+     */
+    kQueryPlanner = 0,
+    /**
+     * In addition reporting basic information about the pipeline, runs the pipeline and reports
+     * execution-related stats.
+     */
+    kExecStats = 1,
+    /**
+     * Generates kExecStats output for all possible query plans.
+     */
+    kExecAllPlans = 2,
+} MongoExtensionExplainVerbosity;
+
+/**
  * Types of aggregation stages that can be implemented as an extension.
  */
 typedef enum MongoExtensionAggStageType : uint32_t {
@@ -261,6 +280,18 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      */
     MongoExtensionStatus* (*serialize)(const MongoExtensionLogicalAggStage* logicalStage,
                                        MongoExtensionByteBuf** output);
+
+    /**
+     * Populates the ByteBuf with the stage's explain output as serialized BSON. Ownership is
+     * transferred to the caller.
+     *
+     * Output is expected to be in the form {$stageName: {...}}.
+     *
+     * Note that this method will be called for all three verbosity levels.
+     */
+    MongoExtensionStatus* (*explain)(const MongoExtensionLogicalAggStage* logicalStage,
+                                     MongoExtensionExplainVerbosity verbosity,
+                                     MongoExtensionByteBuf** output);
 } MongoExtensionLogicalAggStageVTable;
 
 /**
