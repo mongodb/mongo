@@ -117,6 +117,8 @@ public:
                                    truncateMarkers->getCreationProcessingTime().count());
                     builder.append("processingMethod", "scanning");
                 }
+                builder.appendNumber("truncateMarkersCount",
+                                     static_cast<long long>(truncateMarkers->numMarkers()));
             }
         }
 

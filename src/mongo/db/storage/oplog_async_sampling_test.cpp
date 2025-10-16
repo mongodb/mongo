@@ -151,13 +151,13 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampleAndU
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
 
     // Continue finishing the initial scan / sample
     oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
 
     // Confirm that some truncate markers were generated.
-    ASSERT_LT(0U, oplogTruncateMarkers->numMarkers_forTest());
+    ASSERT_LT(0U, oplogTruncateMarkers->numMarkers());
 }  // namespace repl
 
 // In async mode, during startup but before sampling finishes,
@@ -230,7 +230,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) 
               oplogTruncateMarkers->getMarkersCreationMethod());
     // Confirm that some truncate markers were generated.
     ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
-    auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers_forTest();
+    auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers();
     ASSERT_GT(truncateMarkersBefore, 0U);
     ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
 }
@@ -249,7 +249,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeCreateOplo
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
     ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
     ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 }

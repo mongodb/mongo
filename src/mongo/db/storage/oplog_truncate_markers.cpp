@@ -37,6 +37,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/fail_point.h"
 
 #include <memory>
 
@@ -46,7 +47,8 @@ namespace mongo {
 
 namespace {
 const double kNumMSInHour = 1000 * 60 * 60;
-}
+MONGO_FAIL_POINT_DEFINE(hangDuringOplogSampling);
+}  // namespace
 
 std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createEmptyOplogTruncateMarkers(
     RecordStore& rs) {
@@ -88,6 +90,7 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
     // We need to read the whole oplog, override the recoveryUnit's oplogVisibleTimestamp.
     ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
         shard_role_details::getRecoveryUnit(opCtx), boost::none);
+
     std::unique_ptr<CollectionTruncateMarkers::CollectionIterator> iterator;
     if (gOplogSamplingAsyncEnabled && gOplogSamplingAsyncYieldIntervalMs >= 0) {
         iterator = std::make_unique<YieldableCollectionIterator>(
@@ -95,6 +98,14 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
     } else {
         iterator = std::make_unique<UnyieldableCollectionIterator>(opCtx, &rs);
     }
+
+    if (MONGO_unlikely(hangDuringOplogSampling.shouldFail())) {
+        LOGV2(11211900,
+              "Hanging the oplog cap maintainer thread during intial sampling due "
+              "to fail point");
+        hangDuringOplogSampling.pauseWhileSet(opCtx);
+    }
+
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx,
         *iterator,
@@ -109,6 +120,8 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
         numTruncateMarkersToKeep);
     LOGV2(22382,
           "Record store oplog processing finished",
+          "markersCount"_attr = initialSetOfMarkers.markers.size(),
+          "markerCreationMethod"_attr = toString(initialSetOfMarkers.methodUsed),
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
     LOGV2(
         10621110, "Initial set of markers created.", "Oplog size (in bytes)"_attr = rs.dataSize());
