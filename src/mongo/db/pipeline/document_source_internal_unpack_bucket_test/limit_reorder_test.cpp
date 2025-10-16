@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
@@ -62,7 +63,7 @@ auto sortObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
 // Simple test to push limit down.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj2), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 
@@ -81,7 +82,7 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForMultipleLimits) {
     auto pipeline =
         Pipeline::parse(makeVector(unpackSpecObj, limitObj10, limitObj2, limitObj5), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 
@@ -96,7 +97,7 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForMultipleLimits) {
 // Test that the stages after $limit are also preserved.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj2, matchObj), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 
@@ -113,7 +114,7 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
 // Test that limit is not pushed down if it comes after match.
 TEST_F(InternalUnpackBucketLimitReorderTest, NoOptimizeForMatchBeforeLimit) {
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, matchObj, limitObj2), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 
@@ -132,7 +133,7 @@ TEST_F(InternalUnpackBucketLimitReorderTest, NoOptimizeForMatchBeforeLimit) {
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSort) {
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj2), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     const auto& container = pipeline->getSources();
@@ -158,7 +159,7 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSort) {
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimitsIncreasing) {
     auto pipeline =
         Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj5, limitObj10), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     const auto& container = pipeline->getSources();
@@ -182,7 +183,7 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimit
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimitsDecreasing) {
     auto pipeline =
         Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj10, limitObj2), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     const auto& container = pipeline->getSources();

@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_js_emit.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
@@ -480,7 +481,7 @@ std::unique_ptr<Pipeline> translateFromMR(MapReduceCommandRequest parsedMr,
                              parsedMr.getReduce().getCode(),
                              parsedMr.getFinalize())),
             expCtx);
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
         return pipeline;
     } catch (DBException& ex) {
         uassertStatusOK(interpretTranslationError(&ex, parsedMr));

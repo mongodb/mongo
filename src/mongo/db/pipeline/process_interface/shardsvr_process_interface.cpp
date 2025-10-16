@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_merge.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -169,7 +170,7 @@ boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
     boost::optional<BSONObj> readConcern) {
     // We only want to retrieve the one document that corresponds to 'documentKey', so we
     // ignore collation when computing which shard to target.
-    MakePipelineOptions opts;
+    pipeline_factory::MakePipelineOptions opts;
     opts.shardTargetingPolicy = ShardTargetingPolicy::kForceTargetingWithSimpleCollation;
     opts.readConcern = std::move(readConcern);
 

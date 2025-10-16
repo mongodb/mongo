@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
@@ -62,7 +63,7 @@ public:
 
         const auto bsonStages = pipelineFromJsonArray(query);
         auto pipeline = Pipeline::parse(bsonStages, expCtx);
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
 
         return pipeline;
     }

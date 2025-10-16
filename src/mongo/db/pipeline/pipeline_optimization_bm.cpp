@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/intrusive_counter.h"
@@ -53,7 +54,7 @@ public:
             auto pipeline = Pipeline::parse(rawPipeline, expCtx);
             state.ResumeTiming();
 
-            pipeline->optimizePipeline();
+            pipeline_optimization::optimizePipeline(*pipeline);
         }
     }
 

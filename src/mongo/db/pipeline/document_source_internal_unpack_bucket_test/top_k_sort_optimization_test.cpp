@@ -29,6 +29,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -118,7 +119,7 @@ TEST_F(TopKSortOptimization, MatchOnlyAfterTopKSortPushedDownWithTopKSortOptimiz
 
     ASSERT_EQ(pipeline->size(), 4U);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The $match stage should be pushed down before the $_internalUnpackBucket and the
     // $_internalUnpackBucket should have the event filter and the $sort stage should be absorbed
@@ -145,7 +146,7 @@ TEST_F(TopKSortOptimization, MatchOnlyBeforeTopKSortPushedDownWithTopKSortOptimi
 
     ASSERT_EQ(pipeline->size(), 4U);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The $match stage should be pushed down before the $_internalUnpackBucket and the
     // $_internalUnpackBucket should have the event filter and the $sort stage should be absorbed
@@ -222,7 +223,7 @@ TEST_F(TopKSortOptimization,
 
     ASSERT_EQ(pipeline->size(), 5U);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The $match stage should be pushed down before the $_internalUnpackBucket and the $sort stage
     // should be absorbed into the $group stage. The $project stage should be absorbed into the
@@ -254,7 +255,7 @@ TEST_F(TopKSortOptimization,
 
     ASSERT_EQ(pipeline->size(), 5U);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The $match stage should be pushed down before the $_internalUnpackBucket and the $sort stage
     // should be absorbed into the $group stage. The $project stage should be absorbed into the
@@ -309,7 +310,7 @@ TEST_F(TopKSortOptimization,
 
     ASSERT_EQ(pipeline->size(), 5U);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The $match stage should be pushed before the $_internalUnpackBucket and the
     // $_internalUnpackBucket absorb the $project stage. The $sort stage should be absorbed

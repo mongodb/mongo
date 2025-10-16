@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -541,7 +542,7 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::buildPipelineFromViewDefiniti
         }
     };
 
-    MakePipelineOptions opts;
+    pipeline_factory::MakePipelineOptions opts;
     opts.attachCursorSource = false;
     // Only call optimize() here if we actually have a pipeline to resolve in the view definition.
     opts.optimize = !resolvedNs.pipeline.empty();
@@ -550,7 +551,7 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::buildPipelineFromViewDefiniti
     auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
 
-    return Pipeline::makePipelineFromViewDefinition(
+    return pipeline_factory::makePipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }
 

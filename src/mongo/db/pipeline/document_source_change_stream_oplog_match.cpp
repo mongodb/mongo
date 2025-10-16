@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/server_options.h"
@@ -204,7 +205,7 @@ DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOptimi
         return itr;
     }
 
-    itr = Pipeline::optimizeEndOfPipeline(std::prev(itr), container);
+    itr = pipeline_optimization::optimizeEndOfPipeline(std::prev(itr), container);
     _optimizedEndOfPipeline = true;
 
     if (itr == container->end()) {

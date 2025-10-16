@@ -79,6 +79,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
@@ -793,7 +794,7 @@ tryDistinctGroupRewrite(const DocumentSourceContainer& sources) {
 boost::optional<long long> extractSkipForPushdown(Pipeline* pipeline) {
     // If the disablePipelineOptimization failpoint is enabled, then do not attempt the skip
     // pushdown optimization.
-    if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
+    if (MONGO_unlikely(pipeline_optimization::disablePipelineOptimization.shouldFail())) {
         return boost::none;
     }
     auto&& sources = pipeline->getSources();
@@ -801,7 +802,7 @@ boost::optional<long long> extractSkipForPushdown(Pipeline* pipeline) {
     auto skip = extractSkipForPushdown(sources.begin(), &sources);
     if (skip) {
         // Removing stages may have produced the opportunity for additional optimizations.
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
     }
     return skip;
 }
@@ -809,7 +810,7 @@ boost::optional<long long> extractSkipForPushdown(Pipeline* pipeline) {
 SkipThenLimit extractSkipAndLimitForPushdown(Pipeline* pipeline) {
     // If the disablePipelineOptimization failpoint is enabled, then do not attempt the limit and
     // skip pushdown optimization.
-    if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
+    if (MONGO_unlikely(pipeline_optimization::disablePipelineOptimization.shouldFail())) {
         return {boost::none, boost::none};
     }
     auto&& sources = pipeline->getSources();
@@ -822,7 +823,7 @@ SkipThenLimit extractSkipAndLimitForPushdown(Pipeline* pipeline) {
     auto skipThenLimit = LimitThenSkip(limit, skip).flip();
     if (skipThenLimit.getSkip() || skipThenLimit.getLimit()) {
         // Removing stages may have produced the opportunity for additional optimizations.
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
     }
     return skipThenLimit;
 }
@@ -1716,7 +1717,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     ExecShardFilterPolicy shardFilterPolicy) {
     // Make a last effort to optimize pipeline stages before potentially detaching them to be
     // pushed down into the query executor.
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto expCtx = pipeline->getContext();
 

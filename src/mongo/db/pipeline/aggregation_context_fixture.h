@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -247,7 +248,7 @@ public:
         boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
         std::vector<BSONObj> expectedStages) {
         auto optimizedPipeline = Pipeline::parse(expectedStages, expCtx);
-        optimizedPipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*optimizedPipeline);
         auto optimizedSerialized = optimizedPipeline->serializeToBson();
 
         ASSERT_EQ(expectedStages.size(), optimizedSerialized.size());

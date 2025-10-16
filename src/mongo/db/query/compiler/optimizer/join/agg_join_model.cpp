@@ -32,7 +32,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
 namespace mongo::join_ordering {
@@ -40,11 +42,11 @@ namespace {
 std::unique_ptr<Pipeline> createEmptyPipeline(
     const boost::intrusive_ptr<ExpressionContext>& sourceExpCtx) {
     auto expCtx = makeCopyFromExpressionContext(sourceExpCtx, sourceExpCtx->getNamespaceString());
-    MakePipelineOptions opts;
+    pipeline_factory::MakePipelineOptions opts;
     opts.attachCursorSource = false;
     std::vector<BSONObj> emptyPipeline;
 
-    return Pipeline::makePipeline(emptyPipeline, expCtx, opts);
+    return pipeline_factory::makePipeline(emptyPipeline, expCtx, opts);
 }
 
 std::unique_ptr<CanonicalQuery> makeFullScanCQ(boost::intrusive_ptr<ExpressionContext> expCtx) {
@@ -61,7 +63,7 @@ std::unique_ptr<CanonicalQuery> makeCQFromLookup(
         auto workingStage = stage->clone(pipelineExpCtx);
         stage = dynamic_cast<DocumentSourceLookUp*>(workingStage.get());
 
-        stage->getResolvedIntrospectionPipeline().optimizePipeline();
+        pipeline_optimization::optimizePipeline(stage->getResolvedIntrospectionPipeline());
         auto swCQ = createCanonicalQuery(
             expCtx, stage->getFromNs(), stage->getResolvedIntrospectionPipeline());
         const bool allSubPipelineStagesPushedDown =

@@ -871,7 +871,7 @@ SamplingBasedSplitPolicy::makePipelineDocumentSource_forTest(
     const ShardKeyPattern& shardKey,
     int numInitialChunks,
     int samplesPerChunk) {
-    MakePipelineOptions opts;
+    pipeline_factory::MakePipelineOptions opts;
     opts.attachCursorSource = false;
     auto pipeline = _makePipeline(opCtx, ns, shardKey, numInitialChunks, samplesPerChunk, opts);
     pipeline->addInitialSource(initialSource);
@@ -884,7 +884,7 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                                                       const ShardKeyPattern& shardKey,
                                                       int numInitialChunks,
                                                       int samplesPerChunk,
-                                                      MakePipelineOptions opts) {
+                                                      pipeline_factory::MakePipelineOptions opts) {
     auto pipeline = _makePipeline(opCtx, ns, shardKey, numInitialChunks, samplesPerChunk, opts);
     return std::make_unique<PipelineDocumentSource>(std::move(pipeline), samplesPerChunk - 1);
 }
@@ -895,7 +895,7 @@ SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_make
     const ShardKeyPattern& shardKey,
     int numInitialChunks,
     int samplesPerChunk,
-    MakePipelineOptions opts) {
+    pipeline_factory::MakePipelineOptions opts) {
     auto rawPipeline = createRawPipeline(shardKey, numInitialChunks, samplesPerChunk);
     ResolvedNamespaceMap resolvedNamespaces;
     resolvedNamespaces[ns] = {ns, std::vector<BSONObj>{}};
@@ -932,7 +932,8 @@ SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_make
                       .bypassDocumentValidation(true)
                       .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                       .build();
-    return Pipeline::makePipeline(aggRequest, expCtx, boost::none /* shardCursorsSortSpec */, opts);
+    return pipeline_factory::makePipeline(
+        aggRequest, expCtx, boost::none /* shardCursorsSortSpec */, opts);
 }
 
 SamplingBasedSplitPolicy::PipelineDocumentSource::PipelineDocumentSource(

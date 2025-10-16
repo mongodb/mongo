@@ -53,6 +53,7 @@
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/write_ops/single_write_result_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
@@ -167,7 +168,7 @@ boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
     boost::optional<UUID> collectionUUID,
     const Document& documentKey,
     boost::optional<BSONObj> readConcern) {
-    MakePipelineOptions opts;
+    pipeline_factory::MakePipelineOptions opts;
     opts.shardTargetingPolicy = ShardTargetingPolicy::kNotAllowed;
     opts.readConcern = std::move(readConcern);
 

@@ -70,6 +70,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
@@ -1094,7 +1095,7 @@ StatusWith<std::unique_ptr<Pipeline>> preparePipeline(
                 !aggExState.getRequest().getExchange());
     }
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     constexpr bool alreadyOptimized = true;
     pipeline->validateCommon(alreadyOptimized);

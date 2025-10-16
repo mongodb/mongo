@@ -515,6 +515,7 @@ mongo_cc_library(
         "match_processor.cpp",
         "merge_processor.cpp",
         "pipeline.cpp",
+        "pipeline_factory.cpp",
         "pipeline_test_util.cpp",
         "rank_fusion_pipeline_builder.cpp",
         "redact_processor.cpp",
@@ -587,6 +588,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_list_catalog.cpp",
         "//src/mongo/db/pipeline:document_source_list_cluster_catalog.cpp",
         "//src/mongo/db/pipeline:document_source_sharded_data_distribution.cpp",
+        "//src/mongo/db/pipeline/optimization:optimize.cpp",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.cpp",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.cpp",
         "//src/mongo/db/pipeline/search:document_source_list_search_indexes.cpp",
@@ -683,6 +685,8 @@ mongo_cc_library(
         "merge_processor.h",
         "partition_key_comparator.h",
         "pipeline.h",
+        # TODO(SERVER-112281): Move to its own target.
+        "pipeline_factory.h",
         "pipeline_split_state.h",
         "pipeline_test_util.h",
         "rank_fusion_pipeline_builder.h",
@@ -761,6 +765,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_list_catalog.h",
         "//src/mongo/db/pipeline:document_source_list_cluster_catalog.h",
         "//src/mongo/db/pipeline:document_source_sharded_data_distribution.h",
+        # TODO(SERVER-112281): Move to its own target.
+        "//src/mongo/db/pipeline/optimization:optimize.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
         "//src/mongo/db/pipeline/search:document_source_list_search_indexes.h",

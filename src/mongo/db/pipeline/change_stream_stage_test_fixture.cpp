@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
@@ -371,7 +372,7 @@ std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipeline(
     expCtx->setInRouter(true);
 
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     return pipeline;
 }

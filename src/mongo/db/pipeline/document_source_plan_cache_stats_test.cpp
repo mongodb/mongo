@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/unittest/unittest.h"
@@ -168,7 +169,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->size());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->serialize();
@@ -184,7 +185,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->size());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->writeExplainOps(kExplain);
@@ -201,7 +202,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesAllHostsSuccessfullyAfterAbso
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->size());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->serialize();
@@ -219,7 +220,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest,
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->size());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->writeExplainOps(kExplain);
@@ -235,7 +236,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch)
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->size());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(1u, pipeline->size());
     auto serialized = redactToArray(*pipeline->getSources().front());
     ASSERT_EQ(2u, serialized.size());
@@ -269,7 +270,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
     ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),

@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
@@ -201,7 +202,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, OptimizeCorrectlyInternalizes
                                    fromjson("{$project: {x: true, y: true}}")),
                         getExpCtx());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(1u, serialized.size());
@@ -222,7 +223,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, OptimizeCorrectlyInternalizes
                                    groupSpec),
                         getExpCtx());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(4u, serialized.size());
@@ -242,7 +243,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest,
     auto projectSpec = fromjson("{$project: {a: true, _id: false}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
@@ -258,7 +259,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest,
     auto projectSpec = fromjson("{$project: {_id: true, a: true}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());

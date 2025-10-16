@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -235,7 +236,7 @@ protected:
                                                    DocumentSourceContainer* container) final;
 
     boost::intrusive_ptr<DocumentSource> optimize() final {
-        _sharedState->_pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*_sharedState->_pipeline);
         return this;
     }
 

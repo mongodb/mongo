@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/document_source_streaming_group.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -122,10 +123,10 @@ public:
             rawPipeline.push_back(element.Obj());
         }
         auto pipeline =
-            Pipeline::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
+            pipeline_factory::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
 
         auto pipelineSuffix =
-            Pipeline::makePipeline({}, getExpCtx(), {.attachCursorSource = false});
+            pipeline_factory::makePipeline({}, getExpCtx(), {.attachCursorSource = false});
         return OwningDistributedPlanContext(
             std::move(pipeline), std::move(pipelineSuffix), std::move(shardKeys));
     }

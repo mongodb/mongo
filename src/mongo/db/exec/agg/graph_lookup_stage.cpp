@@ -35,7 +35,9 @@
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
@@ -565,7 +567,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                       }
                   }},
               collData);
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
         pipeline->validateCommon(true /* alreadyOptimized */);
     };
     try {
@@ -579,10 +581,10 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
         // This exception returns the information we need to resolve a sharded view. Update
         // the pipeline with the resolved view definition, but don't optimize or attach the
         // cursor source yet.
-        MakePipelineOptions opts;
+        pipeline_factory::MakePipelineOptions opts;
         opts.optimize = false;
         opts.attachCursorSource = false;
-        pipeline = mongo::Pipeline::makePipelineFromViewDefinition(
+        pipeline = pipeline_factory::makePipelineFromViewDefinition(
             _fromExpCtx,
             ResolvedNamespace{e->getNamespace(), e->getPipeline()},
             _fromPipeline,

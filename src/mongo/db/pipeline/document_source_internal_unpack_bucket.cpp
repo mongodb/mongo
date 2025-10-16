@@ -66,6 +66,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/monotonic_expression.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
@@ -287,8 +288,8 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.
 void optimizePrefix(DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto prefix = DocumentSourceContainer(container->begin(), itr);
-    Pipeline::optimizeContainer(&prefix);
-    Pipeline::optimizeEachStage(&prefix);
+    pipeline_optimization::optimizeContainer(&prefix);
+    pipeline_optimization::optimizeEachStage(&prefix);
     container->erase(container->begin(), itr);
     container->splice(itr, prefix);
 }
@@ -1870,7 +1871,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
             }
             // We want to optimize the rest of the pipeline to ensure the stages are in their
             // optimal position and expressions have been optimized to allow for certain rewrites.
-            Pipeline::optimizeEndOfPipeline(itr, container);
+            pipeline_optimization::optimizeEndOfPipeline(itr, container);
         }
 
         if (std::next(itr) == container->end()) {

@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -129,7 +130,7 @@ boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingle
     std::unique_ptr<Pipeline> pipeline;
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {
-        pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
+        pipeline = pipeline_factory::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
         execPipeline = exec::agg::buildPipeline(pipeline->freeze());
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;

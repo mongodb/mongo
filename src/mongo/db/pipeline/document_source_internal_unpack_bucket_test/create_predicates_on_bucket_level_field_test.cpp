@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
@@ -230,7 +231,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before attempting to
     // perform predicate mapping. We will mimic this behavior here to take advantage of the
     // existing $expr rewrite optimizations.
-    Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+    pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -257,7 +258,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before attempting to
     // perform predicate mapping. We will mimic this behavior here to take advantage of the
     // existing $expr rewrite optimizations.
-    Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+    pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -284,7 +285,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before attempting to
     // perform predicate mapping. We will mimic this behavior here to take advantage of the
     // existing $expr rewrite optimizations.
-    Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+    pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -308,7 +309,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before attempting to
     // perform predicate mapping. We will mimic this behavior here to take advantage of the
     // existing $expr rewrite optimizations.
-    Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+    pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -332,7 +333,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before attempting to
     // perform predicate mapping. We will mimic this behavior here to take advantage of the
     // existing $expr rewrite optimizations.
-    Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+    pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -577,7 +578,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto pipeline = Pipeline::parse(makeVector(unpackBucketObj, matchObj), getExpCtx());
     ASSERT_EQ(pipeline->size(), 2U);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(pipeline->size(), 2U);
 
     // To get the optimized $match from the pipeline, we have to serialize with explain.
@@ -605,7 +606,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto pipeline = Pipeline::parse(makeVector(unpackBucketObj, matchObj), getExpCtx());
     ASSERT_EQ(pipeline->size(), 2U);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(pipeline->size(), 2U);
 
     auto stages = pipeline->serializeToBson();
@@ -865,7 +866,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before
             // attempting to perform predicate mapping. We will mimic this behavior here to take
             // advantage of the existing $expr rewrite optimizations.
-            Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+            pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
             ASSERT_EQ(pipeline->size(), 2U);
 
@@ -926,7 +927,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before
             // attempting to perform predicate mapping. We will mimic this behavior here to take
             // advantage of the existing $expr rewrite optimizations.
-            Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+            pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
             ASSERT_EQ(pipeline->size(), 2U);
 
@@ -979,7 +980,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before
             // attempting to perform predicate mapping. We will mimic this behavior here to take
             // advantage of the existing $expr rewrite optimizations.
-            Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+            pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
             ASSERT_EQ(pipeline->size(), 2U);
 
@@ -1044,7 +1045,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before
             // attempting to perform predicate mapping. We will mimic this behavior here to take
             // advantage of the existing $expr rewrite optimizations.
-            Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+            pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
             ASSERT_EQ(pipeline->size(), 2U);
 
@@ -1097,7 +1098,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // $_internalUnpackBucket's doOptimizeAt optimizes the end of the pipeline before
             // attempting to perform predicate mapping. We will mimic this behavior here to take
             // advantage of the existing $expr rewrite optimizations.
-            Pipeline::optimizeEndOfPipeline(container.begin(), &container);
+            pipeline_optimization::optimizeEndOfPipeline(container.begin(), &container);
 
             ASSERT_EQ(pipeline->size(), 2U);
 

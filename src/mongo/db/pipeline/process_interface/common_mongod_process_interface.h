@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
@@ -212,7 +213,7 @@ protected:
         const NamespaceString& nss,
         boost::optional<UUID> collectionUUID,
         const Document& documentKey,
-        MakePipelineOptions opts);
+        pipeline_factory::MakePipelineOptions opts);
 
     BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       Client* client,

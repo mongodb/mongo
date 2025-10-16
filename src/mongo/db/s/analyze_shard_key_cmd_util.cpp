@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -387,7 +388,7 @@ void runClusterAggregate(OperationContext* opCtx,
                       .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                       .build();
 
-    auto pipeline = Pipeline::makePipeline(aggRequest, expCtx);
+    auto pipeline = pipeline_factory::makePipeline(aggRequest, expCtx);
     auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
     while (auto doc = execPipeline->getNext()) {

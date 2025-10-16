@@ -45,7 +45,6 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -56,7 +55,6 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/search/search_helper.h"
-#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
@@ -64,7 +62,6 @@
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/timeseries/timeseries_translation.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -172,8 +169,6 @@ void validateForTimeseries(const DocumentSourceContainer* sources) {
 }
 
 }  // namespace
-
-MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
 
 using boost::intrusive_ptr;
 
@@ -375,47 +370,6 @@ void Pipeline::performPreOptimizationRewrites(const boost::intrusive_ptr<Express
 
     // The only supported translation is for viewless timeseries collections.
     timeseries::translateStagesIfRequired(expCtx, *this, collOrView);
-}
-
-void Pipeline::optimizePipeline() {
-    tassert(10706501,
-            "unexpected attempt to modify a frozen pipeline in 'Pipeline::optimizePipeline()'",
-            !_frozen);
-    // If the disablePipelineOptimization failpoint is enabled, the pipeline won't be optimized.
-    if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
-        return;
-    }
-    optimizeContainer(&_sources);
-    optimizeEachStage(&_sources);
-}
-
-void Pipeline::optimizeContainer(DocumentSourceContainer* container) {
-    DocumentSourceContainer::iterator itr = container->begin();
-    try {
-        while (itr != container->end()) {
-            invariant((*itr).get());
-            itr = (*itr).get()->optimizeAt(itr, container);
-        }
-    } catch (DBException& ex) {
-        ex.addContext("Failed to optimize pipeline");
-        throw;
-    }
-}
-
-void Pipeline::optimizeEachStage(DocumentSourceContainer* container) {
-    DocumentSourceContainer optimizedSources;
-    try {
-        // We should have our final number of stages. Optimize each individually.
-        for (auto&& source : *container) {
-            if (auto out = source->optimize()) {
-                optimizedSources.push_back(std::move(out));
-            }
-        }
-        container->swap(optimizedSources);
-    } catch (DBException& ex) {
-        ex.addContext("Failed to optimize pipeline");
-        throw;
-    }
 }
 
 bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
@@ -865,154 +819,6 @@ void Pipeline::appendPipeline(std::unique_ptr<Pipeline> otherPipeline) {
     }
     constexpr bool alreadyOptimized = false;
     validateCommon(alreadyOptimized);
-}
-
-std::unique_ptr<Pipeline> Pipeline::makePipeline(
-    const std::vector<BSONObj>& rawPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    MakePipelineOptions opts) {
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx, opts.validator);
-
-    expCtx->initializeReferencedSystemVariables();
-
-    bool alreadyOptimized = opts.alreadyOptimized;
-
-    if (opts.optimize) {
-        pipeline->optimizePipeline();
-        alreadyOptimized = true;
-    }
-
-    pipeline->validateCommon(alreadyOptimized);
-
-    if (opts.attachCursorSource) {
-        // Creating AggregateCommandRequest in order to pass all necessary 'opts' to the
-        // preparePipelineForExecution().
-        AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
-                                           pipeline->serializeToBson());
-        pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
-            expCtx,
-            aggRequest,
-            std::move(pipeline),
-            boost::none /* shardCursorsSortSpec */,
-            opts.shardTargetingPolicy,
-            std::move(opts.readConcern),
-            opts.useCollectionDefaultCollator);
-    }
-
-    return pipeline;
-}
-
-std::unique_ptr<Pipeline> Pipeline::makePipeline(
-    AggregateCommandRequest& aggRequest,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<BSONObj> shardCursorsSortSpec,
-    const MakePipelineOptions& opts) {
-    tassert(10892201,
-            "shardCursorsSortSpec must not be set if attachCursorSource is false.",
-            opts.attachCursorSource || shardCursorsSortSpec == boost::none);
-
-    boost::optional<BSONObj> readConcern;
-    // If readConcern is set on opts and aggRequest, assert they are equal.
-    if (opts.readConcern && aggRequest.getReadConcern()) {
-        readConcern = aggRequest.getReadConcern()->toBSONInner();
-        tassert(7393501,
-                "Read concern on aggRequest and makePipelineOpts must match.",
-                opts.readConcern->binaryEqual(*readConcern));
-    } else {
-        readConcern = aggRequest.getReadConcern() ? aggRequest.getReadConcern()->toBSONInner()
-                                                  : opts.readConcern;
-    }
-
-    auto pipeline = Pipeline::parse(aggRequest.getPipeline(), expCtx, opts.validator);
-    if (opts.optimize) {
-        pipeline->optimizePipeline();
-    }
-
-    constexpr bool alreadyOptimized = true;
-    pipeline->validateCommon(alreadyOptimized);
-    aggRequest.setPipeline(pipeline->serializeToBson());
-
-    if (opts.attachCursorSource) {
-        pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
-            expCtx,
-            aggRequest,
-            std::move(pipeline),
-            shardCursorsSortSpec,
-            opts.shardTargetingPolicy,
-            std::move(readConcern),
-            opts.useCollectionDefaultCollator);
-    }
-
-    return pipeline;
-}
-
-DocumentSourceContainer::iterator Pipeline::optimizeEndOfPipeline(
-    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    // We must create a new DocumentSourceContainer representing the subsection of the pipeline we
-    // wish to optimize, since otherwise calls to optimizeAt() will overrun these limits.
-    auto endOfPipeline = DocumentSourceContainer(std::next(itr), container->end());
-    Pipeline::optimizeContainer(&endOfPipeline);
-    Pipeline::optimizeEachStage(&endOfPipeline);
-    container->erase(std::next(itr), container->end());
-    container->splice(std::next(itr), endOfPipeline);
-
-    return std::next(itr);
-}
-
-std::unique_ptr<Pipeline> Pipeline::viewPipelineHelperForSearch(
-    const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
-    ResolvedNamespace resolvedNs,
-    std::vector<BSONObj> currentPipeline,
-    const MakePipelineOptions& opts,
-    const NamespaceString& originalNs) {
-    // Search queries on mongot-indexed views behave differently than non-search aggregations on
-    // views. When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
-    // view transforms as part of its subpipeline. In this way, the view stages will always
-    // be applied directly after $_internalSearchMongotRemote and before the remaining
-    // stages of the user pipeline. This is to ensure the stages following
-    // $search/$vectorSearch in the user pipeline will receive the modified documents: when
-    // storedSource is disabled, idLookup will retrieve full/unmodified documents during
-    // (from the _id values returned by mongot), apply the view's data transforms, and pass
-    // said transformed documents through the rest of the user pipeline.
-    const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
-    subPipelineExpCtx->setView(
-        boost::make_optional(std::make_pair(originalNs, resolvedView.getPipeline())));
-
-    // return the user pipeline without appending the view stages.
-    return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
-}
-
-std::unique_ptr<Pipeline> Pipeline::makePipelineFromViewDefinition(
-    const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
-    ResolvedNamespace resolvedNs,
-    std::vector<BSONObj> currentPipeline,
-    const MakePipelineOptions& opts,
-    const NamespaceString& originalNs) {
-
-    // Update subpipeline's ExpressionContext with the resolved namespace.
-    subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
-
-    if (resolvedNs.pipeline.empty()) {
-        return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
-    }
-
-    if (search_helper_bson_obj::isMongotPipeline(currentPipeline)) {
-        return Pipeline::viewPipelineHelperForSearch(
-            subPipelineExpCtx, std::move(resolvedNs), std::move(currentPipeline), opts, originalNs);
-    }
-
-    auto resolvedPipeline = std::move(resolvedNs.pipeline);
-    // When we get a resolved pipeline back, we may not yet have its namespaces available in the
-    // expression context, e.g. if the view's pipeline contains a $lookup on another collection.
-    LiteParsedPipeline liteParsedPipeline(resolvedNs.ns, resolvedPipeline);
-    subPipelineExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
-
-    resolvedPipeline.reserve(currentPipeline.size() + resolvedPipeline.size());
-    resolvedPipeline.insert(resolvedPipeline.end(),
-                            std::make_move_iterator(currentPipeline.begin()),
-                            std::make_move_iterator(currentPipeline.end()));
-
-    return Pipeline::makePipeline(resolvedPipeline, subPipelineExpCtx, opts);
 }
 
 void Pipeline::detachFromOperationContext() {

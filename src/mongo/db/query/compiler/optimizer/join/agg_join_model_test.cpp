@@ -57,7 +57,7 @@ protected:
 
         const auto bsonStages = pipelineFromJsonArray(query);
         auto pipeline = Pipeline::parse(bsonStages, expCtx);
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
 
         return pipeline;
     }

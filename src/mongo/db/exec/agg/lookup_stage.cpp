@@ -33,6 +33,8 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
@@ -86,7 +88,7 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
 
     auto& container = pipeline.getSources();
 
-    mongo::Pipeline::optimizeContainer(&container);
+    pipeline_optimization::optimizeContainer(&container);
 
     // We want to ensure the cache has been optimized prior to any calls to optimize().
     auto itr = (&container)->begin();
@@ -101,7 +103,7 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
     }
 
     // Optimize the pipeline, with the cache in its correct position if it exists.
-    mongo::Pipeline::optimizeEachStage(&container);
+    pipeline_optimization::optimizeEachStage(&container);
 }
 }  // namespace
 
@@ -319,18 +321,19 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     // We don't want to optimize or attach a cursor source here because we need to update
     // _sharedState->resolvedPipeline so we can reuse it on subsequent calls to getNext(), and we
     // may need to update _fieldMatchPipelineIdx as well in the case of a field join.
-    MakePipelineOptions opts;
+    pipeline_factory::MakePipelineOptions opts;
     opts.optimize = false;
     opts.attachCursorSource = false;
     opts.validator = mongo::lookupPipeValidator;
 
     // Resolve the view definition.
     std::unique_ptr<mongo::Pipeline> resolvedPipeline =
-        mongo::Pipeline::makePipelineFromViewDefinition(fromExpCtx,
-                                                        ResolvedNamespace{resolvedNs, viewPipeline},
-                                                        std::move(_sharedState->resolvedPipeline),
-                                                        opts,
-                                                        _fromNs);
+        pipeline_factory::makePipelineFromViewDefinition(
+            fromExpCtx,
+            ResolvedNamespace{resolvedNs, viewPipeline},
+            std::move(_sharedState->resolvedPipeline),
+            opts,
+            _fromNs);
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
     // first input document.
@@ -406,7 +409,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildStreamsPipeline(
     const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc) {
     prepareStateToBuildPipeline(fromExpCtx, inputDoc);
 
-    MakePipelineOptions pipelineOpts;
+    pipeline_factory::MakePipelineOptions pipelineOpts;
     pipelineOpts.alreadyOptimized = false;
     pipelineOpts.optimize = true;
     pipelineOpts.validator = mongo::lookupPipeValidator;
@@ -415,7 +418,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildStreamsPipeline(
     // The streams engine does not care about sharding, and so it does not allow shard targeting.
     pipelineOpts.shardTargetingPolicy = ShardTargetingPolicy::kNotAllowed;
 
-    return mongo::Pipeline::makePipeline(_sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
+    return pipeline_factory::makePipeline(_sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
 }
 
 std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
@@ -462,7 +465,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
                                         }
                                     }},
                   collData);
-            pipeline->optimizePipeline();
+            pipeline_optimization::optimizePipeline(*pipeline);
             pipeline->validateCommon(true /* alreadyOptimized */);
         };
 

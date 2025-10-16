@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
@@ -52,7 +53,7 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSort) {
     auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 
@@ -72,7 +73,7 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
     auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 
@@ -96,7 +97,7 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
 
     auto pipeline = Pipeline::parse(
         makeVector(unpackSpecObj, matchSpecObj, sortSpecObj, limitSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
     auto container = pipeline->getSources();
@@ -132,7 +133,7 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortSkipLimit) {
     auto pipeline = Pipeline::parse(
         makeVector(unpackSpecObj, projectSpecObj, sortSpecObj, skipSpecObj, limitSpecObj),
         getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 
@@ -148,7 +149,7 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortSkipLimit) {
 
     // Optimize the optimized pipeline again. More rewrites will happen here.
     auto optimizedPipeline = Pipeline::parse(serialized, getExpCtx());
-    optimizedPipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*optimizedPipeline);
     auto optimizedSerialized = optimizedPipeline->serializeToBson();
     ASSERT_EQ(6, optimizedSerialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {t:'$meta.a'}}"), optimizedSerialized[0]);
@@ -179,7 +180,7 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaLimitSortSkipLimit) {
                                                skipSpecObj,
                                                limitTwoSpecObj),
                                     getExpCtx());
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
 

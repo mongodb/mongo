@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -102,7 +103,7 @@ BSONObj createUpdatedCommandForNewShard(
     auto pipeline =
         Pipeline::parseFromArray(shardCommand[AggregateCommandRequest::kPipelineFieldName], expCtx);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Split the full pipeline to get the shard pipeline.
     auto splitPipelines = sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));

@@ -59,6 +59,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
@@ -793,7 +794,7 @@ Status runAggregateImpl(OperationContext* opCtx,
         if (routingTableIsAvailable || requiresCollationForParsingUnshardedAggregate ||
             hasChangeStream || shouldDoFLERewrite ||
             pipelineCtx->getNamespaceString().isCollectionlessAggregateNS()) {
-            pipeline->optimizePipeline();
+            pipeline_optimization::optimizePipeline(*pipeline);
 
             // Validate the pipeline post-optimization.
             const bool alreadyOptimized = true;

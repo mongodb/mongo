@@ -50,6 +50,7 @@
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -215,7 +216,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             }
 
             auto [rawPipeline, expCtx] = makeRawNaturalOrderPipeline(opCtx, mongoProcessInterface);
-            MakePipelineOptions pipelineOpts;
+            pipeline_factory::MakePipelineOptions pipelineOpts;
             pipelineOpts.attachCursorSource = false;
 
             // We associate the aggregation cursors established on each donor shard with a logical
@@ -254,7 +255,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                 request.setRawData(true);
             }
 
-            auto pipeline = Pipeline::makePipeline(rawPipeline, expCtx, pipelineOpts);
+            auto pipeline = pipeline_factory::makePipeline(rawPipeline, expCtx, pipelineOpts);
 
             repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
             readConcern.setArgsAtClusterTimeForSnapshot(_atClusterTime);

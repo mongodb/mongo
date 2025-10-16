@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_test_util.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
@@ -193,7 +194,7 @@ protected:
         ctx->setResolvedNamespace(unionCollNs, {unionCollNs, std::vector<BSONObj>{}});
 
         auto outputPipe = Pipeline::parse(request.getPipeline(), ctx);
-        outputPipe->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*outputPipe);
 
         // We normalize match expressions in the pipeline here to ensure the stability of the
         // predicate order after optimizations.
@@ -3768,7 +3769,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupSwapsWithIndepend
     auto pipeline =
         makePipeline({changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
                       matchStage("{extra: 'predicate'}")});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Make sure the $match stage has swapped before the change look up.
     assertStageAtPos<DocumentSourceChangeStreamAddPostImage>(pipeline->getSources(), -1 /* pos */);
@@ -3780,7 +3781,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMa
     auto pipeline =
         makePipeline({changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}"),
                       matchStage("{fullDocument: null}")});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Make sure the $match stage stays at the end.
     assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1 /* pos */);
@@ -3804,7 +3805,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
     auto pipeline = makePipeline(
         {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
          matchStage("{extra: 'predicate'}")});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Make sure the $match stage has swapped before the change look up.
     assertStageAtPos<DocumentSourceChangeStreamAddPreImage>(pipeline->getSources(), -1 /* pos */);
@@ -3817,7 +3818,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
     auto pipeline = makePipeline(
         {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}"),
          matchStage("{fullDocumentBeforeChange: null}")});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Make sure the $match stage stays at the end.
     assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1 /* pos */);
@@ -3833,7 +3834,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
     // Assert $match is the last stage before optimization.
     assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Assert that $match swaps with $_internalChangeStreamHandleTopologyChange after optimization.
     assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -2);
@@ -3852,7 +3853,7 @@ TEST_F(ChangeStreamPipelineOptimizationTestWithMongoS,
        ChangeStreamHandleTopologyChangeSwapsWithRedact) {
     auto pipeline =
         makePipeline({changestreamStage("{showExpandedEvents: true}"), redactStage("'$$PRUNE'")});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Assert that $redact swaps with $_internalChangeStreamHandleTopologyChange after optimization.
     assertStageAtPos<DocumentSourceRedact>(pipeline->getSources(), -2 /* pos */);
@@ -3870,7 +3871,7 @@ TEST_F(ChangeStreamPipelineOptimizationTestWithMongoS,
     // Assert $match is the last stage before optimization.
     assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -1);
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // Assert that $match swaps with $_internalChangeStreamHandleTopologyChange after optimization.
     assertStageAtPos<DocumentSourceMatch>(pipeline->getSources(), -2);
@@ -4531,7 +4532,7 @@ std::unique_ptr<Pipeline> getOptimizedPipeline(const BSONObj inputBson) {
     ctx->setTempDir(tempDir.path());
 
     auto outputPipe = Pipeline::parse(request.getPipeline(), ctx);
-    outputPipe->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*outputPipe);
     return outputPipe;
 }
 
@@ -4549,7 +4550,7 @@ void assertTwoPipelinesOptimizeAndMergeTo(const std::string& inputPipe1,
     for (const auto& source : pipeline2->getSources()) {
         pipeline1->pushBack(source);
     }
-    pipeline1->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline1);
     auto opts = SerializationOptions{
         .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
     ASSERT_VALUE_EQ(Value(pipeline1->writeExplainOps(opts)), Value(outputBson["pipeline"]));
@@ -4871,7 +4872,7 @@ public:
 
         // Test that we can both split the pipeline and reassemble it into its original form.
         mergePipe = Pipeline::parse(request.getPipeline(), ctx);
-        mergePipe->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*mergePipe);
 
         auto splitPipeline =
             sharded_agg_helpers::SplitPipeline::split(std::move(mergePipe), shardKey);
@@ -5674,14 +5675,14 @@ TEST_F(PipelineMustRunOnRouterTest, UnsplittablePipelineMustRunOnRouter) {
     auto pipeline = makePipeline({matchStage("{x: 5}"), runOnRouter()});
     ASSERT_TRUE(pipeline->requiredToRunOnRouter());
 
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_TRUE(pipeline->requiredToRunOnRouter());
 }
 
 TEST_F(PipelineMustRunOnRouterTest, UnsplittableRouterPipelineAssertsIfDisallowedStagePresent) {
     setExpCtx({.inRouter = true, .allowDiskUse = true});
     auto pipeline = makePipeline({matchStage("{x: 5}"), runOnRouter(), sortStage("{x: 1}")});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The entire pipeline must run on router, but $sort cannot do so when 'allowDiskUse' is true.
     ASSERT_TRUE(pipeline->requiredToRunOnRouter());
@@ -5743,7 +5744,7 @@ TEST_F(PipelineMustRunOnRouterTest, SplittablePipelineAssertsIfRouterStageOnShar
     setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline = makePipeline(
         {matchStage("{x: 5}"), runOnRouter(), splitStage(HostTypeRequirement::kAnyShard)});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The 'runOnRouter' stage comes before any splitpoint, so this entire pipeline must run on
     // rotuer. However, the pipeline *cannot* run on router and *must* split at
@@ -5757,7 +5758,7 @@ TEST_F(PipelineMustRunOnRouterTest, SplittablePipelineRunsUnsplitOnRouterIfSplit
     setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline =
         makePipeline({matchStage("{x: 5}"), runOnRouter(), splitStage(HostTypeRequirement::kNone)});
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
 
     // The 'runOnRouter' stage is before the splitpoint, so this entire pipeline must run on router.
     // In this case, the splitpoint is itself eligible to run on router, and so we are able to

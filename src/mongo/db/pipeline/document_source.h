@@ -510,7 +510,7 @@ public:
      * Returns an optimized DocumentSource that is semantically equivalent to this one, or
      * nullptr if this stage is a no-op. Implementations are allowed to modify themselves
      * in-place and return a pointer to themselves. For best results, first optimize the pipeline
-     * with the optimizePipeline() method defined in pipeline.cpp.
+     * with the pipeline_optimization::optimizePipeline() method defined in optimize.cpp.
      *
      * This is intended for any operations that include expressions, and provides a hook for
      * those to optimize those operations.

@@ -868,7 +868,7 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
     const NamespaceString& nss,
     boost::optional<UUID> collectionUUID,
     const Document& documentKey,
-    MakePipelineOptions opts) {
+    pipeline_factory::MakePipelineOptions opts) {
     std::unique_ptr<Pipeline> pipeline;
     try {
         // Pass empty collator in order avoid inheriting the collator from 'expCtx', which may be
@@ -885,7 +885,7 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
         if (collectionUUID) {
             aggRequest.setCollectionUUID(collectionUUID);
         }
-        pipeline = Pipeline::makePipeline(
+        pipeline = pipeline_factory::makePipeline(
             aggRequest, foreignExpCtx, boost::none /* shardCursorsSortSpec */, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         LOGV2_DEBUG(

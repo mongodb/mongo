@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
@@ -206,7 +207,7 @@ void DocumentSourceFacet::addInvolvedCollections(
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
     for (auto&& facet : _facets) {
-        facet.pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*facet.pipeline);
     }
     return this;
 }

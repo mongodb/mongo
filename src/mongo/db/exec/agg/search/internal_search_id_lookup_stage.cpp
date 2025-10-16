@@ -32,6 +32,7 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/catalog_resource_handle.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 
 namespace mongo {
 
@@ -123,9 +124,9 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
                     pExpCtx->getUUID().has_value());
 
             // Find the document by performing a local read.
-            MakePipelineOptions pipelineOpts;
+            pipeline_factory::MakePipelineOptions pipelineOpts;
             pipelineOpts.attachCursorSource = false;
-            auto pipeline = mongo::Pipeline::makePipeline(
+            auto pipeline = pipeline_factory::makePipeline(
                 {BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
 
             if (_viewPipeline) {

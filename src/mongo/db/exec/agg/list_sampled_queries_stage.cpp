@@ -33,6 +33,7 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/document_source_list_sampled_queries.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -101,7 +102,7 @@ GetNextResult ListSampledQueriesStage::doGetNext() {
                                              *_nss, SerializationContext::stateDefault()))));
         }
         try {
-            _sharedState->pipeline = mongo::Pipeline::makePipeline(stages, foreignExpCtx);
+            _sharedState->pipeline = pipeline_factory::makePipeline(stages, foreignExpCtx);
             _sharedState->execPipeline = buildPipeline(_sharedState->pipeline->freeze());
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             LOGV2(7807800,

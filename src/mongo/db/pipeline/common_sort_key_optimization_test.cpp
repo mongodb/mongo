@@ -29,6 +29,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
@@ -48,7 +49,7 @@ protected:
 
         ASSERT_EQ(pipeline->size(), 1U);
 
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
 
         auto actualOptimizedPipeline = pipeline->serializeToBson();
         ASSERT_EQ(actualOptimizedPipeline.size(), expectedOptimizedPipeline.size())

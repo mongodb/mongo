@@ -31,6 +31,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
@@ -69,7 +70,7 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewrite) {
     {
         auto pipeline =
             Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, groupSpecObj), getExpCtx());
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(2, serialized.size());
@@ -86,7 +87,7 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewrite) {
     {
         auto pipeline =
             Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, limitSpecObj), getExpCtx());
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(4, serialized.size());
@@ -118,7 +119,7 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewriteNegat
     {
         auto pipeline =
             Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, groupSpecObj), getExpCtx());
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(3, serialized.size());
@@ -130,7 +131,7 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewriteNegat
     {
         auto pipeline =
             Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, limitSpecObj), getExpCtx());
-        pipeline->optimizePipeline();
+        pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(3, serialized.size());

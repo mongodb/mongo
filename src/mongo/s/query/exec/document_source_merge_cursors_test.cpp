@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
@@ -422,7 +423,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
 
     // After optimization we should only have a $mergeCursors stage.
-    pipeline->optimizePipeline();
+    pipeline_optimization::optimizePipeline(*pipeline);
     ASSERT_EQ(pipeline->getSources().size(), 1UL);
     ASSERT_TRUE(dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 

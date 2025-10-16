@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -333,14 +334,14 @@ private:
         const ShardKeyPattern& shardKey,
         int numInitialChunks,
         int samplesPerChunk,
-        MakePipelineOptions opts = {});
+        pipeline_factory::MakePipelineOptions opts = {});
 
     static SampleDocumentPipeline _makePipeline(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 const ShardKeyPattern& shardKey,
                                                 int numInitialChunks,
                                                 int samplesPerChunk,
-                                                MakePipelineOptions opts = {});
+                                                pipeline_factory::MakePipelineOptions opts = {});
 
     /**
      * Append split points based from the samples taken from the collection.
