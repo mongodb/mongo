@@ -1918,14 +1918,7 @@ WriteResult performUpdates(
                 collectMultiUpdateDeleteMetrics(timer->elapsed(), reply.getNModified());
             }
         } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
-            // Do not handle errors for time-series bucket compressions. They need to be transparent
-            // to users to not interfere with any decisions around operation retry. It is OK to
-            // leave bucket uncompressed in these edge cases. We just record the status to the
-            // result vector so we can keep track of statistics for failed bucket compressions.
-            if (source == OperationSource::kTimeseriesBucketCompression) {
-                out.results.emplace_back(ex.toStatus());
-                break;
-            } else if (source == OperationSource::kTimeseriesInsert) {
+            if (source == OperationSource::kTimeseriesInsert) {
                 // Special case for failed attempt to compress a reopened bucket.
                 throw;
             } else if (source == OperationSource::kTimeseriesUpdate) {
@@ -1951,14 +1944,6 @@ WriteResult performUpdates(
                 break;
             }
         } catch (const DBException& ex) {
-            // Do not handle errors for time-series bucket compressions. They need to be transparent
-            // to users to not interfere with any decisions around operation retry. It is OK to
-            // leave bucket uncompressed in these edge cases. We just record the status to the
-            // result vector so we can keep track of statistics for failed bucket compressions.
-            if (source == OperationSource::kTimeseriesBucketCompression) {
-                out.results.emplace_back(ex.toStatus());
-                break;
-            }
             out.canContinue = handleError(opCtx,
                                           ex,
                                           ns,
