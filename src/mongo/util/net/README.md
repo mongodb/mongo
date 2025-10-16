@@ -35,7 +35,7 @@ implementations of TLS:
    available exclusively on _MacOS_.
 
 We manage TLS through an interface called
-[`SSLManagerInterface`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L181). There are
+[`SSLManagerInterface`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L204). There are
 three different implementations of this interface for each implementation of TLS respectively:
 
 1. [`SSLManagerOpenSSL`](ssl_manager_openssl.cpp)
@@ -44,10 +44,10 @@ three different implementations of this interface for each implementation of TLS
 
 Every SSLManager has a set of key methods that describe the general idea of establishing a connection over TLS:
 
-- [`connect`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L193): initiates a TLS connection
-- [`accept`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L201): waits for a peer to
+- [`connect`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L241): initiates a TLS connection
+- [`accept`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L249): waits for a peer to
   initiate a TLS connection
-- [`parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L268):
+- [`parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L381):
   parses a certificate acquired from a peer during connection negotiation and validates it.
 
 The SSLManagers are wrappers around these TLS implementations such that they conform to our practices and standards, and
@@ -91,10 +91,10 @@ into certificates along with the public key and certificate metadata. Internal a
 stored in the database, is more commonly used for acquiring access rights, and X.509 authorization is not a typical
 use case of certificates in general. We do not provide any utility for generating these unique certificates, but the
 logic for parsing them is in
-[`parsePeerRoles`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L294).
+[`parsePeerRoles`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L458).
 
 X.509 certificates _are_ commonly used for _authentication_.
-[`SSLManager::parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L268)
+[`SSLManager::parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L381)
 extracts information required for authentication, such as the client name, during connection negotiation. We use
 TLS for authentication, as being able to successfully perform a cryptographic handshake after key exchange should be as
 sufficient proof of authenticity as providing a username and password. This idea is the same as using one's RSA public
@@ -104,7 +104,7 @@ with TLS (using the
 mechanism), it receives a certificate from the client during the initial TLS handshake, extracts the subject name, which
 MongoDB will consider a username, and performs the cryptographic handshake. If the handshake succeeds, then the server
 will note that the client proved ownership of the presented certificate. The authentication logic happens in the
-[`authX509`](https://github.com/mongodb/mongo/blob/master/src/mongo/client/authenticate.cpp#L127) function, although
+[`authX509`](https://github.com/mongodb/mongo/blob/master/src/mongo/client/authenticate.cpp#L135-L147) function, although
 there are many callers of this function that use it in different ways. Later, when that client tries to authenticate,
 the server will know that the previous TLS handshake has proved their authenticity, and will grant themm the appropriate
 access rights.
