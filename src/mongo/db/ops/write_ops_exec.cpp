@@ -199,8 +199,6 @@ MONGO_FAIL_POINT_DEFINE(hangAfterBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterDocumentInsertsReserveOpTimes);
 MONGO_FAIL_POINT_DEFINE(hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection);
-MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection);
-MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection);
 
 // The withLock fail points are for testing interruptability of these operations, so they will not
 // themselves check for interrupt.
@@ -2671,9 +2669,6 @@ void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
     }
 }
 
-}  // namespace
-namespace details {
-
 /**
  * Returns whether the request can continue.
  */
@@ -2688,50 +2683,10 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             std::vector<size_t>* docsToRetry,
                             absl::flat_hash_map<int, int>& retryAttemptsForDup,
                             const write_ops::InsertCommandRequest& request) try {
-    hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection.pauseWhileSet();
-
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
-    auto nss = makeTimeseriesBucketsNamespace(ns(request));
-
-    // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
-    // Collection instances remain valid, and the collator is not invalidated.
-    std::shared_ptr<const CollectionCatalog> catalog;
-    const CollatorInterface* collator = nullptr;
-
-    try {
-        // The associated collection must be acquired before we check for the presence of
-        // buckets collection. This ensures that a potential ShardVersion mismatch can be
-        // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()' might
-        // block waiting for other batches to complete, limiting the scope of the
-        // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
-        const auto acquisition = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
-            MODE_IS);
-
-        // We want to ensure that the catalog instance after the scope of the acquisition is the
-        // same as before the acquisition. Acquiring the collection involves stashing the
-        // current catalog instance, so assigning the catalog in scope of the try block ensures
-        // that we have a consistent catalog with the acquisition.
-        catalog = CollectionCatalog::get(opCtx);
-
-        auto bucketsColl = acquisition.getCollectionPtr().get();
-        timeseries::assertTimeseriesBucketsCollection(bucketsColl);
-        collator = bucketsColl->getDefaultCollator();
-    } catch (const DBException& ex) {
-        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
-            throw;
-        }
-        auto& oss{OperationShardingState::get(opCtx)};
-        oss.setShardingOperationFailedStatus(ex.toStatus());
-        const auto error{
-            write_ops_exec::generateError(opCtx, ex.toStatus(), start + index, errors->size())};
-        errors->emplace_back(std::move(*error));
-        return false;
-    }
-
-    auto status = prepareCommit(bucketCatalog, request.getNamespace(), batch, collator);
+    auto status = prepareCommit(bucketCatalog, request.getNamespace(), batch);
     if (!status.isOK()) {
         invariant(timeseries::bucket_catalog::isWriteBatchFinished(*batch));
         docsToRetry->push_back(index);
@@ -2797,9 +2752,12 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         try {
             auto op = batch->generateCompressedDiff
                 ? timeseries::makeTimeseriesCompressedDiffUpdateOp(
-                      opCtx, batch, nss, std::move(stmtIds))
-                : timeseries::makeTimeseriesUpdateOp(
-                      opCtx, batch, nss, metadata, std::move(stmtIds));
+                      opCtx, batch, makeTimeseriesBucketsNamespace(ns(request)), std::move(stmtIds))
+                : timeseries::makeTimeseriesUpdateOp(opCtx,
+                                                     batch,
+                                                     makeTimeseriesBucketsNamespace(ns(request)),
+                                                     metadata,
+                                                     std::move(stmtIds));
             auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
 
             if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
@@ -2873,9 +2831,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     abort(bucketCatalog, batch, ex.toStatus());
     throw;
 }
-}  // namespace details
 
-namespace {
 std::shared_ptr<timeseries::bucket_catalog::WriteBatch>& extractFromPair(
     std::pair<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>, size_t>& pair) {
     return pair.first;
@@ -2887,8 +2843,6 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                          TimeseriesStmtIds&& stmtIds,
                                          boost::optional<repl::OpTime>* opTime,
                                          boost::optional<OID>* electionId) {
-    hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection.pauseWhileSet();
-
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
     auto batchesToCommit = timeseries::determineBatchesToCommit(batches, extractFromPair);
@@ -2908,58 +2862,23 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
     try {
         std::vector<write_ops::InsertCommandRequest> insertOps;
         std::vector<write_ops::UpdateCommandRequest> updateOps;
-        auto nss = makeTimeseriesBucketsNamespace(ns(request));
-
-        // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
-        // Collection instances remain valid, and the collator is not invalidated.
-        std::shared_ptr<const CollectionCatalog> catalog;
-        const CollatorInterface* collator = nullptr;
-
-        try {
-            // The associated collection must be acquired before we check for the presence of
-            // buckets collection. This ensures that a potential ShardVersion mismatch can be
-            // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()'
-            // might block waiting for other batches to complete, limiting the scope of the
-            // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
-            const auto acquisition =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest::fromOpCtx(
-                                      opCtx, nss, AcquisitionPrerequisites::kRead),
-                                  MODE_IS);
-
-            // We want to ensure that the catalog instance after the scope of the acquisition is the
-            // same as before the acquisition. Acquiring the collection involves stashing the
-            // current catalog instance, so assigning the catalog in scope of the try block ensures
-            // that we have a consistent catalog with the acquisition.
-            catalog = CollectionCatalog::get(opCtx);
-
-            auto bucketsColl = acquisition.getCollectionPtr().get();
-            timeseries::assertTimeseriesBucketsCollection(bucketsColl);
-            collator = bucketsColl->getDefaultCollator();
-        } catch (const DBException& ex) {
-            if (ex.code() != ErrorCodes::StaleDbVersion &&
-                !ErrorCodes::isStaleShardVersionError(ex)) {
-                throw;
-            }
-            // The unsuccessful ordered timeseries insert will resolve into a sequence of unordered
-            // inserts. Therefore, do not set the failed operation status on the operation sharding
-            // state here, as it will be set during the unordered insert attempt.
-            abortStatus = ex.toStatus();
-            return ex.toStatus();
-        }
 
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus =
-                prepareCommit(bucketCatalog, request.getNamespace(), batch, collator);
+            auto prepareCommitStatus = prepareCommit(bucketCatalog, request.getNamespace(), batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return prepareCommitStatus;
             }
 
             try {
-                timeseries::makeWriteRequest(
-                    opCtx, batch, metadata, stmtIds, nss, &insertOps, &updateOps);
+                timeseries::makeWriteRequest(opCtx,
+                                             batch,
+                                             metadata,
+                                             stmtIds,
+                                             makeTimeseriesBucketsNamespace(ns(request)),
+                                             &insertOps,
+                                             &updateOps);
             } catch (const DBException& ex) {
                 if (ex.toStatus() == ErrorCodes::BSONObjectTooLarge) {
                     abortStatus = ex.toStatus();
@@ -3199,9 +3118,9 @@ insertIntoBucketCatalog(OperationContext* opCtx,
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
     auto bucketsNs = makeTimeseriesBucketsNamespace(ns(request));
 
-    // Explicitly hold a refrence to the CollectionCatalog, such that the corresponding Collection
-    // instances remain valid, and the bucketsColl is not invalidated.
-    std::shared_ptr<const CollectionCatalog> catalog;
+    // Explicitly hold a refrence to the CollectionCatalog, such that the corresponding
+    // Collection instances remain valid, and the collator is not invalidated.
+    auto catalog = CollectionCatalog::get(opCtx);
     const Collection* bucketsColl = nullptr;
 
     Status collectionAcquisitionStatus = Status::OK();
@@ -3216,14 +3135,8 @@ insertIntoBucketCatalog(OperationContext* opCtx,
                                             CollectionAcquisitionRequest::fromOpCtx(
                                                 opCtx, bucketsNs, AcquisitionPrerequisites::kRead),
                                             MODE_IS);
-
-        // We want to ensure that the catalog instance after the scope of the acquisition is the
-        // same as before the acquisition. Acquiring the collection involves stashing the
-        // current catalog instance, so assigning the catalog in scope of the try block ensures
-        // that we have a consistent catalog with the acquisition.
-        catalog = CollectionCatalog::get(opCtx);
-
-        bucketsColl = coll.getCollectionPtr().get();
+        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
+        // Check for the presence of the buckets collection
         timeseries::assertTimeseriesBucketsCollection(bucketsColl);
         // Process timeSeriesOptions
         timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
@@ -3442,17 +3355,17 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
             auto stmtIds = isTimeseriesWriteRetryable(opCtx) ? std::move(bucketStmtIds[batch.get()])
                                                              : std::vector<StmtId>{};
             try {
-                canContinue = details::commitTimeseriesBucket(opCtx,
-                                                              batch,
-                                                              start,
-                                                              index,
-                                                              std::move(stmtIds),
-                                                              errors,
-                                                              opTime,
-                                                              electionId,
-                                                              &docsToRetry,
-                                                              retryAttemptsForDup,
-                                                              request);
+                canContinue = commitTimeseriesBucket(opCtx,
+                                                     batch,
+                                                     start,
+                                                     index,
+                                                     std::move(stmtIds),
+                                                     errors,
+                                                     opTime,
+                                                     electionId,
+                                                     &docsToRetry,
+                                                     retryAttemptsForDup,
+                                                     request);
             } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
                 auto bucketId = ex.extraInfo<timeseries::BucketCompressionFailure>()->bucketId();
                 auto keySignature =

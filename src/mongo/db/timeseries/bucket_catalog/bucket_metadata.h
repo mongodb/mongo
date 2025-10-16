@@ -47,6 +47,7 @@ struct BucketMetadata {
 public:
     BucketMetadata(TrackingContext&,
                    BSONElement elem,
+                   const StringDataComparator* comparator,
                    boost::optional<StringData> trueMetaFieldName);
 
     bool operator==(const BucketMetadata& other) const;
@@ -56,6 +57,8 @@ public:
     BSONElement element() const;
 
     boost::optional<StringData> getMetaField() const;
+
+    const StringDataComparator* getComparator() const;
 
     template <typename H>
     friend H AbslHashValue(H h, const BucketMetadata& metadata) {
@@ -71,6 +74,8 @@ private:
 
     // Only the value of '_metadataElement' is used for hashing and comparison.
     BSONElement _metadataElement;
+
+    const StringDataComparator* _comparator = nullptr;
 };
 
 }  // namespace mongo::timeseries::bucket_catalog

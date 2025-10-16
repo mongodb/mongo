@@ -100,6 +100,7 @@ StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucke
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     TrackingContext&,
     const UUID& collectionUUID,
+    const StringDataComparator* comparator,
     const TimeseriesOptions& options,
     const BSONObj& doc);
 
@@ -142,8 +143,7 @@ Bucket* useBucket(OperationContext* opCtx,
                   const NamespaceString& nss,
                   InsertContext& info,
                   AllowBucketCreation mode,
-                  const Date_t& time,
-                  const StringDataComparator* comparator);
+                  const Date_t& time);
 
 /**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
@@ -215,8 +215,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
-    const Date_t& time,
-    const StringDataComparator* comparator);
+    const Date_t& time);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -340,8 +339,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
                        Stripe& stripe,
                        WithLock stripeLock,
                        InsertContext& info,
-                       const Date_t& time,
-                       const StringDataComparator* comparator);
+                       const Date_t& time);
 
 /**
  * Close the existing, full bucket and open a new one for the same metadata.
@@ -355,8 +353,7 @@ Bucket& rollover(OperationContext* opCtx,
                  Bucket& bucket,
                  InsertContext& info,
                  RolloverAction action,
-                 const Date_t& time,
-                 const StringDataComparator* comparator);
+                 const Date_t& time);
 
 /**
  * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
@@ -372,8 +369,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
     Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
-    const Date_t& time,
-    const StringDataComparator* comparator);
+    const Date_t& time);
 
 /**
  * Retrieves or initializes the execution stats for the given namespace, for writing.
