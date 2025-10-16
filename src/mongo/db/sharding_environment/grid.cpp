@@ -122,7 +122,6 @@ void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
     _customConnectionPoolStatsFn = std::move(statsFn);
 }
 
-// TODO (SERVER-104701): Unify mongoS and mongoD implementations and get rid of `isMongos` parameter
 void Grid::shutdown(OperationContext* opCtx,
                     BSONObjBuilder* shutdownTimeElapsedBuilder,
                     bool isMongos) {
@@ -134,22 +133,19 @@ void Grid::shutdown(OperationContext* opCtx,
 
     const auto serviceContext = opCtx->getServiceContext();
 
-    if (isMongos) {
-        if (auto cursorManager = this->getCursorManager()) {
-
-            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                           TimedSectionId::shutDownCursorManager,
-                                           shutdownTimeElapsedBuilder);
-            cursorManager->shutdown(opCtx);
-        }
+    if (auto cursorManager = this->getCursorManager()) {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownCursorManager,
+                                       shutdownTimeElapsedBuilder);
+        cursorManager->shutdown(opCtx);
     }
 
+    // TODO (SERVER-50612): Shut down the ExecutorPool always. The shutdown of the ExecutorPool is
+    // needed to prevent memory leaks. However, it can cause race conditions with sharding
+    // components that use ScopedTaskExecutor. Since memory leaks are more desired than crashing at
+    // shutdown, we decided to skip its shutdown on production but keep it on tests to have more
+    // manageable BF tracking (see SERVER-78971 for more info).
     if (isMongos || TestingProctor::instance().isEnabled()) {
-        // The shutdown of the ExecutorPool is needed to prevent memory leaks. However, it can cause
-        // race conditions with sharding components that use ScopedTaskExecutor.
-        // Since memory leaks are more desired than crashing at shutdown, we decided to skip its
-        // shutdown on production but keep it on tests to have more manageable BF tracking (see
-        // SERVER-78971 for more info).
         if (auto pool = this->getExecutorPool()) {
             LOGV2(7698300, "Shutting down the ExecutorPool");
             SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
