@@ -841,10 +841,10 @@ public:
         ASSERT_FALSE(truncateMarkers.isEmpty());
 
         // Confirm neither the whole marker or partial marker are expired.
-        const auto numWholeMarkersBefore = truncateMarkers.numMarkers_forTest();
+        const auto numWholeMarkersBefore = truncateMarkers.numMarkers();
         assertNoExpiredMarker(truncateMarkers);
         truncateMarkers.createPartialMarkerIfNecessary(opCtx());
-        const auto numWholeMarkersAfter = truncateMarkers.numMarkers_forTest();
+        const auto numWholeMarkersAfter = truncateMarkers.numMarkers();
         ASSERT_EQ(numWholeMarkersBefore, numWholeMarkersAfter);
 
         expirePreImage(kPreImage1, expireAfterSeconds);

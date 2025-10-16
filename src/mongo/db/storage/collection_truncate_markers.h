@@ -275,14 +275,14 @@ public:
         return _creationMethod;
     }
 
-    //
-    // The following methods are public only for use in tests.
-    //
-
-    size_t numMarkers_forTest() const {
+    size_t numMarkers() const {
         stdx::lock_guard<stdx::mutex> lk(_markersMutex);
         return _markers.size();
     }
+
+    //
+    // The following methods are public only for use in tests.
+    //
 
     int64_t currentBytes_forTest() const {
         return _currentBytes.load();
