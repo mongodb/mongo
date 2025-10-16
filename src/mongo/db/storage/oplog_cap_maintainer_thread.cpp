@@ -39,6 +39,7 @@
 #include "mongo/db/local_catalog/local_oplog_info.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/intent_registry.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
@@ -137,6 +138,44 @@ auto oplogTruncateMarkersStats =
          .forShard();
 
 }  // namespace
+
+void startOplogCapMaintainerThread(ServiceContext* serviceContext,
+                                   bool isReplSet,
+                                   bool shouldSkipOplogSampling) {
+    if (shouldSkipOplogSampling) {
+        return;
+    }
+
+    if (!isReplSet) {
+        return;
+    }
+
+    if (storageGlobalParams.queryableBackupMode || storageGlobalParams.repair) {
+        return;
+    }
+
+    if (!serviceContext->userWritesAllowed()) {
+        return;
+    }
+
+    if (!rss::ReplicatedStorageService::get(serviceContext)
+             .getPersistenceProvider()
+             .supportsOplogSampling()) {
+        return;
+    }
+
+    std::unique_ptr<OplogCapMaintainerThread> maintainerThread =
+        std::make_unique<OplogCapMaintainerThread>();
+    OplogCapMaintainerThread::set(serviceContext, std::move(maintainerThread));
+    OplogCapMaintainerThread::get(serviceContext)->go();
+}
+
+void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& reason) {
+    if (OplogCapMaintainerThread* maintainerThread = OplogCapMaintainerThread::get(serviceContext);
+        maintainerThread) {
+        maintainerThread->shutdown(reason);
+    }
+}
 
 OplogCapMaintainerThread* OplogCapMaintainerThread::get(ServiceContext* serviceCtx) {
     auto& maintainerThread = getMaintainerThread(serviceCtx);

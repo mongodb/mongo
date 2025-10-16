@@ -94,6 +94,7 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
     StorageEngineInitFlags initFlags,
     bool isReplSet,
     bool shouldRecoverFromOplogAsStandalone,
+    bool shouldSkipOplogSampling,
     bool inStandaloneMode,
     std::function<void()> changeConfigurationCallback = [] {});
 
