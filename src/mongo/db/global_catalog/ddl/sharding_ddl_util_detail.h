@@ -78,12 +78,6 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
 
     std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>> futures;
     auto indexToShardId = std::make_shared<stdx::unordered_map<int, ShardId>>();
-    // We keep shared pointers to Shards to ensure they remain valid while
-    // accessing shard retry budgets during the lifetime of this call.
-    // TODO SERVER-111875: Remove this vector once the shard retry budget is tracked per shard ID
-    // instead of Shard instance.
-    std::vector<std::shared_ptr<Shard>> indexToShard;
-    indexToShard.reserve(shardIds.size());
 
     CancellationSource cancelSource(originalOpts->token);
 
@@ -93,8 +87,8 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
                 originalOpts->exec, opCtx, shardIds[i], readPref);
         auto shard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIds[i]));
-        auto retryStrategy = std::make_shared<Shard::RetryStrategy>(
-            *shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+        auto retryStrategy = std::make_shared<Shard::OwnerRetryStrategy>(
+            shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
             originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryStrategy);
         if (shardVersions) {
@@ -102,7 +96,6 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         }
         futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
         (*indexToShardId)[i] = shardIds[i];
-        indexToShard.push_back(shard);
     }
 
     auto formatResponse = [](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply) {
