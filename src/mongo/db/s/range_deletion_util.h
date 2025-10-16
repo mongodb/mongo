@@ -100,18 +100,15 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
                               long long changeInOrphans);
 
 /**
- * Removes range deletion task documents from `config.rangeDeletions` for the specified range and
- * collection
+ * Removes the range deletion task document from `config.rangeDeletions` for the specified task.
  */
-void removePersistentRangeDeletionTask(OperationContext* opCtx,
-                                       const UUID& collectionUuid,
-                                       const ChunkRange& range);
+void removePersistentTask(OperationContext* opCtx, const UUID& taskId);
 
 /**
  * Removes all range deletion task documents from `config.rangeDeletions` for the specified
- * collection
+ * collection.
  */
-void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid);
+void removeAllPersistentTasksForCollection(OperationContext* opCtx, const UUID& collectionUuid);
 
 /**
  * Creates a query object that can used to find overlapping ranges in the pending range deletions

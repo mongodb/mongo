@@ -556,17 +556,12 @@ void persistUpdatedNumOrphans(OperationContext* opCtx,
     }
 }
 
-void removePersistentRangeDeletionTask(OperationContext* opCtx,
-                                       const UUID& collectionUuid,
-                                       const ChunkRange& range) {
+void removePersistentTask(OperationContext* opCtx, const UUID& taskId) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    const auto overlappingRangeDeletionsQuery =
-        getQueryFilterForRangeDeletionTask(collectionUuid, range);
-    store.remove(opCtx, overlappingRangeDeletionsQuery);
+    store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << taskId));
 }
 
-void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid) {
+void removeAllPersistentTasksForCollection(OperationContext* opCtx, const UUID& collectionUuid) {
     DBDirectClient dbClient(opCtx);
 
     auto query = BSON(RangeDeletionTask::kCollectionUuidFieldName << collectionUuid);

@@ -31,7 +31,8 @@
 
 namespace mongo {
 
-RangeDeletion::RangeDeletion(const RangeDeletionTask& task) : _range(task.getRange()) {}
+RangeDeletion::RangeDeletion(const RangeDeletionTask& task)
+    : _taskId(task.getId()), _range(task.getRange()) {}
 
 RangeDeletion::~RangeDeletion() {
     if (!_completionPromise.getFuture().isReady()) {
@@ -39,6 +40,9 @@ RangeDeletion::~RangeDeletion() {
     }
 }
 
+const UUID& RangeDeletion::getTaskId() const {
+    return _taskId;
+}
 
 const ChunkRange& RangeDeletion::getRange() const {
     return _range;

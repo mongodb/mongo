@@ -323,9 +323,11 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 
                 // Remove persistent range deletion task
                 try {
-                    RangeDeleterService::get(opCtx)->completeTask(collectionUuid, range);
-                    rangedeletionutil::removePersistentRangeDeletionTask(
-                        opCtx, collectionUuid, range);
+                    auto* self = RangeDeleterService::get(opCtx);
+                    auto task = self->completeTask(collectionUuid, range);
+                    if (task) {
+                        rangedeletionutil::removePersistentTask(opCtx, task->getTaskId());
+                    }
 
                     LOGV2_DEBUG(6872504,
                                 2,
@@ -647,9 +649,14 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     return task->getCompletionFuture();
 }
 
-void RangeDeleterService::completeTask(const UUID& collUUID, const ChunkRange& range) {
+std::shared_ptr<RangeDeletion> RangeDeleterService::completeTask(const UUID& collUUID,
+                                                                 const ChunkRange& range) {
     auto lock = _acquireMutexFailIfServiceNotUp();
-    _rangeDeletionTasks.completeTask(collUUID, range);
+    auto task = _rangeDeletionTasks.removeTask(collUUID, range);
+    if (task) {
+        task->markComplete();
+    }
+    return task;
 }
 
 int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& collectionUUID) {

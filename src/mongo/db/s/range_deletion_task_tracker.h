@@ -83,9 +83,9 @@ public:
 
     /**
      * Removes a previously registered task with the given collectionId and ChunkRange from the set
-     * of registered tasks and calls markComplete() on it. No-op if no matching task exists.
+     * of registered tasks. Returns the removed task, or nullptr if no task existed.
      */
-    void completeTask(const UUID& collectionId, const ChunkRange& range);
+    std::shared_ptr<RangeDeletion> removeTask(const UUID& collectionId, const ChunkRange& range);
 
     /**
      * Returns a map from ChunkRange to std::shared_ptr<RangeDeletion> containing all registered

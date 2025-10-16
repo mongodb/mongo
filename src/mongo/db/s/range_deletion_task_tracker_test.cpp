@@ -162,9 +162,9 @@ TEST(RangeDeletionTaskTracker, CompleteTask) {
     RangeDeletionTaskTracker tasks;
     auto task = createTask(UUID::gen(), kTestRange);
     auto [registeredTask, _] = tasks.registerTask(task);
-    tasks.completeTask(task.getCollectionUuid(), task.getRange());
+    auto removed = tasks.removeTask(task.getCollectionUuid(), task.getRange());
     ASSERT_EQ(tasks.getTaskCount(), 0);
-    registeredTask->getCompletionFuture().get();
+    ASSERT_EQ(removed, registeredTask);
 }
 
 }  // namespace mongo

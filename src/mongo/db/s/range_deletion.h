@@ -45,6 +45,8 @@ public:
 
     ~RangeDeletion();
 
+    const UUID& getTaskId() const;
+
     const ChunkRange& getRange() const;
 
     SharedSemiFuture<void> getPendingFuture();
@@ -56,6 +58,7 @@ public:
     void markComplete();
 
 private:
+    UUID _taskId;
     ChunkRange _range;
 
     // Marked ready once the range deletion has been fully processed

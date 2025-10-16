@@ -75,22 +75,23 @@ RegisteredTask RangeDeletionTaskTracker::registerTask(const RangeDeletionTask& t
     return {it->second, RegistrationResult::kRegisteredNewTask};
 }
 
-void RangeDeletionTaskTracker::completeTask(const UUID& collectionId, const ChunkRange& range) {
+std::shared_ptr<RangeDeletion> RangeDeletionTaskTracker::removeTask(const UUID& collectionId,
+                                                                    const ChunkRange& range) {
     auto collectionTasksIt = _collectionTasks.find(collectionId);
     if (collectionTasksIt == _collectionTasks.end()) {
-        return;
+        return nullptr;
     }
     auto& tasks = collectionTasksIt->second;
     auto tasksIt = tasks.find(range);
     if (tasksIt == tasks.end()) {
-        return;
+        return nullptr;
     }
-    auto& task = tasksIt->second;
-    task->markComplete();
+    auto task = tasksIt->second;
     tasks.erase(tasksIt);
     if (tasks.empty()) {
         _collectionTasks.erase(collectionTasksIt);
     }
+    return task;
 }
 
 RangeDeletionTaskTracker::Tasks RangeDeletionTaskTracker::getOverlappingTasks(

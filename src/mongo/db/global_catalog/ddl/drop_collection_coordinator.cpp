@@ -143,8 +143,8 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
         try {
-            rangedeletionutil::removePersistentRangeDeletionTasksByUUID(alternativeOpCtx.get(),
-                                                                        *collectionUUID);
+            rangedeletionutil::removeAllPersistentTasksForCollection(alternativeOpCtx.get(),
+                                                                     *collectionUUID);
         } catch (const DBException& e) {
             LOGV2_ERROR(6501601,
                         "Failed to remove persistent range deletion tasks on drop collection",

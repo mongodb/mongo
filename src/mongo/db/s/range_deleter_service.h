@@ -194,9 +194,10 @@ public:
         bool pending = false);
 
     /*
-     * Deregister a task from the range deleter service and fulfill its completion promise.
+     * Deregister a task from the range deleter service and fulfill its completion promise. Returns
+     * the completed task or nullptr if no task existed.
      */
-    void completeTask(const UUID& collUUID, const ChunkRange& range);
+    std::shared_ptr<RangeDeletion> completeTask(const UUID& collUUID, const ChunkRange& range);
 
     /*
      * Returns the number of registered range deletion tasks for a collection
