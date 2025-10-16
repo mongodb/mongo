@@ -210,3 +210,8 @@ feature_flags:
         cpp_varname: gFeatureFlagSupportOverloadRetryability
         default: false
         fcv_gated: false
+    featureFlagDedicatedPortForMaintenanceOperations:
+        description: "Feature flag to enable a dedicated port for high priority maintenance operations on mongoD and mongoS"
+        cpp_varname: gFeatureFlagDedicatedPortForMaintenanceOperations
+        default: false
+        fcv_gated: false
