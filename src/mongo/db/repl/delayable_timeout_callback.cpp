@@ -124,6 +124,10 @@ void DelayableTimeoutCallback::_handleTimeout(const executor::TaskExecutor::Call
             // If args.status is CallbackCanceled yet the handles matched, that means the
             // executor canceled the callback itself, probably as part of shutdown.  We
             // do not want to reschedule in this case, nor call the callback.
+            LOGV2_DEBUG(11222006,
+                        2,
+                        "DelayableTimeoutCallback was cancelled by the task executor",
+                        "timerName"_attr = _timerName);
             _cbHandle = executor::TaskExecutor::CallbackHandle();
             _nextCall = Date_t();
             return;
@@ -139,6 +143,12 @@ void DelayableTimeoutCallback::_handleTimeout(const executor::TaskExecutor::Call
             }
             return;
         }
+        LOGV2_DEBUG(11222007,
+                    2,
+                    "DelayableTimeoutCallback hit timeout",
+                    "currentTime"_attr = now,
+                    "timeoutDeadline"_attr = _nextCall,
+                    "timerName"_attr = _timerName);
         _cbHandle = executor::TaskExecutor::CallbackHandle();
         _nextCall = Date_t();
     }
