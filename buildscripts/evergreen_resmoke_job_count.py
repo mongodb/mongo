@@ -99,7 +99,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
         {"task": "sharded_collections_causally_consistent_jscore_txns_passthrough", "factor": 0.25},
         {"task": "sharded_collections_jscore_passthrough", "factor": 0.25},
-        {"task": "sharded_collections_jscore_passthrough_with_auto_bootstrap", "factor": 0.25},
+        {"task": "sharded_collections_jscore_passthrough_with_config_shard", "factor": 0.25},
         {
             "task": "sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard",
             "factor": 0.25,
@@ -107,7 +107,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": "sharded_multi_stmt_txn_jscore_passthrough", "factor": 0.25},
         {"task": "sharding_api_version_jscore_passthrough", "factor": 0.25},
         {"task": "sharding_jscore_passthrough", "factor": 0.25},
-        {"task": "sharding_jscore_passthrough_with_auto_bootstrap", "factor": 0.25},
+        {"task": "sharding_jscore_passthrough_with_config_shard", "factor": 0.25},
         {"task": "sharding_jscore_passthrough_with_balancer", "factor": 0.25},
         {
             "task": "sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard",

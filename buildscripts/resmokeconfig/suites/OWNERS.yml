@@ -180,3 +180,18 @@ filters:
   - "*cbr*":
     approvers:
       - 10gen/query-optimization
+  - "sharding_config_shard.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "concurrency_sharded_with_balancer_and_config_shard.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "concurrency_sharded_with_config_shard.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "sharding_jscore_passthrough_with_config_shard.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "sharded_collections_jscore_passthrough_with_config_shard.yml":
+    approvers:
+      - 10gen/server-cluster-scalability

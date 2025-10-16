@@ -221,6 +221,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/replica_sets_transition_to_csrs_jscore_passthrough.yml @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/streams* @10gen/streams-engine @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/*cbr* @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/sharding_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/concurrency_sharded_with_balancer_and_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/concurrency_sharded_with_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/sharding_jscore_passthrough_with_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/sharded_collections_jscore_passthrough_with_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/ @10gen/devprod-correctness @svc-auto-approve-bot

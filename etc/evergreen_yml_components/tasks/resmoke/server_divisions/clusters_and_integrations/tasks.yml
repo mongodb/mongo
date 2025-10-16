@@ -1563,7 +1563,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: sharded_collections_jscore_passthrough_with_auto_bootstrap_gen
+    name: sharded_collections_jscore_passthrough_with_config_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
@@ -1670,7 +1670,7 @@ tasks:
             --runNoFeatureFlagTests
 
   - <<: *gen_task_template
-    name: sharding_auto_bootstrap_gen
+    name: sharding_config_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
@@ -1833,7 +1833,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: sharding_jscore_passthrough_with_auto_bootstrap_gen
+    name: sharding_jscore_passthrough_with_config_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
@@ -2185,7 +2185,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_with_auto_bootstrap_gen
+    name: concurrency_sharded_with_config_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
@@ -2222,7 +2222,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
+    name: concurrency_sharded_with_balancer_and_config_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
