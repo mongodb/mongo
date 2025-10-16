@@ -29,6 +29,7 @@
 global:
     cpp_namespace: "mongo::transport"
     cpp_includes:
+        - "mongo/db/server_options.h"
         - "mongo/transport/transport_options.h"
 
 server_parameters:
@@ -165,6 +166,6 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: gProxyProtocolMaximumPendingConnections
         cpp_vartype: Atomic<int32_t>
-        default: 100
+        default: {expr: "static_cast<int32_t>(DEFAULT_MAX_CONN)"}
         validator: {gte: 0}
         redact: false
