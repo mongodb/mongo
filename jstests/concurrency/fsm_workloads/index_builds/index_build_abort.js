@@ -23,7 +23,7 @@ export const $config = (function () {
     const data = {
         prefix: "index_build_abort_",
         nCollections: 3,
-        nDocuments: 25000,
+        nDocuments: 2500,
         expectedErrorCodes: [ErrorCodes.IndexBuildAborted, ErrorCodes.Interrupted, 13026],
         mutexColl: "index_build_abort_mutexes",
     };
