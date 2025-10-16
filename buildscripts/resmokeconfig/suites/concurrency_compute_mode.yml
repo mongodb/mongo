@@ -2,7 +2,8 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-    - jstests/concurrency/fsm_workloads_no_passthrough_with_mongod/external_data_source.js
+    # TODO SERVER-112530 Re-enable this test
+    # - jstests/concurrency/fsm_workloads_no_passthrough_with_mongod/external_data_source.js
   exclude_with_any_tags:
 
 executor:

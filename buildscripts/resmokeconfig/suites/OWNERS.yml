@@ -51,6 +51,9 @@ filters:
   - "clustered_collection_passthrough.yml":
     approvers:
       - 10gen/query-execution
+  - "concurrency_compute_mode.yml":
+    approvers:
+      - 10gen/query-integration-features
   - "core_wildcard_indexes.yml":
     approvers:
       - 10gen/query-execution-write-exec
