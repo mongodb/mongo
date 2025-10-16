@@ -78,6 +78,10 @@ public:
         recordDelinquentAcquisition(delay, _writeDelinquencyStats);
     }
 
+    void priorityLowered() {
+        _priorityLowered.store(true);
+    }
+
     /**
      * Getters for stats related to delinquency in acquiring read and write tickets.
      */
@@ -86,6 +90,10 @@ public:
     }
     const DelinquencyStats& writeDelinquencyStats() const {
         return _writeDelinquencyStats;
+    }
+
+    bool getPriorityLowered() const {
+        return _priorityLowered.loadRelaxed();
     }
 
     /**
@@ -104,6 +112,7 @@ private:
 
     DelinquencyStats _readDelinquencyStats;
     DelinquencyStats _writeDelinquencyStats;
+    Atomic<bool> _priorityLowered{false};
 };
 
 }  // namespace mongo

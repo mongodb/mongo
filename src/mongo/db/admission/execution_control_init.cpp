@@ -113,11 +113,13 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                     std::make_unique<TicketHolder>(svcCtx,
                                                    gConcurrentReadLowPriorityTransactions.load(),
                                                    false /* trackPeakUsed */,
-                                                   gReadLowPriorityMaxQueueDepth.load()),
+                                                   gReadLowPriorityMaxQueueDepth.load(),
+                                                   delinquentReadCb),
                     std::make_unique<TicketHolder>(svcCtx,
                                                    gConcurrentWriteLowPriorityTransactions.load(),
                                                    false /* trackPeakUsed */,
-                                                   gWriteLowPriorityMaxQueueDepth.load())});
+                                                   gWriteLowPriorityMaxQueueDepth.load(),
+                                                   delinquentWriteCb)});
         }
 
         case kThroughputProbing: {

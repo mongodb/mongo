@@ -173,9 +173,11 @@ int32_t MultiplePoolsTicketingSystem::numOfTicketsUsed() const {
 void MultiplePoolsTicketingSystem::incrementDelinquencyStats(OperationContext* opCtx) {
     auto& admCtx = ExecutionAdmissionContext::get(opCtx);
 
+    auto priority = admCtx.getPriorityLowered() ? AdmissionContext::Priority::kLow
+                                                : AdmissionContext::Priority::kNormal;
     {
         const auto& stats = admCtx.readDelinquencyStats();
-        _getHolder(AdmissionContext::Priority::kNormal, Operation::kRead)
+        _getHolder(priority, Operation::kRead)
             ->incrementDelinquencyStats(
                 stats.delinquentAcquisitions.loadRelaxed(),
                 Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
@@ -184,7 +186,7 @@ void MultiplePoolsTicketingSystem::incrementDelinquencyStats(OperationContext* o
 
     {
         const auto& stats = admCtx.writeDelinquencyStats();
-        _getHolder(AdmissionContext::Priority::kNormal, Operation::kWrite)
+        _getHolder(priority, Operation::kWrite)
             ->incrementDelinquencyStats(
                 stats.delinquentAcquisitions.loadRelaxed(),
                 Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
@@ -200,6 +202,7 @@ boost::optional<Ticket> MultiplePoolsTicketingSystem::waitForTicketUntil(Operati
     boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> executionPriority;
     if (isOperationDegradedAsLowPriority(opCtx, admCtx)) {
         executionPriority.emplace(opCtx, AdmissionContext::Priority::kLow);
+        admCtx->priorityLowered();
     }
 
     auto* holder = _getHolder(admCtx->getPriority(), o);

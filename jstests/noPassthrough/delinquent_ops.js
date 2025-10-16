@@ -11,11 +11,6 @@
  *
  * This file also tests the operations that have long-duration ticket acquisitions (so called
  * delinquent) are reporting the delinquent stats correctly.
- *
- * @tags: [
- *      # TODO (SERVER-111522): Make MultiplePoolsTicketingSystem to correctly report statistics.
- *      incompatible_with_execution_control_with_prioritization,
- * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -31,6 +26,19 @@ const waitPerIterationMs = 200;
 // This is how long we consider an operation as delinquent.
 const delinquentIntervalMs = waitPerIterationMs - 20;
 const findComment = "delinquent_ops.js-COMMENT";
+
+// TODO (SERVER-111527): remove to properly test delinquency stats per priority.
+function disableDeprioritizationHeuristic(conn) {
+    let algorithm = assert.commandWorked(
+        conn.adminCommand({getParameter: 1, storageEngineConcurrencyAdjustmentAlgorithm: 1}),
+    );
+    if (algorithm.storageEngineConcurrencyAdjustmentAlgorithm == "fixedConcurrentTransactionsWithPrioritization") {
+        // Set a very high number of yields, effectively disabling the heuristic.
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, storageEngineHeuristicNumYieldsDeprioritizeThreshold: 999999}),
+        );
+    }
+}
 
 function assertDelinquentStats(metrics, count, msg, previousOperationMetrics) {
     if (count > 0) {
@@ -404,6 +412,7 @@ const startupParameters = {
         quit();
     }
 
+    disableDeprioritizationHeuristic(conn);
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
 
     runTest(db, db);
@@ -418,6 +427,7 @@ const startupParameters = {
         mongosOptions: {setParameter: startupParameters},
     });
 
+    disableDeprioritizationHeuristic(st.rs0.getPrimary());
     assert.commandWorked(st.shard0.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     runTest(st.s.getDB(jsTestName()), st.shard0.getDB(jsTestName()));
     st.stop();
