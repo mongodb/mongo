@@ -35,7 +35,6 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/assert_util.h"
 
-#include <string>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

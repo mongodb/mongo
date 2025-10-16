@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 /**

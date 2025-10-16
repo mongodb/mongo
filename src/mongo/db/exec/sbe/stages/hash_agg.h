@@ -41,19 +41,12 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
-#include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>

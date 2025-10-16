@@ -33,16 +33,12 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
-#include <tuple>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>

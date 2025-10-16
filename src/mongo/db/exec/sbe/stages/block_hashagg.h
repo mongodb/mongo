@@ -35,7 +35,7 @@
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 
 namespace mongo {

@@ -37,11 +37,12 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 /**
  * This stage is similar to Project stage with the difference being it evaluates accumulator
- * expressions in aggregate context (ie, stateful in contrast to stateless evalution of project)
+ * expressions in aggregate context (ie, stateful in contrast to stateless evaluation of project)
  *
  * Debug string representation:
  *

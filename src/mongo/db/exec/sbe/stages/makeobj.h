@@ -39,6 +39,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
 
 #include <cstddef>

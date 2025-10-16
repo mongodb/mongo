@@ -32,7 +32,6 @@
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"  // countName, partialSumName
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
-#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/collation/collator_interface.h"

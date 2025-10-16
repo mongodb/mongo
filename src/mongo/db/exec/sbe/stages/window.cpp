@@ -34,11 +34,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
-#include "mongo/db/exec/sbe/values/arith_common.h"
-#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo::sbe {
 

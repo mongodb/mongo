@@ -35,8 +35,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <memory>
-
 
 namespace mongo::sbe {
 

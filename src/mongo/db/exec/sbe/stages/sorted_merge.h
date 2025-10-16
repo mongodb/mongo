@@ -37,10 +37,10 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
-#include <queue>
 #include <vector>
 
 #include <boost/optional/optional.hpp>

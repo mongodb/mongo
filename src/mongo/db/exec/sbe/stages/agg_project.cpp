@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo {
 namespace sbe {

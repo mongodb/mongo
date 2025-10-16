@@ -37,11 +37,10 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 namespace mongo::sbe {
@@ -51,8 +50,8 @@ namespace mongo::sbe {
  * order-by slots is given by 'dirs'. The 'obs' and 'dirs' vectors must be the same length. The
  * 'vals' slot vector indicates the values that should associated with the sort keys.
  *
- * Together, a set of values for 'obs' and 'vals' consistute one of the rows being sorted. These
- * rows are materialized at runtime. The given 'memoryLimit' contrains the amount of materialized
+ * Together, a set of values for 'obs' and 'vals' constitute one of the rows being sorted. These
+ * rows are materialized at runtime. The given 'memoryLimit' contains the amount of materialized
  * data that can be held in memory. If this limit is exceeded, and 'allowDiskUse' is false, then
  * this stage throws a query-fatal exception. If 'allowDiskUse' is true, then this stage will spill
  * materialized rows to disk.

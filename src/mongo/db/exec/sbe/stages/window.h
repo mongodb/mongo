@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/util/modules.h"
 
 #include <bit>
 

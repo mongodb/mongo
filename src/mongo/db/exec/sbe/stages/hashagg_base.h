@@ -29,16 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/row.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

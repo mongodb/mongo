@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
@@ -39,11 +38,11 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
-#include <functional>
 
 #include <boost/optional/optional.hpp>
 

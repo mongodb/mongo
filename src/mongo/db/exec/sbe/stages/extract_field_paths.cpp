@@ -30,7 +30,6 @@
 #include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe {

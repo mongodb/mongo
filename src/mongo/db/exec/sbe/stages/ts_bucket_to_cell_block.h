@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 /**

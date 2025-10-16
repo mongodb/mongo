@@ -35,10 +35,10 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
-#include <list>
 #include <memory>
 
 #include <boost/optional/optional.hpp>
@@ -55,7 +55,7 @@ struct CommonStats {
 
     const StringData stageType;
 
-    // An identifier for the node, or zero if the idenfier was not provided. Useful for displaying
+    // An identifier for the node, or zero if the identifier was not provided. Useful for displaying
     // debug output such as explain.
     //
     // These identifiers are not necessarily unique. For example, they can be used by code

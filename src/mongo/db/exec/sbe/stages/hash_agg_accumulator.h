@@ -38,6 +38,7 @@
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

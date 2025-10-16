@@ -34,14 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/values/row.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-
-#include <cstdint>
-#include <limits>
-#include <string>
 
 
 namespace mongo::sbe {

@@ -31,18 +31,17 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/executor/task_executor_cursor.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/string_listset.h"
 
 #include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 namespace mongo::sbe {

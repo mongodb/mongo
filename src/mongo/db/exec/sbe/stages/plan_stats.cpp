@@ -33,8 +33,6 @@
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/tree_walker.h"
 
-#include <vector>
-
 namespace mongo::sbe {
 size_t calculateNumberOfReads(const PlanStageStats* root) {
     auto visitor = PlanStatsNumReadsVisitor{};

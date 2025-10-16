@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 /**

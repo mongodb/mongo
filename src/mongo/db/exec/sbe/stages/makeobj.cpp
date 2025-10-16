@@ -42,7 +42,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <map>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>

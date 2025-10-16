@@ -30,15 +30,11 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/str.h"
-
-#include <set>
 
 
 namespace mongo {

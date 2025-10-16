@@ -29,8 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/hash_lookup_unwind.h"
 
-#include <set>
-
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
