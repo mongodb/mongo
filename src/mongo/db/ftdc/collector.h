@@ -168,13 +168,18 @@ public:
      *    "end" : Date_t,      <- Time at which all collecting ended
      * }
      */
-    std::tuple<BSONObj, Date_t> collect(Client* client, UseMultiServiceSchema multiServiceSchema);
+    std::tuple<BSONObj, Date_t> collect(Client* client,
+                                        UseMultiServiceSchema multiServiceSchema,
+                                        std::vector<std::pair<std::string, int>>& sectionSizes);
 
 protected:
     FTDCCollectorCollection() = default;
 
 private:
-    virtual void _collect(OperationContext* opCtx, ClusterRole role, BSONObjBuilder* builder) = 0;
+    virtual void _collect(OperationContext* opCtx,
+                          ClusterRole role,
+                          BSONObjBuilder* builder,
+                          std::vector<std::pair<std::string, int>>& sectionSizes) = 0;
 };
 
 class SampleCollectorCache {
@@ -325,7 +330,10 @@ public:
     }
 
 private:
-    void _collect(OperationContext* opCtx, ClusterRole role, BSONObjBuilder* builder) override;
+    void _collect(OperationContext* opCtx,
+                  ClusterRole role,
+                  BSONObjBuilder* builder,
+                  std::vector<std::pair<std::string, int>>& sectionsSize) override;
 
     void _forEach(std::function<void(AsyncFTDCCollectorCollectionSet&)> f);
 
@@ -371,7 +379,10 @@ public:
     }
 
 private:
-    void _collect(OperationContext* opCtx, ClusterRole role, BSONObjBuilder* builder) override;
+    void _collect(OperationContext* opCtx,
+                  ClusterRole role,
+                  BSONObjBuilder* builder,
+                  std::vector<std::pair<std::string, int>>& sectionsSize) override;
 
 private:
     // collection of collectors
