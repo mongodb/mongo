@@ -13,7 +13,7 @@ Before calling search_replace, write, or edit_notebook:
 
 ### Allowed File Patterns:
 .bazel*
-**/README.md
+**/*.md
 **/*.bazel
 **/*.bzl
 **/*.py
