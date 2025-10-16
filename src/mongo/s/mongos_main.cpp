@@ -101,6 +101,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/traces/trace_initialization.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -508,6 +509,14 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             LOGV2_OPTIONS(
                 22843, {LogComponent::kNetwork}, "Shutdown: Closing open transport sessions");
             tlm->shutdown();
+        }
+
+        // Shutdown OpenTelemetry traces
+        {
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownOtelTraces,
+                                           &shutdownTimeElapsedBuilder);
+            otel::traces::shutdown(serviceContext);
         }
 
         // Shutdown Full-Time Data Capture
@@ -1075,6 +1084,8 @@ ExitCode mongos_main(int argc, char* argv[]) {
 
         quickExit(ExitCode::auditRotateError);
     }
+
+    uassertStatusOK(otel::traces::initialize(service, "mongos"));
 
     registerShutdownTask(cleanupTask);
 

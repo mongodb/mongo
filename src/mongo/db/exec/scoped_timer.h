@@ -144,6 +144,7 @@ private:
     X(shutDownFTDC)                             \
     X(shutDownOCSP)                             \
     X(shutDownOtelMetrics)                      \
+    X(shutDownOtelTraces)                       \
     X(shutDownReplicaSetAwareServices)          \
     X(waitForStartupComplete)                   \
     X(shutDownReplication)                      \

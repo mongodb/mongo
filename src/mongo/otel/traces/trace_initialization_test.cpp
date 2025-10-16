@@ -30,7 +30,9 @@
 #include "mongo/otel/traces/trace_initialization.h"
 
 #include "mongo/config.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
+#include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/trace/noop.h>
@@ -39,17 +41,25 @@
 namespace mongo {
 namespace {
 
-class TraceInitializationTest : public unittest::Test {
+class TraceInitializationTest : public ServiceContextTest {
 public:
     void setUp() override {
-        opentelemetry::trace::Provider::SetTracerProvider(
+        ServiceContextTest::setUp();
+        // Initialize TracerProviderService with no-op provider
+        auto tracerProviderService = otel::traces::TracerProviderService::create();
+        tracerProviderService->setTracerProvider_ForTest(
             std::make_shared<opentelemetry::trace::NoopTracerProvider>());
+        otel::traces::TracerProviderService::set(getServiceContext(),
+                                                 std::move(tracerProviderService));
+
         otel::traces::gOpenTelemetryHttpEndpoint.clear();
         otel::traces::gOpenTelemetryTraceDirectory.clear();
     }
 
     void tearDown() override {
-        opentelemetry::trace::Provider::SetTracerProvider({});
+        // Clear the TracerProviderService
+        otel::traces::TracerProviderService::set(getServiceContext(), nullptr);
+        ServiceContextTest::tearDown();
     }
 };
 
@@ -58,47 +68,60 @@ bool isNoop(opentelemetry::trace::TracerProvider* provider) {
 }
 
 TEST_F(TraceInitializationTest, NoTraceProvider) {
-    ASSERT_OK(otel::traces::initialize("mongod"));
+    ASSERT_OK(otel::traces::initialize(getServiceContext(), "mongod"));
 
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    ASSERT_FALSE(provider);
+    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    ASSERT_TRUE(tracerProviderService);
+    ASSERT_FALSE(tracerProviderService->isEnabled());
 }
 
 TEST_F(TraceInitializationTest, Shutdown) {
-    otel::traces::shutdown();
+    otel::traces::shutdown(getServiceContext());
 
-    ASSERT_TRUE(isNoop(opentelemetry::trace::Provider::GetTracerProvider().get()));
+    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    ASSERT_TRUE(tracerProviderService);
+    ASSERT_FALSE(tracerProviderService->isEnabled());
 
     otel::traces::gOpenTelemetryTraceDirectory = "/tmp/";
-    otel::traces::shutdown();
+    otel::traces::shutdown(getServiceContext());
 
-    // After calling shutdown, the NoOpTraceProvider is removed.
-    ASSERT_FALSE(opentelemetry::trace::Provider::GetTracerProvider());
+    // After calling shutdown, the service should still exist but be disabled
+    tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    ASSERT_TRUE(tracerProviderService);
+    ASSERT_FALSE(tracerProviderService->isEnabled());
 }
 
 TEST_F(TraceInitializationTest, FileTraceProvider) {
     otel::traces::gOpenTelemetryTraceDirectory = "/tmp/";
-    ASSERT_OK(otel::traces::initialize("mongod"));
+    ASSERT_OK(otel::traces::initialize(getServiceContext(), "mongod"));
 
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    ASSERT_FALSE(isNoop(provider.get()));
+    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    ASSERT_TRUE(tracerProviderService);
+    ASSERT_TRUE(tracerProviderService->isEnabled());
+    ASSERT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
 }
 
 TEST_F(TraceInitializationTest, HttpTraceProvider) {
     otel::traces::gOpenTelemetryHttpEndpoint = "http://localhost:4318/v1/traces";
-    ASSERT_OK(otel::traces::initialize("mongod"));
+    ASSERT_OK(otel::traces::initialize(getServiceContext(), "mongod"));
 
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    ASSERT_FALSE(isNoop(provider.get()));
+    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    ASSERT_TRUE(tracerProviderService);
+    ASSERT_TRUE(tracerProviderService->isEnabled());
+    ASSERT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
 }
 
 TEST_F(TraceInitializationTest, HttpAndDirectory) {
     otel::traces::gOpenTelemetryHttpEndpoint = "http://localhost:4318/v1/traces";
     otel::traces::gOpenTelemetryTraceDirectory = "/tmp/";
-    ASSERT_THROWS_CODE(otel::traces::initialize("mongod"), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(otel::traces::initialize(getServiceContext(), "mongod"),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
 
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    ASSERT_TRUE(isNoop(provider.get()));
+    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    ASSERT_TRUE(tracerProviderService);
+    ASSERT_TRUE(tracerProviderService->isEnabled());
+    ASSERT_TRUE(isNoop(tracerProviderService->getTracerProvider().get()));
 }
 
 }  // namespace

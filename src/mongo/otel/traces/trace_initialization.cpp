@@ -31,17 +31,8 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
+#include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/stdx/chrono.h"
-
-#include <opentelemetry/exporters/otlp/otlp_file_exporter_factory.h>
-#include <opentelemetry/exporters/otlp/otlp_file_exporter_options.h>
-#include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
-#include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
-#include <opentelemetry/sdk/trace/processor.h>
-#include <opentelemetry/sdk/trace/simple_processor_factory.h>
-#include <opentelemetry/sdk/trace/tracer_provider.h>
-#include <opentelemetry/sdk/trace/tracer_provider_factory.h>
-#include <opentelemetry/trace/provider.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -51,90 +42,69 @@ namespace traces {
 
 namespace {
 
-namespace otlp = opentelemetry::exporter::otlp;
-namespace trace_api = opentelemetry::trace;
-namespace trace_sdk = opentelemetry::sdk::trace;
-
-Status initializeHttp(std::string name, std::string endpoint) {
-    LOGV2(9859702,
-          "Initializing OpenTelemetry tracing using HTTP exporter",
-          "name"_attr = name,
-          "endpoint"_attr = endpoint);
-
-    auto pid = ProcessId::getCurrent().toString();
-
-    opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
-    opts.url = endpoint;
-
-    auto exporter = otlp::OtlpHttpExporterFactory::Create(opts);
-    auto processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(exporter));
-
-    auto resourceAttributes = opentelemetry::sdk::resource::ResourceAttributes{
-        {"service.name", name}, {"service.instance.id", pid}};
-    auto resource = opentelemetry::sdk::resource::Resource::Create(resourceAttributes);
-
-    std::shared_ptr<trace_api::TracerProvider> provider =
-        trace_sdk::TracerProviderFactory::Create(std::move(processor), resource);
-    trace_api::Provider::SetTracerProvider(std::move(provider));
-
-    return Status::OK();
+Status initializeHttp(ServiceContext* serviceContext, std::string name, std::string endpoint) {
+    auto tracerProviderService = TracerProviderService::get(serviceContext);
+    if (!tracerProviderService) {
+        return Status(ErrorCodes::InternalError, "TracerProviderService not initialized");
+    }
+    return tracerProviderService->initializeHttp(name, endpoint);
 }
 
-Status initializeFile(std::string name, std::string directory) {
-    LOGV2(9859701,
-          "Initializing OpenTelemetry tracing using file exporter",
-          "name"_attr = name,
-          "directory"_attr = directory);
+Status initializeFile(ServiceContext* serviceContext, std::string name, std::string directory) {
+    auto tracerProviderService = TracerProviderService::get(serviceContext);
+    if (!tracerProviderService) {
+        return Status(ErrorCodes::InternalError, "TracerProviderService not initialized");
+    }
+    return tracerProviderService->initializeFile(name, directory);
+}
 
-    auto pid = ProcessId::getCurrent().toString();
+void initializeNoOp(ServiceContext* serviceContext) {
+    auto tracerProviderService = TracerProviderService::get(serviceContext);
+    if (tracerProviderService) {
+        tracerProviderService->initializeNoOp();
+    }
+}
 
-    otlp::OtlpFileExporterOptions opts;
-    otlp::OtlpFileClientFileSystemOptions sysOpts;
-    sysOpts.file_pattern = fmt::format("{}/{}-{}-%Y%m%d-trace.jsonl", directory, name, pid);
-    opts.backend_options = sysOpts;
-
-    auto exporter = otlp::OtlpFileExporterFactory::Create(opts);
-    auto processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(exporter));
-
-    auto resourceAttributes = opentelemetry::sdk::resource::ResourceAttributes{
-        {"service.name", name}, {"service.instance.id", pid}};
-    auto resource = opentelemetry::sdk::resource::Resource::Create(resourceAttributes);
-
-    std::shared_ptr<trace_api::TracerProvider> provider =
-        trace_sdk::TracerProviderFactory::Create(std::move(processor), resource);
-    trace_api::Provider::SetTracerProvider(std::move(provider));
-
-    return Status::OK();
+void shutdownTracerProvider(ServiceContext* serviceContext) {
+    auto tracerProviderService = TracerProviderService::get(serviceContext);
+    if (tracerProviderService) {
+        tracerProviderService->shutdown();
+    }
 }
 
 }  // namespace
 
-Status initialize(std::string name) {
+Status initialize(ServiceContext* serviceContext, std::string name) {
     uassert(
         ErrorCodes::InvalidOptions,
         "gOpenTelemetryHttpEndpoint and gOpenTelemetryTraceDirectory cannot be set simultaneously",
         gOpenTelemetryHttpEndpoint.empty() || gOpenTelemetryTraceDirectory.empty());
 
+    if (!serviceContext) {
+        return Status(ErrorCodes::InternalError, "No global ServiceContext available");
+    }
+
+    // Initialize the TracerProviderService if it doesn't exist
+    if (!TracerProviderService::get(serviceContext)) {
+        TracerProviderService::set(serviceContext, TracerProviderService::create());
+    }
+
     if (!gOpenTelemetryHttpEndpoint.empty()) {
-        return initializeHttp(name, gOpenTelemetryHttpEndpoint);
+        return initializeHttp(serviceContext, name, gOpenTelemetryHttpEndpoint);
     } else if (!gOpenTelemetryTraceDirectory.empty()) {
-        return initializeFile(name, gOpenTelemetryTraceDirectory);
+        return initializeFile(serviceContext, name, gOpenTelemetryTraceDirectory);
     } else {
-        LOGV2(9859700, "Not initializing OpenTelemetry");
-        // Ensure there is no default No-Op TraceProvider.
-        opentelemetry::trace::Provider::SetTracerProvider({});
+        initializeNoOp(serviceContext);
         return Status::OK();
     }
 }
 
-void shutdown() {
-    if (!gOpenTelemetryHttpEndpoint.empty() || !gOpenTelemetryTraceDirectory.empty()) {
-        auto tracer = opentelemetry::trace::Provider::GetTracerProvider()->GetTracer("mongodb");
-        tracer->Close(stdx::chrono::seconds{1});
-
-        trace_api::Provider::SetTracerProvider({});
+void shutdown(ServiceContext* serviceContext) {
+    if (serviceContext) {
+        shutdownTracerProvider(serviceContext);
     }
 }
+
 
 }  // namespace traces
 }  // namespace otel

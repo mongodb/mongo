@@ -30,8 +30,10 @@
 #include "mongo/otel/traces/span/span.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/otel/traces/tracing_utils.h"
 #include "mongo/util/assert_util.h"
 
@@ -145,12 +147,24 @@ Span Span::start(OperationContext* opCtx, const std::string& name, bool keepSpan
 Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                  const std::string& name,
                  bool keepSpan) {
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    if (!provider) {
+    // Get ServiceContext from global context
+    ServiceContext* serviceContext = getGlobalServiceContext();
+    if (!serviceContext) {
         return Span{};
     }
 
-    auto tracer = provider->GetTracer("mongodb");
+    // Get the TracerProviderService from ServiceContext decoration
+    auto tracerProviderService = TracerProviderService::get(serviceContext);
+    if (!tracerProviderService || !tracerProviderService->isEnabled()) {
+        return Span{};
+    }
+
+    auto tracerProvider = tracerProviderService->getTracerProvider();
+    if (!tracerProvider) {
+        return Span{};
+    }
+
+    auto tracer = tracerProvider->GetTracer("mongodb");
     if (!tracer) {
         return Span{};
     }

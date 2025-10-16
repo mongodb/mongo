@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
+#include "mongo/db/service_context.h"
 
 #include <string>
 
@@ -38,16 +39,16 @@ namespace mongo::otel::traces {
 
 #ifdef MONGO_CONFIG_OTEL
 
-Status initialize(std::string name);
-void shutdown();
+Status initialize(ServiceContext* serviceContext, std::string name);
+void shutdown(ServiceContext* serviceContext);
 
 #else
 
-inline Status initialize(std::string) {
+inline Status initialize(ServiceContext* serviceContext, std::string) {
     return Status::OK();
 }
 
-inline void shutdown();
+inline void shutdown(ServiceContext* serviceContext) {}
 
 #endif
 

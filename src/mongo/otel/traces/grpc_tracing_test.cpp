@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h>
@@ -41,15 +43,33 @@ namespace otel {
 namespace traces {
 namespace {
 
-TEST(GRPCTracingTest, GetTracer) {
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    auto tracer = provider->GetTracer("grpc");
+class GRPCTracingTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        // Initialize TracerProviderService with a basic provider
+        auto tracerProviderService = TracerProviderService::create();
+        tracerProviderService->setTracerProvider_ForTest(
+            opentelemetry::trace::Provider::GetTracerProvider());
+        TracerProviderService::set(getServiceContext(), std::move(tracerProviderService));
+    }
+
+    void tearDown() override {
+        TracerProviderService::set(getServiceContext(), nullptr);
+        ServiceContextTest::tearDown();
+    }
+};
+
+TEST_F(GRPCTracingTest, GetTracer) {
+    auto tracerProviderService = TracerProviderService::get(getServiceContext());
+    ASSERT_TRUE(tracerProviderService);
+    auto tracer = tracerProviderService->getTracerProvider()->GetTracer("grpc");
     ASSERT(tracer);
     auto span = tracer->GetCurrentSpan();
     ASSERT_FALSE(span->IsRecording());
 }
 
-TEST(GRPCTracingTest, CreateExporterAndSpanProcesser) {
+TEST_F(GRPCTracingTest, CreateExporterAndSpanProcesser) {
     opentelemetry::exporter::otlp::OtlpGrpcExporterOptions opts;
     opts.endpoint = "localhost:12345";
     auto exporter = opentelemetry::exporter::otlp::OtlpGrpcExporterFactory::Create(opts);

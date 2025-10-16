@@ -72,12 +72,14 @@ mongo_cc_library(
         "bson_text_map_carrier.cpp",
         "trace_initialization.cpp",
         "trace_settings_gen",
+        "tracer_provider_service.cpp",
         "tracing_utils.cpp",
         "//src/mongo/otel/traces/span:span.cpp",
         "//src/mongo/otel/traces/span:span_telemetry_context_impl.cpp",
     ],
     hdrs = [
         "bson_text_map_carrier.h",
+        "tracer_provider_service.h",
         "tracing_utils.h",
         "//src/mongo/otel/traces/span:span_telemetry_context_impl.h",
     ],
@@ -86,6 +88,7 @@ mongo_cc_library(
         ":tracing_base",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/otel:otel_base",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
@@ -138,6 +141,7 @@ mongo_cc_unit_test(
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         ":tracing",
+        "//src/mongo/db:service_context_test_fixture",
         "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_grpc_exporter",
     ],
 )
