@@ -86,6 +86,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session.h"
@@ -538,7 +539,10 @@ protected:
 
     // Tests the oplog entry generated from 'onCreateCollection'. Simulates the creation of a
     // non-clustered collection.
-    void testOnCreateCollBasic(bool catalogReplicationEnabled, bool viewless = false) {
+    void testOnCreateCollBasic(bool catalogReplicationEnabled,
+                               bool viewless = false,
+                               bool viewlessParam = false) {
+        gFeatureFlagMarkTimeseriesEventsInOplog.setForServerParameter(viewlessParam);
         RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
 
@@ -573,7 +577,7 @@ protected:
         validateReplicatedCatalogIdentifier(
             opCtx, oplogEntry, catalogIdentifier, catalogReplicationEnabled);
         bool isTimeseries = oplogEntryBSON.getBoolField("isTimeseries");
-        ASSERT_EQ(viewless, isTimeseries);
+        ASSERT_EQ(viewless && viewlessParam, isTimeseries);
     }
 
     void testOnCreateCollClustered(bool catalogReplicationEnabled) {
@@ -668,11 +672,25 @@ TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersEnable
 TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersDisabled) {
     testOnCreateCollBasic(false /* catalogReplicationEnabled */);
 }
-TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersEnabledWithTimeseries) {
-    testOnCreateCollBasic(true /* catalogReplicationEnabled */, true /* viewless */);
+TEST_F(OpObserverOnCreateCollectionTest,
+       BasicReplicatedCatalogIdentifiersEnabledWithTimeseriesParamOff) {
+    testOnCreateCollBasic(
+        true /* catalogReplicationEnabled */, true /* viewless */, false /* viewlessParam */);
 }
-TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersDisabledWithTimeseries) {
-    testOnCreateCollBasic(false /* catalogReplicationEnabled */, true /* viewless */);
+TEST_F(OpObserverOnCreateCollectionTest,
+       BasicReplicatedCatalogIdentifiersDisabledWithTimeseriesParamOff) {
+    testOnCreateCollBasic(
+        false /* catalogReplicationEnabled */, true /* viewless */, false /* viewlessParam */);
+}
+TEST_F(OpObserverOnCreateCollectionTest,
+       BasicReplicatedCatalogIdentifiersEnabledWithTimeseriesParamOn) {
+    testOnCreateCollBasic(
+        true /* catalogReplicationEnabled */, true /* viewless */, true /* viewlessParam */);
+}
+TEST_F(OpObserverOnCreateCollectionTest,
+       BasicReplicatedCatalogIdentifiersDisabledWithTimeseriesParamOn) {
+    testOnCreateCollBasic(
+        false /* catalogReplicationEnabled */, true /* viewless */, true /* viewlessParam */);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersEnabled) {
@@ -874,6 +892,8 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
 TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogUpdate) {
     RAIIServerParameterControllerForTest viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
+    RAIIServerParameterControllerForTest viewlessController2(
+        "featureFlagMarkTimeseriesEventsInOplog", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
 
@@ -914,6 +934,8 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogUpdate) {
 TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
     RAIIServerParameterControllerForTest viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
+    RAIIServerParameterControllerForTest viewlessController2(
+        "featureFlagMarkTimeseriesEventsInOplog", true);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -943,6 +965,8 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
 TEST_F(OpObserverTest, checkIsTimeseriesOnInserts) {
     RAIIServerParameterControllerForTest viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
+    RAIIServerParameterControllerForTest viewlessController2(
+        "featureFlagMarkTimeseriesEventsInOplog", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
     auto opCtx = cc().makeOperationContext();
@@ -1923,7 +1947,7 @@ protected:
 
 TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
     RAIIServerParameterControllerForTest viewlessController(
-        "featureFlagCreateViewlessTimeseriesCollections", true);
+        "featureFlagMarkTimeseriesEventsInOplog", true);
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
@@ -3533,6 +3557,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseries) {
     RAIIServerParameterControllerForTest viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
+    RAIIServerParameterControllerForTest viewlessController2(
+        "featureFlagMarkTimeseriesEventsInOplog", true);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
 
     auto opCtxRaii = cc().makeOperationContext();

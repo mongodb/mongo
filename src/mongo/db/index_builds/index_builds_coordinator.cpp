@@ -288,7 +288,8 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
 void onCommitIndexBuild(OperationContext* opCtx,
                         const NamespaceString& nss,
                         std::shared_ptr<ReplIndexBuildState> replState,
-                        std::vector<boost::optional<MultikeyPaths>> multikeys) {
+                        std::vector<boost::optional<MultikeyPaths>> multikeys,
+                        bool isTimeseries) {
     const auto& buildUUID = replState->buildUUID;
 
     replState->commit(opCtx);
@@ -333,7 +334,7 @@ void onCommitIndexBuild(OperationContext* opCtx,
     }
 
     opObserver->onCommitIndexBuild(
-        opCtx, nss, collUUID, buildUUID, indexSpecs, multikeyObjs, fromMigrate);
+        opCtx, nss, collUUID, buildUUID, indexSpecs, multikeyObjs, fromMigrate, isTimeseries);
 }
 
 /**
@@ -342,7 +343,8 @@ void onCommitIndexBuild(OperationContext* opCtx,
  */
 void onAbortIndexBuild(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       ReplIndexBuildState& replState) {
+                       ReplIndexBuildState& replState,
+                       bool isTimeseries) {
     if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
         return;
     }
@@ -359,7 +361,8 @@ void onAbortIndexBuild(OperationContext* opCtx,
                                   replState.buildUUID,
                                   toIndexSpecs(replState.getIndexes()),
                                   replState.getAbortStatus(),
-                                  fromMigrate);
+                                  fromMigrate,
+                                  isTimeseries);
 }
 
 /**
@@ -1595,7 +1598,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
                       str::stream() << "singlePhase: "
                                     << (IndexBuildProtocol::kSinglePhase == replState->protocol));
             auto onCleanUpFn = [&] {
-                onAbortIndexBuild(opCtx, coll->ns(), *replState);
+                onAbortIndexBuild(opCtx, coll->ns(), *replState, coll->isTimeseriesCollection());
             };
             _indexBuildsManager.abortIndexBuild(opCtx, coll, replState->buildUUID, onCleanUpFn);
             removeIndexBuildEntryAfterCommitOrAbort(
@@ -2329,8 +2332,12 @@ void IndexBuildsCoordinator::_createIndex(OperationContext* opCtx,
     auto onCreateEachFn = [&](const BSONObj& spec,
                               const IndexCatalogEntry& entry,
                               boost::optional<MultikeyPaths>&& multikey) {
-        opObserver->onCreateIndex(
-            opCtx, collection->ns(), collection->uuid(), indexBuildInfo, fromMigrate);
+        opObserver->onCreateIndex(opCtx,
+                                  collection->ns(),
+                                  collection->uuid(),
+                                  indexBuildInfo,
+                                  fromMigrate,
+                                  collection->isTimeseriesCollection());
     };
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
         opCtx, collection, nss, buildUUID, onCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
@@ -2377,7 +2384,12 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
         // timestamp.
         indexBuildInfo.spec = uassertStatusOK(indexCatalog->prepareSpecForCreate(
             opCtx, collectionPtr, indexBuildInfo.spec, boost::none));
-        opObserver->onCreateIndex(opCtx, nss, collectionUUID, indexBuildInfo, fromMigrate);
+        opObserver->onCreateIndex(opCtx,
+                                  nss,
+                                  collectionUUID,
+                                  indexBuildInfo,
+                                  fromMigrate,
+                                  collection->isTimeseriesCollection());
         uassertStatusOK(
             IndexBuildBlock::buildEmptyIndex(opCtx, writeableCollection, indexBuildInfo));
     }
@@ -2657,7 +2669,8 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                 replState->collectionUUID,
                 replState->buildUUID,
                 replState->getIndexes(),
-                false /* fromMigrate */);
+                false /* fromMigrate */,
+                collection->isTimeseriesCollection());
         };
     } else {
         onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection.get());
@@ -3558,7 +3571,11 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // If two phase index builds is enabled, index build will be coordinated using
         // startIndexBuild and commitIndexBuild oplog entries.
         auto onCommitFn = [&] {
-            onCommitIndexBuild(opCtx, collection->ns(), replState, multikeys);
+            onCommitIndexBuild(opCtx,
+                               collection->ns(),
+                               replState,
+                               multikeys,
+                               collection->isTimeseriesCollection());
         };
 
         int i = 0;
@@ -3588,8 +3605,12 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
             auto opObserver = opCtx->getServiceContext()->getOpObserver();
             IndexBuildInfo indexBuildInfo(spec, std::string{entry.getIdent()});
             auto fromMigrate = false;
-            opObserver->onCreateIndex(
-                opCtx, collection->ns(), replState->collectionUUID, indexBuildInfo, fromMigrate);
+            opObserver->onCreateIndex(opCtx,
+                                      collection->ns(),
+                                      replState->collectionUUID,
+                                      indexBuildInfo,
+                                      fromMigrate,
+                                      collection->isTimeseriesCollection());
         };
 
         // Commit index build.

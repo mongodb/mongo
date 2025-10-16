@@ -67,6 +67,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_txn_record_gen.h"
@@ -344,7 +345,10 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setObject(builder.obj());
@@ -411,7 +415,10 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(nss.tenantId());
@@ -487,7 +494,10 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(nss.tenantId());
@@ -531,7 +541,10 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(nss.tenantId());
@@ -756,7 +769,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         // Ensure well-formed embedded ReplOperation for logging.
         // This means setting optype, nss, and object at the minimum.
         MutableOplogEntry oplogEntryTemplate;
-        if (coll->isNewTimeseriesWithoutView()) {
+        if (coll->isNewTimeseriesWithoutView() &&
+            gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             oplogEntryTemplate.setIsTimeseries();
         }
         oplogEntryTemplate.setOpType(repl::OpTypeEnum::kInsert);
@@ -1348,7 +1364,10 @@ void OpObserverImpl::onCreateCollection(
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(collectionName.tenantId());
@@ -1438,7 +1457,10 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 
         oplogEntry.setTid(nss.tenantId());
         oplogEntry.setNss(nss.getCommandNS());
-        if (isTimeseries) {
+        if (isTimeseries &&
+            gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             oplogEntry.setIsTimeseries();
         }
         oplogEntry.setUuid(uuid);
@@ -1516,7 +1538,10 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(collectionName.tenantId());
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(collectionName.getCommandNS());
@@ -1552,7 +1577,10 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(nss.tenantId());
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(nss.getCommandNS());
@@ -1600,7 +1628,10 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(fromCollection.tenantId());
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(fromCollection.getCommandNS());
@@ -1674,7 +1705,10 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(nss.tenantId());
-    if (isTimeseries) {
+    if (isTimeseries &&
+        gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(nss.getCommandNS());

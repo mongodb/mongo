@@ -2,7 +2,8 @@
  * Tests that it's not possible to shard or move a malformed timeseries collection where both
  * 'coll' and 'system.buckets.coll' exist as collections (see SERVER-90862).
  *
- * @tags: [featureFlagCreateViewlessTimeseriesCollections_incompatible]
+ * @tags: [featureFlagCreateViewlessTimeseriesCollections_incompatible,
+ *         featureFlagMarkTimeseriesEventsInOplog_incompatible]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

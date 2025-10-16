@@ -233,7 +233,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                 coll->ns(),
                 coll->uuid(),
                 coll->numRecords(opCtx),
-                /*markFromMigrate=*/false);
+                /*markFromMigrate=*/false,
+                coll->isTimeseriesCollection());
         }
 
         Top::getDecoration(opCtx).collectionDropped(coll->ns());

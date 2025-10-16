@@ -503,7 +503,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, nss);
     if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
         _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection(opCtx));
-        opObserver->onDropCollection(opCtx, nss, uuid, numRecords, markFromMigrate);
+        opObserver->onDropCollection(
+            opCtx, nss, uuid, numRecords, markFromMigrate, collection->isTimeseriesCollection());
         return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));
     }
 
@@ -524,12 +525,14 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
           "commitTimestamp"_attr = commitTimestamp);
     if (dropOpTime.isNull()) {
         // Log oplog entry for collection drop and remove the UUID.
-        dropOpTime = opObserver->onDropCollection(opCtx, nss, uuid, numRecords, markFromMigrate);
+        dropOpTime = opObserver->onDropCollection(
+            opCtx, nss, uuid, numRecords, markFromMigrate, collection->isTimeseriesCollection());
         invariant(!dropOpTime.isNull());
     } else {
         // If we are provided with a valid 'dropOpTime', it means we are dropping this
         // collection in the context of applying an oplog entry on a secondary.
-        auto opTime = opObserver->onDropCollection(opCtx, nss, uuid, numRecords, markFromMigrate);
+        auto opTime = opObserver->onDropCollection(
+            opCtx, nss, uuid, numRecords, markFromMigrate, collection->isTimeseriesCollection());
         // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
         invariant(opTime.isNull(),
                   str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
@@ -883,13 +886,15 @@ Collection* DatabaseImpl::_createCollection(
 
     hangBeforeLoggingCreateCollection.pauseWhileSet();
 
-    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(opCtx,
-                                                                    nss,
-                                                                    optionsWithUUID,
-                                                                    fullIdIndexSpec,
-                                                                    createOplogSlot,
-                                                                    catalogIdentifierForColl,
-                                                                    fromMigrate);
+    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
+        opCtx,
+        nss,
+        optionsWithUUID,
+        fullIdIndexSpec,
+        createOplogSlot,
+        catalogIdentifierForColl,
+        fromMigrate,
+        collection->isTimeseriesCollection());
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
     // the storage timestamp for the index creation is after the storage timestamp for the

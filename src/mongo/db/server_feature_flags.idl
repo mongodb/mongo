@@ -145,6 +145,14 @@ feature_flags:
         cpp_varname: gFeatureFlagCreateViewlessTimeseriesCollections
         default: false
         fcv_gated: true
+    featureFlagMarkTimeseriesEventsInOplog:
+        description: >-
+            Enables marking oplog entries writing to viewless timeseries collections.
+            Viewless timeseries collections have only one associated namespace,
+            instead of a view namespace and a system.buckets namespace.
+        cpp_varname: gFeatureFlagMarkTimeseriesEventsInOplog
+        default: false
+        fcv_gated: true
     featureFlagMongodProxyProtocolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
         cpp_varname: gFeatureFlagMongodProxyProtocolSupport

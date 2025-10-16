@@ -273,7 +273,8 @@ Status dropIndexByDescriptor(OperationContext* opCtx,
                                                              collection->ns(),
                                                              collection->uuid(),
                                                              entry->descriptor()->indexName(),
-                                                             entry->descriptor()->infoObj());
+                                                             entry->descriptor()->infoObj(),
+                                                             collection->isTimeseriesCollection());
 
     auto s = indexCatalog->dropIndexEntry(opCtx, collection, entry);
     if (!s.isOK()) {

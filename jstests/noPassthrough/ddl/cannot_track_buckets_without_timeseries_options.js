@@ -5,6 +5,7 @@
  *   # This inconsistency that can only happen with legacy timeseries collections,
  *   # which allowed a system.buckets namespace to exist without timeseries options.
  *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
+ *   featureFlagMarkTimeseriesEventsInOplog_incompatible,
  * ]
  */
 

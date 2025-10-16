@@ -10,6 +10,7 @@
  *     # Tests a state of partial creation (timeseries buckets exists, timeseries view does not)
  *     # which can't happen with viewless timeseries collections, since they are created atomically.
  *     featureFlagCreateViewlessTimeseriesCollections_incompatible,
+ *     featureFlagMarkTimeseriesEventsInOplog_incompatible,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

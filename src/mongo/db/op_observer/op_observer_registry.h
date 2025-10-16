@@ -142,7 +142,7 @@ public:
                        bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onCreateIndex(opCtx, nss, uuid, indexBuildInfo, fromMigrate);
+            o->onCreateIndex(opCtx, nss, uuid, indexBuildInfo, fromMigrate, isTimeseries);
     }
 
     void onStartIndexBuild(OperationContext* opCtx,
@@ -154,7 +154,8 @@ public:
                            bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
-            o->onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+            o->onStartIndexBuild(
+                opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate, isTimeseries);
         }
     }
 
@@ -177,7 +178,7 @@ public:
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onCommitIndexBuild(
-                opCtx, nss, collUUID, indexBuildUUID, indexes, multikey, fromMigrate);
+                opCtx, nss, collUUID, indexBuildUUID, indexes, multikey, fromMigrate, isTimeseries);
         }
     }
 
@@ -191,7 +192,8 @@ public:
                            bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
-            o->onAbortIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate);
+            o->onAbortIndexBuild(
+                opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate, isTimeseries);
         }
     }
 
@@ -356,7 +358,8 @@ public:
                                   idIndex,
                                   createOpTime,
                                   createCollCatalogIdentifier,
-                                  fromMigrate);
+                                  fromMigrate,
+                                  isTimeseries);
     }
 
     void onCollMod(OperationContext* const opCtx,
@@ -368,7 +371,7 @@ public:
                    bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onCollMod(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
+            o->onCollMod(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo, isTimeseries);
     }
 
     void onDropDatabase(OperationContext* const opCtx,
@@ -388,7 +391,7 @@ public:
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
             auto time = observer->onDropCollection(
-                opCtx, collectionName, uuid, numRecords, markFromMigrate);
+                opCtx, collectionName, uuid, numRecords, markFromMigrate, isTimeseries);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);
@@ -402,7 +405,7 @@ public:
                      bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onDropIndex(opCtx, nss, uuid, indexName, idxDescriptor);
+            o->onDropIndex(opCtx, nss, uuid, indexName, idxDescriptor, isTimeseries);
     }
 
     void onRenameCollection(OperationContext* const opCtx,
@@ -467,7 +470,8 @@ public:
                                                             dropTargetUUID,
                                                             numRecords,
                                                             stayTemp,
-                                                            markFromMigrate);
+                                                            markFromMigrate,
+                                                            isTimeseries);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);
