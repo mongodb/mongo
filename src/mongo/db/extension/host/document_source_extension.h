@@ -225,19 +225,6 @@ protected:
                             BSONObj rawStage,
                             mongo::extension::host_connector::AggStageDescriptorHandle descriptor);
 
-    // Struct that simplifies DocumentSourceExtension construction for sub-classes.
-    struct ExtensionBase {
-        std::string name;
-        boost::intrusive_ptr<ExpressionContext> exprCtx;
-        Id id;
-        BSONObj rawStage;
-        host_connector::AggStageDescriptorHandle descriptor;
-    };
-
-    explicit DocumentSourceExtension(const ExtensionBase& extensionBase);
-
-    ExtensionBase extensionBase() const;
-
     /**
      * NB : Here we keep a copy of the stage name to service getSourceName().
      * It is tempting to rely on the name which is provided by the _staticDescriptor, however, that
@@ -247,8 +234,6 @@ protected:
      **/
     const std::string _stageName;
     const Id _id;
-    BSONObj _raw_stage;
-    const mongo::extension::host_connector::AggStageDescriptorHandle _staticDescriptor;
     const mongo::extension::host_connector::AggStageParseNodeHandle _parseNode;
 
 private:

@@ -54,11 +54,6 @@ public:
     explicit DocumentSourceExtensionTest(NamespaceString nsString)
         : AggregationContextFixture(std::move(nsString)) {};
 
-    extension::host::DocumentSourceExtension::ExtensionBase getExtensionBase(
-        const mongo::extension::host::DocumentSourceExtension* stage) {
-        return stage->extensionBase();
-    }
-
     /**
      * Helper to create test pipeline.
      */
@@ -545,30 +540,6 @@ TEST_F(DocumentSourceExtensionTest, ExpandRecursesMultipleLevels) {
     auto* fourth = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it3->get());
     ASSERT_TRUE(fourth != nullptr);
     ASSERT_EQ(fourth->getParseTimeName(), std::string(kLeafDName));
-}
-
-TEST_F(DocumentSourceExtensionTest, extensionBaseSucceeds) {
-    // Register the extension stage and parse a simple pipeline using it.
-    extension::host::HostPortal::registerStageDescriptor(
-        reinterpret_cast<const ::MongoExtensionAggStageDescriptor*>(&_noOpStaticDescriptor));
-
-    std::vector<BSONObj> testPipeline{kValidSpec};
-    auto parsedPipeline = buildTestPipeline(testPipeline);
-    ASSERT(parsedPipeline);
-    ASSERT_EQUALS(parsedPipeline->size(), 1u);
-
-    const auto* stagePtr = parsedPipeline->peekFront();
-    ASSERT_TRUE(stagePtr != nullptr);
-    const auto* documentSourceExtension =
-        dynamic_cast<const extension::host::DocumentSourceExtension*>(stagePtr);
-    ASSERT_TRUE(documentSourceExtension != nullptr);
-
-    // Extract ExtensionBase from the existing stage and validate core fields.
-    auto init = getExtensionBase(documentSourceExtension);
-    ASSERT_EQUALS(std::string(init.name),
-                  extension::sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
-    ASSERT_TRUE(init.exprCtx.get() == stagePtr->getExpCtx().get());
-    ASSERT_BSONOBJ_EQ(init.rawStage, kValidSpec);
 }
 
 namespace {

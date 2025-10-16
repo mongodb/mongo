@@ -213,9 +213,7 @@ DocumentSourceExtension::DocumentSourceExtension(
     : DocumentSource(name, exprCtx),
       _stageName(std::string(name)),
       _id(id),
-      _raw_stage(rawStage.getOwned()),
-      _staticDescriptor(staticDescriptor),
-      _parseNode(staticDescriptor.parse(_raw_stage)) {}
+      _parseNode(staticDescriptor.parse(rawStage)) {}
 
 const char* DocumentSourceExtension::getSourceName() const {
     return _stageName.c_str();
@@ -241,17 +239,6 @@ StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeSta
                                         UnionRequirement::kNotAllowed,
                                         ChangeStreamRequirement::kDenylist);
     return constraints;
-}
-
-DocumentSourceExtension::DocumentSourceExtension(const ExtensionBase& extensionBase)
-    : DocumentSourceExtension(extensionBase.name,
-                              extensionBase.exprCtx,
-                              extensionBase.id,
-                              extensionBase.rawStage,
-                              extensionBase.descriptor) {}
-
-DocumentSourceExtension::ExtensionBase DocumentSourceExtension::extensionBase() const {
-    return ExtensionBase{_stageName, getExpCtx(), _id, _raw_stage, _staticDescriptor};
 }
 
 DocumentSourceExtension::~DocumentSourceExtension() = default;

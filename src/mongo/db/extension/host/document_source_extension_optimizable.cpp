@@ -40,7 +40,7 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
         // Serialize the stage for query execution.
         return Value(_logicalStage.serialize());
     }
-    return Value(_raw_stage);
+    return Value(BSONObj());
 }
 
 }  // namespace mongo::extension::host
