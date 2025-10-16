@@ -51,6 +51,11 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
             }
         })
         .then("best effort to step down node forever", function (conn) {
+            // TODO(SERVER-112500): Remove this check.
+            if (TestData.doesNotSupportGracefulStepdown) {
+                jsTest.log.info("Skipping stepdown as it is not supported in this test");
+                return true;
+            }
             if (conn.isReplicaSetMember()) {
                 // This node should never run for election again. If the node has not
                 // been initialized yet, then it cannot get elected.
@@ -139,6 +144,11 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
             // check for TestData.allowUncleanShutdowns.
             if (TestData.skipEnforceFastCountOnValidate || TestData.allowUncleanShutdowns) {
                 validateOptions.enforceFastCount = false;
+            }
+
+            // TODO(SERVER-112502): Remove this check.
+            if (TestData.doesNotSupportWTVerify) {
+                validateOptions.full = false;
             }
 
             try {
