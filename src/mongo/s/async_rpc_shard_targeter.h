@@ -69,12 +69,13 @@ public:
                     ReadPreferenceSetting readPref)
         : _executor(executor), _opCtx(opCtx), _shardId(shardId), _readPref(readPref) {};
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override {
+    SemiFuture<HostAndPort> resolve(CancellationToken t,
+                                    const TargetingMetadata& targetingMetadata) override {
         return getShard()
             .thenRunOn(_executor)
-            .then([this, t](std::shared_ptr<Shard> shard) {
+            .then([this, t, targetingMetadata](std::shared_ptr<Shard> shard) {
                 _shardFromLastResolve = shard;
-                return shard->getTargeter()->findHosts(_readPref, t);
+                return shard->getTargeter()->findHost(_readPref, t, targetingMetadata);
             })
             .semi();
     }

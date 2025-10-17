@@ -35,6 +35,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -80,9 +81,9 @@ TEST_F(AsyncRemoteCommandTargeterAdapterTest, TargeterResolvesCorrectly) {
     ReadPreferenceSetting readPref;
     auto targeter = AsyncRemoteCommandTargeterAdapter(readPref, getTargeter());
 
-    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
+    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{});
 
-    ASSERT_EQUALS(resolveFuture.get()[0], kHosts[0]);
+    ASSERT_EQUALS(resolveFuture.get(), kHosts[0]);
 }
 
 /**
@@ -126,8 +127,21 @@ TEST_F(AsyncRemoteCommandTargeterAdapterTest, OnRemoteErrorUpdatesTopologyAndRes
     getTargeterMock()->setFindHostsReturnValue(newTargets);
 
     // Check that the resolve function has been updated accordingly.
-    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
-    ASSERT_EQUALS(resolveFuture.get()[0], kHosts[1]);
+    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{});
+    ASSERT_EQUALS(resolveFuture.get(), kHosts[1]);
+}
+
+/**
+ * When targeting metadata contains depioritized servers, the targeter will resolve other servers.
+ */
+TEST_F(AsyncRemoteCommandTargeterAdapterTest, TargeterDeprioritizeServersFromMetadata) {
+    ReadPreferenceSetting readPref;
+    auto targeter = AsyncRemoteCommandTargeterAdapter(readPref, getTargeter());
+
+    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable(),
+                                          TargetingMetadata{.deprioritizedServers = {kHosts[0]}});
+
+    ASSERT_EQUALS(resolveFuture.get(), kHosts[1]);
 }
 
 }  // namespace

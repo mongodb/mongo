@@ -73,12 +73,13 @@ public:
         CancellationToken token,
         OperationContext* opCtx,
         Targeter* targeter,
+        const TargetingMetadata& targetingMetadata,
         const DatabaseName& dbName,
         BSONObj cmdBSON,
         BatonHandle baton,
         boost::optional<UUID> clientOperationKey) final {
         auto proxyExec = std::make_shared<ProxyingExecutor>(exec, baton);
-        return targeter->resolve(token)
+        return targeter->resolve(token, targetingMetadata)
             .thenRunOn(proxyExec)
             .then([dbName,
                    cmdBSON,
@@ -86,11 +87,9 @@ public:
                    exec = std::move(exec),
                    token,
                    baton = std::move(baton),
-                   clientOperationKey](std::vector<HostAndPort> targets) {
-                invariant(targets.size(),
-                          "Successful targeting implies there are hosts to target.");
+                   clientOperationKey](const HostAndPort& target) {
                 executor::RemoteCommandRequest executorRequest(
-                    targets[0],
+                    target,
                     dbName,
                     cmdBSON,
                     rpc::makeEmptyMetadata(),

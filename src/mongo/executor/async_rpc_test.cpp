@@ -58,6 +58,7 @@
 #include "mongo/executor/async_rpc_util.h"
 #include "mongo/executor/async_transaction_rpc.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/topology_version_gen.h"
@@ -703,11 +704,10 @@ TEST_F(AsyncRPCTestFixture, BatonTest) {
  */
 TEST_F(AsyncRPCTestFixture, LocalTargeter) {
     LocalHostTargeter t;
-    auto targetFuture = t.resolve(_cancellationToken);
+    auto targetFuture = t.resolve(_cancellationToken, TargetingMetadata{});
     auto target = targetFuture.get();
 
-    ASSERT_EQ(target.size(), 1);
-    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), target[0]);
+    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), target);
 }
 
 /*
@@ -715,11 +715,10 @@ TEST_F(AsyncRPCTestFixture, LocalTargeter) {
  */
 TEST_F(AsyncRPCTestFixture, HostAndPortTargeter) {
     FixedTargeter t{HostAndPort("FakeHost1", 12345)};
-    auto targetFuture = t.resolve(_cancellationToken);
+    auto targetFuture = t.resolve(_cancellationToken, TargetingMetadata{});
     auto target = targetFuture.get();
 
-    ASSERT_EQ(target.size(), 1);
-    ASSERT_EQ(HostAndPort("FakeHost1", 12345), target[0]);
+    ASSERT_EQ(HostAndPort("FakeHost1", 12345), target);
 }
 
 /*
@@ -1413,6 +1412,57 @@ TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
     // onRemoteCommandError not called, error not from remote host.
     downHosts = targeterMock->getAndClearMarkedDownHosts();
     ASSERT_FALSE(downHosts.find(testHost) != downHosts.end());
+}
+
+/**
+ * Tests that the targeter use the set of deprioritized server to choose a different host on retry.
+ */
+TEST_F(AsyncRPCTestFixture, TargeterDeprioritizedServer) {
+    constexpr auto backoffDelayMs = 10;
+    FailPointEnableBlock _{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backoffDelayMs)};
+    const std::vector<HostAndPort> hosts{
+        HostAndPort("Host1", 1),
+        HostAndPort("Host2", 2),
+    };
+    auto factory = RemoteCommandTargeterFactoryMock();
+    std::shared_ptr<RemoteCommandTargeter> t;
+    t = factory.create(ConnectionString::forStandalones(hosts));
+    auto targeterMock = RemoteCommandTargeterMock::get(t);
+    targeterMock->setFindHostsReturnValue(hosts);
+
+    ReadPreferenceSetting readPref;
+    std::unique_ptr<Targeter> targeter =
+        std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, t);
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        getExecutorPtr(),
+        CancellationToken::uncancelable(),
+        findCmd,
+        std::make_shared<DefaultRetryStrategy>());
+    auto future = sendCommandAndWaitUntilRequestIsReady(
+        options, opCtxHolder.get(), std::move(targeter), getNetworkInterfaceMock());
+
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, hosts[0]);
+        return createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
+    });
+
+    advanceUntilReadyRequest();
+
+    onCommand([&](const auto& request) {
+        // For the second request, we expect the second host to be chosen.
+        // This is because host[0] returned a system overloaded error, and we expect the targeting
+        // metadata to be updated.
+        ASSERT_EQ(request.target, hosts[1]);
+        // We chose BadValue since this code is non-retryable.
+        return createErrorResponse(Status(ErrorCodes::BadValue, "test"));
+    });
+
+    future.wait();
 }
 
 }  // namespace

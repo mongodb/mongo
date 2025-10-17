@@ -38,6 +38,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -126,9 +127,9 @@ TEST_F(AsyncRPCShardingTestFixture, ShardTargeter) {
     ReadPreferenceSetting readPref;
     auto targeter = ShardIdTargeter(executor(), operationContext(), kTestShardIds[0], readPref);
 
-    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
+    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{});
 
-    ASSERT_EQUALS(resolveFuture.get()[0], kTestShardHosts[0]);
+    ASSERT_EQUALS(resolveFuture.get(), kTestShardHosts[0]);
 }
 
 /**
@@ -139,7 +140,7 @@ TEST_F(AsyncRPCShardingTestFixture, ShardDoesNotExist) {
     auto targeter =
         ShardIdTargeter(executor(), operationContext(), ShardId("MissingShard"), readPref);
 
-    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
+    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{});
 
     // Mock the response to the cache refresh request to the config shard.
     onFindCommand([](const executor::RemoteCommandRequest& request) {
@@ -198,7 +199,8 @@ TEST_F(AsyncRPCShardingTestFixture, OnRemoteErrorUpdatesTopology) {
     ShardIdTargeter targeter{executor(), operationContext(), kTestShardIds[0], readPref};
 
     // We must call resolve before calling onRemoteCommandError
-    auto initialResolve = targeter.resolve(CancellationToken::uncancelable()).get();
+    auto initialResolve =
+        targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{}).get();
 
     [[maybe_unused]] auto commandErrorResult = targeter.onRemoteCommandError(
         kTestShardHosts[0], Status(ErrorCodes::NotPrimaryNoSecondaryOk, "mock"));
@@ -223,7 +225,8 @@ TEST_F(AsyncRPCShardingTestFixture, OnRemoteErrorUpdatesTopologyAndResolver) {
     ShardIdTargeter targeter{executor(), operationContext(), kTestShardIds[0], readPref};
 
     // We must call resolve before calling onRemoteCommandError
-    auto initialResolve = targeter.resolve(CancellationToken::uncancelable()).get();
+    auto initialResolve =
+        targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{}).get();
 
     // Mark down a host and ensure that it has been noted as marked down.
     [[maybe_unused]] auto commandErrorResult = targeter.onRemoteCommandError(
@@ -243,8 +246,8 @@ TEST_F(AsyncRPCShardingTestFixture, OnRemoteErrorUpdatesTopologyAndResolver) {
     targeterMock->setFindHostsReturnValue(newTargets);
 
     // Check that the resolve function has been updated accordingly.
-    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
-    ASSERT_EQUALS(resolveFuture.get()[0], kTestShardHosts[1]);
+    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{});
+    ASSERT_EQUALS(resolveFuture.get(), kTestShardHosts[1]);
 }
 
 /**
@@ -258,9 +261,9 @@ TEST_F(AsyncRPCShardingTestFixture, TestingIfShardRemoved) {
     // Pretend we are inside the sendCommand() function.
 
     // We resolve for the first time and get a host.
-    SemiFuture<std::vector<HostAndPort>> resolveFuture =
-        targeter.resolve(CancellationToken::uncancelable());
-    ASSERT_EQUALS(resolveFuture.get()[0], kTestShardHosts[0]);
+    SemiFuture<HostAndPort> resolveFuture =
+        targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{});
+    ASSERT_EQUALS(resolveFuture.get(), kTestShardHosts[0]);
 
     // We will send the command through scheduleRemoteCommand.
 
@@ -277,8 +280,8 @@ TEST_F(AsyncRPCShardingTestFixture, TestingIfShardRemoved) {
     // re-resolve
     ASSERT_DOES_NOT_THROW(commandErrorResult.get());
 
-    SemiFuture<std::vector<HostAndPort>> secondResolveFuture =
-        targeter.resolve(CancellationToken::uncancelable());
+    SemiFuture<HostAndPort> secondResolveFuture =
+        targeter.resolve(CancellationToken::uncancelable(), TargetingMetadata{});
 
     // Mock the response to the cache refresh request to the config shard.
     onFindCommand([](const executor::RemoteCommandRequest& request) {

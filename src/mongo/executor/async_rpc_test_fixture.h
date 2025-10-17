@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/async_rpc.h"
@@ -166,6 +167,40 @@ public:
         return result.obj();
     }
 
+    /**
+     * Generates a retryable error BSONObj command response with the 'SystemOverloaded'
+     * error label.
+     */
+    BSONObj createErrorSystemOverloaded(ErrorCodes::Error errorCode) {
+        BSONObjBuilder bob;
+        bob.append("ok", 0.0);
+        bob.append("code", errorCode);
+        bob.append("errmsg", "overloaded");
+        bob.append("codeName", ErrorCodes::errorString(errorCode));
+        {
+            BSONArrayBuilder arrayBuilder = bob.subarrayStart(kErrorLabelsFieldName);
+            arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
+            arrayBuilder.append(ErrorLabel::kRetryableError);
+        }
+        return bob.obj();
+    }
+
+    Milliseconds advanceUntilReadyRequest() const {
+        using namespace std::literals;
+        auto net = getNetworkInterfaceMock();
+
+        stdx::this_thread::sleep_for(1ms);
+        auto totalWaited = Milliseconds{0};
+        auto _ = executor::NetworkInterfaceMock::InNetworkGuard{net};
+        while (!net->hasReadyRequests()) {
+            auto advance = Milliseconds{10};
+            net->advanceTime(net->now() + advance);
+            totalWaited += advance;
+            stdx::this_thread::sleep_for(100us);
+        }
+        return totalWaited;
+    }
+
     TaskExecutor& getExecutor() const {
         return *_executor;
     }
@@ -211,7 +246,7 @@ private:
 class FailingTargeter : public Targeter {
 public:
     FailingTargeter(Status errorToFailWith) : _status{errorToFailWith} {}
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
+    SemiFuture<HostAndPort> resolve(CancellationToken t, const TargetingMetadata&) final {
         return _status;
     }
 
@@ -237,8 +272,18 @@ public:
         _resolvedHosts = resolvedHosts;
     };
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
-        return SemiFuture<std::vector<HostAndPort>>::makeReady(_resolvedHosts);
+    SemiFuture<HostAndPort> resolve(CancellationToken t,
+                                    const TargetingMetadata& targetingMetadata) final {
+        const auto notDeprioritized = [&](const HostAndPort& server) {
+            return !targetingMetadata.deprioritizedServers.contains(server);
+        };
+
+        if (auto it = std::ranges::find_if(_resolvedHosts, notDeprioritized);
+            it != _resolvedHosts.end()) {
+            return SemiFuture<HostAndPort>::makeReady(*it);
+        }
+
+        return SemiFuture<HostAndPort>::makeReady(_resolvedHosts.front());
     }
 
     SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) final {

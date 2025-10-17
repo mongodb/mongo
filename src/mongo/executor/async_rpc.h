@@ -159,6 +159,7 @@ public:
         CancellationToken token,
         OperationContext* opCtx,
         Targeter* targeter,
+        const TargetingMetadata& targetingMetadata,
         const DatabaseName& dbName,
         BSONObj cmdBSON,
         BatonHandle baton,
@@ -168,6 +169,7 @@ public:
         CancellationToken token,
         OperationContext* opCtx,
         Targeter* targeter,
+        const TargetingMetadata& targetingMetadata,
         const DatabaseName& dbName,
         BSONObj cmdBSON,
         boost::optional<UUID> clientOperationKey) {
@@ -175,6 +177,7 @@ public:
                             std::move(token),
                             std::move(opCtx),
                             std::move(targeter),
+                            targetingMetadata,
                             dbName,
                             std::move(cmdBSON),
                             nullptr,
@@ -253,6 +256,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
                                     options->token,
                                     opCtx,
                                     targeter.get(),
+                                    options->retryStrategy->getTargetingMetadata(),
                                     options->cmd.getDbName(),
                                     cmdBSON,
                                     options->cmd.getGenericArguments().getClientOperationKey());

@@ -59,8 +59,9 @@ public:
                                       std::shared_ptr<RemoteCommandTargeter> targeter)
         : _readPref(readPref), _targeter(std::move(targeter)) {}
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
-        return _targeter->findHosts(_readPref, t);
+    SemiFuture<HostAndPort> resolve(CancellationToken t,
+                                    const TargetingMetadata& targetingMetadata) final {
+        return _targeter->findHost(_readPref, t, targetingMetadata);
     }
 
     SemiFuture<void> onRemoteCommandError(HostAndPort remoteHost,

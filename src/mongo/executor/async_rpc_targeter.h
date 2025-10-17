@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -56,7 +57,8 @@ public:
      * which to run the command, the returned future should be set with an error - an empty vector
      * should never be returned and is treated as a programmer error.
      */
-    virtual SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) = 0;
+    virtual SemiFuture<HostAndPort> resolve(CancellationToken t,
+                                            const TargetingMetadata& targetingMetadata) = 0;
 
     /*
      * Informs the Targeter that an error happened when trying to run a command on a
@@ -70,11 +72,9 @@ class LocalHostTargeter : public Targeter {
 public:
     LocalHostTargeter() = default;
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
+    SemiFuture<HostAndPort> resolve(CancellationToken t, const TargetingMetadata&) final {
         HostAndPort h = HostAndPort("localhost", serverGlobalParams.port);
-        std::vector<HostAndPort> hostList{h};
-
-        return SemiFuture<std::vector<HostAndPort>>::makeReady(hostList);
+        return SemiFuture<HostAndPort>::makeReady(h);
     }
 
     SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) final {
@@ -90,10 +90,8 @@ class FixedTargeter : public Targeter {
 public:
     FixedTargeter(HostAndPort host) : _host(host) {};
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
-        std::vector<HostAndPort> hostList{_host};
-
-        return SemiFuture<std::vector<HostAndPort>>::makeReady(hostList);
+    SemiFuture<HostAndPort> resolve(CancellationToken t, const TargetingMetadata&) final {
+        return SemiFuture<HostAndPort>::makeReady(_host);
     }
 
     SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) final {
