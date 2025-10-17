@@ -1019,7 +1019,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         catalog.deregisterAllCollectionsAndViews(getServiceContext());
     });
     auto lastShutdownState = reinitializeStorageEngine(
-        opCtx.get(), StorageEngineInitFlags{}, false, false, false, [&newPath] {
+        opCtx.get(), StorageEngineInitFlags{}, false, false, false, false, [&newPath] {
             storageGlobalParams.dbpath = newPath;
         });
     {
@@ -1048,7 +1048,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         catalog.deregisterAllCollectionsAndViews(getServiceContext());
     });
     lastShutdownState = reinitializeStorageEngine(
-        opCtx.get(), StorageEngineInitFlags{}, false, false, false, [&oldPath] {
+        opCtx.get(), StorageEngineInitFlags{}, false, false, false, false, [&oldPath] {
             storageGlobalParams.dbpath = oldPath;
         });
     {
@@ -1158,7 +1158,7 @@ StorageEngine* reconfigureStorageEngine(OperationContext* opCtx, auto fn) {
     CollectionCatalog::write(opCtx->getServiceContext(), [&](CollectionCatalog& catalog) {
         catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
     });
-    reinitializeStorageEngine(opCtx, StorageEngineInitFlags{}, false, false, false, [&] {
+    reinitializeStorageEngine(opCtx, StorageEngineInitFlags{}, false, false, false, false, [&] {
         boost::filesystem::remove_all(storageGlobalParams.dbpath);
         boost::filesystem::create_directory(storageGlobalParams.dbpath);
         fn();

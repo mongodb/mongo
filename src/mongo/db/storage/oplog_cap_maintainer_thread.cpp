@@ -138,6 +138,38 @@ auto oplogTruncateMarkersStats =
 
 }  // namespace
 
+void startOplogCapMaintainerThread(ServiceContext* serviceContext,
+                                   bool isReplSet,
+                                   bool shouldSkipOplogSampling) {
+    if (shouldSkipOplogSampling) {
+        return;
+    }
+
+    if (!isReplSet) {
+        return;
+    }
+
+    if (storageGlobalParams.queryableBackupMode || storageGlobalParams.repair) {
+        return;
+    }
+
+    if (!serviceContext->userWritesAllowed()) {
+        return;
+    }
+
+    std::unique_ptr<OplogCapMaintainerThread> maintainerThread =
+        std::make_unique<OplogCapMaintainerThread>();
+    OplogCapMaintainerThread::set(serviceContext, std::move(maintainerThread));
+    OplogCapMaintainerThread::get(serviceContext)->go();
+}
+
+void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& reason) {
+    if (OplogCapMaintainerThread* maintainerThread = OplogCapMaintainerThread::get(serviceContext);
+        maintainerThread) {
+        maintainerThread->shutdown(reason);
+    }
+}
+
 OplogCapMaintainerThread* OplogCapMaintainerThread::get(ServiceContext* serviceCtx) {
     auto& maintainerThread = getMaintainerThread(serviceCtx);
     if (maintainerThread) {
