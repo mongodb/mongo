@@ -30,7 +30,6 @@
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -91,7 +90,6 @@ private:
 struct PhaseTransitionTestCase {
     CoordinatorStateEnum initialPhase;
     std::function<void()> transitionFn;
-    std::string expectedCommand = "update";
     boost::optional<BSONObj> set = boost::none;
     boost::optional<BSONObj> unset = boost::none;
 };
@@ -121,13 +119,10 @@ protected:
         testCase.transitionFn();
 
         const auto& lastRequest = _state->lastRequest;
-        ASSERT_EQUALS(lastRequest.getStringField(testCase.expectedCommand),
+        ASSERT_EQUALS(lastRequest.getStringField("update"),
                       NamespaceString::kConfigReshardingOperationsNamespace.coll());
-
-        if (testCase.expectedCommand == "update") {
-            auto updates = lastRequest.getObjectField("updates");
-            ASSERT_BSONOBJ_EQ_UNORDERED(updates, wrapUpdate(testCase.set, testCase.unset));
-        }
+        auto updates = lastRequest.getObjectField("updates");
+        ASSERT_BSONOBJ_EQ_UNORDERED(updates, wrapUpdate(testCase.set, testCase.unset));
     }
 
     UUID _uuid{UUID::gen()};
@@ -369,81 +364,6 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
         .initialPhase = CoordinatorStateEnum::kCommitting, .transitionFn = [&]() {
             _dao->transitionToAbortingPhase(_opCtx, now, abortReason);
         }});
-}
-
-TEST_F(ReshardingCoordinatorDaoFixture, TransitionToQuiescedPhaseSucceeds) {
-    auto now = _clock->now();
-
-    runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kCommitting,
-        .transitionFn = [&]() { _dao->transitionToQuiescedPhase(_opCtx, now, boost::none); },
-        .set = BSON("state" << "quiesced" << "quiescePeriodEnd"
-                            << now +
-                        Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis))});
-}
-
-TEST_F(ReshardingCoordinatorDaoFixture, TransitionToQuiescedPhaseUpdatesAbortReason) {
-    auto now = _clock->now();
-    Status abortReason{ErrorCodes::InternalError,
-                       "Something went horribly wrong during initialization"};
-
-    runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kInitializing,
-        .transitionFn = [&]() { _dao->transitionToQuiescedPhase(_opCtx, now, abortReason); },
-        .set = BSON(
-            "state" << "quiesced" << "quiescePeriodEnd"
-                    << now + Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis)
-                    << "abortReason"
-                    << resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason))});
-}
-
-TEST_F(ReshardingCoordinatorDaoFixture,
-       TransitionToQuiescedPhaseDoesNotUpdateAbortReasonIfAlreadySet) {
-    auto now = _clock->now();
-    Status abortReason{ErrorCodes::InternalError, "Something went horribly wrong"};
-
-    _state->document.setAbortReason(
-        resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason));
-
-    runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kAborting,
-        .transitionFn = [&]() { _dao->transitionToQuiescedPhase(_opCtx, now, abortReason); },
-        .set = BSON("state" << "quiesced" << "quiescePeriodEnd"
-                            << now +
-                        Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis))});
-}
-
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
-             TransitionToQuiescedPhaseFailsFromInvalidPreviousPhase,
-             "invariant") {
-    auto now = _clock->now();
-
-    runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kCloning, .transitionFn = [&]() {
-            _dao->transitionToQuiescedPhase(_opCtx, now, boost::none);
-        }});
-}
-
-TEST_F(ReshardingCoordinatorDaoFixture, RemoveCoordinatorDocument) {
-    for (auto state : {CoordinatorStateEnum::kInitializing,
-                       CoordinatorStateEnum::kAborting,
-                       CoordinatorStateEnum::kCommitting,
-                       CoordinatorStateEnum::kQuiesced}) {
-        runPhaseTransitionTest(PhaseTransitionTestCase{
-            .initialPhase = state,
-            .transitionFn = [&]() { _dao->removeCoordinatorDocument(_opCtx); },
-            .expectedCommand = "delete",
-        });
-    }
-}
-
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
-             RemoveCoordinatorDocumentFailsFromInvalidPreviousPhase,
-             "invariant") {
-    runPhaseTransitionTest(PhaseTransitionTestCase{.initialPhase = CoordinatorStateEnum::kCloning,
-                                                   .transitionFn = [&]() {
-                                                       _dao->removeCoordinatorDocument(_opCtx);
-                                                   }});
 }
 
 }  // namespace resharding

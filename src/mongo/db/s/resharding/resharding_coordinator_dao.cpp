@@ -33,7 +33,6 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 
 #include <memory>
 
@@ -298,58 +297,6 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToAbortingPhas
     }
 
     return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
-}
-
-ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToQuiescedPhase(
-    OperationContext* opCtx,
-    Date_t now,
-    boost::optional<Status> abortReason,
-    boost::optional<TxnNumber> txnNumber) {
-
-    auto client = _clientFactory->createDaoStorageClient(txnNumber);
-    auto doc = client->readState(opCtx, _reshardingUUID);
-    invariant(doc.getState() == CoordinatorStateEnum::kInitializing ||
-              doc.getState() == CoordinatorStateEnum::kAborting ||
-              doc.getState() == CoordinatorStateEnum::kCommitting);
-
-    BSONObjBuilder updateBuilder;
-    {
-        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
-
-        setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
-                          CoordinatorState_serializer(CoordinatorStateEnum::kQuiesced));
-
-        setBuilder.append(ReshardingCoordinatorDocument::kQuiescePeriodEndFieldName,
-                          now +
-                              Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis));
-
-        if (abortReason && !doc.getAbortReason()) {
-            // No need to override the existing abortReason.
-            setBuilder.append(
-                ReshardingCoordinatorDocument::kAbortReasonFieldName,
-                resharding::serializeAndTruncateReshardingErrorIfNeeded(*abortReason));
-        }
-    }
-
-    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
-}
-
-void ReshardingCoordinatorDao::removeCoordinatorDocument(OperationContext* opCtx,
-                                                         boost::optional<TxnNumber> txnNumber) {
-    auto client = _clientFactory->createDaoStorageClient(txnNumber);
-    auto doc = client->readState(opCtx, _reshardingUUID);
-    invariant(doc.getState() == CoordinatorStateEnum::kInitializing ||
-              doc.getState() == CoordinatorStateEnum::kAborting ||
-              doc.getState() == CoordinatorStateEnum::kCommitting ||
-              doc.getState() == CoordinatorStateEnum::kQuiesced);
-
-    auto deleteRequest =
-        BatchedCommandRequest::buildDeleteOp(NamespaceString::kConfigReshardingOperationsNamespace,
-                                             BSON("_id" << _reshardingUUID),
-                                             false, /* multi */
-                                             boost::none);
-
-    client->alterState(opCtx, deleteRequest);
 }
 
 

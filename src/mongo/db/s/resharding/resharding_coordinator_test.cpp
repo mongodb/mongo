@@ -133,39 +133,6 @@ PhaseTransitionFn createPreparingToDonateDaoUpdate(
     };
 }
 
-PhaseTransitionFn createQuiesceDaoUpdate(ReshardingCoordinatorDocument coordinatorDoc) {
-    return [coordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
-        DBDirectClient client(opCtx);
-        const BSONObj query(BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
-                                 << coordinatorDoc.getReshardingUUID() << "ns"
-                                 << coordinatorDoc.getSourceNss().ns_forTest()));
-
-        auto updates =
-            BSON("$set" << BSON("state" << "quiesced" << "quiescePeriodEnd" << Date_t::now()));
-
-        client.update(NamespaceString::kConfigReshardingOperationsNamespace, query, updates);
-
-        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace, query);
-        return ReshardingCoordinatorDocument::parse(doc,
-                                                    IDLParserContext("ReshardingCoordinatorTest"));
-    };
-}
-
-PhaseTransitionFn createRemoveDocDaoUpdate(ReshardingCoordinatorDocument coordinatorDoc) {
-    return [coordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
-        DBDirectClient client(opCtx);
-        const BSONObj query(BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
-                                 << coordinatorDoc.getReshardingUUID() << "ns"
-                                 << coordinatorDoc.getSourceNss().ns_forTest()));
-
-        client.remove(NamespaceString::kConfigReshardingOperationsNamespace, query, false);
-
-        auto newCoordinatorDoc = coordinatorDoc;
-        newCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
-        return newCoordinatorDoc;
-    };
-}
-
 class ReshardingCoordinatorPersistenceTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
@@ -837,9 +804,8 @@ protected:
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        auto mockTransitionFn = createRemoveDocDaoUpdate(coordinatorDoc);
         auto updatedCoordinatorDoc = removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-            opCtx, _metrics.get(), coordinatorDoc, std::move(mockTransitionFn));
+            opCtx, _metrics.get(), coordinatorDoc);
 
         ASSERT_EQ(updatedCoordinatorDoc.getState(), CoordinatorStateEnum::kDone);
 
@@ -867,9 +833,8 @@ protected:
 
     void quiesceCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        auto mockTransitionFn = createQuiesceDaoUpdate(coordinatorDoc);
         auto updatedCoordinatorDoc = removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-            opCtx, _metrics.get(), coordinatorDoc, std::move(mockTransitionFn));
+            opCtx, _metrics.get(), coordinatorDoc);
 
         // Check that the on disk document is same as the in memory document returned above.
         auto expectedCoordinatorDoc = coordinatorDoc;

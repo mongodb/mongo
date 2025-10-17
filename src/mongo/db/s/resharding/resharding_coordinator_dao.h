@@ -123,15 +123,6 @@ public:
         Status abortReason,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
-    ReshardingCoordinatorDocument transitionToQuiescedPhase(
-        OperationContext* opCtx,
-        Date_t now,
-        boost::optional<Status> abortReason,
-        boost::optional<TxnNumber> txnNumber = boost::none);
-
-    void removeCoordinatorDocument(OperationContext* opCtx,
-                                   boost::optional<TxnNumber> txnNumber = boost::none);
-
 private:
     const UUID _reshardingUUID;
     std::unique_ptr<DaoStorageClientFactory> _clientFactory;

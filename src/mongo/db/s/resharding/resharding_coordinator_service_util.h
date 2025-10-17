@@ -92,7 +92,6 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc,
-    PhaseTransitionFn phaseTransitionFn,
     boost::optional<Status> abortReason = boost::none);
 
 void writeToCoordinatorStateNss(OperationContext* opCtx,
