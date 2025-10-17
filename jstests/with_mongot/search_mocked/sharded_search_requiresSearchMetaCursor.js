@@ -68,7 +68,7 @@ const shard0DB = shard0Conn.getDB(dbName);
 const shard1Conn = st.rs1.getPrimary();
 const shard1DB = shard1Conn.getDB(dbName);
 
-function mockShards(hasSearchMetaStage = false) {
+function mockShards(hasSearchMetaStage = false, comment) {
     // Mock shard0 responses.
     const mongot0ResponseBatch = [
         {_id: 3, $searchScore: 100},
@@ -84,6 +84,10 @@ function mockShards(hasSearchMetaStage = false) {
         collectionUUID: collUUID0,
         protocolVersion: protocolVersion,
     });
+
+    if (comment) {
+        expectedMongotCommand.comment = comment;
+    }
 
     if (hasSearchMetaStage) {
         expectedMongotCommand.optimizationFlags = {omitSearchDocumentResults: true};
@@ -145,6 +149,7 @@ function runRequiresSearchMetaCursorTest({
     expectedDocs,
     shouldRequireSearchMetaCursor,
     hasSearchMetaStage = false,
+    queryComment,
 }) {
     // Mock planShardedSearch responses.
     if (coll.getName() === shardedCollName) {
@@ -170,10 +175,10 @@ function runRequiresSearchMetaCursorTest({
         );
     }
 
-    mockShards(hasSearchMetaStage);
+    mockShards(hasSearchMetaStage, queryComment);
     resetShardProfilers();
 
-    const comment = "search_query";
+    const comment = queryComment ? queryComment : "search_query";
     // Run the query and ensure metrics are as expected.
     assert.eq(coll.aggregate(pipeline, {comment}).toArray(), expectedDocs);
 
@@ -310,6 +315,8 @@ runRequiresSearchMetaCursorTest({
     expectedDocs: [{val: 1}],
     shouldRequireSearchMetaCursor: true,
     hasSearchMetaStage: true,
+    // Unique comment to prevent this test from consuming the next test's mock responses.
+    queryComment: "$searchMeta query",
 });
 
 runRequiresSearchMetaCursorTest({
