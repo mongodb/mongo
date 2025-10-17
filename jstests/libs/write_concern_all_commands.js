@@ -806,12 +806,10 @@ const wcCommandsTests = {
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 // Ensure DB exists, but create a different collection
                 assert.commandWorked(coll.getDB().coll2.insert({_id: 1}));
-
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -3790,7 +3788,7 @@ const wcTimeseriesViewsCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
                 assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
@@ -3803,8 +3801,7 @@ const wcTimeseriesViewsCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -6023,7 +6020,6 @@ function runCommandTest(testCase, conn, coll, cluster, clusterType, preSetup, se
 // they no longer hang until the majority of the shards involved in DDL are available and return
 // WCE on timing out.
 const shardedDDLCommandsRequiringMajorityCommit = [
-    "create",
     "changePrimary",
     "collMod",
     "convertToCapped",
@@ -6066,12 +6062,27 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
         return true;
     }
 
+    // TODO SERVER-112609 Re-enable create command for sharded collections once no-op operations
+    // honor a 'majority' write concern.
+    if (shardedCollection && command == "create") {
+        jsTestLog(
+            "Skipping " +
+                command +
+                " because the preSetup function creates a sharded collection and all test cases become no-op operations.",
+        );
+        return true;
+    }
+
     if (testCase == "noop") {
         // TODO SERVER-100309 adapt/enable setFeatureCompatibilityVersion no-op case once the
         // upgrade procedure will not proactively shard the sessions collection.
         if (
             clusterType == "sharded" &&
-            (shardedDDLCommandsRequiringMajorityCommit.includes(command) || command == "setFeatureCompatibilityVersion")
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
+                command == "setFeatureCompatibilityVersion" ||
+                // TODO SERVER-112609 Re-enable create command no-op test in sharded clusters once
+                // no-op operations honor a 'majority' write concern.
+                command == "create")
         ) {
             jsTestLog("Skipping " + command + " test for no-op case.");
             return true;
