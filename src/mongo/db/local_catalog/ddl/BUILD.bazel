@@ -156,6 +156,26 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "server_parameters_gen",
+    src = "server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "server_parameters_idl",
+    srcs = [
+        ":server_parameters_gen",
+    ],
+    hdrs = [],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_library(
     name = "rename_collection_idl",
     srcs = [

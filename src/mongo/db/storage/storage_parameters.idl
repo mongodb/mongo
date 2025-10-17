@@ -189,15 +189,6 @@ server_parameters:
         default: false
         redact: false
 
-    skipDroppingHashedShardKeyIndex:
-        description: >-
-            Skips dropping hashed shard key supporting indexes when calling dropIndexes with the '*' parameter. Used for testing purposes.
-        set_at: [startup, runtime]
-        cpp_vartype: bool
-        cpp_varname: skipDroppingHashedShardKeyIndex
-        default: false
-        redact: false
-
     enableAutoCompaction:
         description: "Enable auto compact at startup."
         cpp_vartype: bool
