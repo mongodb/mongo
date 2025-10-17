@@ -283,7 +283,7 @@ tasks:
           resmoke_args: >-
             --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
             --runNoFeatureFlagTests
-          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev e6630c1a41c8fb186544654d27f5c803f01ca3ca
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 37c541534c7f9cc741f6d876a301d0ec70671593
 
   - <<: *task_template
     name: aggregation_one_shard_sharded_collections
