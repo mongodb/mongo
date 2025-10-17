@@ -158,20 +158,55 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString unionNss,
-    std::vector<BSONObj> pipeline)
-    : DocumentSourceUnionWith(
-          expCtx,
-          buildPipelineFromViewDefinition(
-              expCtx, expCtx->getResolvedNamespace(unionNss), pipeline, unionNss)) {
-    // Save state regarding the resolved namespace in case we are running explain with
+    std::vector<BSONObj> pipeline,
+    bool hasForeignDB)
+    : DocumentSource(kStageName, expCtx) {
+    _hasForeignDB = hasForeignDB;
+    boost::optional<ResolvedNamespace> resolvedUnionNs;
+    try {
+        auto resolvedNamespaces = expCtx->getResolvedNamespaces();
+        auto it = resolvedNamespaces.find(unionNss);
+
+        if (it != resolvedNamespaces.end()) {
+            resolvedUnionNs = it->second;
+            _sharedState = std::make_shared<UnionWithSharedState>(
+                buildPipelineFromViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
+                nullptr,
+                UnionWithSharedState::ExecutionProgress::kIteratingSource,
+                Variables(),
+                VariablesParseState(Variables().useIdGenerator()));
+        } else {
+            // This case only occurs in a sharded context where the database name is the same
+            // as the current namespace, and will be resolved in the catch below.
+            pipeline_factory::makePipeline(pipeline, expCtx, {});
+        }
+    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+        logShardedViewFound(e, pipeline);
+        // This takes care of the case where this code is executing on mongos and we had to get the
+        // view pipeline from a shard.
+        // We set the resolvedUnionNs from the execption view defintion.
+        resolvedUnionNs = ResolvedNamespace{e->getNamespace(), e->getPipeline()};
+        _sharedState = std::make_shared<UnionWithSharedState>(
+            buildPipelineFromViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
+            nullptr,
+            UnionWithSharedState::ExecutionProgress::kIteratingSource,
+            Variables(),
+            VariablesParseState(Variables().useIdGenerator()));
+    }
+
+    if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
+        serviceOpCounters(getExpCtx()->getOperationContext()).gotNestedAggregate();
+    }
+    _sharedState->_pipeline->getContext()->setInUnionWith(true);
+
+    // Save state regarding the resolved view, if any, in case we are running explain with
     // 'executionStats' or 'allPlansExecution' on a $unionWith with a view on a mongod. Otherwise we
     // wouldn't be able to see details about the execution of the view pipeline in the explain
     // result.
-    ResolvedNamespace resolvedNs = expCtx->getResolvedNamespace(unionNss);
     if (expCtx->getExplain() &&
         expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
-        !resolvedNs.pipeline.empty()) {
-        _resolvedNsForView = std::move(resolvedNs);
+        resolvedUnionNs.has_value() && !resolvedUnionNs->pipeline.empty()) {
+        _resolvedNsForView = resolvedUnionNs;
     }
 
     _userNss = std::move(unionNss);
@@ -213,7 +248,16 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
         auto unionWithSpec =
             UnionWithSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
-            unionNss = NamespaceStringUtil::deserialize(nss.dbName(), *unionWithSpec.getColl());
+            if (unionWithSpec.getDb()) {
+                // For LiteParsing, we just assume this is not a view definition, and thus do not
+                // assert when 'db' is specified.
+                const auto tenantId = nss.dbName().tenantId();
+                auto dbName = DatabaseNameUtil::deserialize(
+                    tenantId, *unionWithSpec.getDb(), SerializationContext::stateDefault());
+                unionNss = NamespaceStringUtil::deserialize(dbName, *unionWithSpec.getColl());
+            } else {
+                unionNss = NamespaceStringUtil::deserialize(nss.dbName(), *unionWithSpec.getColl());
+            }
         } else {
             // If no collection specified, it must have $documents as first field in pipeline.
             validateUnionWithCollectionlessPipeline(unionWithSpec.getPipeline());
@@ -264,6 +308,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
 
     NamespaceString unionNss;
     std::vector<BSONObj> pipeline;
+    bool hasForeignDB = false;
     if (elem.type() == BSONType::string) {
         unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
                                                     elem.valueStringData());
@@ -273,8 +318,30 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         auto unionWithSpec =
             UnionWithSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
-            unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
-                                                        *unionWithSpec.getColl());
+            if (unionWithSpec.getDb()) {
+                // We could simply assert only if db != the current db, but this is safer in the
+                // presence of dynamically set dbs in scripting (users will not have a createView
+                // work in some dynamic contexts and not in others, a source of possible
+                // frustration).
+                uassert(ErrorCodes::FailedToParse,
+                        "db cannot be specified in $unionWith in a view",
+                        !expCtx->getIsParsingViewDefinition());
+                // TODO (SPM-1966): This assert that there is no involved mongos can be removed
+                // after SPM-1966
+                uassert(ErrorCodes::FailedToParse,
+                        "db cannot be specified in $unionWith on mongos, namespace:" +
+                            expCtx->getNamespaceString().toStringForErrorMsg(),
+                        !expCtx->getInRouter() && !expCtx->getFromRouter());
+                hasForeignDB = true;
+                const auto tenantId = expCtx->getNamespaceString().dbName().tenantId();
+                auto dbName = DatabaseNameUtil::deserialize(
+                    tenantId, *unionWithSpec.getDb(), SerializationContext::stateDefault());
+                unionNss = NamespaceStringUtil::deserialize(dbName, *unionWithSpec.getColl());
+            } else {
+                // If no database specified, use the same database as the current namespace.
+                unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
+                                                            *unionWithSpec.getColl());
+            }
         } else {
             // if no collection specified, it must have $documents as first field in pipeline
             validateUnionWithCollectionlessPipeline(unionWithSpec.getPipeline());
@@ -294,7 +361,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         }
     }
     return make_intrusive<DocumentSourceUnionWith>(
-        expCtx, std::move(unionNss), std::move(pipeline));
+        expCtx, std::move(unionNss), std::move(pipeline), hasForeignDB);
 }
 
 DocumentSourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
@@ -377,10 +444,17 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 bab << stage;
             auto spec = collectionless
                 ? DOC("pipeline" << bab.arr())
-                : DOC("coll"
-                      << opts.serializeIdentifier(
-                             _sharedState->_pipeline->getContext()->getNamespaceString().coll())
-                      << "pipeline" << bab.arr());
+                : (_hasForeignDB
+                       ? DOC("db" << _userNss.dbName().db(OmitTenant{}) << "coll"
+                                  << opts.serializeIdentifier(_sharedState->_pipeline->getContext()
+                                                                  ->getNamespaceString()
+                                                                  .coll())
+                                  << "pipeline" << bab.arr())
+                       : DOC("coll"
+                             << opts.serializeIdentifier(_sharedState->_pipeline->getContext()
+                                                             ->getNamespaceString()
+                                                             .coll())
+                             << "pipeline" << bab.arr()));
             return Value(DOC(getSourceName() << spec));
         }
 
@@ -425,9 +499,16 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
 
         auto spec = collectionless
             ? DOC("pipeline" << explainLocal.firstElement())
-            : DOC("coll" << opts.serializeIdentifier(
+            : (_hasForeignDB
+                   ? DOC("db"
+                         << _userNss.dbName().db(OmitTenant{}) << "coll"
+                         << opts.serializeIdentifier(
                                 _sharedState->_pipeline->getContext()->getNamespaceString().coll())
-                         << "pipeline" << explainLocal.firstElement());
+                         << "pipeline" << explainLocal.firstElement())
+                   : DOC("coll"
+                         << opts.serializeIdentifier(
+                                _sharedState->_pipeline->getContext()->getNamespaceString().coll())
+                         << "pipeline" << explainLocal.firstElement()));
         return Value(DOC(getSourceName() << spec));
     } else if (opts.isSerializingForQueryStats()) {
         // Query shapes must reflect the original, unresolved and unoptimized pipeline, so we need a
@@ -449,6 +530,9 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             // Using _userNss here could incorrectly retain the view name, leading to duplicated
             // view resolution and stages (e.g. $search applied twice).
             const auto underlyingNss = _sharedState->_pipeline->getContext()->getNamespaceString();
+            if (_hasForeignDB) {
+                spec["db"] = Value(underlyingNss.dbName().db(OmitTenant{}));
+            }
             spec["coll"] = Value(opts.serializeIdentifier(underlyingNss.coll()));
         }
         spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));

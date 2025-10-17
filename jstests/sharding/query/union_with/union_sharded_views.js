@@ -1,4 +1,6 @@
-// Tests that $unionWith can successfully read from a view that is backed by a sharded collection.
+/**
+ * Tests that $unionWith can successfully read from a view that is backed by a sharded collection.
+ **/
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -6,6 +8,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 
 const db = st.s.getDB("test");
+const fdb = st.s.getDB("fdb");
 const sourceUnsharded = db.source_collection_unsharded;
 const unshardedData = [
     {_id: 0},
@@ -24,6 +27,10 @@ assert.commandWorked(sourceUnsharded.insert(unshardedData));
 const sourceSharded = db.source_collection_sharded;
 st.shardColl(sourceSharded, {shardKey: 1}, {shardKey: 0}, {shardKey: 1}, db.getName());
 
+// Shard a backing collection and distribute amongst the two shards in fdb.
+const fdbSourceSharded = fdb.source_collection_sharded;
+st.shardColl(fdbSourceSharded, {shardKey: 1}, {shardKey: 0}, {shardKey: 1}, fdb.getName());
+
 const shardedData = [
     {_id: 0, shardKey: -100},
     {_id: 1, shardKey: -100},
@@ -38,18 +45,28 @@ const shardedData = [
     {_id: 10, shardKey: 100},
 ];
 assert.commandWorked(sourceSharded.insert(shardedData));
+assert.commandWorked(fdbSourceSharded.insert(shardedData));
 
 // Test that we can query the backing collection normally.
 assert.eq(sourceSharded.aggregate().itcount(), shardedData.length);
+assert.eq(fdbSourceSharded.aggregate().itcount(), shardedData.length);
 assert.eq(sourceUnsharded.aggregate().itcount(), unshardedData.length);
 assert.eq(
     sourceSharded.aggregate([{$unionWith: sourceUnsharded.getName()}]).itcount(),
     shardedData.length + unshardedData.length,
 );
+// We do not assert the specific code because this will throw IDLUnknownField in multiversion tests,
+// and ParseFailure in latest version.
+assert.throws(() =>
+    fdbSourceSharded.aggregate([{$unionWith: {db: "test", coll: sourceUnsharded.getName()}}]).itcount(),
+);
 assert.eq(
     sourceUnsharded.aggregate([{$unionWith: sourceSharded.getName()}]).itcount(),
     shardedData.length + unshardedData.length,
 );
+// We do not assert the specific code because this will throw IDLUnknownField in multiversion tests,
+// and ParseFailure in latest version.
+assert.throws(() => sourceUnsharded.aggregate([{$unionWith: {db: "fdb", coll: fdbSourceSharded.getName()}}]).itcount());
 
 // Now create an identity view on top of each collection and expect to get the same results.
 const identityUnsharded = db.identity_unsharded;
