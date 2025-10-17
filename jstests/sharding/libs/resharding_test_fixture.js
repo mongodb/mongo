@@ -1270,31 +1270,46 @@ export var ReshardingTest = class {
             // up secondaries until one succeeds.
             const newPrimaryIdx = Random.randInt(secondaries.length);
             const newPrimary = secondaries[newPrimaryIdx];
-
+            let numRetries = 0;
+            let maxRetries = 3;
             let res;
-            try {
-                res = newPrimary.adminCommand({replSetStepUp: 1});
-            } catch (e) {
-                if (!isNetworkError(e)) {
-                    throw e;
+
+            while (numRetries <= maxRetries) {
+                try {
+                    res = newPrimary.adminCommand({replSetStepUp: 1});
+                } catch (e) {
+                    if (!isNetworkError(e)) {
+                        throw e;
+                    }
+
+                    jsTest.log(
+                        `ReshardingTestFixture got a network error ${tojson(e)} while` +
+                            ` attempting to step up secondary ${newPrimary.host}. This is likely due to` +
+                            ` the secondary previously having transitioned through ROLLBACK and closing` +
+                            ` its user connections. Will retry stepping up the same secondary again`,
+                    );
+                    res = newPrimary.adminCommand({replSetStepUp: 1});
                 }
 
-                jsTest.log(
-                    `ReshardingTestFixture got a network error ${tojson(e)} while` +
-                        ` attempting to step up secondary ${newPrimary.host}. This is likely due to` +
-                        ` the secondary previously having transitioned through ROLLBACK and closing` +
-                        ` its user connections. Will retry stepping up the same secondary again`,
-                );
-                res = newPrimary.adminCommand({replSetStepUp: 1});
-            }
+                if (res.ok === 1) {
+                    replSet.awaitNodesAgreeOnPrimary();
 
-            if (res.ok === 1) {
-                replSet.awaitNodesAgreeOnPrimary();
-                assert.eq(newPrimary, replSet.getPrimary());
-                this._st.getAllNodes().forEach((conn) => {
-                    awaitRSClientHosts(conn, {host: newPrimary.host}, {ok: true, ismaster: true});
-                });
-                return;
+                    if (originalPrimary == replSet.getPrimary()) {
+                        numRetries += 1;
+                        jsTest.log(
+                            `ReshardingTestFixture triggered step-up of ${newPrimary.host}, but ${originalPrimary.host} is still primary. Retrying (${numRetries}/${maxRetries})`,
+                        );
+                        continue;
+                    }
+
+                    assert.eq(newPrimary, replSet.getPrimary());
+                    this._st.getAllNodes().forEach((conn) => {
+                        awaitRSClientHosts(conn, {host: newPrimary.host}, {ok: true, ismaster: true});
+                    });
+                    return;
+                } else {
+                    break;
+                }
             }
 
             jsTest.log(
