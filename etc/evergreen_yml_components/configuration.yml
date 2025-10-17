@@ -87,13 +87,6 @@ modules:
     prefix: "${workdir}/devprodCoveritySrc"
     branch: main
     auto_update: true
-  - name: asp-js-engine
-    owner: 10gen
-    # repo: git@github.com:10gen/asp-js-engine.git
-    repo: asp-js-engine
-    prefix: asp-js-engine
-    branch: master
-    auto_update: true
 
 # Pre task steps
 pre:

@@ -87,16 +87,6 @@ functions:
         wtdevelop: ${wtdevelop_rev}
       clone_depth: 1000
 
-  "git get shallow streams project": &git_get_shallow_streams_project
-    command: git.get_project
-    display_name: "git get shallow project"
-    params:
-      directory: ${git_project_directory|src}
-      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-        wtdevelop: ${wtdevelop_rev}
-        asp-js-engine: ${asp-js-engine_rev}
-      clone_depth: 1000
-
   "restore git history and tags": &restore_git_history_and_tags
     command: subprocess.exec
     display_name: "restore git history and tags"
@@ -131,12 +121,6 @@ functions:
   "git get project and add git tag":
     - *f_expansions_write
     - *git_get_shallow_project
-    - *restore_git_history_and_tags
-    - *add_git_tag
-
-  "git get streams project and add git tag":
-    - *f_expansions_write
-    - *git_get_shallow_streams_project
     - *restore_git_history_and_tags
     - *add_git_tag
 
