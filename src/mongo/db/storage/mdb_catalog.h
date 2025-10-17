@@ -34,19 +34,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
 namespace mongo {
-class KVEngine;
-
-// This is only necessary because MDBCatalogTest is defined in a .cpp file in a different module
-// from MDBCatalog. Once that fixture is moved to the same module as MDBCatalog, this can be
-// removed and MDBCatalogTest can be made PRIVATE.
-// TODO(SERVER-105385): delete this line and comment.
-class MONGO_MOD_OPEN MDBCatalogTest;
+class MONGO_MOD_FILE_PRIVATE MDBCatalogTest;
 
 /**
  * A wrapper around the '_mdb_catalog' storage table. Each row in the table is indexed with a
@@ -75,27 +70,18 @@ class MONGO_MOD_OPEN MDBCatalogTest;
  *      'ns': <std::string>
  *    }
  */
-class MDBCatalog final {
-    MDBCatalog(const MDBCatalog&) = delete;
-    MDBCatalog& operator=(const MDBCatalog&) = delete;
-    MDBCatalog(MDBCatalog&&) = delete;
-    MDBCatalog& operator=(MDBCatalog&&) = delete;
-
+class MONGO_MOD_PUBLIC MDBCatalog final {
 public:
     /**
      * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
      */
     struct EntryIdentifier {
-        EntryIdentifier() {}
-        EntryIdentifier(RecordId catalogId, std::string ident, NamespaceString nss)
-            : catalogId(std::move(catalogId)), ident(std::move(ident)), nss(std::move(nss)) {}
         RecordId catalogId;
         std::string ident;
         NamespaceString nss;
     };
 
     MDBCatalog(RecordStore* rs, KVEngine* engine);
-    MDBCatalog() = delete;
 
     static MDBCatalog* get(OperationContext* opCtx) {
         return opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
@@ -181,10 +167,12 @@ public:
                                              const std::string& ident,
                                              bool isClustered);
 
+    MONGO_MOD_PUBLIC
     boost::optional<EntryIdentifier> getEntry_forTest(const RecordId& catalogId) const;
 
 private:
     class AddIdentChange;
+    friend class MDBCatalogTest;
 
     BSONObj _findRawEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) const;
 
@@ -210,7 +198,5 @@ private:
     mutable stdx::mutex _catalogIdToEntryMapLock;
 
     KVEngine* const _engine;
-
-    friend class MDBCatalogTest;
 };
 }  // namespace mongo
