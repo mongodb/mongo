@@ -246,18 +246,6 @@ std::vector<BSONObj> insertNewSchemaDocuments(const std::vector<BSONObj>& docs, 
     return newDocs;
 }
 
-class MockLargeDataCollector : public MockCollector {
-public:
-    MockLargeDataCollector(int32_t largeDataSize) : _largeDataSize(largeDataSize) {}
-
-    void generateDocument(BSONObjBuilder& builder, std::uint32_t counter) final {
-        builder.append("testingDataLarge", std::string(_largeDataSize, 'a'));
-    }
-
-private:
-    int32_t _largeDataSize = 0;
-};
-
 /**
  * Used to sync the flow of the FTDCController with its test. FTDCController calls onStartLoop() at
  * the start of each collection loop and it will block until the test calls
@@ -368,7 +356,7 @@ void FTDCControllerTest::testPeriodicCollector(UseMultiServiceSchema multiServic
     }
     _checkpoint->wait();
 
-    // Wait for numCollections samples to have occurred
+    // Wait for numCollections samples to have occured
     LOGV2_DEBUG(9129201, 0, "Collecting");
     auto collectUntilDocCount = [&](auto& collectorPtr, size_t docs) {
         while (collectorPtr->getDocs().size() < docs)
@@ -528,7 +516,7 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
 
 DEATH_TEST_REGEX_F(FTDCControllerTest,
                    LogAndTerminateWhenExceptionThrown,
-                   "9761500.*MockFailCollector.*size") {
+                   "9761500.*MockFailCollector") {
     FTDCConfig config;
     config.period = Milliseconds(100);
     setUpControllerAndCheckpoint(config);
@@ -539,25 +527,6 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
     startController();
 
     // Do a single sample collection to ensure we run through FTDCController::doLoop() and die.
-    doCollection();
-}
-
-DEATH_TEST_REGEX_F(FTDCControllerTest,
-                   LogAndTerminateWhenLargeDataCollectionFails,
-                   "10630200.*FTDC Entry.*name.*size") {
-    FTDCConfig config;
-    config.period = Milliseconds(100);
-    setUpControllerAndCheckpoint(config);
-
-    auto collector1 = std::make_unique<MockLargeDataCollector>(50 * 1024 * 1024);
-    auto collector2 = std::make_unique<MockLargeDataCollector>(60 * 1024 * 1024);
-    auto collector3 = std::make_unique<MockLargeDataCollector>(70 * 1024 * 1024);
-    controller()->addPeriodicCollector(std::move(collector1), ClusterRole::None);
-    controller()->addPeriodicCollector(std::move(collector2), ClusterRole::None);
-    controller()->addPeriodicCollector(std::move(collector3), ClusterRole::None);
-
-    startController();
-
     doCollection();
 }
 

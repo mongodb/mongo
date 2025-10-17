@@ -63,6 +63,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
+
 namespace {
 
 static constexpr auto roles = std::to_array<std::pair<ClusterRole::Value, StringData>>({
@@ -109,9 +110,7 @@ bool FTDCCollectorCollection::empty() {
 }
 
 std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
-    Client* client,
-    UseMultiServiceSchema multiServiceSchema,
-    std::vector<std::pair<std::string, int>>& sectionSizes) {
+    Client* client, UseMultiServiceSchema multiServiceSchema) {
     BSONObjBuilder builder;
     // If there are no collectors, just return an empty BSONObj so that that are caller knows we did
     // not collect anything
@@ -152,7 +151,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
             scopedRouterService.emplace(opCtx.get());
         }
 
-        _collect(opCtx.get(), role.first, parent, sectionSizes);
+        _collect(opCtx.get(), role.first, parent);
 
         if (multiServiceSchema) {
             maybeSubBuilder->appendDate(kFTDCCollectEndField, getCurrentDate(opCtx.get()));
@@ -334,11 +333,9 @@ void AsyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> c
     getSet(role).addCollector(std::move(collector), role);
 }
 
-void AsyncFTDCCollectorCollection::_collect(
-    OperationContext* opCtx,
-    ClusterRole role,
-    BSONObjBuilder* builder,
-    std::vector<std::pair<std::string, int>>& sectionSizes) {
+void AsyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
+                                            ClusterRole role,
+                                            BSONObjBuilder* builder) {
     getSet(role).collect(opCtx, builder);
 }
 
@@ -358,8 +355,7 @@ void SyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> co
 
 void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
                                            ClusterRole role,
-                                           BSONObjBuilder* builder,
-                                           std::vector<std::pair<std::string, int>>& sectionSizes) {
+                                           BSONObjBuilder* builder) {
     auto& collectorVector = _collectors[role];
     for (auto& collector : collectorVector) {
         // Skip collection if this collector has no data to return
@@ -369,19 +365,17 @@ void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
 
         try {
             BSONObjBuilder subObjBuilder(builder->subobjStart(collector->name()));
+
             // Add a Date_t before and after each BSON is collected so that we can track timing of
             // the collector.
             subObjBuilder.appendDate(kFTDCCollectStartField, getCurrentDate(opCtx));
             collector->collect(opCtx, subObjBuilder);
             subObjBuilder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx));
-            sectionSizes.emplace_back(collector->name(), subObjBuilder.len());
         } catch (...) {
             LOGV2_ERROR(9761500,
                         "Collector threw an error",
                         "error"_attr = exceptionToStatus(),
-                        "collector"_attr = collector->name(),
-                        "size"_attr = builder->len());
-            sectionSizes.emplace_back(collector->name(), builder->len());
+                        "collector"_attr = collector->name());
             throw;
         }
 
