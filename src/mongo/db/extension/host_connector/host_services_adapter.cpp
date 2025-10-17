@@ -38,11 +38,6 @@ namespace mongo::extension::host_connector {
 // Initialize the static instance of HostServicesAdapter.
 HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
 
-MongoExtensionStatus* HostServicesAdapter::_extAlwaysOK_TEMPORARY() noexcept {
-    return wrapCXXAndConvertExceptionToStatus(
-        [&]() { return host::HostServices::alwaysTrue_TEMPORARY(); });
-}
-
 MongoExtensionStatus* HostServicesAdapter::_extLog(::MongoExtensionByteView logMessage) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         BSONObj obj = bsonObjFromByteView(logMessage);

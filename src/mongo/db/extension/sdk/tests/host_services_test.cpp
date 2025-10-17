@@ -95,8 +95,7 @@ TEST_F(HostServicesTest, uasserted) {
     BSONObj errInfo = BSON("message" << errmsg << "errorCode" << errorCode);
     ::MongoExtensionByteView errInfoByteView = objAsByteView(errInfo);
 
-    HostStatusHandle status(
-        sdk::HostServicesHandle::getHostServices()->userAsserted(errInfoByteView));
+    StatusHandle status(sdk::HostServicesHandle::getHostServices()->userAsserted(errInfoByteView));
 
     ASSERT_EQ(status.getCode(), errorCode);
     // Reason is not populated on the status for re-throwable exceptions.

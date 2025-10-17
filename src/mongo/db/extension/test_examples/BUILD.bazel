@@ -87,7 +87,6 @@ extensions_with_config(
     )
     for extension_name in [
         "host_version_succeeds",
-        "invoke_host_services_asap",
         "load_highest_compatible_version",
         "load_two_stages",
     ]

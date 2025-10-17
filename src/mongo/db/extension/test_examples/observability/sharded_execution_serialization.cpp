@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
@@ -101,11 +102,9 @@ public:
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        uassert(11173702,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+        sdk::validateStageDefinition(stageBson, kStageName);
 
-        uassert(
+        userAssert(
             11173701,
             "Intended assertion in sharded scenarios tripped",
             !stageBson.getField(kStageName)

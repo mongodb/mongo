@@ -38,8 +38,6 @@ namespace mongo::extension::host {
  */
 class HostServices {
 public:
-    static bool alwaysTrue_TEMPORARY();
-
     /**
      * Logs a message from the extension with severity INFO, WARNING, or ERROR.
      */

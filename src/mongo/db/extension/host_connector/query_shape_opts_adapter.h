@@ -49,18 +49,17 @@ public:
 private:
     static MongoExtensionStatus* _extSerializeIdentifier(
         const ::MongoExtensionHostQueryShapeOpts* ctx,
-        const ::MongoExtensionByteView* identifier,
+        ::MongoExtensionByteView identifier,
         ::MongoExtensionByteBuf** output) noexcept;
 
     static MongoExtensionStatus* _extSerializeFieldPath(
         const ::MongoExtensionHostQueryShapeOpts* ctx,
-        const ::MongoExtensionByteView* fieldPath,
+        ::MongoExtensionByteView fieldPath,
         ::MongoExtensionByteBuf** output) noexcept;
 
-    static MongoExtensionStatus* _extSerializeLiteral(
-        const ::MongoExtensionHostQueryShapeOpts* ctx,
-        const ::MongoExtensionByteView* bsonElementPtr,
-        ::MongoExtensionByteBuf** output) noexcept;
+    static MongoExtensionStatus* _extSerializeLiteral(const ::MongoExtensionHostQueryShapeOpts* ctx,
+                                                      ::MongoExtensionByteView bsonElement,
+                                                      ::MongoExtensionByteBuf** output) noexcept;
 
     static constexpr ::MongoExtensionHostQueryShapeOptsVTable VTABLE{
         &_extSerializeIdentifier, &_extSerializeFieldPath, &_extSerializeLiteral};

@@ -38,10 +38,6 @@
 
 namespace mongo::extension::host {
 
-bool HostServices::alwaysTrue_TEMPORARY() {
-    return true;
-}
-
 void HostServices::log(const mongo::extension::MongoExtensionLog& log) {
     // For now we always log extension messages under the EXTENSION-MONGOT component. Someday we'd
     // like to dynamically create EXTENSION sub-components per extension.

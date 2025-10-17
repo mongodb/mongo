@@ -38,9 +38,9 @@ namespace mongo::extension::sdk {
 
 template <typename T>
 T QueryShapeOptsHandle::serializeUsingOptsHelper(
-    const MongoExtensionByteView* byteView,
+    MongoExtensionByteView byteView,
     const std::function<MongoExtensionStatus*(const MongoExtensionHostQueryShapeOpts*,
-                                              const MongoExtensionByteView*,
+                                              MongoExtensionByteView,
                                               ::MongoExtensionByteBuf**)>& apiFunc,
     const std::function<T(MongoExtensionByteView)>& transformViewToReturn) const {
     assertValid();
@@ -68,7 +68,7 @@ std::string QueryShapeOptsHandle::serializeIdentifier(const std::string& identif
     };
 
     return serializeUsingOptsHelper<std::string>(
-        &byteView, vtable().serialize_identifier, transformViewToReturn);
+        byteView, vtable().serialize_identifier, transformViewToReturn);
 }
 
 std::string QueryShapeOptsHandle::serializeFieldPath(const std::string& fieldPath) const {
@@ -79,7 +79,7 @@ std::string QueryShapeOptsHandle::serializeFieldPath(const std::string& fieldPat
     };
 
     return serializeUsingOptsHelper<std::string>(
-        &byteView, vtable().serialize_field_path, transformViewToReturn);
+        byteView, vtable().serialize_field_path, transformViewToReturn);
 }
 
 void QueryShapeOptsHandle::appendLiteral(BSONObjBuilder& builder,
@@ -98,7 +98,7 @@ void QueryShapeOptsHandle::appendLiteral(BSONObjBuilder& builder,
         return true;
     };
 
-    serializeUsingOptsHelper<bool>(&byteView, vtable().serialize_literal, transformViewToReturn);
+    serializeUsingOptsHelper<bool>(byteView, vtable().serialize_literal, transformViewToReturn);
 }
 
 }  // namespace mongo::extension::sdk

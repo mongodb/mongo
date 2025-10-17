@@ -52,12 +52,6 @@ public:
     HostServicesHandle(const ::MongoExtensionHostServices* services)
         : UnownedHandle<const ::MongoExtensionHostServices>(services) {}
 
-    bool alwaysTrue_TEMPORARY() const {
-        assertValid();
-        invokeCAndConvertStatusToException([&]() { return vtable().alwaysOK_TEMPORARY(); });
-        return true;
-    }
-
     static BSONObj createExtensionLogMessage(
         std::string message,
         std::int32_t code,

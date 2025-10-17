@@ -268,12 +268,6 @@ TEST_F(LoadExtensionsTest, LoadExtensionTwoStagesSucceeds) {
     ASSERT_EQUALS(std::string(barStage->getSourceName()), "$bar");
 }
 
-TEST_F(LoadExtensionsTest, LoadExtensionInvokeHostServicesAsapSucceeds) {
-    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
-        "invoke_host_services_asap",
-        makeEmptyExtensionConfig("libinvoke_host_services_asap_mongo_extension.so")));
-}
-
 TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
         "loadHighestCompatibleVersion",

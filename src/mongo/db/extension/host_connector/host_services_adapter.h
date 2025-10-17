@@ -55,8 +55,6 @@ public:
 private:
     static HostServicesAdapter _hostServicesAdapter;
 
-    static MongoExtensionStatus* _extAlwaysOK_TEMPORARY() noexcept;
-
     static MongoExtensionStatus* _extLog(::MongoExtensionByteView logMessage) noexcept;
 
     static MongoExtensionStatus* _extLogDebug(::MongoExtensionByteView rawLog) noexcept;
@@ -68,6 +66,6 @@ private:
         ::MongoExtensionByteView structuredErrorMessage);
 
     static constexpr ::MongoExtensionHostServicesVTable VTABLE{
-        &_extAlwaysOK_TEMPORARY, &_extLog, &_extLogDebug, &_extUserAsserted, &_extTripwireAsserted};
+        &_extLog, &_extLogDebug, &_extUserAsserted, &_extTripwireAsserted};
 };
 }  // namespace mongo::extension::host_connector

@@ -163,7 +163,7 @@ typedef struct MongoExtensionHostQueryShapeOptsVTable {
      * transferred to the caller.
      */
     MongoExtensionStatus* (*serialize_identifier)(const MongoExtensionHostQueryShapeOpts* ctx,
-                                                  const MongoExtensionByteView* ident,
+                                                  MongoExtensionByteView ident,
                                                   MongoExtensionByteBuf** output);
 
     /**
@@ -171,7 +171,7 @@ typedef struct MongoExtensionHostQueryShapeOptsVTable {
      * transferred to the caller.
      */
     MongoExtensionStatus* (*serialize_field_path)(const MongoExtensionHostQueryShapeOpts* ctx,
-                                                  const MongoExtensionByteView* fieldPath,
+                                                  MongoExtensionByteView fieldPath,
                                                   MongoExtensionByteBuf** output);
 
     /**
@@ -186,7 +186,7 @@ typedef struct MongoExtensionHostQueryShapeOptsVTable {
      * Returned BSON format: {"": <serializedLiteral>}
      */
     MongoExtensionStatus* (*serialize_literal)(const MongoExtensionHostQueryShapeOpts* ctx,
-                                               const MongoExtensionByteView* bsonElementPtr,
+                                               MongoExtensionByteView bsonElement,
                                                MongoExtensionByteBuf** output);
 } MongoExtensionHostQueryShapeOptsVTable;
 
@@ -515,8 +515,6 @@ typedef struct MongoExtensionHostPortalVTable {
  * MongoExtensionHostServices exposes services provided by the host to the extension.
  *
  * Currently, the VTable struct is a placeholder for future services.
- * TODO SERVER-110982 (or whichever ticket adds the first function to this struct): Remove
- * alwaysOK_TEMPORARY().
  */
 typedef struct MongoExtensionHostServices {
     const struct MongoExtensionHostServicesVTable* vtable;
@@ -526,8 +524,6 @@ typedef struct MongoExtensionHostServices {
  * Virtual function table for MongoExtensionHostServices.
  */
 typedef struct MongoExtensionHostServicesVTable {
-    MongoExtensionStatus* (*alwaysOK_TEMPORARY)();
-
     /**
      * Logs a message from the extension with severity INFO, WARNING, or ERROR.
      *

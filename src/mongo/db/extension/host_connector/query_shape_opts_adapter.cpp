@@ -36,14 +36,14 @@ namespace mongo::extension::host {
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
     const ::MongoExtensionHostQueryShapeOpts* ctx,
-    const ::MongoExtensionByteView* identifier,
+    ::MongoExtensionByteView identifier,
     ::MongoExtensionByteBuf** output) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         *output = nullptr;
 
         const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
         auto transformedIdentifier =
-            opts->serializeIdentifier(std::string(byteViewAsStringView(*identifier)));
+            opts->serializeIdentifier(std::string(byteViewAsStringView(identifier)));
 
         // Allocate a buffer on the heap. Ownership is transferred to the caller.
         *output = new VecByteBuf(reinterpret_cast<uint8_t*>(transformedIdentifier.data()),
@@ -53,14 +53,14 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
     const ::MongoExtensionHostQueryShapeOpts* ctx,
-    const ::MongoExtensionByteView* fieldPath,
+    ::MongoExtensionByteView fieldPath,
     ::MongoExtensionByteBuf** output) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         *output = nullptr;
 
         const auto& opts = static_cast<const QueryShapeOptsAdapter*>(ctx)->getOptsImpl();
         auto transformedFieldPath =
-            opts->serializeFieldPath(std::string(byteViewAsStringView(*fieldPath)));
+            opts->serializeFieldPath(std::string(byteViewAsStringView(fieldPath)));
 
         // Allocate a buffer on the heap. Ownership is transferred to the caller.
         *output = new VecByteBuf(reinterpret_cast<uint8_t*>(transformedFieldPath.data()),
@@ -70,7 +70,7 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
     const ::MongoExtensionHostQueryShapeOpts* ctx,
-    const ::MongoExtensionByteView* bsonElementPtr,
+    ::MongoExtensionByteView bsonElement,
     ::MongoExtensionByteBuf** output) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         *output = nullptr;
@@ -79,12 +79,12 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
 
         // Parse a BSONElement out of the ptr passed from the extension. Note that the caller must
         // ensure that underlying BSONObj remains valid.
-        BSONElement element(reinterpret_cast<const char*>(bsonElementPtr->data));
+        BSONElement rawLiteral(reinterpret_cast<const char*>(bsonElement.data));
 
         // Serialize the literal and then copy it into a BSON object. The BSON serialization is
         // necessary because the Value returned can be any valid Value type, and the easiest way to
         // have the extension deduce the return type is to rely on our existing BSON infrastructure.
-        auto val = opts->serializeLiteral(element);
+        auto val = opts->serializeLiteral(rawLiteral);
 
         // Serialize the Value into a BSON document.
         MutableDocument doc;
@@ -93,9 +93,9 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
 
         // Allocate a buffer on the heap for the output BSONElement with the serialized literal.
         // Ownership is transferred to the caller.
-        auto bsonElement = bson.firstElement();
-        *output = new VecByteBuf(reinterpret_cast<const uint8_t*>(bsonElement.rawdata()),
-                                 bsonElement.size());
+        BSONElement transformedLiteral = bson.firstElement();
+        *output = new VecByteBuf(reinterpret_cast<const uint8_t*>(transformedLiteral.rawdata()),
+                                 transformedLiteral.size());
     });
 }
 

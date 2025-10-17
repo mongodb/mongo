@@ -81,9 +81,9 @@ private:
      */
     template <typename T>
     T serializeUsingOptsHelper(
-        const MongoExtensionByteView* byteViewToSerialize,
+        MongoExtensionByteView byteViewToSerialize,
         const std::function<MongoExtensionStatus*(const MongoExtensionHostQueryShapeOpts*,
-                                                  const MongoExtensionByteView*,
+                                                  MongoExtensionByteView,
                                                   ::MongoExtensionByteBuf**)>& apiFunc,
         const std::function<T(MongoExtensionByteView)>& transformViewToReturn) const;
 };

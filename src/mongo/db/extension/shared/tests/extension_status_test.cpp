@@ -37,10 +37,10 @@ namespace mongo::extension {
 namespace {
 
 TEST(ExtensionStatusTest, extensionStatusOKTest) {
-    // HostStatusHandle going out of scope should call destroy, but not destroy our singleton.
+    // StatusHandle going out of scope should call destroy, but not destroy our singleton.
     auto* const statusOKSingleton = &ExtensionStatusOK::getInstance();
     {
-        HostStatusHandle statusHandle(statusOKSingleton);
+        StatusHandle statusHandle(statusOKSingleton);
         ASSERT_EQUALS(statusHandle.getCode(), 0);
         ASSERT_EQUALS(statusHandle.getReason().size(), 0);
     }
@@ -55,7 +55,7 @@ TEST(ExtensionStatusTest, extensionStatusOKTest) {
 // Test that a std::exception correctly returns MONGO_EXTENSION_STATUS_RUNTIME_ERROR when called via
 // wrapCXXAndConvertExceptionToStatus.
 TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_stdException) {
-    HostStatusHandle status(wrapCXXAndConvertExceptionToStatus(
+    StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
 }
@@ -76,7 +76,7 @@ TEST(
 // Test that wrapCXXAndConvertExceptionToStatus correctly wraps a DBException (uassert) and returns
 // the correct code when a call is made at the C API boundary.
 TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_AssertionException) {
-    HostStatusHandle status(wrapCXXAndConvertExceptionToStatus(
+    StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
     ASSERT_TRUE(status.getCode() == 10596408);
 }
@@ -111,7 +111,7 @@ TEST(
         std::make_unique<ExtensionStatusException>(nullptr, 10596412, kErrorString);
     const auto* extensionStatusOriginalPtr = extensionStatusPtr.get();
 
-    HostStatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus([&]() {
+    StatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus([&]() {
         invokeCAndConvertStatusToException([&]() { return extensionStatusPtr.release(); });
     }));
 

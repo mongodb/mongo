@@ -54,9 +54,6 @@ BSONObj HostServicesHandle::createExtensionDebugLogMessage(std::string message,
 }
 
 void HostServicesHandle::_assertVTableConstraints(const VTable_t& vtable) const {
-    tripwireAssert(11097600,
-                   "Host services' 'alwaysOK_TEMPORARY' is null",
-                   vtable.alwaysOK_TEMPORARY != nullptr);
     tripwireAssert(
         11097801, "Host services' 'user_asserted' is null", vtable.user_asserted != nullptr);
     tripwireAssert(11188200, "Host services' 'log' is null", vtable.log != nullptr);

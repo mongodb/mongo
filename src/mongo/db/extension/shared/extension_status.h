@@ -153,13 +153,15 @@ private:
     std::exception_ptr _exception;
 };
 /**
- * HostStatusHandle is an owned handle wrapper around a MongoExtensionStatus.
+ * StatusHandle is an owned handle wrapper around a MongoExtensionStatus.
+ *
  * Typically this is a handle around a MongoExtensionStatus allocated by the host whose ownership
- * has been transferred to the extension.
+ * has been transferred to the extension. Note that this includes assertion exceptions that are
+ * allocated by the host but were triggered/conceptually thrown by the extension.
  */
-class HostStatusHandle : public OwnedHandle<::MongoExtensionStatus> {
+class StatusHandle : public OwnedHandle<::MongoExtensionStatus> {
 public:
-    HostStatusHandle(::MongoExtensionStatus* status) : OwnedHandle<::MongoExtensionStatus>(status) {
+    StatusHandle(::MongoExtensionStatus* status) : OwnedHandle<::MongoExtensionStatus>(status) {
         _assertValidVTable();
     }
 
@@ -193,12 +195,12 @@ protected:
 class ExtensionDBException final : public DBException {
 public:
     using DBException::DBException;
-    ExtensionDBException(HostStatusHandle extensionStatus)
+    ExtensionDBException(StatusHandle extensionStatus)
         : DBException(error_details::makeStatus(extensionStatus.getCode(),
                                                 std::string(extensionStatus.getReason()))),
           _extensionStatus(std::move(extensionStatus)) {}
 
-    HostStatusHandle extractStatus() {
+    StatusHandle extractStatus() {
         stdx::unique_lock lk(_mutex);
         return std::move(_extensionStatus);
     }
@@ -206,7 +208,7 @@ public:
 private:
     void defineOnlyInFinalSubclassToPreventSlicing() final {};
     stdx::mutex _mutex;
-    HostStatusHandle _extensionStatus;
+    StatusHandle _extensionStatus;
 };
 
 /**
@@ -245,7 +247,7 @@ template <typename Fn>
     }
 }
 
-void convertStatusToException(HostStatusHandle status);
+void convertStatusToException(StatusHandle status);
 
 /**
  * invokeCAndConvertStatusToException is a template helper that wraps a function that **calls into
@@ -255,7 +257,7 @@ void convertStatusToException(HostStatusHandle status);
  */
 template <typename Fn>
 void invokeCAndConvertStatusToException(Fn&& fn) {
-    HostStatusHandle status(fn());
+    StatusHandle status(fn());
     if (auto code = status.getCode(); MONGO_unlikely(code != MONGO_EXTENSION_STATUS_OK)) {
         return convertStatusToException(std::move(status));
     }
