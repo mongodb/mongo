@@ -967,6 +967,11 @@ error_codes:
       name: SchemaRegistryConnectionError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
+  - {
+      code: 470,
+      name: StreamProcessorAtlasConnectionErrorDuringFirstStart,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
