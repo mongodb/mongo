@@ -65,7 +65,7 @@ HashAggBaseStage<Derived>::HashAggBaseStage(StringData stageName,
 
 template <class Derived>
 void HashAggBaseStage<Derived>::doSaveState() {
-    if (_rsCursor) {
+    if (_recordStore && _rsCursor) {
         _recordStore->saveCursor(_opCtx, _rsCursor);
     }
 }
