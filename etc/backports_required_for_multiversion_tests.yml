@@ -67,6 +67,8 @@ last-continuous:
       ticket: SERVER-110953
     - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
       ticket: SERVER-110574
+    - test_file: jstests/core/timeseries/ddl/timeseries_collmod_timeseries_options.js
+      ticket: SERVER-108801
     - test_file: jstests/replsets/log_unprepared_abort_txns.js
       ticket: SERVER-111017
     - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
@@ -640,6 +642,8 @@ last-lts:
       ticket: SERVER-110953
     - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
       ticket: SERVER-110574
+    - test_file: jstests/core/timeseries/ddl/timeseries_collmod_timeseries_options.js
+      ticket: SERVER-108801
     - test_file: jstests/replsets/log_unprepared_abort_txns.js
       ticket: SERVER-111017
     - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js

@@ -90,11 +90,6 @@ MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
 namespace {
 
 
-bool hasTimeseriesParams(const CollModRequest& request) {
-    return (request.getTimeseries().has_value() && !request.getTimeseries()->toBSON().isEmpty()) ||
-        request.getTimeseriesBucketsMayHaveMixedSchemaData().has_value();
-}
-
 template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShards(
     OperationContext* opCtx,
@@ -352,7 +347,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
-                    hasTimeseriesParams(_request)) {
+                    hasTimeseriesOptions(_request)) {
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -376,7 +371,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
-                    hasTimeseriesParams(_request)) {
+                    hasTimeseriesOptions(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     generic_argument_util::setMajorityWriteConcern(request);
 
@@ -440,7 +435,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                         ShardsvrCollModParticipant request(originalNss(), _request);
                         bool needsUnblock =
-                            _collInfo->timeSeriesOptions && hasTimeseriesParams(_request);
+                            _collInfo->timeSeriesOptions && hasTimeseriesOptions(_request);
                         request.setNeedsUnblock(needsUnblock);
 
                         std::vector<AsyncRequestsSender::Response> responses;

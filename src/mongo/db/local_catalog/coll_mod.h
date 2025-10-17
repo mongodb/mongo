@@ -78,6 +78,11 @@ Status processCollModCommand(OperationContext* opCtx,
                              BSONObjBuilder* result);
 
 /**
+ * Returns true if the given collmod @request contains options related to timeseries collections
+ */
+bool hasTimeseriesOptions(const CollModRequest& request);
+
+/**
  * Performs static validation of CollMod request.
  *
  * Static checks are the ones perfomed exclusively on the request itself without accessing the
