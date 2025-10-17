@@ -677,6 +677,8 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             *tightnessOut = IndexBoundsBuilder::EXACT;
         }
 
+        bool isMultikeyField = index.pathHasMultikeyComponent(elt.fieldNameStringData());
+
         // Generally speaking inverting bounds can only be done for exact bounds. Any looser bounds
         // (like INEXACT_FETCH) would signal that inversion would be mistakenly excluding some
         // values. One exception is for collation, whose index bounds are tracked as INEXACT_FETCH,
@@ -684,13 +686,13 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // is imprecise.
         tassert(4457011,
                 "Cannot invert inexact bounds",
-                *tightnessOut == IndexBoundsBuilder::EXACT || index.collator);
+                *tightnessOut == IndexBoundsBuilder::EXACT || index.collator || isMultikeyField);
 
         // If the index is multikey on this path, it doesn't matter what the tightness of the child
         // is, we must return INEXACT_FETCH. Consider a multikey index on 'a' with document
         // {a: [1, 2, 3]} and query {a: {$ne: 3}}. If we treated the bounds [MinKey, 3), (3, MaxKey]
         // as exact, then we would erroneously return the document!
-        if (index.pathHasMultikeyComponent(elt.fieldNameStringData())) {
+        if (isMultikeyField) {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
     } else if (MatchExpression::EXISTS == expr->matchType()) {
