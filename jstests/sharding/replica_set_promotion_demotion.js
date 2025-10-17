@@ -130,6 +130,10 @@ describe("promote and demote replicaset to sharded cluster", function () {
         assert(this.testDBDirectConnection.auth("user", "x"), "Authentication failed");
 
         assert.commandWorked(this.testDBDirectConnection.foo.insertOne({bar: 42}));
+        assert.commandWorked(
+            this.testDBDirectConnection.createCollection("testTsColl", {timeseries: {timeField: "time"}}),
+        );
+        assert.commandWorked(this.testDBDirectConnection.testTsColl.insertOne({time: new Date(), temperature: 25.0}));
 
         this.doRollingRestart(this.configRS, {
             configsvr: "",
@@ -196,21 +200,32 @@ describe("promote and demote replicaset to sharded cluster", function () {
     it("promotion to cluster keeps data", () => {
         assert.eq(this.testDBDirectConnection.foo.count({bar: 42}), 1);
         assert.eq(this.mongos.getDB("test").foo.count({bar: 42}), 1);
+        assert.eq(this.testDBDirectConnection.testTsColl.count({temperature: 25.0}), 1);
+        assert.eq(this.mongos.getDB("test").testTsColl.count({temperature: 25.0}), 1);
     });
 
     it("direct operation is allowed after promotion", () => {
+        const collections = ["test.foo", "test.testTsColl", "test.system.buckets.testTsColl"];
         this.configRS.asCluster(
             this.configRS.getPrimary(),
             () => {
-                assert.commandWorked(
-                    this.configRS.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: "test.foo"}),
-                );
+                collections.forEach((collection) => {
+                    assert.commandWorked(
+                        this.configRS
+                            .getPrimary()
+                            .getDB("admin")
+                            .runCommand({_flushRoutingTableCacheUpdates: collection}),
+                    );
+                });
             },
             this.keyFile,
         );
         assert.commandWorked(this.testDBDirectConnection.foo.insertOne({baz: -1}));
         assert.eq(this.testDBDirectConnection.foo.count({baz: -1}), 1);
         assert.eq(this.mongos.getDB("test").foo.count({baz: -1}), 1);
+        assert.commandWorked(this.testDBDirectConnection.testTsColl.insertOne({time: new Date(), temperature: 35.0}));
+        assert.eq(this.testDBDirectConnection.testTsColl.count({temperature: 35.0}), 1);
+        assert.eq(this.mongos.getDB("test").testTsColl.count({temperature: 35.0}), 1);
     });
 
     it("adding new shard prohibits direct connections", () => {
@@ -233,10 +248,12 @@ describe("promote and demote replicaset to sharded cluster", function () {
             return res.status !== "completed";
         });
         assert.eq(this.mongos.getDB("test").foo.count({bar: 42}), 1);
+        assert.eq(this.mongos.getDB("test").testTsColl.count({temperature: 25.0}), 1);
     });
 
     it("demoting keeps data", () => {
         assert.commandWorked(this.mongos.getDB("test").foo.insertOne({baz: -1}));
+        assert.commandWorked(this.mongos.getDB("test").testTsColl.insertOne({time: new Date(), temperature: 35.0}));
 
         this.doRollingRestart(this.configRS, {
             replSet: "replica_set_promotion_demotion",
@@ -271,5 +288,7 @@ describe("promote and demote replicaset to sharded cluster", function () {
 
         assert.eq(testDB.foo.count({bar: 42}), 1);
         assert.eq(testDB.foo.count({baz: -1}), 1);
+        assert.eq(testDB.testTsColl.count({temperature: 25.0}), 1);
+        assert.eq(testDB.testTsColl.count({temperature: 35.0}), 1);
     });
 });

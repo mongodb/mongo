@@ -6,7 +6,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -21,10 +20,14 @@ rs1.initiate();
 
 let db1 = rs1.getPrimary().getDB("testDB");
 
-let numObjs = 3;
-for (let i = 0; i < numObjs; i++) {
+let numObjsFoo = 3;
+for (let i = 0; i < numObjsFoo; i++) {
     assert.commandWorked(db1.foo.save({a: i}));
 }
+
+assert.commandWorked(db1.createCollection("testTsColl", {timeseries: {timeField: "time"}}));
+assert.commandWorked(db1.testTsColl.insertOne({time: new Date(), temperature: 25.0}));
+let numObjsTestTsColl = 1;
 
 let configDB = s.s.getDB("config");
 assert.eq(null, configDB.databases.findOne({_id: "testDB"}));
@@ -57,9 +60,16 @@ s.config.databases.find().forEach(printjson);
 let rejectedShard = "rejectedShard";
 assert(!s.admin.runCommand({addShard: rs2.getURL(), name: rejectedShard}).ok, "accepted mongod with duplicate db");
 
+// Check that all collection that were local to the mongod's are writable through the mongos
+assert.commandWorked(db1.foo.insertOne({a: 4}));
+numObjsFoo++;
+assert.commandWorked(db1.testTsColl.insertOne({time: new Date(), temperature: 35.0}));
+numObjsTestTsColl++;
+
 // Check that all collection that were local to the mongod's are accessible through the mongos
 let sdb1 = s.getDB("testDB");
-assert.eq(numObjs, sdb1.foo.count(), "wrong count for database that existed before addshard");
+assert.eq(numObjsFoo, sdb1.foo.count(), "wrong count collection foo that existed before addshard");
+assert.eq(numObjsTestTsColl, sdb1.testTsColl.count(), "wrong count collection testTsColl that existed before addshard");
 
 let sdb2 = s.getDB("otherDB");
 assert.eq(0, sdb2.foo.count(), "database of rejected shard appears through mongos");
@@ -76,19 +86,28 @@ let origShard = s.getNonPrimaries("testDB")[0];
 moveDatabaseAndUnshardedColls(s.s.getDB("testDB"), origShard);
 
 assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary), origShard, "DB primary didn't move");
-assert.eq(numObjs, sdb1.foo.count(), "wrong count after moving datbase that existed before addshard");
+assert.eq(
+    numObjsFoo,
+    sdb1.foo.count(),
+    "wrong count on foo collection after moving database that existed before addshard",
+);
+assert.eq(
+    numObjsTestTsColl,
+    sdb1.testTsColl.count(),
+    "wrong count on testTsColl collection after moving database that existed before addshard",
+);
 
 // make sure we can shard the original collections
 sdb1.foo.createIndex({a: 1}, {unique: true}); // can't shard populated collection without an index
 s.adminCommand({enablesharding: "testDB"});
 s.adminCommand({shardcollection: "testDB.foo", key: {a: 1}});
-s.adminCommand({split: "testDB.foo", middle: {a: Math.floor(numObjs / 2)}});
+s.adminCommand({split: "testDB.foo", middle: {a: Math.floor(numObjsFoo / 2)}});
 assert.eq(
     2,
     findChunksUtil.countChunksForNs(s.config, "testDB.foo"),
     "wrong chunk number after splitting collection that existed before",
 );
-assert.eq(numObjs, sdb1.foo.count(), "wrong count after splitting collection that existed before");
+assert.eq(numObjsFoo, sdb1.foo.count(), "wrong count after splitting collection that existed before");
 
 s.stop();
 rs1.stopSet();
