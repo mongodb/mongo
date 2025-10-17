@@ -444,6 +444,17 @@ void IndexUpdateIdentifier::determineAffectedIndexes(DocumentDiffReader* reader,
         }
     }
 
+    boost::optional<BSONElement> binaryItem;
+    while ((binaryItem = reader->nextBinary())) {
+        FieldRef::FieldRefTempAppend tempAppend(fieldRef, binaryItem->fieldNameStringData());
+        determineAffectedIndexes(fieldRef, indexesToUpdate);
+
+        // Early exit if possible.
+        if (indexesToUpdate.count() == _numIndexes) {
+            return;
+        }
+    }
+
     for (auto subItem = reader->nextSubDiff(); subItem; subItem = reader->nextSubDiff()) {
         FieldRef::FieldRefTempAppend tempAppend(fieldRef, subItem->first);
         visit(OverloadedVisitor{[this, &fieldRef, &indexesToUpdate](DocumentDiffReader& item) {

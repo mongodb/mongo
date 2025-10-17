@@ -69,6 +69,8 @@ last-continuous:
       ticket: SERVER-110574
     - test_file: jstests/replsets/log_unprepared_abort_txns.js
       ticket: SERVER-111017
+    - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
+      ticket: SERVER-112520
   suites: null
 last-lts:
   all:
@@ -640,4 +642,6 @@ last-lts:
       ticket: SERVER-110574
     - test_file: jstests/replsets/log_unprepared_abort_txns.js
       ticket: SERVER-111017
+    - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
+      ticket: SERVER-112520
   suites: null
