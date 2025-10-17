@@ -822,6 +822,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/txns/OWNERS.yml
 /jstests/core/txns/**/* @10gen/server-transactions @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/views/OWNERS.yml
+/jstests/core/views/**/* @10gen/query-optimization @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/write/OWNERS.yml
 /jstests/core/write/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 
