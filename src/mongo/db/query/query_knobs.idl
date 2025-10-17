@@ -1204,6 +1204,22 @@ server_parameters:
         on_update: query_stats_util::onQueryStatsSamplingRateUpdate
         redact: false
 
+    internalQueryStatsWriteCmdSampleRate:
+        description: >-
+            Controls whether query stats are collected for write commands. Set to 1 to enable collection for
+            write commands, or 0 to disable. This parameter is only effective if query stats is already enabled
+            via 'internalQueryStatsRateLimit' or 'internalQueryStatsSampleRate'.
+            Note: This parameter may become a floating point value to support percentage-based sampling.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryStatsWriteCmdSampleRate"
+        cpp_vartype: AtomicWord<double>
+        default: 1.0
+        validator:
+            gte: 0.0
+            lte: 1.0
+            callback: query_stats_util::validateQueryStatsWriteCmdSampleRate
+        redact: false
+
     internalQueryStatsCacheSize:
         description: >-
             The maximum amount of memory that the system will allocate for the query queryStats

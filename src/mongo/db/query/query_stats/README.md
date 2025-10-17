@@ -296,6 +296,16 @@ following way:
     stats rate limiting falls back to the window-based policy controlled by
     `internalQueryStatsRateLimit`.
 
+- `internalQueryStatsWriteCmdSampleRate`:
+
+  - This parameter is an integer number either 0 or 1. It controls whether query stats are collected
+    for write commands.
+    - `0` - Disable recording write commands.
+    - `1` - Enable recording write commands.
+  - This parameter is only effective if query stats is already enabled via `internalQueryStatsRateLimit`
+    or `internalQueryStatsSampleRate`.
+  - This parameter may become a floating point value to support percentage-based sampling in the future.
+
 - `logComponentVerbosity.queryStats`:
   - Controls the logging behavior for query stats. See [Logging](#logging) for details.
 

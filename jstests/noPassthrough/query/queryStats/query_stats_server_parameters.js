@@ -86,6 +86,50 @@ function runTest(conn) {
         assert.gte(execCount, 10);
         assert.lte(execCount, 90);
     }
+
+    {
+        // Test enabling collecting write commands.
+        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 1}));
+        const sampleRate = conn.adminCommand({
+            getParameter: 1,
+            internalQueryStatsWriteCmdSampleRate: 1,
+        }).internalQueryStatsWriteCmdSampleRate;
+        assert.eq(sampleRate, 1);
+    }
+
+    {
+        // Test disabling collecting write commands.
+        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0}));
+        const sampleRate = conn.adminCommand({
+            getParameter: 1,
+            internalQueryStatsWriteCmdSampleRate: 1,
+        }).internalQueryStatsWriteCmdSampleRate;
+        assert.eq(sampleRate, 0);
+    }
+
+    {
+        // Test setting internalQueryStatsWriteCmdSampleRate with invalid values.
+        assert.commandFailedWithCode(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.001}),
+            11204700,
+        );
+        assert.commandFailedWithCode(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.999}),
+            11204700,
+        );
+        assert.commandFailedWithCode(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.5}),
+            11204700,
+        );
+        assert.commandFailedWithCode(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 2}),
+            11204700,
+        );
+        assert.commandFailedWithCode(
+            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: -1}),
+            11204700,
+        );
+    }
 }
 
 const conn = MongoRunner.runMongod();

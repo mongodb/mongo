@@ -1448,7 +1448,7 @@ void registerRequestForQueryStats(OperationContext* opCtx,
 
 
     // Register query stats collection.
-    query_stats::registerRequest(opCtx, ns, [&]() {
+    query_stats::registerWriteRequest(opCtx, ns, [&]() {
         uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
         return std::make_unique<query_stats::UpdateKey>(parsedUpdate.expCtx(),
                                                         wholeOp,

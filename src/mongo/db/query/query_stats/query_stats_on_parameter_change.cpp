@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/client.h"
@@ -100,6 +101,15 @@ Status onQueryStatsRateLimitUpdate(int) {
 
 Status onQueryStatsSamplingRateUpdate(double) {
     return onQueryStatsRateLimiterUpdateImpl();
+}
+
+Status validateQueryStatsWriteCmdSampleRate(const double& value, const boost::optional<TenantId>&) {
+    if (value == 0.0 || value == 1.0) {
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::Error{11204700},
+                  "Query stats write command sample rate should be either 0.0 or 1.0");
 }
 
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>

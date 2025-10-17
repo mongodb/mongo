@@ -35,6 +35,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/local_catalog/util/partitioned.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -444,6 +445,16 @@ void registerRequest(OperationContext* opCtx,
                                  cmdObj, status, getBuildInfoVersionOnly().getVersion()),
                              "Failed to create query stats store key"});
         }
+    }
+}
+
+void registerWriteRequest(OperationContext* opCtx,
+                          const NamespaceString& collection,
+                          const std::function<std::unique_ptr<Key>(void)>& makeKey,
+                          bool willNeverExhaust) {
+    // Check if collecting write commands is enabled.
+    if (internalQueryStatsWriteCmdSampleRate.load() != 0.0) {
+        registerRequest(opCtx, collection, makeKey, willNeverExhaust);
     }
 }
 

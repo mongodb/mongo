@@ -53,6 +53,8 @@ Status onQueryStatsRateLimitUpdate(int requestLimit);
 
 Status onQueryStatsSamplingRateUpdate(double samplingRate);
 
+Status validateQueryStatsWriteCmdSampleRate(const double&, const boost::optional<TenantId>&);
+
 /**
  * An interface used to modify the queryStats store when query setParameters are modified. This is
  * done via an interface decorating the 'ServiceContext' in order to avoid a link-time dependency of
