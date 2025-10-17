@@ -56,15 +56,34 @@ mkdir -p ./src/bin
 mv "$MONGOD_PATH" ./src/bin/mongod
 mv "$MONGO_PATH" ./src/bin/mongo
 
+# track asp-js-engine repo clone from evergreen modules
+JS_ENGINE_PATH_ABS="$(pwd)"/src/asp-js-engine/asp-js-engine
+
 cd src
 activate_venv
 setup_db_contrib_tool
 
-if [ "$DISTRO" == "amazon2" ]; then
-    docker build --build-arg BUILD_VERSION=$GITSHA-$TAG_SUFFIX -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile .
+# Build docker build args array
+BUILD_ARGS=(--build-arg "BUILD_VERSION=$GITSHA-$TAG_SUFFIX")
+
+# Only add JS_ENGINE_PATH build arg if the path exists
+# Note: Path must be relative to the build context (src directory)
+if [ -d "$JS_ENGINE_PATH_ABS" ]; then
+    # Make path relative to src directory (current directory after cd src)
+    JS_ENGINE_PATH_REL="asp-js-engine/asp-js-engine"
+    echo "JS_ENGINE_PATH exists: $JS_ENGINE_PATH_ABS"
+    echo "Using relative path for Docker: $JS_ENGINE_PATH_REL"
+    BUILD_ARGS+=(--build-arg "JS_ENGINE_PATH=$JS_ENGINE_PATH_REL")
 else
-    docker build --build-arg BUILD_VERSION=$GITSHA-$TAG_SUFFIX -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
+    echo "JS_ENGINE_PATH does not exist: $JS_ENGINE_PATH_ABS (skipping build arg)"
 fi
+
+if [ "$DISTRO" == "amazon2" ]; then
+    docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile .
+else
+    docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
+fi
+
 docker tag "$IMAGE" "$IMAGE:$GITSHA-$TAG_SUFFIX"
 
 docker images

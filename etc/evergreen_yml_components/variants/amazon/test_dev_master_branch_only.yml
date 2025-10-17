@@ -179,6 +179,7 @@ buildvariants:
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps
     display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags, extra system deps)"
+    modules: ["asp-js-engine"]
     run_on:
       - amazon2023-arm64-latest-small
     expansions:
