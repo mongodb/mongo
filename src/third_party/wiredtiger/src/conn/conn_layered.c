@@ -905,6 +905,7 @@ __wt_disagg_copy_metadata_later(
     WT_RET(__wt_calloc_one(session, &entry));
     WT_RET(__wt_strdup(session, stable_uri, &entry->stable_uri));
     WT_RET(__wt_strdup(session, table_name, &entry->table_name));
+    entry->retries_left = 1;
 
     __wt_spin_lock(session, &conn->disaggregated_storage.copy_metadata_lock);
     TAILQ_INSERT_TAIL(&conn->disaggregated_storage.copy_metadata_qh, entry, q);
@@ -954,17 +955,34 @@ __wt_disagg_copy_metadata_process(WT_SESSION_IMPL *session)
 
     __wt_spin_lock(session, &conn->disaggregated_storage.copy_metadata_lock);
 
-    WT_TAILQ_SAFE_REMOVE_BEGIN(entry, &conn->disaggregated_storage.copy_metadata_qh, q, tmp)
+    TAILQ_FOREACH_SAFE(entry, &conn->disaggregated_storage.copy_metadata_qh, q, tmp)
     {
-        WT_ERR(__disagg_copy_shared_metadata_one(session, entry->stable_uri));
-        WT_ERR(__wt_disagg_copy_shared_metadata_layered(session, entry->table_name));
+        WT_ERR_NOTFOUND_OK(__disagg_copy_shared_metadata_one(session, entry->stable_uri), true);
+
+        /*
+         * There are two reasons why we might not find the metadata for the table: either the table
+         * has been dropped, or the table has been created concurrently with the checkpoint, in
+         * which case the table would not be included in the checkpoint. There is no way to
+         * distinguish the two cases, so we retry at the following checkpoint, which would see the
+         * table if it still exists.
+         */
+        if (WT_CHECK_AND_RESET(ret, WT_NOTFOUND)) {
+            if (entry->retries_left > 0) {
+                __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+                  "Failed to find metadata for table \"%s\" to copy into shared metadata table, "
+                  "will retry later",
+                  entry->table_name);
+                entry->retries_left--;
+                continue;
+            }
+        } else
+            WT_ERR(__wt_disagg_copy_shared_metadata_layered(session, entry->table_name));
 
         TAILQ_REMOVE(&conn->disaggregated_storage.copy_metadata_qh, entry, q);
         __wt_free(session, entry->stable_uri);
         __wt_free(session, entry->table_name);
         __wt_free(session, entry);
     }
-    WT_TAILQ_SAFE_REMOVE_END
 
 err:
     __wt_spin_unlock(session, &conn->disaggregated_storage.copy_metadata_lock);
@@ -1174,6 +1192,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
 
         /* Follower step-up. */
         if (reconfig && !was_leader && leader) {
+            F_SET(conn, WT_CONN_RECONFIGURING_STEP_UP);
             /* Abandon the current checkpoint if it is incomplete, and begin a new one. */
             WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_restart_checkpoint(session));
             WT_ERR(ret);
@@ -1185,6 +1204,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
             /* Drain the ingest tables before switching to leader. */
             WT_ERR_MSG_CHK(
               session, __layered_drain_ingest_tables(session), "Failed to drain ingest tables");
+            F_CLR(conn, WT_CONN_RECONFIGURING_STEP_UP);
         }
 
         /* Leader step-down. */
@@ -2107,7 +2127,7 @@ __disagg_copy_shared_metadata_one(WT_SESSION_IMPL *session, const char *uri)
     md_cursor = NULL;
 
     WT_ERR(__wt_metadata_cursor(session, &md_cursor));
-    WT_ERR_NOTFOUND_OK(__disagg_copy_shared_metadata(session, md_cursor, uri), false);
+    WT_ERR(__disagg_copy_shared_metadata(session, md_cursor, uri));
 
 err:
     if (md_cursor != NULL)

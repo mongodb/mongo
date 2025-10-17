@@ -148,6 +148,30 @@ static KEY_VALUES begin_txn_kv[] = {
   {"sync", valid_bool, invalid_bool, NULL}, {NULL, NULL, NULL, NULL}};
 
 /*
+ * Check compiling configuration strings for WT_SESSION.reconfigure.
+ *
+ *   "cache_cursor=%s,cache_max_wait_ms=%s,ignore_cache_size=%s,"
+ *   "isolation=%s,prefetch=(enabled=%s),"
+ *   "debug=(checkpoint_fail_before_turtle_update=%s,release_evict_page=%s)";
+ */
+
+/*
+ * The complete set of configuration keys for WT_SESSION.reconfigure, along with valid/invalid pairs
+ * for each.
+ */
+static KEY_VALUES reconfigure_prefetch_kv[] = {
+  {"enabled", valid_bool, invalid_bool, NULL}, {NULL, NULL, NULL, NULL}};
+static KEY_VALUES reconfigure_debug_kv[] = {
+  {"checkpoint_fail_before_turtle_update", valid_bool, invalid_bool, NULL},
+  {"release_evict_page", valid_bool, invalid_bool, NULL}, {NULL, NULL, NULL, NULL}};
+static KEY_VALUES reconfigure_kv[] = {{"cache_cursors", valid_bool, invalid_bool, NULL},
+  {"cache_max_wait_ms", valid_nonnegative_int, invalid_nonnegative_int, NULL},
+  {"ignore_cache_size", valid_bool, invalid_bool, NULL},
+  {"isolation", valid_isolation, invalid_isolation, NULL},
+  {"prefetch", NULL, NULL, reconfigure_prefetch_kv}, {"debug", NULL, NULL, reconfigure_debug_kv},
+  {"debug", NULL, NULL, reconfigure_debug_kv}, {NULL, NULL, NULL, NULL}};
+
+/*
  * free_parse_state --
  *     Free and zero the state to prepare for another set of callbacks.
  */
@@ -406,13 +430,15 @@ check_compiling_valid_configurations(
  *     input.
  */
 static void
-check_compiling_configurations(TEST_OPTS *opts, CUSTOM_EVENT_HANDLER *handler)
+check_compiling_configurations(TEST_OPTS *opts, CUSTOM_EVENT_HANDLER *handler,
+  const char *method_name, const int expect_compile_output_count)
 {
     int ret;
     const char **bad_config;
     const char *compiled_ptr, *compiled_ptr2;
     static const char *bad_configs[] = {
       "789=value", "=value", "unknown_key=value", "++", "%s", "%", NULL};
+    KEY_VALUES *kv_list;
 
     handler->expect_errors = true;
 
@@ -421,8 +447,8 @@ check_compiling_configurations(TEST_OPTS *opts, CUSTOM_EVENT_HANDLER *handler)
      * anything to do with valid keys.
      */
     for (bad_config = bad_configs; *bad_config != NULL; ++bad_config) {
-        ret = opts->conn->compile_configuration(
-          opts->conn, "WT_SESSION.begin_transaction", *bad_config, &compiled_ptr);
+        ret =
+          opts->conn->compile_configuration(opts->conn, method_name, *bad_config, &compiled_ptr);
         testutil_assert(ret != 0);
     }
 
@@ -432,8 +458,8 @@ check_compiling_configurations(TEST_OPTS *opts, CUSTOM_EVENT_HANDLER *handler)
 
     /* Compile with a parameter to be bound. */
     handler->expect_errors = false;
-    testutil_check(opts->conn->compile_configuration(
-      opts->conn, "WT_SESSION.begin_transaction", "isolation=%s", &compiled_ptr));
+    testutil_check(
+      opts->conn->compile_configuration(opts->conn, method_name, "isolation=%s", &compiled_ptr));
 
     /* We cannot use the resulting compiled string without binding it. */
     handler->expect_errors = true;
@@ -445,29 +471,49 @@ check_compiling_configurations(TEST_OPTS *opts, CUSTOM_EVENT_HANDLER *handler)
     testutil_check(opts->session->bind_configuration(opts->session, compiled_ptr, "snapshot"));
 
     /* Now we can use the API. */
-    testutil_check(opts->session->begin_transaction(opts->session, compiled_ptr));
-    testutil_check(opts->session->rollback_transaction(opts->session, NULL));
+    if (strcmp(method_name, "WT_SESSION.begin_transaction") == 0) {
+        testutil_check(opts->session->begin_transaction(opts->session, compiled_ptr));
+        testutil_check(opts->session->rollback_transaction(opts->session, NULL));
+    } else if (strcmp(method_name, "WT_SESSION.reconfigure") == 0)
+        testutil_check(opts->session->reconfigure(opts->session, compiled_ptr));
+    else
+        testutil_assert(false);
 
     /* We should be able to compile an empty string. */
     handler->expect_errors = false;
-    ret = opts->conn->compile_configuration(
-      opts->conn, "WT_SESSION.begin_transaction", "", &compiled_ptr);
+    ret = opts->conn->compile_configuration(opts->conn, method_name, "", &compiled_ptr);
     testutil_assert(ret == 0);
 
     /* We shouldn't be able to use the result of a successful compile. */
     handler->expect_errors = true;
-    ret = opts->conn->compile_configuration(
-      opts->conn, "WT_SESSION.begin_transaction", compiled_ptr, &compiled_ptr2);
+    ret = opts->conn->compile_configuration(opts->conn, method_name, compiled_ptr, &compiled_ptr2);
     testutil_assert(ret != 0);
 
     /* Check that the parser rejects invalid values for every key. */
-    check_compiling_invalid_configurations(
-      opts->conn, "WT_SESSION.begin_transaction", NULL, begin_txn_kv);
+    if (strcmp(method_name, "WT_SESSION.begin_transaction") == 0)
+        kv_list = begin_txn_kv;
+    else if (strcmp(method_name, "WT_SESSION.reconfigure") == 0)
+        kv_list = reconfigure_kv;
+    else
+        testutil_assert(false);
+    check_compiling_invalid_configurations(opts->conn, method_name, NULL, kv_list);
 
     /* Check that the parser accepts valid values for every key. */
     handler->expect_errors = false;
-    check_compiling_valid_configurations(
-      opts->conn, "WT_SESSION.begin_transaction", NULL, begin_txn_kv);
+    check_compiling_valid_configurations(opts->conn, method_name, NULL, kv_list);
+
+    /*
+     * Make sure we've been able to successfully check the expected number of configuration
+     * compilations. When this tests other APIs, or other APIs are made to be compilable, this
+     * number will need to change. What we get by having an exact number is protection against the
+     * WiredTiger verbose output changing or being reduced in the future. If that were to happen, we
+     * want to fail, since without verbose feedback, we aren't doing the checks that we need.
+     */
+    printf("checked %d successful configuration compilation outputs for '%s'\n",
+      handler->state.completed, method_name);
+    testutil_assert(handler->state.completed == expect_compile_output_count);
+
+    free_parse_state(&handler->state);
 }
 
 /*
@@ -493,20 +539,9 @@ main(int argc, char *argv[])
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &opts->session));
 
-    check_compiling_configurations(opts, &event_handler);
+    check_compiling_configurations(opts, &event_handler, "WT_SESSION.begin_transaction", 46);
+    check_compiling_configurations(opts, &event_handler, "WT_SESSION.reconfigure", 89);
 
-    /*
-     * Make sure we've been able to successfully check the expected number of configuration
-     * compilations. When this tests other APIs, or other APIs are made to be compilable, this
-     * number will need to change. What we get by having an exact number is protection against the
-     * WiredTiger verbose output changing or being reduced in the future. If that were to happen, we
-     * want to fail, since without verbose feedback, we aren't doing the checks that we need.
-     */
-    printf(
-      "checked %d successful configuration compilation outputs\n", event_handler.state.completed);
-    testutil_assert(event_handler.state.completed == 45);
-
-    free_parse_state(&event_handler.state);
     testutil_cleanup(opts);
     return (EXIT_SUCCESS);
 }

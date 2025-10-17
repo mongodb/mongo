@@ -126,5 +126,5 @@ __wt_conf_gets_def_func(
         value->val = def;
         return (0);
     }
-    return (__wt_conf_gets_func(session, conf, keys, def, true, value));
+    return (__wt_conf_gets_func(session, conf, keys, def, true, false, value));
 }

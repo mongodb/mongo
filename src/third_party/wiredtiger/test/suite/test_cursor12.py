@@ -331,7 +331,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         self.conn.close()
         self.conn = self.setUpConnectionOpen(newdir)
         self.session = self.setUpSessionOpen(self.conn)
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess()
 
         self.modify_confirm(ds, False)
 

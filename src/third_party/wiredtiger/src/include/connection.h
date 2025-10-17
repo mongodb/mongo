@@ -151,6 +151,7 @@ struct __wt_layered_table_manager {
 struct __wt_disagg_copy_metadata {
     char *stable_uri;                         /* The full URI of the stable component. */
     char *table_name;                         /* The table name without prefix or suffix. */
+    int retries_left;                         /* The number of retries left. */
     TAILQ_ENTRY(__wt_disagg_copy_metadata) q; /* Linked list of entries. */
 };
 
@@ -1022,6 +1023,7 @@ struct __wt_connection_impl {
 #define WT_CONN_PANIC 0x00001000u
 #define WT_CONN_READY 0x00002000u
 #define WT_CONN_RECONFIGURING 0x00004000u
+#define WT_CONN_RECONFIGURING_STEP_UP 0x00008000u
 #define WT_CONN_TIERED_FIRST_FLUSH 0x00008000u
     /* AUTOMATIC ATOMIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags_atomic;

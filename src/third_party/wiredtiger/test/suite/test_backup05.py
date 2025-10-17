@@ -71,7 +71,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         # Open the new directory and verify
         conn = self.setUpConnectionOpen(newdir)
         session = self.setUpSessionOpen(conn)
-        session.verify(self.uri)
+        self.verifyUntilSuccess(session)
         conn.close()
 
     def backup(self):

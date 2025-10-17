@@ -15,8 +15,8 @@
  *     overrides any default found in the compiled structure.
  */
 int
-__wt_conf_gets_func(WT_SESSION_IMPL *session, const WT_CONF *orig_conf, uint64_t orig_keys, int def,
-  bool use_def, WT_CONFIG_ITEM *value)
+__wt_conf_gets_func(WT_SESSION_IMPL *session, const WT_CONF *orig_conf, uint64_t orig_keys,
+  int override_default, bool use_override_default, bool no_precompiled_def, WT_CONFIG_ITEM *value)
 {
     WT_CONFIG_ITEM_STATIC_INIT(false_value);
     WT_CONF_BIND_DESC *bind_desc;
@@ -48,9 +48,11 @@ __wt_conf_gets_func(WT_SESSION_IMPL *session, const WT_CONF *orig_conf, uint64_t
 
         switch (conf_value->type) {
         case CONF_VALUE_DEFAULT_ITEM:
-            if (use_def) {
+            if (no_precompiled_def)
+                return (WT_NOTFOUND);
+            if (use_override_default) {
                 *value = false_value;
-                value->val = def;
+                value->val = override_default;
                 return (0);
             }
 
@@ -79,9 +81,9 @@ __wt_conf_gets_func(WT_SESSION_IMPL *session, const WT_CONF *orig_conf, uint64_t
             conf = &conf[conf_value->u.sub_conf_index];
 
             /* Do a quick check to see if the sub-configuration value is the default. */
-            if (use_def && WT_CONF_DEFAULT_VALUE_SHORTCUT(conf, keys & 0xffff)) {
+            if (use_override_default && WT_CONF_DEFAULT_VALUE_SHORTCUT(conf, keys & 0xffff)) {
                 *value = false_value;
-                value->val = def;
+                value->val = override_default;
                 return (0);
             }
             break;

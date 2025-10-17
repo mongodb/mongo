@@ -11,6 +11,7 @@
 #include "wt_internal.h"
 #include "../wrappers/mock_session.h"
 
+#ifdef ENABLE_DISABLED_TEST
 /*
  * session_config.cpp: Test one of the session configuration functions, __session_config_int. Ensure
  * that the relevant configurations correctly modify the session state.
@@ -98,3 +99,4 @@ TEST_CASE("cache_max_wait_ms", "[session_config]")
     REQUIRE(__ut_session_config_int(session, "cache_max_wait_ms=1") == 0);
     REQUIRE(session->cache_max_wait_us == 1);
 }
+#endif

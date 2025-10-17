@@ -322,8 +322,10 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
                 if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
                     WT_TRET(__verify_page_discard(session, bm));
 
-                if (!skip_hs)
+                if (!skip_hs) {
+                    __wt_verbose(session, WT_VERB_VERIFY, "%s: verify against history store", name);
                     WT_TRET(__wt_hs_verify_one(session, btree->id));
+                }
                 /*
                  * We cannot error out here. If we got an error verifying the history store, we need
                  * to follow through with reacquiring the exclusive call below. We'll error out
@@ -423,9 +425,9 @@ __verify_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf)
     WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 
     if (__wt_ref_addr_copy(session, ref, &addr)) {
-        WT_ERR(
-          __wt_buf_fmt(session, buf, "%s %s", __wt_addr_string(session, addr.addr, addr.size, tmp),
-            __wt_time_aggregate_to_string(&addr.ta, time_string)));
+        WT_ERR(__wt_buf_fmt(session, buf, "address:%s, time-window: %s",
+          __wt_addr_string(session, addr.addr, addr.size, tmp),
+          __wt_time_aggregate_to_string(&addr.ta, time_string)));
     } else
         WT_ERR(__wt_buf_fmt(session, buf, "%s -/-,-/-", __wt_addr_string(session, NULL, 0, tmp)));
 
@@ -546,8 +548,9 @@ __verify_tree(
     if (__wt_session_prefetch_check(session, ref))
         WT_RET(__wti_btree_prefetch(session, ref));
 
-    __wt_verbose(session, WT_VERB_VERIFY, "%s %s", __verify_addr_string(session, ref, vs->tmp1),
-      __wt_page_type_string(page->type));
+    __wt_verbose(session, WT_VERB_VERIFY, "%s, %s, write gen: %" PRIu64 ", entries: %" PRIu32,
+      __wt_page_type_string(page->type), __verify_addr_string(session, ref, vs->tmp1),
+      page->dsk->write_gen, page->entries);
 
     /* Optionally dump address information. */
     if (vs->dump_address)
@@ -1018,6 +1021,9 @@ __verify_overflow(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_siz
 
     bm = S2BT(session)->bm;
 
+    __wt_verbose_debug3(session, WT_VERB_VERIFY, "read overflow page at: %s",
+      __wt_addr_string(session, addr, addr_size, vs->tmp1));
+
     /* Read and verify the overflow item. */
     WT_RET(__wt_blkcache_read(session, vs->tmp1, NULL, addr, addr_size));
 
@@ -1175,6 +1181,10 @@ __verify_page_content_int(
     WT_CELL_FOREACH_ADDR (session, dsk, unpack) {
         ++cell_num;
 
+        __wt_verbose_debug3(session, WT_VERB_VERIFY,
+          "cell num: %" PRIu32 ", cell type: %s, page type: %s", cell_num - 1,
+          __wti_cell_type_string(unpack.type), __wt_page_type_string(dsk->type));
+
         if (!__wti_cell_type_check(unpack.type, dsk->type))
             WT_RET_MSG(session, WT_ERROR,
               "illegal cell and page type combination: cell %" PRIu32
@@ -1312,6 +1322,7 @@ __verify_page_content_leaf(
     uint64_t recno, rle;
     uint32_t cell_num;
     uint8_t *p;
+    char tw_string[WT_TIME_STRING_SIZE];
     bool found_ovfl;
 
     page = ref->page;
@@ -1325,6 +1336,10 @@ __verify_page_content_leaf(
     cell_num = 0;
     WT_CELL_FOREACH_KV (session, dsk, unpack) {
         ++cell_num;
+
+        __wt_verbose_debug3(session, WT_VERB_VERIFY,
+          "cell num: %" PRIu32 ", cell type: %s, page type: %s", cell_num - 1,
+          __wti_cell_type_string(unpack.type), __wt_page_type_string(dsk->type));
 
         if (!__wti_cell_type_check(unpack.type, dsk->type))
             WT_RET_MSG(session, WT_ERROR,
@@ -1352,6 +1367,9 @@ __verify_page_content_leaf(
         case WT_CELL_VALUE_COPY:
         case WT_CELL_VALUE_OVFL:
         case WT_CELL_VALUE_SHORT:
+            __wt_verbose_debug3(session, WT_VERB_VERIFY, "cell num: %" PRIu32 ", time window: %s",
+              cell_num - 1, __wt_time_window_to_string(tw, tw_string));
+
             if ((ret = __wt_time_value_validate(session, tw, &parent->ta, false)) != 0)
                 WT_RET_MSG(session, ret,
                   "cell %" PRIu32 " on page at %s failed timestamp validation", cell_num - 1,

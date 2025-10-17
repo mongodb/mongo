@@ -123,20 +123,15 @@ functions:
         # Pulled from evergreen/generate_evergreen_engflow_bazelrc.sh
         # FIXME-SERVER-86966: consider consolidating once prelude.sh is runnable in the perf project.
 
-        source ./evergreen/bazel_RBE_supported.sh
+        uri="https://spruce.mongodb.com/task/${task_id}?execution=${execution}"
 
-        if bazel_rbe_supported; then
-
-          uri="https://spruce.mongodb.com/task/${task_id}?execution=${execution}"
-
-          echo "build --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
-          echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
-          echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
-          echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
-        fi
+        echo "build --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
+        echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
+        echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
+        echo "build --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
+        echo "build --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
+        echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
+        echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
   "get project":
     command: git.get_project
     type: setup
@@ -280,6 +275,7 @@ functions:
           ${ENABLE_CPPSUITE|} \
           ${ENABLE_GCP|} \
           ${ENABLE_S3|} \
+          ${ENABLE_PALITE|-DENABLE_PALITE=ON} \
           ${IMPORT_AZURE_SDK|} \
           ${IMPORT_GCP_SDK|} \
           ${IMPORT_S3_SDK|} \
@@ -555,8 +551,9 @@ functions:
               if [ -d cmake_build ]; then rm -r cmake_build; fi
               mkdir -p cmake_build
               pushd cmake_build
-              # Adding -DENABLE_PYTHON=1 -DENABLE_STRICT=1 as 6.0 does not default these like develop.
-              $CMAKE -DCMAKE_C_FLAGS="-DMIGHT_NOT_RUN -Wno-error" -DENABLE_PYTHON=1 -DENABLE_STRICT=1 ../.
+              # Adding -DENABLE_PYTHON=ON -DENABLE_STRICT=ON as 6.0 does not default these like develop.
+              # Disable PALite build, as docs build does not need it and it can fail to build on some platforms.
+              $CMAKE -DCMAKE_C_FLAGS="-DMIGHT_NOT_RUN -Wno-error" -DENABLE_PYTHON=ON -DENABLE_STRICT=ON -DENABLE_PALITE=OFF ../.
               make -C lang/python -j ${num_jobs}
             fi
             # Pop to root project directory.
@@ -1452,6 +1449,8 @@ variables:
       # We'll explicitly use the python3 in /usr/bin, we use the same in configuring cmake.
       CMAKE_TOOLCHAIN_FILE:
       CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
+      # FIXME-WT-15777 PALite currently does not build on macOS 14 (ARM64) because of outdated CLang.
+      ENABLE_PALITE: -DENABLE_PALITE=OFF
       num_jobs: $(echo $(sysctl -n hw.logicalcpu) / 2 | bc)
       cmake_generator: "Unix Makefiles"
       additional_env_vars: |
@@ -1459,6 +1458,8 @@ variables:
         export DYLD_LIBRARY_PATH=$WT_BUILDDIR
       # Must disable TCMALLOC as it may be picked up locally and its not on all hosts.
       ENABLE_TCMALLOC: 0
+      # FIXME-WT-15777 Use PALM for unit tests for now until we can build PALite on macos-14.
+      unit_test_variant_args: "page_log=palm"
     tasks:
       - name: compile
         # This is a special case and should *only* be used for the macOS buildvariant.
@@ -1712,18 +1713,22 @@ tasks:
       - func: "compile wiredtiger"
         vars:
           GNU_C_VERSION: -DGNU_C_VERSION=7
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           GNU_C_VERSION: -DGNU_C_VERSION=8
           GNU_CXX_VERSION: -DGNU_CXX_VERSION=8
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           GNU_C_VERSION: -DGNU_C_VERSION=9
           GNU_CXX_VERSION: -DGNU_CXX_VERSION=9
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           GNU_C_VERSION: -DGNU_C_VERSION=11
           GNU_CXX_VERSION: -DGNU_CXX_VERSION=11
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
 
   - name: compile-clang
     tags: ["pull_request", "pull_request_compilers"]
@@ -1745,30 +1750,37 @@ tasks:
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=7
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=7
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=8
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=8
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=9
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=9
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=10
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=10
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=11
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=12
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=13
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=13
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
       - func: "compile wiredtiger"
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=14
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=14
+          ENABLE_PALITE: -DENABLE_PALITE=OFF
 
   # Compile WiredTiger with uncommon build flags to make sure we compile code that
   # is often pre-processed out.
@@ -4908,7 +4920,7 @@ tasks:
           test-name: modularity_metrics
           collection: CodeModularityMetrics
 
-  - name: generate-tsan-metric
+  - name: generate-tsan-metric-timestamp
     tags: ["pull_request_code_statistics"]
     depends_on:
       - name: "unit-test-tsan"
@@ -4923,7 +4935,22 @@ tasks:
           # Track warnings only after time 2025-08-06 06:07:50.655735+00:00
           timestamp: 1754460496
 
-  - name: generate-tsan-metric-disagg
+  - name: generate-tsan-metric
+    tags: ["pull_request_code_statistics"]
+    depends_on:
+      - name: "unit-test-tsan"
+    commands:
+      - func: "get project"
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: unit-test-tsan
+          destination: wiredtiger/unit-test-tsan
+      - func: "tsan warning metric"
+        vars:
+          # Report all warnings
+          timestamp: 0
+
+  - name: generate-tsan-metric-disagg-timestamp
     tags: ["pull_request_code_statistics"]
     depends_on:
       - name: "unit-test-disagg-leader-tsan"
@@ -4942,6 +4969,26 @@ tasks:
         vars:
           # Track warnings right before disagg merge 2025-08-02.
           timestamp: 1746576000
+
+  - name: generate-tsan-metric-disagg
+    tags: ["pull_request_code_statistics"]
+    depends_on:
+      - name: "unit-test-disagg-leader-tsan"
+      - name: "unit-test-disagg-follower-tsan"
+    commands:
+      - func: "get project"
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: unit-test-disagg-leader-tsan
+          destination: wiredtiger/unit-test-disagg-leader-tsan
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: unit-test-disagg-follower-tsan
+          destination: wiredtiger/unit-test-disagg-follower-tsan
+      - func: "tsan warning metric"
+        vars:
+          # Generate all warnings
+          timestamp: 0
 
     ###############################
     # Performance Tests for btree #
@@ -6516,8 +6563,10 @@ buildvariants:
     - name: unit-test-disagg-follower-tsan
       distros: ubuntu2004-large
     - name: generate-tsan-metric
-    - name: tsan-playground-test
     - name: generate-tsan-metric-disagg
+    - name: generate-tsan-metric-timestamp
+    - name: generate-tsan-metric-disagg-timestamp
+    - name: tsan-playground-test
 
 # FIXME-WT-13256
 # This variant runs all possible tasks under TSan but instructs TSan to not report any issues it
@@ -7360,7 +7409,14 @@ buildvariants:
     - name: examples-c-test
     - name: unit-test-tsan
       distros: amazon2023-arm64-latest-large-m8g
+    - name: unit-test-disagg-leader-tsan
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: unit-test-disagg-follower-tsan
+      distros: amazon2023-arm64-latest-large-m8g
     - name: generate-tsan-metric
+    - name: generate-tsan-metric-disagg
+    - name: generate-tsan-metric-timestamp
+    - name: generate-tsan-metric-disagg-timestamp
 
 - name: amazon2023-armv9-msan
   display_name: "(ARMV9) Amazon Linux 2023 MSAN"

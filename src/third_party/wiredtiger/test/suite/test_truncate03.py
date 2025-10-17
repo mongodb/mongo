@@ -59,7 +59,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
             key_format=self.key_format, value_format = self.value_format, config=self.config)
         ds.populate()
         self.reopen_conn()
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess()
 
         if self.value_format == '8t':
             changed_value = 0xfe
@@ -86,7 +86,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
 
         # Crash/reopen the connection and verify the object.
         self.reopen_conn()
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess()
 
         # Open a cursor and update a record (to dirty the tree, else we won't
         # mark pages with address-deleted cells dirty), then walk the tree so
@@ -150,7 +150,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
 
         self.session.checkpoint()
         self.reopen_conn()
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess()
 
         cursor = ds.open_cursor(self.uri, None)
         for i in range(3000, 7000, 137):

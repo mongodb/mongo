@@ -47,7 +47,7 @@ class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
         # Open the new directory
         conn = self.setUpConnectionOpen(newdir)
         session = self.setUpSessionOpen(conn)
-        session.verify(self.uri)
+        self.verifyUntilSuccess(session)
         conn.close()
 
     def test_durability(self):

@@ -428,9 +428,6 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
             __bit_set(block->fragfile, last);
         }
 
-        if (!WT_VERBOSE_ISSET(session, WT_VERB_VERIFY))
-            continue;
-
         __wt_errx(session, "file range %" PRIuMAX "-%" PRIuMAX " never verified",
           (uintmax_t)WT_FRAG_TO_OFF(block, first), (uintmax_t)WT_FRAG_TO_OFF(block, last));
     }
@@ -512,9 +509,6 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
                 break;
             __bit_clear(block->fragckpt, last);
         }
-
-        if (!WT_VERBOSE_ISSET(session, WT_VERB_VERIFY))
-            continue;
 
         __wt_errx(session, "checkpoint range %" PRIuMAX "-%" PRIuMAX " never verified",
           (uintmax_t)WT_FRAG_TO_OFF(block, first), (uintmax_t)WT_FRAG_TO_OFF(block, last));

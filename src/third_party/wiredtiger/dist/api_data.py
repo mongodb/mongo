@@ -2231,7 +2231,7 @@ methods = {
         max=10),     # !!! Must match WT_RTS_MAX_WORKERS
 ]),
 
-'WT_SESSION.reconfigure' : Method(session_config),
+'WT_SESSION.reconfigure' : Method(session_config, compilable=True),
 
 # There are 4 variants of the wiredtiger_open configurations.
 # wiredtiger_open:

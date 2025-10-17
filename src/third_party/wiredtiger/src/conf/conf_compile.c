@@ -679,7 +679,7 @@ __conf_verbose_cat_config(WT_SESSION_IMPL *session, const char **cfg, WT_CONF *c
               ccheck->subconfigs_entries, ccheck->name));
             WT_RET(__wt_buf_catfmt(session, buf, ")"));
         } else {
-            WT_RET(__wt_conf_gets_func(session, conf, key_id, 0, false, &value));
+            WT_RET(__wt_conf_gets_func(session, conf, key_id, 0, false, false, &value));
 
             switch (type) {
             case WT_CONFIG_COMPILED_TYPE_INT:

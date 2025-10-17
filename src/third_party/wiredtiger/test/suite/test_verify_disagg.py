@@ -76,7 +76,7 @@ class test_verify_disagg(wttest.WiredTigerTestCase):
                 self.assertRaisesException(wiredtiger.WiredTigerError, \
                     lambda: session.verify(self.uri), os.strerror(expected_error))
             else:
-                session.verify(self.uri)
+                self.verifyUntilSuccess(session)
 
     def create_follower(self):
         self.conn_follow = self.wiredtiger_open('follower', self.extensionsConfig() + ',create,' +

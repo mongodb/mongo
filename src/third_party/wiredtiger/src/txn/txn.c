@@ -728,7 +728,7 @@ err:
  *     WT_SESSION::reconfigure for transactions.
  */
 int
-__wt_txn_reconfigure(WT_SESSION_IMPL *session, const char *config)
+__wt_txn_reconfigure(WT_SESSION_IMPL *session, WT_CONF *conf)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
@@ -736,7 +736,7 @@ __wt_txn_reconfigure(WT_SESSION_IMPL *session, const char *config)
 
     txn = session->txn;
 
-    ret = __wt_config_getones(session, config, "isolation", &cval);
+    ret = __wt_conf_getones(session, conf, isolation, &cval);
     if (ret == 0)
         /* Can only reconfigure this if transaction is not active. */
         WT_RET(__wt_txn_context_check(session, false));
