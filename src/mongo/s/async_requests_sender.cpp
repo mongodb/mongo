@@ -292,7 +292,7 @@ void AsyncRequestsSender::RemoteData::executeRequest() {
 auto AsyncRequestsSender::RemoteData::scheduleRequest() -> SemiFuture<RemoteCommandCallbackArgs> {
     return getShard()
         .thenRunOn(*_ars->_subBaton)
-        .then([this](const auto& shard) -> SemiFuture<std::vector<HostAndPort>> {
+        .then([this](const auto& shard) -> SemiFuture<HostAndPort> {
             if (!_retryStrategy) {
                 _retryStrategy.emplace(shard, _ars->_retryPolicy);
             }
@@ -305,27 +305,26 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest() -> SemiFuture<RemoteComm
                                       << " is not a host in shard " << shard->getId(),
                         std::find(servers.begin(), servers.end(), _designatedHostAndPort) !=
                             servers.end());
-                return std::vector<HostAndPort>{_designatedHostAndPort};
+                return _designatedHostAndPort;
             }
 
-            // TODO(SERVER-108323): Evaluate if we need to send targeting information here.
-            return shard->getTargeter()->findHosts(_ars->_readPreference,
-                                                   CancellationToken::uncancelable());
+            return shard->getTargeter()->findHost(_ars->_readPreference,
+                                                  CancellationToken::uncancelable(),
+                                                  _retryStrategy->getTargetingMetadata());
         })
         .thenRunOn(*_ars->_subBaton)
-        .then([this](const auto& hostAndPorts) {
-            _shardHostAndPort.emplace(hostAndPorts.front());
-            return scheduleRemoteCommand(hostAndPorts);
+        .then([this](const auto& hostAndPort) {
+            _shardHostAndPort.emplace(hostAndPort);
+            return scheduleRemoteCommand(hostAndPort);
         })
         .then([this](auto&& rcr) { return handleResponse(std::move(rcr)); })
         .semi();
 }
 
-auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(
-    std::span<const HostAndPort> hostAndPorts) -> SemiFuture<RemoteCommandCallbackArgs> {
-    // TODO: SERVER-108323 Consider if this function needs to take targeting into account.
+auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(const HostAndPort& hostAndPort)
+    -> SemiFuture<RemoteCommandCallbackArgs> {
     executor::RemoteCommandRequest request(
-        hostAndPorts[0], _ars->_db, _cmdObj, _ars->_metadataObj, _ars->_opCtx);
+        hostAndPort, _ars->_db, _cmdObj, _ars->_metadataObj, _ars->_opCtx);
 
     // We have to make a promise future pair because the TaskExecutor doesn't currently support a
     // future returning variant of scheduleRemoteCommand
@@ -394,7 +393,6 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
                     "attemptedHosts"_attr = rcr.request.target,
                     "failedHost"_attr = rcr.response.target,
                     "error"_attr = redact(status));
-                // TODO(SERVER-108323): Evaluate if we need to change the targeting logic here.
                 _shardHostAndPort.reset();
                 const auto delay = _retryStrategy->getNextRetryDelay();
 

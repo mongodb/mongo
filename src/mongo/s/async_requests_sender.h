@@ -258,16 +258,9 @@ private:
         SemiFuture<RemoteCommandCallbackArgs> scheduleRequest();
 
         /**
-         * Given a read preference, selects a lists of hosts on which the command can run.
-         */
-        SemiFuture<std::vector<HostAndPort>> resolveShardIdToHostAndPorts(
-            const ReadPreferenceSetting& readPref);
-
-        /**
          * Schedules the remote command on the ARS's TaskExecutor
          */
-        SemiFuture<RemoteCommandCallbackArgs> scheduleRemoteCommand(
-            std::span<const HostAndPort> hostAndPort);
+        SemiFuture<RemoteCommandCallbackArgs> scheduleRemoteCommand(const HostAndPort& hostAndPort);
 
         /**
          * Handles the remote response
