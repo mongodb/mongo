@@ -78,10 +78,11 @@ void ConfigShardWrapper::runFireAndForgetCommand(OperationContext* opCtx,
 
 RetryStrategy::Result<std::monostate> ConfigShardWrapper::_runAggregation(
     OperationContext* opCtx,
+    const TargetingMetadata& targetingMetadata,
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
-    return _configShard->_runAggregation(opCtx, aggRequest, std::move(callback));
+    return _configShard->_runAggregation(opCtx, targetingMetadata, aggRequest, std::move(callback));
 }
 
 BatchedCommandResponse ConfigShardWrapper::runBatchWriteCommand(
@@ -98,27 +99,30 @@ BatchedCommandResponse ConfigShardWrapper::runBatchWriteCommand(
 StatusWith<Shard::CommandResponse> ConfigShardWrapper::_runCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const DatabaseName& dbName,
     Milliseconds maxTimeMSOverrideUnused,
     const BSONObj& cmdObj) {
     const auto readPrefWithConfigTime = _attachConfigTimeToMinClusterTime(opCtx, readPref);
     return _configShard->_runCommand(
-        opCtx, readPrefWithConfigTime, dbName, maxTimeMSOverrideUnused, cmdObj);
+        opCtx, readPrefWithConfigTime, targetingMetadata, dbName, maxTimeMSOverrideUnused, cmdObj);
 }
 
 RetryStrategy::Result<Shard::QueryResponse> ConfigShardWrapper::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const DatabaseName& dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
     return _configShard->_runExhaustiveCursorCommand(
-        opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
+        opCtx, readPref, targetingMetadata, dbName, maxTimeMSOverride, cmdObj);
 }
 
 RetryStrategy::Result<Shard::QueryResponse> ConfigShardWrapper::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
@@ -126,7 +130,7 @@ RetryStrategy::Result<Shard::QueryResponse> ConfigShardWrapper::_exhaustiveFindO
     boost::optional<long long> limit,
     const boost::optional<BSONObj>& hint) {
     return _configShard->_exhaustiveFindOnConfig(
-        opCtx, readPref, readConcernLevel, nss, query, sort, limit, hint);
+        opCtx, readPref, targetingMetadata, readConcernLevel, nss, query, sort, limit, hint);
 }
 
 ReadPreferenceSetting ConfigShardWrapper::_attachConfigTimeToMinClusterTime(

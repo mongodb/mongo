@@ -61,11 +61,22 @@ namespace {
 constexpr StringData kNamespaceName = "unittests.shard_remote_test";
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 
-const std::vector<ShardId> kTestShardIds = {
-    ShardId("FakeShard1"), ShardId("FakeShard2"), ShardId("FakeShard3")};
-const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 12345),
-                                                  HostAndPort("FakeShard2Host", 12345),
-                                                  HostAndPort("FakeShard3Host", 12345)};
+struct TestShardInfo {
+    ShardId id;
+    std::vector<HostAndPort> hosts;
+};
+
+std::array kTestShards = {
+    TestShardInfo{
+        .id = ShardId("FakeShard1"),
+        .hosts = {HostAndPort("FakeShard1Host", 12345), HostAndPort("FakeShard1Host2", 12345)}},
+    TestShardInfo{
+        .id = ShardId("FakeShard2"),
+        .hosts = {HostAndPort("FakeShard2Host", 12345), HostAndPort("FakeShard2Host2", 12345)}},
+    TestShardInfo{
+        .id = ShardId("FakeShard3"),
+        .hosts = {HostAndPort("FakeShard3Host", 12345), HostAndPort("FakeShard3Host2", 12345)}},
+};
 
 class ShardRemoteTest : public ShardingTestFixture {
 protected:
@@ -76,19 +87,19 @@ protected:
 
         std::vector<ShardType> shards;
 
-        for (size_t i = 0; i < kTestShardIds.size(); i++) {
+        for (const auto& shard : kTestShards) {
             ShardType shardType;
-            shardType.setName(kTestShardIds[i].toString());
-            shardType.setHost(kTestShardHosts[i].toString());
+            auto host = ConnectionString::forReplicaSet(shard.id.toString(), shard.hosts);
+            shardType.setName(shard.id.toString());
+            shardType.setHost(host.toString());
             shards.push_back(shardType);
 
             std::unique_ptr<RemoteCommandTargeterMock> targeter(
                 std::make_unique<RemoteCommandTargeterMock>());
-            targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHosts[i]));
-            targeter->setFindHostReturnValue(kTestShardHosts[i]);
+            targeter->setConnectionStringReturnValue(host);
+            targeter->setFindHostsReturnValue(shard.hosts);
 
-            targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHosts[i]),
-                                                   std::move(targeter));
+            targeterFactory()->addTargeterToReturn(host, std::move(targeter));
         }
 
         setupShards(shards);
@@ -151,7 +162,7 @@ protected:
     void setUp() override {
         ShardRemoteTest::setUp();
         _shard =
-            uassertStatusOK(shardRegistry()->getShard(operationContext(), kTestShardIds.front()));
+            uassertStatusOK(shardRegistry()->getShard(operationContext(), kTestShards.front().id));
     }
 
     void tearDown() override {
@@ -174,8 +185,8 @@ TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
 }
 
 TEST_F(ShardRemoteTest, GridSetRetryBudgetCapacityServerParameter) {
-    auto firstShard = kTestShardIds.front();
-    auto firstShardHostAndPort = kTestShardHosts.front();
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
 
     auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
     auto& retryBudget = shard->getRetryBudget_forTest();
@@ -192,8 +203,8 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetCapacityServerParameter) {
 }
 
 TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
-    auto firstShard = kTestShardIds.front();
-    auto firstShardHostAndPort = kTestShardHosts.front();
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
 
     auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
     auto& retryBudget = shard->getRetryBudget_forTest();
@@ -221,8 +232,8 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
 
 TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     constexpr auto backoff = Milliseconds{100};
-    auto firstShard = kTestShardIds.front();
-    auto firstShardHostAndPort = kTestShardHosts.front();
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
 
     auto shardState = getShardState(firstShard);
     auto& [retryBudget, stats] = *shardState;
@@ -460,6 +471,36 @@ TEST_F(ShardRemoteTest, TimeoutCodeUnsetWhenMaxTimeMSNotSet) {
         ASSERT_EQ(request.timeout, executor::RemoteCommandRequest::kNoTimeout);
         ASSERT(!request.timeoutCode);
         return error;
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
+}
+
+TEST_F(ShardRemoteTest, SystemOverloadedTargetingDeprioritizedServers) {
+    FailPointEnableBlock _{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 0)};
+
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHosts = kTestShards.front().hosts;
+
+    auto future = launchAsync([&] {
+        auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), firstShard));
+        auto result = uassertStatusOK(shard->runCommandWithIndefiniteRetries(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            Shard::RetryPolicy::kIdempotent));
+        uassertStatusOK(result.commandStatus);
+    });
+
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, firstShardHosts[0]);
+        return createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
+    });
+
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, firstShardHosts[1]);
+        return Status{ErrorCodes::CommandFailed, "Error"};
     });
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);

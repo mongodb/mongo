@@ -393,11 +393,13 @@ StatusWith<Shard::CommandResponse> Shard::_runCommandImpl(OperationContext* opCt
                   "command"_attr = redact(cmdObj),
                   "error"_attr = redact(status));
         }};
-    return runCommandWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
-        auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
-        auto effectiveStatus = CommandResponse::getEffectiveStatus(swResponse);
-        return RunCommandResult{swResponse, effectiveStatus};
-    });
+    return runCommandWithRetryStrategy(
+        opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
+            auto swResponse =
+                _runCommand(opCtx, readPref, targetingMetadata, dbName, maxTimeMSOverride, cmdObj);
+            auto effectiveStatus = CommandResponse::getEffectiveStatus(swResponse);
+            return RunCommandResult{swResponse, effectiveStatus};
+        });
 }
 
 StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
@@ -408,9 +410,11 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
     Milliseconds maxTimeMSOverride) {
     RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent};
 
-    return runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
-        return _runExhaustiveCursorCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
-    });
+    return runWithRetryStrategy(
+        opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
+            return _runExhaustiveCursorCommand(
+                opCtx, readPref, targetingMetadata, dbName, maxTimeMSOverride, cmdObj);
+        });
 }
 
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
@@ -426,10 +430,18 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     invariant(isConfig());
 
     RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent};
-    return runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
-        return _exhaustiveFindOnConfig(
-            opCtx, readPref, readConcernLevel, nss, query, sort, limit, hint);
-    });
+    return runWithRetryStrategy(
+        opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
+            return _exhaustiveFindOnConfig(opCtx,
+                                           readPref,
+                                           targetingMetadata,
+                                           readConcernLevel,
+                                           nss,
+                                           query,
+                                           sort,
+                                           limit,
+                                           hint);
+        });
 }
 
 Status Shard::runAggregation(
@@ -437,7 +449,14 @@ Status Shard::runAggregation(
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
-    return _runAggregation(opCtx, aggRequest, callback).getStatus();
+    RetryStrategy retryStrategy{*this, RetryPolicy::kNoRetry};
+
+    auto status =
+        runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
+            return _runAggregation(opCtx, targetingMetadata, aggRequest, callback);
+        });
+
+    return status.getStatus();
 }
 
 BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
@@ -456,21 +475,26 @@ BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
     BatchedCommandResponse batchResponse;
     Status lastWriteStatus = Status::OK();
 
-    auto status = runCommandWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
-                      auto swResponse =
-                          _runCommand(opCtx,
-                                      ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                      dbName,
-                                      maxTimeMS,
-                                      serialisedBatchRequest);
-                      auto writeStatus =
-                          CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
-                      lastWriteStatus = writeStatus;
-                      return RunCommandResult{
-                          .swResponse = swResponse,
-                          .effectiveStatus = writeStatus,
-                      };
-                  }).getStatus();
+    auto status =
+        runCommandWithRetryStrategy(
+            opCtx,
+            retryStrategy,
+            [&](const TargetingMetadata& targetingMetadata) {
+                auto swResponse = _runCommand(opCtx,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              targetingMetadata,
+                                              dbName,
+                                              maxTimeMS,
+                                              serialisedBatchRequest);
+                auto writeStatus =
+                    CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
+                lastWriteStatus = writeStatus;
+                return RunCommandResult{
+                    .swResponse = swResponse,
+                    .effectiveStatus = writeStatus,
+                };
+            })
+            .getStatus();
 
     // The last status will be different than the status of runCommandWithRetryStrategy if the
     // operation was interrupted.
@@ -511,9 +535,10 @@ StatusWith<std::vector<BSONObj>> Shard::runAggregationWithResult(
                                                         aggResult.clear();
                                                     }};
 
-    auto status = runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
-        return _runAggregation(opCtx, aggRequest, callback);
-    });
+    auto status =
+        runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
+            return _runAggregation(opCtx, targetingMetadata, aggRequest, callback);
+        });
 
     if (status.isOK()) {
         return aggResult;

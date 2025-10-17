@@ -99,6 +99,7 @@ public:
     }
     RetryStrategy::Result<std::monostate> _runAggregation(
         OperationContext* opCtx,
+        const TargetingMetadata& targetingMetadata,
         const AggregateCommandRequest& aggRequest,
         std::function<bool(const std::vector<BSONObj>& batch,
                            const boost::optional<BSONObj>& postBatchResumeToken)> callback)
@@ -122,6 +123,7 @@ public:
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& readPref,
+                                                   const TargetingMetadata& targetingMetadata,
                                                    const DatabaseName& dbName,
                                                    Milliseconds maxTimeMSOverride,
                                                    const BSONObj& cmdObj) final {
@@ -132,6 +134,7 @@ private:
     RetryStrategy::Result<Shard::QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
+        const TargetingMetadata& targetingMetadata,
         const DatabaseName& dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) final {
@@ -142,6 +145,7 @@ private:
     RetryStrategy::Result<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
+        const TargetingMetadata& targetingMetadata,
         const repl::ReadConcernLevel& readConcernLevel,
         const NamespaceString& nss,
         const BSONObj& query,

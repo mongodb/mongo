@@ -449,6 +449,7 @@ private:
      */
     virtual StatusWith<CommandResponse> _runCommand(OperationContext* opCtx,
                                                     const ReadPreferenceSetting& readPref,
+                                                    const TargetingMetadata& targetingMetadata,
                                                     const DatabaseName& dbname,
                                                     Milliseconds maxTimeMSOverride,
                                                     const BSONObj& cmdObj) = 0;
@@ -456,6 +457,7 @@ private:
     virtual RetryStrategy::Result<QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
+        const TargetingMetadata& targetingMetadata,
         const DatabaseName& dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) = 0;
@@ -463,6 +465,7 @@ private:
     virtual RetryStrategy::Result<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
+        const TargetingMetadata& targetingMetadata,
         const repl::ReadConcernLevel& readConcernLevel,
         const NamespaceString& nss,
         const BSONObj& query,
@@ -473,6 +476,7 @@ private:
     // TODO(SERVER-104141): Change return type to Status
     virtual RetryStrategy::Result<std::monostate> _runAggregation(
         OperationContext* opCtx,
+        const TargetingMetadata& targetingMetadata,
         const AggregateCommandRequest& aggRequest,
         std::function<bool(const std::vector<BSONObj>& batch,
                            const boost::optional<BSONObj>& postBatchResumeToken)> callback) = 0;

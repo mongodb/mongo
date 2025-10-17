@@ -147,15 +147,18 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
     return builder.obj();
 }
 
-StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* opCtx,
-                                                            const ReadPreferenceSetting& readPref,
-                                                            const DatabaseName& dbName,
-                                                            Milliseconds maxTimeMSOverride,
-                                                            const BSONObj& cmdObj) {
+StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
+    const DatabaseName& dbName,
+    Milliseconds maxTimeMSOverride,
+    const BSONObj& cmdObj) {
     boost::optional<RemoteCommandResponse> response;
     auto asyncStatus = _scheduleCommand(
         opCtx,
         readPref,
+        targetingMetadata,
         dbName,
         maxTimeMSOverride,
         cmdObj,
@@ -212,10 +215,11 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
 RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const DatabaseName& dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
-    const auto host = _targeter->findHost(opCtx, readPref, {});
+    const auto host = _targeter->findHost(opCtx, readPref, targetingMetadata);
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -332,6 +336,7 @@ Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
 RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
@@ -379,8 +384,12 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig
         findCommand.serialize(&findCmdBuilder);
     }
 
-    return _runExhaustiveCursorCommand(
-        opCtx, readPrefWithConfigTime, nss.dbName(), maxTimeMS, findCmdBuilder.done());
+    return _runExhaustiveCursorCommand(opCtx,
+                                       readPrefWithConfigTime,
+                                       targetingMetadata,
+                                       nss.dbName(),
+                                       maxTimeMS,
+                                       findCmdBuilder.done());
 }
 
 void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
@@ -389,6 +398,7 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
                                           const BSONObj& cmdObj) {
     _scheduleCommand(opCtx,
                      readPref,
+                     TargetingMetadata{},
                      dbName,
                      Milliseconds::max(),
                      cmdObj,
@@ -399,6 +409,7 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
 
 RetryStrategy::Result<std::monostate> ShardRemote::_runAggregation(
     OperationContext* opCtx,
+    const TargetingMetadata& targetingMetadata,
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
@@ -410,7 +421,7 @@ RetryStrategy::Result<std::monostate> ShardRemote::_runAggregation(
             aggRequest.getUnwrappedReadPref().value_or(BSONObj()),
             ReadPreference::SecondaryPreferred));
 
-    auto swHost = _targeter->findHost(opCtx, readPreference, {});
+    auto swHost = _targeter->findHost(opCtx, readPreference, targetingMetadata);
     if (!swHost.isOK()) {
         return swHost.getStatus();
     }
@@ -535,12 +546,13 @@ BatchedCommandResponse ShardRemote::runBatchWriteCommand(OperationContext* opCtx
 StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const DatabaseName& dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj,
     const TaskExecutor::RemoteCommandCallbackFn& cb) {
 
-    const auto swHost = _targeter->findHost(opCtx, readPref, {});
+    const auto swHost = _targeter->findHost(opCtx, readPref, targetingMetadata);
     if (!swHost.isOK()) {
         return swHost.getStatus();
     }

@@ -77,17 +77,20 @@ bool ShardLocal::isRetriableError(ErrorCodes::Error code,
     return localIsRetriableError(code, errorLabels, options);
 }
 
-StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opCtx,
-                                                           const ReadPreferenceSetting& unused,
-                                                           const DatabaseName& dbName,
-                                                           Milliseconds maxTimeMSOverrideUnused,
-                                                           const BSONObj& cmdObj) {
+StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& unused,
+    const TargetingMetadata& targetingMetadata,
+    const DatabaseName& dbName,
+    Milliseconds maxTimeMSOverrideUnused,
+    const BSONObj& cmdObj) {
     return _rsLocalClient.runCommandOnce(opCtx, dbName, cmdObj);
 }
 
 RetryStrategy::Result<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const DatabaseName& dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
@@ -97,6 +100,7 @@ RetryStrategy::Result<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorComm
 RetryStrategy::Result<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
     const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
@@ -116,6 +120,7 @@ void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,
 
 RetryStrategy::Result<std::monostate> ShardLocal::_runAggregation(
     OperationContext* opCtx,
+    const TargetingMetadata& targetingMetadata,
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
