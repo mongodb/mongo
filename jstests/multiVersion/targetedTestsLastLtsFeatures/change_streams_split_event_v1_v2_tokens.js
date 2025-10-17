@@ -39,6 +39,15 @@ function getHighWaterMarkToken(collection, pipeline = [], options = {}) {
     return result;
 }
 
+function removeLargeFields(event) {
+    if (event.hasOwnProperty("fullDocument")) {
+        delete event.fullDocument.largeField;
+    }
+    if (event.updateDescription) {
+        delete event.updateDescription;
+    }
+}
+
 // Record a high-watermark resume token marking the start point of the test.
 const testStartV1HWMToken = getHighWaterMarkToken(testColl);
 
@@ -140,18 +149,33 @@ expectedEvents.push({operationType: "dropDatabase"},
         $_generateV2ResumeTokens: false
     });
 
+    jsTestLog(`Original expected events: ${tojsononeline(expectedEvents)}`);
+
     // The 'drop', 'dropIndexes' and 'rename' events coming from different shards may are likely to
     // get identical resume tokens in v6.0.
     for (let prevEvent = csCursor.next(), nextEvent; csCursor.hasNext(); prevEvent = nextEvent) {
         nextEvent = csCursor.next();
+
+        // Remove large event fields before printing.
+        removeLargeFields(prevEvent);
+        removeLargeFields(nextEvent);
+
+        jsTestLog(`Fetched actual event: ${tojsononeline(nextEvent)}`);
+
         if (bsonWoCompare(nextEvent._id, prevEvent._id) === 0) {
-            // If two or more consecutive events have identical resume tokens, remove all but the
-            // last from from the expected events.
+            // If two or more consecutive events have identical resume tokens, remove the last from
+            // the expected events.
             expectedEvents.splice(expectedEvents.findIndex(
-                                      (event) => (event.operationType === prevEvent.operationType)),
+                                      (event) => (event.operationType === nextEvent.operationType)),
                                   1);
+
+            jsTestLog(`Found two events with identical resume tokens:`);
+            jsTestLog(`Prev event: ${tojsononeline(prevEvent)}`);
+            jsTestLog(`Next event: ${tojsononeline(nextEvent)}`);
         }
     }
+
+    jsTestLog(`Final expected events: ${tojsononeline(expectedEvents)}`);
 
     csCursor.close();
 }
@@ -166,10 +190,18 @@ function assertEventMatches(event, expectedEvent, errorMsg) {
 // Asserts the next change event with the given pipeline and options matches the expected event.
 // Returns the resume token of the matched event on success.
 function assertNextChangeEvent(expectedEvent, pipeline, options) {
+    jsTestLog(
+        `Opening change stream pipeline for resume token ${tojsononeline(options.startAfter)}`);
     const csCursor = testDB.watch([...pipeline], {showExpandedEvents: true, ...options});
     const errorMsg = "could not retrieve the expected event matching " + tojson(expectedEvent);
     assert.doesNotThrow(() => assert.soon(() => csCursor.hasNext()), [], errorMsg);
     const event = csCursor.next();
+
+    // Remove large fields before printing.
+    removeLargeFields(event);
+    jsTestLog(`Comparing change events. Expected: ${tojsononeline(expectedEvent)}, ` +
+              `Actual: ${tojsononeline(event)}`);
+
     assertEventMatches(event, expectedEvent, errorMsg);
     csCursor.close();
     return event._id;
