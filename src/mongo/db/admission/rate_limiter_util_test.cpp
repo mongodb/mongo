@@ -81,6 +81,11 @@ auto makeClientsWithOpCtxs(ServiceContext* svcCtx, size_t numOps) {
     return clientsWithOps;
 }
 
+auto assertApproxEqualUnevenBounds(double value, double lowerBound, double upperBound) {
+    ASSERT_GTE(value, lowerBound);
+    ASSERT_LT(value, upperBound);
+}
+
 class RateLimiterTest : public ServiceContextTest {
 private:
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
@@ -154,7 +159,11 @@ TEST_F(RateLimiterTest, RateLimitIsValidAfterQueueing) {
               "Elapsed vs. expected elapsed millis",
               "elapsed"_attr = elapsed,
               "expected"_attr = expectedElapsedMillis);
-        ASSERT_APPROX_EQUAL(durationCount<Milliseconds>(elapsed), expectedElapsedMillis, 100);
+        // The folly token bucket may dispense tokens at a slightly lower rate than specified,
+        // but it must not dispense tokens at a higher rate.
+        assertApproxEqualUnevenBounds(durationCount<Milliseconds>(elapsed),
+                                      expectedElapsedMillis - 100,
+                                      expectedElapsedMillis + 1000);
 
         // Once all the threads have joined, we expect that 3 threads were admitted and 2 were
         // rejected.
@@ -175,7 +184,7 @@ TEST_F(RateLimiterTest, RateLimitIsValidAfterQueueing) {
               "Elapsed vs. expected elapsed millis",
               "elapsed"_attr = finalElapsed,
               "expected"_attr = expectedFinalMillis);
-        ASSERT_APPROX_EQUAL(durationCount<Milliseconds>(finalElapsed), expectedFinalMillis, 100);
+        ASSERT_APPROX_EQUAL(durationCount<Milliseconds>(finalElapsed), expectedFinalMillis, 500);
     });
 }
 
