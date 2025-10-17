@@ -61,7 +61,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/util/bson_corpus.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
@@ -850,41 +849,6 @@ BSONObj getObjInDumpFile(const BSONObj& a, void*) {
     return builder.obj<BSONObj::LargeSizeTrait>();
 }
 
-// Returns the number of BSON objects present in the BSON corpus.
-// This is a corpus of edge cases and interesting BSON objects
-// intended to be used for testing
-BSONObj numObjsInCorpus(const BSONObj& a, void*) {
-    uassert(9479201, "numObjsInCorpus accepts no arguments", a.nFields() == 0);
-
-    return BSON("" << mongo::bson::corpusSize());
-}
-
-// Returns the nth (0-indexed) object in the BSON corpus.
-// The name of the file to scan is provided as a string in the first
-// field of the 'a' object. The only other argument should be an integer
-// specifying which object to fetch.
-BSONObj getObjInCorpus(const BSONObj& a, void*) {
-    uassert(9479202,
-            "getObjInCorpus() takes one argument: the index of the "
-            "object to be fetched",
-            a.nFields() == 1);
-
-    BSONObjIterator it(a);
-    const int objIndex = it.next().safeNumberInt();
-    auto contents = mongo::bson::getCorpusObject(objIndex);
-
-    ConstDataRangeCursor cursor(contents.data(), contents.size());
-    const auto expectedValidBytes = cursor.length();
-    BSONObj obj;
-    cursor.readAndAdvance<BSONObj>(&obj);
-    uassertStatusOKWithContext(validateBSON(obj.objdata(), expectedValidBytes),
-                               str::stream() << " at offset " << cursor.debug_offset());
-
-    BSONObjBuilder builder;
-    builder.append("", obj);
-    return builder.obj<BSONObj::LargeSizeTrait>();
-}
-
 BSONObj ls(const BSONObj& args, void* data) {
     BSONArrayBuilder ret;
     BSONObj o = listFiles(args, data);
@@ -941,8 +905,6 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("_readDumpFile", readDumpFile);
     scope.injectNative("_numObjsInDumpFile", numObjsInDumpFile);
     scope.injectNative("_getObjInDumpFile", getObjInDumpFile);
-    scope.injectNative("_numObjsInCorpus", numObjsInCorpus);
-    scope.injectNative("_getObjInCorpus", getObjInCorpus);
     scope.injectNative("_getEnv", shellGetEnv);
     scope.injectNative("writeBsonArrayToFile", writeBsonArrayToFile);
     scope.injectNative("getStringWidth", getStringWidth);

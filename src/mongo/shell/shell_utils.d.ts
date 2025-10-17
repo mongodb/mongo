@@ -5,6 +5,12 @@ declare function _closeGoldenData()
 declare function _compareStringsWithCollation()
 declare function _createSecurityToken()
 declare function _createTenantToken()
+/**
+ * Get Decimal128 maximum and minimum positive and negative values.
+ *
+ * @param String matching [+-]?(max|min), case insensitive.
+ */
+declare function _decimal128Limit(str): number
 declare function _fnvHashToHexString()
 declare function _isWindows()
 declare function _openGoldenData()

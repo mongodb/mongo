@@ -10,30 +10,6 @@ exports_files(
 )
 
 mongo_cc_library(
-    name = "bson_corpus",
-    srcs = [
-        "bson_corpus.cpp",
-    ],
-    hdrs = [
-        "bson_corpus.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_binary(
-    name = "bson_corpus_gen",
-    srcs = [
-        "bson_corpus_gen.cpp",
-    ],
-    deps = [
-        ":bson_corpus",
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
     name = "bson_extract",
     srcs = [
         "bson_extract.cpp",

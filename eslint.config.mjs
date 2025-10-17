@@ -114,6 +114,7 @@ export default [
                 _compareStringsWithCollation: true,
                 _createSecurityToken: true,
                 _createTenantToken: true,
+                _decimal128Limit: true,
                 _fnvHashToHexString: true,
                 _isWindows: true,
                 _openGoldenData: true,

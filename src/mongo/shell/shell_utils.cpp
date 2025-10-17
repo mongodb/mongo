@@ -781,6 +781,37 @@ BSONObj _buildBsonObj(const BSONObj& args, void*) {
     return BSON("" << builder.obj());
 }
 
+namespace {
+
+// Intel's implementation supports magic strings for
+// Infinity and NaN, but not for maximum and minimum size.
+// Intel's match is case insensitive, so ours should be too.
+const std::array<std::pair<StringData, Decimal128>, 6> magicMatches{{
+    {"max", Decimal128::kLargestPositive},
+    {"min", Decimal128::kSmallestPositive},
+    {"+max", Decimal128::kLargestPositive},
+    {"+min", Decimal128::kSmallestPositive},
+    {"-max", Decimal128::kLargestNegative},
+    {"-min", Decimal128::kSmallestNegative},
+}};
+
+}  // namespace
+
+BSONObj _decimal128Limit(const BSONObj& args, void*) {
+    uassert(11190601,
+            "_decimal128Limit expects one string argument",
+            args.nFields() == 1 && args.firstElement().type() == BSONType::string);
+
+    auto input = args.firstElement().str();
+    for (auto&& [name, value] : magicMatches) {
+        if (str::equalCaseInsensitive(input, name)) {
+            return BSON("" << value);
+        }
+    }
+
+    uasserted(11190602, str::stream() << "Invalid magic Decimal128 string '" << input << "'");
+}
+
 /*
  * The following code has been updated to remove unnecessary content and better comply
  * with MongoDB coding standards.  The original source code can be found at:
@@ -1209,6 +1240,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_writeGoldenData", _writeGoldenData);
     scope.injectNative("_closeGoldenData", _closeGoldenData);
     scope.injectNative("_buildBsonObj", _buildBsonObj);
+    scope.injectNative("_decimal128Limit", _decimal128Limit);
     scope.injectNative("_fnvHashToHexString", _fnvHashToHexString);
     scope.injectNative("_resultSetsEqualUnordered", _resultSetsEqualUnordered);
     scope.injectNative("_resultSetsEqualNormalized", _resultSetsEqualNormalized);
