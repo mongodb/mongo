@@ -76,8 +76,6 @@ public:
     void appendStats(BSONObjBuilder* bob) const;
 
 private:
-    bool _isAuthorizationExempt(Client* client);
-
     admission::RateLimiter _rateLimiter;
 };
 

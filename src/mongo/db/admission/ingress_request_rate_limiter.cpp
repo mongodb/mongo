@@ -71,6 +71,16 @@ private:
             ingressRequestRateLimiterAppExemptions.isCurrent(_appExemptions);
     }
 
+    bool _isAuthorizationExempt(Client* client) {
+        if (!AuthorizationSession::exists(client)) {
+            return true;
+        }
+
+        const auto authorizationSession = AuthorizationSession::get(client);
+        return !authorizationSession->shouldIgnoreAuthChecks() &&
+            !authorizationSession->isAuthenticated();
+    };
+
     bool _isConnectionExempt(Client* client) {
         ingressRequestRateLimiterIPExemptions.refreshSnapshot(_ipExemptions);
         return _ipExemptions && client->session()->isExemptedByCIDRList(*_ipExemptions);
@@ -101,6 +111,13 @@ private:
     }
 
     bool _isExempted(Client* client) {
+        // The rate limiter applies only requests when the client is authenticated to prevent DoS
+        // attacks caused by many unauthenticated requests. In the case auth is disabled, all
+        // requests will be subject to rate limiting.
+        if (_isAuthorizationExempt(client)) {
+            return true;
+        }
+
         if (MONGO_unlikely(!_exempted.has_value() || !_areSnapshotsCurrent())) {
             _exempted = _isConnectionExempt(client) || _isApplicationExempt(client);
         }
@@ -198,15 +215,6 @@ IngressRequestRateLimiter& IngressRequestRateLimiter::get(ServiceContext* servic
 }
 
 Status IngressRequestRateLimiter::admitRequest(Client* client) {
-    // The rate limiter applies only requests when the client is authenticated to prevent DoS
-    // attacks caused by many unauthenticated requests. In the case auth is disabled, all
-    // requests will be subject to rate limiting.
-    if (_isAuthorizationExempt(client)) {
-        _rateLimiter.recordExemption();
-        return Status::OK();
-    }
-
-    // TODO SERVER-112549 Move _isAuthorizationExempt into  ClientAdmissionControlState.
     if (ClientAdmissionControlState::isExempted(client)) {
         _rateLimiter.recordExemption();
         return Status::OK();
@@ -263,15 +271,5 @@ void IngressRequestRateLimiter::appendStats(BSONObjBuilder* bob) const {
     bob->append(rateLimiterStats.getField("attemptedAdmissions"));
     bob->append(rateLimiterStats.getField("totalAvailableTokens"));
 }
-
-bool IngressRequestRateLimiter::_isAuthorizationExempt(Client* client) {
-    if (!AuthorizationSession::exists(client)) {
-        return true;
-    }
-
-    const auto authorizationSession = AuthorizationSession::get(client);
-    return !authorizationSession->shouldIgnoreAuthChecks() &&
-        !authorizationSession->isAuthenticated();
-};
 
 }  // namespace mongo
