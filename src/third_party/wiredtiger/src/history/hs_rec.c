@@ -835,6 +835,8 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
     hs_cbt = __wt_curhs_get_cbt(hs_cursor);
     WT_CLEAR(hs_key);
     WT_CLEAR(hs_value);
+    twp = NULL;
+    hs_start_ts = WT_TS_NONE;
     cache_hs_order_lose_durable_timestamp = cache_hs_order_reinsert = cache_hs_order_remove = 0;
 
 #ifndef HAVE_DIAGNOSTIC
@@ -922,8 +924,14 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
      * If we find a key with a timestamp larger than or equal to the specified timestamp then the
      * specified timestamp must be mixed mode.
      */
-    WT_ASSERT_ALWAYS(
-      session, ts == 1 || ts == WT_TS_NONE, "out-of-order timestamp update detected");
+    WT_ASSERT_ALWAYS(session, ts == 1 || ts == WT_TS_NONE,
+      "out-of-order timestamp update detected, found an existing update with "
+      "hs_start_ts=%s, start_ts=%s, stop_ts=%s, that exists later than specified ts=%s",
+      __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
+      __wt_timestamp_to_string(twp == NULL ? WT_TS_NONE : twp->start_ts, ts_string[1]),
+      __wt_timestamp_to_string(twp == NULL ? WT_TS_NONE : twp->stop_ts, ts_string[2]),
+      __wt_timestamp_to_string(ts, ts_string[3]));
+
     /*
      * Fail the eviction if we detect any timestamp ordering issue and the error flag is set. We
      * cannot modify the history store to fix the update's timestamps as it may make the history

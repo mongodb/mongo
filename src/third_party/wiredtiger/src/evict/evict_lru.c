@@ -1869,8 +1869,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     WT_PAGE *last_parent, *page;
     WT_REF *ref;
     WT_TXN *txn;
+    uint64_t gen_gap, min_pages, pages_already_queued, pages_queued, pages_seen, refs_walked;
     uint64_t internal_pages_already_queued, internal_pages_queued, internal_pages_seen;
-    uint64_t min_pages, pages_already_queued, pages_queued, pages_seen, refs_walked;
     uint64_t pages_seen_clean, pages_seen_dirty, pages_seen_updates;
     uint32_t read_flags, remaining_slots, target_pages, walk_flags;
     int restarts;
@@ -2119,6 +2119,17 @@ rand_next:
             continue;
 
         page = ref->page;
+
+        /*
+         * Update the maximum evict pass generation gap seen at time of eviction. This helps track
+         * how long it's been since a page was last queued for eviction. We need to update the
+         * statistic here during the walk and not at __evict_page because the evict_pass_gen is
+         * reset here.
+         */
+        gen_gap = __wt_atomic_load64(&cache->evict_pass_gen) - page->evict_pass_gen;
+        if (gen_gap > __wt_atomic_load64(&cache->evict_max_gen_gap))
+            __wt_atomic_store64(&cache->evict_max_gen_gap, gen_gap);
+
         modified = __wt_page_is_modified(page);
         page->evict_pass_gen = __wt_atomic_load64(&cache->evict_pass_gen);
 
@@ -2495,6 +2506,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     uint64_t time_start, time_stop;
     uint32_t flags;
     uint8_t previous_state;
+    bool page_is_modified;
 
     WT_TRACK_OP_INIT(session);
 
@@ -2505,18 +2517,21 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     time_start = 0;
 
     flags = 0;
+    page_is_modified = false;
 
     /*
      * An internal session flags either the server itself or an eviction worker thread.
      */
     if (is_server)
-        WT_STAT_CONN_INCR(session, cache_eviction_server_evicting);
+        WT_STAT_CONN_INCR(session, eviction_server_evict_attempt);
     else if (F_ISSET(session, WT_SESSION_INTERNAL))
-        WT_STAT_CONN_INCR(session, cache_eviction_worker_evicting);
+        WT_STAT_CONN_INCR(session, eviction_worker_evict_attempt);
     else {
-        if (__wt_page_is_modified(ref->page))
-            WT_STAT_CONN_INCR(session, cache_eviction_app_dirty);
-        WT_STAT_CONN_INCR(session, cache_eviction_app);
+        if (__wt_page_is_modified(ref->page)) {
+            page_is_modified = true;
+            WT_STAT_CONN_INCR(session, eviction_app_dirty_attempt);
+        }
+        WT_STAT_CONN_INCR(session, eviction_app_attempt);
         cache->app_evicts++;
         time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
     }
@@ -2539,6 +2554,19 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
         WT_STAT_CONN_INCRV(
           session, cache_eviction_app_time, WT_CLOCKDIFF_US(time_stop, time_start));
     }
+
+    if (WT_UNLIKELY(ret != 0)) {
+        if (is_server)
+            WT_STAT_CONN_INCR(session, eviction_server_evict_fail);
+        else if (F_ISSET(session, WT_SESSION_INTERNAL))
+            WT_STAT_CONN_INCR(session, eviction_worker_evict_fail);
+        else {
+            if (page_is_modified)
+                WT_STAT_CONN_INCR(session, eviction_app_dirty_fail);
+            WT_STAT_CONN_INCR(session, eviction_app_fail);
+        }
+    }
+
     WT_TRACK_OP_END(session);
     return (ret);
 }
