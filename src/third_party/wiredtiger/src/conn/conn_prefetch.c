@@ -225,6 +225,8 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     return (0);
 
 err:
+    /* Unlock the ref. */
+    WT_REF_SET_STATE(ref, WT_REF_DISK);
 done:
     __wt_spin_unlock(session, &conn->prefetch_lock);
     return (ret);

@@ -312,6 +312,7 @@ __prepared_discover_tree_walk_skip(
         page_del = ref->page_del;
         WT_ASSERT_ALWAYS(session, page_del->prepare_state == WT_PREPARE_INIT,
           "Prepared transaction discovery does not support truncate operations");
+        WT_REF_SET_STATE(ref, WT_REF_DELETED);
     }
     /*
      * Any other deleted page can't have prepared content that needs to be discovered, so it is safe

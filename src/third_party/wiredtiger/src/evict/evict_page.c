@@ -668,7 +668,6 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
                 visible = true;
             else
                 visible = __wt_page_del_visible_all(session, child->page_del, false);
-            /* FIXME-WT-9780: is there a reason this doesn't use WT_REF_UNLOCK? */
             WT_REF_SET_STATE(child, WT_REF_DELETED);
             if (!visible)
                 return (__wt_set_return(session, EBUSY));

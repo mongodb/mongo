@@ -124,7 +124,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      */
     if (ref->page != NULL && !__wt_page_evict_clean(ref->page)) {
         WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
-        WT_RET(__wt_curhs_cache(session));
+        ret = __wt_curhs_cache(session);
+        if (ret != 0) {
+            WT_ASSERT(session, locked);
+            WT_REF_SET_STATE(ref, previous_state);
+            return (ret);
+        }
     }
     (void)__wt_atomic_addv32(&btree->evict_busy, 1);
     ret = __wt_evict(session, ref, previous_state, evict_flags);

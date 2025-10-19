@@ -75,7 +75,6 @@ __rts_btree_walk_page_skip(
             WT_STAT_CONN_INCR(session, txn_rts_tree_walk_skip_pages);
             *skipp = true;
         }
-        WT_REF_SET_STATE(ref, WT_REF_DELETED);
 
         if (page_del != NULL)
             __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
@@ -85,6 +84,8 @@ __rts_btree_walk_page_skip(
               __wt_timestamp_to_string(page_del->pg_del_start_ts, time_string[0]),
               __wt_timestamp_to_string(page_del->pg_del_durable_ts, time_string[1]),
               __wt_timestamp_to_string(rollback_timestamp, time_string[2]), page_del->txnid);
+
+        WT_REF_SET_STATE(ref, WT_REF_DELETED);
         return (0);
     }
 
