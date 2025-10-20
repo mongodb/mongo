@@ -155,6 +155,7 @@ mongo_cc_library(
     }),
     includes = [
         "dist/src",
+        "dist/src-cpp",
     ],
     linkopts = [
         "-lcurl",
