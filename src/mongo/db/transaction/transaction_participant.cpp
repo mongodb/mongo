@@ -1102,8 +1102,9 @@ void TransactionParticipant::Participant::beginOrContinue(
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Transactions are not allowed on shard servers when "
                 "writeConcernMajorityJournalDefault=false",
-                !autocommit || !serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
-                    replCoord->getWriteConcernMajorityShouldJournal() || getTestCommandsEnabled());
+                replCoord->getWriteConcernMajorityShouldJournal() ||
+                    !serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) || !autocommit ||
+                    getTestCommandsEnabled());
     }
 
     if (txnNumberAndRetryCounter.getTxnNumber() <
