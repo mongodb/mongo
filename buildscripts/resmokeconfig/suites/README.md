@@ -103,13 +103,13 @@ A list of strings representing glob patterns. Excludes this list of tests from t
 
 A list of strings. Only jstests which define a list of tags which includes any of these tags will be included in the suite, unless otherwise excluded by filename.
 
-To see all available tags, run `./buildscripts/resmoke.py list-tags`.
+To see all tags referenced across suites, run `./buildscripts/resmoke.py list-tags`.
 
 ### `selector.exclude_with_any_tags`
 
 A list of strings. Any jstest which defines a list of tags which includes any of these tags will be excluded from the suite, unless otherwise included by filename.
 
-To see all available tags, run `./buildscripts/resmoke.py list-tags`.
+To see all tags referenced across suites, run `./buildscripts/resmoke.py list-tags`.
 
 ## `executor`
 

@@ -16,6 +16,7 @@ Specify any of the following as the `test_kind` in your [Suite](../../../../buil
 - `db_test`: [`DBTestCase`](./dbtest.py) - A dbtest to execute.
 - `fsm_workload_test`: [`FSMWorkloadTestCase`](./fsm_workload_test.py) - A wrapper for several copies of a `_SingleFSMWorkloadTestCase` to execute.
 - `js_test`: [`JSTestCase`](./jstest.py) - A wrapper for several copies of a `_SingleJSTestCase` to execute
+  - Around **75% of all suites use the `js_test` kind**. See [jstests/README.md](../../../../jstests/README.md) for specific guidance.
 - `json_schema_test`: [`JSONSchemaTestCase`](./json_schema_test.py) - A JSON Schema test to execute.
 - `magic_restore_js_test`: [`MagicRestoreTestCase`](./magic_restore_js_test.py) - A test to execute for running tests in a try/catch block.
 - `mongos_test`: [`MongosTestCase`](./mongos_test.py) - A TestCase which runs a mongos binary with the given parameters.
@@ -39,13 +40,21 @@ Top level interfaces:
 
 Subclasses:
 
-- [`FixtureTestCase`](./fixture.py) - Base class for the fixture test cases.
-- [`FixtureSetupTestCase`](./fixture.py) - TestCase for setting up a fixture.
-- [`FixtureTeardownTestCase`](./fixture.py) - TestCase for tearing down a fixture.
-- [`FixtureAbortTestCase`](./fixture.py) - TestCase for killing a fixture. Intended for use before archiving a failed test.
 - [`JSRunnerFileTestCase`](./jsrunnerfile.py) - A test case with a static JavaScript runner file to execute.
 - [`MultiClientsTestCase`](./jstest.py) - A wrapper for several copies of a SingleTestCase to execute.
 - [`TestCaseFactory`](./interface.py) - Convenience interface to initialize and build test cases
+
+## Fixture TestCases
+
+These are testcases that are used to coordinate fixture lifecycles via resmoke's internal `FixtureTestCaseManager`.
+
+> NOTE This design does lead to seeing "extra" tests in a run, where a fixture sets up, your `N` tests are run, and the fixture tears down, so you see `N+2` "tests" passing via resmoke.
+
+- [`FixtureTestCase`](./fixture.py) - Base class for the fixture test cases.
+- [`FixtureSetupTestCase`](./fixture.py) - TestCase for setting up a fixture.
+- [`FixtureTeardownTestCase`](./fixture.py) - TestCase for tearing down a fixture.
+- [`FixtureAbortTestCase`](./fixture.py) - TestCase for killing/aborting a fixture. Intended for use before archiving a failed test.
+  - When resmoke detects that a test has failed (and [archiving](../../../../buildscripts/resmokeconfig/suites/README.md#executorarchive) is configured​), it dynamically generates a new `FixtureAbortTestCase` for immediate execution. This test case sends a `SIGABRT` to each running mongod process.
 
 ## Testing TestCases
 

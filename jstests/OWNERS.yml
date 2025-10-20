@@ -3,6 +3,9 @@ filters:
   - "README.md":
     approvers:
       - 10gen/devprod-correctness
+  - "tags.md":
+    approvers:
+      - 10gen/devprod-correctness
   - "**/*analyze_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability
