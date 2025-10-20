@@ -622,9 +622,16 @@ struct __wt_connection_stats {
     int64_t cache_eviction_split_leaf;
     int64_t cache_eviction_random_sample_inmem_root;
     int64_t cache_bytes_max;
-    int64_t eviction_maximum_gen_gap;
+    int64_t eviction_maximum_clean_page_size_per_checkpoint;
+    int64_t eviction_maximum_dirty_page_size_per_checkpoint;
+    int64_t eviction_maximum_unvisited_gen_gap;
+    int64_t eviction_maximum_unvisited_gen_gap_per_checkpoint;
+    int64_t eviction_maximum_visited_gen_gap;
+    int64_t eviction_maximum_visited_gen_gap_per_checkpoint;
     int64_t eviction_maximum_milliseconds;
+    int64_t eviction_maximum_milliseconds_per_checkpoint;
     int64_t eviction_maximum_page_size;
+    int64_t eviction_maximum_updates_page_size_per_checkpoint;
     int64_t eviction_app_dirty_attempt;
     int64_t eviction_app_dirty_fail;
     int64_t cache_eviction_dirty;

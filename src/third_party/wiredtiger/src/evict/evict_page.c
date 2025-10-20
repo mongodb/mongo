@@ -101,6 +101,10 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
     }
     if (!session->evict_timeline.reentry_hs_eviction) {
         eviction_time_milliseconds = eviction_time / WT_THOUSAND;
+        if (eviction_time_milliseconds >
+          __wt_atomic_load64(&conn->evict->evict_max_ms_per_checkpoint))
+            __wt_atomic_store64(
+              &conn->evict->evict_max_ms_per_checkpoint, eviction_time_milliseconds);
         if (eviction_time_milliseconds > __wt_atomic_load64(&conn->evict->evict_max_ms))
             __wt_atomic_store64(&conn->evict->evict_max_ms, eviction_time_milliseconds);
         if (eviction_time_milliseconds > WT_MINUTE * WT_THOUSAND)
@@ -148,14 +152,15 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE *page;
+    uint64_t page_size;
     uint8_t stats_flags;
-    bool clean_page, closing, ebusy_only, inmem_split, tree_dead;
+    bool clean_page, closing, ebusy_only, inmem_split, is_dirty, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
     stats_flags = 0;
-    clean_page = ebusy_only = false;
+    clean_page = ebusy_only = is_dirty = false;
 
     __wt_verbose_debug3(
       session, WT_VERB_EVICTION, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
@@ -231,8 +236,11 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
         goto done;
     }
 
+    if (__wt_page_is_modified(page))
+        is_dirty = true;
+
     /* No need to reconcile the page if it is from a dead tree or it is clean. */
-    if (!tree_dead && __wt_page_is_modified(page))
+    if (!tree_dead && is_dirty)
         WT_ERR(__evict_reconcile(session, ref, flags));
 
     /* After this spot, the only recoverable failure is EBUSY. */
@@ -257,10 +265,26 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
      * force pages out before they're larger than the cache. We don't care about races, it's just a
      * statistic.
      */
-    if (__wt_atomic_loadsize(&page->memory_footprint) >
-      __wt_atomic_load64(&conn->evict->evict_max_page_size))
-        __wt_atomic_store64(
-          &conn->evict->evict_max_page_size, __wt_atomic_loadsize(&page->memory_footprint));
+    page_size = __wt_atomic_loadsize(&page->memory_footprint);
+    if (page_size > __wt_atomic_load64(&conn->evict->evict_max_page_size))
+        __wt_atomic_store64(&conn->evict->evict_max_page_size, page_size);
+
+    /* Clean page */
+    if (!is_dirty) {
+        if (page_size > __wt_atomic_load64(&conn->evict->evict_max_clean_page_size_per_checkpoint))
+            __wt_atomic_store64(&conn->evict->evict_max_clean_page_size_per_checkpoint, page_size);
+    } else {
+        /* Dirty page */
+        if (page_size > __wt_atomic_load64(&conn->evict->evict_max_dirty_page_size_per_checkpoint))
+            __wt_atomic_store64(&conn->evict->evict_max_dirty_page_size_per_checkpoint, page_size);
+    }
+    /* Check if the page has updates */
+    if (page->modify != NULL) {
+        if (page_size >
+          __wt_atomic_load64(&conn->evict->evict_max_updates_page_size_per_checkpoint))
+            __wt_atomic_store64(
+              &conn->evict->evict_max_updates_page_size_per_checkpoint, page_size);
+    }
 
     /* Figure out whether reconciliation was done on the page */
     if (__wt_page_evict_clean(page)) {
