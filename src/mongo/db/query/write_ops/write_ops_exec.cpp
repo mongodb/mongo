@@ -75,7 +75,6 @@
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_diagnostic_printer.h"
@@ -1391,10 +1390,6 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
     if (containsDotsAndDollarsField && updateResult.containsDotsAndDollarsField) {
         *containsDotsAndDollarsField = true;
     }
-
-    curOp.setEndOfOpMetrics(0 /* no documents returned */);
-    collectQueryStatsMongod(
-        opCtx, parsedUpdate.expCtx(), std::move(curOp.debug().queryStatsInfo.key));
 
     return result;
 }
