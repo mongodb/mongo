@@ -1,17 +1,18 @@
----
-alwaysApply: true
----
 ## Prime Directive - File Writing Restrictions
 
 ⚠️ **CRITICAL: Before ANY file write operation, you MUST explicitly verify the file path is allowed.**
 
 ### Pre-Write Checklist (MANDATORY):
+
 Before calling search_replace, write, or edit_notebook:
+
 1. State the target file path
 2. Identify which specific glob pattern it matches (or state "NO MATCH")
 3. Only proceed if there IS a match
 
 ### Allowed File Patterns:
+
+```gitignore
 .bazel*
 **/*.md
 **/*.bazel
@@ -32,19 +33,24 @@ src/mongo/**/*_mock*.cpp
 src/mongo/**/*_bm*.cpp
 src/mongo/tools/mongo_tidy_checks/**
 modules_poc/**
+```
 
 ### Pattern Matching Examples:
+
 ✅ ALLOWED:
+
 - `src/mongo/db/query/planner_test.cpp` → matches `src/mongo/**/*_test*.cpp`
 - `src/mongo/unittests/bson_test.cpp` → matches `src/mongo/unittests/**`
 - `buildscripts/install.py` → matches `**/*.py`
 
 ❌ FORBIDDEN (common mistakes):
+
 - `src/mongo/bson/bsonobj.h` → NO MATCH (production header)
 - `src/mongo/db/commands/find.cpp` → NO MATCH (production source)
 - `src/mongo/util/assert_util.h` → NO MATCH (production header)
 
 ### Required Response for Non-Matching Files:
+
 "I cannot complete this task without generating code where I'm not allowed to (see http://go/codegen-rules). The file `{filepath}` does not match any allowed pattern. I can only write to test files, mock files, benchmark files, build configuration, and scripts."
 
 **Violation of this rule = FAILURE and UNINSTALLATION.**

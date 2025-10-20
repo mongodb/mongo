@@ -21,7 +21,10 @@ filters:
   - "**/.clang-tidy":
     approvers:
       - 10gen/server-programmability
-  - "**/.cursor*":
+  - "AGENTS.md":
+    approvers:
+      - 10gen/genai-coding-policy
+  - "CLAUDE.md":
     approvers:
       - 10gen/genai-coding-policy
   - "/.editorconfig":

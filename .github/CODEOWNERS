@@ -11,7 +11,8 @@ OWNERS.yml @10gen/server-root-ownership @svc-auto-approve-bot
 .clang-format @10gen/server-programmability @svc-auto-approve-bot
 .clang-tidy.in @10gen/server-programmability @svc-auto-approve-bot
 **/.clang-tidy @10gen/server-programmability @svc-auto-approve-bot
-**/.cursor* @10gen/genai-coding-policy @svc-auto-approve-bot
+AGENTS.md @10gen/genai-coding-policy @svc-auto-approve-bot
+CLAUDE.md @10gen/genai-coding-policy @svc-auto-approve-bot
 /.editorconfig @10gen/devprod-build @svc-auto-approve-bot
 .git* @10gen/devprod-build @svc-auto-approve-bot
 .mypy.ini @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
