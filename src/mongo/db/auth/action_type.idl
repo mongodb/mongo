@@ -156,6 +156,7 @@ enums:
            querySettings: "querySettings" # allows to set and retrieve querySettings
            queryStatsRead: "queryStatsRead" # view untransformed contents of queryStats store
            queryStatsReadTransformed: "queryStatsReadTransformed" # view transformed contents of queryStats store
+           readBackupFile: "readBackupFile" # run $_backupFile aggregation
            refineCollectionShardKey :  "refineCollectionShardKey"
            reIndex :  "reIndex"
            remove :  "remove"

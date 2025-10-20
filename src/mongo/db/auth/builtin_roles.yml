@@ -506,6 +506,7 @@ roles:
             - matchType: cluster
               actions:
                   - appendOplogNote # For BRS
+                  - readBackupFile # For oplog based migrations
                   - serverStatus # For push based initial sync
                   - setUserWriteBlockMode # For C2C replication
             - matchType: exact_namespace
