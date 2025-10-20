@@ -31,9 +31,8 @@
 
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
-namespace mongo {
-namespace exec {
-namespace agg {
+
+namespace mongo::exec::agg {
 
 class UnionWithStage final : public Stage {
 public:
@@ -77,6 +76,13 @@ protected:
     void doDispose() override;
 
 private:
+    /**
+     * Prepare the sub pipeline.
+     * This can throw with error code 'CommandOnShardedViewNotSupportedOnMongod' in case the command
+     * is not supported on a sharded view.
+     */
+    void prepareSubPipeline(const std::vector<BSONObj>& serializedPipeline);
+
     std::shared_ptr<UnionWithSharedState> _sharedState;
     UnionWithStats _stats;
     // The original, unresolved namespace to union.
@@ -84,6 +90,4 @@ private:
 };
 
 
-}  // namespace agg
-}  // namespace exec
-}  // namespace mongo
+}  // namespace mongo::exec::agg

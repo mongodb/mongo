@@ -89,14 +89,13 @@ MONGO_COMPILER_NOINLINE void logPipeline(int32_t id,
     LOGV2_DEBUG(id, 5, msg, "pipeline"_attr = pipe.serializeToBson());
 }
 
-};  // namespace
+}  // namespace
 
 UnionWithStage::UnionWithStage(const StringData stageName,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                const std::shared_ptr<UnionWithSharedState>& sharedState,
                                const NamespaceString& userNss)
     : Stage(stageName, pExpCtx), _sharedState(sharedState), _userNss(userNss) {}
-
 
 GetNextResult UnionWithStage::doGetNext() {
     if (!_sharedState->_pipeline) {
@@ -106,65 +105,46 @@ GetNextResult UnionWithStage::doGetNext() {
 
     if (_sharedState->_executionState ==
         UnionWithSharedState::ExecutionProgress::kIteratingSource) {
-        auto nextInput = pSource->getNext();
-        if (!nextInput.isEOF()) {
+        if (auto nextInput = pSource->getNext(); !nextInput.isEOF()) {
             return nextInput;
         }
-        _sharedState->_executionState =
-            UnionWithSharedState::ExecutionProgress::kStartingSubPipeline;
+
         // All documents from the base collection have been returned, switch to iterating the sub-
         // pipeline by falling through below.
+        _sharedState->_executionState =
+            UnionWithSharedState::ExecutionProgress::kStartingSubPipeline;
     }
 
     if (_sharedState->_executionState ==
         UnionWithSharedState::ExecutionProgress::kStartingSubPipeline) {
-        // Since the subpipeline will be executed again for explain, we store the starting state of
-        // the variables to reset them later.
-        if (pExpCtx->getExplain()) {
-            auto expCtx = _sharedState->_pipeline->getContext();
-            _sharedState->_variables = expCtx->variables;
-            _sharedState->_variablesParseState =
-                expCtx->variablesParseState.copyWith(_sharedState->_variables.useIdGenerator());
-        }
+        auto serializedPipeline = _sharedState->_pipeline->serializeToBson();
 
-        auto serializedPipe = _sharedState->_pipeline->serializeToBson();
-        logStartingSubPipeline(serializedPipe);
+        // Prepare the sub pipeline. This is expected to fail if the command is not supported on a
+        // sharded view.
         try {
-            // Query settings are looked up after parsing and therefore are not populated in the
-            // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith constructor.
-            // Attach query settings to the '_pipeline->getContext()' by copying them from the
-            // parent query ExpressionContext.
-            _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
-                pExpCtx->getQuerySettings());
-
-            logPipeline(104243, "$unionWith before pipeline prep: ", *_sharedState->_pipeline);
-            _sharedState->_pipeline =
-                pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
-                    std::move(_sharedState->_pipeline));
-            logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
-
-            _sharedState->_executionState =
-                UnionWithSharedState::ExecutionProgress::kIteratingSubPipeline;
+            prepareSubPipeline(serializedPipeline);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+            // Preparation of sub pipeline failed. The pipeline will be modified to use the view
+            // definition instead, and we attempt to prepare it again.
             _sharedState->_pipeline = DocumentSourceUnionWith::buildPipelineFromViewDefinition(
                 pExpCtx,
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
-                std::move(serializedPipe),
+                std::move(serializedPipeline),
                 _userNss);
             logShardedViewFound(e, *_sharedState->_pipeline);
-            return doGetNext();
-        }
-        _sharedState->_execPipeline = exec::agg::buildPipeline(_sharedState->_pipeline->freeze());
 
-        // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
-        // Pipeline that contains the $unionWith is disposed of, it will propagate dispose() to its
-        // subpipeline.
-        _sharedState->_execPipeline->dismissDisposal();
+            // Serialize the new pipeline.
+            serializedPipeline = _sharedState->_pipeline->serializeToBson();
+
+            // If this throws again, the exception will bubble up and will be caught by an outer
+            // layer.
+            prepareSubPipeline(serializedPipeline);
+        }
     }
 
-    auto res = _sharedState->_execPipeline->getNext();
-    if (res)
+    if (auto res = _sharedState->_execPipeline->getNext()) {
         return std::move(*res);
+    }
 
     // Record the plan summary stats after $unionWith operation is done.
     _sharedState->_execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
@@ -175,6 +155,40 @@ GetNextResult UnionWithStage::doGetNext() {
 
     _sharedState->_executionState = UnionWithSharedState::ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
+}
+
+void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPipeline) {
+    // Since the subpipeline will be executed again for explain, we store the starting state of
+    // the variables to reset them later.
+    if (pExpCtx->getExplain()) {
+        auto expCtx = _sharedState->_pipeline->getContext();
+        _sharedState->_variables = expCtx->variables;
+        _sharedState->_variablesParseState =
+            expCtx->variablesParseState.copyWith(_sharedState->_variables.useIdGenerator());
+    }
+
+    logStartingSubPipeline(serializedPipeline);
+
+    // Query settings are looked up after parsing and therefore are not populated in the
+    // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith constructor.
+    // Attach query settings to the '_pipeline->getContext()' by copying them from the
+    // parent query ExpressionContext.
+    _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
+        pExpCtx->getQuerySettings());
+
+    logPipeline(104243, "$unionWith before pipeline prep: ", *_sharedState->_pipeline);
+    _sharedState->_pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
+        std::move(_sharedState->_pipeline));
+    logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
+
+    _sharedState->_executionState = UnionWithSharedState::ExecutionProgress::kIteratingSubPipeline;
+
+    _sharedState->_execPipeline = exec::agg::buildPipeline(_sharedState->_pipeline->freeze());
+
+    // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
+    // Pipeline that contains the $unionWith is disposed of, it will propagate dispose() to its
+    // subpipeline.
+    _sharedState->_execPipeline->dismissDisposal();
 }
 
 bool UnionWithStage::usedDisk() const {
@@ -188,7 +202,6 @@ void UnionWithStage::doDispose() {
             _stats.planSummaryStats.usedDisk || _sharedState->_execPipeline->usedDisk();
         _sharedState->_execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
     }
-
 
     // When not in explain command, propagate disposal to the subpipeline, otherwise the subpipeline
     // will be disposed in '~UnionWithSharedState()'.
