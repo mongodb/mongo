@@ -7,71 +7,54 @@
 # * ${env} - Env variable string to set (ex. ENV_VAR_ABC=123)
 # * ${redact_args} - If set, redact the args in the report
 
-# Needed for evergreen scripts that use evergreen expansions and utility methods.
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
-cd src
-
 set -o errexit
 set -o verbose
+set -o pipefail
 
-activate_venv
+. "$DIR/bazel_evergreen_shutils.sh"
+
+bazel_evergreen_shutils::activate_and_cd_src
+bazel_evergreen_shutils::export_ssl_paths_if_needed
 
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Args: ${args} Target: ${target} Env: ${env} redact_args: ${redact_args}"
 
-source ./evergreen/bazel_utility_functions.sh
-source ./evergreen/bazel_RBE_supported.sh
+BAZEL_BINARY="$(bazel_evergreen_shutils::bazel_get_binary_path)"
 
-if bazel_rbe_supported; then
-  LOCAL_ARG=""
-else
-  LOCAL_ARG="--config=local"
+# Build LOCAL_ARG for run-mode
+LOCAL_ARG="$(bazel_evergreen_shutils::compute_local_arg run)"
+# Honor .bazel_build_flags --config lines (do not evict previous cache)
+ALL_FLAGS=""
+if [[ -f .bazel_build_flags ]]; then
+  ALL_FLAGS="$(< .bazel_build_flags)"
+fi
+CONFIG_FLAGS="$(bazel_evergreen_shutils::extract_config_flags "${ALL_FLAGS}")"
+LOCAL_ARG="${CONFIG_FLAGS} ${LOCAL_ARG}"
+
+INVOCATION_WITH_REDACTION="${target}"
+if [[ -z "${redact_args:-}" ]]; then
+  INVOCATION_WITH_REDACTION+=" ${args}"
 fi
 
-if [[ "${evergreen_remote_exec}" != "on" ]]; then
-  LOCAL_ARG="--config=local"
-fi
+# Record invocation
+echo "bazel run --verbose_failures ${LOCAL_ARG} ${INVOCATION_WITH_REDACTION}" > bazel-invocation.txt
 
-REMOTE_EXEC_DISABLE=""
-if is_s390x_or_ppc64le; then
-  REMOTE_EXEC_DISABLE="$REMOTE_EXEC_DISABLE --remote_executor="
-elif [[ "$evergreen_remote_exec" != "on" ]]; then
-  REMOTE_EXEC_DISABLE="$REMOTE_EXEC_DISABLE --remote_executor="
-fi
+# capture exit code
+set +o errexit
 
-BAZEL_BINARY=$(bazel_get_binary_path)
+bazel_evergreen_shutils::retry_bazel_cmd 5 "$BAZEL_BINARY" \
+  run --verbose_failures ${LOCAL_ARG} ${target} ${args} 2>&1 | tee -a bazel_output.log
+RET=${PIPESTATUS[0]}
+: "${RET:=1}"
+set -o errexit
 
-# AL2 stores certs in a nonstandard location
-if [[ -f /etc/os-release ]]; then
-  DISTRO=$(awk -F '[="]*' '/^PRETTY_NAME/ { print $2 }' < /etc/os-release)
-  if [[ $DISTRO == "Amazon Linux 2" ]]; then
-    export SSL_CERT_DIR=/etc/pki/tls/certs
-    export SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
-  elif [[ $DISTRO == "Red Hat Enterprise Linux"* ]]; then
-    export SSL_CERT_DIR=/etc/pki/ca-trust/extracted/pem
-    export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
-  fi
-fi
+# Report
+$python ./buildscripts/simple_report.py \
+  --test-name "bazel run ${INVOCATION_WITH_REDACTION}" \
+  --log-file bazel_output.log \
+  --exit-code "${RET}"
 
-if [[ -n "$redact_args" ]]; then
-  INVOCATION_WITH_REDACTION="${target}"
-else
-  INVOCATION_WITH_REDACTION="${target} ${args}"
-fi
-
-# Print command being run to file that can be uploaded
-echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
-echo "bazel run --verbose_failures ${bazel_compile_flags} ${task_compile_flags} ${LOCAL_ARG} ${INVOCATION_WITH_REDACTION} ${REMOTE_EXEC_DISABLE}" >> bazel-invocation.txt
-
-# Run bazel command, retrying up to five times
-MAX_ATTEMPTS=5
-for ((i = 1; i <= $MAX_ATTEMPTS; i++)); do
-  eval $env $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${target} ${args} ${REMOTE_EXEC_DISABLE} >> bazel_output.log 2>&1 && RET=0 && break || RET=$? && sleep 10
-  if [ $i -lt $MAX_ATTEMPTS ]; then echo "Bazel failed to execute, retrying ($(($i + 1)) of $MAX_ATTEMPTS attempts)... " >> bazel_output.log 2>&1; fi
-  $BAZEL_BINARY shutdown
-done
-
-$python ./buildscripts/simple_report.py --test-name "bazel run ${INVOCATION_WITH_REDACTION}" --log-file bazel_output.log --exit-code $RET
-exit $RET
+exit "${RET}"
