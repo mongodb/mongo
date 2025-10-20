@@ -915,54 +915,6 @@ tasks:
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
-- <<: *jstestfuzz_template
-  name: change_stream_serverless_no_optimization_fuzzer_gen
-  tags:
-    [
-      "assigned_to_jira_team_server_query_optimization",
-      "non_deterministic",
-      "change_stream_fuzzer",
-      "require_npm",
-      "random_name",
-      "incompatible_tsan",
-      "incompatible_aubsan",
-      "incompatible_debug_mode",
-    ]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        <<: *jstestfuzz_config_vars
-        num_files: 20
-        num_tasks: 20
-        jstestfuzz_vars: --diffTestingMode serverlessNoOptimization
-        npm_command: change-stream-fuzzer
-        suite: generational_fuzzer
-        resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-- <<: *jstestfuzz_template
-  name: change_stream_serverless_fuzzer_gen
-  tags:
-    [
-      "assigned_to_jira_team_server_query_optimization",
-      "non_deterministic",
-      "change_stream_fuzzer",
-      "require_npm",
-      "random_name",
-      "incompatible_tsan",
-      "incompatible_aubsan",
-      "incompatible_debug_mode",
-    ]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        <<: *jstestfuzz_config_vars
-        num_files: 20
-        num_tasks: 20
-        jstestfuzz_vars: --diffTestingMode serverless
-        npm_command: change-stream-fuzzer
-        suite: generational_fuzzer
-        resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
 - <<: *task_template
   name: jsCore_wildcard_indexes
   depends_on:

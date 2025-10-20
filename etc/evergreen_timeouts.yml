@@ -43,10 +43,6 @@ overrides:
     exec_timeout: 600 # 10 hours
   - task: change_stream_optimization_fuzzer
     exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_fuzzer
-    exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_no_optimization_fuzzer
-    exec_timeout: 600 # 10 hours
 
   enterprise-amazon-linux2-arm64-all-feature-flags:
   - task: cursor_hints_to_query_settings_replset_passthrough
@@ -72,10 +68,6 @@ overrides:
   - task: aggregation_blockprocessing_fuzzer
     exec_timeout: 600 # 10 hours
   - task: change_stream_optimization_fuzzer
-    exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_fuzzer
-    exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_no_optimization_fuzzer
     exec_timeout: 600 # 10 hours
 
   debian12:
@@ -108,10 +100,6 @@ overrides:
 
   enterprise-rhel-8-64-bit-dynamic-classic-engine:
   - task: aggregation_blockprocessing_fuzzer
-    exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_no_optimization_fuzzer
-    exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_fuzzer
     exec_timeout: 600 # 10 hours
   - task: change_stream_optimization_fuzzer
     exec_timeout: 600 # 10 hours
@@ -319,10 +307,6 @@ overrides:
     exec_timeout: 600 # 10 hours
   - task: update_timeseries_fuzzer
     exec_timeout: 180 # 3 hours
-  - task: change_stream_serverless_no_optimization_fuzzer
-    exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_fuzzer
-    exec_timeout: 600 # 10 hours
   - task: change_stream_optimization_fuzzer
     exec_timeout: 600 # 10 hours
 
@@ -331,10 +315,6 @@ overrides:
     exec_timeout: 600 # 10 hours
   - task: update_timeseries_fuzzer
     exec_timeout: 180 # 3 hours
-  - task: change_stream_serverless_no_optimization_fuzzer
-    exec_timeout: 600 # 10 hours
-  - task: change_stream_serverless_fuzzer
-    exec_timeout: 600 # 10 hours
   - task: change_stream_optimization_fuzzer
     exec_timeout: 600 # 10 hours
 
