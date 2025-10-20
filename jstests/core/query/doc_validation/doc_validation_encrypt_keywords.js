@@ -8,8 +8,6 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_non_retryable_commands,
  *   uses_full_validation,
- *   # TODO SERVER-87119: re-enable this tests in sharding suites with random migrations
- *   assumes_balancer_off,
  * ]
  */
 
