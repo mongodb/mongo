@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/otel/telemetry_context.h"
 
+#include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/context.h>
 
 namespace mongo {
@@ -41,6 +42,8 @@ namespace traces {
 using OtelContext = opentelemetry::context::Context;
 using ScopedSpan = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>;
 using OtelStringView = opentelemetry::nostd::string_view;
+using TextMapPropagator = opentelemetry::context::propagation::TextMapPropagator;
+using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
 
 constexpr OtelStringView keepSpanKey = "keepSpan";
 constexpr OtelStringView trueValue = "true";
@@ -82,6 +85,8 @@ public:
     StringData type() const override {
         return "SpanTelemetryContextImpl";
     }
+
+    void propagate(TextMapPropagator& propagator, TextMapCarrier& carrier) const;
 
 private:
     OtelContext _ctx;

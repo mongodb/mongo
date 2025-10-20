@@ -34,6 +34,8 @@
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
+#include <opentelemetry/baggage/propagation/baggage_propagator.h>
+#include <opentelemetry/context/propagation/composite_propagator.h>
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/context.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
@@ -43,40 +45,57 @@
 namespace mongo {
 namespace otel {
 
+using opentelemetry::baggage::propagation::BaggagePropagator;
+using opentelemetry::context::propagation::CompositePropagator;
+using opentelemetry::context::propagation::TextMapPropagator;
 using opentelemetry::trace::propagation::HttpTraceContext;
 using OtelContext = opentelemetry::context::Context;
 
+namespace {
 // TODO: TextMapPropagator's interface (defined by the C++ Otel library) does not appear to mark
 // Inject/Extract as const, despite it being required according to my reading of the spec:
 // "Getter and Setter MUST be stateless and allowed to be saved as constants, in order to
 // effectively avoid runtime allocations."
 // https://opentelemetry.io/docs/specs/otel/context/api-propagators/#textmap-propagator
-// Assuming this is a bug, pass the propagator around as const and use const_cast
-// until it's fixed upstream.
+// Unless this is fixed, create the propagator on demand.
+auto getPropagator() {
+    std::vector<std::unique_ptr<TextMapPropagator>> propagators;
+    propagators.emplace_back(std::make_unique<BaggagePropagator>());
+    propagators.emplace_back(std::make_unique<HttpTraceContext>());
+    return CompositePropagator{std::move(propagators)};
+}
+}  // namespace
 
 std::shared_ptr<TelemetryContext> TelemetryContextSerializer::fromBSON(const BSONObj& bson) {
-    // TODO SERVER-100120 Replace this with a CompositePropagator that also understands keepSpan.
-    HttpTraceContext propagator;
+    auto propagator = getPropagator();
+    return detail::fromBSON(bson, propagator);
+}
 
+BSONObj TelemetryContextSerializer::toBSON(const std::shared_ptr<TelemetryContext>& context) {
+    auto propagator = getPropagator();
+    return detail::toBSON(*context, propagator);
+}
+
+namespace detail {
+std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson, TextMapPropagator& propagator) {
     traces::BSONTextMapCarrier carrier{bson};
     OtelContext context;
     context = propagator.Extract(carrier, context);
     return std::make_shared<traces::SpanTelemetryContextImpl>(std::move(context));
 }
 
-BSONObj TelemetryContextSerializer::toBSON(const std::shared_ptr<TelemetryContext>& context) {
-    // TODO SERVER-100120 Replace this with a CompositePropagator that also understands keepSpan.
-    const HttpTraceContext propagator;
-    traces::BSONTextMapCarrier carrier;
-    const auto& typedContext = std::dynamic_pointer_cast<traces::SpanTelemetryContextImpl>(context);
-    if (typedContext) {
-        // TODO SERVER-100120 typedContext->propagate(propagator, &carrier);
+BSONObj toBSON(const TelemetryContext& context, TextMapPropagator& propagator) {
+    try {
+        traces::BSONTextMapCarrier carrier;
+        const auto* typedContext = dynamic_cast<const traces::SpanTelemetryContextImpl*>(&context);
+        tassert(10012000, "Bad cast", typedContext);
+        typedContext->propagate(propagator, carrier);
         return carrier.toBSON();
-    } else {
-        // We should theoretically never get here, but if we do, return an empty BSONObj.
-        return BSONObj();
+    } catch (const AssertionException&) {
+        return {};
     }
 }
+}  // namespace detail
 
 }  // namespace otel
 }  // namespace mongo

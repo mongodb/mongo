@@ -29,6 +29,7 @@
 
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/otel/traces/tracing_utils.h"
 
 #include <opentelemetry/baggage/baggage_context.h>
@@ -55,6 +56,11 @@ bool SpanTelemetryContextImpl::shouldKeepSpan() const {
     std::string value;
     auto exists = baggage->GetValue(keepSpanKey, value);
     return exists && (value == trueValue);
+}
+
+void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
+                                         TextMapCarrier& carrier) const {
+    propagator.Inject(carrier, _ctx);
 }
 
 }  // namespace traces

@@ -79,6 +79,7 @@ mongo_cc_unit_test(
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
         ":otel",
+        "//src/mongo/otel/traces:tracing_test_util",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )

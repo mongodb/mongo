@@ -32,6 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/otel/telemetry_context.h"
 
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/context/propagation/text_map_propagator.h>
+#endif
+
+
 namespace mongo {
 namespace otel {
 
@@ -45,6 +50,13 @@ public:
     static std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson);
     static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context);
 };
+
+namespace detail {
+using TextMapPropagator = opentelemetry::context::propagation::TextMapPropagator;
+using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
+std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson, TextMapPropagator& propagator);
+BSONObj toBSON(const TelemetryContext& context, TextMapPropagator& propagator);
+}  // namespace detail
 
 #else
 

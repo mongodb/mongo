@@ -100,9 +100,8 @@ TEST_F(TelemetryContextMetadataHookWithSpanTest, WriteRequestMetadataWithRealSpa
     ASSERT_TRUE(obj.hasField("$traceCtx"));
     ASSERT_EQ(obj["$traceCtx"].type(), BSONType::object);
 
-    // TODO SERVER-100120: Uncomment the assertion below
-    // BSONObj traceCtx = obj["$traceCtx"].Obj();
-    // ASSERT_TRUE(traceCtx.hasField("traceparent"));
+    BSONObj traceCtx = obj["$traceCtx"].Obj();
+    ASSERT_TRUE(traceCtx.hasField("traceparent"));
 }
 #endif  // MONGO_CONFIG_OTEL
 
