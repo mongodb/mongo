@@ -30,6 +30,7 @@
 
 #include "mongo/executor/async_multicaster.h"
 
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/condition_variable.h"
@@ -57,51 +58,111 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     OperationContext* opCtx,
     Milliseconds timeoutMillis) {
 
-    // Everything goes into a state struct because we can get cancelled, and then our callback would
-    // be invoked later.
-    struct State {
-        State(size_t leftToDo) : leftToDo(leftToDo) {}
-
-        stdx::mutex mutex;
-        stdx::condition_variable cv;
-        size_t leftToDo;
-        size_t running = 0;
-
-        // To indicate which hosts fail.
-        std::vector<Reply> out;
-    };
-
     auto state = std::make_shared<State>(servers.size());
+    state->out.reserve(servers.size());
+    state->strategies.reserve(servers.size());
+
+    // Set default strategy factory if none provided
+    if (!_options.strategyFactory) {
+        _options.strategyFactory = []() {
+            return std::make_unique<DefaultRetryStrategy>(
+                DefaultRetryStrategy::RetryCriteria{
+                    [](Status s, std::span<const std::string> labels) {
+                        return containsRetryableLabels(labels);
+                    }},
+                DefaultRetryStrategy::getRetryParametersFromServerParameters());
+        };
+    }
+
+    // Update the strategy creation loop in multicast method:
+    for (const auto& server : servers) {
+        state->strategies.emplace(server, _options.strategyFactory());
+    }
+
     for (const auto& server : servers) {
         stdx::unique_lock<stdx::mutex> lk(state->mutex);
         // spin up no more than maxConcurrency tasks at once
         opCtx->waitForConditionOrInterrupt(
             state->cv, lk, [&] { return state->running < _options.maxConcurrency; });
         ++state->running;
-
-        uassertStatusOK(_executor->scheduleRemoteCommand(
-            RemoteCommandRequest{server, theDbName, theCmdObj, opCtx, timeoutMillis},
-            [state](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-                stdx::lock_guard<stdx::mutex> lk(state->mutex);
-
-                state->out.emplace_back(
-                    std::forward_as_tuple(cbData.request.target, cbData.response));
-
-                // If we were the last job, flush the done flag and release via notify.
-                if (!--(state->leftToDo)) {
-                    state->cv.notify_one();
-                }
-
-                if (--(state->running) < kMaxConcurrency) {
-                    state->cv.notify_one();
-                }
-            }));
+        RemoteCommandRequest request{server, theDbName, theCmdObj, opCtx, timeoutMillis};
+        _scheduleAttempt(state, request, opCtx->getCancellationToken(), server);
     }
 
     stdx::unique_lock<stdx::mutex> lk(state->mutex);
     opCtx->waitForConditionOrInterrupt(state->cv, lk, [&] { return state->leftToDo == 0; });
 
     return std::move(state->out);
+}
+
+void AsyncMulticaster::_scheduleAttempt(std::shared_ptr<State> state,
+                                        const RemoteCommandRequest& request,
+                                        const CancellationToken& cancellationToken,
+                                        const HostAndPort& server) {
+    uassertStatusOK(_executor->scheduleRemoteCommand(
+        request,
+        [this, state, server, request, cancellationToken](
+            const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+            stdx::lock_guard<stdx::mutex> lk(state->mutex);
+
+            auto it = state->strategies.find(cbData.request.target);
+            tassert(10944600,
+                    str::stream() << "Retry strategy not found for target shard "
+                                  << cbData.request.target,
+                    it != state->strategies.end());
+            auto* hostRetryStrategy = it->second.get();
+
+            bool shouldRetry = false;
+
+            if (cbData.response.isOK() && cbData.response.getErrorLabels().empty()) {
+                hostRetryStrategy->recordSuccess(cbData.request.target);
+            } else {
+                shouldRetry = hostRetryStrategy->recordFailureAndEvaluateShouldRetry(
+                    cbData.response.status,
+                    cbData.request.target,
+                    cbData.response.getErrorLabels());
+            }
+            if (shouldRetry) {
+                const auto delay = hostRetryStrategy->getNextRetryDelay();
+                _executor->sleepFor(delay, cancellationToken)
+                    .getAsync([this,
+                               state,
+                               server,
+                               request,
+                               cancellationToken,
+                               originalResponse = cbData.response,
+                               delay](Status s) {
+                        stdx::lock_guard<stdx::mutex> lk(state->mutex);
+                        if (s.isOK()) {
+                            auto it = state->strategies.find(server);
+                            if (it != state->strategies.end()) {
+                                it->second->recordBackoff(delay);
+                            }
+                            _scheduleAttempt(state, request, cancellationToken, server);
+                        } else {
+                            _onComplete(lk, state, server, originalResponse);
+                        }
+                    });
+            } else {
+                _onComplete(lk, state, cbData.request.target, cbData.response);
+            }
+        }));
+}
+
+void AsyncMulticaster::_onComplete(WithLock,
+                                   std::shared_ptr<State> state,
+                                   const HostAndPort& server,
+                                   const RemoteCommandResponse& response) {
+    state->out.emplace_back(std::forward_as_tuple(server, response));
+
+    // If we were the last job, flush the done flag and release via notify.
+    if (!--(state->leftToDo)) {
+        state->cv.notify_one();
+    }
+
+    if (--(state->running) < kMaxConcurrency) {
+        state->cv.notify_one();
+    }
 }
 
 }  // namespace executor
