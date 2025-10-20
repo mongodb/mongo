@@ -268,14 +268,14 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
 
-        ASSERT_EQ(0U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
 
         // Inserting a record smaller than 'minBytesPerMarker' shouldn't create a new collection
         // marker.
         auto insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 99, Timestamp(1, 1), RecordId(1, 1));
         ASSERT_EQ(insertedRecordId, RecordId(1, 1));
-        ASSERT_EQ(0U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
         ASSERT_EQ(1, testMarkers->currentRecords_forTest());
         ASSERT_EQ(99, testMarkers->currentBytes_forTest());
 
@@ -284,7 +284,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 51, Timestamp(1, 2), RecordId(1, 2));
         ASSERT_EQ(insertedRecordId, RecordId(1, 2));
-        ASSERT_EQ(1U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
         ASSERT_EQ(0, testMarkers->currentRecords_forTest());
         ASSERT_EQ(0, testMarkers->currentBytes_forTest());
 
@@ -294,7 +294,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(1, 3), RecordId(1, 3));
         ASSERT_EQ(insertedRecordId, RecordId(1, 3));
-        ASSERT_EQ(1U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
         ASSERT_EQ(1, testMarkers->currentRecords_forTest());
         ASSERT_EQ(50, testMarkers->currentBytes_forTest());
 
@@ -303,7 +303,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(1, 4), RecordId(1, 4));
         ASSERT_EQ(insertedRecordId, RecordId(1, 4));
-        ASSERT_EQ(2U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(2U, testMarkers->numMarkers());
         ASSERT_EQ(0, testMarkers->currentRecords_forTest());
         ASSERT_EQ(0, testMarkers->currentBytes_forTest());
 
@@ -312,7 +312,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 101, Timestamp(1, 5), RecordId(1, 5));
         ASSERT_EQ(insertedRecordId, RecordId(1, 5));
-        ASSERT_EQ(3U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(3U, testMarkers->numMarkers());
         ASSERT_EQ(0, testMarkers->currentRecords_forTest());
         ASSERT_EQ(0, testMarkers->currentBytes_forTest());
     }
@@ -338,11 +338,11 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
 
-        ASSERT_EQ(0U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
         auto insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 2), RecordId(2, 2));
         ASSERT_EQ(insertedRecordId, RecordId(2, 2));
-        ASSERT_EQ(0U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(0U, testMarkers->numMarkers());
         ASSERT_EQ(1, testMarkers->currentRecords_forTest());
         ASSERT_EQ(50, testMarkers->currentBytes_forTest());
 
@@ -351,7 +351,7 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 1), RecordId(2, 1));
         ASSERT_EQ(insertedRecordId, RecordId(2, 1));
-        ASSERT_EQ(1U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
         ASSERT_EQ(0, testMarkers->currentRecords_forTest());
         ASSERT_EQ(0, testMarkers->currentBytes_forTest());
 
@@ -361,7 +361,7 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 100, Timestamp(1, 1), RecordId(1, 1));
         ASSERT_EQ(insertedRecordId, RecordId(1, 1));
-        ASSERT_EQ(1U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(1U, testMarkers->numMarkers());
         ASSERT_EQ(1, testMarkers->currentRecords_forTest());
         ASSERT_EQ(100, testMarkers->currentBytes_forTest());
 
@@ -370,7 +370,7 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 3), RecordId(2, 3));
         ASSERT_EQ(insertedRecordId, RecordId(2, 3));
-        ASSERT_EQ(2U, testMarkers->numMarkers_forTest());
+        ASSERT_EQ(2U, testMarkers->numMarkers());
         ASSERT_EQ(0, testMarkers->currentRecords_forTest());
         ASSERT_EQ(0, testMarkers->currentBytes_forTest());
     }

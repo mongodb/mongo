@@ -218,6 +218,7 @@ MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
+MONGO_FAIL_POINT_DEFINE(hangDuringOplogSampling);
 
 std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
 WiredTigerRecordStore::OplogTruncateMarkers::createEmptyOplogTruncateMarkers(
@@ -270,6 +271,14 @@ WiredTigerRecordStore::OplogTruncateMarkers::sampleAndUpdate(OperationContext* o
     } else {
         iterator = std::make_unique<UnyieldableCollectionIterator>(opCtx, rs);
     }
+
+    if (MONGO_unlikely(hangDuringOplogSampling.shouldFail())) {
+        LOGV2(11211900,
+              "Hanging the oplog cap maintainer thread during intial sampling due "
+              "to fail point");
+        hangDuringOplogSampling.pauseWhileSet(opCtx);
+    }
+
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx,
         *iterator,
@@ -285,6 +294,8 @@ WiredTigerRecordStore::OplogTruncateMarkers::sampleAndUpdate(OperationContext* o
         numTruncateMarkersToKeep);
     LOGV2(22382,
           "WiredTiger record store oplog processing finished",
+          "markersCount"_attr = initialSetOfMarkers.markers.size(),
+          "markerCreationMethod"_attr = toString(initialSetOfMarkers.methodUsed),
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
     LOGV2(10621110,
           "Initial set of markers created.",
@@ -397,6 +408,8 @@ void WiredTigerRecordStore::OplogTruncateMarkers::getOplogTruncateMarkersStats(
                _creationMethod == CollectionTruncateMarkers::MarkersCreationMethod::Scanning) {
         builder.append("processingMethod", "scanning");
     }
+
+    builder.appendNumber("truncateMarkersCount", static_cast<long long>(numMarkers()));
 
     if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
         builder.append("oplogMinRetentionHours", oplogMinRetentionHours);

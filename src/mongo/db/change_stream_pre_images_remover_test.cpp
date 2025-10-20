@@ -464,10 +464,10 @@ TEST_F(PreImagesRemoverTest, createPartialMarkerIfNecessaryEmptySet) {
                                                     0,
                                                     100,
                                                     kArbitraryMarkerCreationMethod);
-    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
+    auto numMarkersBefore = nsUUIDMarkers.numMarkers();
     ASSERT_EQ(numMarkersBefore, 0);
     nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
-    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
+    auto numMarkersAfter = nsUUIDMarkers.numMarkers();
     ASSERT_EQ(numMarkersAfter, 0);
 }
 
@@ -486,10 +486,10 @@ TEST_F(PreImagesRemoverTest, createPartialMarkerIfNecessaryNoHighestRecordIdOrWa
                                                     1,
                                                     100,
                                                     kArbitraryMarkerCreationMethod);
-    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
+    auto numMarkersBefore = nsUUIDMarkers.numMarkers();
     ASSERT_EQ(numMarkersBefore, 0);
     nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
-    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
+    auto numMarkersAfter = nsUUIDMarkers.numMarkers();
     ASSERT_EQ(numMarkersAfter, 0);
 }
 
@@ -521,10 +521,10 @@ TEST_F(PreImagesRemoverTest, createPartialMarkerSucceedsExpiryByOldestOplogEntry
     // auto-generated.
     nsUUIDMarkers.updateMarkers(numBytesToInsert, recordIdToInsert, wallTime, numRecordsToInsert);
 
-    auto numMarkersBefore = nsUUIDMarkers.numMarkers_forTest();
+    auto numMarkersBefore = nsUUIDMarkers.numMarkers();
     ASSERT_EQ(numMarkersBefore, 0);
     nsUUIDMarkers.createPartialMarkerIfNecessary(opCtx);
-    auto numMarkersAfter = nsUUIDMarkers.numMarkers_forTest();
+    auto numMarkersAfter = nsUUIDMarkers.numMarkers();
     ASSERT_EQ(numMarkersAfter, 1);
 }
 
