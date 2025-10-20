@@ -1208,6 +1208,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     serviceContext->notifyStorageStartupRecoveryComplete();
+    startOplogCapMaintainerThread(
+        serviceContext, replSettings.isReplSet(), replSettings.shouldSkipOplogSampling());
 
 #ifndef _WIN32
     initialize_server_global_state::signalForkSuccess();

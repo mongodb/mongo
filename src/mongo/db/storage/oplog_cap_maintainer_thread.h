@@ -38,6 +38,12 @@
 
 namespace mongo {
 
+void startOplogCapMaintainerThread(ServiceContext* serviceContext,
+                                   bool isReplSet,
+                                   bool shouldSkipOplogSampling);
+
+void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& reason);
+
 /**
  * Responsible for deleting oplog truncate markers once their max capacity has been reached.
  */

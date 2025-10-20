@@ -89,6 +89,8 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service, bool memLeakAll
  */
 StorageEngine::LastShutdownState reinitializeStorageEngine(
     OperationContext* opCtx,
+    bool isReplSet,
+    bool shouldSkipOplogSampling,
     StorageEngineInitFlags initFlags,
     std::function<void()> changeConfigurationCallback = [] {});
 

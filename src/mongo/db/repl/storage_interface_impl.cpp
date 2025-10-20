@@ -1478,6 +1478,7 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
     // thread for durability.
     Status reason = Status(ErrorCodes::InterruptedDueToReplStateChange, "Rollback in progress.");
     StorageControl::stopStorageControls(serviceContext, reason, /*forRestart=*/true);
+    stopOplogCapMaintainerThread(serviceContext, reason);
 
     auto swStableTimestamp = serviceContext->getStorageEngine()->recoverToStableTimestamp(opCtx);
     if (!swStableTimestamp.isOK()) {
@@ -1488,6 +1489,10 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
     fassert(31049, swStableTimestamp);
 
     StorageControl::startStorageControls(serviceContext);
+    startOplogCapMaintainerThread(
+        serviceContext,
+        repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet(),
+        repl::ReplSettings::shouldSkipOplogSampling());
 
     return swStableTimestamp.getValue();
 }

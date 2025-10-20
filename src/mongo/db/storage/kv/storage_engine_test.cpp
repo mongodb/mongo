@@ -794,7 +794,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     const auto newPath = boost::filesystem::path(oldPath).append(".alternate").string();
     boost::filesystem::create_directory(newPath);
     auto lastShutdownState =
-        reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&newPath] {
+        reinitializeStorageEngine(opCtx.get(), false, false, StorageEngineInitFlags{}, [&newPath] {
             storageGlobalParams.dbpath = newPath;
         });
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
@@ -812,7 +812,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
 
     LOGV2(5781104, "Starting up storage engine in original location");
     lastShutdownState =
-        reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&oldPath] {
+        reinitializeStorageEngine(opCtx.get(), false, false, StorageEngineInitFlags{}, [&oldPath] {
             storageGlobalParams.dbpath = oldPath;
         });
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();

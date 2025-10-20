@@ -125,7 +125,10 @@ public:
                         int numElements,
                         Timestamp timestampToUse) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-        const auto correctedSize = dataLength - BSON("x" << "").objsize();
+        const auto correctedSize = dataLength -
+            BSON("x"
+                 << "")
+                .objsize();
         invariant(correctedSize >= 0);
         const auto objToInsert = BSON("x" << std::string(correctedSize, 'a'));
         WriteUnitOfWork wuow(opCtx);
@@ -144,14 +147,14 @@ public:
                                                int64_t leftoverRecordsBytes,
                                                int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
-              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
+              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
 
     TestCollectionMarkersWithPartialExpiration(std::deque<Marker> markers,
                                                int64_t leftoverRecordsCount,
                                                int64_t leftoverRecordsBytes,
                                                int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
+              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
 
     void setExpirePartialMarker(bool value) {
         _expirePartialMarker = value;
@@ -177,14 +180,14 @@ public:
                           int64_t leftoverRecordsBytes,
                           int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
-              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
+              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
 
     TestCollectionMarkers(std::deque<Marker> markers,
                           int64_t leftoverRecordsCount,
                           int64_t leftoverRecordsBytes,
                           int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {};
+              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override {
