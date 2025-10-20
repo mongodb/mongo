@@ -980,7 +980,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
                                    repl::ReadConcernLevel::kLocalReadConcern);
         listIndexesCmd.setReadConcern(args);
     }
-    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         listIndexesCmd.setRawData(true);
@@ -1049,7 +1049,7 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
     } else {
         listCollectionsCmd.setFilter(BSON("info.uuid" << nssOrUUID.uuid()));
     }
-    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         listCollectionsCmd.setRawData(true);
@@ -1137,7 +1137,7 @@ void _dropLocalIndexes(OperationContext* opCtx,
                 recipientIndex[IndexDescriptor::kKeyPatternFieldName].Obj())) {
             DropIndexes dropIndexesCmd{nss};
             dropIndexesCmd.setIndex(indexNameElem.str());
-            if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 dropIndexesCmd.setRawData(true);

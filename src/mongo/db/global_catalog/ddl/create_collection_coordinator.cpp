@@ -288,6 +288,12 @@ bool viewlessTimeseriesEnabled(OperationContext* opCtx) {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
+bool shouldUseRawDataOperations(OperationContext* opCtx) {
+    return gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
 void assertTimeseriesLocalCatalogConsistency(OperationContext* opCtx, const Collection* coll) {
     tassert(9934501,
             fmt::format("Encountered invalid state for target collection '{}'. ",
@@ -2042,7 +2048,7 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
     ListCollections listCollections;
     listCollections.setDbName(nss().dbName());
     listCollections.setFilter(BSON("info.uuid" << *_uuid));
-    if (viewlessTimeseriesEnabled(opCtx)) {
+    if (shouldUseRawDataOperations(opCtx)) {
         listCollections.setRawData(true);
     }
 
@@ -2069,7 +2075,7 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
     }
 
     ListIndexes listIndexes(NamespaceStringOrUUID(nss().dbName(), *_uuid));
-    if (viewlessTimeseriesEnabled(opCtx)) {
+    if (shouldUseRawDataOperations(opCtx)) {
         listIndexes.setRawData(true);
     }
 

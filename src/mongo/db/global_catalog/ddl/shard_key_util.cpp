@@ -444,7 +444,7 @@ void ValidationBehaviorsShardCollection::createShardKeyIndex(
     CreateIndexesCommand createIndexesCmd{nss};
     createIndexesCmd.setIndexes({indexSpec});
     createIndexesCmd.setWriteConcern(defaultMajorityWriteConcern());
-    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(_opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         createIndexesCmd.setRawData(true);

@@ -314,7 +314,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
     aggRequest.setHint(hint);
 
     // TODO SERVER-107180 always set rawData once 9.0 becomes last LTS
-    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         aggRequest.setRawData(true);
