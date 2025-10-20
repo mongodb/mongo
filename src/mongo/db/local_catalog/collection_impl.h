@@ -445,6 +445,11 @@ private:
                       std::shared_ptr<durable_catalog::CatalogEntryMetaData>&& metadata);
 
     /**
+     * Checks that the given validator can be used on this collection
+     */
+    Status _checkValidatorCanBeUsed(const BSONObj& validator) const;
+
+    /**
      * Holder of shared state between CollectionImpl clones and snapshots at a point in time.
      */
     struct SharedState {

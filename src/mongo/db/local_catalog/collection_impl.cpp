@@ -123,39 +123,6 @@ MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 // and clear the new durable flag which is stored inside the collection options.
 MONGO_FAIL_POINT_DEFINE(simulateLegacyTimeseriesMixedSchemaFlag);
 
-Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
-                                   const NamespaceString& nss,
-                                   const UUID& uuid) {
-    if (validator.isEmpty())
-        return Status::OK();
-
-    if (nss.isTemporaryReshardingCollection()) {
-        // In resharding, if the user's original collection has a validator, then the temporary
-        // resharding collection is created with it as well.
-        return Status::OK();
-    }
-
-    if (nss.isTimeseriesBucketsCollection()) {
-        return Status::OK();
-    }
-
-    if (nss.isSystem()) {
-        return {ErrorCodes::InvalidOptions,
-                str::stream() << "Document validators not allowed on system collection "
-                              << nss.toStringForErrorMsg() << " with UUID " << uuid};
-    }
-
-    // Allow schema on config.settings. This is created internally, and user changes to this
-    // validator are disallowed in the createCollection and collMod commands.
-    if (nss.isOnInternalDb() && nss != NamespaceString::kConfigSettingsNamespace) {
-        return {ErrorCodes::InvalidOptions,
-                str::stream() << "Document validators are not allowed on collection "
-                              << nss.toStringForErrorMsg() << " with UUID " << uuid << " in the "
-                              << nss.dbName().toStringForErrorMsg() << " internal database"};
-    }
-    return Status::OK();
-}
-
 Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                                        boost::optional<ValidationLevelEnum> newLevel,
                                        boost::optional<ValidationActionEnum> newAction) {
@@ -470,7 +437,7 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
         : collectionOptions.validator.getOwned();
 
     // Enforce that the validator can be used on this namespace.
-    uassertStatusOK(checkValidatorCanBeUsedOnNs(validatorDoc, _ns, _uuid));
+    uassertStatusOK(_checkValidatorCanBeUsed(validatorDoc));
 
     // Make sure validationAction and validationLevel are allowed on this collection
     uassertStatusOK(checkValidationOptionsCanBeUsed(
@@ -522,6 +489,38 @@ void CollectionImpl::_setMetadata(
     }
     _metadata = std::move(metadata);
 }
+
+Status CollectionImpl::_checkValidatorCanBeUsed(const BSONObj& validator) const {
+    if (validator.isEmpty())
+        return Status::OK();
+
+    if (isTimeseriesCollection()) {
+        return Status::OK();
+    }
+
+    if (_ns.isTemporaryReshardingCollection()) {
+        // In resharding, if the user's original collection has a validator, then the temporary
+        // resharding collection is created with it as well.
+        return Status::OK();
+    }
+
+    if (_ns.isSystem()) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "Document validators not allowed on system collection "
+                              << _ns.toStringForErrorMsg() << " with UUID " << _uuid};
+    }
+
+    // Allow schema on config.settings. is created internally, and user changes to this
+    // validator are disallowed in the createCollection and collMod commands.
+    if (_ns.isOnInternalDb() && _ns != NamespaceString::kConfigSettingsNamespace) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "Document validators are not allowed on collection "
+                              << _ns.toStringForErrorMsg() << " with UUID " << _uuid << " in the "
+                              << _ns.dbName().toStringForErrorMsg() << " internal database"};
+    }
+    return Status::OK();
+}
+
 
 bool CollectionImpl::isInitialized() const {
     return _initialized;
@@ -685,7 +684,7 @@ Collection::Validator CollectionImpl::parseValidator(
         return {validator, nullptr, nullptr};
     }
 
-    Status canUseValidatorInThisContext = checkValidatorCanBeUsedOnNs(validator, ns(), _uuid);
+    Status canUseValidatorInThisContext = _checkValidatorCanBeUsed(validator);
     if (!canUseValidatorInThisContext.isOK()) {
         return {validator, nullptr, canUseValidatorInThisContext};
     }
