@@ -842,8 +842,8 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForData
 DEATH_TEST_REGEX_F(ChangeStreamStageTest,
                    BuildControlEventsFilterForDataShardFailsWhenCallingForNonV2ChangeStreamReaders,
                    "Tripwire assertion.*10743901") {
-    // Set version v1 in the change stream spec of the ExpressionContext. Unfortunately
-    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    // Set version v1 in the change stream spec of the ExpressionContext.
+    // 'getChangeStreamSpec()' returns a const reference, so we need to make a copy of it.
     auto spec = getExpCtx()->getChangeStreamSpec();
     spec->setVersion(ChangeStreamReaderVersionEnum::kV1);
     getExpCtx()->setChangeStreamSpec(spec);
@@ -871,8 +871,8 @@ TEST_F(ChangeStreamStageTest,
                 return expectedFilter;
             }));
 
-    // Set version v2 in the change stream spec of the ExpressionContext. Unfortunately
-    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    // Set version v2 in the change stream spec of the ExpressionContext.
+    // 'getChangeStreamSpec()' returns a const reference, so we need to make a copy of it.
     auto spec = getExpCtx()->getChangeStreamSpec();
     spec->setVersion(ChangeStreamReaderVersionEnum::kV2);
     getExpCtx()->setChangeStreamSpec(spec);
@@ -883,8 +883,8 @@ TEST_F(ChangeStreamStageTest,
 
 // Test that the transaction filter for v1 change streams is as expected.
 TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
-    // Set version v1 in the change stream spec of the ExpressionContext. Unfortunately
-    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    // Set version v1 in the change stream spec of the ExpressionContext.
+    // 'getChangeStreamSpec()' returns a const reference, so we need to make a copy of it.
     auto spec = getExpCtx()->getChangeStreamSpec();
     spec->setVersion(ChangeStreamReaderVersionEnum::kV1);
     getExpCtx()->setChangeStreamSpec(spec);
@@ -1024,8 +1024,8 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                 return expectedFilter;
             }));
 
-    // Set version v2 in the change stream spec of the ExpressionContext. Unfortunately
-    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    // Set version v2 in the change stream spec of the ExpressionContext.
+    // 'getChangeStreamSpec()' returns a const reference, so we need to make a copy of it.
     auto spec = getExpCtx()->getChangeStreamSpec();
     spec->setVersion(ChangeStreamReaderVersionEnum::kV2);
     getExpCtx()->setChangeStreamSpec(spec);

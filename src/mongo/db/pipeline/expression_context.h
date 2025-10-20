@@ -792,7 +792,7 @@ public:
         _params.changeStreamTokenVersion = changeStreamTokenVersion;
     }
 
-    boost::optional<DocumentSourceChangeStreamSpec> getChangeStreamSpec() const {
+    const boost::optional<DocumentSourceChangeStreamSpec>& getChangeStreamSpec() const {
         return _params.changeStreamSpec;
     }
 

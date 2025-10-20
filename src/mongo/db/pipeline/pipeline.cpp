@@ -137,7 +137,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                 hasChangeStreamSplitLargeEventStage = true;
             }
         }
-        auto spec = isChangeStream ? expCtx->getChangeStreamSpec() : boost::none;
+        const auto& spec = isChangeStream ? expCtx->getChangeStreamSpec() : boost::none;
         auto hasSplitEventResumeToken = spec &&
             change_stream::resolveResumeTokenFromSpec(expCtx, *spec).fragmentNum.has_value();
         uassert(ErrorCodes::ChangeStreamFatalError,
