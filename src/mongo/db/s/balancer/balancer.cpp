@@ -560,7 +560,7 @@ class BalancerWarning {
 public:
     BalancerWarning() = default;
 
-    void warnIfRequired(OperationContext* opCtx, BalancerSettingsType::BalancerMode balancerMode) {
+    void warnIfRequired(OperationContext* opCtx, BalancerModeEnum balancerMode) {
         if (Date_t::now() - _lastDrainingShardsCheckTime < kDrainingShardsCheckInterval &&
             MONGO_likely(!forceBalancerWarningChecks.shouldFail())) {
             return;
@@ -574,7 +574,7 @@ public:
             return;
         }
 
-        if (balancerMode == BalancerSettingsType::BalancerMode::kOff) {
+        if (balancerMode == BalancerModeEnum::kOff) {
             LOGV2_WARNING(
                 6434000,
                 "Draining of removed shards cannot be completed because the balancer is disabled",
@@ -836,7 +836,7 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     const auto mode = balancerConfig->getBalancerMode();
 
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-    builder->append("mode", BalancerSettingsType::kBalancerModes[mode]);
+    builder->append("mode", BalancerMode_serializer(mode));
     builder->append("inBalancerRound", _inBalancerRound);
     builder->append("numBalancerRounds", _numBalancerRounds);
     builder->append("term", repl::ReplicationCoordinator::get(opCtx)->getTerm());

@@ -132,31 +132,24 @@ StatusWith<MigrationSecondaryThrottleOptions> MigrationSecondaryThrottleOptions:
 }
 
 StatusWith<MigrationSecondaryThrottleOptions>
-MigrationSecondaryThrottleOptions::createFromBalancerConfig(const BSONObj& obj) {
-    {
-        bool isSecondaryThrottle;
-        Status status =
-            bsonExtractBooleanField(obj, kSecondaryThrottleMongos, &isSecondaryThrottle);
-        if (status.isOK()) {
-            return MigrationSecondaryThrottleOptions::create(isSecondaryThrottle ? kOn : kOff);
-        } else if (status == ErrorCodes::NoSuchKey) {
-            return MigrationSecondaryThrottleOptions::create(kDefault);
-        } else if (status != ErrorCodes::TypeMismatch) {
-            return status;
+MigrationSecondaryThrottleOptions::createFromBalancerConfig(const BSONElement& elem) {
+    if (elem.eoo()) {
+        return MigrationSecondaryThrottleOptions::create(kDefault);
+    }
+
+    if (elem.type() == BSONType::boolean) {
+        return MigrationSecondaryThrottleOptions::create(elem.Bool() ? kOn : kOff);
+    } else if (elem.type() == BSONType::object) {
+        auto sw = WriteConcernOptions::parse(elem.Obj());
+        if (!sw.isOK()) {
+            return sw.getStatus();
         }
+        return MigrationSecondaryThrottleOptions::createWithWriteConcern(sw.getValue());
+    } else {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected bool or object for _secondaryThrottle, got: "
+                                    << typeName(elem.type()));
     }
-
-    // Try to load it as a BSON document
-    BSONElement elem;
-    Status status = bsonExtractTypedField(obj, kSecondaryThrottleMongos, BSONType::object, &elem);
-    if (!status.isOK())
-        return status;
-
-    auto sw = WriteConcernOptions::parse(elem.Obj());
-    if (!sw.isOK()) {
-        return sw.getStatus();
-    }
-    return MigrationSecondaryThrottleOptions::createWithWriteConcern(sw.getValue());
 }
 
 WriteConcernOptions MigrationSecondaryThrottleOptions::getWriteConcern() const {
@@ -193,5 +186,33 @@ bool MigrationSecondaryThrottleOptions::operator!=(
     const MigrationSecondaryThrottleOptions& other) const {
     return !(*this == other);
 }
+
+MigrationSecondaryThrottleOptions MigrationSecondaryThrottleOptions::parseFromBalancerConfigElement(
+    const BSONElement& element) {
+    auto sw = MigrationSecondaryThrottleOptions::createFromBalancerConfig(element);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Invalid MigrationSecondaryThrottle: " << sw.getStatus(),
+            sw.isOK());
+    return sw.getValue();
+}
+
+void MigrationSecondaryThrottleOptions::serializeToBalancerConfigElement(
+    StringData fieldName, BSONObjBuilder* builder) const {
+
+    if (_secondaryThrottle == kDefault) {
+        return;
+    }
+
+    if (_secondaryThrottle == kOff) {
+        builder->appendBool(fieldName, false);
+    } else if (_secondaryThrottle == kOn) {
+        if (_writeConcernBSON.has_value()) {
+            builder->append(fieldName, *_writeConcernBSON);
+        } else {
+            builder->appendBool(fieldName, true);
+        }
+    }
+}
+
 
 }  // namespace mongo

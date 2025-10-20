@@ -1,0 +1,127 @@
+# Copyright (C) 2025-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/request_types/migration_secondary_throttle_options.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+enums:
+    BalancerMode:
+        description: "Balancer mode enum"
+        type: string
+        values:
+            kFull: "full"
+            kOff: "off"
+
+    DayOfWeek:
+        description: "Valid days of the week for balancer windows"
+        type: string
+        values:
+            Sunday: "Sunday"
+            Monday: "Monday"
+            Tuesday: "Tuesday"
+            Wednesday: "Wednesday"
+            Thursday: "Thursday"
+            Friday: "Friday"
+            Saturday: "Saturday"
+
+types:
+    MigrationSecondaryThrottle:
+        bson_serialization_type: any
+        description: "Secondary throttle policy to adopt during the migration"
+        cpp_type: "mongo::MigrationSecondaryThrottleOptions"
+        serializer: mongo::MigrationSecondaryThrottleOptions::serializeToBalancerConfigElement
+        deserializer: mongo::MigrationSecondaryThrottleOptions::parseFromBalancerConfigElement
+        is_view: false
+
+structs:
+    ActiveWindow:
+        description: "Active window configuration for balancer"
+        strict: false
+        fields:
+            start:
+                type: string
+                description: "Start time in HH:MM format"
+                optional: false
+            stop:
+                type: string
+                description: "Stop time in HH:MM format"
+                optional: false
+
+    DayOfWeekWindow:
+        description: "Day of week specific active window configuration"
+        strict: false
+        fields:
+            day:
+                type: DayOfWeek
+                description: "Day of the week (must be a valid, capitalized day name)"
+                optional: false
+            start:
+                type: string
+                description: "Start time in HH:MM format"
+                optional: false
+            stop:
+                type: string
+                description: "Stop time in HH:MM format"
+                optional: false
+
+    BalancerSettings:
+        description: "Balancer configuration settings"
+        strict: false
+        fields:
+            mode:
+                type: BalancerMode
+                description: "Balancer mode (full or off)"
+                default: kFull
+            stopped:
+                type: bool
+                description: "Whether the balancer is stopped"
+                default: false
+            activeWindow:
+                type: ActiveWindow
+                description: "Time window when balancer is active"
+                optional: true
+            activeWindowDOW:
+                type: array<DayOfWeekWindow>
+                description: "Day-of-week specific active windows"
+                optional: true
+            _secondaryThrottle:
+                type: MigrationSecondaryThrottle
+                description: "Secondary throttle configuration"
+                optional: true
+            _waitForDelete:
+                type: bool
+                description: "Whether to wait for deletes to complete"
+                default: false
+            attemptToBalanceJumboChunks:
+                type: bool
+                description: "Whether to attempt balancing jumbo chunks"
+                default: false

@@ -127,7 +127,7 @@ public:
 private:
     void _run(OperationContext* opCtx, BSONObjBuilder* result) override {
         auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-        uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerSettingsType::kFull));
+        uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerModeEnum::kFull));
         uassertStatusOK(balancerConfig->changeAutoMergeSettings(opCtx, true));
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
         auto catalogManager = ShardingCatalogManager::get(opCtx);
@@ -154,7 +154,7 @@ private:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-        uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerSettingsType::kOff));
+        uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerModeEnum::kOff));
         uassertStatusOK(balancerConfig->changeAutoMergeSettings(opCtx, false));
 
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);

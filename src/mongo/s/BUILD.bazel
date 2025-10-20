@@ -43,6 +43,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "balancer_configuration_gen",
+    src = "balancer_configuration.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "sharding_helpers",
     srcs = [
@@ -344,6 +352,7 @@ mongo_cc_library(
         "refresh_query_analyzer_configuration_cmd_gen",
         "transaction_participant_failed_unyield_exception.cpp",
         "would_change_owning_shard_exception.cpp",
+        ":balancer_configuration_gen",
         ":balancer_feature_flag_gen",
         "//src/mongo/db/cluster_parameters:sharding_cluster_parameters_gen",
         "//src/mongo/db/global_catalog:chunk.cpp",

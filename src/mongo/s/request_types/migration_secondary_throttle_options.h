@@ -98,6 +98,25 @@ public:
         return uassertStatusOK(createFromCommand(obj));
     }
 
+    /**
+     * IDL deserializer for BalancerSettings._secondaryThrottle field.
+     * Handles both boolean values (true/false) and WriteConcern objects formatted as BSON.
+     * This method is specifically designed for parsing the _secondaryThrottle field
+     * from balancer configuration documents.
+     */
+    static MigrationSecondaryThrottleOptions parseFromBalancerConfigElement(
+        const BSONElement& element);
+
+    /**
+     * IDL serializer for BalancerSettings._secondaryThrottle field.
+     * Serializes to either a boolean value (true/false) or a WriteConcern BSON object,
+     * depending on the internal configuration. This method is specifically designed
+     * for serializing the _secondaryThrottle field in balancer configuration documents.
+     *
+     * @param fieldName The name of the field to serialize (typically "_secondaryThrottle").
+     * @param builder The BSON object builder to append the field to.
+     */
+    void serializeToBalancerConfigElement(StringData fieldName, BSONObjBuilder* builder) const;
 
     /**
      * Extracts the secondary throttle settings from a balancer configuration document, which can
@@ -110,7 +129,7 @@ public:
      * If secondary throttle is not specified, uses kDefault.
      */
     static StatusWith<MigrationSecondaryThrottleOptions> createFromBalancerConfig(
-        const BSONObj& obj);
+        const BSONElement& elem);
 
     /**
      * Returns the selected secondary throttle option.
