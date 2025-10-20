@@ -31,15 +31,14 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/util/str.h"
+
+#include <fmt/format.h>
 
 namespace mongo::sorter {
 boost::filesystem::path nextFileName(boost::filesystem::path path) {
     static AtomicWord<unsigned> fileCounter;
     static const uint64_t randomSuffix = SecureRandom().nextUInt64();
-    std::ostringstream fileName;
-    fileName << "extsort." << fileCounter.fetchAndAdd(1) << '-' << randomSuffix;
-    path /= fileName.str();
+    path /= fmt::format("extsort.{}-{}", fileCounter.fetchAndAdd(1), randomSuffix);
     return path;
 }
 }  // namespace mongo::sorter

@@ -1,5 +1,6 @@
 global:
     cpp_namespace: "mongo"
+    mod_visibility: private
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -29,6 +30,7 @@ structs:
                 description: "The version of checksum that dictates what hash was used to calculate it."
                 type: SorterChecksumVersion
                 optional: true
+        mod_visibility: pub
 
 server_parameters:
     maxIteratorsMemoryUsagePercentage:

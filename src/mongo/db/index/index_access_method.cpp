@@ -1146,7 +1146,7 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
     }
 
     int64_t iterations = 0;
-    while (it->more()) {
+    while (it && it->more()) {
         opCtx->checkForInterrupt();
 
         auto failPointHang = [opCtx, iterations, &indexName = _indexName](FailPoint& fp) {
@@ -1329,7 +1329,7 @@ PrimaryDrivenBulkBuilder::_finalizeSort(OperationContext* opCtx,
         wuow.commit();
         ++_keysInserted;
     }
-    return std::make_unique<sorter::InMemIterator<key_string::Value, mongo::NullValue>>();
+    return nullptr;
 }
 
 void PrimaryDrivenBulkBuilder::_addKeyForCommit(OperationContext* opCtx,

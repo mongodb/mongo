@@ -29,12 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-
-#include <string>
+#include "mongo/util/modules.h"
 
 #include <boost/filesystem/path.hpp>
 
+MONGO_MOD_PUB;
 namespace mongo::sorter {
 /**
  * Generates a new file name on each call using a static, atomic and monotonically increasing

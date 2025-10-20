@@ -29,7 +29,28 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/util/spill_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_checksum_calculator.h"
+#include "mongo/db/sorter/sorter_file_name.h"
+#include "mongo/db/sorter/sorter_gen.h"
+#include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/db/stats/counters_sort.h"
+#include "mongo/db/storage/encryption_hooks.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/file.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/shared_buffer_fragment.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -50,36 +71,9 @@
 
 #include <snappy.h>
 
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/util/spill_util.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/sorter/sorter_checksum_calculator.h"
-#include "mongo/db/sorter/sorter_file_name.h"
-#include "mongo/db/sorter/sorter_gen.h"
-#include "mongo/db/sorter/sorter_stats.h"
-#include "mongo/db/stats/counters_sort.h"
-#include "mongo/db/storage/encryption_hooks.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/atomic.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/bufreader.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/file.h"
-#include "mongo/util/shared_buffer_fragment.h"
-#include "mongo/util/str.h"
-
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include <boost/optional.hpp>
 
 /**
  * Template definitions for Sorter implementations.
@@ -121,7 +115,7 @@ inline EncryptionHooks* getEncryptionHooksIfEnabled() {
     return encryptionHooks;
 }
 
-inline SharedBufferFragmentBuilder makeMemPool() {
+MONGO_MOD_PUB inline SharedBufferFragmentBuilder makeMemPool() {
     return SharedBufferFragmentBuilder(
         gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),
         SharedBufferFragmentBuilder::DoubleGrowStrategy(

@@ -30,9 +30,11 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
+MONGO_MOD_PUB;
 namespace mongo {
 
 /**

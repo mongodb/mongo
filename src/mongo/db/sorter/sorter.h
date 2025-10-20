@@ -35,27 +35,23 @@
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
-#include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <cstddef>
-#include <cstdint>
-#include <fstream>  // IWYU pragma: keep
+#include <fstream>
 #include <functional>
-#include <iterator>
 #include <memory>
 #include <queue>
 #include <span>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include <boost/optional.hpp>
 
 /**
  * This is the public API for the Sorter (both in-memory and external)
@@ -103,7 +99,7 @@
  * };
  */
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Runtime options that control the Sorter's behavior
@@ -691,7 +687,7 @@ protected:
 };
 
 template <typename Key, typename Value>
-class SortedFileWriter : public SortedStorageWriter<Key, Value> {
+class SortedFileWriter final : public SortedStorageWriter<Key, Value> {
 public:
     typedef SortIteratorInterface<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
@@ -718,4 +714,4 @@ private:
     // be given to the Iterator in done().
     std::streamoff _fileStartOffset;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
