@@ -151,7 +151,7 @@ MultiPlanner::PlanQ MultiPlanner::preparePlans(
         auto tracker = std::make_unique<TrialRunTracker>(
             trackerResultsBudget,
             _maxNumReads,
-            size_t{0} /*kNumPlanningResults - used only in crp_sbe*/);
+            boost::none /*kNumPlanningResults - used only in crp_sbe*/);
         root->attachToTrialRunTracker(tracker.get());
 
         plan_ranker::CandidatePlanData data = {std::move(stageData), std::move(tracker)};

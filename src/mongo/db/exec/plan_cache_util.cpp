@@ -438,7 +438,7 @@ void ClassicPlanCacheWriter::operator()(const CanonicalQuery& cq,
 
     if (_executeInSbe) {
         auto stats = mps.getStats();
-        auto nReads = computeNumReadsFromWorks(*stats, *ranking);
+        auto nReads = computeNumReadsFromStats(*stats, *ranking);
 
         updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
             _opCtx, _collection.getCollectionPtr(), cq, nReads, std::move(ranking), candidates);
@@ -519,14 +519,22 @@ bool ConditionalClassicPlanCacheWriter::shouldCacheBasedOnCachingMode(
     MONGO_UNREACHABLE;
 }
 
-NumReads computeNumReadsFromWorks(const PlanStageStats& stats,
+NumReads computeNumReadsFromStats(const PlanStageStats& stats,
                                   const plan_ranker::PlanRankingDecision& ranking) {
     auto winnerIdx = ranking.candidateOrder[0];
     auto summary = collectExecutionStatsSummary(&stats, winnerIdx);
     tassert(8523807,
             "Expected StatsDetails in classic runtime planner ranking decision.",
             std::holds_alternative<plan_ranker::StatsDetails>(ranking.stats));
-    return NumReads{summary.totalKeysExamined + summary.totalDocsExamined};
+
+    // The original "all classic" multiplanner uses the "works" stat as its unit of measure for
+    // tracking how much work a plan has done, while this multiplanner (the "CRP SBE" multiplanner)
+    // uses the "reads" metric (totalKeysExamined + totalDocsExamined) as its unit of measure.
+    //
+    // The "works" stat is always greater than zero. To play it safe and make it easier for the "all
+    // classic" and "CRP SBE" multiplanners to coexist, this function makes sure to always return
+    // a positive "reads" value.
+    return NumReads{std::max<size_t>(summary.totalKeysExamined + summary.totalDocsExamined, 1)};
 }
 
 }  // namespace plan_cache_util

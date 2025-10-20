@@ -139,7 +139,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     };
     candidate.data.tracker = std::make_unique<TrialRunTracker>(
         std::move(onMetricReached),
-        size_t{0} /*kNumResults - used only in SBE multi-planner*/,
+        boost::none /*kNumResults - used only in SBE multi-planner*/,
         maxTrialPeriodNumReads,
         maxTrialResultsFromPlanningRoot);
     candidate.root->attachToTrialRunTracker(

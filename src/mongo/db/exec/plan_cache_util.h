@@ -224,6 +224,8 @@ protected:
     const Mode _planCachingMode;
 };
 
-NumReads computeNumReadsFromWorks(const PlanStageStats& stats,
+// This function computes the value of the "reads" metric for the winning plan using the specified
+// 'stats'. This function will always return a positive value.
+NumReads computeNumReadsFromStats(const PlanStageStats& stats,
                                   const plan_ranker::PlanRankingDecision& ranking);
 }  // namespace mongo::plan_cache_util

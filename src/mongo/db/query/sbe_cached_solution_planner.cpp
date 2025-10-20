@@ -229,11 +229,11 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
                 MONGO_UNREACHABLE;
         }
     };
-    candidate.data.tracker =
-        std::make_unique<TrialRunTracker>(std::move(onMetricReached),
-                                          maxNumResults,
-                                          maxTrialPeriodNumReads,
-                                          size_t{0} /*kNumPlanningResults - used only in crp_sbe*/);
+    candidate.data.tracker = std::make_unique<TrialRunTracker>(
+        std::move(onMetricReached),
+        maxNumResults,
+        maxTrialPeriodNumReads,
+        boost::none /*kNumPlanningResults - used only in crp_sbe*/);
     candidate.root->attachToTrialRunTracker(candidate.data.tracker.get());
     _trialRuntimeExecutor.executeCachedCandidateTrial(&candidate, maxNumResults);
 

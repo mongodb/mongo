@@ -91,7 +91,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
                                            kEmptyPlanNodeId /* nodeId */,
                                            ScanCallbacks());
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { scanStage->detachFromTrialRunTracker(); });
 
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
@@ -113,7 +113,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
                          nullptr /* yieldPolicy */,
                          kEmptyPlanNodeId);
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { sortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
@@ -151,7 +151,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
                                           nullptr /* yieldPolicy */,
                                           kEmptyPlanNodeId);
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
@@ -400,7 +400,7 @@ TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
                               ScanCallbacks());
 
     scanStage->disableTrialRunTracking();
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none);
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
     ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 }
@@ -440,7 +440,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
                                           kEmptyPlanNodeId);
 
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
@@ -504,7 +504,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
                          kEmptyPlanNodeId);
 
     // We expect the TrialRunTracker to attach to _only_ the left child.
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, boost::none, boost::none);
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
 
     // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
@@ -538,7 +538,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToPlanningRootStageAndTracksTheDocume
                          nullptr /* yieldPolicy */,
                          PlanNodeId{3});
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{6}, size_t{0}, size_t{3});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{6}, boost::none, size_t{3});
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get(), PlanNodeId{1});
     ASSERT_EQ(attachResult,
               PlanStage::TrialRunTrackingType::TrackPlanningResults |
@@ -550,5 +550,46 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToPlanningRootStageAndTracksTheDocume
     prepareTree(ctx.get(), sortStage.get(), unwindSlot);
     ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumResults>(), 6);
     ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumPlanningResults>(), 3);
+}
+
+TEST_F(TrialRunTrackerTest, TrackerCanTrackMetricWithMaxMetricSetToZero) {
+    auto ctx = makeCompileCtx();
+
+    auto [inputTag, inputVal] = stage_builder::makeValue(
+        BSON_ARRAY(BSON("a" << 1) << BSON("a" << 2) << BSON("a" << 3) << BSON("a" << 4)));
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal, PlanNodeId{1});
+    auto sortStage =
+        makeS<SortStage>(std::move(scanStage),
+                         makeSV(scanSlot),
+                         std::vector<value::SortDirection>{value::SortDirection::Ascending},
+                         makeSV(),
+                         nullptr /*limit*/,
+                         1024 * 1024,
+                         false,
+                         nullptr /* yieldPolicy */,
+                         PlanNodeId{3});
+
+    auto onMetricReached = [&](TrialRunTracker::TrialRunMetric metric) {
+        // This callback should get called for the kNumResults metric.
+        ASSERT_EQ(metric, TrialRunTracker::kNumResults);
+        // Detach the TrialRunTracker and allow the plan to continue running.
+        sortStage->detachFromTrialRunTracker();
+        return false;
+    };
+
+    auto tracker = std::make_unique<TrialRunTracker>(
+        std::move(onMetricReached), size_t{0}, boost::none, boost::none);
+    auto attachResult = sortStage->attachToTrialRunTracker(tracker.get(), PlanNodeId{1});
+    ASSERT_EQ(attachResult,
+              PlanStage::TrialRunTrackingType::TrackPlanningResults |
+                  PlanStage::TrialRunTrackingType::TrackResults);
+
+    // The 'prepareTree()' function opens the SortStage, causing it to read documents from its
+    // child. The scan stage (which is marked as the planning root) should return 4 documents.
+    // The tracker should only observe the first document, because the callback we supplied should
+    // detach the tracker after the first document is observed (because that is precisely when
+    // 'tracker->getMetric<TrialRunTracker::kNumResults>()' becomes greater than the maximum of 0.)
+    prepareTree(ctx.get(), sortStage.get(), scanSlot);
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumResults>(), 1);
 }
 }  // namespace mongo::sbe

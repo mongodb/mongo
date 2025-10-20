@@ -58,20 +58,23 @@ public:
         //
         // TODO SERVER-88047: Remove this and replace with kNumResults.
         kNumPlanningResults,
-        // Must always be the last element to hold the number of element in the enum.
+        // Must always be the last element to hold the number of elements in the enum.
         kLastElem
     };
+
+    static constexpr size_t numTrialRunMetrics = static_cast<size_t>(TrialRunMetric::kLastElem);
 
     /**
      * Constructs a 'TrialRunTracker' which indicates that the trial period is over when any
      * 'TrialRunMetric' exceeds the maximum provided at construction.
      *
-     * Callers can also pass a value of zero to indicate that the given metric should not be
-     * tracked.
+     * Callers can also pass a value of boost::none to indicate that the given metric should not
+     * be tracked.
      */
-    template <typename... MaxMetrics,
-              std::enable_if_t<sizeof...(MaxMetrics) == TrialRunMetric::kLastElem, int> = 0>
-    TrialRunTracker(MaxMetrics... maxMetrics) : _maxMetrics{maxMetrics...} {}
+    TrialRunTracker(boost::optional<size_t> maxNumResults,
+                    boost::optional<size_t> maxNumReads,
+                    boost::optional<size_t> maxNumPlanningResults)
+        : _maxMetrics{maxNumResults, maxNumReads, maxNumPlanningResults} {}
 
     /**
      * Constructs a 'TrialRunTracker' that also has an '_onMetricReached' function, which gets
@@ -80,11 +83,12 @@ public:
      * '_onMetricReached' can prevent tracking from halting plan execution, thereby upgrading a
      * trial run to a normal run.
      */
-    template <typename... MaxMetrics>
-    TrialRunTracker(std::function<bool(TrialRunMetric)> onMetricReached, MaxMetrics... maxMetrics)
-        : TrialRunTracker{maxMetrics...} {
-        _onMetricReached = std::move(onMetricReached);
-    }
+    TrialRunTracker(std::function<bool(TrialRunMetric)> onMetricReached,
+                    boost::optional<size_t> maxNumResults,
+                    boost::optional<size_t> maxNumReads,
+                    boost::optional<size_t> maxNumPlanningResults)
+        : _maxMetrics{maxNumResults, maxNumReads, maxNumPlanningResults},
+          _onMetricReached(std::move(onMetricReached)) {}
 
     /**
      * Increments the trial run metric specified as a template parameter 'metric' by the
@@ -102,7 +106,7 @@ public:
     bool trackProgress(size_t metricIncrement) {
         static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
 
-        if (_maxMetrics[metric] == 0) {
+        if (!_maxMetrics[metric].has_value()) {
             // This metric is not being tracked.
             return false;
         }
@@ -131,24 +135,24 @@ public:
     template <TrialRunMetric metric>
     bool metricReached() const {
         static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
-        return metricTracked<metric>() && _metrics[metric] > _maxMetrics[metric];
+        return _maxMetrics[metric].has_value() && _metrics[metric] > *_maxMetrics[metric];
     }
 
     template <TrialRunMetric metric>
     bool metricTracked() const {
         static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
-        return _maxMetrics[metric] != 0;
+        return _maxMetrics[metric].has_value();
     }
 
     template <TrialRunMetric metric>
-    void updateMaxMetric(size_t newMaxMetric) {
+    void updateMaxMetric(boost::optional<size_t> newMaxMetric) {
         static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
         _maxMetrics[metric] = newMaxMetric;
     }
 
 private:
-    size_t _maxMetrics[TrialRunMetric::kLastElem];
-    size_t _metrics[TrialRunMetric::kLastElem]{0};
+    boost::optional<size_t> _maxMetrics[numTrialRunMetrics];
+    size_t _metrics[numTrialRunMetrics]{0};
     bool _done{false};
     std::function<bool(TrialRunMetric)> _onMetricReached{};
 };

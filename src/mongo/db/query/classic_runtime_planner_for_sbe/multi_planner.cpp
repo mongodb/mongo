@@ -137,7 +137,7 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
     boost::optional<NumReads> numReads;
     if (_shouldWriteToPlanCache) {
         auto stats = _multiPlanStage->getStats();
-        numReads = plan_cache_util::computeNumReadsFromWorks(*stats, *ranking);
+        numReads = plan_cache_util::computeNumReadsFromStats(*stats, *ranking);
     }
 
     // If classic plan cache is enabled, write to it. We need to do this before we extend the QSN
