@@ -46,6 +46,9 @@ public:
     OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
 
     static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
+    static OplogCapMaintainerThread* get(OperationContext* opCtx);
+    static void set(ServiceContext* serviceCtx,
+                    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread);
 
     std::string name() const override {
         return _name;
@@ -54,15 +57,25 @@ public:
     void run() override;
 
     /**
-     * Waits until the maintainer thread finishes.
+     * Waits until the maintainer thread finishes. Must not be called concurrently with start().
      */
-    void waitForFinish();
+    void shutdown(const Status& reason);
 
 private:
     /**
      * Returns true iff there was an oplog to delete from.
      */
     bool _deleteExcessDocuments(OperationContext* opCtx);
+
+    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
+    mutable stdx::mutex _opCtxMutex;
+
+    // Saves a reference to the cap maintainer thread's operation context.
+    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
+
+    mutable stdx::mutex _stateMutex;
+    bool _shuttingDown = false;
+    Status _shutdownReason = Status::OK();
 
     std::string _name = std::string("OplogCapMaintainerThread-") +
         toStringForLogging(NamespaceString::kRsOplogNamespace);

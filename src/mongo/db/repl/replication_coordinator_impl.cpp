@@ -1020,8 +1020,6 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
         return;
     }
 
-    _storage->initializeStorageControlsForReplication(opCtx->getServiceContext());
-
     // We are expected to be able to transition out of the kConfigStartingUp state by the end
     // of this function. Any uncaught exceptions here leave us in an invalid state and we will
     // not be able to shut down by normal means, as clean shutdown assumes we can leave that state.

@@ -68,14 +68,39 @@ namespace mongo {
 
 namespace {
 
-const auto getMaintainerThread = ServiceContext::declareDecoration<OplogCapMaintainerThread>();
+const auto getMaintainerThread =
+    ServiceContext::declareDecoration<std::unique_ptr<OplogCapMaintainerThread>>();
 
 MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
 
 }  // namespace
 
 OplogCapMaintainerThread* OplogCapMaintainerThread::get(ServiceContext* serviceCtx) {
-    return &getMaintainerThread(serviceCtx);
+    auto& maintainerThread = getMaintainerThread(serviceCtx);
+    if (maintainerThread) {
+        return maintainerThread.get();
+    }
+
+    return nullptr;
+}
+
+OplogCapMaintainerThread* OplogCapMaintainerThread::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
+void OplogCapMaintainerThread::set(
+    ServiceContext* serviceCtx,
+
+    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread) {
+    auto& maintainerThread = getMaintainerThread(serviceCtx);
+    if (maintainerThread) {
+        invariant(!maintainerThread->running(),
+                  "Tried to reset the OplogCapMaintainerThread without shutting down the original "
+                  "instance.");
+    }
+
+    invariant(oplogCapMaintainerThread);
+    maintainerThread = std::move(oplogCapMaintainerThread);
 }
 
 bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
@@ -153,8 +178,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
 }
 
 void OplogCapMaintainerThread::run() {
-    LOGV2_DEBUG(
-        5295000, 1, "Oplog cap maintainer thread started and active", "threadName"_attr = _name);
+    LOGV2(5295000, "Oplog cap maintainer thread started", "threadName"_attr = _name);
     ThreadClient tc(_name, getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     {
@@ -162,50 +186,83 @@ void OplogCapMaintainerThread::run() {
         tc.get()->setSystemOperationUnkillableByStepdown(lk);
     }
 
-    while (!globalInShutdownDeprecated()) {
-        auto opCtx = tc->makeOperationContext();
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
 
-        if (feature_flags::gOplogSamplingAsyncEnabled.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            gOplogSamplingAsyncEnabled) {
-            try {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
 
-                boost::optional<AutoGetOplogFastPath> oplogRead;
-                RecordStore* rs = nullptr;
+        // Initialize the thread's opCtx.
+        _uniqueCtx.emplace(tc->makeOperationContext());
 
-                // Need the oplog to have been created first before we proceed.
-                do {
-                    // Create the initial set of truncate markers as part of this thread before we
-                    // attempt to delete excess markers. Ensure that the oplog has been created as
-                    // part of restart before we attempt to create markers.
-                    oplogRead.emplace(opCtx.get(),
-                                      OplogAccessMode::kRead,
-                                      Date_t::max(),
-                                      AutoGetOplogFastPathOptions{.skipRSTLLock = true});
+        // Maintaining the Oplog cap is crucial to the stability of the server so that we don't
+        // let the oplog grow unbounded. We mark the operation as having immediate priority to
+        // skip ticket acquisition and flow control.
+        admissionPriority.emplace(_uniqueCtx->get(), AdmissionContext::Priority::kExempt);
+    }
 
-                    const auto& oplog = oplogRead->getCollection();
-                    if (oplog) {
-                        rs = oplog->getRecordStore();
-                        break;
-                    }
+    ON_BLOCK_EXIT([&] {
+        stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
+        admissionPriority.reset();
+        _uniqueCtx.reset();
+    });
 
-                    // Wait a bit to give the oplog a chance to be created.
-                    MONGO_IDLE_THREAD_BLOCK;
-                    LOGV2_DEBUG(10621101, 1, "OplogCapMaintainerThread is idle");
 
-                    // Reset the oplogRead so we don't hold a lock while we sleep.
-                    oplogRead.reset();
-                    sleepFor(Milliseconds(100));
-                    LOGV2_DEBUG(10621109, 1, "OplogCapMaintainerThread is active");
-                } while (!rs);
+    if (gOplogSamplingAsyncEnabled) {
+        try {
+            {
+                stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+                if (_shuttingDown) {
+                    return;
+                }
+            }
 
-                // Initial sampling and marker creation.
-                rs->sampleAndUpdate(opCtx.get());
-            } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-                LOGV2_DEBUG(9468100,
-                            1,
-                            "Interrupted due to shutdown. OplogCapMaintainerThread Exiting!",
-                            "error"_attr = e.what());
+            boost::optional<AutoGetOplogFastPath> oplogRead;
+
+            // Need the oplog to have been created first before we proceed.
+            do {
+                // Create the initial set of truncate markers as part of this thread before we
+                // attempt to delete excess markers. Ensure that the oplog has been created as part
+                // of restart before we attempt to create markers.
+                oplogRead.emplace(_uniqueCtx->get(),
+                                  OplogAccessMode::kRead,
+                                  Date_t::max(),
+                                  AutoGetOplogFastPathOptions{.skipRSTLLock = true});
+
+                const auto& oplog = oplogRead->getCollection();
+                if (oplog) {
+                    oplog->getRecordStore()->sampleAndUpdate(_uniqueCtx->get());
+                    break;
+                }
+
+                // Wait a bit to give the oplog a chance to be created.
+                MONGO_IDLE_THREAD_BLOCK;
+                LOGV2_DEBUG(10621101, 1, "OplogCapMaintainerThread is idle");
+
+                // Reset the oplogRead so we don't hold a lock while we sleep.
+                oplogRead.reset();
+                sleepFor(Milliseconds(100));
+                LOGV2_DEBUG(10621109, 1, "OplogCapMaintainerThread is active");
+            } while (true);
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+            LOGV2_DEBUG(9468100,
+                        1,
+                        "Interrupted due to shutdown. OplogCapMaintainerThread Exiting!",
+                        "error"_attr = e.what());
+            return;
+        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>&) {
+            LOGV2_DEBUG(10167201,
+                        1,
+                        "Interrupted due to storage change. OplogCapMaintainerThread Exiting!");
+            return;
+        }
+    }
+
+    while (true) {
+        // We need this check since the first check to _shuttingDown is guarded by
+        // gOplogSamplingAsyncEnabled and we will never check this value if async is disabled.
+        {
+            stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+            if (_shuttingDown) {
                 return;
             }
         }
@@ -213,9 +270,9 @@ void OplogCapMaintainerThread::run() {
         if (MONGO_unlikely(hangOplogCapMaintainerThread.shouldFail())) {
             LOGV2(5095500, "Hanging the oplog cap maintainer thread due to fail point");
             try {
-                hangOplogCapMaintainerThread.pauseWhileSet(opCtx.get());
+                hangOplogCapMaintainerThread.pauseWhileSet(_uniqueCtx->get());
             } catch (DBException& ex) {
-                auto interruptStatus = opCtx->checkForInterruptNoAssert();
+                auto interruptStatus = _uniqueCtx->get()->checkForInterruptNoAssert();
                 if (!interruptStatus.isOK()) {
                     LOGV2(9064302,
                           "Stop hanging the oplog cap maintainer thread due to interrupted fail "
@@ -229,18 +286,32 @@ void OplogCapMaintainerThread::run() {
             }
         }
 
-        if (!_deleteExcessDocuments(opCtx.get()) && !globalInShutdownDeprecated()) {
+        if (!_deleteExcessDocuments(_uniqueCtx->get()) && !globalInShutdownDeprecated()) {
             sleepmillis(1000);  // Back off in case there were problems deleting.
         }
     }
 }
 
-void OplogCapMaintainerThread::waitForFinish() {
-    if (running()) {
-        LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread");
-        wait();
-        LOGV2(7474901, "Finished shutting down oplog cap maintainer thread");
+
+void OplogCapMaintainerThread::shutdown(const Status& reason) {
+    LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread");
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
+        if (_uniqueCtx) {
+            stdx::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
+            _uniqueCtx->get()->markKilled(reason.code());
+        }
     }
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+        _shuttingDown = true;
+        _shutdownReason = reason;
+    }
+
+    wait();
+    LOGV2(7474901, "Finished shutting down oplog cap maintainer thread");
 }
 
 }  // namespace mongo

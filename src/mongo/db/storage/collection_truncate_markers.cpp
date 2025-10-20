@@ -185,6 +185,7 @@ void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
 
 void CollectionTruncateMarkers::initialSamplingFinished() {
     stdx::lock_guard<stdx::mutex> lk(_markersMutex);
+    LOGV2_DEBUG(10167200, 2, "Initial sampling finished marked true.");
     _initialSamplingFinished = true;
 }
 

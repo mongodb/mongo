@@ -124,6 +124,7 @@ mongo_cc_library(
         "//src/mongo/db/storage/control:storage_control.cpp",
     ],
     deps = [
+        ":oplog_cap_maintainer_thread",
         "//src/mongo:base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands:test_commands_enabled",
@@ -468,7 +469,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:flow_control_test.cpp",
         "//src/mongo/db/storage:index_entry_comparison_test.cpp",
         "//src/mongo/db/storage:key_string_test.cpp",
-        "//src/mongo/db/storage:oplog_truncation_test.cpp",
+        "//src/mongo/db/storage:oplog_async_sampling_test.cpp",
         "//src/mongo/db/storage:storage_engine_lock_file_test.cpp",
         "//src/mongo/db/storage:storage_engine_metadata_test.cpp",
         "//src/mongo/db/storage:storage_repair_observer_test.cpp",

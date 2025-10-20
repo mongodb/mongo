@@ -152,7 +152,7 @@ public:
 
     void reserveRecordIds(OperationContext* opCtx,
                           std::vector<RecordId>* out,
-                          size_t nRecords) final {};
+                          size_t nRecords) final{};
 
     NamespaceString ns(OperationContext* opCtx) const final {
         return _data->ns;

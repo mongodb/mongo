@@ -1500,19 +1500,6 @@ bool StorageInterfaceImpl::supportsRecoveryTimestamp(ServiceContext* serviceCtx)
     return serviceCtx->getStorageEngine()->supportsRecoveryTimestamp();
 }
 
-void StorageInterfaceImpl::initializeStorageControlsForReplication(
-    ServiceContext* serviceCtx) const {
-    // The storage engine may support the use of OplogTruncateMarkers to more finely control
-    // oplog history deletion, in which case we need to start the thread to
-    // periodically execute deletion via oplog truncate markers. OplogTruncateMarkers are a
-    // replacement for capped collection deletion of the oplog collection history.
-    if (serviceCtx->getStorageEngine()->supportsOplogTruncateMarkers() &&
-        !ReplSettings::shouldSkipOplogSampling()) {
-        auto maintainerThread = OplogCapMaintainerThread::get(serviceCtx);
-        maintainerThread->go();
-    }
-}
-
 boost::optional<Timestamp> StorageInterfaceImpl::getRecoveryTimestamp(
     ServiceContext* serviceCtx) const {
     return serviceCtx->getStorageEngine()->getRecoveryTimestamp();
