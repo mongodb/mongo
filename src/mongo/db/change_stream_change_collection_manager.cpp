@@ -381,7 +381,8 @@ public:
                             tenantWriteStats.bytesInserted,
                             tenantWriteStats.maxRecordIdSeen,
                             tenantWriteStats.maxWallTimeSeen,
-                            tenantWriteStats.docsInserted);
+                            tenantWriteStats.docsInserted,
+                            /*gOplogSamplingAsyncEnabled=*/false);
                     }
                 }
             }

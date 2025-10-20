@@ -301,14 +301,10 @@ std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
 WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
                                                                         WiredTigerRecordStore* rs,
                                                                         const NamespaceString& ns) {
-    bool samplingAsynchronously =
-        feature_flags::gOplogSamplingAsyncEnabled.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        gOplogSamplingAsyncEnabled;
     LOGV2(10621000,
           "Creating oplog markers",
-          "sampling asynchronously"_attr = samplingAsynchronously);
-    if (!samplingAsynchronously) {
+          "sampling asynchronously"_attr = gOplogSamplingAsyncEnabled);
+    if (!gOplogSamplingAsyncEnabled) {
         return sampleAndUpdate(opCtx, rs, ns);
     }
     return createEmptyOplogTruncateMarkers(rs);
@@ -1284,8 +1280,12 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                 return ele.Date();
             }
         }();
-        _oplogTruncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
-            opCtx, totalLength, records[nRecords - 1].id, wall, nRecords);
+        _oplogTruncateMarkers->updateCurrentMarkerAfterInsertOnCommit(opCtx,
+                                                                      totalLength,
+                                                                      records[nRecords - 1].id,
+                                                                      wall,
+                                                                      nRecords,
+                                                                      gOplogSamplingAsyncEnabled);
     }
 
     return Status::OK();

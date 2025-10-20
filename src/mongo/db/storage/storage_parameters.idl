@@ -284,8 +284,3 @@ feature_flags:
         cpp_varname: feature_flags::gBlockBasedDecodingPathAPI
         default: true
         shouldBeFCVGated: false
-    featureFlagOplogSamplingAsyncEnabled:
-        description: "Enable oplog sampling to run asynchronously to startup on the OplogCapMaintainerThread"
-        cpp_varname: feature_flags::gOplogSamplingAsyncEnabled
-        default: false
-        shouldBeFCVGated: false

@@ -63,7 +63,8 @@ public:
     // Performs post initialisation work. The constructor doesn't specify the highest element seen,
     // so we must update it after initialisation.
     void performPostInitialisation(const RecordId& highestRecordId, Date_t highestWallTime) {
-        updateCurrentMarker(0, highestRecordId, highestWallTime, 0);
+        updateCurrentMarker(
+            0, highestRecordId, highestWallTime, 0, /*gOplogSamplingAsyncEnabled=*/false);
     }
 
 private:

@@ -145,7 +145,8 @@ void ChangeCollectionTruncateMarkers::expirePartialMarker(OperationContext* opCt
     const auto& doc = obj->data.toBson();
     auto wallTime = doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
 
-    updateCurrentMarkerAfterInsertOnCommit(opCtx, bytesNotTruncated, obj->id, wallTime, 1);
+    updateCurrentMarkerAfterInsertOnCommit(
+        opCtx, bytesNotTruncated, obj->id, wallTime, 1, /*gOplogSamplingAsyncEnabled=*/false);
 
     auto bytesDeleted = oldestMarker->bytes - bytesNotTruncated;
     auto docsDeleted = oldestMarker->records - 1;

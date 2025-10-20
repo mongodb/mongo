@@ -224,7 +224,8 @@ void PreImagesTruncateMarkersPerNsUUID::updateMarkers(int64_t numBytes,
                                                       RecordId recordId,
                                                       Date_t wallTime,
                                                       int64_t numRecords) {
-    updateCurrentMarker(numBytes, recordId, wallTime, numRecords);
+    updateCurrentMarker(
+        numBytes, recordId, wallTime, numRecords, /*gOplogSamplingAsyncEnabled=*/false);
 }
 
 bool PreImagesTruncateMarkersPerNsUUID::_hasExcessMarkers(OperationContext* opCtx) const {
