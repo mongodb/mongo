@@ -90,7 +90,9 @@ public:
      * operation context.
      */
     virtual void kill(OperationContext* opCtx) {
-        invariant(_child);  // The default implementation forwards to the child stage.
+        tassert(11052344,
+                "router stage should have a child or provide alternative implementation",
+                _child);  // The default implementation forwards to the child stage.
         _child->kill(opCtx);
     }
 
@@ -106,7 +108,9 @@ public:
      * Returns the number of remote hosts involved in this execution plan.
      */
     virtual std::size_t getNumRemotes() const {
-        invariant(_child);  // The default implementation forwards to the child stage.
+        tassert(11052345,
+                "router stage should have a child or provide alternative implementation",
+                _child);  // The default implementation forwards to the child stage.
         return _child->getNumRemotes();
     }
 
@@ -114,7 +118,9 @@ public:
      * Returns whether or not all the remote cursors are exhausted.
      */
     virtual bool remotesExhausted() const {
-        invariant(_child);  // The default implementation forwards to the child stage.
+        tassert(11052346,
+                "router stage should have a child or provide alternative implementation",
+                _child);  // The default implementation forwards to the child stage.
         return _child->remotesExhausted();
     }
 

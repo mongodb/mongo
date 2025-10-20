@@ -356,8 +356,8 @@ void CursorEstablisher::checkForFailedRequests() {
 }
 
 void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption) {
-    invariant(!newError.isOK());
-    invariant(!_maybeFailure->isOK());
+    tassert(11052339, "Expected error", !newError.isOK());
+    tassert(11052340, "Expected failure", !_maybeFailure->isOK());
 
     // Prefer interruptions above all else.
     if (_wasInterrupted) {
@@ -388,7 +388,7 @@ void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption
 
     // Favor 'CollectionUUIDMismatchError' that has a non empty 'actualNamespace'.
     auto errorInfo = _maybeFailure->extraInfo<CollectionUUIDMismatchInfo>();
-    invariant(errorInfo);
+    tassert(11052341, "Expected extraInfo of type CollectionUUIDMismatchInfo", errorInfo);
     if (!errorInfo->actualCollection()) {
         _maybeFailure = std::move(newError);
     }

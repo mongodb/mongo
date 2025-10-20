@@ -144,7 +144,9 @@ ClusterCursorManager::PinnedCursor::PinnedCursor(ClusterCursorManager* manager,
                                                  CursorId cursorId)
     : _manager(manager), _cursor(cursorGuard.releaseCursor()), _nss(nss), _cursorId(cursorId) {
     invariant(_manager);
-    invariant(_cursorId);  // Zero is not a valid cursor id.
+    tassert(11052323,
+            "Unexpected zero value for cursor id",
+            _cursorId != 0);  // Zero is not a valid cursor id.
 }
 
 ClusterCursorManager::PinnedCursor::~PinnedCursor() {
@@ -174,7 +176,7 @@ ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator
 }
 
 void ClusterCursorManager::PinnedCursor::returnCursor(CursorState cursorState) {
-    invariant(_cursor);
+    tassert(11052324, "PinnedCursor does not own a cursor", _cursor);
     // Note that unpinning a cursor transfers ownership of the underlying ClusterClientCursor object
     // back to the manager.
     _manager->checkInCursor(std::move(_cursor), _cursorId, cursorState);
@@ -190,7 +192,7 @@ GenericCursor ClusterCursorManager::PinnedCursor::toGenericCursor() const {
 }
 
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
-    invariant(_cursor);
+    tassert(11052325, "PinnedCursor does not own a cursor", _cursor);
 
     // Return the cursor as exhausted so that it's deleted immediately.
     returnCursor(CursorState::Exhausted);
@@ -234,7 +236,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
                       "Cannot register new cursors as we are in the process of shutting down");
     }
 
-    invariant(cursor);
+    tassert(11052326, "Cursor not available", cursor);
     cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
 
     auto cursorId = generic_cursor::allocateCursorId(
@@ -253,7 +255,9 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
                                                              opCtx->getClient()->getUUID(),
                                                              opCtx->getOperationKey(),
                                                              nss));
-    invariant(emplaceResult.second);
+    tassert(11052327,
+            fmt::format("A CursorEntry already exists in the map for the CursorId {}", cursorId),
+            emplaceResult.second);
 
     return cursorId;
 }
@@ -348,7 +352,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
                                          CursorId cursorId,
                                          CursorState cursorState,
                                          bool isReleaseMemory) {
-    invariant(cursor);
+    tassert(11052328, "Cursor not available", cursor);
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
 
@@ -457,7 +461,7 @@ Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
     OperationContext* opUsingCursor = entry->getOperationUsingCursor();
     if (opUsingCursor) {
         // The caller shouldn't need to call killCursor on their own cursor.
-        invariant(opUsingCursor != opCtx, "Cannot call killCursor() on your own cursor");
+        tassert(11052329, "Cannot call killCursor() on your own cursor", opUsingCursor != opCtx);
         killOperationUsingCursor(lk, entry);
         return Status::OK();
     }
@@ -474,7 +478,10 @@ void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk
                                                CursorId cursorId) {
     LOGV2_DEBUG(8928411, 2, "Detaching and killing cursor", "cursorId"_attr = cursorId);
     auto detachedCursorGuard = _detachCursor(lk, opCtx, cursorId);
-    invariant(detachedCursorGuard.getStatus());
+    tassert(11052330,
+            str::stream() << "Unexpected error " << detachedCursorGuard.getStatus()
+                          << " while detaching cursor",
+            detachedCursorGuard.getStatus().isOK());
 
     // Deletion of the cursor can happen out of the lock.
     lk.unlock();
@@ -552,7 +559,7 @@ std::size_t ClusterCursorManager::killCursorsSatisfying(
     lk.unlock();
 
     for (auto&& cursorGuard : cursorsToDestroy) {
-        invariant(cursorGuard);
+        tassert(11052331, "Expected valid cursor", cursorGuard);
         cursorGuard->kill(opCtx);
     }
 
@@ -698,7 +705,7 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
 
     // Destroy the entry.
     size_t eraseResult = _cursorEntryMap.erase(cursorId);
-    invariant(1 == eraseResult);
+    tassert(11052332, "CursorId not found in map", 1 == eraseResult);
 
     return std::move(cursor);
 }

@@ -65,12 +65,12 @@ public:
     }
 
     RemoteCursor* operator->() {
-        invariant(_remoteCursor);
+        tassert(11052342, "Expected OwnedRemoteCursor to own a cursor", _remoteCursor);
         return &(*_remoteCursor);
     }
 
     RemoteCursor* operator*() {
-        invariant(_remoteCursor);
+        tassert(11052343, "Expected OwnedRemoteCursor to own a cursor", _remoteCursor);
         return &(*_remoteCursor);
     }
 

@@ -160,7 +160,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
             _nextHighWaterMarkDeterminingStrategy);
 
     if (_params.getTxnNumber()) {
-        invariant(_params.getSessionId());
+        tassert(11052300, "Expected session id", _params.getSessionId());
     }
 
     // Build a list of remote cursors from the parameters we got, and store them in '_remotes'.
@@ -172,7 +172,14 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
         auto remote = _buildRemote(WithLock::withoutLock(), remoteCursor, ShardTag::kDefault);
 
         // A remote cannot be flagged as 'partialResultsReturned' if 'allowPartialResults' is false.
-        invariant(!(remote->partialResultsReturned && !_params.getAllowPartialResults()));
+        tassert(
+            11052301,
+            fmt::format(
+                "A remote cannot be flagged as 'partialResultsReturned' if 'allowPartialResults' "
+                "is false (partialResultsReturned: {}, allowPartialResults: {})",
+                remote->partialResultsReturned,
+                _params.getAllowPartialResults()),
+            !(remote->partialResultsReturned && !_params.getAllowPartialResults()));
 
         // For the first batch, cursor should never be invalidated.
         tassert(5493704, "Found invalidated cursor on the first batch", !remote->invalidated);
@@ -181,7 +188,14 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
     }
 
     // If this is a change stream, then we expect to have already received PBRTs from every shard.
-    invariant(_promisedMinSortKeys.empty() || _promisedMinSortKeys.size() == _remotes.size());
+    tassert(
+        11052302,
+        fmt::format(
+            "Expected _promisedMinSortKeys to be either empty or have the same size as the number "
+            "of remote shards (_promisedMinSortKeys size {}, remotes size {})",
+            _promisedMinSortKeys.size(),
+            _remotes.size()),
+        _promisedMinSortKeys.empty() || _promisedMinSortKeys.size() == _remotes.size());
     _determineInitialHighWaterMark();
 }
 
@@ -494,8 +508,10 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
     }
 
     // The high water mark is stored in sort-key format: {"": <high watermark>}. We only return
-    // the <high watermark> part of of the sort key, which looks like {_data: ..., _typeBits: ...}.
-    invariant(_highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::object);
+    // the <high watermark> part of the sort key, which looks like {_data: ..., _typeBits: ...}.
+    tassert(11052303,
+            "Expected _highWaterMark to be either empty or of object type",
+            _highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::object);
     return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
 }
 
@@ -675,7 +691,7 @@ bool AsyncResultsMerger::_readySortedTailable(WithLock lk) const {
 
     // We should always have a minPromisedSortKey for every remote in the sorted tailable case.
     auto minPromisedSortKey = _getMinPromisedSortKey(lk);
-    invariant(minPromisedSortKey);
+    tassert(11052304, "minPromisedSortKey does not exist", minPromisedSortKey);
     return compareSortKeys(keyWeWantToReturn, minPromisedSortKey->first, *_params.getSort()) <= 0;
 }
 
@@ -750,7 +766,9 @@ void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationCont
 
 AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLock) {
     // Tailable non-awaitData cursors cannot have a sort.
-    invariant(_tailableMode != TailableModeEnum::kTailable);
+    tassert(11052305,
+            "Tailable non-awaitData cursors must not have a sort",
+            _tailableMode != TailableModeEnum::kTailable);
 
     if (_mergeQueue.empty()) {
         return NextReadyResult{};
@@ -848,7 +866,7 @@ void AsyncResultsMerger::_updateHighWaterMark(const BSONObj& value) {
 BSONObj AsyncResultsMerger::_makeRequest(WithLock,
                                          const RemoteCursorData& remote,
                                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const {
-    invariant(!remote.cbHandle.isValid());
+    tassert(11052306, "Expected CallbackHandle to not be valid", !remote.cbHandle.isValid());
 
     GetMoreCommandRequest getMoreRequest(remote.cursorId, std::string{remote.cursorNss.coll()});
     getMoreRequest.setBatchSize(_params.getBatchSize());
@@ -1158,12 +1176,15 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock lk,
 
     if (auto postBatchResumeToken = response.getPostBatchResumeToken()) {
         // We only expect to see this for change streams.
-        invariant(_params.getSort());
-        invariant(SimpleBSONObjComparator::kInstance.evaluate(*_params.getSort() ==
-                                                              change_stream_constants::kSortSpec));
+        tassert(11052307, "Expected sort specification for change streams", _params.getSort());
+        tassert(11052308,
+                str::stream() << "Unexpected sort specification " << *_params.getSort(),
+                SimpleBSONObjComparator::kInstance.evaluate(*_params.getSort() ==
+                                                            change_stream_constants::kSortSpec));
 
         // The postBatchResumeToken should never be empty.
-        invariant(!postBatchResumeToken->isEmpty());
+        tassert(
+            11052309, "postBatchResumeToken must not be empty", !postBatchResumeToken->isEmpty());
 
         // Note that the PBRT is an object of format {_data: ..., _typeBits: ...} that we must wrap
         // in a sort key so that it can compare correctly with sort keys from other streams.
@@ -1179,7 +1200,12 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock lk,
         if (auto& oldMinSortKey = remote->promisedMinSortKey) {
             _ensureHighWaterMarkIsMonotonicallyIncreasing(
                 *oldMinSortKey, newMinSortKey, "_updateRemoteMetadata");
-            invariant(_promisedMinSortKeys.size() <= _remotes.size());
+            tassert(11052310,
+                    fmt::format("Expected size of promised min sort key set {} to not be greater "
+                                "than the size of remotes {}",
+                                _promisedMinSortKeys.size(),
+                                _remotes.size()),
+                    _promisedMinSortKeys.size() <= _remotes.size());
             std::size_t erased = _promisedMinSortKeys.erase({*oldMinSortKey, remote});
             tassert(8456106, "Expected to find the promised min sort key in the set.", erased == 1);
         }
@@ -1293,12 +1319,13 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
 }
 
 void AsyncResultsMerger::_cleanUpKilledBatch(WithLock lk) {
-    invariant(_lifecycleState == kKillStarted);
+    tassert(11052311, "Expected kill started state", _lifecycleState == kKillStarted);
 
     // If this is the last callback to run then we are ready to free the ARM. We signal the
     // '_killCompleteInfo', which the caller of kill() may be waiting on.
     if (!_haveOutstandingBatchRequests(lk)) {
-        invariant(_killCompleteInfo);
+        tassert(
+            11052312, "Expected shutdown to be invoked before freeing the ARM", _killCompleteInfo);
         _killCompleteInfo->signalFutures();
 
         _lifecycleState = kKillComplete;
@@ -1336,7 +1363,10 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     // through to the client as-is. (Note: tailable cursors are only valid on unsharded collections,
     // so the end of the batch from one shard means the end of the overall batch).
     if (_tailableMode == TailableModeEnum::kTailable && !remote->hasNext()) {
-        invariant(_remotes.size() == 1);
+        tassert(
+            11052313,
+            fmt::format("Expected the number of remotes to be 1 instead of {}", _remotes.size()),
+            _remotes.size() == 1);
         _eofNext = true;
     }
 }
@@ -1400,7 +1430,9 @@ bool AsyncResultsMerger::_haveOutstandingBatchRequests(WithLock) {
 }
 
 void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opCtx) {
-    invariant(_killCompleteInfo);
+    tassert(11052314,
+            "Expected shutdown to be invoked before killing cursors for remote",
+            _killCompleteInfo);
 
     for (const auto& remote : _remotes) {
         _scheduleKillCursorForRemote(lk, opCtx, remote);
@@ -1465,11 +1497,15 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_killCompleteInfo) {
-        invariant(_lifecycleState != kAlive);
+        tassert(11052315,
+                "Unexpected alive state since shutdown was invoked before",
+                _lifecycleState != kAlive);
         return _killCompleteInfo->getFuture();
     }
 
-    invariant(_lifecycleState == kAlive);
+    tassert(11052316,
+            "Expected alive state when starting shutting down the ARM",
+            _lifecycleState == kAlive);
     _lifecycleState = kKillStarted;
 
     // Create "_killCompleteInfo", which we will signal as soon as all of our callbacks have

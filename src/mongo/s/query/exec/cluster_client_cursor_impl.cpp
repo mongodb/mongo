@@ -232,7 +232,7 @@ long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
 void ClusterClientCursorImpl::queueResult(ClusterQueryResult&& result) {
     const auto& resultObj = result.getResult();
     if (resultObj) {
-        invariant(resultObj->isOwned());
+        tassert(11052321, "Expected result object to be owned", resultObj->isOwned());
     }
     _stash.push(std::move(result));
 }

@@ -55,7 +55,7 @@ RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline> mergePipeline
     : RouterExecStage(mergePipeline->getContext()->getOperationContext()),
       _mergePipeline(std::move(mergePipeline)),
       _mergeExecPipeline(exec::agg::buildPipeline(_mergePipeline->freeze())) {
-    invariant(!_mergePipeline->getSources().empty());
+    tassert(11052348, "Merge pipeline cannot be empty", !_mergePipeline->getSources().empty());
     _mergeCursorsStage =
         dynamic_cast<exec::agg::MergeCursorsStage*>(_mergeExecPipeline->getStages().front().get());
 }
@@ -109,7 +109,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     auto eventBSON = event.toBson();
     auto resumeToken = event.metadata().getSortKey();
     auto idField = eventBSON.getObjectField("_id");
-    invariant(!resumeToken.missing());
+    tassert(11052349, "Resume token is missing from event", !resumeToken.missing());
     uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream() << "Encountered an event whose _id field, which contains the resume "
                              "token, was modified by the pipeline. Modifying the _id field of an "
@@ -136,8 +136,9 @@ bool RouterStagePipeline::remotesExhausted() const {
 }
 
 Status RouterStagePipeline::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    invariant(_mergeCursorsStage,
-              "The only cursors which should be tailable are those with remote cursors.");
+    tassert(11052350,
+            "The only cursors which should be tailable are those with remote cursors.",
+            _mergeCursorsStage);
     return _mergeCursorsStage->setAwaitDataTimeout(awaitDataTimeout);
 }
 

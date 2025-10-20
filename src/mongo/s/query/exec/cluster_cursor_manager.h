@@ -195,7 +195,7 @@ public:
          * be owned.
          */
         ClusterClientCursor* operator->() const {
-            invariant(_cursor);
+            tassert(11052333, "Expected PinnedCursor to own a cursor", _cursor);
             return _cursor.get();
         }
 
@@ -204,7 +204,7 @@ public:
          * be owned.
          */
         ClusterClientCursor* get() const {
-            invariant(_cursor);
+            tassert(11052334, "Expected PinnedCursor to own a cursor", _cursor);
             return _cursor.get();
         }
 
@@ -280,7 +280,7 @@ public:
               _nss(std::move(nss)),
               _originatingClient(std::move(clientUUID)),
               _authenticatedUser(std::move(authenticatedUser)) {
-            invariant(_cursor);
+            tassert(11052335, "Expected CursorEntry to own a cursor", _cursor);
         }
 
         CursorEntry(const CursorEntry&) = delete;
@@ -339,7 +339,7 @@ public:
         ClusterClientCursorGuard releaseCursor(OperationContext* opCtx,
                                                StringData commandName = "") {
             invariant(!_operationUsingCursor);
-            invariant(_cursor);
+            tassert(11052336, "Expected CursorEntry to own a cursor", _cursor);
             invariant(opCtx);
             _operationUsingCursor = opCtx;
             _commandUsingCursor = std::string{commandName};
@@ -367,8 +367,8 @@ public:
          * another operation may check the cursor out.
          */
         void returnCursor(std::unique_ptr<ClusterClientCursor> cursor) {
-            invariant(cursor);
-            invariant(!_cursor);
+            tassert(11052337, "Cursor not available", cursor);
+            tassert(11052338, "Expected CursorEntry to not own a cursor", !_cursor);
             invariant(_operationUsingCursor);
 
             _cursor = std::move(cursor);

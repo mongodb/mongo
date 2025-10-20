@@ -93,7 +93,7 @@ public:
      * using operator bool or operator ->.
      */
     std::unique_ptr<ClusterClientCursor> releaseCursor() {
-        invariant(_ccc);
+        tassert(11052320, "Expected ClusterClientCursorGuard to own a cursor", _ccc);
         return std::move(_ccc);
     }
 

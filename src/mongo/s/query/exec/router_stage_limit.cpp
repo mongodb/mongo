@@ -45,7 +45,7 @@ RouterStageLimit::RouterStageLimit(OperationContext* opCtx,
                                    std::unique_ptr<RouterExecStage> child,
                                    long long limit)
     : RouterExecStage(opCtx, std::move(child)), _limit(limit) {
-    invariant(limit > 0);
+    tassert(11052347, "Expected positive value for limit", limit > 0);
 }
 
 StatusWith<ClusterQueryResult> RouterStageLimit::next() {

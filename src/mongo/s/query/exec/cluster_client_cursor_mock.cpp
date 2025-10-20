@@ -53,7 +53,7 @@ ClusterClientCursorMock::~ClusterClientCursorMock() {
 }
 
 StatusWith<ClusterQueryResult> ClusterClientCursorMock::next() {
-    invariant(!_killed);
+    tassert(11052322, "Expected cursor not killed", !_killed);
 
     if (_resultsQueue.empty()) {
         _remotesExhausted = true;
@@ -80,15 +80,15 @@ const PrivilegeVector& ClusterClientCursorMock::getOriginatingPrivileges() const
 }
 
 bool ClusterClientCursorMock::partialResultsReturned() const {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(11052359);
 }
 
 std::size_t ClusterClientCursorMock::getNumRemotes() const {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(11052360);
 }
 
 BSONObj ClusterClientCursorMock::getPostBatchResumeToken() const {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(11052361);
 }
 
 long long ClusterClientCursorMock::getNumReturnedSoFar() const {
@@ -159,7 +159,7 @@ void ClusterClientCursorMock::queueError(Status status) {
 }
 
 Status ClusterClientCursorMock::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(11052362);
 }
 
 boost::optional<LogicalSessionId> ClusterClientCursorMock::getLsid() const {

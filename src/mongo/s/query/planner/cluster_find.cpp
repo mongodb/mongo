@@ -263,7 +263,9 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto makeShardRequest = [&](const auto& shardId) {
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        invariant(!shard->isConfig() || shard->getConnString());
+        tassert(11052355,
+                "Expected either non-config shard or valid connection string for the config shard",
+                !shard->isConfig() || shard->getConnString());
 
         BSONObjBuilder cmdBuilder;
         findCommandToForward->serialize(&cmdBuilder);
@@ -425,7 +427,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             // We received CollectionUUIDMismatch but it does not contain the actual namespace, and
             // we did not attempt to establish a cursor on the primary shard.
             uassertStatusOK(populateCollectionUUIDMismatch(opCtx, ex.toStatus()));
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11052364);
         }
         throw;
     }
@@ -606,7 +608,9 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
         awaitDataState(opCtx).waitForInsertsDeadline =
             opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;
         awaitDataState(opCtx).shouldWaitForInserts = true;
-        invariant(cursor->setAwaitDataTimeout(timeout));
+        tassert(11052356,
+                "Cursor type does not support maxTimeMS on getMore",
+                cursor->setAwaitDataTimeout(timeout).isOK());
     } else if (cmd.getMaxTimeMS()) {
         return {ErrorCodes::BadValue,
                 "maxTimeMS can only be used with getMore for tailable, awaitData cursors"};
@@ -1044,7 +1048,7 @@ StatusWith<std::unique_ptr<FindCommandRequest>> ClusterFind::transformQueryForSh
     // shards.
     if (!query.getSortPattern() &&
         QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::GEO_NEAR)) {
-        invariant(findCommand.getSort().isEmpty());
+        tassert(11052357, "Expected empty sort specification", findCommand.getSort().isEmpty());
         BSONObjBuilder projectionBuilder;
         projectionBuilder.appendElements(findCommand.getProjection());
         projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kGeoNearDistanceMetaProjection);
@@ -1080,7 +1084,11 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     if (!pinnedCursor.isOK()) {
         return pinnedCursor.getStatus();
     }
-    invariant(cursorId == pinnedCursor.getValue().getCursorId());
+    tassert(11052358,
+            fmt::format("Unexpected cursor id (pinned CursorId: {}, getMore CursorId: {})",
+                        pinnedCursor.getValue().getCursorId(),
+                        cursorId),
+            cursorId == pinnedCursor.getValue().getCursorId());
 
     // Ensure cursor and getMore belong the same namespace.
     const auto genericCursor = pinnedCursor.getValue().toGenericCursor();

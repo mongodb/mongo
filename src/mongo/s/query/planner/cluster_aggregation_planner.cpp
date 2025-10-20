@@ -733,7 +733,7 @@ ClusterClientCursorGuard convertPipelineToRouterStages(std::unique_ptr<Pipeline>
             // We previously checked that everything was a $mergeCursors, $skip, or $limit. We
             // already popped off the $mergeCursors, so everything else should be a $skip or a
             // $limit.
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11052363);
         }
     }
     // We are executing the pipeline without using an actual Pipeline, so we need to strip out any
@@ -809,7 +809,9 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
     auto expCtx = pipeline->getContext();
 
     // We should never receive a pipeline which cannot run on router.
-    invariant(!expCtx->getExplain());
+    tassert(11052354,
+            "Expected no explain to be requested when running pipeline on mongoS",
+            !expCtx->getExplain());
     uassertStatusOKWithContext(pipeline->canRunOnRouter(),
                                "pipeline is required to run on router, but cannot");
 

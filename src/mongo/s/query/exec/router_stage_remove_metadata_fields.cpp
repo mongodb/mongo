@@ -48,7 +48,9 @@ RouterStageRemoveMetadataFields::RouterStageRemoveMetadataFields(
     OperationContext* opCtx, std::unique_ptr<RouterExecStage> child, StringDataSet metadataFields)
     : RouterExecStage(opCtx, std::move(child)), _metaFields(std::move(metadataFields)) {
     for (auto&& fieldName : _metaFields) {
-        invariant(fieldName[0] == '$');  // We use this information to optimize next().
+        tassert(11052352,
+                fmt::format("Expected a $-prefixed metadata field but got {}", fieldName),
+                fieldName[0] == '$');  // We use this information to optimize next().
     }
 }
 

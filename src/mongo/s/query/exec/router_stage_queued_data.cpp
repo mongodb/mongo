@@ -43,7 +43,7 @@ namespace mongo {
 void RouterStageQueuedData::queueResult(ClusterQueryResult&& result) {
     const auto& resultObj = result.getResult();
     if (resultObj) {
-        invariant(resultObj->isOwned());
+        tassert(11052351, "Expected result object to be owned", resultObj->isOwned());
     }
     _resultsQueue.push({std::move(result)});
 }

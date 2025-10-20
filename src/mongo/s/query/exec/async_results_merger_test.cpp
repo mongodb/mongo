@@ -2479,10 +2479,9 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestIncludesMaxTimeMS) {
     scheduleNetworkResponses(std::move(responses));
 }
 
-DEATH_TEST_REGEX_F(
-    AsyncResultsMergerTest,
-    SortedTailableInvariantsIfInitialBatchHasNoPostBatchResumeToken,
-    R"#(Invariant failure.*_promisedMinSortKeys.empty\(\) || _promisedMinSortKeys.size\(\) == _remotes.size\(\))#") {
+DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+                   SortedTailableFailsIfInitialBatchHasNoPostBatchResumeToken,
+                   "Tripwire assertion.*11052302") {
     AsyncResultsMergerParams params;
     params.setNss(kTestNss);
     UUID uuid = UUID::gen();
@@ -2515,8 +2514,8 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
-                   SortedTailableCursorInvariantsIfOneOrMoreRemotesHasEmptyPostBatchResumeToken,
-                   R"#(Invariant failure.*!postBatchResumeToken->isEmpty\(\))#") {
+                   SortedTailableCursorFailsIfOneOrMoreRemotesHasEmptyPostBatchResumeToken,
+                   "Tripwire assertion.*11052309") {
     AsyncResultsMergerParams params;
     params.setNss(kTestNss);
     UUID uuid = UUID::gen();

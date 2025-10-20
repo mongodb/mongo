@@ -103,7 +103,9 @@ StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(
 
 StatusWith<ClusterQueryResult> BlockingResultsMerger::awaitNextWithTimeout(
     OperationContext* opCtx) {
-    invariant(_tailableMode == TailableModeEnum::kTailableAndAwaitData);
+    tassert(11052317,
+            "Expected tailable awaitData cursor mode",
+            _tailableMode == TailableModeEnum::kTailableAndAwaitData);
     // If we should wait for inserts and the ARM is not ready, we don't block. Fall straight through
     // to the return statement.
     while (!_arm->ready() && awaitDataState(opCtx).shouldWaitForInserts) {
@@ -158,7 +160,9 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::blockUntilNext(OperationCo
 
         // We have not provided a deadline, so if the wait returns without interruption, we do not
         // expect to have timed out.
-        invariant(status.getValue() == stdx::cv_status::no_timeout);
+        tassert(11052318,
+                "Expected to not have timed out",
+                status.getValue() == stdx::cv_status::no_timeout);
     }
 
     return _arm->nextReady();
@@ -180,7 +184,9 @@ Status BlockingResultsMerger::releaseMemory() {
 StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEvent() {
     // If we abandoned a previous event due to a mongoS-side timeout, wait for it first.
     if (_leftoverEventFromLastTimeout) {
-        invariant(_tailableMode == TailableModeEnum::kTailableAndAwaitData);
+        tassert(11052319,
+                "Expected tailable awaitData cursor mode",
+                _tailableMode == TailableModeEnum::kTailableAndAwaitData);
         // If we have an outstanding event from last time, then we might have to manually schedule
         // some getMores for the cursors. If a remote response came back while we were between
         // getMores (from the user to mongos), the response may have been an empty batch, and the
