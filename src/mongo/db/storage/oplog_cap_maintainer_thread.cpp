@@ -293,22 +293,9 @@ void OplogCapMaintainerThread::run() {
     }
 
     ON_BLOCK_EXIT([&] {
-        auto ts = _uniqueCtx->get()->getServiceContext()->getTickSource();
-        auto killTime = _uniqueCtx->get()->getKillTime();
-        {
-            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
-            LOGV2(11211800,
-                  "Time spent between an operation interrupting the cap maintainer thread and the "
-                  "thread successfully shutting down.",
-                  "reason"_attr = _shutdownReason,
-                  "durationMs"_attr = (ts->ticksTo<Milliseconds>(ts->getTicks() - killTime)));
-        }
-
-        {
-            stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
-            admissionPriority.reset();
-            _uniqueCtx.reset();
-        }
+        stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
+        admissionPriority.reset();
+        _uniqueCtx.reset();
     });
 
     if (gOplogSamplingAsyncEnabled) {
@@ -360,10 +347,6 @@ void OplogCapMaintainerThread::run() {
         } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
             LOGV2(11212201, "OplogCapMaintainerThread interrupted", "reason"_attr = ex.reason());
             interruptCount.fetchAndAdd(1);
-
-            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
-            _shutdownReason = ex.toStatus();
-
             return;
         }
     }
@@ -393,10 +376,6 @@ void OplogCapMaintainerThread::run() {
         } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
             LOGV2(11212204, "OplogCapMaintainerThread interrupted", "reason"_attr = ex.reason());
             interruptCount.fetchAndAdd(1);
-
-            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
-            _shutdownReason = ex.toStatus();
-
             return;
         } catch (...) {
             const auto& err = mongo::exceptionToStatus();
