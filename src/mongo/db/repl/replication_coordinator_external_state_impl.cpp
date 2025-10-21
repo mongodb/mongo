@@ -297,7 +297,6 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
             replCoord,
             _storageInterface,
             _replicationProcess->getConsistencyMarkers(),
-            &noopOplogWriterObserver,
             OplogWriter::Options(false /* skipWritesToOplogColl */));
     }
 
