@@ -537,7 +537,7 @@ void MongoBase::Functions::setAutoEncryption::call(JSContext* cx, JS::CallArgs a
     std::shared_ptr<DBClientWithAutoEncryption> kvClient;
     JS::RootedObject keyvaultConn(cx);
     if (args.length() > 1 && !args.get(1).isUndefined()) {
-        uassert(7760001,
+        uassert(7760002,
                 str::stream() << "the second parameter to setAutoEncryption() must be an object",
                 args.get(1).isObject());
         keyvaultConn.set(args.get(1).toObjectOrNull());

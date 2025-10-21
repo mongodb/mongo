@@ -57,17 +57,7 @@ _CODE_PATTERNS = [
     ]
 ]
 
-_DIR_EXCLUDE_RE = re.compile(
-    r"(\..*"
-    r"|pcre2.*"
-    r"|32bit.*"
-    r"|mongodb-.*"
-    r"|debian.*"
-    r"|mongo-cxx-driver.*"
-    r"|.*gotools.*"
-    r"|.*mozjs.*"
-    r")"
-)
+_DIR_EXCLUDE_RE = re.compile(r"(pcre2.*|debian.*)")
 
 _FILE_INCLUDE_RE = re.compile(r".*\.(cpp|c|h|py|idl)")
 

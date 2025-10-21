@@ -186,7 +186,7 @@ void logStatus(const Status& status, bool plainShell) {
         }
 
         LOGV2_INFO_OPTIONS(
-            20163,
+            10077200,
             logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
             "{jsError}",
             "jsError"_attr = std::string(ss));
