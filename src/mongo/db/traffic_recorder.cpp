@@ -92,22 +92,22 @@ void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
 
 TrafficRecorder::Recording::Recording(const StartTrafficRecording& options, TickSource* tickSource)
     : _path(_getPath(std::string{options.getDestination()})),
-      _maxLogSize(options.getMaxFileSize()) {
+      _maxLogSize(options.getMaxFileSize()),
+      _tickSource(tickSource) {
 
     MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Options queueOptions;
     queueOptions.maxQueueDepth = options.getMaxMemUsage();
     _pcqPipe =
         MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe(queueOptions);
 
-    _trafficStats.setRunning(true);
     _trafficStats.setBufferSize(options.getMaxMemUsage());
     _trafficStats.setRecordingDir(_path);
     _trafficStats.setMaxFileSize(_maxLogSize);
-
-    startTime.store(tickSource->ticksTo<Microseconds>(tickSource->getTicks()));
 }
 
-void TrafficRecorder::Recording::run() {
+void TrafficRecorder::Recording::start() {
+    _trafficStats.setRunning(true);
+    startTime.store(_tickSource->ticksTo<Microseconds>(_tickSource->getTicks()));
     _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
         if (!boost::filesystem::is_directory(boost::filesystem::absolute(_path))) {
             boost::filesystem::create_directory(boost::filesystem::absolute(_path));
@@ -302,7 +302,7 @@ void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext
         uassert(ErrorCodes::BadValue, "Traffic recording already active", !*rec);
         *rec = _makeRecording(options, svcCtx->getTickSource());
 
-        (*rec)->run();
+        (*rec)->start();
     }
 
     _shouldRecord.store(true);
@@ -436,7 +436,7 @@ TrafficRecorderForTest::RecordingForTest::getPcqPipe() {
     return _pcqPipe;
 }
 
-void TrafficRecorderForTest::RecordingForTest::run() {
+void TrafficRecorderForTest::RecordingForTest::start() {
     // No-op for tests
 }
 

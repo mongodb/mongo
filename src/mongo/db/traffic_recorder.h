@@ -119,7 +119,7 @@ protected:
         Recording(const StartTrafficRecording& options, TickSource* tickSource);
         virtual ~Recording() = default;
 
-        virtual void run();
+        virtual void start();
         virtual Status shutdown();
 
         /**
@@ -153,6 +153,8 @@ protected:
 
         const std::string _path;
         const int64_t _maxLogSize;
+
+        TickSource* _tickSource;
 
         stdx::thread _thread;
 
@@ -189,7 +191,7 @@ public:
                                          TrafficRecorder::Recording::CostFunction>::Pipe&
         getPcqPipe();
 
-        void run() override;
+        void start() override;
 
         Status shutdown() override;
     };
