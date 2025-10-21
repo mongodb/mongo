@@ -4,6 +4,7 @@ This guide covers common issues and their solutions when working with MongoDB de
 
 ## Table of Contents
 
+- [Rancher Desktop Problems](#rancher-desktop-problems)
 - [Container Build Issues](#container-build-issues)
 - [Performance Problems](#performance-problems)
 - [VS Code Issues](#vs-code-issues)
@@ -14,6 +15,20 @@ This guide covers common issues and their solutions when working with MongoDB de
 - [Platform-Specific Issues](#platform-specific-issues)
 - [Docker Provider Issues](#docker-provider-issues)
 - [Debugging Tips](#debugging-tips)
+
+## Rancher Desktop Problems
+
+### VSCode prompts for installation of Docker Desktop when I have Rancher Desktop installed
+
+**Symptoms**
+
+```
+Docker version <version> or later is required
+```
+
+**Solution**
+
+Restart VSCode. If you install Rancher Desktop while you already have VSCode open, it doesn't properly detect the Docker socket and prompts you to install Docker Desktop by mistake.
 
 ## Container Build Issues
 

@@ -30,6 +30,8 @@ After installation, increase resources for better build performance:
 
 > **Tip:** More resources = faster builds. MongoDB builds benefit significantly from additional CPU cores and memory.
 
+**IMPORTANT!**: If you already have VSCode open when you install Rancher Desktop, make sure to restart VSCode otherwise it may not find the Docker socket and VSCode will prompt you to install Docker Desktop instead.
+
 #### Option B: Docker Desktop
 
 [Docker Desktop](https://www.docker.com/products/docker-desktop/) is a popular alternative.
