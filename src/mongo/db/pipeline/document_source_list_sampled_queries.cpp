@@ -100,6 +100,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
         }
     }
 
+    tassert(11124500, "expecting '_execPipeline' to be initialized", _execPipeline);
     if (auto doc = _execPipeline->getNext()) {
         auto queryDoc = SampledQueryDocument::parse(
             IDLParserContext(DocumentSourceListSampledQueries::kStageName), doc->toBson());
