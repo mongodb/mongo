@@ -120,6 +120,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(pauseAfterFillingOutIndexEntries);
+
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
     invariant(opCtx);
@@ -272,7 +274,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             ice.getFilterExpression(),
             desc->infoObj(),
             ice.getCollator(),
-            wildcardProjection};
+            wildcardProjection,
+            ice.shared_from_this()};
 }
 
 ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
@@ -462,6 +465,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->availableMemoryBytes =
             static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
     }
+    pauseAfterFillingOutIndexEntries.pauseWhileSet();
 }
 
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
