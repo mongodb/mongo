@@ -18,8 +18,6 @@ selector:
     - jstests/sharding/chunk_migration_with_bulk_write.js
     # - jstests/sharding/database_versioning_all_commands.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
-    # TODO SERVER-104134 add support for max replies size
-    # - jstests/sharding/bulk_write_max_replies_size.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
     # TODO SERVER-111710: enable viewful timeseries
     # - jstests/sharding/timeseries/**/*.js
@@ -28,7 +26,7 @@ selector:
     - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     # TODO: SERVER-103781 try enabling when write without shard key with id supported.
     # - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
-    # - jstests/sharding/query/bulk_write_size_limit.js
+    - jstests/sharding/query/bulk_write_size_limit.js
     - jstests/sharding/query/let_rand.js
     # - jstests/sharding/query/update/update_shard_key_bulk_write.js
     # - jstests/sharding/query/update_delete_many_metrics.js
@@ -38,6 +36,7 @@ selector:
     - jstests/sharding/updateOne_without_shard_key/dropping_collection_during_clusterQueryWithoutShardKey_errors.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
+    - jstests/noPassthrough/crud/bulk_write_max_replies_size_mongos.js
     - jstests/noPassthrough/crud/bulk_write_metrics.js
     - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     - jstests/sharding/retryable_writes.js
@@ -72,6 +71,9 @@ selector:
     - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

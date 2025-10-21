@@ -44,7 +44,7 @@ struct ShardResponse {
     StatusWith<executor::RemoteCommandResponse> swResponse;
     // Ops referencing the original command from the client in the order they were specified in the
     // command to the shard. The items in this array should appear in the order you would see them
-    // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] shound return
+    // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] should return
     // the corresponding WriteOp from the original command from the client.
     std::vector<WriteOp> ops;
     // For debugging purposes.

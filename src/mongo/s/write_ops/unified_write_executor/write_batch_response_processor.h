@@ -178,6 +178,12 @@ public:
         return _numOkResponses;
     }
 
+    /**
+     * Returns true if we've exceeded the max reply size, false otherwise. If we have exceeded the
+     * max size, we record this as an error for the next write op.
+     */
+    bool checkBulkWriteReplyMaxSize();
+
 private:
     Result _onWriteBatchResponse(OperationContext* opCtx,
                                  RoutingContext& routingCtx,
@@ -218,6 +224,10 @@ private:
                                                    const std::vector<BulkWriteReplyItem>&,
                                                    std::vector<WriteOp>&& toRetry);
 
+    /**
+     * Helper to keep _approximateSize up to date when appending to _replies.
+     */
+    void updateApproximateSize(const BulkWriteReplyItem& replyItem);
 
     /**
      * Iterates through all of the the _results and combines all of the reply items for each op into
@@ -287,6 +297,7 @@ private:
     size_t _nDeleted{0};
     size_t _numOkResponses{0};
     std::map<WriteOpId, WriteOpResults> _results;
+    int32_t _approximateSize = 0;
     std::vector<ShardWCError> _wcErrors;
     stdx::unordered_set<StmtId> _retriedStmtIds;
 };

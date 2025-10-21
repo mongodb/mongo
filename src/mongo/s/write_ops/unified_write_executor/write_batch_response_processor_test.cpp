@@ -36,6 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
@@ -862,6 +863,154 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     ASSERT_TRUE(wcError->getErrmsg().find(reply2WcErrorMsg) != std::string::npos);
 }
 
+TEST_F(WriteBatchResponseProcessorTest, ProcessesExceededMemoryLimitError) {
+    RAIIServerParameterControllerForTest maxRepliesSizeController("bulkWriteMaxRepliesSize", 20);
+
+    auto request = BulkWriteCommandRequest(
+        {BulkWriteInsertOp(0, BSON("_id" << 1)), BulkWriteInsertOp(0, BSON("_id" << 2))},
+        {NamespaceInfoEntry(nss1)});
+    auto reply = makeReply();
+    reply.setNInserted(1);
+    reply.setNMatched(0);
+    reply.setNModified(0);
+    reply.setCursor(BulkWriteCommandResponseCursor(0,
+                                                   {
+                                                       BulkWriteReplyItem{0, Status::OK()},
+                                                   },
+                                                   nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef ctx(request);
+
+    {
+        Stats stats;
+        WriteBatchResponseProcessor processor(ctx, stats);
+
+        // It is not possible to exceeded the size limit if we have yet to process the response.
+        ASSERT_FALSE(processor.checkBulkWriteReplyMaxSize());
+        ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
+
+        // If we are able to batch all writes together, we should not exceed the memory limit. This
+        // is because any memory limit is recorded as an error for the first incomplete WriteOp,
+        // which we do not have if we have batched all writes together.
+        auto result = processor.onWriteBatchResponse(
+            opCtx,
+            routingCtx,
+            SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}},
+                                     {shard2Name, Response{rcr1, {WriteOp(request, 1)}}}});
+        ASSERT_FALSE(processor.checkBulkWriteReplyMaxSize());
+        auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+        ASSERT_EQ(clientReply.getNErrors(), 0);
+
+        // Should have an OK response.
+        auto batch = clientReply.getCursor().getFirstBatch();
+        ASSERT_EQ(batch.size(), 2);
+        ASSERT_EQ(batch[0].getIdx(), 0);
+        ASSERT_EQ(batch[1].getIdx(), 1);
+        ASSERT_EQ(batch[0].getStatus().code(), Status::OK());
+        ASSERT_EQ(batch[1].getStatus().code(), Status::OK());
+    }
+
+    // This time, we only get a response for a single WriteOp. We should detect that the memory
+    // limit error has been exceeded and mark the incomplete WriteOp as having failed.
+    {
+        Stats stats;
+        WriteBatchResponseProcessor processor(ctx, stats);
+
+        auto result = processor.onWriteBatchResponse(
+            opCtx,
+            routingCtx,
+            SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
+
+        ASSERT_TRUE(processor.checkBulkWriteReplyMaxSize());
+        ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
+        auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+        ASSERT_EQ(clientReply.getNErrors(), 1);
+
+        // Should have an OK response even if the last error is terminal.
+        auto batch = clientReply.getCursor().getFirstBatch();
+        ASSERT_EQ(batch.size(), 2);
+        ASSERT_EQ(batch[0].getIdx(), 0);
+        ASSERT_EQ(batch[1].getIdx(), 1);
+        ASSERT_EQ(batch[0].getStatus().code(), Status::OK());
+        ASSERT_EQ(batch[1].getStatus().code(), ErrorCodes::ExceededMemoryLimit);
+    }
+}
+
+TEST_F(WriteBatchResponseProcessorTest, IncrementApproxSizeOnceForRetry) {
+    // Set the limit to just above the reply size for a single op.
+    RAIIServerParameterControllerForTest maxRepliesSizeController("bulkWriteMaxRepliesSize", 35);
+    //  shard1: {code: ok, firstBatch: [{code: ok}, {code: CannotImplicitlyCreateCollection}]}
+    // Note that we add a third op to the request such that we can detect that the memory limit has
+    // been exceeded after our retry.
+    auto request = BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("_id" << 1)),
+                                            BulkWriteInsertOp(1, BSON("_id" << 2)),
+                                            BulkWriteInsertOp(1, BSON("_id" << 3))},
+                                           {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+    WriteOp op1(request, 0);
+    WriteOp op2(request, 1);
+    WriteOp op3(request, 2);
+    BulkWriteReplyItem replyOk = BulkWriteReplyItem{0, Status::OK()};
+    BulkWriteReplyItem replyRetry =
+        BulkWriteReplyItem{1, Status(CannotImplicitlyCreateCollectionInfo(nss2), "")};
+
+    auto reply = makeReply();
+    reply.setNErrors(1);
+    reply.setNInserted(1);
+    reply.setCursor(BulkWriteCommandResponseCursor(0,
+                                                   {
+                                                       replyOk,
+                                                       replyRetry,
+                                                   },
+                                                   nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef ctx(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(ctx, stats);
+    auto result = processor.onWriteBatchResponse(opCtx,
+                                                 routingCtx,
+                                                 SimpleWriteBatchResponse{{shard1Name,
+                                                                           Response{
+                                                                               rcr1,
+                                                                               {op1, op2},
+                                                                           }}});
+    // No unrecoverable error.
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
+
+    // One incomplete returned (op2).
+    ASSERT_EQ(result.opsToRetry.size(), 1);
+    ASSERT_EQ(result.opsToRetry[0].getNss(), nss2);
+    ASSERT_EQ(result.opsToRetry[0].getId(), 1);
+
+    // We should not have exceeded the max size because we've only incremented the non-retry item.
+    ASSERT_FALSE(processor.checkBulkWriteReplyMaxSize());
+
+    // Assert nss2 was flagged for creation.
+    ASSERT_EQ(result.collsToCreate.size(), 1);
+    ASSERT(result.collsToCreate.contains(nss2));
+
+    // Simulate a successful retry.
+    reply = makeReply();
+    reply.setNInserted(1);
+    reply.setCursor(BulkWriteCommandResponseCursor(0,
+                                                   {
+                                                       replyOk,
+                                                   },
+                                                   nss2));
+
+    RemoteCommandResponse rcr2(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    result = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr2, {op2}}}});
+
+    // On successful retry, we should have exceeded the memory limit.
+    ASSERT_TRUE(processor.checkBulkWriteReplyMaxSize());
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
+    ASSERT(result.opsToRetry.empty());
+    ASSERT(result.collsToCreate.empty());
+}
+
 TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
     auto updateRequest = write_ops::UpdateCommandRequest(
         nss1,
@@ -876,7 +1025,6 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
     WriteCommandRef cmdRef(request);
     Stats stats;
     WriteBatchResponseProcessor processor(cmdRef, stats);
-
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,

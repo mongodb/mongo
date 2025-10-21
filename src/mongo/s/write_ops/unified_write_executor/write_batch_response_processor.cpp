@@ -33,6 +33,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/router_role_api/collection_uuid_mismatch.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -370,6 +371,8 @@ void WriteBatchResponseProcessor::addReplyToResults(WriteOpId opId,
     bool hasNonRetryableError =
         !reply.getStatus().isOK() && !write_op_helpers::isRetryErrCode(reply.getStatus().code());
 
+    updateApproximateSize(reply);
+
     if (!shardId) {
         _results[opId].hasNonRetryableError |= hasNonRetryableError;
         _results[opId].replies = reply;
@@ -410,8 +413,6 @@ void WriteBatchResponseProcessor::addReplyToResults(WriteOpId opId,
 void WriteBatchResponseProcessor::processReplyItem(const WriteOp& op,
                                                    BulkWriteReplyItem item,
                                                    boost::optional<ShardId> shardId) {
-    const bool isOK = item.getStatus().isOK();
-
     // Set the "idx" field to the ID of 'op'.
     item.setIdx(op.getId());
 
@@ -422,9 +423,10 @@ void WriteBatchResponseProcessor::processReplyItem(const WriteOp& op,
 
     addReplyToResults(op.getId(), item, shardId);
 
-    if (isOK) {
+    const Status status = item.getStatus();
+    if (status.isOK()) {
         _numOkResponses++;
-    } else if (!write_op_helpers::isRetryErrCode(item.getStatus().code())) {
+    } else if (!write_op_helpers::isRetryErrCode(status.code())) {
         _nErrors++;
     }
 }
@@ -606,6 +608,22 @@ std::vector<WriteOp> WriteBatchResponseProcessor::processOpsNotInReplyItems(
     return toRetry;
 }
 
+void WriteBatchResponseProcessor::updateApproximateSize(const BulkWriteReplyItem& item) {
+    // If the response is not an error and 'errorsOnly' is set, then we should not store this reply
+    // and therefore shouldn't count the size.
+    if (item.getOk() && _cmdRef.getErrorsOnly() && *(_cmdRef.getErrorsOnly())) {
+        return;
+    }
+
+    // A retryable error will end up being retried by mongos so we should not consider this
+    // result final and count towards the maximum size limit for a response.
+    if (write_op_helpers::isRetryErrCode(item.getStatus().code())) {
+        return;
+    }
+
+    _approximateSize += item.getApproximateSize();
+}
+
 void WriteBatchResponseProcessor::recordTargetError(OperationContext* opCtx,
                                                     const WriteOp& op,
                                                     const Status& status) {
@@ -636,6 +654,35 @@ void WriteBatchResponseProcessor::recordErrorForRemainingOps(OperationContext* o
         WriteOp op{WriteOpRef{_cmdRef, static_cast<int>(i)}};
         processError(op, status, boost::none);
     }
+}
+
+bool WriteBatchResponseProcessor::checkBulkWriteReplyMaxSize() {
+    // Cannot exceed the reply size limit if we have no responses.
+    if (_results.empty()) {
+        return false;
+    }
+
+    // If we have exceeded the max reply size limit, we will record an error for the first
+    // incomplete WriteOp.
+    const WriteOpId nextHighestWriteOpId = _results.rbegin()->first + 1;
+
+    if (_cmdRef.isBulkWriteCommand() &&
+        _approximateSize >= gBulkWriteMaxRepliesSize.loadRelaxed() &&
+        nextHighestWriteOpId < _cmdRef.getNumOps()) {
+        BulkWriteReplyItem exceededMemLimitReplyItem(
+            nextHighestWriteOpId,
+            Status{ErrorCodes::ExceededMemoryLimit,
+                   fmt::format("BulkWrite response size exceeded limit ({} bytes)",
+                               _approximateSize)});
+        exceededMemLimitReplyItem.setOk(0.0);
+        exceededMemLimitReplyItem.setN(0);
+        exceededMemLimitReplyItem.setNModified(boost::none);
+
+        _nErrors++;
+        addReplyToResults(nextHighestWriteOpId, std::move(exceededMemLimitReplyItem), boost::none);
+        return true;
+    }
+    return false;
 }
 
 std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRepliesForOps() {
@@ -719,8 +766,8 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulk
     OperationContext* opCtx) {
     // Generate the list of reply items that should be returned to the client. For non-verbose bulk
     // write command requests, we always return an empty list of reply items. This matches the
-    // behavior of ClusterBulkWriteCmd::Invocation::_populateCursorReply(). We call
-    // 'finalizeRepliesForOps' to aggregate replies from different shards for a single op.
+    // behavior of populateCursorReply(). We call 'finalizeRepliesForOps' to aggregate replies from
+    // different shards for a single op.
     std::map<WriteOpId, BulkWriteReplyItem> finalResults = finalizeRepliesForOps();
 
     std::vector<BulkWriteReplyItem> results;

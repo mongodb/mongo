@@ -165,7 +165,7 @@ bool isCompatibleWithBatch(
 }
 
 /**
- * Helper to determine whether there is room to add a given op to the current btach.
+ * Helper to determine whether there is room to add a given op to the current batch.
  */
 bool wouldFitInBatch(OperationContext* opCtx,
                      std::vector<std::unique_ptr<TargetedWrite>>& writes,

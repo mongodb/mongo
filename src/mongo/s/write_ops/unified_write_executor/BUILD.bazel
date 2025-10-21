@@ -35,6 +35,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db/commands/query_cmd:bulk_write_common",
         "//src/mongo/db/query/write_ops:parsed_update",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s:sharding_write_without_shard_key_api",
         "//src/mongo/s/commands/query_cmd:populate_cursor",

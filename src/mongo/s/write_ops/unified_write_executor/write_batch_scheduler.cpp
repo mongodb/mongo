@@ -83,6 +83,12 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     const auto nssList = std::vector<NamespaceString>{_nssSet.begin(), _nssSet.end()};
 
+    // If we've exceeded our memory limit, stop execution.
+    if (_processor.checkBulkWriteReplyMaxSize()) {
+        _batcher.stopMakingBatches();
+        return false;
+    }
+
     // Create a RoutingContext. If creating the RoutingContext fails, handle the failure and
     // return an empty vector.
     auto swRoutingCtx = initRoutingContext(opCtx, nssList);
