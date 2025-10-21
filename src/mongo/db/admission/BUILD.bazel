@@ -73,20 +73,20 @@ mongo_cc_library(
         "admission_feature_flags_gen",
         "concurrency_adjustment_validator.cpp",
         "execution_control_parameters_gen",
-        "multiple_pools_ticketing_system.cpp",
-        "single_pool_ticketing_system.cpp",
+        "throughput_probing.cpp",
+        "throughput_probing_gen",
         "ticketing_system.cpp",
     ],
     hdrs = [
         "concurrency_adjustment_validator.h",
-        "multiple_pools_ticketing_system.h",
-        "single_pool_ticketing_system.h",
+        "throughput_probing.h",
         "ticketing_system.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:ticketholder",
     ],
 )
@@ -104,27 +104,6 @@ mongo_cc_library(
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:transport_layer_common",
-    ],
-)
-
-mongo_cc_library(
-    name = "execution_control",
-    srcs = [
-        "execution_control_init.cpp",
-        "throughput_probing.cpp",
-        "throughput_probing_gen",
-    ],
-    hdrs = [
-        "execution_control_init.h",
-        "throughput_probing.h",
-    ],
-    deps = [
-        "ticketing_system",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:ticketholder",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -248,7 +227,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [
-        ":execution_control",
+        ":ticketing_system",
         "//src/mongo/db:service_context",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db:shard_role_api",

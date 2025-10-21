@@ -31,12 +31,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/admission/single_pool_ticketing_system.h"
-#include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
@@ -49,6 +48,8 @@
 namespace mongo {
 namespace admission {
 namespace throughput_probing {
+
+class ThroughputProbingTest;
 
 Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
 Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
@@ -72,7 +73,11 @@ public:
 
     void start();
 
+    void stop();
+
 private:
+    friend class throughput_probing::ThroughputProbingTest;
+
     enum class ProbingState {
         kStable,
         kUp,
@@ -91,16 +96,21 @@ private:
 
     void _resize(OperationContext* opCtx, TicketHolder* ticketholder, int newTickets);
 
+    void _initState();
+
+    ServiceContext* _svcCtx;
+
     TicketHolder* _readTicketHolder;
     TicketHolder* _writeTicketHolder;
 
     // This value is split between reads and writes based on the read/write ratio.
-    double _stableConcurrency;
+    double _stableConcurrency = 0;
     double _stableThroughput = 0;
     ProbingState _state = ProbingState::kStable;
-    Timer _timer;
-
     int64_t _prevNumFinishedProcessing = -1;
+
+    Milliseconds _interval;
+    Timer _timer;
 
     struct Stats {
         void serialize(BSONObjBuilder& builder) const;
@@ -115,32 +125,10 @@ private:
         AtomicWord<int64_t> timesProbedDown;
     } _stats;
 
+    mutable stdx::mutex _mutex;
+
     PeriodicJobAnchor _job;
 };
 
-class ThroughputProbingTicketingSystem : public SinglePoolTicketingSystem {
-public:
-    ThroughputProbingTicketingSystem(ServiceContext* svcCtx,
-                                     std::unique_ptr<TicketHolder> readTicketHolder,
-                                     std::unique_ptr<TicketHolder> writeTicketHolder,
-                                     Milliseconds interval);
-
-    bool isRuntimeResizable() const override;
-
-    bool usesPrioritization() const override;
-
-    void appendStats(BSONObjBuilder& b) const override;
-
-    /**
-     * Start the periodic job to probe throughput and dynamically adjust ticket levels
-     */
-    void startThroughputProbe();
-
-private:
-    /**
-     * Task which adjusts the number of concurrent read/write transactions.
-     */
-    std::unique_ptr<admission::ThroughputProbing> _monitor;
-};
 }  // namespace admission
 }  // namespace mongo

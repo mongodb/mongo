@@ -30,6 +30,9 @@
 #include "mongo/db/admission/ticketing_system.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/admission/admission_feature_flags_gen.h"
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
@@ -54,6 +57,7 @@ template <typename Updater>
 Status updateSettings(const std::string& op, Updater&& updater) {
     if (auto client = Client::getCurrent()) {
         auto ticketingSystem = TicketingSystem::get(client->getServiceContext());
+
         if (!ticketingSystem) {
             auto message =
                 fmt::format("Attempting to modify {} on an instance without a storage engine", op);
@@ -65,6 +69,33 @@ Status updateSettings(const std::string& op, Updater&& updater) {
 
     return Status::OK();
 }
+
+bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
+                                         ExecutionAdmissionContext* admCtx) {
+    if (!gStorageEngineHeuristicDeprioritizationEnabled.load()) {
+        // If the heuristic is not enabled, we do not de-prioritize based on the number of yields.
+        return false;
+    }
+
+    const auto priority = admCtx->getPriority();
+
+    if (priority == AdmissionContext::Priority::kExempt) {
+        // It is illegal to demote a high-priority (exempt) operation to a low-priority operation.
+        return false;
+    }
+
+    if (priority == AdmissionContext::Priority::kLow) {
+        // Fast exit for those operations that are manually marked as low-priority.
+        return false;
+    }
+
+    if (admCtx->getAdmissions() >= gStorageEngineHeuristicNumYieldsDeprioritizeThreshold.load()) {
+        return true;
+    }
+
+    return false;
+}
+
 }  // namespace
 
 Status TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth(
@@ -213,6 +244,21 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions(
         });
 }
 
+Status TicketingSystem::updateConcurrencyAdjustmentAlgorithm(std::string algorithmName) {
+    return updateSettings(
+        "concurrency adjustment algorithm", [&](Client* client, TicketingSystem* ticketingSystem) {
+            if (!gFeatureFlagMultipleTicketPoolsExecutionControl.isEnabled()) {
+                return Status{ErrorCodes::IllegalOperation,
+                              "Cannot modify concurrency adjustment algorithm in runtime"};
+            }
+
+            ticketingSystem->setConcurrencyAdjustmentAlgorithm(client->getOperationContext(),
+                                                               algorithmName);
+
+            return Status::OK();
+        });
+}
+
 TicketingSystem* TicketingSystem::get(ServiceContext* svcCtx) {
     return ticketingSystemDecoration(svcCtx).get();
 }
@@ -220,6 +266,273 @@ TicketingSystem* TicketingSystem::get(ServiceContext* svcCtx) {
 void TicketingSystem::use(ServiceContext* svcCtx,
                           std::unique_ptr<TicketingSystem> newTicketingSystem) {
     ticketingSystemDecoration(svcCtx) = std::move(newTicketingSystem);
+}
+
+TicketingSystem::TicketingSystem(
+    ServiceContext* svcCtx,
+    RWTicketHolder normal,
+    RWTicketHolder low,
+    Milliseconds throughputProbingInterval,
+    StorageEngineConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm)
+    : _state({concurrencyAdjustmentAlgorithm}),
+      _throughputProbing(svcCtx, normal.read.get(), normal.write.get(), throughputProbingInterval) {
+    _holders[static_cast<size_t>(AdmissionContext::Priority::kNormal)] = std::move(normal);
+    _holders[static_cast<size_t>(AdmissionContext::Priority::kLow)] = std::move(low);
+};
+
+bool TicketingSystem::isRuntimeResizable() const {
+    return _state.loadRelaxed().isRuntimeResizable();
+}
+
+bool TicketingSystem::usesPrioritization() const {
+    return _state.loadRelaxed().usesPrioritization();
+}
+
+void TicketingSystem::setMaxQueueDepth(AdmissionContext::Priority p, Operation o, int32_t depth) {
+    auto* holder = _getHolder(p, o);
+    invariant(holder != nullptr);
+    holder->setMaxQueueDepth(depth);
+}
+
+void TicketingSystem::setConcurrentTransactions(OperationContext* opCtx,
+                                                AdmissionContext::Priority p,
+                                                Operation o,
+                                                int32_t transactions) {
+    auto* holder = _getHolder(p, o);
+    invariant(holder != nullptr);
+    holder->resize(opCtx, transactions, Date_t::max());
+}
+
+void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
+                                                        std::string algorithmName) {
+    tassert(11132200,
+            "Feature flag MultipleTicketPoolsExecutionControl must be enabled to change the "
+            "concurrency adjustment algorithm at runtime",
+            gFeatureFlagMultipleTicketPoolsExecutionControl.isEnabled());
+
+    const auto parsedAlgorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
+        algorithmName, IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"});
+
+    const TicketingState oldState = _state.loadRelaxed();
+    const TicketingState newState = {parsedAlgorithm};
+    _state.store(newState);
+
+    const bool wasThroughputProbingRunning = oldState.usesThroughputProbing();
+    const bool isThroughputProbingRunningNow = newState.usesThroughputProbing();
+
+    if (wasThroughputProbingRunning == isThroughputProbingRunningNow) {
+        // There has been a change in the algorithm related to the prioritization of operations, but
+        // no change in the throughput probing state. There is nothing more to update.
+        return;
+    }
+
+    if (isThroughputProbingRunningNow) {
+        // Throughput probing needs to start. Apart from that, there is nothing more to update.
+        _throughputProbing.start();
+        return;
+    }
+
+    // There has been a change in the algorithm from throughput probing to fixed concurrency. We
+    // should align the ticketholders size with the server parameter values.
+
+    _throughputProbing.stop();
+
+    setConcurrentTransactions(opCtx,
+                              AdmissionContext::Priority::kNormal,
+                              Operation::kRead,
+                              gConcurrentReadTransactions.load());
+    setConcurrentTransactions(opCtx,
+                              AdmissionContext::Priority::kNormal,
+                              Operation::kWrite,
+                              gConcurrentWriteTransactions.load());
+    setConcurrentTransactions(opCtx,
+                              AdmissionContext::Priority::kLow,
+                              Operation::kRead,
+                              gConcurrentReadLowPriorityTransactions.load());
+    setConcurrentTransactions(opCtx,
+                              AdmissionContext::Priority::kLow,
+                              Operation::kWrite,
+                              gConcurrentWriteLowPriorityTransactions.load());
+}
+
+void TicketingSystem::appendStats(BSONObjBuilder& b) const {
+    boost::optional<BSONObjBuilder> readStats;
+    boost::optional<BSONObjBuilder> writeStats;
+    int32_t readOut = 0, readAvailable = 0, readTotalTickets = 0;
+    int32_t writeOut = 0, writeAvailable = 0, writeTotalTickets = 0;
+
+    for (size_t i = 0; i < _holders.size(); ++i) {
+        const auto priority = static_cast<AdmissionContext::Priority>(i);
+
+        if (priority == AdmissionContext::Priority::kExempt) {
+            // Do not report statistics for kExempt as they are included in the normal priority pool
+            continue;
+        }
+
+        const auto& rw = _holders[i];
+
+        const auto& fieldName = priority == AdmissionContext::Priority::kNormal
+            ? kNormalPriorityName
+            : kLowPriorityName;
+        if (rw.read) {
+            readOut += rw.read->used();
+            readAvailable += rw.read->available();
+            readTotalTickets += rw.read->outof();
+            if (!readStats.is_initialized()) {
+                readStats.emplace();
+            }
+            BSONObjBuilder bb(readStats->subobjStart(fieldName));
+            rw.read->appendTicketStats(bb);
+            rw.read->appendHolderStats(bb);
+            bb.done();
+            if (priority == AdmissionContext::Priority::kNormal) {
+                BSONObjBuilder bb(readStats->subobjStart(kExemptPriorityName));
+                rw.read->appendExemptStats(readStats.value());
+                bb.done();
+            }
+        }
+        if (rw.write) {
+            writeOut += rw.write->used();
+            writeAvailable += rw.write->available();
+            writeTotalTickets += rw.write->outof();
+            if (!writeStats.is_initialized()) {
+                writeStats.emplace();
+            }
+            BSONObjBuilder bb(writeStats->subobjStart(fieldName));
+            rw.write->appendTicketStats(bb);
+            rw.write->appendHolderStats(bb);
+            bb.done();
+            if (priority == AdmissionContext::Priority::kNormal) {
+                BSONObjBuilder bb(writeStats->subobjStart(kExemptPriorityName));
+                rw.write->appendExemptStats(writeStats.value());
+                bb.done();
+            }
+        }
+    }
+    if (readStats.is_initialized()) {
+        readStats->append("out", readOut);
+        readStats->append("available", readAvailable);
+        readStats->append("totalTickets", readTotalTickets);
+        readStats->done();
+        b.append("read", readStats->obj());
+    }
+    if (writeStats.is_initialized()) {
+        writeStats->appendNumber("out", writeOut);
+        writeStats->appendNumber("available", writeAvailable);
+        writeStats->appendNumber("totalTickets", writeTotalTickets);
+        writeStats->done();
+        b.append("write", writeStats->obj());
+    }
+
+    {
+        BSONObjBuilder bbb(b.subobjStart("monitor"));
+        _throughputProbing.appendStats(bbb);
+        bbb.done();
+    }
+}
+
+int32_t TicketingSystem::numOfTicketsUsed() const {
+    int32_t total = 0;
+    for (const auto& rw : _holders) {
+        if (rw.read) {
+            total += rw.read->used();
+        }
+        if (rw.write) {
+            total += rw.write->used();
+        }
+    }
+    return total;
+}
+
+void TicketingSystem::incrementDelinquencyStats(OperationContext* opCtx) {
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+
+    auto priority = admCtx.getPriorityLowered() ? AdmissionContext::Priority::kLow
+                                                : AdmissionContext::Priority::kNormal;
+    {
+        const auto& stats = admCtx.readDelinquencyStats();
+        _getHolder(priority, Operation::kRead)
+            ->incrementDelinquencyStats(
+                stats.delinquentAcquisitions.loadRelaxed(),
+                Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
+                Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
+    }
+
+    {
+        const auto& stats = admCtx.writeDelinquencyStats();
+        _getHolder(priority, Operation::kWrite)
+            ->incrementDelinquencyStats(
+                stats.delinquentAcquisitions.loadRelaxed(),
+                Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
+                Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
+    }
+}
+
+boost::optional<Ticket> TicketingSystem::waitForTicketUntil(OperationContext* opCtx,
+                                                            Operation o,
+                                                            Date_t until) const {
+    ExecutionAdmissionContext* admCtx = &ExecutionAdmissionContext::get(opCtx);
+
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> executionPriority;
+
+    auto effectivePriority = admCtx->getPriority();
+    if (usesPrioritization()) {
+        if (wasOperationDowngradedToLowPriority(opCtx, admCtx)) {
+            executionPriority.emplace(opCtx, AdmissionContext::Priority::kLow);
+            effectivePriority = AdmissionContext::Priority::kLow;
+            admCtx->priorityLowered();
+        }
+    } else {
+        // Fall back to the normal ticket pool for low-priority when prioritization is disabled.
+        if (effectivePriority == AdmissionContext::Priority::kLow) {
+            effectivePriority = AdmissionContext::Priority::kNormal;
+        }
+    }
+
+    auto* holder = _getHolder(effectivePriority, o);
+    invariant(holder);
+
+    if (opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
+        return holder->waitForTicketUntilNoInterrupt_DO_NOT_USE(opCtx, admCtx, until);
+    }
+
+    return holder->waitForTicketUntil(opCtx, admCtx, until);
+}
+
+void TicketingSystem::startThroughputProbe() {
+    tassert(11132202,
+            "The throughput probing parameter should be enabled. This is only safe to use for "
+            "initialization purposes.",
+            _state.loadRelaxed().usesThroughputProbing());
+
+    _throughputProbing.start();
+}
+
+TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, Operation o) const {
+    if (p == AdmissionContext::Priority::kExempt) {
+        // Redirect kExempt priority to the normal ticket pool as it bypasses acquisition.
+        return _getHolder(AdmissionContext::Priority::kNormal, o);
+    }
+
+    const auto index = static_cast<size_t>(p);
+    invariant(index < _holders.size());
+
+    const auto& rwHolder = _holders[index];
+    return (o == Operation::kRead) ? rwHolder.read.get() : rwHolder.write.get();
+}
+
+bool TicketingSystem::TicketingState::usesPrioritization() const {
+    return algorithm ==
+        StorageEngineConcurrencyAdjustmentAlgorithmEnum::
+            kFixedConcurrentTransactionsWithPrioritization;
+}
+
+bool TicketingSystem::TicketingState::usesThroughputProbing() const {
+    return algorithm == StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing;
+}
+
+bool TicketingSystem::TicketingState::isRuntimeResizable() const {
+    return !usesThroughputProbing();
 }
 
 }  // namespace admission

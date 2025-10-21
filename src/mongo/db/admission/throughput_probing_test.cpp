@@ -49,7 +49,6 @@
 #include <boost/move/utility_core.hpp>
 
 namespace mongo::admission::throughput_probing {
-namespace {
 
 TEST(ThroughputProbingParameterTest, InitialConcurrency) {
     ASSERT_OK(validateInitialConcurrency(gMinConcurrency, {}));
@@ -84,6 +83,19 @@ protected:
         throughput_probing::gReadWriteRatio.store(readWriteRatio);
         _throughputProbing = std::make_unique<ThroughputProbing>(
             _svcCtx, &_readTicketHolder, &_writeTicketHolder, Milliseconds{1});
+
+        {
+            auto client = _svcCtx->getService()->makeClient("ThroughputProbingInit");
+            auto opCtx = client->makeOperationContext();
+            _throughputProbing->_job =
+                _svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
+                    "ThroughputProbingTicketHolderMonitor",
+                    [this](Client* client) { _throughputProbing->_run(client); },
+                    Milliseconds{1},
+                    true /* isKillableByStepdown */});
+            _throughputProbing->_initState();
+            _throughputProbing->_resetConcurrency(opCtx.get());
+        }
 
         // We need to advance the ticks to something other than zero, since that is used to
         // determine the if we're in the first iteration or not.
@@ -519,5 +531,4 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
     ASSERT_LT(_writeTicketHolder.outof(), writes);
 }
 
-}  // namespace
 }  // namespace mongo::admission::throughput_probing

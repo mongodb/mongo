@@ -558,6 +558,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/crud/OWNERS.yml
 /jstests/concurrency/fsm_workloads/crud/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/crud/**/crud_and_commands_with_dynamic_execution_control.js @10gen/server-workload-resilience @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/ddl/OWNERS.yml
 /jstests/concurrency/fsm_workloads/ddl/**/* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot

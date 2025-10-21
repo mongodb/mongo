@@ -2936,7 +2936,7 @@ mongo_cc_library(
         "periodic_runner_cache_pressure_rollback.h",
     ],
     deps = [
-        "//src/mongo/db/admission:execution_control",
+        "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/transaction",
         "//src/mongo/util:periodic_runner",
@@ -3026,12 +3026,14 @@ mongo_cc_library(
     srcs = [
         "service_entry_point_rs_endpoint.cpp",
         "service_entry_point_shard_role.cpp",
+        "//src/mongo/db/admission:execution_control_init.cpp",
         "//src/mongo/db/local_catalog/shard_role_api:transaction_resources_init_mongod.cpp",
     ],
     hdrs = [
         "service_entry_point_rs_endpoint.h",
         "service_entry_point_shard_role.h",
         "service_entry_point_shard_role_helpers.h",
+        "//src/mongo/db/admission:execution_control_init.h",
     ],
     deps = [
         "audit",
@@ -3388,7 +3390,7 @@ mongo_cc_library(
         "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util:signal_handlers",
         "//src/mongo/watchdog:watchdog_mongod",
-        "//src/mongo/db/admission:execution_control",
+        "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/db/admission:flow_control",
         "//src/mongo/db/admission:flow_control_parameters",
         "//src/mongo/db/auth:auth_op_observer",

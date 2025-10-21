@@ -25,7 +25,7 @@ mongo_cc_binary(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/admission:execution_admission_context",
-        "//src/mongo/db/admission:execution_control",
+        "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/tools/workload_simulation:simulator_main",
         "//src/mongo/tools/workload_simulation:workload_characteristics",
         "//src/mongo/util:mock_periodic_runner",

@@ -35,7 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/admission/single_pool_ticketing_system.h"
+#include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
@@ -101,9 +101,16 @@ public:
         : _svcCtx(svcCtx) {
         const bool trackPeakUsed = false;
         constexpr auto maxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
-        auto ticketingSystem = std::make_unique<admission::SinglePoolTicketingSystem>(
-            std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
-            std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth));
+        auto ticketingSystem = std::make_unique<admission::TicketingSystem>(
+            _svcCtx,
+            admission::TicketingSystem::RWTicketHolder{
+                std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
+                std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth)},
+            admission::TicketingSystem::RWTicketHolder{
+                std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
+                std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth)},
+            Milliseconds{100},
+            StorageEngineConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions);
         admission::TicketingSystem::use(_svcCtx, std::move(ticketingSystem));
     }
 

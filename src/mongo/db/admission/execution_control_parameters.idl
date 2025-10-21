@@ -164,9 +164,10 @@ server_parameters:
     storageEngineConcurrencyAdjustmentAlgorithm:
         description: >-
             The algorithm to be used for adjusting the number of concurrent storage engine transactions.
-        set_at: startup
+        set_at: [startup, runtime]
         cpp_vartype: std::string
         cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
+        on_update: "admission::TicketingSystem::updateConcurrencyAdjustmentAlgorithm"
         default: "throughputProbing"
         validator:
             callback: validateConcurrencyAdjustmentAlgorithm

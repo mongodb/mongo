@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-collection-write-path
+  - "crud_and_commands_with_dynamic_execution_control.js":
+    approvers:
+      - 10gen/server-workload-resilience

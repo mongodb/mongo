@@ -76,7 +76,7 @@ jsTestLog("Wait for no available read tickets");
 assert.soon(() => {
     let stats = db.runCommand({serverStatus: 1});
     jsTestLog(stats.queues.execution);
-    return stats.queues.execution.read.available == 0;
+    return stats.queues.execution.read.normalPriority.available == 0;
 }, "Expected to have no available read tickets.");
 
 // Force thread to sleep for 1ms to guarantee readers accrue wait time in queue.

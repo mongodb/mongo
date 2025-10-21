@@ -31,7 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/throughput_probing.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -43,6 +45,9 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+enum class StorageEngineConcurrencyAdjustmentAlgorithmEnum;
+
 namespace admission {
 
 /**
@@ -52,6 +57,11 @@ namespace admission {
  * The TicketingSystem maintains n pools of m available tickets. It is responsible for sizing each
  * ticket pool and determining which pool a caller should use for ticket acquisition.
  *
+ * It can operate in one of several concurrency adjustment modes:
+ *   - Fixed concurrency: a single pool with fixed number of tickets, no prioritization.
+ *   - Fixed concurrency with prioritization: two pools, where operations are redirected to each
+ * pool based on a heuristic.
+ *   - Throughput probing: a single pool is dynamically adjusted based on observed throughput.
  */
 class TicketingSystem {
 public:
@@ -63,8 +73,16 @@ public:
 
     enum class Operation { kRead = 0, kWrite };
 
-    TicketingSystem() = default;
-    virtual ~TicketingSystem() = default;
+    struct RWTicketHolder {
+        std::unique_ptr<TicketHolder> read;
+        std::unique_ptr<TicketHolder> write;
+    };
+
+    TicketingSystem(ServiceContext* svcCtx,
+                    RWTicketHolder normal,
+                    RWTicketHolder low,
+                    Milliseconds throughputProbingInterval,
+                    StorageEngineConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm);
 
     /**
      * A collection of static methods for managing normal priority settings.
@@ -92,6 +110,8 @@ public:
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
     };
 
+    static Status updateConcurrencyAdjustmentAlgorithm(std::string newAlgorithm);
+
     static TicketingSystem* get(ServiceContext* svcCtx);
 
     static void use(ServiceContext* svcCtx, std::unique_ptr<TicketingSystem> newTicketingSystem);
@@ -99,48 +119,101 @@ public:
     /**
      * Returns true if this TicketingSystem supports runtime size adjustment.
      */
-    virtual bool isRuntimeResizable() const = 0;
+    bool isRuntimeResizable() const;
 
     /**
      * Returns true if this TicketingSystem supports different ticket pools for prioritization.
      */
-    virtual bool usesPrioritization() const = 0;
+    bool usesPrioritization() const;
 
     /**
      * Sets the maximum queue depth for operations of a given priority and type.
      */
-    virtual void setMaxQueueDepth(AdmissionContext::Priority p, Operation o, int32_t depth) = 0;
+    void setMaxQueueDepth(AdmissionContext::Priority p, Operation o, int32_t depth);
 
     /**
      * Sets the maximum number of concurrent transactions (i.e., available tickets) for a given
      * priority and operation type.
      */
-    virtual void setConcurrentTransactions(OperationContext* opCtx,
-                                           AdmissionContext::Priority p,
-                                           Operation o,
-                                           int32_t transactions) = 0;
+    void setConcurrentTransactions(OperationContext* opCtx,
+                                   AdmissionContext::Priority p,
+                                   Operation o,
+                                   int32_t transactions);
+
+    /**
+     * Sets the concurrency adjustment algorithm.
+     *
+     * This method is used to dynamically change the algorithm used by the ticketing system to
+     * adjust the number of concurrent transactions. This includes switching between fixed
+     * concurrency and throughput probing-based algorithms.
+     */
+    void setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx, std::string algorithmName);
 
     /**
      * Appends statistics about the ticketing system's state to a BSON.
      */
-    virtual void appendStats(BSONObjBuilder& b) const = 0;
+    void appendStats(BSONObjBuilder& b) const;
 
     /**
      * Instantaneous number of tickets that are checked out by an operation.
      */
-    virtual int32_t numOfTicketsUsed() const = 0;
+    int32_t numOfTicketsUsed() const;
 
     /**
      * Bumps the delinquency counters to all ticket holders (read and write pools).
      */
-    virtual void incrementDelinquencyStats(OperationContext* opCtx) = 0;
+    void incrementDelinquencyStats(OperationContext* opCtx);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'.
      */
-    virtual boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
-                                                       Operation o,
-                                                       Date_t until) const = 0;
+    boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+                                               Operation o,
+                                               Date_t until) const;
+
+    /**
+     * Initializes and starts the periodic job that probes throughput and dynamically adjusts ticket
+     * levels. The throughput probing parameter must be enabled before calling this function.
+     */
+    void startThroughputProbe();
+
+private:
+    /**
+     * Returns the appropriate TicketHolder based on the given priority and operation type.
+     */
+    TicketHolder* _getHolder(AdmissionContext::Priority p, Operation o) const;
+
+    /**
+     * Encapsulates the ticketing system's concurrency mode and the logic that defines its behavior.
+     */
+    struct TicketingState {
+        StorageEngineConcurrencyAdjustmentAlgorithmEnum algorithm;
+
+        bool usesPrioritization() const;
+        bool usesThroughputProbing() const;
+        bool isRuntimeResizable() const;
+    };
+
+    /**
+     * Atomically holds the current state of the ticketing system. The TicketingState struct
+     * contains both the raw algorithm enum and the logic to interpret it.
+     */
+    AtomicWord<TicketingState> _state;
+
+    /**
+     * Holds the ticket pools for different priority levels.
+     *
+     * Each entry in the array corresponds to a specific priority level and contains separate
+     * holders for read and write operations.
+     */
+    std::array<RWTicketHolder, static_cast<size_t>(AdmissionContext::Priority::kPrioritiesCount)>
+        _holders;
+
+    /**
+     * Periodic task that probes system throughput and adjusts the number of concurrent read and
+     * write transactions dynamically.
+     */
+    ThroughputProbing _throughputProbing;
 };
 
 }  // namespace admission

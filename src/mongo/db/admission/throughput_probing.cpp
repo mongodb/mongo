@@ -98,27 +98,38 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                                      TicketHolder* readTicketHolder,
                                      TicketHolder* writeTicketHolder,
                                      Milliseconds interval)
-    : _readTicketHolder(readTicketHolder),
+    : _svcCtx(svcCtx),
+      _readTicketHolder(readTicketHolder),
       _writeTicketHolder(writeTicketHolder),
-      _stableConcurrency(
-          gInitialConcurrency
-              ? gInitialConcurrency
-              : std::clamp(static_cast<int32_t>(ProcessInfo::getNumLogicalCores() * 2),
-                           gMinConcurrency * 2,
-                           gMaxConcurrency.load() * 2)),
-      _timer(svcCtx->getTickSource()),
-      _job(svcCtx->getPeriodicRunner()->makeJob(
-          PeriodicRunner::PeriodicJob{"ThroughputProbingTicketHolderMonitor",
-                                      [this](Client* client) { _run(client); },
-                                      interval,
-                                      true /*isKillableByStepdown*/})) {
-    auto client = svcCtx->getService()->makeClient("ThroughputProbingInit");
-    auto opCtx = client->makeOperationContext();
-    _resetConcurrency(opCtx.get());
-}
+      _interval(interval),
+      _timer(svcCtx->getTickSource()) {}
 
 void ThroughputProbing::start() {
-    _job.start();
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    _initState();
+
+    auto client = _svcCtx->getService()->makeClient("ThroughputProbingInit");
+    auto opCtx = client->makeOperationContext();
+    _resetConcurrency(opCtx.get());
+
+    if (!_job.isValid()) {
+        _job = _svcCtx->getPeriodicRunner()->makeJob(
+            PeriodicRunner::PeriodicJob{"ThroughputProbingTicketHolderMonitor",
+                                        [this](Client* client) { _run(client); },
+                                        _interval,
+                                        true /* isKillableByStepdown */});
+        _job.start();
+    }
+}
+
+void ThroughputProbing::stop() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    if (_job.isValid()) {
+        _job.stop();
+        _job.detach();
+    }
 }
 
 void ThroughputProbing::appendStats(BSONObjBuilder& builder) const {
@@ -374,6 +385,17 @@ void ThroughputProbing::_decreaseConcurrency(OperationContext* opCtx) {
                 "writeConcurrency"_attr = _writeTicketHolder->outof());
 }
 
+void ThroughputProbing::_initState() {
+    _stableConcurrency = gInitialConcurrency
+        ? gInitialConcurrency
+        : std::clamp(static_cast<int32_t>(ProcessInfo::getNumLogicalCores() * 2),
+                     gMinConcurrency * 2,
+                     gMaxConcurrency.load() * 2);
+    _stableThroughput = 0;
+    _state = ProbingState::kStable;
+    _prevNumFinishedProcessing = -1;
+}
+
 void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("timesDecreased", static_cast<long long>(timesDecreased.load()));
     builder.append("timesIncreased", static_cast<long long>(timesIncreased.load()));
@@ -383,36 +405,6 @@ void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("timesProbedStable", static_cast<long long>(timesProbedStable.load()));
     builder.append("timesProbedUp", static_cast<long long>(timesProbedUp.load()));
     builder.append("timesProbedDown", static_cast<long long>(timesProbedDown.load()));
-}
-
-ThroughputProbingTicketingSystem::ThroughputProbingTicketingSystem(
-    ServiceContext* svcCtx,
-    std::unique_ptr<TicketHolder> read,
-    std::unique_ptr<TicketHolder> write,
-    Milliseconds interval)
-    : SinglePoolTicketingSystem(std::move(read), std::move(write)) {
-    _monitor = std::make_unique<admission::ThroughputProbing>(
-        svcCtx, _readTicketHolder.get(), _writeTicketHolder.get(), interval);
-}
-
-bool ThroughputProbingTicketingSystem::isRuntimeResizable() const {
-    return false;
-}
-
-bool ThroughputProbingTicketingSystem::usesPrioritization() const {
-    return false;
-}
-
-void ThroughputProbingTicketingSystem::appendStats(BSONObjBuilder& b) const {
-    SinglePoolTicketingSystem::appendStats(b);
-
-    BSONObjBuilder bbb(b.subobjStart("monitor"));
-    _monitor->appendStats(bbb);
-    bbb.done();
-}
-
-void ThroughputProbingTicketingSystem::startThroughputProbe() {
-    _monitor->start();
 }
 
 }  // namespace admission
