@@ -226,8 +226,21 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                 uassertStatusOK(completionStatus);
 
                 // Result must be populated if the coordinator succeeded.
-                tasserted(10710101, "DropIndexes result unavailable");
+                tassert(10710101, "DropIndexes result unavailable", result);
             }
+
+            // If 'result' is set but not OK, we should avoid propagating the coordinator error;
+            // otherwise, the 'raw' field would not be returned to the user.
+            //
+            // However, if 'result' is set and OK, we should propagate the coordinator error.
+            // For example, in the case of a stepdown, the coordinator’s persistent document
+            // will not be deleted. In this scenario, we must return the stepdown error to the
+            // user even if the dropIndexes succeeded on all shards, since the dropIndexes command
+            // may be retried on the new primary node.
+            if (result->getField("ok").trueValue()) {
+                uassertStatusOK(completionStatus);
+            }
+
             return Response(result->getOwned());
         }
 
