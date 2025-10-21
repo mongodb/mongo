@@ -32,6 +32,9 @@
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
+class AggregateCommandRequest;
+class DistinctCommandRequest;
+class FindCommandRequest;
 
 class ExpressionContextBuilder {
 public:

@@ -29,11 +29,9 @@
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
@@ -51,9 +49,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -61,7 +57,6 @@
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/version_context.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
@@ -69,11 +64,9 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
-#include "mongo/util/version/releases.h"
 
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -86,11 +79,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-class FindCommandRequest;
-class DistinctCommandRequest;
-class AggregateCommandRequest;
-
 
 enum struct SbeCompatibility {
     // Not implemented in SBE.
