@@ -39,6 +39,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -69,7 +70,7 @@ public:
     virtual void preCheckInterruptOnly(OperationContext* opCtx) const = 0;
 };
 
-class PlanYieldPolicy {
+class MONGO_MOD_PUBLIC PlanYieldPolicy {
 public:
     enum class YieldPolicy {
         // Any call to getNext() may yield. In particular, the executor may die on any call to

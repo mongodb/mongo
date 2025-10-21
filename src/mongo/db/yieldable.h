@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
-class Yieldable {
+class MONGO_MOD_OPEN Yieldable {
 public:
     virtual ~Yieldable() {}
     virtual bool yieldable() const = 0;
