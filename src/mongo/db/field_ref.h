@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
 
@@ -156,7 +157,7 @@ public:
     /**
      * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
      */
-    StringData getPart(FieldIndex i) const;
+    StringData getPart(FieldIndex i) const MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
      * Returns true when 'this' FieldRef is a prefix of 'other'. Equality is not considered
@@ -206,13 +207,14 @@ public:
      * Returns a StringData of the full dotted field in its current state (i.e., some parts may have
      * been replaced since the parse() call).
      */
-    StringData dottedField(FieldIndex offsetFromStart = 0) const;
+    StringData dottedField(FieldIndex offsetFromStart = 0) const MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
      * Returns a StringData of parts of the dotted field from startPart to endPart in its current
      * state (i.e., some parts may have been replaced since the parse() call).
      */
-    StringData dottedSubstring(FieldIndex startPart, FieldIndex endPart) const;
+    StringData dottedSubstring(FieldIndex startPart,
+                               FieldIndex endPart) const MONGO_COMPILER_LIFETIME_BOUND;
 
     /**
      * Compares the full dotted path represented by this FieldRef to other
@@ -245,7 +247,7 @@ public:
         return numParts() == 0;
     }
 
-    StringData operator[](int index) const {
+    StringData operator[](int index) const MONGO_COMPILER_LIFETIME_BOUND {
         return getPart(index);
     }
 
@@ -302,11 +304,11 @@ private:
         // Constructs an empty StringView.
         StringView() = default;
 
-        StringView(std::uint32_t offset, std::uint32_t len) : offset(offset), len(len) {};
+        StringView(std::uint32_t offset, std::uint32_t len) : offset(offset), len(len) {}
 
         StringData toStringData(const std::string& viewInto) const {
             return {viewInto.c_str() + offset, len};
-        };
+        }
 
         // uint32 is large enough for FieldRef since we have a limit on it's size. At the top of
         // this file we statically assert that this is true.

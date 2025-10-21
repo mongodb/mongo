@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string_reserved.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -295,14 +296,14 @@ public:
     /**
      * This function must only be used in sharding code (src/mongo/s and src/mongo/db/s).
      */
-    StringData db_forSharding() const {
+    StringData db_forSharding() const MONGO_COMPILER_LIFETIME_BOUND {
         return db_deprecated();
     }
 
     /**
      * This function must only be used in unit tests.
      */
-    StringData db_forTest() const {
+    StringData db_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
         return db_deprecated();
     }
 
@@ -310,7 +311,7 @@ public:
         return *this;
     }
 
-    StringData coll() const {
+    StringData coll() const MONGO_COMPILER_LIFETIME_BOUND {
         const auto offset = kDataOffset + dbSize() + 1 + tenantIdSize();
         if (offset > _data.size()) {
             return {};
@@ -319,12 +320,12 @@ public:
         return StringData{_data.data() + offset, _data.size() - offset};
     }
 
-    ConstDataRange asDataRange() const {
+    ConstDataRange asDataRange() const MONGO_COMPILER_LIFETIME_BOUND {
         auto nss = ns();
         return ConstDataRange(nss.data(), nss.size());
     }
 
-    StringData ns_forTest() const {
+    StringData ns_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
         return ns();
     }
 
@@ -721,7 +722,7 @@ public:
     /**
      * This function removes the tenant id and returns the namespace part of NamespaceString.
      */
-    friend StringData redactTenant(const NamespaceString& nss) {
+    friend StringData redactTenant(const NamespaceString& nss MONGO_COMPILER_LIFETIME_BOUND) {
         return nss.ns();
     }
 
@@ -762,7 +763,7 @@ private:
      * Please refer to NamespaceStringUtil::serialize method or use ns_forTest to satisfy any unit
      * test needing access to ns().
      */
-    StringData ns() const {
+    StringData ns() const MONGO_COMPILER_LIFETIME_BOUND {
         auto offset = kDataOffset + tenantIdSize();
         return StringData{_data.data() + offset, _data.size() - offset};
     }
@@ -785,7 +786,7 @@ private:
      * In case you would need to a StringData object instead we strongly recommend taking a look
      * at the DatabaseNameUtil::serialize method which takes in a DatabaseName object.
      */
-    StringData db_deprecated() const {
+    StringData db_deprecated() const MONGO_COMPILER_LIFETIME_BOUND {
         return dbName().db(omitTenant);
     }
 
@@ -856,7 +857,7 @@ public:
         }
     }
 
-    ConstDataRange asDataRange() const {
+    ConstDataRange asDataRange() const MONGO_COMPILER_LIFETIME_BOUND {
         if (isNamespaceString()) {
             return nss().asDataRange();
         }
@@ -894,7 +895,7 @@ inline std::string nsToDatabase(StringData ns) {
 /**
  * "database.a.b.c" -> "a.b.c"
  */
-inline StringData nsToCollectionSubstring(StringData ns) {
+inline StringData nsToCollectionSubstring(StringData ns MONGO_COMPILER_LIFETIME_BOUND) {
     size_t i = ns.find('.');
     massert(16886, "nsToCollectionSubstring: no .", i != std::string::npos);
     return ns.substr(i + 1);

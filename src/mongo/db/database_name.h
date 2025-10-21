@@ -37,6 +37,7 @@
 #include "mongo/db/database_name_reserved.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
@@ -320,7 +321,7 @@ public:
      * DatabaseName that can never contain a tenant id (such as global database constants) otherwise
      * data isolation between tenant can break.
      */
-    constexpr StringData db(OmitTenant) const {
+    constexpr StringData db(OmitTenant) const MONGO_COMPILER_LIFETIME_BOUND {
         return view().substr(dbNameOffsetStart(), size());
     }
 
@@ -361,7 +362,7 @@ protected:
     /**
      * Returns a view of the internal string.
      */
-    constexpr StringData view() const {
+    constexpr StringData view() const MONGO_COMPILER_LIFETIME_BOUND {
         return StringData{_data.data(), _data.size()};
     }
 
@@ -398,7 +399,7 @@ protected:
      */
     DatabaseName(const Storage& data, size_t size, TrustedInitTag) noexcept : _data(data, size) {}
 
-    StringData tenantIdView() const {
+    StringData tenantIdView() const MONGO_COMPILER_LIFETIME_BOUND {
         if (!hasTenantId()) {
             return {};
         }

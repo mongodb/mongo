@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
 #include <compare>
@@ -95,7 +96,7 @@ public:
     /**
      * Get the subpath including path elements [0, n].
      */
-    StringData getSubpath(size_t n) const {
+    StringData getSubpath(size_t n) const MONGO_COMPILER_LIFETIME_BOUND {
         invariant(n + 1 < _fieldPathDotPosition.size());
         return StringData(_fieldPath.c_str(), _fieldPathDotPosition[n + 1]);
     }
@@ -103,21 +104,21 @@ public:
     /**
      * Return the first path component.
      */
-    StringData front() const {
+    StringData front() const MONGO_COMPILER_LIFETIME_BOUND {
         return getFieldName(0);
     }
 
     /**
      * Return the last path component.
      */
-    StringData back() const {
+    StringData back() const MONGO_COMPILER_LIFETIME_BOUND {
         return getFieldName(getPathLength() - 1);
     }
 
     /**
      * Return the ith field name from this path using zero-based indexes.
      */
-    StringData getFieldName(size_t i) const {
+    StringData getFieldName(size_t i) const MONGO_COMPILER_LIFETIME_BOUND {
         dassert(i < getPathLength());
         const auto begin = _fieldPathDotPosition[i] + 1;
         const auto end = _fieldPathDotPosition[i + 1];
@@ -129,7 +130,7 @@ public:
      * Tasserts when trying to access a field name hash for a position for which no hashes were
      * calculated.
      */
-    HashedFieldName getFieldNameHashed(size_t i) const {
+    HashedFieldName getFieldNameHashed(size_t i) const MONGO_COMPILER_LIFETIME_BOUND {
         dassert(i < getPathLength());
         tassert(
             11212700, "cannot access a not-calculated field hash position", i < _fieldHash.size());
