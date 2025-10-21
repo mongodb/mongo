@@ -1014,12 +1014,12 @@ mongo_cc_library(
     ],
     hdrs = [
         "change_stream_oplog_notification.h",
-        "//src/mongo/db/global_catalog/ddl:notify_sharding_event_gen",
     ],
     deps = [
         ":oplog",
         ":oplog_entry",
         "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/global_catalog/ddl:notify_sharding_event_idl",
         "//src/mongo/db/local_catalog/lock_manager",
         "//src/mongo/db/local_catalog/lock_manager:exception_util",
         "//src/mongo/db/pipeline:change_stream_helpers",

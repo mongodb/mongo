@@ -120,6 +120,12 @@ public:
                 return;
             }
 
+            if (request().getEventType() ==
+                notify_sharding_event::kPlacementHistoryMetadataChanged) {
+                notifyChangeStreamsOnPlacementHistoryMetadataChanged(opCtx);
+                return;
+            }
+
             MONGO_UNREACHABLE_TASSERT(10083526);
         }
 

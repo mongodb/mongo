@@ -43,6 +43,7 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kCheckPreconditions: "checkPreconditions"
             kBlockDDLs: "blockDDLs"
             kDefineInitializationTime: "defineInitializationTime"
             kUnblockDDLs: "unblockDDLs"

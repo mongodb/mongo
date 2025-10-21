@@ -109,6 +109,12 @@ structs:
                 description: "The cluster time at which the placement-changing DDL got recorded into the global catalog."
                 type: timestamp
 
+    PlacementHistoryMetadataChanged:
+        description:
+            "Notification of the commit of a metadata change affecting the whole content of config.placementHistory.
+            Shards are expected to react by emitting a no-op log entry directed to change stream readers."
+        strict: false
+
 commands:
     _shardsvrNotifyShardingEvent:
         command_name: _shardsvrNotifyShardingEvent

@@ -42,10 +42,12 @@ static constexpr char kDatabasesAdded[] = "databasesAdded";
 static constexpr char kCollectionSharded[] = "collectionSharded";
 static constexpr char kCollectionResharded[] = "collectionResharded";
 static constexpr char kNamespacePlacementChanged[] = "namespacePlacementChanged";
+static constexpr char kPlacementHistoryMetadataChanged[] = "placementHistoryMetadataChanged";
 
 inline Status validateEventType(const std::string& eventType) {
     if (eventType == kCollectionResharded || eventType == kNamespacePlacementChanged ||
-        eventType == kDatabasesAdded || eventType == kCollectionSharded) {
+        eventType == kDatabasesAdded || eventType == kCollectionSharded ||
+        eventType == kPlacementHistoryMetadataChanged) {
         return Status::OK();
     }
 

@@ -29,11 +29,13 @@
 
 #include "mongo/db/global_catalog/ddl/initialize_placement_history_coordinator.h"
 
+#include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/db/local_catalog/drop_collection.h"
+#include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/vector_clock/vector_clock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -97,10 +99,54 @@ void blockAndDrainConflictingDDLs(OperationContext* opCtx) {
 void unblockConflictingDDLs(OperationContext* opCtx) {
     broadcastHistoryInitializationState(opCtx, false /*isInProgress*/);
 }
+
+void broadcastPlacementHistoryChangedNotification(
+    OperationContext* opCtx,
+    const OperationSessionInfo& osi,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
+    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+
+    ShardsvrNotifyShardingEventRequest request(
+        notify_sharding_event::kPlacementHistoryMetadataChanged,
+        PlacementHistoryMetadataChanged().toBSON());
+
+    request.setDbName(DatabaseName::kAdmin);
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, osi);
+
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
+        **executor, token, std::move(request));
+
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, std::move(allShards), false /* throwOnError */);
+    for (const auto& response : responses) {
+        auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+        if (status.isOK()) {
+            continue;
+        }
+
+        if (status == ErrorCodes::UnsupportedShardingEventNotification) {
+            // Swallow the error, which is expected when the recipient runs a legacy binary that
+            // does not support the kPlacementHistoryMetadataChanged notification type.
+            LOGV2_WARNING(10916800,
+                          "Skipping kPlacementHistoryMetadataChanged notification",
+                          "recipient"_attr = response.shardId);
+        } else {
+            uassertStatusOK(status);
+        }
+    }
+}
+
+bool anyShardInTheCluster(OperationContext* opCtx) {
+    auto* shardRegistry = Grid::get(opCtx)->shardRegistry();
+    return shardRegistry->getNumShards(opCtx) != 0;
+}
+
 }  // namespace
 
 bool InitializePlacementHistoryCoordinator::_mustAlwaysMakeProgress() {
-    return _doc.getPhase() > Phase::kUnset;
+    return _doc.getPhase() > Phase::kCheckPreconditions;
 }
 
 std::set<NamespaceString> InitializePlacementHistoryCoordinator::_getAdditionalLocksToAcquire(
@@ -114,9 +160,22 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
+        .then(_buildPhaseHandler(Phase::kCheckPreconditions,
+                                 [](auto* opCtx) {
+                                     // Disregard this request if the cluster is 'empty':
+                                     // config.placementHistory has no meaning within such a state
+                                     // and the first shard addition is expected to later trigger
+                                     // the initialization of its content.
+                                     uassert(
+                                         ErrorCodes::RequestAlreadyFulfilled,
+                                         "Skipping initialization of config.placementHistory: "
+                                         "there is currently no shard registered in the cluster",
+                                         anyShardInTheCluster(opCtx));
+                                 }))
         .then([this, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
+            ShardingLogging::get(opCtx)->logChange(opCtx, "resetPlacementHistory.start", nss());
             // Ensure that there is no concurrent access from the periodic cleaning job (which may
             // have been re-activated during the execution of this Coordinator during a node step
             // up).
@@ -192,9 +251,22 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                               "config.placementHistory initialization failed");
                 }
             }))
-        .then(_buildPhaseHandler(Phase::kFinalize, [](auto* opCtx) {
-            PlacementHistoryCleaner::get(opCtx)->resume(opCtx);
-        }));
+        .then(_buildPhaseHandler(
+            Phase::kFinalize,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                const auto osi = getNewSession(opCtx);
+                broadcastPlacementHistoryChangedNotification(opCtx, osi, executor, token);
+                PlacementHistoryCleaner::get(opCtx)->resume(opCtx);
+                ShardingLogging::get(opCtx)->logChange(opCtx, "resetPlacementHistory.end", nss());
+            }))
+        .onError([](const Status& status) {
+            if (status == ErrorCodes::RequestAlreadyFulfilled) {
+                LOGV2(10916801, "Skipping initialization of config.placementHistory");
+                return Status::OK();
+            };
+
+            return status;
+        });
 }
 
 }  // namespace mongo

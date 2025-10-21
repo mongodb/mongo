@@ -1,5 +1,5 @@
 /**
- * Test validating the expected behavior of resetPlacementHistory (in particular, its logic performing snapshot reads of the global catalog).
+ * Test validating the expected behavior of resetPlacementHistory.
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
  *  ]
@@ -40,6 +40,96 @@ function launchAndPauseResetPlacementHistory() {
             joinParallelResetRequest();
         },
     };
+}
+
+{
+    jsTest.log.info("resetPlacementHistory produces the expected oplog entries across the shards of the cluster");
+
+    const initializationMetadataBeforeReset = st.config.placementHistory
+        .find({nss: initializationMetadataNssId})
+        .sort({timestamp: 1})
+        .toArray();
+
+    assert.eq(initializationMetadataBeforeReset.length, 2);
+    assert(
+        timestampCmp(initializationMetadataBeforeReset[0].timestamp, initializationMetadataBeforeReset[1].timestamp) !==
+            0,
+    );
+    const initializationTimeBeforeReset = initializationMetadataBeforeReset[1].timestamp;
+
+    assert.commandWorked(st.s.adminCommand({resetPlacementHistory: 1}));
+
+    const initializationMetadataAfterReset = st.config.placementHistory
+        .find({nss: initializationMetadataNssId})
+        .sort({timestamp: 1})
+        .toArray();
+
+    assert.eq(initializationMetadataAfterReset.length, 2);
+    assert(
+        timestampCmp(initializationMetadataAfterReset[0].timestamp, initializationMetadataAfterReset[1].timestamp) !==
+            0,
+    );
+    const initializationTimeAfterReset = initializationMetadataAfterReset[1].timestamp;
+
+    assert(timestampCmp(initializationTimeAfterReset, initializationTimeBeforeReset) > 0);
+
+    [st.rs0, st.rs1].forEach((rs) => {
+        const primary = rs.getPrimary();
+        const placementHistoryChangedNotifications = primary
+            .getCollection("local.oplog.rs")
+            .find({"ns": "", "o2.namespacePlacementChanged": 1})
+            .toArray();
+        assert.eq(placementHistoryChangedNotifications.length, 1);
+        const entry = placementHistoryChangedNotifications[0];
+        assert.eq(entry.op, "n");
+        assert(timestampCmp(entry.ts, initializationTimeAfterReset) > 0);
+    });
+}
+
+{
+    jsTest.log.info("resetPlacementHistory produces the expected oplog entries across the shards of the cluster");
+
+    const initializationMetadataBeforeReset = st.config.placementHistory
+        .find({nss: initializationMetadataNssId})
+        .sort({timestamp: 1})
+        .toArray();
+
+    assert.eq(initializationMetadataBeforeReset.length, 2);
+    assert(
+        timestampCmp(initializationMetadataBeforeReset[0].timestamp, initializationMetadataBeforeReset[1].timestamp) !==
+            0,
+    );
+    const initializationTimeBeforeReset = initializationMetadataBeforeReset[1].timestamp;
+
+    assert.commandWorked(st.s.adminCommand({resetPlacementHistory: 1}));
+
+    const initializationMetadataAfterReset = st.config.placementHistory
+        .find({nss: initializationMetadataNssId})
+        .sort({timestamp: 1})
+        .toArray();
+
+    assert.eq(initializationMetadataAfterReset.length, 2);
+    assert(
+        timestampCmp(initializationMetadataAfterReset[0].timestamp, initializationMetadataAfterReset[1].timestamp) !==
+            0,
+    );
+    const initializationTimeAfterReset = initializationMetadataAfterReset[1].timestamp;
+
+    assert(timestampCmp(initializationTimeAfterReset, initializationTimeBeforeReset) > 0);
+
+    [st.rs0, st.rs1].forEach((rs) => {
+        const primary = rs.getPrimary();
+        const placementHistoryChangedNotifications = primary
+            .getCollection("local.oplog.rs")
+            .find({"ns": "", "o2.namespacePlacementChanged": 1})
+            .sort({ts: -1})
+            .toArray();
+
+        const entry = placementHistoryChangedNotifications[0];
+        assert.eq(entry.op, "n");
+        assert.eq(entry.o, {msg: {namespacePlacementChanged: ""}});
+        assert(timestampCmp(entry.ts, initializationTimeAfterReset) > 0);
+    });
 }
 
 {

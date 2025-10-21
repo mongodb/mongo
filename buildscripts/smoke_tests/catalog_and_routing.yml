@@ -49,6 +49,6 @@ suites:
   no_passthrough:
     - jstests/noPassthrough/ddl/set_allow_migrations.js
     - jstests/noPassthrough/global_catalog/repair_sharded_collection_history.js
-    - jstests/noPassthrough/global_catalog/reset_placement_history_snapshot_read.js
+    - jstests/noPassthrough/global_catalog/reset_placement_history.js
     - jstests/noPassthrough/versioning_protocol/_flush_cache_update_commands.js
     - jstests/noPassthrough/versioning_protocol/flush_router_config.js
