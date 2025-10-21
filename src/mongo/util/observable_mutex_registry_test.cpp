@@ -30,7 +30,8 @@
 #include "mongo/util/observable_mutex_registry.h"
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+
+#include <iterator>
 
 namespace mongo {
 namespace {
@@ -78,19 +79,28 @@ class ObservableMutexRegistryReportTest : public unittest::Test {
 public:
     using StatsList = std::vector<TaggedStats>;
 
+    static constexpr StringData kInternalMutexTags[] = {
+        ObservableMutexRegistry::kRegistrationMutexTag,
+        ObservableMutexRegistry::kCollectionMutexTag};
+
     std::unique_ptr<MockObservableMutex> makeMutexAndAddToRegistry(TaggedStats stats) {
         auto m = std::make_unique<MockObservableMutex>(stats.data);
         _registry.add(stats.tag, m->getMutex());
         return m;
     }
 
-    void runTest(StatsList expected, bool listAll = false) {
-        auto stats = _registry.report(listAll);
-        _compare(listAll, stats, expected);
+    struct Options {
+        bool listAll = false;
+        bool skipInternalMutexes = true;
+    };
+
+    void assertReport(StatsList expected, Options options) {
+        auto stats = _registry.report(options.listAll);
+        _compare(options, stats, expected);
     }
 
 private:
-    void _compare(bool listAll, BSONObj actual, StatsList expected) {
+    void _compare(Options options, BSONObj actual, StatsList expected) {
         auto assertStats = [](BSONObj statObj, MutexAcquisitionStats expected) {
             ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName),
                       expected.total);
@@ -100,16 +110,26 @@ private:
                       expected.waitCycles);
         };
 
-        ASSERT_EQ(actual.nFields(), expected.size());
+        const std::size_t expectedSize = options.skipInternalMutexes
+            ? expected.size() + std::size(kInternalMutexTags)
+            : expected.size();
+
+        ASSERT_EQ(actual.nFields(), expectedSize);
         for (const auto& [tag, data, listAllData] : expected) {
+            if (options.skipInternalMutexes &&
+                std::find(std::begin(kInternalMutexTags), std::end(kInternalMutexTags), tag) !=
+                    std::end(kInternalMutexTags)) {
+                continue;
+            }
+
             auto tagStats = actual.getObjectField(tag);
             assertStats(tagStats.getObjectField(ObservableMutexRegistry::kExclusiveFieldName),
                         data.exclusiveAcquisitions);
             assertStats(tagStats.getObjectField(ObservableMutexRegistry::kSharedFieldName),
                         data.sharedAcquisitions);
 
-            ASSERT_EQ(listAll, tagStats.hasField(ObservableMutexRegistry::kMutexFieldName));
-            if (listAll) {
+            ASSERT_EQ(options.listAll, tagStats.hasField(ObservableMutexRegistry::kMutexFieldName));
+            if (options.listAll) {
                 ASSERT(listAllData);
                 auto subArr = tagStats[ObservableMutexRegistry::kMutexFieldName].Array();
 
@@ -117,7 +137,7 @@ private:
                     auto obj = subArr.at(i).Obj();
                     ASSERT_TRUE(obj.hasField(ObservableMutexRegistry::kRegisteredFieldName));
                     ASSERT_EQ(obj.getField(ObservableMutexRegistry::kIdFieldName).Long(),
-                              *listAllData->at(i).mutexId);
+                              *listAllData->at(i).mutexId + std::size(kInternalMutexTags));
 
                     assertStats(obj.getObjectField(ObservableMutexRegistry::kExclusiveFieldName),
                                 listAllData->at(i).data.exclusiveAcquisitions);
@@ -131,22 +151,38 @@ private:
     ObservableMutexRegistry _registry;
 };
 
-TEST_F(ObservableMutexRegistryReportTest, EmptyRegistry) {
-    runTest({});
+TEST_F(ObservableMutexRegistryReportTest, SelfRegistry) {
+    // 1. Register _registrationMutex
+    // 2. Register _collectionMutex
+    // 3. Grab new registrations in `report()`.
+    const int numRegistrationAcquisitions = 3;
+    // 1. `report()` in `assertReport(...)`.
+    const int numCollectionAcquisitions = 1;
+    const std::vector<TaggedStats> expected = {
+        {ObservableMutexRegistry::kRegistrationMutexTag,
+         {{numRegistrationAcquisitions, 0, 0}, {0, 0, 0}}},
+        {ObservableMutexRegistry::kCollectionMutexTag,
+         {{numCollectionAcquisitions, 0, 0}, {0, 0, 0}}},
+    };
+    assertReport(expected, {.listAll = false, .skipInternalMutexes = false});
+}
+
+TEST_F(ObservableMutexRegistryReportTest, ExternallyEmptyRegistry) {
+    assertReport({}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, ZeroStats) {
     TaggedStats statsA = {"A", {{0, 0, 0}, {0, 0, 0}}};
     auto mutex = makeMutexAndAddToRegistry(statsA);
 
-    runTest({statsA});
+    assertReport({statsA}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, NonZeroStats) {
     TaggedStats statsA = {"A", {{3, 2, 500}, {1, 0, 17}}};
     auto mutex = makeMutexAndAddToRegistry(statsA);
 
-    runTest({statsA});
+    assertReport({statsA}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, MultipleMutexes) {
@@ -160,7 +196,7 @@ TEST_F(ObservableMutexRegistryReportTest, MultipleMutexes) {
 
     // The stats for tag A should be aggregated.
     TaggedStats statsA = {"A", statsA0.data + statsA1.data};
-    runTest({statsA, statsB});
+    assertReport({statsA, statsB}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, InvalidatingMutexBeforeVisitingStillEmitsStats) {
@@ -168,7 +204,7 @@ TEST_F(ObservableMutexRegistryReportTest, InvalidatingMutexBeforeVisitingStillEm
     auto mutex = makeMutexAndAddToRegistry(statsA);
 
     mutex->invalidate();
-    runTest({statsA});
+    assertReport({statsA}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, SomeMutexInvalidated) {
@@ -183,15 +219,15 @@ TEST_F(ObservableMutexRegistryReportTest, SomeMutexInvalidated) {
     auto mutexC = makeMutexAndAddToRegistry(statsC);
 
     TaggedStats statsA = {"A", statsA0.data + statsA1.data};
-    runTest({statsA, statsB, statsC});
+    assertReport({statsA, statsB, statsC}, {.listAll = false, .skipInternalMutexes = true});
 
     // Invalidating a mutex should not remove its stats from the report when listAll is disabled.
     mutexA1->invalidate();
-    runTest({statsA, statsB, statsC});
+    assertReport({statsA, statsB, statsC}, {.listAll = false, .skipInternalMutexes = true});
 
     mutexA0->invalidate();
     mutexB->invalidate();
-    runTest({statsA, statsB, statsC});
+    assertReport({statsA, statsB, statsC}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, ListAll) {
@@ -210,15 +246,17 @@ TEST_F(ObservableMutexRegistryReportTest, ListAll) {
     std::vector<StatsRecord> listAllA = {{statsA0.data, 0 /* mutexId */, dummyTimestamp},
                                          {statsA1.data, 1 /* mutexId */, dummyTimestamp}};
     std::vector<StatsRecord> listAllB = {{statsB.data, 2 /* mutexId */, dummyTimestamp}};
-    runTest({{"A", statsA.data, listAllA}, {"B", statsB.data, listAllB}}, true /* listAll */);
+    assertReport({{"A", statsA.data, listAllA}, {"B", statsB.data, listAllB}},
+                 {.listAll = true, .skipInternalMutexes = true});
 
     // Only valid mutexes should be included in the listAll portion of the report..
     mutexB->invalidate();
     listAllB.clear();
-    runTest({{"A", statsA.data, listAllA}, {"B", statsB.data, listAllB}}, true /* listAll */);
+    assertReport({{"A", statsA.data, listAllA}, {"B", statsB.data, listAllB}},
+                 {.listAll = true, .skipInternalMutexes = true});
 
     // When listAll is disabled, we should still see stats for the invalidated mutex.
-    runTest({{statsA, statsB}}, false /* listAll */);
+    assertReport({{statsA, statsB}}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, MutexIdShouldNeverChangeAfterInvalidation) {
@@ -237,12 +275,12 @@ TEST_F(ObservableMutexRegistryReportTest, MutexIdShouldNeverChangeAfterInvalidat
     std::vector<StatsRecord> listAllA = {{statsA0.data, 0 /* mutexId */, dummyTimestamp},
                                          {statsA1.data, 1 /* mutexId */, dummyTimestamp},
                                          {statsA2.data, 2 /* mutexId */, dummyTimestamp}};
-    runTest({{"A", statsA.data, listAllA}}, true /* listAll */);
+    assertReport({{"A", statsA.data, listAllA}}, {.listAll = true, .skipInternalMutexes = true});
 
     // mutexA2 should still have id 2 even after mutexA1 is invalidated.
     mutexA1->invalidate();
     listAllA.erase(listAllA.begin() + 1);
-    runTest({{"A", statsA.data, listAllA}}, true /* listAll */);
+    assertReport({{"A", statsA.data, listAllA}}, {.listAll = true, .skipInternalMutexes = true});
 }
 
 }  // namespace

@@ -53,6 +53,9 @@ public:
     static constexpr auto kIdFieldName = "id"_sd;
     static constexpr auto kRegisteredFieldName = "registered"_sd;
 
+    static constexpr auto kRegistrationMutexTag = "ObservableMutexRegistry::_registrationMutex"_sd;
+    static constexpr auto kCollectionMutexTag = "ObservableMutexRegistry::_collectionMutex"_sd;
+
     struct StatsRecord {
         MutexStats data;
         boost::optional<int64_t> mutexId;
@@ -62,7 +65,10 @@ public:
     static ObservableMutexRegistry& get();
 
     ObservableMutexRegistry() : ObservableMutexRegistry(SystemClockSource::get()) {}
-    explicit ObservableMutexRegistry(ClockSource* clk) : _clockSource(clk) {}
+    explicit ObservableMutexRegistry(ClockSource* clk) : _clockSource(clk) {
+        add(kRegistrationMutexTag, _registrationMutex);
+        add(kCollectionMutexTag, _collectionMutex);
+    }
 
     template <typename MutexType>
     void add(StringData tag, const MutexType& mutex) {
@@ -149,10 +155,10 @@ private:
 
     ClockSource* _clockSource;
 
-    mutable stdx::mutex _registrationMutex;
+    mutable ObservableMutex<stdx::mutex> _registrationMutex;
     std::list<NewMutexEntry> _newMutexEntries;
 
-    mutable stdx::mutex _collectionMutex;
+    mutable ObservableMutex<stdx::mutex> _collectionMutex;
     int64_t _nextMutexId{0};
     StringMap<std::list<MutexEntry>> _mutexEntries;
     // Maps a Mutex tag to the sum of all its invalidated token stats.
