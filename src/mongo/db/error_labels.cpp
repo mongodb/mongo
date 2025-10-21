@@ -177,6 +177,12 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     return swLitePipe.isOK() && swLitePipe.getValue().hasChangeStream();
 }
 
+bool ErrorLabelBuilder::isOperationIdempotent() const {
+    // TODO: SERVER-108898 When OperationContext support marking an operation as idempotent, check
+    //       for idempotency to apply the error label
+    return false;
+}
+
 bool ErrorLabelBuilder::isErrorWithNoWritesPerformed() const {
     if (!_code && !_wcCode) {
         return false;
@@ -208,6 +214,8 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
                 // SERVER-66479 and DRIVERS-2327).
                 labels << ErrorLabel::kNoWritesPerformed;
             }
+        } else if (isOperationIdempotent()) {
+            labels << ErrorLabel::kRetryableError;
         }
     }
 

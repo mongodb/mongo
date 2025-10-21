@@ -212,7 +212,12 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
         return Status::OK();
     }
 
-    return _rateLimiter.tryAcquireToken();
+    auto rateLimitResult = _rateLimiter.tryAcquireToken();
+    if (MONGO_unlikely(rateLimitResult == admission::RateLimiter::kRejectedErrorCode)) {
+        return Status{ErrorCodes::IngressRequestRateLimitExceeded, rateLimitResult.reason()};
+    }
+
+    return rateLimitResult;
 }
 
 void IngressRequestRateLimiter::updateRateParameters(double refreshRatePerSec,
