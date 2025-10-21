@@ -105,7 +105,10 @@ void PlanCacheIndexabilityState::processPartialIndex(const std::string& indexNam
 }
 
 void PlanCacheIndexabilityState::processWildcardIndex(const CoreIndexInfo& cii) {
-    invariant(cii.type == IndexType::INDEX_WILDCARD);
+    tassert(11177604,
+            fmt::format("Expected wildcard index, but found index with key pattern {}",
+                        cii.keyPattern.toString()),
+            cii.type == IndexType::INDEX_WILDCARD);
 
     _wildcardIndexDiscriminators.emplace_back(
         cii.indexPathProjection->exec(), cii.identifier.catalogName, cii.collator);

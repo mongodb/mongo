@@ -519,7 +519,7 @@ public:
         const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks,
         PlanSecurityLevel securityLevel,
         boost::optional<double> worksGrowthCoefficient = boost::none) {
-        invariant(cachedPlan);
+        tassert(11177600, "cachedPlan must not be null", cachedPlan);
 
         auto oldEntryWithPartitionLock = this->getWithPartitionLock(key);
         // Can't use reference to structured bindings in a lambda until C++20 so manually
@@ -608,7 +608,7 @@ public:
                      Date_t now,
                      DebugInfoType debugInfo,
                      bool shouldOmitDiagnosticInformation) {
-        invariant(plan);
+        tassert(11177601, "plan cannot be null", plan);
         std::shared_ptr<Entry> entry =
             Entry::createPinned(std::move(plan),
                                 key.planCacheShapeHash(),
