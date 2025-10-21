@@ -837,9 +837,8 @@ TEST(ExpressionConvertTest, CanRoundTripBitArrays) {
         const auto exprBinToArray = Expression::parseExpression(
             &expCtx,
             BSON("$convert" << BSON("input" << arrayConvertedToBinData << "to"
-                                            << BSON("type" << "array"
-                                                           << "format"
-                                                           << "base64"))),
+                                            << BSON("type" << "array") << "format"
+                                            << "base64")),
             expCtx.variablesParseState);
         Value finalArray = exprBinToArray->evaluate({}, &expCtx.variables);
 
@@ -865,9 +864,8 @@ TEST(ExpressionConvertTest, CanRoundTripIntArray) {
     auto exprBinToArray = Expression::parseExpression(
         &expCtx,
         BSON("$convert" << BSON("input" << arrayConvertedToBinData << "to"
-                                        << BSON("type" << "array"
-                                                       << "format"
-                                                       << "base64"))),
+                                        << BSON("type" << "array") << "format"
+                                        << "base64")),
         expCtx.variablesParseState);
     auto finalArray = exprBinToArray->evaluate({}, &expCtx.variables);
     ASSERT_VALUE_EQ(originalArray, finalArray);
@@ -890,9 +888,8 @@ TEST(ExpressionConvertTest, CanRoundTripIntArrayHexFormat) {
     auto exprBinToArray = Expression::parseExpression(
         &expCtx,
         BSON("$convert" << BSON("input" << arrayConvertedToBinData << "to"
-                                        << BSON("type" << "array"
-                                                       << "format"
-                                                       << "hex"))),
+                                        << BSON("type" << "array") << "format"
+                                        << "hex")),
         expCtx.variablesParseState);
     auto finalArray = exprBinToArray->evaluate({}, &expCtx.variables);
     ASSERT_VALUE_EQ(originalArray, finalArray);
@@ -935,11 +932,45 @@ TEST(ExpressionConvertTest, CanRoundTripFloatArray) {
     auto exprBinToArray = Expression::parseExpression(
         &expCtx,
         BSON("$convert" << BSON("input" << arrayConvertedToBinData << "to"
-                                        << BSON("type" << "array"
-                                                       << "format"
-                                                       << "base64"))),
+                                        << BSON("type" << "array") << "format"
+                                        << "base64")),
         expCtx.variablesParseState);
     auto finalArray = exprBinToArray->evaluate({}, &expCtx.variables);
+    ASSERT_VALUE_EQ(originalArray, finalArray);
+}
+
+TEST(ExpressionConvertTest, CanRoundTripFloatArrayBigEndian) {
+    RAIIServerParameterControllerForTest convertFlag{"featureFlagConvertBinDataVectors", true};
+    auto expCtx = ExpressionContextForTest{};
+
+    auto bsonArray = createBsonArrayFromFloats({10.3, 5.87, 10.10294, 24.1, -30.2, 79, 83});
+    auto originalArray = Value(bsonArray);
+
+    const auto exprToBinData = Expression::parseExpression(
+        &expCtx,
+        BSON("$convert" << BSON("input" << bsonArray << "to"
+                                        << BSON("type" << "binData"
+                                                       << "subtype" << 9)
+                                        << "byteOrder"
+                                        << "big"
+                                        << "format"
+                                        << "base64")),
+        expCtx.variablesParseState);
+
+    Value arrayConvertedToBinData = exprToBinData->evaluate({}, &expCtx.variables);
+
+    const auto exprBinToArray = Expression::parseExpression(
+        &expCtx,
+        BSON("$convert" << BSON("input" << arrayConvertedToBinData << "to"
+                                        << BSON("type" << "array") << "byteOrder"
+                                        << "big"
+                                        << "format"
+                                        << "base64")),
+        expCtx.variablesParseState);
+
+    Value finalArray = exprBinToArray->evaluate({}, &expCtx.variables);
+
+    // Compare float values within float precision tolerance
     ASSERT_VALUE_EQ(originalArray, finalArray);
 }
 

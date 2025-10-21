@@ -1704,7 +1704,8 @@ private:
                                             const std::byte* dataPointer,
                                             int* indexInArray,
                                             dType d,
-                                            int requiredPadding) {
+                                            int requiredPadding,
+                                            ByteOrderArg byteOrder) {
         switch (d) {
             case PACKED_BIT: {
                 std::byte thisByte = dataPointer[*indexInArray];
@@ -1735,8 +1736,9 @@ private:
                 break;
             }
             case dType::FLOAT32: {
-                float convertedVal;
-                memcpy(&convertedVal, &(dataPointer[*indexInArray]), sizeof(convertedVal));
+                float convertedVal = readNumberAccordingToEndianness<float, float>(
+                    ConstDataView(reinterpret_cast<const char*>(dataPointer + *indexInArray)),
+                    byteOrder);
                 result.push_back(Value(static_cast<double>(convertedVal)));
                 *indexInArray += sizeof(convertedVal);
             }
@@ -1745,6 +1747,7 @@ private:
 
     static Value performConvertBinDataToArray(ExpressionContext* const expCtx,
                                               Value inputValue,
+                                              ByteOrderArg byteOrder,
                                               SubtypeArg subtypeValue) {
         if (!feature_flags::gFeatureFlagConvertBinDataVectors.isEnabled(
                 VersionContext::getDecoration(expCtx->getOperationContext()),
@@ -1792,13 +1795,14 @@ private:
                 thisPadding = padding;  // Number of least-significant bits that should be discarded
                                         // at the end of the byte
             }
-            readAndAppendNextByteNumber(results, dataPointer, &i, dTypeCur, thisPadding);
+            readAndAppendNextByteNumber(results, dataPointer, &i, dTypeCur, thisPadding, byteOrder);
         }
         return Value(std::move(results));
     }
 
     static Value performConvertArrayToBinData(ExpressionContext* const expCtx,
                                               Value inputValue,
+                                              ByteOrderArg byteOrder,
                                               SubtypeArg subtypeValue) {
         if (!feature_flags::gFeatureFlagConvertBinDataVectors.isEnabled(
                 VersionContext::getDecoration(expCtx->getOperationContext()),
@@ -1857,11 +1861,14 @@ private:
                 case dType::FLOAT32:
                     // Note that casting to a float here truncates the double and may lose
                     // precision.
-                    auto truncated = static_cast<float>(obj.coerceToDouble());
+                    auto value = writeNumberAccordingToEndianness<float>(
+                        static_cast<float>(obj.coerceToDouble()), byteOrder, subtypeValue);
+                    auto binData = value.getBinData();
                     byteArray.resize(byteArray.size() + sizeof(float));
                     std::memcpy(byteArray.data() + byteArray.size() - sizeof(float),
-                                &truncated,
+                                binData.data,
                                 sizeof(float));
+                    break;
             }
         }
         if (bitsInByteUsed != 0) {

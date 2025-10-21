@@ -1,7 +1,7 @@
 /**
- * Tests behavior of BinData $convert numeric.
+ * Tests behavior of BinData $convert array.
  * @tags: [
- *   # BinData $convert numeric was added in v8.3.
+ *   # BinData $convert array was added in v8.3.
  *   requires_fcv_83,
  *   featureFlagConvertBinDataVectors,
  * ]
@@ -53,6 +53,23 @@ let testCases = [
         padding: 0,
         dtype: kFloat32Byte,
     },
+
+    // Big-endian versions of the above test cases.
+    {array_elems: [], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {array_elems: [0.3], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {array_elems: [1.2], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {array_elems: [2.2], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {array_elems: [127.0, 7.0, -128.0], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {array_elems: [128.0, 7.0], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {array_elems: [-129.0, 7.0], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {array_elems: [-127.7, -7.7], padding: 0, dtype: kFloat32Byte, littleEndian: false},
+    {
+        array_elems: [Number.NEGATIVE_INFINITY, 0.0, Number.POSITIVE_INFINITY],
+        padding: 0,
+        dtype: kFloat32Byte,
+        littleEndian: false,
+    },
+
     // TODO SERVER-106059 Add tests for integers larger than INT8.
 ];
 
@@ -83,13 +100,13 @@ function hexToBitArray(hexString) {
     return bitArray;
 }
 
-function float32VectorToBitArray(vector) {
+function float32VectorToBitArray(vector, littleEndian = true) {
     const bitArray = [];
 
     for (const value of vector) {
         const buffer = new ArrayBuffer(4); // 4 bytes for float32
         const view = new DataView(buffer);
-        view.setFloat32(0, value, true); // true for little-endian
+        view.setFloat32(0, value, littleEndian);
 
         for (let i = 0; i < 4; i++) {
             const byte = view.getUint8(i);
@@ -160,20 +177,20 @@ function bitArrayToBase64String(bitArray) {
  * @param {array<number>} vector: a vector of int8 or float32s, containing the values of the array
  * @param {number} numPaddingBits: the number of padding bits, applicable in the PACKED_BIT case
  */
-function createBindataVectorBitArray(dataTypeByte, vector, numPaddingBits) {
+function createBindataVectorBitArray(dataTypeByte, vector, numPaddingBits, littleEndian = true) {
     let dTypeBitArray = hexToBitArray(dataTypeByte);
     let paddingBitArray =
         dataTypeByte == kPackedBitByte ? int8VectorToBitArray([numPaddingBits]) : int8VectorToBitArray([0]);
     let arrayElemsBitArray =
-        dataTypeByte == kFloat32Byte ? float32VectorToBitArray(vector) : int8VectorToBitArray(vector);
+        dataTypeByte == kFloat32Byte ? float32VectorToBitArray(vector, littleEndian) : int8VectorToBitArray(vector);
     return [...dTypeBitArray, ...paddingBitArray, ...arrayElemsBitArray];
 }
 
 testCases.forEach((testCase) => {
-    let {dtype, array_elems, padding} = testCase;
+    let {dtype, array_elems, padding, littleEndian = true} = testCase;
 
     // Determine base64-encoded version of bindata vector, and the bson array of the vector.
-    let bindataArray = createBindataVectorBitArray(dtype, array_elems, padding);
+    let bindataArray = createBindataVectorBitArray(dtype, array_elems, padding, littleEndian);
     let base64BindataArray = bitArrayToBase64String(bindataArray);
     let bsonArray = array_elems;
     if (dtype == kPackedBitByte) {
@@ -205,7 +222,13 @@ testCases.forEach((testCase) => {
                 _id: 0,
                 approx: 1,
                 expected: "$bson_array",
-                output: {$convert: {to: {type: "array"}, input: "$bindata_array_base64"}},
+                output: {
+                    $convert: {
+                        to: {type: "array"},
+                        input: "$bindata_array_base64",
+                        byteOrder: littleEndian ? "little" : "big",
+                    },
+                },
             },
         },
     ];
@@ -243,7 +266,12 @@ testCases.forEach((testCase) => {
         expectedBindataVector = BinData(
             kBindataVectorSubtype,
             bitArrayToBase64String(
-                createBindataVectorBitArray(kPackedBitByte, bitArrayToByteArray(arrayFilledWithZeros), numZeros),
+                createBindataVectorBitArray(
+                    kPackedBitByte,
+                    bitArrayToByteArray(arrayFilledWithZeros),
+                    numZeros,
+                    littleEndian,
+                ),
             ),
         );
     }
@@ -255,7 +283,7 @@ testCases.forEach((testCase) => {
     if (floatArrayCanConvertToInt8) {
         expectedBindataVector = BinData(
             kBindataVectorSubtype,
-            bitArrayToBase64String(createBindataVectorBitArray(kInt8Byte, array_elems, 0)),
+            bitArrayToBase64String(createBindataVectorBitArray(kInt8Byte, array_elems, 0, littleEndian)),
         );
     }
 
@@ -264,7 +292,7 @@ testCases.forEach((testCase) => {
     if (arrayIsEmpty) {
         expectedBindataVector = BinData(
             kBindataVectorSubtype,
-            bitArrayToBase64String(createBindataVectorBitArray(kPackedBitByte, [], 0)),
+            bitArrayToBase64String(createBindataVectorBitArray(kPackedBitByte, [], 0, littleEndian)),
         );
     }
 
@@ -273,7 +301,13 @@ testCases.forEach((testCase) => {
             $project: {
                 _id: 0,
                 expected: expectedBindataVector,
-                output: {$convert: {to: {type: "binData", subtype: 9}, input: "$bson_array"}},
+                output: {
+                    $convert: {
+                        to: {type: "binData", subtype: 9},
+                        input: "$bson_array",
+                        byteOrder: littleEndian ? "little" : "big",
+                    },
+                },
             },
         },
     ];
