@@ -33,7 +33,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -434,17 +433,15 @@ void CurOp::setGenericOpRequestDetails(
     _nss = std::move(nss);
 }
 
-void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline) {
+void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal) {
     auto opCtx = this->opCtx();
-    // Do not fetch operation statistics again if we have already got them (for
-    // instance, as a part of stashing the transaction). Take a lock before calling into
-    // the storage engine to prevent racing against a shutdown. Any operation that used
-    // a storage engine would have at-least held a global lock at one point, hence we
-    // limit our lock acquisition to such operations. We can get here and our lock
-    // acquisition be timed out or interrupted, in which case we'll throw. Callers should
+    // After storage stats are fetched with isFinal flag set to true, they won't be updated for this
+    // operation. Take a lock before calling into the storage engine to prevent racing against a
+    // shutdown. Any operation that used a storage engine would have at-least held a global lock at
+    // one point, hence we limit our lock acquisition to such operations. We can get here and our
+    // lock acquisition be timed out or interrupted, in which case we'll throw. Callers should
     // handle that case, e.g., by logging a message.
-    if (_debug.storageStats == nullptr &&
-        shard_role_details::getLocker(opCtx)->wasGlobalLockTaken() &&
+    if (_allowStorageStatsUpdate && shard_role_details::getLocker(opCtx)->wasGlobalLockTaken() &&
         opCtx->getServiceContext()->getStorageEngine()) {
         ScopedAdmissionPriority<ExecutionAdmissionContext> admissionControl(
             opCtx, AdmissionContext::Priority::kExempt);
@@ -453,8 +450,14 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline) {
                             deadline,
                             Lock::InterruptBehavior::kThrow,
                             Lock::GlobalLockOptions{.skipRSTLLock = true});
-        _debug.storageStats =
+        auto storageStats =
             shard_role_details::getRecoveryUnit(opCtx)->computeOperationStatisticsSinceLastCall();
+        if (_debug.storageStats == nullptr) {
+            _debug.storageStats = std::move(storageStats);
+        } else if (storageStats != nullptr) {
+            *_debug.storageStats += *storageStats;
+        }
+        _allowStorageStatsUpdate = !isFinal;
     }
 }
 
@@ -517,7 +520,7 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
             // If we choose a fixed priority other than kExempt (e.g., kNormal), it may
             // be lower than the operation's current priority, which would cause an exception to be
             // thrown.
-            _fetchStorageStatsIfNecessary(Date_t::max());
+            _fetchStorageStatsIfNecessary(Date_t::max(), true);
         } catch (DBException& ex) {
             LOGV2(8457400,
                   "Failed to gather storage statistics for query stats",
@@ -713,13 +716,81 @@ bool CurOp::shouldCurOpStackOmitDiagnosticInformation(CurOp* curop) {
     return false;
 }
 
+void CurOp::_updateExecutionTimers() {
+    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+
+    auto workingMillis = duration_cast<Milliseconds>(*_debug.additiveMetrics.executionTime) -
+        (_sumBlockedTimeTotal() - _blockedTimeAtStart);
+    // Round up to zero if necessary to allow precision errors from FastClockSource used by flow
+    // control ticketholder.
+    _debug.workingTimeMillis = std::max(Milliseconds(0), workingMillis);
+}
+
+CurOp::ShouldProfileQuery CurOp::_shouldProfileAtLevel1AndLogSlowQuery(
+    const logv2::LogOptions& logOptions, std::shared_ptr<const ProfileFilter> filter) {
+    if (filter) {
+        // Calculate this operation's CPU time before deciding whether logging/profiling is
+        // necessary only if it is needed for filtering.
+        if (filter->dependsOn("cpuNanos")) {
+            calculateCpuTime();
+        }
+
+        const bool passesFilter = filter->matches(opCtx(), _debug, *this);
+        return ShouldProfileQuery{passesFilter, passesFilter};
+    } else {
+        // Log the operation if it is eligible according to the current slowMS and sampleRate
+        // settings.
+        const auto [shouldLogSlowOp, shouldSample] =
+            shouldLogSlowOpWithSampling(opCtx(),
+                                        logOptions.component(),
+                                        _debug.workingTimeMillis,
+                                        Milliseconds(serverGlobalParams.slowMS.load()));
+
+        return ShouldProfileQuery{.shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample,
+                                  .shouldLogSlowQuery = shouldLogSlowOp};
+    }
+}
+
+logv2::DynamicAttributes CurOp::_reportDebugAndStats(const logv2::LogOptions& logOptions,
+                                                     bool isFinalStorageStatsUpdate) {
+    auto* opCtx = this->opCtx();
+    auto locker = shard_role_details::getLocker(opCtx);
+    SingleThreadedLockStats lockStats(locker->stats());
+
+    try {
+        // Slow query logs are critical for observability and should not wait for ticket
+        // acquisition. Slow queries can happen for various reasons; however, if queries
+        // are slower due to ticket exhaustion, queueing in order to log can compound
+        // the issue. Hence we pass the kExempt priority to _fetchStorageStatsIfNecessary.
+        _fetchStorageStatsIfNecessary(Date_t::now() + Milliseconds(500), isFinalStorageStatsUpdate);
+    } catch (const DBException& ex) {
+        LOGV2_OPTIONS(20526,
+                      logOptions,
+                      "Failed to gather storage statistics for slow operation",
+                      "opId"_attr = opCtx->getOpID(),
+                      "error"_attr = redact(ex));
+    }
+
+    // Gets the time spent blocked on prepare conflicts.
+    auto prepareConflictDurationMicros = StorageExecutionContext::get(opCtx)
+                                             ->getPrepareConflictTracker()
+                                             .getThisOpPrepareConflictDuration();
+    _debug.prepareConflictDurationMillis =
+        duration_cast<Milliseconds>(prepareConflictDurationMicros);
+
+    const auto& storageMetrics = getOperationStorageMetrics();
+
+    logv2::DynamicAttributes attr;
+    _debug.report(opCtx, &lockStats, storageMetrics, getPrepareReadConflicts(), &attr);
+    return attr;
+}
+
 bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
                                     std::shared_ptr<const ProfileFilter> filter,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {
     auto opCtx = this->opCtx();
-    const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS.load());
 
     // Record the size of the response returned to the client, if applicable.
     if (responseLength) {
@@ -728,9 +799,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     // Obtain the total execution time of this operation.
     done();
-    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
-    const auto executionTimeMillis =
-        durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
+
+    _updateExecutionTimers();
 
     if (!opCtx->inMultiDocumentTransaction()) {
         // If we're not in a txn, we record information about delinquent ticket acquisitions to the
@@ -753,38 +823,11 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     }
 
     if (_debug.isReplOplogGetMore) {
-        oplogGetMoreStats.recordMillis(executionTimeMillis);
+        oplogGetMoreStats.recordMillis(
+            durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime));
     }
-
-    auto workingMillis =
-        Milliseconds(executionTimeMillis) - (_sumBlockedTimeTotal() - _blockedTimeAtStart);
-    // Round up to zero if necessary to allow precision errors from FastClockSource used by flow
-    // control ticketholder.
-    _debug.workingTimeMillis = (workingMillis < Milliseconds(0) ? Milliseconds(0) : workingMillis);
-
-    bool shouldLogSlowOp, shouldProfileAtLevel1;
-
-    if (filter) {
-        // Calculate this operation's CPU time before deciding whether logging/profiling is
-        // necessary only if it is needed for filtering.
-        if (filter->dependsOn("cpuNanos")) {
-            calculateCpuTime();
-        }
-
-        bool passesFilter = filter->matches(opCtx, _debug, *this);
-
-        shouldLogSlowOp = passesFilter;
-        shouldProfileAtLevel1 = passesFilter;
-
-    } else {
-        // Log the operation if it is eligible according to the current slowMS and sampleRate
-        // settings.
-        bool shouldSample;
-        std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-            opCtx, logOptions.component(), _debug.workingTimeMillis, Milliseconds(slowMs));
-
-        shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
-    }
+    const auto [shouldProfileAtLevel1, shouldLogSlowOp] =
+        _shouldProfileAtLevel1AndLogSlowQuery(logOptions, std::move(filter));
 
     // Defer calculating the CPU time until we know that we actually are going to write it to
     // the logs or profiler. The CPU time may have been determined earlier if it was a
@@ -794,35 +837,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     }
 
     if (forceLog || shouldLogSlowOp) {
-        auto locker = shard_role_details::getLocker(opCtx);
-        SingleThreadedLockStats lockStats(locker->stats());
-
-        try {
-            // Slow query logs are critical for observability and should not wait for ticket
-            // acquisition. Slow queries can happen for various reasons; however, if queries
-            // are slower due to ticket exhaustion, queueing in order to log can compound
-            // the issue. Hence we pass the kExempt priority to _fetchStorageStatsIfNecessary.
-            _fetchStorageStatsIfNecessary(Date_t::now() + Milliseconds(500));
-        } catch (const DBException& ex) {
-            LOGV2_OPTIONS(20526,
-                          logOptions,
-                          "Failed to gather storage statistics for slow operation",
-                          "opId"_attr = opCtx->getOpID(),
-                          "error"_attr = redact(ex));
-        }
-
-        // Gets the time spent blocked on prepare conflicts.
-        auto prepareConflictDurationMicros = StorageExecutionContext::get(opCtx)
-                                                 ->getPrepareConflictTracker()
-                                                 .getThisOpPrepareConflictDuration();
-        _debug.prepareConflictDurationMillis =
-            duration_cast<Milliseconds>(prepareConflictDurationMicros);
-
-        const auto& storageMetrics = getOperationStorageMetrics();
-
-        logv2::DynamicAttributes attr;
-        _debug.report(opCtx, &lockStats, storageMetrics, getPrepareReadConflicts(), &attr);
-
+        logv2::DynamicAttributes attr = _reportDebugAndStats(logOptions, true);
         LOGV2_OPTIONS(51803, logOptions, "Slow query", attr);
 
         _checkForFailpointsAfterCommandLogged();
@@ -834,6 +849,40 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     if (_dbprofile <= 0)
         return false;
     return shouldProfileAtLevel1;
+}
+
+void CurOp::logLongRunningOperationIfNeeded() {
+    static constexpr int kSlowInProgressLogDebugLevel = 1;
+    static const logv2::LogOptions kLogOptions{logv2::LogComponent::kCommandSlowInProg};
+
+    if (!_eligibleForLongRunningQueryLogging ||
+        !logv2::shouldLog(kLogOptions.component(),
+                          logv2::LogSeverity::Debug(kSlowInProgressLogDebugLevel))) {
+        return;
+    }
+    if (shouldCurOpStackOmitDiagnosticInformation(this)) {
+        // Set the flag to true to not repeat checks.
+        _eligibleForLongRunningQueryLogging = false;
+        return;
+    }
+
+    _updateExecutionTimers();
+
+    std::shared_ptr<const ProfileFilter> filter =
+        DatabaseProfileSettings::get(opCtx()->getServiceContext())
+            .getDatabaseProfileSettings(getNSS().dbName())
+            .filter;
+    const bool shouldLogSlowOp =
+        _shouldProfileAtLevel1AndLogSlowQuery(kLogOptions, std::move(filter)).shouldLogSlowQuery;
+    if (!shouldLogSlowOp) {
+        return;
+    }
+
+    calculateCpuTime();
+    logv2::DynamicAttributes attr = _reportDebugAndStats(kLogOptions, false);
+    LOGV2_DEBUG_OPTIONS(
+        1794200, kSlowInProgressLogDebugLevel, kLogOptions, "Slow in-progress query", attr);
+    _eligibleForLongRunningQueryLogging = false;
 }
 
 std::string CurOp::getNS() const {

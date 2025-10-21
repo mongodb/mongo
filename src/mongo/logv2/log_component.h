@@ -54,6 +54,7 @@ namespace mongo::logv2 {
     X(kAccessControl,          , "accessControl"         , "ACCESS"          , kDefault) \
     X(kAssert,                 , "assert"                , "ASSERT"          , kDefault) \
     X(kCommand,                , "command"               , "COMMAND"         , kDefault) \
+    X(kCommandSlowInProg,      , "slowInProgress"        , "SLOWPROG"        , kCommand) \
     X(kControl,                , "control"               , "CONTROL"         , kDefault) \
     X(kExecutor,               , "executor"              , "EXECUTOR"        , kDefault) \
     X(kGeo,                    , "geo"                   , "GEO"             , kDefault) \

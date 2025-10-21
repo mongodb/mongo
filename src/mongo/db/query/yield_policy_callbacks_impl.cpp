@@ -57,6 +57,8 @@ YieldPolicyCallbacksImpl::YieldPolicyCallbacksImpl(NamespaceString nssForFailpoi
 void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
     CurOp::get(opCtx)->yielded();
 
+    _tryLogLongRunningQueries(opCtx);
+
     // If we yielded because we encountered the need to refresh the sharding CatalogCache, refresh
     // it here while the locks are yielded.
     auto& catalogCacheRefreshRequired =
@@ -99,6 +101,8 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
 }
 
 void YieldPolicyCallbacksImpl::preCheckInterruptOnly(OperationContext* opCtx) const {
+    _tryLogLongRunningQueries(opCtx);
+
     // If the 'setInterruptOnlyPlansCheckForInterruptHang' fail point is enabled, set the
     // 'failPointMsg' field of this operation's CurOp to signal that we've hit this point.
     if (MONGO_unlikely(setInterruptOnlyPlansCheckForInterruptHang.shouldFail())) {
@@ -107,6 +111,10 @@ void YieldPolicyCallbacksImpl::preCheckInterruptOnly(OperationContext* opCtx) co
             opCtx,
             "setInterruptOnlyPlansCheckForInterruptHang");
     }
+}
+
+void YieldPolicyCallbacksImpl::_tryLogLongRunningQueries(OperationContext* opCtx) const {
+    CurOp::get(opCtx)->logLongRunningOperationIfNeeded();
 }
 
 }  // namespace mongo

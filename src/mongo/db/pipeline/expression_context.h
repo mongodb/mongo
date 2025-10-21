@@ -1194,12 +1194,7 @@ protected:
     private:
         // Performs the heavy work of checking whether an interrupt has occurred. For performance
         // reasons, this should only be called every now and then.
-        MONGO_COMPILER_NOINLINE void checkForInterruptSlow() {
-            _tick = kInterruptCheckPeriod;
-
-            invariant(_expressionContext->getOperationContext());
-            _expressionContext->getOperationContext()->checkForInterrupt();
-        }
+        void checkForInterruptSlow();
 
         static constexpr int kInterruptCheckPeriod = 128;
 

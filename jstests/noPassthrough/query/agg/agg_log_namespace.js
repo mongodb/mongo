@@ -16,7 +16,9 @@ function verifyLoggedNamespace({pipeline, comment}) {
     checkLog.containsWithCount(
         conn,
         RegExp(
-            `"appName"\:"MongoDB Shell",` +
+            `"Slow query"` +
+                ".*" +
+                `"appName"\:"MongoDB Shell",` +
                 ".*" + // leave some space for other keys
                 `"command"\:{"aggregate"\:"${regexLiteral(source.getName())}",` +
                 `"comment"\:"${regexLiteral(comment)}"`,

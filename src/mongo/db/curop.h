@@ -191,6 +191,8 @@ public:
                                  boost::optional<long long> slowMsOverride = boost::none,
                                  bool forceLog = false);
 
+    void logLongRunningOperationIfNeeded();
+
     bool haveOpDescription() const {
         return !_opDescription.isEmpty();
     }
@@ -775,16 +777,36 @@ private:
     Milliseconds _sumBlockedTimeTotal();
 
     /**
+     * Updates the values of _debug.additiveMetrics.executionTime and _debug.workingTimeMillis.
+     */
+    void _updateExecutionTimers();
+
+    /**
+     * Returns two boolean values: should the query be profiled at profile level 1 and should the
+     * query be logged as a "slow query".
+     */
+    struct ShouldProfileQuery {
+        bool shouldProfileAtLevel1;
+        bool shouldLogSlowQuery;
+    };
+    ShouldProfileQuery _shouldProfileAtLevel1AndLogSlowQuery(
+        const logv2::LogOptions& logOptions, std::shared_ptr<const ProfileFilter> filter);
+
+    logv2::DynamicAttributes _reportDebugAndStats(const logv2::LogOptions& logOptions,
+                                                  bool isFinalStorageStatsUpdate);
+
+    /**
      * Handles failpoints that check whether a command has completed or not.
      * Used for testing purposes instead of the getLog command.
      */
     void _checkForFailpointsAfterCommandLogged();
 
     /**
-     * Fetches storage stats and stores them in the OpDebug if they're not already present.
-     * Can throw if interrupted while waiting for the global lock.
+     * Fetches storage stats and stores them in the OpDebug if they're not already present. If
+     * parameter isFinal set to true, storage stats won't be updated again. Can throw if interrupted
+     * while waiting for the global lock.
      */
-    void _fetchStorageStatsIfNecessary(Date_t deadline);
+    void _fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal);
 
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 
@@ -888,5 +910,14 @@ private:
     // memory from shards.
     AtomicWord<int64_t> _inUseTrackedMemoryBytes{0};
     AtomicWord<int64_t> _peakTrackedMemoryBytes{0};
+
+    // Long running queries are logged only once to avoid excessive logging.
+    bool _eligibleForLongRunningQueryLogging{true};
+
+    // Updating storage stats requires a lock, so to avoid doing it multiple times for a single
+    // query, it is guarded by this flag. In cases where we know that we are fetching stats for an
+    // in-progress operation, we can keep it true and allow storage stats to be fetched multiple
+    // times.
+    bool _allowStorageStatsUpdate{true};
 };
 }  // namespace mongo

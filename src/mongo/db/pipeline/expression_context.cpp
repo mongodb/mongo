@@ -31,6 +31,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
@@ -121,6 +122,16 @@ ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
 
 ExpressionContext::CollatorStash::~CollatorStash() {
     _expCtx->setCollator(std::move(_originalCollator));
+}
+
+void ExpressionContext::InterruptChecker::checkForInterruptSlow() {
+    _tick = kInterruptCheckPeriod;
+
+    OperationContext* opCtx = _expressionContext->getOperationContext();
+    invariant(opCtx);
+
+    opCtx->checkForInterrupt();
+    CurOp::get(opCtx)->logLongRunningOperationIfNeeded();
 }
 
 std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(

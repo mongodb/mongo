@@ -51,6 +51,8 @@ public:
     void preCheckInterruptOnly(OperationContext*) const override;
 
 private:
+    void _tryLogLongRunningQueries(OperationContext*) const;
+
     NamespaceString _nss;
 };
 
