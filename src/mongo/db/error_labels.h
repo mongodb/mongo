@@ -50,6 +50,7 @@ static constexpr StringData kNonResumableChangeStream = "NonResumableChangeStrea
 static constexpr StringData kResumableChangeStream = "ResumableChangeStreamError"_sd;
 static constexpr StringData kNoWritesPerformed = "NoWritesPerformed"_sd;
 static constexpr StringData kSystemOverloadedError = "SystemOverloadedError"_sd;
+static constexpr StringData kRetryableError = "RetryableError"_sd;
 }  // namespace ErrorLabel
 
 class ErrorLabelBuilder {
@@ -83,6 +84,7 @@ public:
     bool isNonResumableChangeStreamError() const;
     bool isErrorWithNoWritesPerformed() const;
     bool isSystemOverloadedError() const;
+    bool isOperationIdempotent() const;
 
 private:
     bool _isCommitOrAbort() const;
