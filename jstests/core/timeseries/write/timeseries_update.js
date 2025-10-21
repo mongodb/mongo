@@ -38,24 +38,42 @@ TimeseriesTest.run((insert) => {
         ordered = true,
     }) {
         const coll = testDB.getCollection("t");
-        assert.commandWorked(
-            testDB.createCollection(coll.getName(), {
-                timeseries: hasMetaField
-                    ? {timeField: timeFieldName, metaField: metaFieldName}
-                    : {timeField: timeFieldName},
-            }),
-        );
-
-        assert.commandWorked(insert(coll, initialDocList));
-
         const updateCommand = {update: coll.getName(), updates: updateList, ordered: ordered, let: letDoc};
-        const res = failCode
-            ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
-            : assert.commandWorked(testDB.runCommand(updateCommand));
 
-        assert.eq(n, res.n);
-        assert.eq(nModified, res.nModified);
-        assert.eq(initialDocList.length, resultDocList.length);
+        const prepareData = () => {
+            assert(coll.drop());
+            assert.commandWorked(
+                testDB.createCollection(coll.getName(), {
+                    timeseries: hasMetaField
+                        ? {timeField: timeFieldName, metaField: metaFieldName}
+                        : {timeField: timeFieldName},
+                }),
+            );
+
+            assert.commandWorked(insert(coll, initialDocList));
+        };
+
+        prepareData();
+
+        const kNoRetry = true;
+        const kRetry = false;
+        assert.soon(() => {
+            try {
+                const res = failCode
+                    ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
+                    : assert.commandWorked(testDB.runCommand(updateCommand));
+
+                assert.eq(n, res.n);
+                assert.eq(nModified, res.nModified);
+                assert.eq(initialDocList.length, resultDocList.length);
+            } catch (e) {
+                if (TestData.shardsAddedRemoved && e.code == ErrorCodes.MovePrimaryInProgress) {
+                    prepareData();
+                    return kRetry;
+                }
+            }
+            return kNoRetry;
+        });
 
         resultDocList.forEach((resultDoc) => {
             assert.docEq(
