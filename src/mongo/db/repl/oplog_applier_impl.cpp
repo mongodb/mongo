@@ -65,6 +65,7 @@
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
@@ -556,9 +557,22 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 
         // Make sure the oplog doesn't go back in time or repeat an entry.
         if (firstOpTimeInBatch <= lastAppliedOpTimeAtStartOfBatch) {
+            auto& entry = ops.front();
+            auto obj = entry.getRaw();
+            // TODO: Temporary logging to output as much information as possible before segfault
+            // (see SERVER-108464 and AF-3761).
+            LOGV2(10846400,
+                  "Oplog entry less than our last applied OpTime detected, outputting diagnostic "
+                  "information",
+                  "owned"_attr = obj.isOwned(),
+                  "size"_attr = entry.getRawObjSizeBytes());
+            if (!logv2::shouldRedactLogs() && obj.validateBSONObjSize().isOK()) {
+                LOGV2(10846401, "Outputting raw oplog entry hex", "hex"_attr = obj.hexDump());
+            }
+
             LOGV2(10180701,
                   "Oplog entry that is less than our last applied OpTime",
-                  "entry"_attr = redact(ops.front().toBSONForLogging()));
+                  "entry"_attr = redact(obj));
 
             fassert(34361,
                     Status(ErrorCodes::OplogOutOfOrder,

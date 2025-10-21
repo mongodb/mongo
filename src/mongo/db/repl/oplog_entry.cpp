@@ -937,6 +937,10 @@ int OplogEntry::getRawObjSizeBytes() const {
     return _entry.getRawObjSizeBytes();
 }
 
+const BSONObj& OplogEntry::getRaw() const {
+    return _entry.getRaw();
+}
+
 OplogEntryParserNonStrict::OplogEntryParserNonStrict(const BSONObj& oplogEntry)
     : _oplogEntryObject{oplogEntry.getOwned()} {}
 

@@ -931,6 +931,7 @@ public:
     BSONObj getObjectContainingDocumentKey() const;
     OplogEntry::CommandType getCommandType() const;
     int getRawObjSizeBytes() const;
+    const BSONObj& getRaw() const;
 
 private:
     DurableOplogEntry _entry;
