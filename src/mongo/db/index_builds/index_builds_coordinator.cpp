@@ -3364,6 +3364,9 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
     const boost::optional<RecordId>& resumeAfterRecordId) {
+    ScopedAdmissionPriority<ExecutionAdmissionContext> deprioritizeExecutionControl(
+        opCtx, AdmissionContext::Priority::kLow);
+
     invariant(replState->getGenerateTableWrites());
 
     // Collection scan and insert into index.
@@ -3396,6 +3399,9 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    ScopedAdmissionPriority<ExecutionAdmissionContext> deprioritizeExecutionControl(
+        opCtx, AdmissionContext::Priority::kLow);
+
     {
         tassert(7683109,
                 "Expected readSource to be kNoTimestamp",
