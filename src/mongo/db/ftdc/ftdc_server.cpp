@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/ftdc/collection_metrics.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/controller.h"
@@ -133,6 +134,8 @@ Status onUpdateFTDCPeriod(const std::int32_t potentialNewValue) {
     if (FTDCController * controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
         controller->setPeriod(Milliseconds(potentialNewValue));
+        FTDCCollectionMetrics::get(getGlobalServiceContext())
+            .onUpdatingCollectionPeriod(Milliseconds(potentialNewValue));
     }
 
     return Status::OK();
@@ -377,6 +380,7 @@ void startFTDC(ServiceContext* serviceContext,
                UseMultiServiceSchema multiServiceSchema) {
     FTDCConfig config;
     config.period = Milliseconds(ftdcStartupParams.periodMillis.load());
+    FTDCCollectionMetrics::get(serviceContext).onUpdatingCollectionPeriod(config.period);
     config.metadataCaptureFrequency = ftdcStartupParams.metadataCaptureFrequency.load();
     // Only enable FTDC if our caller says to enable FTDC, MongoS may not have a valid path to write
     // files to so update the diagnosticDataCollectionEnabled set parameter to reflect that.

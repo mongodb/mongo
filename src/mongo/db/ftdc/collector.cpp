@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/cluster_role.h"
+#include "mongo/db/ftdc/collection_metrics.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replica_set_endpoint_util.h"
@@ -124,8 +125,8 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
     auto opCtx = client->makeOperationContext();
     opCtx->setEnforceConstraints(false);
 
-    Date_t start = getCurrentDate(opCtx.get());
-    builder.appendDate(kFTDCCollectStartField, start);
+    const auto startDate = getCurrentDate(opCtx.get());
+    builder.appendDate(kFTDCCollectStartField, startDate);
 
     ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
         opCtx.get(), AdmissionContext::Priority::kExempt);
@@ -158,9 +159,12 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
         }
     }
 
-    builder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx.get()));
+    const auto endDate = getCurrentDate(opCtx.get());
+    builder.appendDate(kFTDCCollectEndField, endDate);
 
-    return std::tuple<BSONObj, Date_t>(builder.obj(), start);
+    FTDCCollectionMetrics::get(opCtx.get()).onCompletingCollection(endDate - startDate);
+
+    return std::tuple<BSONObj, Date_t>(builder.obj(), startDate);
 }
 
 SampleCollectorCache::SampleCollectorCache(ClusterRole role,
