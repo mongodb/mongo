@@ -87,7 +87,6 @@ std::shared_ptr<CatalogEntryMetaData> parseMetaData(const BSONElement& mdElement
 namespace internal {
 CatalogEntryMetaData createMetaDataForNewCollection(const NamespaceString& nss,
                                                     const CollectionOptions& collectionOptions) {
-    const auto ns = NamespaceStringUtil::serializeForCatalog(nss);
     CatalogEntryMetaData md;
     md.nss = nss;
     md.options = collectionOptions;

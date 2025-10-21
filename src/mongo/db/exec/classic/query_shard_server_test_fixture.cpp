@@ -112,7 +112,6 @@ void QueryShardServerTestFixture::insertDocs(const std::vector<BSONObj>& docs) {
 const IndexDescriptor& QueryShardServerTestFixture::getIndexDescriptor(const CollectionPtr& coll,
                                                                        StringData indexName) {
     auto* opCtx = operationContext();
-    std::vector<const IndexDescriptor*> indexes;
     const auto* idxDesc = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     ASSERT_NE(idxDesc, nullptr);
     return *idxDesc;

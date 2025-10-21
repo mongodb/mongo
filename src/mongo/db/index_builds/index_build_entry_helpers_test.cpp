@@ -109,7 +109,6 @@ public:
         CatalogTestFixture::setUp();
 
         const UUID collectionUUID = UUID::gen();
-        const CommitQuorumOptions commitQuorum(CommitQuorumOptions::kMajority);
 
         // `_firstEntry` and `_secondEntry` are index builds on the same collection.
         _firstEntry = IndexBuildEntry(UUID::gen(),

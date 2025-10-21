@@ -164,9 +164,6 @@ public:
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-                const auto dbNameStr =
-                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-
                 auto newOpCtxPtr = newOpCtx.get();
 
                 commitDropDatabaseMetadataLocally(newOpCtxPtr, dbName);

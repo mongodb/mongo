@@ -604,7 +604,6 @@ std::string StreamableReplicaSetMonitor::getServerAddress() const {
             output << ",";
     }
 
-    auto result = output.str();
     return output.str();
 }
 

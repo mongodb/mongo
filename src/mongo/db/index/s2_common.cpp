@@ -175,8 +175,6 @@ void initialize2dsphereParams(const BSONObj& infoObj,
     out->radius = kRadiusOfEarthInMeters;
 
     static const std::string kIndexVersionFieldName("2dsphereIndexVersion");
-    static const std::string kFinestIndexedLevel("finestIndexedLevel");
-    static const std::string kCoarsestIndexedLevel("coarsestIndexedLevel");
 
     long long indexVersion;
 

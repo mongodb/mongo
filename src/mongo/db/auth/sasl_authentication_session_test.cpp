@@ -160,7 +160,6 @@ SaslConversation::SaslConversation(std::string mech)
 
 void SaslConversation::assertConversationFailure() {
     std::string clientMessage;
-    std::string serverMessage;
     Status clientStatus(ErrorCodes::InternalError, "");
     StatusWith<std::string> serverResponse("");
     do {

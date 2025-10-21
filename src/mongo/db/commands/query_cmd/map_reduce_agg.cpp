@@ -163,8 +163,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         return bab.arr();
     };
 
-    Timer cmdTimer;
-
     const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
     auto sc = vts
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())

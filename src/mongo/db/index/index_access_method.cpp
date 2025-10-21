@@ -345,7 +345,6 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
     UpdateTicket updateTicket;
     prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket);
 
-    auto status = Status::OK();
     if (entry->sideWritesAllowed() || !entry->isReady()) {
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,

@@ -114,7 +114,6 @@ private:
 
 template <typename T>
 std::string doSequence(const T& seq) {
-    std::string r;
     Joiner joiner;
     for (const auto& e : seq)
         joiner(e);

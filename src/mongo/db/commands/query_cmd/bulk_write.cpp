@@ -1029,7 +1029,6 @@ bool handleDeleteOp(OperationContext* opCtx,
         auto stmtId = opCtx->isRetryableWrite()
             ? bulk_write_common::getStatementId(req, currentOpIdx)
             : kUninitializedStmtId;
-        auto stmtIds = std::vector<StmtId>{stmtId};
 
         if (op->getMulti()) {
             // We don't allow multi=true retryable writes unless we are in a transaction.
@@ -1610,7 +1609,6 @@ bool handleUpdateOp(OperationContext* opCtx,
         auto stmtId = opCtx->isRetryableWrite()
             ? bulk_write_common::getStatementId(req, currentOpIdx)
             : kUninitializedStmtId;
-        auto stmtIds = std::vector<StmtId>{stmtId};
 
         if (op->getMulti()) {
             // We don't allow multi=true retryable writes unless we are in a transaction.

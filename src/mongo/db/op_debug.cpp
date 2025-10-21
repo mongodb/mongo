@@ -761,8 +761,6 @@ void OpDebug::append(OperationContext* opCtx,
 void OpDebug::appendUserInfo(const CurOp& c,
                              BSONObjBuilder& builder,
                              AuthorizationSession* authSession) {
-    std::string opdb(nsToDatabase(c.getNS()));
-
     BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
     auto name = authSession->getAuthenticatedUserName();
     if (name) {

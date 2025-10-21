@@ -54,7 +54,6 @@ std::string getLinkLocalIPv6Address(bool scopeOnly = false) {
     struct ifaddrs *ifaddr, *ifa;
     char addr_str[INET6_ADDRSTRLEN];
     std::string linkLocalWithScope;
-    std::string scopeOnlyStr;
 
     if (getifaddrs(&ifaddr) == -1) {
         return std::string();

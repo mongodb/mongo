@@ -197,8 +197,6 @@ private:
     void validateServerField(const PhaseResultPtr result,
                              const ServerDescriptionPtr& serverDescription,
                              const BSONElement& expectedField) const {
-        const auto serverAddress = serverDescription->getAddress();
-
         std::string fieldName = expectedField.fieldName();
         if (fieldName == "type") {
             doValidateServerField(

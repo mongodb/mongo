@@ -2187,7 +2187,6 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
 
     for (int threadId = 1; threadId < numThreads; threadId++) {
         threads.emplace_back([&, threadId]() {
-            Timer t;
             for (int iters = 0; !done.load(); iters++) {
                 OperationContext* opCtx = clientOpctxPairs[threadId].second.get();
                 boost::optional<Lock::GlobalLock> lock;

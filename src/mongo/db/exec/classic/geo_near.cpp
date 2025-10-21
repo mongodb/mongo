@@ -256,7 +256,6 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(ExpressionContext* expCtx,
     scanParams.bounds = _nearParams->baseBounds;
 
     // The "2d" field is always the first in the index
-    const string twoDFieldName = _nearParams->nearQuery->field;
     const int twoDFieldPosition = 0;
 
     // Construct index intervals used by this stage

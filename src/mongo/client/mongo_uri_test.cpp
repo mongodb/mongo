@@ -642,7 +642,6 @@ std::string returnStringFromElementOrNull(BSONElement element) {
 // Helper method to take a valid test case, parse() it, and assure the output is correct
 void testValidURIFormat(URITestCase testCase) {
     LOGV2(20153, "Testing URI", "mongoUri"_attr = testCase.URI);
-    std::string errMsg;
     const auto cs_status = MongoURI::parse(testCase.URI);
     ASSERT_OK(cs_status);
     auto result = cs_status.getValue();

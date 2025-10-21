@@ -357,7 +357,6 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Incorrect SCRAM channel binding: " << input[0]);
     }
-    const auto cbind = input[0].substr(2);
 
     if (!str::startsWith(input[1], "r=") || input[1].size() < 6) {
         return Status(ErrorCodes::BadValue,
