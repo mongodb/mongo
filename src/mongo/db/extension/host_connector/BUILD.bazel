@@ -13,11 +13,13 @@ exports_files(
 mongo_cc_library(
     name = "extensions_host_connector",
     srcs = [
+        "query_execution_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
     ],
     hdrs = [
         "extension_handle.h",
         "host_services_adapter.h",
+        "query_execution_context_adapter.h",
         "query_shape_opts_adapter.h",
         "//src/mongo/db/extension/host:host_portal.h",
     ],

@@ -12,6 +12,7 @@ mongo_cc_library(
         "aggregation_stage.cpp",
         "extension_helper.cpp",
         "host_services.cpp",
+        "query_execution_context_handle.cpp",
         "query_shape_opts_handle.cpp",
     ],
     hdrs = [
@@ -22,6 +23,7 @@ mongo_cc_library(
         "extension_helper.h",
         "host_portal.h",
         "host_services.h",
+        "query_execution_context_handle.h",
         "query_shape_opts_handle.h",
         "test_extension_factory.h",
         "test_extension_util.h",

@@ -27,43 +27,37 @@
  *    it in the license file.
  */
 #pragma once
-
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::host_connector {
-/**
- * QueryShapeOptsAdapter is an adapter to ::MongoExtensionHostQueryShapeOpts,
- * providing host serialization options to extensions.
- */
-class QueryShapeOptsAdapter final : public ::MongoExtensionHostQueryShapeOpts {
-public:
-    QueryShapeOptsAdapter(const SerializationOptions* opts)
-        : ::MongoExtensionHostQueryShapeOpts{&VTABLE}, _opts(opts) {}
+namespace mongo::extension::sdk {
 
-    const SerializationOptions* getOptsImpl() const {
-        return _opts;
+/**
+ * Wrapper for ::MongoExtensionQueryExecutionContext, providing safe access to its public API
+ * through the underlying vtable.
+ *
+ * This is an unowned handle, meaning the object is fully owned by the host, and
+ * ownership is never transferred to the extension.
+ */
+class QueryExecutionContextHandle
+    : public UnownedHandle<const ::MongoExtensionQueryExecutionContext> {
+public:
+    QueryExecutionContextHandle(const ::MongoExtensionQueryExecutionContext* ctx)
+        : UnownedHandle<const ::MongoExtensionQueryExecutionContext>(ctx) {
+        _assertValidVTable();
     }
 
+    ExtensionGenericStatus checkForInterrupt() const;
+
 private:
-    static MongoExtensionStatus* _extSerializeIdentifier(
-        const ::MongoExtensionHostQueryShapeOpts* ctx,
-        ::MongoExtensionByteView identifier,
-        ::MongoExtensionByteBuf** output) noexcept;
-
-    static MongoExtensionStatus* _extSerializeFieldPath(
-        const ::MongoExtensionHostQueryShapeOpts* ctx,
-        ::MongoExtensionByteView fieldPath,
-        ::MongoExtensionByteBuf** output) noexcept;
-
-    static MongoExtensionStatus* _extSerializeLiteral(const ::MongoExtensionHostQueryShapeOpts* ctx,
-                                                      ::MongoExtensionByteView bsonElement,
-                                                      ::MongoExtensionByteBuf** output) noexcept;
-
-    static constexpr ::MongoExtensionHostQueryShapeOptsVTable VTABLE{
-        &_extSerializeIdentifier, &_extSerializeFieldPath, &_extSerializeLiteral};
-
-    const SerializationOptions* _opts;
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tripwireAssert(11098300,
+                       "QueryExecutionContext' 'check_for_interrupt' is null",
+                       vtable.check_for_interrupt != nullptr);
+    };
 };
-}  // namespace mongo::extension::host_connector
+
+}  // namespace mongo::extension::sdk

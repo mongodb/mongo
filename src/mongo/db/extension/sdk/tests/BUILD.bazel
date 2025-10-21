@@ -22,6 +22,7 @@ mongo_cc_unit_test(
     srcs = [
         "aggregation_stage_test.cpp",
         "host_services_test.cpp",
+        "query_execution_context_test.cpp",
         "versioned_extension_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
@@ -33,5 +34,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/host_connector/handle/aggregation_stage",
         "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/extension/shared/handle",
+        "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )

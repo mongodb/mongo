@@ -92,8 +92,80 @@ private:
         return stringViewAsByteView(static_cast<const ExtensionStatusOK*>(status)->getReason());
     }
 
+    static void _extSetCode(::MongoExtensionStatus* status, int32_t newCode) noexcept {
+        // No-op for ExtensionStatusOK
+    }
+
+    static void _extSetReason(::MongoExtensionStatus* status,
+                              MongoExtensionByteView newReason) noexcept {
+        // No-op for ExtensionStatusOK
+    }
+
     static const ::MongoExtensionStatusVTable VTABLE;
     static size_t sInstanceCount;
+};
+
+/**
+ * ExtensionGenericStatus is an implementation of ::MongoExtensionStatus that can be set across the
+ * API boundary.
+ */
+class ExtensionGenericStatus final : public ::MongoExtensionStatus {
+public:
+    ExtensionGenericStatus()
+        : ::MongoExtensionStatus{&VTABLE}, _code(MONGO_EXTENSION_STATUS_OK), _reason("") {}
+
+    ExtensionGenericStatus(int32_t code, std::string reason)
+        : ::MongoExtensionStatus{&VTABLE}, _code(code), _reason(reason) {}
+
+    ~ExtensionGenericStatus() = default;
+
+    std::string_view getReason() const {
+        return _reason;
+    }
+
+    int32_t getCode() const {
+        return _code;
+    }
+
+    void setCode(int32_t code) {
+        _code = code;
+    }
+
+    void setReason(const std::string_view& reason) {
+        _reason = reason;
+    }
+
+    bool operator==(const auto& other) const {
+        return _code == other.getCode() && _reason == other.getReason();
+    }
+
+private:
+    static void _extDestroy(::MongoExtensionStatus* status) noexcept {
+        delete static_cast<ExtensionGenericStatus*>(status);
+    }
+
+    static int32_t _extGetCode(const ::MongoExtensionStatus* status) noexcept {
+        return static_cast<const ExtensionGenericStatus*>(status)->getCode();
+    }
+
+    static MongoExtensionByteView _extGetReason(const ::MongoExtensionStatus* status) noexcept {
+        return stringViewAsByteView(
+            static_cast<const ExtensionGenericStatus*>(status)->getReason());
+    }
+
+    static void _extSetCode(::MongoExtensionStatus* status, int32_t newCode) noexcept {
+        static_cast<ExtensionGenericStatus*>(status)->setCode(newCode);
+    }
+
+    static void _extSetReason(::MongoExtensionStatus* status,
+                              MongoExtensionByteView newReason) noexcept {
+        static_cast<ExtensionGenericStatus*>(status)->setReason(byteViewAsStringView(newReason));
+    }
+
+    static const ::MongoExtensionStatusVTable VTABLE;
+
+    int32_t _code;
+    std::string _reason;
 };
 
 /**
@@ -142,6 +214,16 @@ private:
             static_cast<const ExtensionStatusException*>(status)->getReason());
     }
 
+    static void _extSetCode(::MongoExtensionStatus* status, int32_t newCode) noexcept {
+        // No-op for ExtensionStatusException because the wrapped exception is immutable
+        // and its error code is set at construction time
+    }
+
+    static void _extSetReason(::MongoExtensionStatus* status,
+                              MongoExtensionByteView newReason) noexcept {
+        // No-op for ExtensionStatusException because the wrapped exception is immutable
+        // and its error message is set at construction time
+    }
     static const ::MongoExtensionStatusVTable VTABLE;
 
     /**

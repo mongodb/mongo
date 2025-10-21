@@ -29,41 +29,31 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
-/**
- * QueryShapeOptsAdapter is an adapter to ::MongoExtensionHostQueryShapeOpts,
- * providing host serialization options to extensions.
- */
-class QueryShapeOptsAdapter final : public ::MongoExtensionHostQueryShapeOpts {
-public:
-    QueryShapeOptsAdapter(const SerializationOptions* opts)
-        : ::MongoExtensionHostQueryShapeOpts{&VTABLE}, _opts(opts) {}
 
-    const SerializationOptions* getOptsImpl() const {
-        return _opts;
+/**
+ * QueryExecutionContextAdapter is an adapter to ::MongoExtensionQueryExecutionContext,
+ * providing host expression context methods to extensions.
+ */
+class QueryExecutionContextAdapter final : public ::MongoExtensionQueryExecutionContext {
+public:
+    QueryExecutionContextAdapter(const ExpressionContext* ctx)
+        : ::MongoExtensionQueryExecutionContext{&VTABLE}, _ctx(ctx) {}
+
+    const ExpressionContext* getCtxImpl() const {
+        return _ctx;
     }
 
 private:
-    static MongoExtensionStatus* _extSerializeIdentifier(
-        const ::MongoExtensionHostQueryShapeOpts* ctx,
-        ::MongoExtensionByteView identifier,
-        ::MongoExtensionByteBuf** output) noexcept;
+    static MongoExtensionStatus* _extCheckForInterrupt(
+        const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept;
 
-    static MongoExtensionStatus* _extSerializeFieldPath(
-        const ::MongoExtensionHostQueryShapeOpts* ctx,
-        ::MongoExtensionByteView fieldPath,
-        ::MongoExtensionByteBuf** output) noexcept;
+    static constexpr ::MongoExtensionQueryExecutionContextVTable VTABLE{&_extCheckForInterrupt};
 
-    static MongoExtensionStatus* _extSerializeLiteral(const ::MongoExtensionHostQueryShapeOpts* ctx,
-                                                      ::MongoExtensionByteView bsonElement,
-                                                      ::MongoExtensionByteBuf** output) noexcept;
-
-    static constexpr ::MongoExtensionHostQueryShapeOptsVTable VTABLE{
-        &_extSerializeIdentifier, &_extSerializeFieldPath, &_extSerializeLiteral};
-
-    const SerializationOptions* _opts;
+    const ExpressionContext* _ctx;
 };
+
 }  // namespace mongo::extension::host_connector

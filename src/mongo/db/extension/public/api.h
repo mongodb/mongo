@@ -136,6 +136,16 @@ typedef struct MongoExtensionStatusVTable {
      * Return a utf-8 string associated with `status`. May be empty.
      */
     MongoExtensionByteView (*get_reason)(const MongoExtensionStatus* status);
+
+    /**
+     * Set an error code associated with `status`
+     */
+    void (*set_code)(MongoExtensionStatus* status, int32_t newCode);
+
+    /**
+     * Set a reason associated with `status`. May be empty.
+     */
+    void (*set_reason)(MongoExtensionStatus* status, MongoExtensionByteView newReason);
 } MongoExtensionStatusVTable;
 
 /**
@@ -145,6 +155,30 @@ typedef struct MongoExtensionStatusVTable {
  **/
 const int32_t MONGO_EXTENSION_STATUS_RUNTIME_ERROR = -1;
 const int32_t MONGO_EXTENSION_STATUS_OK = 0;
+
+/**
+ * MongoExtensionQueryExecutionContext exposes helpers for an extension to call certain
+ * functionality on a wrapped ExpressionContext. It is owned by the host and used by an extension.
+ */
+typedef struct MongoExtensionQueryExecutionContext {
+    const struct MongoExtensionQueryExecutionContextVTable* vtable;
+} MongoExtensionQueryExecutionContext;
+
+typedef struct MongoExtensionQueryExecutionContextVTable {
+    /**
+     * Call checkForInterruptNoAssert() on the wrapped ExpressionContext and populate the
+     * `queryStatus` with the resulting code/reason.
+     */
+    /**
+     * Call checkForInterruptNoAssert() on the wrapped ExpressionContext and populate the
+     * `queryStatus` with the resulting code/reason. Populates queryStatus with
+     * MONGO_EXTENSION_STATUS_OK unless this operation is in a killed state. Note that the
+     * MongoExtensionStatus `queryStatus` is owned by the extension and ownership is NOT
+     * transferred to the host.
+     */
+    MongoExtensionStatus* (*check_for_interrupt)(const MongoExtensionQueryExecutionContext* ctx,
+                                                 MongoExtensionStatus* queryStatus);
+} MongoExtensionQueryExecutionContextVTable;
 
 /**
  * MongoExtensionHostQueryShapeOpts exposes helpers for an extension to serialize certain values

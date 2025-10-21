@@ -42,7 +42,7 @@ BSONObj AggStageParseNodeHandle::getQueryShape(const SerializationOptions& opts)
     ::MongoExtensionByteBuf* buf;
     const auto& vtbl = vtable();
     auto* ptr = get();
-    host::QueryShapeOptsAdapter optsCtx(&opts);
+    host_connector::QueryShapeOptsAdapter optsCtx(&opts);
 
     invokeCAndConvertStatusToException([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
 

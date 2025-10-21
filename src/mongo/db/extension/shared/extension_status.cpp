@@ -40,15 +40,27 @@ size_t ExtensionStatusOK::getInstanceCount() {
 }
 
 const ::MongoExtensionStatusVTable extension::ExtensionStatusOK::VTABLE = {
-    &ExtensionStatusOK::_extDestroy,
-    &ExtensionStatusOK::_extGetCode,
-    &ExtensionStatusOK::_extGetReason,
+    .destroy = &ExtensionStatusOK::_extDestroy,
+    .get_code = &ExtensionStatusOK::_extGetCode,
+    .get_reason = &ExtensionStatusOK::_extGetReason,
+    .set_code = &ExtensionStatusOK::_extSetCode,
+    .set_reason = &ExtensionStatusOK::_extSetReason,
 };
 
 const ::MongoExtensionStatusVTable extension::ExtensionStatusException::VTABLE = {
-    &ExtensionStatusException::_extDestroy,
-    &ExtensionStatusException::_extGetCode,
-    &ExtensionStatusException::_extGetReason,
+    .destroy = &ExtensionStatusException::_extDestroy,
+    .get_code = &ExtensionStatusException::_extGetCode,
+    .get_reason = &ExtensionStatusException::_extGetReason,
+    .set_code = &ExtensionStatusException::_extSetCode,
+    .set_reason = &ExtensionStatusException::_extSetReason,
+};
+
+const ::MongoExtensionStatusVTable extension::ExtensionGenericStatus::VTABLE = {
+    .destroy = &ExtensionGenericStatus::_extDestroy,
+    .get_code = &ExtensionGenericStatus::_extGetCode,
+    .get_reason = &ExtensionGenericStatus::_extGetReason,
+    .set_code = &ExtensionGenericStatus::_extSetCode,
+    .set_reason = &ExtensionGenericStatus::_extSetReason,
 };
 
 void convertStatusToException(StatusHandle status) {

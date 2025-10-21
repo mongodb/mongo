@@ -32,7 +32,7 @@
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::host_connector {
 
 MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
     const ::MongoExtensionHostQueryShapeOpts* ctx,
@@ -99,4 +99,4 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
     });
 }
 
-}  // namespace mongo::extension::host
+}  // namespace mongo::extension::host_connector
