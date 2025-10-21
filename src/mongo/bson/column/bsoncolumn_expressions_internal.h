@@ -31,8 +31,9 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::bsoncolumn::bsoncolumn_internal {
+namespace mongo::bsoncolumn::internal {
 
 /*
  * Collector type that performs comparisons of all appended values. Working value is replaced when
@@ -1047,4 +1048,4 @@ typename std::pair<typename CMaterializer::Element, typename CMaterializer::Elem
     return collector.minmax();
 }
 
-}  // namespace mongo::bsoncolumn::bsoncolumn_internal
+}  // namespace mongo::bsoncolumn::internal

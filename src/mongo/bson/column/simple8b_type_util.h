@@ -33,6 +33,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/int128.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstddef>
@@ -41,7 +42,6 @@
 #include <absl/base/config.h>
 #include <absl/numeric/int128.h>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

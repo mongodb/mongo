@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-namespace mongo {
-namespace bsoncolumn {
+#include "mongo/util/modules.h"
+
+namespace mongo::bsoncolumn {
 
 template <class Buffer>
 requires Appendable<Buffer>
@@ -222,10 +223,17 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
                     break;
             }
         } else if (isInterleavedStartControlByte(control)) {
-            BlockBasedInterleavedDecompressor decompressor{buffer.getAllocator(), ptr, end};
-            using PathBufferPair = std::pair<RootPath, Buffer&>;
-            std::array<PathBufferPair, 1> path{{{RootPath{}, buffer}}};
-            ptr = decompressor.decompress(std::span<PathBufferPair, 1>{path});
+            internal::BlockBasedInterleavedDecompressor decompressor{
+                buffer.getAllocator(), ptr, end};
+
+            struct RootPath {
+                boost::container::small_vector<const char*, 1> elementsToMaterialize(
+                    BSONObj refObj) {
+                    return {refObj.objdata()};
+                }
+            };
+            std::pair<RootPath, Buffer&> path{RootPath(), buffer};
+            ptr = decompressor.decompress(std::span{&path, 1});
             ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(ptr, end, buffer);
         } else {
             uasserted(8295706, "Unexpected control");
@@ -233,5 +241,4 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
     }
 }
 
-}  // namespace bsoncolumn
-}  // namespace mongo
+}  // namespace mongo::bsoncolumn

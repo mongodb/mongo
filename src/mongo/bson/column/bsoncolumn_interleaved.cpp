@@ -29,7 +29,7 @@
 
 #include "mongo/bson/column/bsoncolumn_interleaved.h"
 
-namespace mongo::bsoncolumn {
+namespace mongo::bsoncolumn::internal {
 
 BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(BSONElementStorage& allocator,
                                                                      const char* control,
@@ -352,4 +352,4 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(BSONElementStorage& 
     return std::pair{_lastLiteral.type(), *d128.lastEncodedValue};
 }
 
-}  // namespace mongo::bsoncolumn
+}  // namespace mongo::bsoncolumn::internal

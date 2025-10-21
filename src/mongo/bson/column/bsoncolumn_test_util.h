@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::bsoncolumn {
 
