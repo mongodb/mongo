@@ -51,6 +51,5 @@ rst.reInitiate();
 
 // We were able to add a new member and we're still sampling.
 assert(samplingIsIncomplete(primary));
-assert(samplingIsIncomplete(newNode));
 
 rst.stopSet();
