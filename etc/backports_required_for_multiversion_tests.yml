@@ -478,6 +478,8 @@ last-continuous:
       ticket: SERVER-107535
     - test_file: jstests/change_streams/events_containing_version_literals.js
       ticket: SERVER-111406
+    - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
+      ticket: SERVER-112520
   suites: null
 last-lts:
   all:
@@ -1013,4 +1015,6 @@ last-lts:
       ticket: SERVER-107535
     - test_file: jstests/change_streams/events_containing_version_literals.js
       ticket: SERVER-111406
+    - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
+      ticket: SERVER-112520
   suites: null
