@@ -39,28 +39,36 @@ namespace mongo {
 namespace otel {
 namespace traces {
 
+SpanTelemetryContextImpl::SpanTelemetryContextImpl(OtelContext ctx)
+    : _ctx(ctx), _keepSpan([&] {
+          auto baggage = opentelemetry::baggage::GetBaggage(ctx);
+          std::string value;
+          auto exists = baggage->GetValue(keepSpanKey, value);
+          return exists && (value == trueValue);
+      }()) {}
+
 void SpanTelemetryContextImpl::keepSpan(bool keepSpan) {
+    _keepSpan = keepSpan;
+}
+
+bool SpanTelemetryContextImpl::shouldKeepSpan() const {
+    return _keepSpan;
+}
+
+void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
+                                         TextMapCarrier& carrier) const {
     auto baggage = opentelemetry::baggage::GetBaggage(_ctx);
 
     // Baggage is not a set and we do not want duplicate keys, so we must remove the existing key if
     // it exists.
     baggage = baggage->Delete(keepSpanKey);
 
-    auto value = keepSpan ? trueValue : falseValue;
+    auto value = _keepSpan ? trueValue : falseValue;
     baggage = baggage->Set(keepSpanKey, value);
-    _ctx = opentelemetry::baggage::SetBaggage(_ctx, baggage);
-}
+    auto ctx = _ctx;
+    ctx = opentelemetry::baggage::SetBaggage(ctx, baggage);
 
-bool SpanTelemetryContextImpl::shouldKeepSpan() const {
-    auto baggage = opentelemetry::baggage::GetBaggage(_ctx);
-    std::string value;
-    auto exists = baggage->GetValue(keepSpanKey, value);
-    return exists && (value == trueValue);
-}
-
-void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
-                                         TextMapCarrier& carrier) const {
-    propagator.Inject(carrier, _ctx);
+    propagator.Inject(carrier, ctx);
 }
 
 }  // namespace traces

@@ -55,7 +55,7 @@ constexpr OtelStringView falseValue = "false";
  */
 class SpanTelemetryContextImpl : public TelemetryContext {
 public:
-    explicit SpanTelemetryContextImpl(OtelContext ctx) : _ctx(std::move(ctx)) {}
+    explicit SpanTelemetryContextImpl(OtelContext ctx);
     SpanTelemetryContextImpl() : _ctx() {}
 
     /**
@@ -90,6 +90,7 @@ public:
 
 private:
     OtelContext _ctx;
+    bool _keepSpan{false};
 };
 
 }  // namespace traces
