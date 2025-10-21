@@ -1887,6 +1887,7 @@ void TransactionRouter::Router::_resetRouterState(
         o(lk).metricsTracker.emplace(opCtx->getServiceContext());
         p().terminationInitiated = false;
         p().createdDatabases.clear();
+        p().disallowSingleWriteShardCommit = false;
 
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
