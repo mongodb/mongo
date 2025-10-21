@@ -75,3 +75,11 @@ res = t.update({"c": 2}, {'$inc': {'a.c000': 1}});
 assert.commandWorked(res);
 
 assert.eq({"c00": 1, "c000": 1}, t.findOne().a, "D1");
+
+// SERVER-103960: Field paths cannot contain more than 255 dots.
+assert(t.drop());
+
+const longPath = '.'.repeat(256);
+
+assert.commandWorked(t.insertMany([{a: 1}, {b: 1}]));
+assert.commandFailedWithCode(t.update({a: 1}, {$set: {[longPath]: "y"}}), 10396001);

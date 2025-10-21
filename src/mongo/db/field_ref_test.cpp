@@ -444,6 +444,11 @@ TEST(AppendShort, SetEmptyPartThenAppend) {
     ASSERT_EQUALS("", path.getPart(1));
 }
 
+TEST(FieldRefTest, ContainsTooManyDots) {
+    std::string path(255, '.');
+    ASSERT_THROWS_CODE(FieldRef(path), AssertionException, 10396001);
+}
+
 // The "medium" append tests feature an append operation that spills out of reserve space (i.e.,
 // we append to a path that has _size == kReserveAhead).
 TEST(AppendMedium, Simple) {
