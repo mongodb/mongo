@@ -73,3 +73,15 @@ server_parameters:
         cpp_varname: disableTransitionFromLastLTSToLastContinuousWithUserData
         default: true
         redact: false
+
+    maxShardStaleMetadataRetryAttempts:
+        description: >-
+            Maximum number of times a shard will retry a ShardRole operation after detecting stale
+            or missing sharding metadata.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: maxShardStaleMetadataRetryAttempts
+        validator:
+            gte: 1
+        default: 10
+        redact: false

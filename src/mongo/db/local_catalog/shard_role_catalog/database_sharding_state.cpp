@@ -83,6 +83,10 @@ public:
         return result;
     }
 
+    const StaleShardDatabaseMetadataHandler& getStaleShardExceptionHandler() {
+        return _factory->getStaleShardExceptionHandler();
+    }
+
 private:
     std::unique_ptr<DatabaseShardingStateFactory> _factory;
 
@@ -146,6 +150,12 @@ DatabaseShardingState::ScopedDatabaseShardingState DatabaseShardingState::assert
 std::vector<DatabaseName> DatabaseShardingState::getDatabaseNames(OperationContext* opCtx) {
     auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
     return databasesMap->getDatabaseNames();
+}
+
+const StaleShardDatabaseMetadataHandler& DatabaseShardingState::getStaleShardExceptionHandler(
+    OperationContext* opCtx) {
+    auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
+    return databasesMap->getStaleShardExceptionHandler();
 }
 
 void DatabaseShardingStateFactory::set(ServiceContext* service,

@@ -47,6 +47,21 @@
 namespace mongo {
 
 /**
+ * Interface for handling stale shard metadata errors.
+ * Implementations perform recovery or refresh actions for sharding metadata for a given collection
+ * when stale metadata exceptions are encountered.
+ */
+class StaleShardCollectionMetadataHandler {
+public:
+    /**
+     * Handles a StaleConfig error by recovering the sharding metadata for the specified collection.
+     * Returns the newly installed ShardVersion after recovery, if any.
+     */
+    virtual boost::optional<ChunkVersion> handleStaleShardVersionException(
+        OperationContext* opCtx, const StaleConfigInfo& sci) const = 0;
+};
+
+/**
  * Each shard node process (primary or secondary) has one instance of this object for each
  * collection residing on that shard. It sits on the second level of the hierarchy of the Shard Role
  * runtime-authoritative caches (along with DatabaseShardingState) and represents the shard's
@@ -126,6 +141,13 @@ public:
      * Reports all collections which have filtering information associated.
      */
     static void appendInfoForShardingStateCommand(OperationContext* opCtx, BSONObjBuilder* builder);
+
+    /**
+     * Returns StaleShardCollectionMetadataHandler object that can be used to react to Stale Shard
+     * exceptions.
+     */
+    static const StaleShardCollectionMetadataHandler& getStaleShardExceptionHandler(
+        OperationContext* opCtx);
 
     /**
      * If the shard currently doesn't know whether the collection is sharded or not, it will throw a
@@ -216,6 +238,12 @@ public:
      * Implementations must be thread-safe when called from multiple threads.
      */
     virtual std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) = 0;
+
+    /**
+     * Called by the CollectionShardingState::getStaleShardExceptionHandler. Constructs a
+     * StaleShardExceptionHandler object that can be used to react to Stale Shard exceptions.
+     */
+    virtual const StaleShardCollectionMetadataHandler& getStaleShardExceptionHandler() const = 0;
 
 protected:
     CollectionShardingStateFactory() = default;

@@ -41,6 +41,8 @@ public:
     DatabaseShardingStateFactoryMock() = default;
 
     std::unique_ptr<DatabaseShardingState> make(const DatabaseName& dbName) override;
+
+    const StaleShardDatabaseMetadataHandler& getStaleShardExceptionHandler() const override;
 };
 
 }  // namespace mongo

@@ -38,4 +38,9 @@ std::unique_ptr<DatabaseShardingState> DatabaseShardingStateFactoryShard::make(
     return std::make_unique<DatabaseShardingRuntime>(dbName);
 }
 
+const StaleShardDatabaseMetadataHandler&
+DatabaseShardingStateFactoryShard::getStaleShardExceptionHandler() const {
+    return _staleExceptionHandler;
+}
+
 }  // namespace mongo

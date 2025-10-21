@@ -27,20 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state_factory_mock.h"
+#pragma once
 
-#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state_mock.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
+#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 
 namespace mongo {
 
-std::unique_ptr<DatabaseShardingState> DatabaseShardingStateFactoryMock::make(
-    const DatabaseName& dbName) {
-    return std::make_unique<DatabaseShardingStateMock>(dbName);
-}
+class StaleShardCollectionMetadataHandlerImpl : public StaleShardCollectionMetadataHandler {
+public:
+    boost::optional<ChunkVersion> handleStaleShardVersionException(
+        OperationContext* opCtx, const StaleConfigInfo& sci) const override;
+};
 
-const StaleShardDatabaseMetadataHandler&
-DatabaseShardingStateFactoryMock::getStaleShardExceptionHandler() const {
-    MONGO_UNIMPLEMENTED;
-}
+class StaleShardDatabaseMetadataHandlerImpl : public StaleShardDatabaseMetadataHandler {
+public:
+    void handleStaleDatabaseVersionException(
+        OperationContext* opCtx, const StaleDbRoutingVersion& staleDbException) const override;
+};
 
 }  // namespace mongo

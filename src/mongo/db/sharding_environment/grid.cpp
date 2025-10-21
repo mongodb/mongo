@@ -183,4 +183,12 @@ void Grid::clearForUnitTests() {
     _shardingInitialized.store(false);
 }
 
+void Grid::setCatalogCache_forTest(std::unique_ptr<CatalogCache> catalogCache) {
+    _catalogCache = std::move(catalogCache);
+}
+
+void Grid::setInitialized_forTest() {
+    _isGridInitialized.store(true);
+}
+
 }  // namespace mongo

@@ -109,6 +109,10 @@ public:
         return result;
     }
 
+    const StaleShardCollectionMetadataHandler& getStaleShardExceptionHandler() {
+        return _factory->getStaleShardExceptionHandler();
+    }
+
 private:
     std::unique_ptr<CollectionShardingStateFactory> _factory;
 
@@ -196,6 +200,12 @@ void CollectionShardingState::appendInfoForShardingStateCommand(OperationContext
 std::vector<NamespaceString> CollectionShardingState::getCollectionNames(OperationContext* opCtx) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     return collectionsMap->getCollectionNames();
+}
+
+const StaleShardCollectionMetadataHandler& CollectionShardingState::getStaleShardExceptionHandler(
+    OperationContext* opCtx) {
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    return collectionsMap->getStaleShardExceptionHandler();
 }
 
 void CollectionShardingStateFactory::set(ServiceContext* service,

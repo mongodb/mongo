@@ -182,6 +182,16 @@ public:
      */
     void clearForUnitTests();
 
+    /**
+     * Sets the catalog cache. Used for unit-testing purposes only.
+     */
+    void setCatalogCache_forTest(std::unique_ptr<CatalogCache> catalogCache);
+
+    /**
+     * Sets the sharding initialization state. Used for unit-testing purposes only.
+     */
+    void setInitialized_forTest();
+
 private:
     /**
      * Helper function to set retry budget server parameters on shard instances.

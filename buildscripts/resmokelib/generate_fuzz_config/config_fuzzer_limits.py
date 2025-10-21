@@ -131,6 +131,11 @@ config_fuzzer_params = {
             "max": 1000,
             "fuzz_at": ["startup"],
         },
+        "maxShardStaleMetadataRetryAttempts": {
+            "min": 1,
+            "max": 100,
+            "fuzz_at": ["startup"],
+        },
         "operationMemoryPoolBlockMaxSizeKB": {
             "min": 1024,
             "max": 2048,

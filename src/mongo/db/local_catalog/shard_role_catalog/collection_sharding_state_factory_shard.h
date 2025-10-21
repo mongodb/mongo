@@ -30,10 +30,9 @@
 #pragma once
 
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
+#include "mongo/db/local_catalog/shard_role_catalog/stale_shard_exception_handler.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-
-#include <memory>
 
 namespace mongo {
 
@@ -43,9 +42,13 @@ public:
 
     std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) override;
 
+    const StaleShardCollectionMetadataHandler& getStaleShardExceptionHandler() const override;
+
 private:
     // The service context which owns this factory
     ServiceContext* const _serviceContext;
+
+    StaleShardCollectionMetadataHandlerImpl _staleExceptionHandler;
 };
 
 }  // namespace mongo

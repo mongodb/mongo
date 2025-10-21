@@ -31,7 +31,6 @@
 
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 
 #include <shared_mutex>
@@ -40,6 +39,21 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+/**
+ * Interface for handling stale shard metadata errors.
+ * Implementations perform recovery or refresh actions for sharding metadata for a given database
+ * when stale metadata exceptions are encountered.
+ */
+class StaleShardDatabaseMetadataHandler {
+public:
+    /**
+     * Handles a StaleDbVersion error by recovering the sharding metadata for the specified
+     * database.
+     */
+    virtual void handleStaleDatabaseVersionException(
+        OperationContext* opCtx, const StaleDbRoutingVersion& staleDbException) const = 0;
+};
 
 /**
  * Each shard node process (primary or secondary) has one instance of this object for each database
@@ -105,6 +119,13 @@ public:
     static std::vector<DatabaseName> getDatabaseNames(OperationContext* opCtx);
 
     /**
+     * Returns StaleShardDatabaseMetadataHandler object that can be used to react to Stale Shard
+     * exceptions.
+     */
+    static const StaleShardDatabaseMetadataHandler& getStaleShardExceptionHandler(
+        OperationContext* opCtx);
+
+    /**
      * Checks that the cached database version matches the one attached to the operation, which
      * means that the operation is routed to the right shard (database owner).
      *
@@ -152,6 +173,12 @@ public:
      * Implementations must be thread-safe when called from multiple threads.
      */
     virtual std::unique_ptr<DatabaseShardingState> make(const DatabaseName& dbName) = 0;
+
+    /**
+     * Called by the DatabaseShardingState::getStaleShardExceptionHandler. Constructs a
+     * StaleShardExceptionHandler object that can be used to react to Stale Shard exceptions.
+     */
+    virtual const StaleShardDatabaseMetadataHandler& getStaleShardExceptionHandler() const = 0;
 
 protected:
     DatabaseShardingStateFactory() = default;
