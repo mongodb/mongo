@@ -574,8 +574,8 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
                                        const BSONObj& cmdObj) {
-    bool background = cmdObj["background"].trueValue();
-    bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
+    const bool background = cmdObj["background"].trueValue();
+    const bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
 
     const bool fullValidate = cmdObj["full"].trueValue();
     if (background && fullValidate) {
@@ -591,13 +591,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                 << " and { enforceFastCount: true } is not supported.");
     }
 
-    const auto rawCheckBSONConformance = cmdObj["checkBSONConformance"];
-    const bool checkBSONConformance = rawCheckBSONConformance.trueValue();
-    if (rawCheckBSONConformance && !checkBSONConformance && (fullValidate || enforceFastCount)) {
-        uasserted(ErrorCodes::InvalidOptions,
-                  str::stream() << "Cannot explicitly set 'checkBSONConformance: false' with "
-                                   "full validation set.");
-    }
+    const bool checkBSONConformance = cmdObj["checkBSONConformance"].trueValue();
 
     const bool repair = cmdObj["repair"].trueValue();
     if (opCtx->readOnly() && repair) {
@@ -739,7 +733,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         CollectionValidation::validateHashes(*revealHashedIds, /*equalLength=*/false);
     }
 
-    auto validateMode = [&] {
+    const auto validateMode = [&] {
         if (metadata) {
             return CollectionValidation::ValidateMode::kMetadata;
         }
@@ -750,16 +744,16 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             return CollectionValidation::ValidateMode::kCollectionHash;
         }
         if (background) {
-            if (checkBSONConformance) {
-                return CollectionValidation::ValidateMode::kBackgroundCheckBSON;
-            }
-            return CollectionValidation::ValidateMode::kBackground;
+            return checkBSONConformance ? CollectionValidation::ValidateMode::kBackgroundCheckBSON
+                                        : CollectionValidation::ValidateMode::kBackground;
         }
         if (enforceFastCount) {
             return CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount;
         }
         if (fullValidate) {
-            return CollectionValidation::ValidateMode::kForegroundFull;
+            return checkBSONConformance
+                ? CollectionValidation::ValidateMode::kForegroundFullCheckBSON
+                : CollectionValidation::ValidateMode::kForegroundFull;
         }
         if (checkBSONConformance) {
             return CollectionValidation::ValidateMode::kForegroundCheckBSON;
@@ -767,7 +761,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         return CollectionValidation::ValidateMode::kForeground;
     }();
 
-    auto repairMode = [&] {
+    const auto repairMode = [&] {
         if (opCtx->readOnly()) {
             // On read-only mode we can't make any adjustments.
             return CollectionValidation::RepairMode::kNone;

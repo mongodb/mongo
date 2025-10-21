@@ -75,7 +75,7 @@ function validateTimeseriesBucketingParametersChangeFail(
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
     // We have to run full validation so we decompress BSON.
-    let res = coll.validate({full: true});
+    let res = coll.validate({checkBSONConformance: true});
     assert(!res.valid, tojson(res));
     assert.eq(res.errors.length, 1);
     assert.contains(
@@ -101,7 +101,7 @@ function validateTimeseriesBucketingParametersChangeFail(
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
-    res = coll.validate({full: true});
+    res = coll.validate({checkBSONConformance: true});
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
 
@@ -126,7 +126,7 @@ function validateTimeseriesBucketingParametersChangeFail(
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
-    res = coll.validate({full: true});
+    res = coll.validate({checkBSONConformance: true});
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
     assert.commandWorked(
@@ -151,7 +151,7 @@ function validateTimeseriesBucketingParametersChangeFail(
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
-    res = coll.validate({full: true});
+    res = coll.validate({checkBSONConformance: true});
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
     assert.commandWorked(

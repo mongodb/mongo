@@ -42,7 +42,7 @@ assert.commandWorked(
     ),
 );
 
-let res = assert.commandWorked(tsColl.validate({full: true}));
+let res = assert.commandWorked(tsColl.validate({checkBSONConformance: true}));
 assert(!res.valid);
 assert.eq(res.errors.length, 1);
 

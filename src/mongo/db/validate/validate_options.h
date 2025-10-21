@@ -54,15 +54,18 @@ enum class ValidateMode {
     // The standard foreground validation above, plus a more thorough BSON document validation.
     kForegroundCheckBSON,
 
-    // The full index validation and more thorough BSON document validation above, plus a full
-    // validation of the underlying record store using the storage engine's validation
-    // functionality. For WiredTiger, this results in a call to
+    // The full index validation plus a full validation of the underlying record store using the
+    // storage engine's validation functionality. For WiredTiger, this results in a call to
     // verify().
     kForegroundFull,
 
-    // The full index, BSON document, and record store validation above, plus enforce that the fast
-    // count is equal to the number of records (as opposed to correcting the fast count if it is
-    // incorrect).
+    // The full validation above including thorough BSON document validation above, plus a full
+    // validation of the underlying record store using the storage engine's validation
+    // functionality. For WiredTiger, this results in a call to verify().
+    kForegroundFullCheckBSON,
+
+    // The full index and record store validation above, plus enforce that the fast count is equal
+    // to the number of records (as opposed to correcting the fast count if it is incorrect).
     kForegroundFullEnforceFastCount,
 
     // Performs an extended validate where a total collection hash is computed and returned,
@@ -118,6 +121,7 @@ public:
 
     bool isFullValidation() const {
         return _validateMode == ValidateMode::kForegroundFull ||
+            _validateMode == ValidateMode::kForegroundFullCheckBSON ||
             _validateMode == ValidateMode::kForegroundFullEnforceFastCount ||
             _validateMode == ValidateMode::kCollectionHash;
     }
@@ -127,7 +131,8 @@ public:
     }
 
     bool isBSONConformanceValidation() const {
-        return isFullValidation() || _validateMode == ValidateMode::kBackgroundCheckBSON ||
+        return _validateMode == ValidateMode::kForegroundFullCheckBSON ||
+            _validateMode == ValidateMode::kBackgroundCheckBSON ||
             _validateMode == ValidateMode::kForegroundCheckBSON;
     }
 

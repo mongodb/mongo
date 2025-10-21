@@ -33,6 +33,8 @@ assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: tr
 
 assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: true, enforceFastCount: true}));
 
+assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: false, full: true}));
+
 assert.commandFailedWithCode(
     db.runCommand({validate: collName, checkBSONConformance: true, metadata: true}),
     ErrorCodes.InvalidOptions,
@@ -43,14 +45,6 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions,
 );
 
-assert.commandFailedWithCode(
-    db.runCommand({validate: collName, checkBSONConformance: false, full: true}),
-    ErrorCodes.InvalidOptions,
-);
-
-assert.commandFailedWithCode(
-    db.runCommand({validate: collName, checkBSONConformance: false, enforceFastCount: true}),
-    ErrorCodes.InvalidOptions,
-);
+assert.commandWorked(db.runCommand({validate: collName, checkBSONConformance: false, enforceFastCount: true}));
 
 rst.stopSet();
