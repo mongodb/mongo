@@ -146,7 +146,7 @@ public:
      */
     WriteCommandResponse generateClientResponse(OperationContext* opCtx);
 
-    BatchedCommandResponse generateClientResponseForBatchedCommand();
+    BatchedCommandResponse generateClientResponseForBatchedCommand(OperationContext* opCtx);
 
     BulkWriteCommandReply generateClientResponseForBulkWriteCommand(OperationContext* opCtx);
 
@@ -233,7 +233,7 @@ private:
      * Iterates through all of the the _results and combines all of the reply items for each op into
      * a single reply item. This is called when we are ready to generate the client response.
      */
-    std::map<WriteOpId, BulkWriteReplyItem> finalizeRepliesForOps();
+    std::map<WriteOpId, BulkWriteReplyItem> finalizeRepliesForOps(OperationContext* opCtx);
 
     /**
      * Remove ops that already have non-retryable errors from ops to retry.

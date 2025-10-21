@@ -102,17 +102,6 @@ write_ops::WriteError combineOpErrors(const std::vector<ChildWriteOp const*>& er
     return write_ops::WriteError(errOps.front()->error->getIndex(),
                                  Status(MultipleErrorsOccurredInfo(errB.arr()), msg.str()));
 }
-
-bool isSafeToIgnoreErrorInPartiallyAppliedOp(write_ops::WriteError& error) {
-    // UUID mismatch errors are safe to ignore if the actualCollection is null in conjuntion with
-    // other successful operations. This is true because it means we wrongly targeted a non-owning
-    // shard with the operation and we wouldn't have applied any modifications anyway.
-    //
-    // Note this is only safe if we're using ShardVersion::IGNORED since we're ignoring any
-    // placement concern and broadcasting to all shards.
-    return error.getStatus().code() == ErrorCodes::CollectionUUIDMismatch &&
-        !error.getStatus().extraInfo<CollectionUUIDMismatchInfo>()->actualCollection();
-}
 }  // namespace
 
 const BatchItemRef& WriteOp::getWriteItem() const {
@@ -424,7 +413,8 @@ void WriteOp::_updateOpState(OperationContext* opCtx,
         // as no-ops if the shard response had been instead a successful result since they wouldn't
         // have modified any data. As a result, we can swallow the errors and treat them as a
         // successful operation.
-        if (isTargetingAllShardsWithSVIgnored && isSafeToIgnoreErrorInPartiallyAppliedOp(*_error) &&
+        if (isTargetingAllShardsWithSVIgnored &&
+            write_op_helpers::isSafeToIgnoreErrorInPartiallyAppliedOp(_error->getStatus()) &&
             !_successfulShardSet.empty()) {
             if (!hasPendingChild) {
                 _error.reset();

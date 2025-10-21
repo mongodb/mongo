@@ -685,7 +685,8 @@ bool WriteBatchResponseProcessor::checkBulkWriteReplyMaxSize() {
     return false;
 }
 
-std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRepliesForOps() {
+std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRepliesForOps(
+    OperationContext* opCtx) {
 
     std::map<WriteOpId, BulkWriteReplyItem> aggregatedReplies;
 
@@ -730,20 +731,35 @@ std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRep
         }
 
         BulkWriteReplyItem reply;
-        if (successfulReplies.size() == 0 && errorReplies.size() == 0) {
+        if (successfulReplies.empty() && errorReplies.empty()) {
             continue;
-        } else if (errorReplies.size() == 0) {
+        } else if (errorReplies.empty()) {
             reply = combineSuccessfulReplies(opId, successfulReplies);
-        } else if (successfulReplies.size() == 0) {
+        } else if (successfulReplies.empty()) {
             reply = combineErrorReplies(opId, errorReplies);
         } else {
             // We have a combination of errors and successes.
             auto successReply = combineSuccessfulReplies(opId, successfulReplies);
 
-            reply = combineErrorReplies(opId, errorReplies);
-            reply.setN(successReply.getN());
-            reply.setNModified(successReply.getNModified());
-            reply.setUpserted(successReply.getUpserted());
+            auto errorReply = combineErrorReplies(opId, errorReplies);
+
+            // There are errors that are safe to ignore if they were correctly applied to other
+            // shards and we're using ShardVersion::IGNORED. They are safe to ignore as they can be
+            // interpreted as no-ops if the shard response had been instead a successful result
+            // since they wouldn't have modified any data. As a result, we can swallow the errors
+            // and treat them as a successful operation.
+            const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+            const bool canIgnoreErrors = write_op_helpers::shouldTargetAllShardsSVIgnored(
+                                             inTransaction, _cmdRef.getOp(opId).getMulti()) &&
+                write_op_helpers::isSafeToIgnoreErrorInPartiallyAppliedOp(errorReply.getStatus());
+            if (canIgnoreErrors) {
+                reply = std::move(successReply);
+            } else {
+                reply = std::move(errorReply);
+                reply.setN(successReply.getN());
+                reply.setNModified(successReply.getNModified());
+                reply.setUpserted(successReply.getUpserted());
+            }
         }
 
         aggregatedReplies.emplace(opId, reply);
@@ -755,7 +771,7 @@ std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRep
 WriteCommandResponse WriteBatchResponseProcessor::generateClientResponse(OperationContext* opCtx) {
     return _cmdRef.visitRequest(OverloadedVisitor{
         [&](const BatchedCommandRequest&) {
-            return WriteCommandResponse{generateClientResponseForBatchedCommand()};
+            return WriteCommandResponse{generateClientResponseForBatchedCommand(opCtx)};
         },
         [&](const BulkWriteCommandRequest&) {
             return WriteCommandResponse{generateClientResponseForBulkWriteCommand(opCtx)};
@@ -768,7 +784,7 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulk
     // write command requests, we always return an empty list of reply items. This matches the
     // behavior of populateCursorReply(). We call 'finalizeRepliesForOps' to aggregate replies from
     // different shards for a single op.
-    std::map<WriteOpId, BulkWriteReplyItem> finalResults = finalizeRepliesForOps();
+    std::map<WriteOpId, BulkWriteReplyItem> finalResults = finalizeRepliesForOps(opCtx);
 
     std::vector<BulkWriteReplyItem> results;
     for (const auto& [id, item] : finalResults) {
@@ -800,7 +816,8 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulk
         opCtx, _cmdRef.getBulkWriteCommandRequest(), _originalCommand, std::move(info));
 }
 
-BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBatchedCommand() {
+BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBatchedCommand(
+    OperationContext* opCtx) {
     BatchedCommandResponse resp;
     resp.setStatus(Status::OK());
 
@@ -811,7 +828,7 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
     }
 
     // We call 'finalizeRepliesForOps' to aggregate replies from different shards for a single op.
-    std::map<WriteOpId, BulkWriteReplyItem> finalResults = finalizeRepliesForOps();
+    std::map<WriteOpId, BulkWriteReplyItem> finalResults = finalizeRepliesForOps(opCtx);
 
     for (const auto& [id, item] : finalResults) {
         auto status = item.getStatus();

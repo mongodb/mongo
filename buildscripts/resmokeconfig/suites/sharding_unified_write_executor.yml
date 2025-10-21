@@ -70,6 +70,8 @@ selector:
     - jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
     - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
 
+    - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
+
 executor:
   archive:
     hooks:

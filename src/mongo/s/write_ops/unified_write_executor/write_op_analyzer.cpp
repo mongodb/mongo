@@ -29,11 +29,10 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
-#include "mongo/db/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 #include "mongo/db/raw_data_operation.h"
-#include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
+#include "mongo/s/write_ops/write_op_helper.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -81,7 +80,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool isShardedTimeseries = cm.isSharded() && cm.isTimeseriesCollection();
     const bool isUpdate = op.getType() == WriteType::kUpdate;
     const bool isRetryableWrite = opCtx->isRetryableWrite();
-    const bool inTxn = opCtx->inMultiDocumentTransaction();
+    const bool inTxn = static_cast<bool>(TransactionRouter::get(opCtx));
     const bool isRawData = isRawDataOperation(opCtx);
     const bool isTimeseriesRetryableUpdateOp =
         isShardedTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
@@ -120,20 +119,12 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         return Analysis{
             BatchType::kSingleShard, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else {
-        // multi:true writes outside of a transaction are not
-        // retryable. We target all shards and set the placement version to ignored.
-
-        // Fetch the "onlyTargetDataOwningShardsForMultiWrites" cluster param.
-        auto* clusterParam =
-            ServerParameterSet::getClusterParameterSet()
-                ->get<ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
-                    "onlyTargetDataOwningShardsForMultiWrites");
-
-        // We target all shards for multi: true writes outside of a transaction when the
-        // 'onlyTargetDataOwningShardsForMultiWrites' is false.
-        const bool targetAllShards = op.isMulti() &&
-            !static_cast<bool>(TransactionRouter::get(opCtx)) &&
-            !clusterParam->getValue(boost::none).getEnabled();
+        // For updates/upserts/deletes running outside of a transaction that need to target more
+        // than one endpoint, all shards are targeted -AND- 'shardVersion' is set to IGNORED on all
+        // endpoints. The exception to this is when 'onlyTargetDataOwningShardsForMultiWrites' is
+        // true.
+        const bool targetAllShards = (isUpdate || isDelete) &&
+            write_op_helpers::shouldTargetAllShardsSVIgnored(inTxn, op.isMulti());
         if (targetAllShards) {
             auto endpoints = targeter.targetAllShards(opCtx);
 

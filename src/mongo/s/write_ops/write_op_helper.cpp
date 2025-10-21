@@ -30,6 +30,8 @@
 #include "mongo/s/write_ops/write_op_helper.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/cluster_parameters/sharding_cluster_parameters_gen.h"
+#include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
 
 namespace mongo {
 namespace write_op_helpers {
@@ -40,5 +42,21 @@ bool isRetryErrCode(int errCode) {
         errCode == ErrorCodes::CannotImplicitlyCreateCollection;
 }
 
+bool shouldTargetAllShardsSVIgnored(bool inTransaction, bool isMulti) {
+    // Fetch the 'onlyTargetDataOwningShardsForMultiWrites' cluster param.
+    if (isMulti && !inTransaction) {
+        auto* clusterParam =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
+                    "onlyTargetDataOwningShardsForMultiWrites");
+        return !clusterParam->getValue(boost::none).getEnabled();
+    }
+    return false;
+}
+
+bool isSafeToIgnoreErrorInPartiallyAppliedOp(const Status& status) {
+    return status.code() == ErrorCodes::CollectionUUIDMismatch &&
+        !status.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection();
+}
 }  // namespace write_op_helpers
 }  // namespace mongo
