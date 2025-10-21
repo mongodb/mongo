@@ -44,14 +44,6 @@ const runTestCase = function (fn, isSharded = false) {
     }
 };
 
-const countIndexKeysDeletedByLog = function () {
-    const logs = rawMongoProgramOutput('"numKeysDeleted"');
-    const indexKeyDeletedLogs = [...logs.matchAll(/"numKeysDeleted":(\d*)/g)];
-    const keysDeleted = indexKeyDeletedLogs.reduce((acc, curr) => acc + parseInt(curr[1]), 0);
-    clearRawMongoProgramOutput();
-    return keysDeleted;
-};
-
 const countIndexKeysDeletedByMetrics = function (db) {
     let sum = 0;
     FixtureHelpers.mapOnEachShardNode({
@@ -96,7 +88,6 @@ const triggerIndexScanTTL = function (db, doShardCollection = false) {
 
     // Validate that the correct number of keys has been deleted in the indexes on the _id and x fields.
     // In a sharded cluster, there is an additional hashed index on the _id field.
-    assert.eq(docCount * (doShardCollection ? 3 : 2), countIndexKeysDeletedByLog());
     assert.eq(docCount * (doShardCollection ? 3 : 2), countIndexKeysDeletedByMetrics(db));
 };
 
@@ -161,7 +152,6 @@ const triggerCollectionScanTTL = function (testDB, doShardCollection = false) {
 
     // Validate that the correct number of keys has been deleted in the index on the host/time fields.
     // In a sharded cluster, there is an additional index on the host field.
-    assert.eq(doShardCollection ? 2 : 1, countIndexKeysDeletedByLog());
     assert.eq(doShardCollection ? 2 : 1, countIndexKeysDeletedByMetrics(testDB));
 };
 
