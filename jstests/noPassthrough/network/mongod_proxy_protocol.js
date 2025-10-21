@@ -1,7 +1,7 @@
 /**
  * Verify mongod support proxy protocol connections.
  * @tags: [
- *   requires_fcv_81,
+ *    requires_fcv_82,
  *    grpc_incompatible,
  * ]
  */
@@ -75,7 +75,14 @@ function basicTest(ingressPort, egressPort, node) {
 
 function standardPortTest(ingressPort, egressPort, version) {
     const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
-    rs.startSet({setParameter: {featureFlagMongodProxyProtocolSupport: true}});
+    rs.startSet({
+        setParameter: {
+            featureFlagMongodProxyProtocolSupport: true,
+            "logComponentVerbosity": {"network": {"verbosity": 5}},
+            "proxyProtocolTimeoutSecs": 10,
+            "proxyProtocolMaximumWaitBackoffMillis": 500,
+        },
+    });
     rs.initiate();
 
     const node = rs.getPrimary();
