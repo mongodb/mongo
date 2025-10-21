@@ -231,13 +231,13 @@ feature_flags:
         description: "Feature flag to enable MultiPlan rate limiter."
         cpp_varname: gfeatureFlagMultiPlanLimiter
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeUpgradeBinaryTrees:
         description: "Feature flag to enable N-ary ABT nodes"
         cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagUUIDExpression:
         description: "Feature flag to enable $createUUID expression"
