@@ -38,8 +38,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/str.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

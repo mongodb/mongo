@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 
 namespace mongo {
@@ -46,7 +46,7 @@ namespace mongo {
  * handles state transitions so that failed repairs are recoverable and so that replica set
  * corruption is not possible.
  * */
-class StorageRepairObserver {
+class MONGO_MOD_PUBLIC StorageRepairObserver {
 public:
     using InvalidateReplConfigCallback = std::function<void()>;
 

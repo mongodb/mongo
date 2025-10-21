@@ -34,6 +34,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #include <memory>
 

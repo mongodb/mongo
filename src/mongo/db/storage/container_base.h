@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/storage/container.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class IntegerKeyedContainerBase : public IntegerKeyedContainer {
+class MONGO_MOD_OPEN IntegerKeyedContainerBase : public IntegerKeyedContainer {
 public:
     explicit IntegerKeyedContainerBase(std::shared_ptr<Ident> ident);
 
@@ -45,7 +46,7 @@ private:
     std::shared_ptr<Ident> _ident;
 };
 
-class StringKeyedContainerBase : public StringKeyedContainer {
+class MONGO_MOD_OPEN StringKeyedContainerBase : public StringKeyedContainer {
 public:
     explicit StringKeyedContainerBase(std::shared_ptr<Ident> ident);
 

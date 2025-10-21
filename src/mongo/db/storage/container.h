@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -42,7 +43,7 @@ namespace mongo {
  * from, where the keys are integers and the values are byte arrays. Multiple container instances
  * may refer to the same ident.
  */
-class IntegerKeyedContainer {
+class MONGO_MOD_OPEN IntegerKeyedContainer {
 public:
     virtual ~IntegerKeyedContainer() {}
 
@@ -73,7 +74,7 @@ public:
  * where the keys and values are both byte arrays. Multiple container instances may refer to the
  * same ident.
  */
-class StringKeyedContainer {
+class MONGO_MOD_OPEN StringKeyedContainer {
 public:
     virtual ~StringKeyedContainer() {}
 

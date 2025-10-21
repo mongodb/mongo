@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -42,11 +43,11 @@
  * that allow the user to change a different subset of these options.
  */
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 struct StorageGlobalParams {
     StorageGlobalParams();
-    void reset_forTest();
+    MONGO_MOD_PUBLIC void reset_forTest();
 
     // Returns the directory path used by the spill storage engine to store spilled data.
     boost::filesystem::path getSpillDbPath() const;
@@ -149,4 +150,4 @@ private:
 
 extern StorageGlobalParams storageGlobalParams;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

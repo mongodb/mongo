@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
  * Manages statistics from the storage engine, allowing addition of statistics, serialization to
  * BSON, and access to certain metrics.
  */
-class StorageStats {
+class MONGO_MOD_OPEN StorageStats {
 public:
     virtual ~StorageStats() = default;
 

@@ -32,18 +32,19 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
 #include <fmt/format.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * A faster alternative to `iasserted`, designed to throw exceptions for unexceptional events on the
  * critical execution path (e.g., `WriteConflict`).
  */
 template <ErrorCodes::Error ec>
-[[noreturn]] void throwExceptionFor(std::string reason) {
+MONGO_MOD_FILE_PRIVATE [[noreturn]] void throwExceptionFor(std::string reason) {
     throw ExceptionFor<ec>({ec, std::move(reason)});
 }
 
@@ -77,4 +78,4 @@ template <ErrorCodes::Error ec>
     throwExceptionFor<ErrorCodes::TransactionTooLargeForCache>(std::move(context));
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

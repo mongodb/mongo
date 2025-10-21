@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/base/data_range.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
-#include <cstdint>
 
 namespace mongo {
 
@@ -49,7 +49,7 @@ class Status;
  * appended to the end of the protected data.
  * The caller may then call finalizeTag() to get implementation defined metadata.
  */
-class DataProtector {
+class MONGO_MOD_OPEN DataProtector {
 public:
     virtual ~DataProtector() = default;
 

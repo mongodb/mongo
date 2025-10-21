@@ -30,6 +30,9 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 /**
    A light-weight util library that provides functionality to assess whether a document is a
@@ -37,15 +40,9 @@
    generate as of 5.1, but to allow for backwards compatibility we still need to be able to account
    for them.
 */
-namespace mongo {
-
-namespace feature_document_util {
-
+namespace mongo::feature_document_util {
 /**
  *  Allows featureDocuments to be checked with older versions.
  */
 bool isFeatureDocument(const BSONObj& obj);
-
-}  // namespace feature_document_util
-
-}  // namespace mongo
+}  // namespace mongo::feature_document_util

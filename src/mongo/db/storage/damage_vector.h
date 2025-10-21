@@ -29,17 +29,18 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <cstddef>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 // Represents one modification from a source to a target. Specifies a change of 'targetSize' bytes
 // starting at 'targetOffset', with the replacement data being 'sourceSize' bytes from
 // 'sourceOffset'. The base addresses for these offsets are handled externally and not captured
 // here.
 struct DamageEvent {
-
     DamageEvent() = default;
 
     DamageEvent(size_t srcOffset, size_t srcSize, size_t tgtOffset, size_t tgtSize)
@@ -56,4 +57,4 @@ struct DamageEvent {
 
 using DamageVector = std::vector<DamageEvent>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

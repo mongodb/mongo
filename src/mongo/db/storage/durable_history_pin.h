@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -41,7 +42,7 @@
 
 namespace mongo {
 
-class DurableHistoryPin {
+class MONGO_MOD_OPEN DurableHistoryPin {
 public:
     virtual ~DurableHistoryPin() {}
 
@@ -55,7 +56,7 @@ public:
  * should create a class that implements `DurableHistoryPin` and register an instance of that class
  * at startup prior to the first call of `reconcilePins`.
  */
-class DurableHistoryRegistry {
+class MONGO_MOD_PUBLIC DurableHistoryRegistry {
 public:
     static DurableHistoryRegistry* get(ServiceContext* service);
     static DurableHistoryRegistry* get(ServiceContext& service);

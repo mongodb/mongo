@@ -34,14 +34,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/text.h"
 
 #include <cstddef>
 #include <limits>
 #include <ostream>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

@@ -31,8 +31,9 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This class encompasses the storage state needed for an operation.
@@ -60,4 +61,4 @@ private:
     PrepareConflictTracker _prepareConflictTracker;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

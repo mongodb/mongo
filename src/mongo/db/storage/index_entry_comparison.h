@@ -37,24 +37,22 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/modules.h"
 
-#include <cstdint>
 #include <iosfwd>
 #include <string>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Represents a single item in an index. An index item simply consists of a key
@@ -80,8 +78,6 @@ struct IndexKeyEntry {
         return bob.obj();
     }
 
-    IndexKeyEntry(BSONObj key, RecordId loc) : key(std::move(key)), loc(std::move(loc)) {}
-
     void serialize(BSONObjBuilder* builder) const {
         builder->append("key"_sd, key);
         loc.serializeToken("RecordId", builder);
@@ -95,10 +91,6 @@ std::ostream& operator<<(std::ostream& stream, const IndexKeyEntry& entry);
 
 inline bool operator==(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
     return SimpleBSONObjComparator::kInstance.evaluate(lhs.key == rhs.key) && (lhs.loc == rhs.loc);
-}
-
-inline bool operator!=(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
-    return !(lhs == rhs);
 }
 
 /**
@@ -291,4 +283,4 @@ Status buildDupKeyErrorStatus(const key_string::Value& keyString,
                               const BSONObj& indexCollation,
                               const Ordering& ordering);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

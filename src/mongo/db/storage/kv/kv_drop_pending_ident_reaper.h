@@ -36,6 +36,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
@@ -45,10 +46,7 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
-
-class Ident;
-
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * This class manages idents in the KV storage engine that are marked as drop-pending by the
  * two-phase index/collection drop algorithm.
@@ -239,4 +237,4 @@ private:
     StringMap<std::shared_ptr<IdentInfo>> _dropPendingIdents;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
