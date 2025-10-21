@@ -114,4 +114,68 @@ TEST(WiredTigerSessionTest, CacheMixedOverwrite) {
     }
 }
 
+TEST(WiredTigerSessionTest, StaleCursorNotReturnedToCacheAfterRollbackToStable) {
+    WiredTigerHarnessHelper helper;
+    std::unique_ptr<RecordStore> rs = helper.newRecordStore();
+    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+    auto& conn = helper.connection();
+
+    std::unique_ptr<RecoveryUnit> ruA = helper.newRecoveryUnit();
+    auto* session = static_cast<WiredTigerRecoveryUnit*>(ruA.get())->getSession();
+
+    // Populate cache before epoch bump
+    {
+        session->closeAllCursors(uri);
+        ASSERT_EQ(session->cachedCursors(), 0);
+
+        WT_CURSOR* cursor = session->getNewCursor(uri, "");
+        ASSERT(cursor);
+        session->releaseCursor(999999999, cursor, "");
+        ASSERT_GT(session->cachedCursors(), 0);
+    }
+
+    // Bump RTS epoch
+    conn.closeAll(WiredTigerConnection::ShutdownReason::kRollbackToStable);
+
+    // Check that the stale cursor was closed and not returned to the cache
+    {
+        WT_CURSOR* cursor = session->getCachedCursor(999999999, "");
+        ASSERT(cursor);
+        session->releaseCursor(999999999, cursor, "");
+        ASSERT_EQ(session->cachedCursors(), 0);
+
+        WT_CURSOR* staleCursor = session->getCachedCursor(999999999, "");
+        ASSERT_FALSE(staleCursor) << "Stale cursor should have been closed after RTS epoch bump";
+    }
+}
+
+TEST(WiredTigerSessionTest, CursorNotCachedAfterCleanShutdown) {
+    WiredTigerHarnessHelper helper;
+    auto& conn = helper.connection();
+    std::unique_ptr<RecordStore> rs = helper.newRecordStore();
+    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+
+    std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
+    auto* session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();
+    session->closeAllCursors(uri);
+    ASSERT_EQ(session->cachedCursors(), 0);
+
+    WT_CURSOR* cursor = session->getNewCursor(uri, "");
+    ASSERT(cursor);
+
+    int cachedBefore = session->cachedCursors();
+
+    // Trigger CleanShutdown to bump engine epoch
+    conn.closeAll(WiredTigerConnection::ShutdownReason::kCleanShutdown);
+
+    // CleanShutdown path in releaseCursor should early-return
+    session->releaseCursor(555555, cursor, "");
+    ASSERT_EQ(session->cachedCursors(), cachedBefore);
+
+    // CHeck that the cursor was not cached
+    WT_CURSOR* checkCursor = session->getCachedCursor(555555, "");
+    ASSERT_FALSE(checkCursor)
+        << "Cursor should not be cached after clean-shutdown engine epoch bump";
+}
+
 }  // namespace mongo

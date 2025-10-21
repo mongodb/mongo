@@ -71,10 +71,10 @@ WiredTigerConnection::WiredTigerConnection(WT_CONNECTION* conn,
 }
 
 WiredTigerConnection::~WiredTigerConnection() {
-    shuttingDown();
+    shuttingDown(ShutdownReason::kCleanShutdown);
 }
 
-void WiredTigerConnection::shuttingDown() {
+void WiredTigerConnection::shuttingDown(ShutdownReason reason) {
     // Try to atomically set _shuttingDown flag, but just return if another thread was first.
     if (_shuttingDown.fetchAndBitOr(kShuttingDownMask) & kShuttingDownMask)
         return;
@@ -84,7 +84,7 @@ void WiredTigerConnection::shuttingDown() {
         sleepmillis(1);
     }
 
-    closeAll();
+    closeAll(reason);
 }
 
 void WiredTigerConnection::restart() {
@@ -161,13 +161,24 @@ void WiredTigerConnection::closeExpiredIdleSessions(int64_t idleTimeMillis) {
     }
 }
 
-void WiredTigerConnection::closeAll() {
-    // Increment the epoch as we are now closing all sessions with this epoch.
+void WiredTigerConnection::closeAll(ShutdownReason reason) {
     SessionCache swap;
 
     {
         stdx::lock_guard<stdx::mutex> lock(_cacheLock);
-        _epoch.fetchAndAdd(1);
+        switch (reason) {
+            case ShutdownReason::kCleanShutdown:
+                // Bump the engine epoch during clean shutdowns to ensure that any session or cursor
+                // checked out during shutdown are not returned to the cache.
+                _engineEpoch.fetchAndAdd(1);
+                break;
+            case ShutdownReason::kRollbackToStable:
+                // Bump the rollback to stable epoch during a rollback to stable operation.
+                // This ensures that any stale sessions are not cached and that stale cursors are
+                // closed.
+                _rtsEpoch.fetchAndAdd(1);
+                break;
+        }
         _sessions.swap(swap);
     }
 }
@@ -203,7 +214,7 @@ WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession(const c
 
     // Outside of the cache partition lock, but on release will be put back on the cache
     return WiredTigerManagedSession(
-        std::make_unique<WiredTigerSession>(this, _epoch.load(), config));
+        std::make_unique<WiredTigerSession>(this, _engineEpoch.load(), _rtsEpoch.load(), config));
 }
 
 int32_t WiredTigerConnection::getSessionCacheMax() const {
@@ -214,16 +225,24 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
     invariant(session);
 
     BlockShutdown blockShutdown(this);
-
-    uint64_t currentEpoch = _epoch.load();
-    if (isShuttingDown() || session->_getEpoch() != currentEpoch) {
-        invariant(session->_getEpoch() <= currentEpoch);
+    uint64_t currentEngineEpoch = _engineEpoch.load();
+    uint64_t currentRtsEpoch = _rtsEpoch.load();
+    if (isShuttingDown() || session->_getEngineEpoch() != currentEngineEpoch ||
+        session->_getRtsEpoch() != currentRtsEpoch) {
+        invariant(session->_getEngineEpoch() <= currentEngineEpoch);
         // There is a race condition with clean shutdown, where the storage engine is ripped
         // from underneath OperationContexts, which are not "active" (i.e., do not have any
         // locks), but are just about to delete the recovery unit. See SERVER-16031 for more
         // information. Since shutting down the WT_CONNECTION will close all WT_SESSIONS, we
         // shouldn't also try to directly close this session.
         session->dropSessionBeforeDeleting();
+        return;
+    }
+
+    if (session->_getRtsEpoch() != currentRtsEpoch) {
+        // When the session is stale due to rollback to stable, we skip caching and return early.
+        // The session and cursor will be closed by the session wrapper.
+        invariant(session->_getRtsEpoch() <= currentRtsEpoch);
         return;
     }
 

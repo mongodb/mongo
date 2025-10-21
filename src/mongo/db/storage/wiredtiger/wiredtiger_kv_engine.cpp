@@ -66,6 +66,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_storage_options_config_string_flags_parser.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -965,7 +966,7 @@ void WiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
                        "Initial Data Timestamp"_attr = Timestamp(_initialDataTimestamp.load()),
                        "Oldest Timestamp"_attr = Timestamp(_oldestTimestamp.load()));
 
-    _connection->shuttingDown();
+    _connection->shuttingDown(WiredTigerConnection::ShutdownReason::kCleanShutdown);
 
     syncSizeInfo(/*syncToDisk=*/true);
 
@@ -2582,7 +2583,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(Interruptible
     int ret = 0;
 
     // Shut down the cache before rollback and restart afterwards.
-    _connection->shuttingDown();
+    _connection->shuttingDown(WiredTigerConnection::ShutdownReason::kRollbackToStable);
 
     // The rollback_to_stable operation requires all open cursors to be closed or reset before
     // the call, otherwise EBUSY will be returned. Occasionally, there could be an operation

@@ -83,6 +83,11 @@ public:
         WiredTigerConnection* _conn;
     };
 
+    enum class ShutdownReason {
+        kRollbackToStable,
+        kCleanShutdown,
+    };
+
     /**
      * Returns an RAII wrapper to a previously released session for reuse, or creates a new session.
      * This method must only be called while holding the global lock to avoid races with
@@ -117,14 +122,15 @@ public:
      * Free all cached sessions and ensures that previously acquired sessions will be freed on
      * release.
      */
-    void closeAll();
+    void closeAll(ShutdownReason reason);
 
     /**
      * Transitions the cache to shutting down mode. Any already released sessions are freed and
      * any sessions released subsequently are leaked. Must be called while holding the global
      * lock in exclusive mode to avoid races with getSession.
+     * @param reason Reason for shutting down.
      */
-    void shuttingDown();
+    void shuttingDown(ShutdownReason reason);
 
     /**
      * True when in the process of shutting down.
@@ -231,8 +237,15 @@ private:
     typedef std::vector<std::unique_ptr<WiredTigerSession>> SessionCache;
     SessionCache _sessions;
 
-    // Bumped when all open sessions need to be closed
-    AtomicWord<unsigned long long> _epoch;  // atomic so we can check it outside of the lock
+    // We track two epochs here:
+    //  Engine epoch: bumped when the storage engine reloads. If out of sync, we return without
+    //      caching the cursor and skip closing it, since session teardown will handle closure.
+    //  RTS (rollback-to-stable) epoch: bumped on rollback-to-stable. If out of sync, we must close
+    //      the cursor immediately without caching to prevent leaking the cursor since the cursor is
+    //      no longer tracked.
+    //  The engine epoch takes precedence over the RTS epoch and should be checked first.
+    AtomicWord<unsigned long long> _engineEpoch;  // atomic so we can check it outside of the lock
+    AtomicWord<unsigned long long> _rtsEpoch;     // atomic so we can check it outside of the lock
 
     // Mutex and cond var for waiting on prepare commit or abort.
     stdx::mutex _prepareCommittedOrAbortedMutex;

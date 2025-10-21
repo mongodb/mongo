@@ -133,7 +133,7 @@ TEST(WiredTigerConnectionTest, ReleaseCursorDuringShutdown) {
     // Simulates the cursor already being deleted during shutdown.
     WT_CURSOR* cursor = nullptr;
 
-    connection->shuttingDown();
+    connection->shuttingDown(WiredTigerConnection::ShutdownReason::kCleanShutdown);
     ASSERT(connection->isShuttingDown());
 
     auto tableIdWeDontCareAbout = WiredTigerUtil::genTableId();
@@ -153,7 +153,7 @@ TEST(WiredTigerConnectionTest, ReleaseSessionAfterShutdown) {
         WiredTigerManagedSession session = connection->getUninterruptibleSession();
         WT_CURSOR* cursor = nullptr;
 
-        connection->shuttingDown();
+        connection->shuttingDown(WiredTigerConnection::ShutdownReason::kCleanShutdown);
         ASSERT(connection->isShuttingDown());
         connection->restart();
 

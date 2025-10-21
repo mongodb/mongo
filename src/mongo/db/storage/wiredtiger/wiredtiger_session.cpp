@@ -42,9 +42,11 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection)
     : WiredTigerSession(connection, nullptr, nullptr) {}
 
 WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
-                                     uint64_t epoch,
+                                     uint64_t engineEpoch,
+                                     uint64_t rtsEpoch,
                                      const char* config)
-    : _epoch(epoch),
+    : _engineEpoch(engineEpoch),
+      _rtsEpoch(rtsEpoch),
       _session(connection->_openSession(this, nullptr, config)),
       _cursorGen(0),
       _cursorsOut(0),
@@ -54,7 +56,8 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
 WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      WT_EVENT_HANDLER* handler,
                                      const char* config)
-    : _epoch(0),
+    : _engineEpoch(0),
+      _rtsEpoch(0),
       _session(connection->_openSession(this, handler, config)),
       _cursorGen(0),
       _cursorsOut(0),
@@ -63,7 +66,8 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
 
 WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      StatsCollectionPermit& permit)
-    : _epoch(0),
+    : _engineEpoch(0),
+      _rtsEpoch(0),
       _session(connection->_openSession(this, permit, nullptr)),
       _cursorGen(0),
       _cursorsOut(0),
@@ -73,7 +77,8 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
 WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      WT_EVENT_HANDLER* handler,
                                      StatsCollectionPermit& permit)
-    : _epoch(0),
+    : _engineEpoch(0),
+      _rtsEpoch(0),
       _session(connection->_openSession(this, handler, permit, nullptr)),
       _cursorGen(0),
       _cursorsOut(0),
@@ -87,8 +92,12 @@ WiredTigerSession::~WiredTigerSession() {
     }
 }
 
-namespace {
-void _openCursor(WT_SESSION* session, StringData uri, const char* config, WT_CURSOR** cursorOut) {
+void WiredTigerSession::_openCursor(WT_SESSION* session,
+                                    StringData uri,
+                                    const char* config,
+                                    WT_CURSOR** cursorOut) {
+
+    // TODO: SERVER-110391 Add an invariant here to catch stale sessions.
     int ret = session->open_cursor(session, uri.data(), nullptr, config, cursorOut);
     if (ret == 0) {
         return;
@@ -116,7 +125,6 @@ void _openCursor(WT_SESSION* session, StringData uri, const char* config, WT_CUR
                         "error"_attr = status,
                         "message"_attr = kWTRepairMsg);
 }
-}  // namespace
 
 WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& config) {
     // Find the most recently used cursor
@@ -148,13 +156,21 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::strin
 
     // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
     // cursor from an earlier epoch.
-    if (_connection->isShuttingDown() || _getEpoch() < _connection->_epoch.load()) {
+    if (_connection->isShuttingDown() || _getEngineEpoch() < _connection->_engineEpoch.load()) {
         return;
     }
 
     invariant(_session);
     invariant(cursor);
     _cursorsOut--;
+
+    // Do not put the cursor back in cache if the rollback to stable epoch has changed since we
+    // acquired it. It is a stale cursor, so close it instead to ensure we do not leak cursors.
+    // Always check the engine epoch first as that takes precedence.
+    if (_getRtsEpoch() < _connection->_rtsEpoch.load()) {
+        invariantWTOK(cursor->close(cursor), _session);
+        return;
+    }
 
     invariantWTOK(cursor->reset(cursor), _session);
 
@@ -178,7 +194,7 @@ void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
 
     // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
     // cursor from an earlier epoch.
-    if (_connection->isShuttingDown() || _getEpoch() < _connection->_epoch.load()) {
+    if (_connection->isShuttingDown() || _getEngineEpoch() < _connection->_engineEpoch.load()) {
         return;
     }
 

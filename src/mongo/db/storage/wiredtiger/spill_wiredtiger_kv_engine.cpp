@@ -36,6 +36,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
@@ -214,7 +215,7 @@ void SpillWiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
         return;
     }
 
-    _connection->shuttingDown();
+    _connection->shuttingDown(WiredTigerConnection::ShutdownReason::kCleanShutdown);
 
     std::string closeConfig = "";
     if (memLeakAllowed) {

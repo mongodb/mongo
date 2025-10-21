@@ -74,9 +74,13 @@ public:
      * cached by the WiredTigerConnection.
      *
      * @param connection Wrapped WT connection
-     * @param epoch In which session cache cleanup epoch was this session instantiated.
+     * @param engineEpoch In which session epoch was this session instantiated.
+     * @param rtsEpoch In which rollback to stable epoch was this session instantiated.
      */
-    WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch, const char* config);
+    WiredTigerSession(WiredTigerConnection* connection,
+                      uint64_t engineEpoch,
+                      uint64_t rtsEpoch,
+                      const char* config);
 
     /**
      * Creates a new WT session on the specified connection. This session will not be cached.
@@ -291,12 +295,26 @@ private:
     // The cursor cache is a list of pairs that contain an ID and cursor
     typedef std::list<CachedCursor> CursorCache;
 
-    // Used internally by WiredTigerConnection
-    uint64_t _getEpoch() const {
-        return _epoch;
+    void _openCursor(WT_SESSION* session,
+                     StringData uri,
+                     const char* config,
+                     WT_CURSOR** cursorOut);
+
+    // Used internally by WiredTigerConnection to get the engine epoch
+    uint64_t _getEngineEpoch() const {
+        return _engineEpoch;
     }
 
-    const uint64_t _epoch;
+    // Used internally by WiredTigerConnection to get the rollback to stable epoch.
+    uint64_t _getRtsEpoch() const {
+        return _rtsEpoch;
+    }
+
+    // Ensure the engine epoch is checked before the roll back to stable epoch as it takes
+    // precedence.
+    const uint64_t _engineEpoch;
+    const uint64_t _rtsEpoch;
+
 
     WT_SESSION* _session;  // owned
     CursorCache _cursors;  // owned
