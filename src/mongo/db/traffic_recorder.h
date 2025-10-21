@@ -169,7 +169,7 @@ protected:
 
     std::shared_ptr<Recording> _getCurrentRecording() const;
 
-    AtomicWord<bool> _shouldRecord;
+    AtomicWord<bool> _shouldRecord = false;
 
     mongo::synchronized_value<std::shared_ptr<Recording>> _recording;
 };

@@ -14,7 +14,7 @@ TestData.enableTestCommands = false;
 // enableTestCommands not specified.
 assertFails({
     "setParameter": {
-        AlwaysRecordTraffic: "false",
+        requireApiVersion: "false",
     },
 });
 
@@ -23,7 +23,7 @@ assertFails({
     assertStarts({
         "setParameter": {
             enableTestCommands: v,
-            takeUnstableCheckpointOnShutdown: "false",
+            requireApiVersion: "false",
         },
     });
 });
@@ -33,7 +33,7 @@ assertFails({
     assertFails({
         "setParameter": {
             enableTestCommands: v,
-            AlwaysRecordTraffic: "false",
+            requireApiVersion: "false",
         },
     });
 });

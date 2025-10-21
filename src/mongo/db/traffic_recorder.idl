@@ -114,11 +114,3 @@ server_parameters:
         validator:
             callback: "validateTrafficRecordDestination"
         redact: false
-
-    AlwaysRecordTraffic:
-        description: "Start server with traffic recording enabled, and ensure all records are flushed. Test only."
-        test_only: true
-        set_at: startup
-        cpp_vartype: std::string
-        cpp_varname: gAlwaysRecordTraffic
-        redact: false

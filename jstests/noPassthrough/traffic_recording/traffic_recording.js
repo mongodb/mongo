@@ -19,27 +19,6 @@ function runTest(client, restartCommand) {
     const path = MongoRunner.toRealDir("$dataDir/traffic_recording/");
     mkdir(path);
 
-    if (!jsTest.isMongos(client)) {
-        TestData.enableTestCommands = false;
-        client = restartCommand({
-            trafficRecordingDirectory: path,
-            AlwaysRecordTraffic: "notARealPath",
-            enableTestCommands: 0,
-        });
-        TestData.enableTestCommands = true;
-        assert.eq(null, client, "AlwaysRecordTraffic and not enableTestCommands should fail");
-    }
-
-    client = restartCommand({
-        trafficRecordingDirectory: path,
-        AlwaysRecordTraffic: "notARealPath",
-        enableTestCommands: 1,
-    });
-    assert.neq(null, client, "AlwaysRecordTraffic and with enableTestCommands should suceed");
-    db = getDB(client);
-
-    assert(db.runCommand({"serverStatus": 1}).trafficRecording.running);
-
     client = restartCommand({trafficRecordingDirectory: path});
     db = getDB(client);
 
