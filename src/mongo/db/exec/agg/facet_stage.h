@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/tee_buffer.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 

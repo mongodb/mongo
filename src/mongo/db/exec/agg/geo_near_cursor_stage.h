@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/util/modules.h"
 
 #include <memory.h>
 

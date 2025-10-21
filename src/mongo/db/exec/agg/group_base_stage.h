@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/group_processor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::exec::agg {
 

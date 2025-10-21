@@ -33,6 +33,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/sequential_document_cache.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

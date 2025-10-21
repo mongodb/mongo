@@ -34,6 +34,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

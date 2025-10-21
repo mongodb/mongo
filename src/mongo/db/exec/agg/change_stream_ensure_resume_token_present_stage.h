@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/change_stream_check_resumability_stage.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

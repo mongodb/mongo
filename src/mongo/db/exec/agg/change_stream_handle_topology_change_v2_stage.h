@@ -45,6 +45,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/query/exec/merge_cursors_stage.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -248,66 +249,69 @@ public:
     static Timestamp extractTimestampFromDocument(const Document& input);
 
     // Test-only methods.
+    // TODO SERVER-112709: Remove 'MONO_MOD_PRIVATE' macros once
+    // 'document_source_change_stream_handle_topology_change_v2_test.cpp' is split into two tests.
     // ------------------
 
     /**
      * Returns the '_lastAllocationToShardsRequestTime' value for testing.
      */
-    Date_t getLastAllocationToShardsRequestTime_forTest() const {
+    MONGO_MOD_PRIVATE Date_t getLastAllocationToShardsRequestTime_forTest() const {
         return _lastAllocationToShardsRequestTime;
     }
 
     /**
      * Sets the value of '_lastAllocationToShardsRequestTime' value for testing.
      */
-    void setLastAllocationToShardsRequestTime_forTest(Date_t lastRequestTime) {
+    MONGO_MOD_PRIVATE void setLastAllocationToShardsRequestTime_forTest(Date_t lastRequestTime) {
         _lastAllocationToShardsRequestTime = lastRequestTime;
     }
 
     /**
      * Returns the '_segmentStartTimestamp' value for testing.
      */
-    const boost::optional<Timestamp>& getSegmentStartTimestamp_forTest() const {
+    MONGO_MOD_PRIVATE const boost::optional<Timestamp>& getSegmentStartTimestamp_forTest() const {
         return _segmentStartTimestamp;
     }
 
     /**
      * Sets the value of '_segmentStartTimestamp' value for testing.
      */
-    void setSegmentStartTimestamp_forTest(Timestamp ts) {
+    MONGO_MOD_PRIVATE void setSegmentStartTimestamp_forTest(Timestamp ts) {
         _segmentStartTimestamp = ts;
     }
 
     /**
      * Returns the '_segmentEndTimestamp' value for testing.
      */
-    const boost::optional<Timestamp>& getSegmentEndTimestamp_forTest() const {
+    MONGO_MOD_PRIVATE const boost::optional<Timestamp>& getSegmentEndTimestamp_forTest() const {
         return _segmentEndTimestamp;
     }
 
     /**
      * Sets the value of '_segmentEndTimestamp' value for testing.
      */
-    void setSegmentEndTimestamp_forTest(Timestamp ts) {
+    MONGO_MOD_PRIVATE void setSegmentEndTimestamp_forTest(Timestamp ts) {
         _segmentEndTimestamp = ts;
     }
 
     /**
      * Returns the current state.
      */
-    State getState_forTest() const {
+    MONGO_MOD_PRIVATE State getState_forTest() const {
         return _state;
     }
 
     /**
      * Injects the current start state for testing, and optionally validates the state transition.
      */
-    void setState_forTest(State state, bool validateStateTransition);
+    MONGO_MOD_PRIVATE void setState_forTest(State state, bool validateStateTransition);
 
     /**
      * Runs a single iteration of the internal state machine for testing.
      */
-    boost::optional<DocumentSource::GetNextResult> runGetNextStateMachine_forTest();
+    MONGO_MOD_PRIVATE boost::optional<DocumentSource::GetNextResult>
+    runGetNextStateMachine_forTest();
 
     // Maximum number of 'ShardNotFound' errors in a row that the stage will accept in the
     // 'FetchingStartingChangeStreamSegment' state before running into a tassert. This is a

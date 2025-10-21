@@ -39,6 +39,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -106,7 +107,11 @@ public:
         return bool(_timeSorter);
     }
 
-    const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
+    /**
+     * TODO SERVER-112710 Remove 'MONGO_MOD_PRIVATE' once document_source_sort_test.cpp is split
+     * into two parts.
+     */
+    MONGO_MOD_PRIVATE const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
         return _memoryTracker;
     }
 

@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <deque>

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -44,8 +45,11 @@ public:
     ListMqlEntitiesStage(StringData stageName,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          MqlEntityTypeEnum type);
-
-    static boost::intrusive_ptr<Stage> create_forTest(
+    /**
+     * TODO SERVER-112711: Remove 'MONGO_MOD_PRIVATE' once
+     * 'document_source_list_mql_entities_test.cpp' is split in two.
+     */
+    MONGO_MOD_PRIVATE static boost::intrusive_ptr<Stage> create_forTest(
         StringData stageName,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         MqlEntityTypeEnum type,

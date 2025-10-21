@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_list_sessions_gen.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::exec::agg {
 class ListLocalSessionsStage final : public Stage {

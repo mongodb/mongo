@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/granularity_rounder.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -65,10 +66,13 @@ public:
     Document getExplainOutput(
         const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    const MemoryUsageTracker* getMemoryTracker_forTest() const {
+    /**
+     * TODO SERVER-112710: Remove 'MONGO_MOD_PRIVATE' once document_source_bucket_auto_test.cpp is
+     * split into two parts.
+     */
+    MONGO_MOD_PRIVATE const MemoryUsageTracker* getMemoryTracker_forTest() const {
         return &_memoryTracker;
     }
-
 
 private:
     // struct for holding information about a bucket.

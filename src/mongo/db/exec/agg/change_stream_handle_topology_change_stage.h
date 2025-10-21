@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/merge_cursors_stage.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

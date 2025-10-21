@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_list_sampled_queries.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

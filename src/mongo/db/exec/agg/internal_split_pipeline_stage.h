@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::exec::agg {
 
