@@ -54,6 +54,9 @@
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -449,6 +452,45 @@ TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_LastAppliedEqualToLastCommi
 
     auto actualReplicationLag = getMajorityReplicationLag(operationContext());
     ASSERT_EQ(actualReplicationLag, Milliseconds(0));
+}
+
+TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocContainsTelemetryContextFromOpCtx) {
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+
+    ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+    configsvrReshardCollection.setDbName(nss().dbName());
+
+    auto telemetryCtx = otel::traces::Span::createTelemetryContext();
+    auto& telemetryCtxHolder = otel::TelemetryContextHolder::get(operationContext());
+
+    telemetryCtxHolder.set(telemetryCtx);
+
+    ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
+        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+    ASSERT_TRUE(coordinatorDoc.getTelemetryContext().has_value());
+    ASSERT_BSONOBJ_EQ(coordinatorDoc.getTelemetryContext().value(),
+                      otel::TelemetryContextSerializer::toBSON(telemetryCtx));
+}
+
+TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocDoesNotContainTelemetryContextWhenNotSet) {
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+
+    ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+    configsvrReshardCollection.setDbName(nss().dbName());
+
+    ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
+        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+    ASSERT_FALSE(coordinatorDoc.getTelemetryContext().has_value());
 }
 
 TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_LastAppliedLessThanLastCommitted) {

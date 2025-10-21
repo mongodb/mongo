@@ -33,6 +33,8 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/unittest/unittest.h"
 namespace mongo {
 namespace resharding {
@@ -266,6 +268,36 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 
     // We do not need to add anything to the result because we do not validate the result on insert.
     ASSERT_DOES_NOT_THROW(resharding::assertResultIsValidForUpdatesAndDeletes(request, result));
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       CreateReshardingFieldsUpdateForOriginalNssAddsTelemetryContext) {
+    auto opCtx = makeOperationContext();
+
+    ReshardingCoordinatorDocument coordinatorDoc;
+    // Set the common resharding metadata.
+    NamespaceString sourceNss = NamespaceString::createNamespaceString_forTest("db.foo");
+    NamespaceString tempNss =
+        NamespaceString::createNamespaceString_forTest("db.system.resharding");
+    CommonReshardingMetadata commonReshardingMetadata(
+        UUID::gen(), sourceNss, UUID::gen(), tempNss, KeyPattern(BSON("tempShardKey" << 1)));
+    commonReshardingMetadata.setStartTime(Date_t::now());
+    commonReshardingMetadata.setPerformVerification(true);
+
+    coordinatorDoc.setCommonReshardingMetadata(std::move(commonReshardingMetadata));
+
+    coordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+
+    // Set a telemetry context
+    auto telemetryContext = otel::traces::Span::createTelemetryContext();
+    coordinatorDoc.setTelemetryContext(otel::TelemetryContextSerializer::toBSON(telemetryContext));
+
+    auto updateBSON = createReshardingFieldsUpdateForOriginalNss(
+        opCtx.get(), coordinatorDoc, OID::gen(), Timestamp(1, 2));
+
+    auto setFields = updateBSON.getObjectField("$set");
+    auto reshardingFields = setFields.getObjectField("reshardingFields");
+    ASSERT(reshardingFields.hasField("telemetryContext"));
 }
 
 }  // namespace resharding
