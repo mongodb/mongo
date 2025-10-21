@@ -1590,10 +1590,12 @@ mongo_cc_library(
     srcs = [
         "traffic_recorder.cpp",
         "traffic_recorder_gen",
+        "traffic_recorder_session_utils.cpp",
         "traffic_recorder_validators.cpp",
     ],
     hdrs = [
         "traffic_recorder.h",
+        "traffic_recorder_session_utils.h",
         "traffic_recorder_validators.h",
     ],
     deps = [

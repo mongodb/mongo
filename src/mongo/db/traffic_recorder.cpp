@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
+#include "mongo/db/traffic_recorder_session_utils.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -324,10 +325,7 @@ std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_makeRecording(
     return std::make_shared<Recording>(options, tickSource);
 }
 
-void TrafficRecorder::start(
-    const StartTrafficRecording& options,
-    ServiceContext* svcCtx,
-    const std::vector<std::pair<transport::SessionId, std::string>>& sessions) {
+void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
     invariant(!shouldAlwaysRecordTraffic);
 
     uassert(ErrorCodes::BadValue,
@@ -341,19 +339,23 @@ void TrafficRecorder::start(
 
         (*rec)->run();
     }
-    _shouldRecord.store(true);
     {
+        // TODO SERVER-111903: Ensure all session starts are observed exactly once. A session
+        // starting just after this getActiveSessions call, but before _shouldRecord is updated
+        // will not report session started.
+        auto sessions = getActiveSessions(svcCtx);
         // Record SessionStart events if exists any active session.
         for (const auto& [id, session] : sessions) {
             observe(id, session, Message(), svcCtx, EventType::kSessionStart);
         }
     }
+    _shouldRecord.store(true);
 }
 
-void TrafficRecorder::stop(
-    ServiceContext* svcCtx,
-    const std::vector<std::pair<transport::SessionId, std::string>>& sessions) {
+void TrafficRecorder::stop(ServiceContext* svcCtx) {
     invariant(!shouldAlwaysRecordTraffic);
+
+    auto sessions = getActiveSessions(svcCtx);
     // Record SessionEnd events if exists any active session.
     for (const auto& [id, session] : sessions) {
         observe(id, session, Message(), svcCtx, EventType::kSessionEnd);

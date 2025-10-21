@@ -87,13 +87,9 @@ public:
     virtual ~TrafficRecorder();
 
     // Start and stop block until the associate operation has succeeded or failed
-    //
     // On failure these methods throw
-    void start(const StartTrafficRecording& options,
-               ServiceContext* svcCtx,
-               const std::vector<std::pair<transport::SessionId, std::string>>& sessions);
-    void stop(ServiceContext* svcCtx,
-              const std::vector<std::pair<transport::SessionId, std::string>>& sessions);
+    void start(const StartTrafficRecording& options, ServiceContext* svcCtx);
+    void stop(ServiceContext* svcCtx);
 
     void observe(uint64_t id,
                  const std::string& session,
