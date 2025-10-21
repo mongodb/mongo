@@ -45,7 +45,5 @@ server_parameters:
         description: "Skip authentication for mongod->search-index-server connections, even if auth is enabled on mongod"
         set_at: [startup]
         cpp_varname: "globalSearchIndexParams.skipAuthToSearchIndexServer"
-        # The search index server doesn't support our authentication protocol at this time,
-        # so this is `true` by default.
-        default: true
+        default: false
         redact: false

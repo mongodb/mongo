@@ -111,11 +111,19 @@ function listSearchIndexPrivilegeWorks(conn) {
         shards: 1,
         keyFile: "jstests/libs/key1",
         other: {
-            mongosOptions: {setParameter: {searchIndexManagementHostAndPort: mockConn.host}},
+            mongosOptions: {
+                setParameter: {
+                    searchIndexManagementHostAndPort: mockConn.host,
+                    skipAuthenticationToSearchIndexManagementServer: true,
+                },
+            },
             rs0: {
                 // Need the shard to have a stable secondary to test commands against.
                 nodes: [{}, {rsConfig: {priority: 0}}],
-                setParameter: {searchIndexManagementHostAndPort: mockConn.host},
+                setParameter: {
+                    searchIndexManagementHostAndPort: mockConn.host,
+                    skipAuthenticationToSearchIndexManagementServer: true,
+                },
             },
         }
     });
@@ -131,7 +139,12 @@ function listSearchIndexPrivilegeWorks(conn) {
     const rst = new ReplSetTest({
         nodes: 1,
         keyFile: "jstests/libs/key1",
-        nodeOptions: {setParameter: {searchIndexManagementHostAndPort: mockConn.host}}
+        nodeOptions: {
+            setParameter: {
+                searchIndexManagementHostAndPort: mockConn.host,
+                skipAuthenticationToSearchIndexManagementServer: true,
+            },
+        },
     });
     rst.startSet();
     rst.initiate();
