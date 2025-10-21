@@ -456,9 +456,10 @@ private:
                          HostAndPort hostAndPort,
                          NamespaceString cursorNss,
                          CursorId establishedCursorId,
-                         std::string shardId,
+                         ShardId shardId,
                          const ShardTag& tag,
-                         bool partialResultsReturned);
+                         bool partialResultsReturned,
+                         Shard::OwnerRetryStrategy retryStrategy);
 
         /**
          * Returns the resolved host and port on which the remote cursor resides.
@@ -532,12 +533,18 @@ private:
         // The buffer of results that have been retrieved but not yet returned to the caller.
         std::deque<BSONObj> docBuffer;
 
+        // Set to 'true' when at least one request is outstanding.
+        bool outstandingRequest = false;
+
         // Is valid if there is currently a pending request to this remote.
         executor::TaskExecutor::CallbackHandle cbHandle;
 
         // Set to an error status if there is an error retrieving a response from this remote or if
         // the command result contained an error.
         Status status = Status::OK();
+
+        // Holds the retry strategy responsible for retrying failed requests.
+        Shard::OwnerRetryStrategy retryStrategy;
     };
 
     using RemoteCursorPtr = boost::intrusive_ptr<RemoteCursorData>;
@@ -747,6 +754,10 @@ private:
                                        OperationContext* opCtx,
                                        const std::vector<RemoteCursorPtr>& remotes);
 
+    Status _sendRequestWithRetries(WithLock,
+                                   const executor::RemoteCommandRequest& request,
+                                   const RemoteCursorPtr& remote);
+
     /**
      * Schedules a killCursors command to be run on all remote hosts that have open cursors.
      */
@@ -933,6 +944,8 @@ private:
     };
 
     boost::optional<CompletePromiseFuture> _killCompleteInfo;
+
+    CancellationSource _cancellationSource;
 };
 
 }  // namespace mongo

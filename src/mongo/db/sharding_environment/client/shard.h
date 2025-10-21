@@ -119,9 +119,28 @@ public:
     };
 
     enum class RetryPolicy {
+        /**
+         * Safe to retry the command if a retryable error occurs.
+         */
         kIdempotent,
+        /**
+         * Safe to retry the command under the same conditions as `kIdempotent`,
+         * and additionally safe to retry if the command fails with CursorInvalidated.
+         */
         kIdempotentOrCursorInvalidated,
+        /**
+         * Not safe to retry the command, except in the case of a NoPrimary error.
+         */
         kNotIdempotent,
+        /**
+         * Not safe to retry unless the response includes a retryable error label,
+         * indicating that effective execution never began.
+         * TODO (SERVER-111380) Try to merge kNotIdempotent and kStrictlyNotIdempotent
+         */
+        kStrictlyNotIdempotent,
+        /**
+         * The command is never retried under any circumstances.
+         */
         kNoRetry,
     };
 
@@ -134,8 +153,36 @@ public:
      */
     class RetryStrategy final : public mongo::RetryStrategy {
     public:
+        /**
+         * Constructs a RetryStrategy object given a shard object and a retryPolicy.
+         * Note that, if this constructor is used, the returned instance of this class cannot
+         * outlive the shard passed in as it internally holds a pointer to the shard.
+         */
         RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy);
+
+        /**
+         * Same as the previous constructor but will use a custom 'maxRetryAttempts' parameter
+         * instead of the default one.
+         */
         RetryStrategy(const Shard& shard,
+                      Shard::RetryPolicy retryPolicy,
+                      std::int32_t maxRetryAttempts);
+
+        /**
+         * Constructs a RetryStrategy object given the connectionType and the shardState of a shard.
+         * This is useful if we don't want or can't provide a shard object, mainly for performance
+         * reasons.
+         */
+        RetryStrategy(ConnectionString::ConnectionType connectionType,
+                      ShardSharedStateCache::State& shardState,
+                      Shard::RetryPolicy retryPolicy);
+
+        /**
+         * Same as the previous constructor but will use a custom 'maxRetryAttempts' parameter
+         * instead of the default one.
+         */
+        RetryStrategy(ConnectionString::ConnectionType connectionType,
+                      ShardSharedStateCache::State& shardState,
                       Shard::RetryPolicy retryPolicy,
                       std::int32_t maxRetryAttempts);
 
@@ -158,8 +205,7 @@ public:
         void _recordOperationAttempted();
         void _recordOperationNotOverloaded();
 
-        RetryStrategy(const Shard& shard,
-                      Shard::RetryPolicy retryPolicy,
+        RetryStrategy(AdaptiveRetryStrategy::RetryCriteria retryCriteria,
                       AdaptiveRetryStrategy::RetryParameters parameters,
                       ShardSharedStateCache::State& sharedState);
 
@@ -178,13 +224,28 @@ public:
     class OwnerRetryStrategy final : public mongo::RetryStrategy {
     public:
         OwnerRetryStrategy(std::shared_ptr<Shard> shard, Shard::RetryPolicy retryPolicy)
-            : _underlyingStrategy{*shard, retryPolicy}, _owner{std::move(shard)} {}
+            : _underlyingStrategy{*shard, retryPolicy},
+              _stateOwner{shard->_sharedState},
+              _shardOwner{std::move(shard)} {}
 
         OwnerRetryStrategy(std::shared_ptr<Shard> shard,
                            Shard::RetryPolicy retryPolicy,
                            std::int32_t maxRetryAttempts)
             : _underlyingStrategy{*shard, retryPolicy, maxRetryAttempts},
-              _owner{std::move(shard)} {}
+              _stateOwner{shard->_sharedState},
+              _shardOwner{std::move(shard)} {}
+
+        OwnerRetryStrategy(ConnectionString::ConnectionType connectionType,
+                           std::shared_ptr<ShardSharedStateCache::State> shardState,
+                           Shard::RetryPolicy retryPolicy)
+            : _underlyingStrategy{connectionType, *shardState, retryPolicy},
+              _stateOwner{std::move(shardState)} {}
+        OwnerRetryStrategy(ConnectionString::ConnectionType connectionType,
+                           std::shared_ptr<ShardSharedStateCache::State> shardState,
+                           Shard::RetryPolicy retryPolicy,
+                           std::int32_t maxRetryAttempts)
+            : _underlyingStrategy{connectionType, *shardState, retryPolicy, maxRetryAttempts},
+              _stateOwner{std::move(shardState)} {}
 
         bool recordFailureAndEvaluateShouldRetry(
             Status s,
@@ -211,7 +272,8 @@ public:
 
     private:
         Shard::RetryStrategy _underlyingStrategy;
-        std::shared_ptr<Shard> _owner;
+        std::shared_ptr<ShardSharedStateCache::State> _stateOwner;
+        std::shared_ptr<Shard> _shardOwner;
     };
 
     virtual ~Shard() = default;

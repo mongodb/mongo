@@ -29,6 +29,7 @@
 
 #include "mongo/db/sharding_environment/client/shard.h"
 
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/retry_strategy.h"
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
@@ -52,10 +53,34 @@
 namespace mongo {
 namespace {
 
-auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolicy) {
+auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolicy)
+    -> AdaptiveRetryStrategy::RetryCriteria {
     return [retryPolicy, shard = &shard](Status s, std::span<const std::string> errorLabels) {
         return shard->isRetriableError(s.code(), errorLabels, retryPolicy);
     };
+}
+
+auto makeRetryCriteriaForConnectionType(ConnectionString::ConnectionType connectionType,
+                                        Shard::RetryPolicy retryPolicy)
+    -> AdaptiveRetryStrategy::RetryCriteria {
+    tassert(10944501,
+            str::stream() << "Unexpected ConnectionString type "
+                          << ConnectionString::typeToString(connectionType),
+            connectionType == ConnectionString::ConnectionType::kLocal ||
+                connectionType == ConnectionString::ConnectionType::kReplicaSet);
+
+    switch (connectionType) {
+        case ConnectionString::ConnectionType::kLocal:
+            return [retryPolicy](Status s, std::span<const std::string> errorLabels) {
+                return Shard::localIsRetriableError(s.code(), errorLabels, retryPolicy);
+            };
+        case ConnectionString::ConnectionType::kReplicaSet:
+            return [retryPolicy](Status s, std::span<const std::string> errorLabels) {
+                return Shard::remoteIsRetriableError(s.code(), errorLabels, retryPolicy);
+            };
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 auto backoffFromMaxRetryAttempts(std::int32_t maxRetryAttempts) {
@@ -110,24 +135,36 @@ StatusWith<Shard::CommandResponse> runCommandWithRetryStrategy(Interruptible* in
 }  // namespace
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy)
-    : RetryStrategy{shard,
-                    retryPolicy,
+    : RetryStrategy{makeRetryCriteriaForShard(shard, retryPolicy),
                     DefaultRetryStrategy::getRetryParametersFromServerParameters(),
                     *shard._sharedState} {}
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard,
                                     Shard::RetryPolicy retryPolicy,
                                     std::int32_t maxRetryAttempts)
-    : RetryStrategy{
-          shard, retryPolicy, backoffFromMaxRetryAttempts(maxRetryAttempts), *shard._sharedState} {}
+    : RetryStrategy{makeRetryCriteriaForShard(shard, retryPolicy),
+                    backoffFromMaxRetryAttempts(maxRetryAttempts),
+                    *shard._sharedState} {}
 
-Shard::RetryStrategy::RetryStrategy(const Shard& shard,
+Shard::RetryStrategy::RetryStrategy(ConnectionString::ConnectionType connectionType,
+                                    ShardSharedStateCache::State& state,
+                                    Shard::RetryPolicy retryPolicy)
+    : RetryStrategy{makeRetryCriteriaForConnectionType(connectionType, retryPolicy),
+                    DefaultRetryStrategy::getRetryParametersFromServerParameters(),
+                    state} {}
+
+Shard::RetryStrategy::RetryStrategy(ConnectionString::ConnectionType connectionType,
+                                    ShardSharedStateCache::State& state,
                                     Shard::RetryPolicy retryPolicy,
+                                    std::int32_t maxRetryAttempts)
+    : RetryStrategy{makeRetryCriteriaForConnectionType(connectionType, retryPolicy),
+                    backoffFromMaxRetryAttempts(maxRetryAttempts),
+                    state} {}
+
+Shard::RetryStrategy::RetryStrategy(AdaptiveRetryStrategy::RetryCriteria retryCriteria,
                                     AdaptiveRetryStrategy::RetryParameters parameters,
                                     ShardSharedStateCache::State& sharedState)
-    : _underlyingStrategy{sharedState.retryBudget,
-                          makeRetryCriteriaForShard(shard, retryPolicy),
-                          parameters},
+    : _underlyingStrategy{sharedState.retryBudget, std::move(retryCriteria), parameters},
       _stats{&sharedState.stats} {}
 
 bool Shard::RetryStrategy::recordFailureAndEvaluateShouldRetry(
@@ -296,6 +333,10 @@ bool Shard::localIsRetriableError(ErrorCodes::Error code,
         case Shard::RetryPolicy::kNotIdempotent: {
             return false;
         } break;
+
+        case RetryPolicy::kStrictlyNotIdempotent: {
+            return containsRetryableLabels(errorLabels);
+        } break;
     }
 
     MONGO_UNREACHABLE;
@@ -324,6 +365,10 @@ bool Shard::remoteIsRetriableError(ErrorCodes::Error code,
 
         case RetryPolicy::kNotIdempotent: {
             return ErrorCodes::isNotPrimaryError(code);
+        } break;
+
+        case RetryPolicy::kStrictlyNotIdempotent: {
+            return containsRetryableLabels(errorLabels);
         } break;
     }
 

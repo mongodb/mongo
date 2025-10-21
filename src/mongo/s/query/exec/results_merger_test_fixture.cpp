@@ -55,25 +55,12 @@ void ResultsMergerTestFixture::setUp() {
 
     configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
-    std::vector<ShardType> shards;
-
+    // Setup the shards
+    std::vector<std::tuple<ShardId, HostAndPort>> shardInfos;
     for (size_t i = 0; i < kTestShardIds.size(); i++) {
-        ShardType shardType;
-        shardType.setName(kTestShardIds[i].toString());
-        shardType.setHost(kTestShardHosts[i].toString());
-
-        shards.push_back(shardType);
-
-        std::unique_ptr<RemoteCommandTargeterMock> targeter(
-            std::make_unique<RemoteCommandTargeterMock>());
-        targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHosts[i]));
-        targeter->setFindHostReturnValue(kTestShardHosts[i]);
-
-        targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHosts[i]),
-                                               std::move(targeter));
+        shardInfos.emplace_back(std::make_tuple(kTestShardIds[i], kTestShardHosts[i]));
     }
-
-    setupShards(shards);
+    addRemoteShards(shardInfos);
 
     CurOp::get(operationContext())->ensureStarted();
 }

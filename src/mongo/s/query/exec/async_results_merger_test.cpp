@@ -114,6 +114,23 @@ NextHighWaterMarkDeterminingStrategyPtr buildNextHighWaterMarkDeterminingStrateg
         recognizeControlEvents);
 }
 
+BSONObj makeResponseObjWithErrorLabels(int errorCode,
+                                       StringData reason,
+                                       std::vector<StringData> errorLabels) {
+    BSONObjBuilder responseBuilder;
+    responseBuilder.append("ok", 0);
+    responseBuilder.append("code", errorCode);
+    responseBuilder.append("errmsg", reason);
+
+    BSONArrayBuilder arr(responseBuilder.subarrayStart("errorLabels"));
+    for (const auto& label : errorLabels) {
+        arr.append(label);
+    }
+    arr.done();
+
+    return responseBuilder.obj();
+}
+
 TEST_F(AsyncResultsMergerTest, ResponseReceivedWhileDetachedFromOperationContext) {
     std::vector<RemoteCursor> cursors;
     cursors.push_back(
@@ -4151,6 +4168,388 @@ TEST(NextHighWaterMarkDeterminingStrategyTest,
                      << "control1");
     next = (*nextHighWaterMarkDeterminingStrategy)(doc, next);
     ASSERT_BSONOBJ_EQ(pbrt, next.firstElement().Obj());
+}
+
+TEST_F(AsyncResultsMergerTest, DontRetryRequestIfErrorLabelsDontIncludeARetryableError) {
+
+    const auto backOffDelayMs = 1000;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
+
+    const BSONObj response = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "dummy msg", {ErrorLabel::kSystemOverloadedError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Exhaust the first shard
+    {
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        responses.emplace_back(kTestNss, CursorId(0), batch1);
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    // Force a failure on the response including a retryable label
+    scheduleNetworkResponseObjs({response});
+
+    // Verify the request doesn't get retried
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    // Verify the request is not retried with a backoff delay either
+    advanceTime(Milliseconds(backOffDelayMs));
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    ASSERT_TRUE(arm->ready());
+
+    executor()->waitForEvent(readyEvent);
+
+    auto statusWithNext = arm->nextReady();
+    ASSERT(!statusWithNext.isOK());
+    ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::HostUnreachable);
+    ASSERT_STRING_CONTAINS(statusWithNext.getStatus().reason(), "dummy msg");
+
+    // Required to kill the 'arm' on error before destruction.
+    auto killFuture = arm->kill(operationContext());
+    killFuture.wait();
+}
+
+TEST_F(AsyncResultsMergerTest,
+       RetryRequestIfErrorLabelsIncludesRetryableErrorUntilMaxAttemptsAreReached) {
+
+    const int maxAttempts = 3;
+    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
+                                                                maxAttempts);
+
+    const BSONObj response = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "dummy msg", {ErrorLabel::kRetryableError});
+
+    {
+        auto shardState = getShardState(kTestShardIds[0]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(0, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    {
+        auto shardState = getShardState(kTestShardIds[1]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(0, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Exhaust the first shard
+    {
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        responses.emplace_back(kTestNss, CursorId(0), batch1);
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    for (auto i = 0; i < maxAttempts; ++i) {
+        // Force a failure on the response including a retryable label
+        scheduleNetworkResponseObjs({response});
+
+        // Verify the request doesn't get immediately retried because 'SystemOverloadedError' label
+        // implies entering in an exponential backoff delay.
+        ASSERT_TRUE(networkHasReadyRequests());
+    }
+
+    // We should stop retrying at 'maxAttempts'.
+    scheduleNetworkResponseObjs({response});
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    ASSERT_TRUE(arm->ready());
+
+    executor()->waitForEvent(readyEvent);
+
+    auto statusWithNext = arm->nextReady();
+    ASSERT(!statusWithNext.isOK());
+    ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::HostUnreachable);
+    ASSERT_STRING_CONTAINS(statusWithNext.getStatus().reason(), "dummy msg");
+
+    {
+        auto shardState = getShardState(kTestShardIds[0]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(1, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    {
+        auto shardState = getShardState(kTestShardIds[1]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(1, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    // Required to kill the 'arm' on error before destruction.
+    auto killFuture = arm->kill(operationContext());
+    killFuture.wait();
+}
+
+TEST_F(AsyncResultsMergerTest,
+       RetryRequestIfErrorLabelsIncludesRetryableErrorAndCompleteSuccessfully) {
+
+    const int maxAttempts = 3;
+    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
+                                                                maxAttempts);
+
+    const BSONObj responseToRetry = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "dummy msg", {ErrorLabel::kRetryableError});
+
+    {
+        auto shardState = getShardState(kTestShardIds[0]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(0, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    {
+        auto shardState = getShardState(kTestShardIds[1]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(0, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Exhaust the first shard
+    {
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        responses.emplace_back(kTestNss, CursorId(0), batch1);
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    for (auto i = 0; i < maxAttempts; ++i) {
+        // Force a failure on the response including a retryable label
+        scheduleNetworkResponseObjs({responseToRetry});
+
+        // Verify the request doesn't get immediately retried because 'SystemOverloadedError' label
+        // implies entering in an exponential backoff delay.
+        ASSERT_TRUE(networkHasReadyRequests());
+    }
+
+    // Finally return a successful response
+    {
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+        responses.emplace_back(kTestNss, CursorId(0), batch2);
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    // ARM is ready to return the results.
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+
+    // ARM returns results from second shard immediately.
+    executor()->waitForEvent(readyEvent);
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
+
+
+    {
+        auto shardState = getShardState(kTestShardIds[0]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(1, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    {
+        auto shardState = getShardState(kTestShardIds[1]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(1, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+}
+
+TEST_F(AsyncResultsMergerTest,
+       RetryRequestAndBackoffIfErrorLabelsIncludesRetryableErrorAndSystemOverloadedError) {
+
+    const BSONObj response = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable,
+        "dummy msg",
+        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError});
+
+    const auto backOffDelayMs = 1000;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
+
+    const int maxAttempts = 3;
+    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
+                                                                maxAttempts);
+
+    {
+        auto shardState = getShardState(kTestShardIds[0]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(0, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    {
+        auto shardState = getShardState(kTestShardIds[1]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(0, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Exhaust the first shard
+    {
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        responses.emplace_back(kTestNss, CursorId(0), batch1);
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    // Force failures on the response including a retryable label
+    for (auto i = 0; i < maxAttempts; ++i) {
+        scheduleNetworkResponseObjs({response});
+
+        // Verify the request doesn't get immediately retried because 'SystemOverloadedError' label
+        // implies entering in an exponential backoff delay.
+        ASSERT_FALSE(networkHasReadyRequests());
+
+        advanceTime(Milliseconds(backOffDelayMs - 1));
+        ASSERT_FALSE(networkHasReadyRequests());
+
+        advanceTime(Milliseconds(backOffDelayMs));
+        ASSERT_TRUE(networkHasReadyRequests());
+    }
+
+    // We should stop retrying at 'maxAttempts'.
+    scheduleNetworkResponseObjs({response});
+
+    advanceTime(Milliseconds(backOffDelayMs));
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    ASSERT_TRUE(arm->ready());
+
+    executor()->waitForEvent(readyEvent);
+
+    auto statusWithNext = arm->nextReady();
+    ASSERT(!statusWithNext.isOK());
+    ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::HostUnreachable);
+    ASSERT_STRING_CONTAINS(statusWithNext.getStatus().reason(), "dummy msg");
+
+    // Required to kill the 'arm' on error before destruction.
+    auto killFuture = arm->kill(operationContext());
+    killFuture.wait();
+
+    {
+        auto shardState = getShardState(kTestShardIds[0]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(1, stats.numOperationsAttempted.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(0, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(0, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(0, stats.totalBackoffTimeMillis.load());
+    }
+
+    {
+        auto shardState = getShardState(kTestShardIds[1]);
+        auto& [_, stats] = *shardState;
+
+        ASSERT_EQ(1, stats.numOperationsAttempted.load());
+        ASSERT_EQ(1, stats.numOperationsRetriedAtLeastOnceDueToOverload.load());
+        ASSERT_EQ(0, stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.load());
+        ASSERT_EQ(3, stats.numRetriesDueToOverloadAttempted.load());
+        ASSERT_EQ(maxAttempts + 1, stats.numOverloadErrorsReceived.load());
+        ASSERT_EQ(backOffDelayMs * maxAttempts, stats.totalBackoffTimeMillis.load());
+    }
 }
 
 }  // namespace

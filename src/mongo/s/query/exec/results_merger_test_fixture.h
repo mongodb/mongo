@@ -389,6 +389,11 @@ protected:
         return guard->hasReadyRequests();
     }
 
+    void advanceTime(Milliseconds advance) {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + advance);
+    }
+
     void scheduleErrorResponse(executor::TaskExecutor::ResponseStatus rs) {
         invariant(!rs.isOK());
         rs.elapsed = Milliseconds(0);

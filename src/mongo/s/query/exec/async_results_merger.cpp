@@ -42,6 +42,7 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
@@ -124,6 +125,20 @@ Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Resp
         return error.getStatus()->withContext(generateReason(error.getCursorId()));
     }
     return Status::OK();
+}
+
+Shard::OwnerRetryStrategy buildRetryStrategy(OperationContext* opCtx, const ShardId& shardId) {
+    auto connType = std::invoke([&]() -> ConnectionString::ConnectionType {
+        auto shState = ShardingState::get(opCtx);
+        if (shState->enabled() && shState->shardId() == shardId) {
+            return ConnectionString::ConnectionType::kLocal;
+        }
+        return ConnectionString::ConnectionType::kReplicaSet;
+    });
+
+    return Shard::OwnerRetryStrategy(connType,
+                                     ShardSharedStateCache::get(opCtx).getShardState(shardId),
+                                     Shard::RetryPolicy::kStrictlyNotIdempotent);
 }
 
 }  // namespace
@@ -553,15 +568,17 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
                                                                      const RemoteCursor& rc,
                                                                      const ShardTag& tag) {
     RemoteCursorData::IdType id = ++_nextId;
+    ShardId shardId{std::string{rc.getShardId()}};
 
     auto remote =
         make_intrusive<RemoteCursorData>(id,
                                          rc.getHostAndPort(),
                                          rc.getCursorResponse().getNSS(),
                                          rc.getCursorResponse().getCursorId(),
-                                         std::string{rc.getShardId()},
+                                         shardId,
                                          tag,
-                                         rc.getCursorResponse().getPartialResultsReturned());
+                                         rc.getCursorResponse().getPartialResultsReturned(),
+                                         buildRetryStrategy(_opCtx, shardId));
 
     // We don't check the return value of _addBatchToBuffer here; if there was an error, it will be
     // stored in the remote and the first call to ready() will return true.
@@ -866,7 +883,7 @@ void AsyncResultsMerger::_updateHighWaterMark(const BSONObj& value) {
 BSONObj AsyncResultsMerger::_makeRequest(WithLock,
                                          const RemoteCursorData& remote,
                                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const {
-    tassert(11052306, "Expected CallbackHandle to not be valid", !remote.cbHandle.isValid());
+    tassert(11052306, "Expected to not have outstanding requests", !remote.outstandingRequest);
 
     GetMoreCommandRequest getMoreRequest(remote.cursorId, std::string{remote.cursorNss.coll()});
     getMoreRequest.setBatchSize(_params.getBatchSize());
@@ -1007,7 +1024,7 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
             return remote->status;
         }
 
-        if (!remote->hasNext() && !remote->exhausted() && !remote->cbHandle.isValid()) {
+        if (!remote->hasNext() && !remote->exhausted() && !remote->outstandingRequest) {
             // If this remote is not exhausted and there is no outstanding request for it, schedule
             // work to retrieve the next batch.
             remotes.push_back(remote);
@@ -1015,6 +1032,40 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
     }
 
     return _scheduleGetMoresForRemotes(lk, _opCtx, remotes);
+}
+
+Status AsyncResultsMerger::_sendRequestWithRetries(WithLock lk,
+                                                   const executor::RemoteCommandRequest& request,
+                                                   const RemoteCursorPtr& remote) {
+
+    auto callbackStatus = _executor->scheduleRemoteCommand(
+        request, [self = shared_from_this(), remote /* intrusive_ptr copy! */](auto const& cbData) {
+            // Parse response outside of the mutex.
+            auto parsedResponse = [&](const auto& cbData) -> StatusWith<CursorResponse> {
+                if (!cbData.response.isOK()) {
+                    return cbData.response.status;
+                }
+                auto cursorResponseStatus =
+                    _parseCursorResponse(cbData.response.data, remote->cursorId);
+                if (!cursorResponseStatus.isOK()) {
+                    return cursorResponseStatus.getStatus().withContext(
+                        "Error on remote shard " + remote->shardHostAndPort.toString());
+                }
+                return std::move(cursorResponseStatus.getValue());
+            }(cbData);
+
+            // Handle the response and update the remote's status under the mutex.
+            stdx::lock_guard<stdx::mutex> lk(self->_mutex);
+            self->_handleBatchResponse(lk, cbData, parsedResponse, remote);
+        });
+
+    if (!callbackStatus.isOK()) {
+        return callbackStatus.getStatus();
+    }
+
+    remote->outstandingRequest = true;
+    remote->cbHandle = callbackStatus.getValue();
+    return Status::OK();
 }
 
 Status AsyncResultsMerger::_scheduleGetMoresForRemotes(
@@ -1052,38 +1103,11 @@ Status AsyncResultsMerger::_scheduleGetMoresForRemotes(
     }
 
     for (size_t i = 0; i < executorRequests.size(); i++) {
-        auto& remote = remotes[i];
-        // Make a copy of the remote's cursorId here while holding the mutex. The copy is passed
-        // into the lambda so the cursorId can be accessed without holding the mutex.
-        const auto cursorId = remote->cursorId;
-        auto callbackStatus = _executor->scheduleRemoteCommand(
-            executorRequests[i],
-            [self = shared_from_this(), cursorId, remote /* intrusive_ptr copy! */](
-                auto const& cbData) {
-                // Parse response outside of the mutex.
-                auto parsedResponse = [&](const auto& cbData) -> StatusWith<CursorResponse> {
-                    if (!cbData.response.isOK()) {
-                        return cbData.response.status;
-                    }
-                    auto cursorResponseStatus =
-                        _parseCursorResponse(cbData.response.data, cursorId);
-                    if (!cursorResponseStatus.isOK()) {
-                        return cursorResponseStatus.getStatus().withContext(
-                            "Error on remote shard " + remote->shardHostAndPort.toString());
-                    }
-                    return std::move(cursorResponseStatus.getValue());
-                }(cbData);
+        auto status = _sendRequestWithRetries(lk, executorRequests[i], remotes[i]);
 
-                // Handle the response and update the remote's status under the mutex.
-                stdx::lock_guard<stdx::mutex> lk(self->_mutex);
-                self->_handleBatchResponse(lk, cbData, parsedResponse, remote);
-            });
-
-        if (!callbackStatus.isOK()) {
-            return callbackStatus.getStatus();
+        if (!status.isOK()) {
+            return status;
         }
-
-        remote->cbHandle = callbackStatus.getValue();
     }
 
     return Status::OK();
@@ -1277,6 +1301,7 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                                               const RemoteCursorPtr& remote) {
     // Got a response from remote, so indicate we are no longer waiting for one.
     remote->cbHandle = executor::TaskExecutor::CallbackHandle();
+    remote->outstandingRequest = false;
 
     if (parsedResponse.isOK()) {
         if (const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
@@ -1298,15 +1323,52 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
         _cleanUpKilledBatch(lk);
         return;
     }
+
+    // If the remote for which we received a result has been closed via 'closeShardCursors()'
+    // before, we do not add the batch results.
+    if (remote->closed) {
+        _signalCurrentEventIfReady(lk);
+        return;
+    }
+
     try {
-        // If the remote for which we received a result has been closed via 'closeShardCursors()'
-        // before, we do not add the batch results.
-        if (!remote->closed) {
-            if (parsedResponse.isOK()) {
-                _processBatchResults(lk, parsedResponse.getValue(), remote);
-            } else {
-                _cleanUpFailedBatch(lk, parsedResponse.getStatus(), *remote);
-            }
+        auto& retryStrategy = remote->retryStrategy;
+
+        if (parsedResponse.isOK()) {
+            retryStrategy.recordSuccess(remote->shardHostAndPort);
+            _processBatchResults(lk, parsedResponse.getValue(), remote);
+        } else if (retryStrategy.recordFailureAndEvaluateShouldRetry(
+                       parsedResponse.getStatus(),
+                       remote->shardHostAndPort,
+                       cbData.response.getErrorLabels())) {
+
+            const auto delay = retryStrategy.getNextRetryDelay();
+            _executor->sleepFor(delay, _cancellationSource.token())
+                .getAsync([self = shared_from_this(),
+                           request = cbData.request,
+                           remote /* intrusive_ptr copy! */,
+                           delay](Status s) {
+                    stdx::lock_guard<stdx::mutex> lk(self->_mutex);
+
+                    if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
+                        remote->outstandingRequest = false;
+                        self->_signalCurrentEventIfReady(
+                            lk);  // First, wake up anyone waiting on '_currentEvent'.
+                        self->_cleanUpKilledBatch(lk);
+                        return;
+                    }
+
+                    remote->retryStrategy.recordBackoff(delay);
+                    auto status = self->_sendRequestWithRetries(lk, request, remote);
+                    if (!status.isOK()) {
+                        self->_signalCurrentEventIfReady(lk);
+                    }
+                });
+
+            remote->outstandingRequest = true;
+            return;
+        } else {
+            _cleanUpFailedBatch(lk, parsedResponse.getStatus(), *remote);
         }
     } catch (DBException const& e) {
         remote->status = e.toStatus();
@@ -1425,7 +1487,7 @@ void AsyncResultsMerger::_signalCurrentEventIfReady(WithLock lk) {
 
 bool AsyncResultsMerger::_haveOutstandingBatchRequests(WithLock) {
     return std::any_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
-        return remote->cbHandle.isValid();
+        return remote->outstandingRequest;
     });
 }
 
@@ -1512,6 +1574,8 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     // finished running.
     _killCompleteInfo.emplace();
 
+    _cancellationSource.cancel();
+
     _scheduleKillCursors(lk, opCtx);
 
     // We do a last attempt to process the pending additional transaction participants if executing
@@ -1569,16 +1633,18 @@ AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
     HostAndPort hostAndPort,
     NamespaceString cursorNss,
     CursorId establishedCursorId,
-    std::string shardId,
+    ShardId shardId,
     const ShardTag& tag,
-    bool partialResultsReturned)
+    bool partialResultsReturned,
+    Shard::OwnerRetryStrategy retryStrategy)
     : id(id),
       cursorId(establishedCursorId),
       cursorNss(std::move(cursorNss)),
       shardHostAndPort(std::move(hostAndPort)),
       shardId(std::move(shardId)),
       tag(tag),
-      partialResultsReturned(partialResultsReturned) {
+      partialResultsReturned(partialResultsReturned),
+      retryStrategy(std::move(retryStrategy)) {
     // If the 'partialResultsReturned' flag is set, the cursorId must be zero (closed).
     tassert(11103800,
             "expecting partialResultsFlag to be set only for cursorId == 0",
