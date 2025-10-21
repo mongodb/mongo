@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/devprod-build
+  - "repository_rules/profiling_data.bzl":
+    approvers:
+      - 10gen/performance
