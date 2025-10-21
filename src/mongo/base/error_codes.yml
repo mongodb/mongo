@@ -18,7 +18,15 @@ error_categories:
     - ConnectionFatalMessageParseError
     - ExceededTimeLimitError
     - SnapshotError
+    # isVoteAbortError() includes all error codes that a participant might return in response to the
+    # prepare command sent by the coordinator during the two-phase commit protocol.
+    # These error codes indicate that the coordinator should choose to abort the transaction.
     - VoteAbortError
+    # isTwoPhaseDecisionAckError() includes all error codes that a participant may return in response
+    # to the decision (abort/commit) sent by the coordinator during the two-phase commit protocol.
+    # These codes indicate the participant has seen the decision before and forgotten the transaction,
+    # so the coordinator treats them as successful acknowledgment.
+    - TwoPhaseDecisionAckError
     - NonResumableChangeStreamError
     - RetriableError
     # isCloseConnectionError() includes all codes that indicate that it is no longer safe or
@@ -270,7 +278,11 @@ error_codes:
     - {code: 222,name: CloseChangeStream}
     - {code: 223,name: IllegalOpMsgFlag,categories: [ConnectionFatalMessageParseError]}
     - {code: 224,name: QueryFeatureNotAllowed}
-    - {code: 225,name: TransactionTooOld,categories: [VoteAbortError]}
+    - {
+        code: 225,
+        name: TransactionTooOld,
+        categories: [VoteAbortError, TwoPhaseDecisionAckError],
+      }
     - {code: 226,name: AtomicityFailure}
     - {code: 227,name: CannotImplicitlyCreateCollection,
                   extra: CannotImplicitlyCreateCollectionInfo}
@@ -300,7 +312,11 @@ error_codes:
     - {code: 248,name: ProducerConsumerQueueEndClosed}
     - {code: 249,name: StaleDbVersion,extra: StaleDbRoutingVersion}
     - {code: 250,name: StaleChunkHistory,categories: [SnapshotError]}
-    - {code: 251,name: NoSuchTransaction,categories: [VoteAbortError]}
+    - {
+        code: 251,
+        name: NoSuchTransaction,
+        categories: [VoteAbortError, TwoPhaseDecisionAckError],
+      }
     - {code: 252,name: ReentrancyNotAllowed}
     # - {code: 253,name: FreeMonHttpInFlight} # Removed in 7.1
     # - {code: 254,name: FreeMonHttpTemporaryFailure} # Removed in 7.1
@@ -449,7 +465,7 @@ error_codes:
 
     - {code: 355, name: InterruptedDueToStorageChange,categories: [Interruption,CancellationError]}
 
-    - {code: 356, name: TxnRetryCounterTooOld, extra: TxnRetryCounterTooOldInfo, categories: [VoteAbortError]}
+    - {code: 356, name: TxnRetryCounterTooOld, extra: TxnRetryCounterTooOldInfo, categories: [VoteAbortError, TwoPhaseDecisionAckError]}
 
     - {code: 357, name: InvalidBSONType}
 

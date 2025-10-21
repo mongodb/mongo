@@ -914,8 +914,18 @@ Future<void> sendDecisionToShard(ServiceContext* service,
                                 "command"_attr = commandObj,
                                 "shardId"_attr = shardId);
 
-                    if (ErrorCodes::isVoteAbortError(status.code())) {
-                        // Interpret voteAbort errors as an ack.
+                    if (ErrorCodes::isTwoPhaseDecisionAckError(status.code())) {
+                        // Interpret these errors as a successful ack.
+                        LOGV2_DEBUG(
+                            10613800,
+                            3,
+                            "Coordinator shard received an error from a shard which will be "
+                            "interpreted as a successful acknowledgment.",
+                            "sessionId"_attr = lsid,
+                            "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
+                            "status"_attr = status,
+                            "command"_attr = commandObj,
+                            "shardId"_attr = shardId);
                         status = Status::OK();
                     }
 
