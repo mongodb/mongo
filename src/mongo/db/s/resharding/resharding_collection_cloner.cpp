@@ -445,6 +445,8 @@ public:
             GetMoreCommandRequest getMoreRequest(
                 cursor->getCursorResponse().getCursorId(),
                 cursor->getCursorResponse().getNSS().coll().toString());
+            getMoreRequest.setBatchSize(
+                resharding::gReshardingCollectionClonerBatchSizeCount.load());
             BSONObj cmdObj;
             if (opCtx->getLogicalSessionId()) {
                 BSONObjBuilder cmdObjWithLsidBuilder;
