@@ -533,9 +533,6 @@ void processUnorderedCommitResult(OperationContext* opCtx,
                   abortBatch(result.error);
                   abandonSnapshot();
               },
-              [&](const commit_result::NonContinuableError& result) {
-                  handleNonContinuableError(result.error);
-              },
               [&](const commit_result::NonContinuableErrorWithAbortBatch& result) {
                   handleNonContinuableError(result.error);
                   abortBatch(result.error);
@@ -1112,7 +1109,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
         auto& oss{OperationShardingState::get(opCtx)};
         oss.setShardingOperationFailedStatus(ex.toStatus());
 
-        return commit_result::NonContinuableError{ex.toStatus()};
+        return commit_result::NonContinuableErrorWithAbortBatch{ex.toStatus()};
     }
 
     auto status = prepareCommit(bucketCatalog, batch, collator);
