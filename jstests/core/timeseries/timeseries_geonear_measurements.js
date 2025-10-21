@@ -38,7 +38,7 @@ function degreesToMeters(degrees) {
     return degrees * (earthCircumferenceMeters / 360);
 }
 
-function insertTestData(coll) {
+function insertTestData(coll, batchInsert = true) {
     // When these points are interpreted as spherical coordinates, [long, lat],
     // the units are interpreted as degrees.
     const nMeasurements = 10;
@@ -56,7 +56,13 @@ function insertTestData(coll) {
 
     // Insert in a random order to ensure queries are really sorting.
     Array.shuffle(docs);
-    assert.commandWorked(coll.insert(docs));
+    if (batchInsert) {
+        assert.commandWorked(coll.insert(docs));
+    } else {
+        for (let i = 0; i < docs.length; i++) {
+            assert.commandWorked(coll.insert(docs[i]));
+        }
+    }
 }
 
 function runFlatExamples(coll, isTimeseries) {
@@ -576,6 +582,38 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
     }
 }
 
+function runIntersectsExamples(coll, isTimeseries, has2dsphereIndex, coord, expected) {
+    let pipeline, plan;
+
+    // Run some additional tests with $geoIntersects.
+    pipeline = [
+        {
+            $match: {
+                loc: {
+                    $geoIntersects: {
+                        $geometry: {
+                            type: "Point",
+                            coordinates: coord,
+                        },
+                    },
+                },
+            },
+        },
+    ];
+
+    assert.eq(coll.aggregate(pipeline).toArray().length, expected);
+    plan = coll.explain().aggregate(pipeline);
+    if (isTimeseries) {
+        if (has2dsphereIndex) {
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
+        } else {
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
+        }
+    } else {
+        assert(aggPlanHasStage(plan, "IXSCAN"), plan);
+    }
+}
+
 function runExamples(coll, isTimeseries, has2dsphereIndex) {
     runFlatExamples(coll, isTimeseries, has2dsphereIndex);
 
@@ -599,6 +637,12 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
         near: [180, 0],
         spherical: true,
     });
+
+    // Run some additional tests with $geoIntersects to ensure the index is being maintained
+    // correctly by finding the exact locations we inserted.
+    runIntersectsExamples(coll, isTimeseries, has2dsphereIndex, [0, 0], 1);
+    runIntersectsExamples(coll, isTimeseries, has2dsphereIndex, [0, 6], 1);
+    runIntersectsExamples(coll, isTimeseries, has2dsphereIndex, [1, 4], 0);
 }
 
 // Test $geoNear query results in several contexts:
@@ -654,5 +698,31 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
                            : [{'data.loc': '2dsphere_bucket'}]);
 
     insertTestData(coll);
+    runExamples(coll, true /* isTimeseries */, true /* has2dsphereIndex */);
+}
+
+// 4. Test a timeseries collection, with a 2dsphere index on measurements.
+//    Data is inserted one document at a time to verify correct index maintenance.
+//    This should work if $geoWithin is indexed correctly.
+{
+    const coll = db.getCollection(jsTestName() + "_indexed_nonbatch");
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+
+    // Make sure the 2dsphere index exists. (If the collection is implicitly sharded then we will
+    // also see an implicitly created index.)
+    const buckets = db.getCollection('system.buckets.' + coll.getName());
+    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+    let extraIndexesForSharding =
+        FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection")
+        ? {'control.min.time': 1, 'control.max.time': 1}
+        : {'control.min.time': 1};
+    assert.sameMembers(buckets.getIndexKeys(),
+                       FixtureHelpers.isSharded(buckets)
+                           ? [{'data.loc': '2dsphere_bucket'}, extraIndexesForSharding]
+                           : [{'data.loc': '2dsphere_bucket'}]);
+
+    insertTestData(coll, /* batchInsert */ false);
     runExamples(coll, true /* isTimeseries */, true /* has2dsphereIndex */);
 }

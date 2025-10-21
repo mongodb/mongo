@@ -55,6 +55,98 @@ void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
     ASSERT_EQ(comparator.compare(lhs, rhs), 0);
 }
 
+TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndex) {
+    // Constant for a binary diff at offset 0 with some binary change. We need to use a constant as
+    // computeOplogDiff does not compute binary diffs.
+    const BSONObj kBinaryDiffObj = BSON(
+        "elem" << BSON("o" << 0 << "d" << BSONBinData("abcdef", 6, BinDataType::BinDataGeneral)));
+    const BSONElement kBinaryDiffElem = kBinaryDiffObj["elem"];
+
+    // Generate a binary diff at 'a'
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addBinary("a", kBinaryDiffElem);
+    auto oplogDiff = diffNode.serialize();
+
+    {
+        UpdateIndexData uid;
+        uid.addPath(FieldRef("a"));
+
+        doc_diff::BitVector affected = doc_diff::anyIndexesMightBeAffected(oplogDiff, {&uid});
+
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        UpdateIndexData uid;
+        uid.addPathComponent("a"_sd);
+
+        doc_diff::BitVector affected = doc_diff::anyIndexesMightBeAffected(oplogDiff, {&uid});
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+}
+
+TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
+    // Constant for a binary diff at offset 0 with some binary change. We need to use a constant as
+    // computeOplogDiff does not compute binary diffs.
+    const BSONObj kBinaryDiffObj = BSON(
+        "elem" << BSON("o" << 0 << "d" << BSONBinData("abcdef", 6, BinDataType::BinDataGeneral)));
+    const BSONElement kBinaryDiffElem = kBinaryDiffObj["elem"];
+
+    // Generate a binary diff at 'a.b'
+    diff_tree::DocumentSubDiffNode diffRoot;
+    auto diffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+    diffNode->addBinary("b", kBinaryDiffElem);
+    diffRoot.addChild("a", std::move(diffNode));
+    auto oplogDiff = diffRoot.serialize();
+
+    {
+        UpdateIndexData uid;
+        uid.addPath(FieldRef("a.b"));
+
+        doc_diff::BitVector affected = doc_diff::anyIndexesMightBeAffected(oplogDiff, {&uid});
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        UpdateIndexData uid;
+        uid.addPath(FieldRef("b.a"));
+
+        doc_diff::BitVector affected = doc_diff::anyIndexesMightBeAffected(oplogDiff, {&uid});
+        ASSERT_FALSE(affected[0]);
+        ASSERT_EQ(0, affected.count());
+    }
+
+    {
+
+        UpdateIndexData uid;
+        uid.addPathComponent("a"_sd);
+
+        doc_diff::BitVector affected = doc_diff::anyIndexesMightBeAffected(oplogDiff, {&uid});
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        UpdateIndexData uid;
+        uid.addPathComponent("b"_sd);
+
+        doc_diff::BitVector affected = doc_diff::anyIndexesMightBeAffected(oplogDiff, {&uid});
+        ASSERT_TRUE(affected[0]);
+        ASSERT_EQ(1, affected.count());
+    }
+
+    {
+        UpdateIndexData uid;
+        uid.addPathComponent("c"_sd);
+
+        doc_diff::BitVector affected = doc_diff::anyIndexesMightBeAffected(oplogDiff, {&uid});
+        ASSERT_FALSE(affected[0]);
+        ASSERT_EQ(0, affected.count());
+    }
+}
 
 TEST(DocumentDiffCalculatorTest, SameObjectsNoDiff) {
     auto assertDiffEmpty = [](const BSONObj& doc) {

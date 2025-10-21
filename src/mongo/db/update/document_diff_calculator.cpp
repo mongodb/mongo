@@ -365,6 +365,20 @@ void anyIndexesMightBeAffected(DocumentDiffReader* reader,
         }
     }
 
+    boost::optional<BSONElement> binaryItem;
+    while ((binaryItem = reader->nextBinary())) {
+        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, binaryItem->fieldNameStringData());
+        for (size_t i = 0; i < indexData.size(); i++) {
+            if (!(*result)[i]) {
+                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+            }
+        }
+        // early exit
+        if (result->all()) {
+            return;
+        }
+    }
+
     for (auto subItem = reader->nextSubDiff(); subItem; subItem = reader->nextSubDiff()) {
         FieldRef::FieldRefTempAppend tempAppend(*fieldRef, subItem->first);
         visit(OverloadedVisitor{[&indexData, &fieldRef, &result](DocumentDiffReader& item) {
