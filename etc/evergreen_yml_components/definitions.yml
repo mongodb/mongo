@@ -1720,6 +1720,7 @@ functions:
       params:
         file: github_expansions.yml
     - *f_expansions_write
+    - *determine_task_timeout
     - *update_task_timeout_expansions
     - *f_expansions_write
     - *update_task_timeout
