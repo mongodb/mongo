@@ -3338,6 +3338,7 @@ mongo_cc_library(
         # please add that library here, as a private library dependency.
         "//src/mongo/executor:async_rpc_error_info",
         "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/logv2/log_metric_initializer",
         "//src/mongo/rpc",
         "//src/mongo/s/commands:cluster_commands",
         "//src/mongo/s/commands:sharded_cluster_commands",

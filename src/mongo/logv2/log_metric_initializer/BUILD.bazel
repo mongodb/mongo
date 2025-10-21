@@ -1,0 +1,14 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "log_metric_initializer",
+    srcs = [
+        "log_metric_initializer.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:server_status_metric",
+    ],
+)
