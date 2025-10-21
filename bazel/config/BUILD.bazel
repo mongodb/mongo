@@ -3034,3 +3034,19 @@ config_setting(
         "//bazel/config:all_headers": "True",
     },
 )
+
+# --------------------------------------
+# antithesis options
+# --------------------------------------
+
+bool_flag(
+    name = "antithesis",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "antithesis_enabled",
+    flag_values = {
+        "//bazel/config:antithesis": "True",
+    },
+)

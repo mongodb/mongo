@@ -1,5 +1,8 @@
-version: 1.0.0
+version: 2.0.0
 filters:
   - "config.h.in":
+    approvers:
+      - 10gen/server-programmability
+  - "mongo_config_header.py":
     approvers:
       - 10gen/server-programmability

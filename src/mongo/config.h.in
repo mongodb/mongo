@@ -35,6 +35,10 @@
 #define MONGO_CONFIG_SSL_PROVIDER_WINDOWS 2
 #define MONGO_CONFIG_SSL_PROVIDER_APPLE 3
 
+// Disabling clang-format since it changes `@var@` to `@var @` which would break the template.
+//
+// clang-format off
+
 // Define altivec vec_vbpermq output index
 @mongo_config_altivec_vec_vbpermq_output_index@
 
@@ -130,3 +134,8 @@
 
 // Defined if using prettier dev stacktraces
 @mongo_config_dev_stacktrace@
+
+// Defined if the build is for antithesis
+@mongo_config_antithesis@
+
+    // clang-format on

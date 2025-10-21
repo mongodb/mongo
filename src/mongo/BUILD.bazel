@@ -91,6 +91,11 @@ generate_config_header(
         },
         "//conditions:default": {
         },
+    }) | select({
+        "//bazel/config:antithesis_enabled": {
+            "MONGO_CONFIG_ANTITHESIS": "1",
+        },
+        "//conditions:default": {},
     }),
     logfile = "mongo_config.log",
     output = "config.h",

@@ -16,6 +16,10 @@ variables:
       large_distro_name: ubuntu2204-large
       mciuploads_binary_permissions: private
       mciuploads_binary_visibility: signed
+      antithesis_bazel_compile_flags: >-
+        --//bazel/config:antithesis=True
+        --copt=-fsanitize-coverage=trace-pc-guard
+        --linkopt=-lvoidstar
     tasks:
       - name: compile_and_archive_dist_test_TG
       - name: .antithesis
@@ -31,12 +35,11 @@ buildvariants:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       compile_variant: *enterprise-ubuntu2204-64-libvoidstar
       bazel_compile_flags: >-
+        ${antithesis_bazel_compile_flags}
         --define=MONGO_DISTMOD=ubuntu2204
         --compiler_type=clang
         --dtlto=False
         --pgo_profile_use=False
-        --copt=-fsanitize-coverage=trace-pc-guard
-        --linkopt=-lvoidstar
         --build_atlas=True
 
   - <<: *enterprise-ubuntu2204-64-libvoidstar-template
@@ -49,13 +52,12 @@ buildvariants:
       antithesis_build_type: aubsan
       compile_variant: *enterprise-ubuntu2204-64-aubsan-libvoidstar
       bazel_compile_flags: >-
+        ${antithesis_bazel_compile_flags}
         --config=dbg_aubsan
         --opt=on
         --fission=no
         --define=MONGO_DISTMOD=ubuntu2204
         --copt=-shared-libsan
-        --copt=-fsanitize-coverage=trace-pc-guard
-        --linkopt=-lvoidstar
         --build_atlas=True
       san_options: >-
         UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/usr/lib/llvm-12/bin/llvm-symbolizer"
@@ -76,12 +78,11 @@ buildvariants:
       antithesis_build_type: tsan
       compile_variant: *enterprise-ubuntu2204-64-tsan-libvoidstar
       bazel_compile_flags: >-
+        ${antithesis_bazel_compile_flags}
         --config=dbg_tsan
         --opt=on
         --fission=no
         --define=MONGO_DISTMOD=ubuntu2204
-        --copt=-fsanitize-coverage=trace-pc-guard
-        --linkopt=-lvoidstar
         --build_atlas=True
       san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4"
       test_flags: >-

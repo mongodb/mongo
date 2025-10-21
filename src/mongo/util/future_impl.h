@@ -32,6 +32,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/condition_variable.h"
@@ -418,6 +419,13 @@ public:
         dassert(oldState == SSBState::kWaitingOrHaveChildren ||
                 oldState == SSBState::kHaveCallback);
 
+        // Antithesis uses adversarial scheduling which trips this condition more than would happen
+        // in the real world. We set an artificially low limit here, orders of magnitude lower than
+        // the actual limit where correctness issues could arise, to make it more likely to trip
+        // with variable length chains during normal testing. We could use a higher limit on
+        // Antithesis, but this is an O(N^2) check (technically each check is linear, but it runs N
+        // times), so making the limit higher can significantly slow down execution.
+#ifndef MONGO_CONFIG_ANTITHESIS
         if (kDebugBuild) {
             // If you hit this limit one of two things has probably happened
             //
@@ -438,6 +446,7 @@ public:
                 invariant(depth < kMaxDepth);
             }
         }
+#endif
 
         if (oldState == SSBState::kHaveCallback) {
             dassert(children.empty());
