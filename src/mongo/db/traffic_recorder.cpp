@@ -304,17 +304,18 @@ void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext
 
         (*rec)->run();
     }
+
+    _shouldRecord.store(true);
     {
         // TODO SERVER-111903: Ensure all session starts are observed exactly once. A session
-        // starting just after this getActiveSessions call, but before _shouldRecord is updated
-        // will not report session started.
+        // starting just before this getActiveSessions call may be reported twice.
+        // For now, duplicate session starts are simpler to handle than omitted ones.
         auto sessions = getActiveSessions(svcCtx);
         // Record SessionStart events if exists any active session.
         for (const auto& [id, session] : sessions) {
             observe(id, session, Message(), svcCtx, EventType::kSessionStart);
         }
     }
-    _shouldRecord.store(true);
 }
 
 void TrafficRecorder::stop(ServiceContext* svcCtx) {
