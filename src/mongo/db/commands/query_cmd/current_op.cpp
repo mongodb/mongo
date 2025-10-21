@@ -38,7 +38,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/fsync_locked.h"
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/query_cmd/current_op_common.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/database_name.h"

@@ -87,7 +87,7 @@ Note: This feature is still in development; see https://jira.mongodb.org/browse/
 To run clang-tidy via Bazel, do the following:
 
 1. To analyze all code, run `bazel build --config=clang-tidy src/...`
-2. To analyze a single target (e.g.: `fsync_locked`), run the following command (note that `_with_debug` suffix on the target): `bazel build --config=clang-tidy src/mongo/db/commands:fsync_locked_with_debug`
+2. To analyze a single target (e.g.: `environment_buffer`), run the following command (note that `_with_debug` suffix on the target): `bazel build --config=clang-tidy src/mongo/db/commands:environment_buffer_with_debug`
 
 Testing notes:
 

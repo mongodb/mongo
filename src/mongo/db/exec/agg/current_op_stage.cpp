@@ -29,7 +29,7 @@
 
 #include "mongo/db/exec/agg/current_op_stage.h"
 
-#include "mongo/db/commands/fsync_locked.h"
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_current_op.h"
 

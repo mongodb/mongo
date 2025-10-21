@@ -1478,12 +1478,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     BSONObjBuilder shutdownInfoBuilder;
 
     // Before doing anything else, ensure fsync is inactive or make it release its GlobalRead lock.
-    {
-        stdx::unique_lock<stdx::mutex> stateLock(fsyncStateMutex);
-        if (globalFsyncLockThread) {
-            globalFsyncLockThread->shutdown(stateLock);
-        }
-    }
+    shutdownFsyncLockThread();
 
     auto const serviceContext = getGlobalServiceContext();
 

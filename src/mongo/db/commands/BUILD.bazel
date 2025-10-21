@@ -9,12 +9,6 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "fsync_locked",
-    srcs = ["fsync_locked.cpp"],
-    hdrs = ["fsync_locked.h"],
-)
-
 idl_generator(
     name = "test_commands_enabled_gen",
     src = "test_commands_enabled.idl",
@@ -600,7 +594,6 @@ mongo_cc_library(
         "fsync.h",
     ],
     deps = [
-        ":fsync_locked",
         "//src/mongo/db:commands",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db/auth",
@@ -957,7 +950,6 @@ mongo_cc_library(
         "buildinfo_common",
         "core",
         "create_command",
-        "fsync_locked",
         "kill_common",
         "list_collections_filter",
         "list_databases_command",

@@ -47,7 +47,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/commands:fsync_locked",
+        "//src/mongo/db/commands:mongod_fsync",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/local_catalog:catalog_helpers",
         "//src/mongo/db/local_catalog:index_key_validate",

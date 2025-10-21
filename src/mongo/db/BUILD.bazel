@@ -3064,7 +3064,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/auth:user_acquisition_stats",
-        "//src/mongo/db/commands:fsync_locked",
+        "//src/mongo/db/commands:mongod_fsync",
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/repl:repl_server_parameters",

@@ -27,13 +27,9 @@
  *    it in the license file.
  */
 
-
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/commands/fsync.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -45,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync_gen.h"
-#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -60,6 +55,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
@@ -70,6 +66,46 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+namespace {
+/**
+ * Maintains a global read lock while mongod is fsyncLocked.
+ */
+class FSyncLockThread final : public BackgroundJob {
+public:
+    FSyncLockThread(ServiceContext* serviceContext,
+                    bool allowFsyncFailure,
+                    const Milliseconds deadline)
+        : BackgroundJob(false),
+          _serviceContext(serviceContext),
+          _allowFsyncFailure(allowFsyncFailure),
+          _deadline(deadline) {}
+
+    std::string name() const override {
+        return "FSyncLockThread";
+    }
+
+    void run() override;
+
+    /**
+     * Releases the fsync lock for shutdown.
+     */
+    void shutdown(stdx::unique_lock<stdx::mutex>& lk);
+
+private:
+    /**
+     * Wait lastApplied to catch lastWritten so we won't write/apply any oplog when fsync locked.
+     */
+    void _waitUntilLastAppliedCatchupLastWritten();
+
+private:
+    ServiceContext* const _serviceContext;
+    bool _allowFsyncFailure;
+    const Milliseconds _deadline;
+};
+
+// Ensures that only one command is operating on fsyncLock state at a time. As a 'ResourceMutex',
+// lock time will be reported for a given user operation.
+Lock::ResourceMutex fsyncSingleCommandExclusionMutex("fsyncSingleCommandExclusionMutex");
 
 // Protects access to globalFsyncLockThread and other global fsync state.
 stdx::mutex fsyncStateMutex;
@@ -77,16 +113,6 @@ stdx::mutex fsyncStateMutex;
 // Globally accessible FsyncLockThread to allow shutdown to coordinate with any active fsync cmds.
 // Must acquire the 'fsyncStateMutex' before accessing.
 std::unique_ptr<FSyncLockThread> globalFsyncLockThread = nullptr;
-
-// Exposed publically via extern in fsync.h.
-stdx::mutex oplogWriterLockedFsync;
-stdx::mutex oplogApplierLockedFsync;
-
-namespace {
-
-// Ensures that only one command is operating on fsyncLock state at a time. As a 'ResourceMutex',
-// lock time will be reported for a given user operation.
-Lock::ResourceMutex fsyncSingleCommandExclusionMutex("fsyncSingleCommandExclusionMutex");
 
 class FSyncCore {
 public:
@@ -283,8 +309,7 @@ private:
 
     stdx::mutex _fsyncLockedMutex;
     bool _fsyncLocked = false;
-};
-FSyncCore fsyncCore;
+} fsyncCore;
 
 class FSyncCommand : public TypedCommand<FSyncCommand> {
 public:
@@ -419,8 +444,6 @@ bool FSyncCore::runFsyncUnlockCommand(OperationContext* opCtx,
     }
 }
 
-}  // namespace
-
 void FSyncLockThread::shutdown(stdx::unique_lock<stdx::mutex>& stateLock) {
     if (fsyncCore.getLockCount_inLock() > 0) {
         LOGV2_WARNING(20469, "Interrupting fsync because the server is shutting down");
@@ -543,9 +566,21 @@ void FSyncLockThread::run() {
         LOGV2_FATAL(40350, "FSyncLockThread exception", "error"_attr = e.what());
     }
 }
+}  // namespace
 
-MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
-    setLockedForWritingImpl([]() { return fsyncCore.fsyncLocked(); });
+// Exposed publicly via extern in fsync.h.
+stdx::mutex oplogWriterLockedFsync;
+stdx::mutex oplogApplierLockedFsync;
+
+bool lockedForWriting() {
+    return fsyncCore.fsyncLocked();
+}
+
+void shutdownFsyncLockThread() {
+    stdx::unique_lock stateLock(fsyncStateMutex);
+    if (globalFsyncLockThread) {
+        globalFsyncLockThread->shutdown(stateLock);
+    }
 }
 
 }  // namespace mongo

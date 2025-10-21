@@ -119,12 +119,12 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: >-
-            //src/mongo/db/commands:fsync_locked_with_debug
+            //src/mongo/base:environment_buffer_with_debug
           bazel_args: >-
             --config=evg
       - func: "verify build output present"
         vars:
-          output: bazel-bin/src/mongo/db/commands/libfsync_locked_with_debug.lo
+          output: bazel-bin/src/mongo/base/libenvironment_buffer_with_debug.lo
 
   - name: run_bazel_program
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]

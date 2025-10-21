@@ -825,7 +825,7 @@ mongo_cc_library(
         "//src/mongo/db:shard_filterer",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/auth",
-        "//src/mongo/db/commands:fsync_locked",
+        "//src/mongo/db/commands:mongod_fsync",
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/exec:bucket_unpacker",
         "//src/mongo/db/exec:projection_executor",
