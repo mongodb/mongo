@@ -106,7 +106,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
 MONGO_FAIL_POINT_DEFINE(sessionWorkflowDelayOrFailSendMessage);
-MONGO_FAIL_POINT_DEFINE(skipRateLimiterForTestClient);
 
 namespace metrics_detail {
 
@@ -719,20 +718,6 @@ void SessionWorkflow::Impl::_sendResponse() {
 Status SessionWorkflow::Impl::_rateLimit() const {
     if (!gFeatureFlagIngressRateLimiting.isEnabled() || !gIngressRequestRateLimiterEnabled.load()) {
         return Status::OK();
-    }
-
-    if (const auto scoped = skipRateLimiterForTestClient.scoped();
-        MONGO_unlikely(scoped.isActive())) {
-        if (const auto clientMetadata = ClientMetadata::get(client())) {
-            const auto appName = clientMetadata->getApplicationName();
-            const auto exemptAppName = scoped.getData().getStringField("exemptAppName");
-
-            invariant(!exemptAppName.empty());
-
-            if (appName == exemptAppName) {
-                return Status::OK();
-            }
-        }
     }
 
     auto& admissionRateLimiter = IngressRequestRateLimiter::get(_serviceContext);

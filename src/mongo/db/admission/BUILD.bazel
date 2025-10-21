@@ -12,6 +12,9 @@ exports_files(
 idl_generator(
     name = "ingress_request_rate_limiter_gen",
     src = "ingress_request_rate_limiter.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )
 
 mongo_cc_library(
@@ -29,6 +32,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/auth",
+        "//src/mongo/rpc:client_metadata",
         "//src/mongo/transport:cidr_range_list_parameter",
     ],
 )

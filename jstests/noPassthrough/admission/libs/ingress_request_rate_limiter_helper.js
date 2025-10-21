@@ -28,10 +28,11 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  */
 export const kConfigLogsAndFailPointsForRateLimiterTests = {
     logComponentVerbosity: tojson({command: 2}),
-    "failpoint.ingressRequestRateLimiterFractionalRateOverride":
-        tojson({mode: "alwaysOn", data: {rate: kSlowestRefreshRateSecs}}),
-    "failpoint.skipRateLimiterForTestClient":
-        tojson({mode: "alwaysOn", data: {exemptAppName: kRateLimiterExemptAppName}}),
+    "failpoint.ingressRequestRateLimiterFractionalRateOverride": tojson({
+        mode: "alwaysOn",
+        data: {rate: kSlowestRefreshRateSecs},
+    }),
+    ingressRequestRateLimiterApplicationExemptions: {appNames: [kRateLimiterExemptAppName]},
 };
 
 const kUser = "admin";
