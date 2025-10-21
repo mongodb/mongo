@@ -1074,7 +1074,7 @@ To isolate whether an issue is devcontainer-specific:
 
 ```bash
 # Clone locally
-git clone git@github.com:mongodb/mongo.git
+git clone git@github.com:10gen/mongo.git
 cd mongo
 
 # Try building without devcontainer

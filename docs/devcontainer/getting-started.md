@@ -195,17 +195,31 @@ For **optimal performance**, especially on macOS, clone the repository directly 
 
 3. **Enter Repository URL**
 
-   ```
-   git@github.com:mongodb/mongo.git
-   ```
+##### For use with the internal mongodb repo:
 
-   Or use HTTPS:
+```
+git@github.com:10gen/mongo.git
+```
 
-   ```
-   https://github.com/mongodb/mongo.git
-   ```
+Or use HTTPS:
 
-   > **Tip**: SSH URLs are recommended if you have SSH keys configured
+```
+https://github.com/mongodb/mongo.git
+```
+
+##### For use with the public mongodb repo:
+
+```
+git@github.com:mongodb/mongo.git
+```
+
+Or use HTTPS:
+
+```
+https://github.com/mongodb/mongo.git
+```
+
+> **Tip**: SSH URLs are recommended if you have SSH keys configured
 
 4. **Choose Volume Name**
 
@@ -442,7 +456,7 @@ If you prefer to clone locally first (not recommended for best performance):
 1. Clone the repository to your local machine:
 
    ```bash
-   git clone git@github.com:mongodb/mongo.git
+   git clone git@github.com:10gen/mongo.git
    cd mongo
    ```
 

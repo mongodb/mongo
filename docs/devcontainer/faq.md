@@ -36,7 +36,7 @@ Report issues to help improve it for everyone!
 
 **You can use:**
 
-- ✅ **SSH** (recommended): `git@github.com:mongodb/mongo.git`
+- ✅ **SSH** (recommended): `git@github.com:10gen/mongo.git`
   - Pros: More secure, no password prompts, required for pushing code
   - Requires: SSH keys configured with GitHub
 - ✅ **HTTPS**: `https://github.com/mongodb/mongo.git`
