@@ -14,10 +14,16 @@ let topology;
 try {
     topology = DiscoverTopology.findConnectedNodes(conn);
 } catch (e) {
+    // Because these errors can come from establishing the connection to the cluster, they don't
+    // always print the error code which makes debugging difficult, so we log it directly here.
+    let errorWithCode = "Code: " + e.code + ", Message: " + e;
     if (CheckShardFilteringMetadataHelpers.isTransientError(e)) {
-        jsTest.log(`Aborted filtering metadata check due to retriable error during topology discovery: ${e}`);
+        jsTest.log(
+            "Aborted filtering metadata check due to retriable error during topology discovery: " + errorWithCode,
+        );
         quit();
     } else {
+        jsTest.log.info("Error while running check shard filtering metadata: " + errorWithCode);
         throw e;
     }
 }

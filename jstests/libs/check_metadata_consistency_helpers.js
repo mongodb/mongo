@@ -102,6 +102,7 @@ export var MetadataConsistencyChecker = (function () {
         try {
             checkMetadataConsistency();
         } catch (e) {
+            let errorWithCode = "Code: " + e.code + ", Message: " + e;
             if (isTransientError(e)) {
                 jsTest.log(`Aborted metadata consistency check due to retriable error: ${e}`);
             } else if (e.code === ErrorCodes.LockBusy) {
@@ -113,6 +114,7 @@ export var MetadataConsistencyChecker = (function () {
                         `Ignoring LockBusy error on checkMetadataConsistency because we are running with very slow build (e.g. ASAN enabled)`,
                     );
                 } else {
+                    jsTest.log("Caught error during check metadata consistency hook: " + errorWithCode);
                     throw e;
                 }
             } else if (e.code === ErrorCodes.ConflictingOperationInProgress) {
@@ -121,6 +123,7 @@ export var MetadataConsistencyChecker = (function () {
                 jsTest.log("Ignoring ConflictingOperationInProgress error during checkMetadataConsistency");
             } else {
                 // For all the other errors re-throw the exception
+                jsTest.log("Caught error during check metadata consistency hook: " + errorWithCode);
                 throw e;
             }
         }
