@@ -187,6 +187,12 @@ public:
         return FieldPath(_fieldPath.substr(_fieldPathDotPosition[prefixLength] + 1));
     }
 
+    friend std::string toStringForLogging(const FieldPath& x) {
+        // There are at least two ways of serializing 'FieldPath' (with and without the prefix). For
+        // the logging purposes the distinction is likely not too important, so we simply pick one.
+        return x.fullPath();
+    }
+
 private:
     FieldPath(std::string string, std::vector<size_t> dots, std::vector<uint32_t> hashes)
         : _fieldPath(std::move(string)),

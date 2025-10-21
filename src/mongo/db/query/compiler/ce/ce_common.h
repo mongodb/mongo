@@ -83,14 +83,18 @@ inline bool reversedInterval(sbe::value::TypeTags tagLow,
 
 /**
  * Returns the number of distinct values of tuples of the given field names in the input documents.
- * Null and missing are treated as distinct. When values are objects, field order matters. That is,
- * {a: 1, b: 1} and {b: 1, a: 1} are considered distinct.
+ * For example, given documents [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 2, b: 2}], the NDV of
+ * ["a","b"] is 3.
+ *
+ * Important notes on what is treated as "distinct":
+ * - Null and missing are treated as distinct: given documents [{a: null}, {}], the NDV of "a" is 2.
+ * - When values are objects, field order matters: given documents [{a: {b: 1, c: 1}}, {a: {c: 1, b:
+ *   1}}], the NDV of "a" is 2.
+ * - The field order of fields in 'fieldNames' in the documents in 'docs' is not significant: given
+ *   documents [{a: 1, b: 2}, {b: 2, a: 1}], the NDV of ["a","b"] is 1.
  *
  * Does not support counting NDV over array-valued fields; tasserts if any of 'fieldNames' are
  * array-valued in 'docs'.
- *
- * For example, given documents [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 2, b: 2}], the NDV of
- * ["a","b"] is 3.
  */
 size_t countNDV(const std::vector<FieldPath>& fieldNames, const std::vector<BSONObj>& docs);
 

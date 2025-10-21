@@ -1331,7 +1331,7 @@ std::vector<BSONObj> createDocumentsForNDVTesting(int num) {
     for (int i = 0; i < num; i++) {
         // These fields are uniformly distributed.
         BSONObj obj = BSON("_id" << i << "a" << i % 1000 << "b" << i % 100 << "c" << i % 10 << "d"
-                                 << i % 2 << "e" << 1);
+                                 << i % 7 << "e" << 1);
         docs.push_back(obj);
     }
     gen.shuffleVector(docs);
@@ -1373,11 +1373,28 @@ void makeNDVAssertions(SamplingEstimatorForTesting& estimator, const size_t samp
     }
 
     assertBetween(ndvC, 8, 12);
-    assertBetween(ndvD, 1.6, 2.4);
+    assertBetween(ndvD, 5.6, 8.4);
 
     // Single unique value.
     assertBetween(ndvE, .8, 1.2);
     assertBetween(ndvNonexistent, .8, 1.2);
+
+    // Combination of fields.
+    auto ndvAB = estimator.estimateNDV({"a", "b"});
+    auto ndvBC = estimator.estimateNDV({"b", "c"});
+    auto ndvBD = estimator.estimateNDV({"b", "d"});
+
+    // Again: when the sample size is small (here, 1%-2%), we see a lot of unique values for A and
+    // B, causing us to overestimate the true number of unique values.
+    if (sampleSize > 100) {
+        assertBetween(ndvAB, 800, 1200);
+        assertBetween(ndvBC, 80, 120);
+        assertBetween(ndvBD, 560, 840);
+    } else {
+        assertBetween(ndvAB, 800, 5000);
+        assertBetween(ndvBC, 80, 200);
+        assertBetween(ndvBD, 560, 5000);
+    }
 }
 }  // namespace
 

@@ -171,4 +171,87 @@ DEATH_TEST(CountNDV, ThrowsOnEmptyArrayInTraversal, "unexpected array in NDV com
 DEATH_TEST(CountNDV, ThrowsOnArrayInTraversal, "unexpected array in NDV computation") {
     countNDV({"a.b"}, {fromjson("{a: [{b: 1}]}")});
 }
+
+TEST(CountNDV, BasicMultiField) {
+    const std::vector<BSONObj> docs = {fromjson("{a: 1, b: 1}"),
+                                       fromjson("{a: 1, b: 2}"),
+                                       fromjson("{a: 2, b: 2}"),
+                                       fromjson("{a: 2, b: 2}"),
+                                       fromjson("{a: 3}"),
+                                       fromjson("{c: 3}"),
+                                       fromjson("{}")};
+    ASSERT_EQ(4, countNDV({"a"}, docs));
+    ASSERT_EQ(3, countNDV({"b"}, docs));
+    ASSERT_EQ(5, countNDV({"a", "b"}, docs));
+}
+
+TEST(CountNDV, MultiFieldManyFields) {
+    const std::vector<BSONObj> docs = {
+        // Note: different orders of fields in these documents.
+        fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}"),
+        fromjson("{b: 1, c: 1, a: 1, d: 1, e: 1}"),
+        // Note: different orders of fields in these documents.
+        fromjson("{a: 1, b: 1, c: 1, d: 1, e: 2}"),
+        fromjson("{d: 1, e: 2, a: 1, b: 1, c: 1}"),
+        // Note: different orders of fields in these documents.
+        fromjson("{a: 1, b: 2, c: 2, d: 2, e: 2}"),
+        fromjson("{e: 2, c: 2, b: 2, d: 2, a: 1}"),
+    };
+    ASSERT_EQ(1, countNDV({"a"}, docs));
+    ASSERT_EQ(2, countNDV({"b"}, docs));
+    ASSERT_EQ(2, countNDV({"c"}, docs));
+    ASSERT_EQ(2, countNDV({"d"}, docs));
+    ASSERT_EQ(2, countNDV({"e"}, docs));
+    ASSERT_EQ(2, countNDV({"a", "b"}, docs));
+    ASSERT_EQ(2, countNDV({"b", "c"}, docs));
+    ASSERT_EQ(3, countNDV({"a", "b", "c", "d", "e"}, docs));
+}
+
+TEST(CountNDV, MultiFieldOrderInsensitive) {
+    const std::vector<BSONObj> docs = {fromjson("{a: 1, b: 1}"),
+                                       fromjson("{b: 1, a: 1}"),
+                                       fromjson("{a: 1, b: 2}"),
+                                       fromjson("{b: 2, a: 1}"),
+                                       fromjson("{a: 2, b: 2}"),
+                                       fromjson("{b: 2, a: 2}")};
+    ASSERT_EQ(2, countNDV({"a"}, docs));
+    ASSERT_EQ(2, countNDV({"b"}, docs));
+    ASSERT_EQ(3, countNDV({"a", "b"}, docs));
+    ASSERT_EQ(3, countNDV({"b", "a"}, docs));
+}
+
+TEST(CountNDV, MultiFieldNullMissing) {
+    const std::vector<BSONObj> docs = {fromjson("{a: 1}"),
+                                       fromjson("{b: 1}"),
+                                       fromjson("{a: null}"),
+                                       fromjson("{b: null}"),
+                                       fromjson("{a: null, b: 1}"),
+                                       fromjson("{a: 1, b: null}"),
+                                       fromjson("{a: null, b: null}"),
+                                       fromjson("{}")};
+    ASSERT_EQ(3, countNDV({"a"}, docs));
+    ASSERT_EQ(3, countNDV({"b"}, docs));
+    ASSERT_EQ(8, countNDV({"a", "b"}, docs));
+    ASSERT_EQ(8, countNDV({"b", "a"}, docs));
+}
+
+TEST(CountNDV, MultiFieldDuplicateAndNestedFields) {
+    const std::vector<BSONObj> docs = {
+        fromjson("{a: 1, b: 1}"),
+        fromjson("{a: 1, b: 2}"),
+        fromjson("{a: 2, b: 1}"),
+        fromjson("{a: {b: 10}}"),
+        fromjson("{a: {b: 20}}"),
+        fromjson("{a: {b: 20}}"),
+        fromjson("{b: {b: 10}}"),
+    };
+    ASSERT_EQ(5, countNDV({"a"}, docs));
+    ASSERT_EQ(4, countNDV({"b"}, docs));
+
+    // Arguably these queries don't make the most sense, but we handle them correctly.
+    ASSERT_EQ(5, countNDV({"a", "a"}, docs));
+    ASSERT_EQ(5, countNDV({"a", "a.b"}, docs));
+    ASSERT_EQ(5, countNDV({"a.b", "a"}, docs));
+    ASSERT_EQ(5, countNDV({"a.b", "b"}, docs));
+}
 }  // namespace mongo::ce

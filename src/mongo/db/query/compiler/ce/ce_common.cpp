@@ -34,28 +34,54 @@
 
 namespace mongo::ce {
 
-size_t countNDV(const std::vector<FieldPath>& fieldNames, const std::vector<BSONObj>& docs) {
-    tassert(11158500, "Only single-field NDV computation is supported", fieldNames.size() == 1);
-    BSONElementSet distinctValues;
+namespace {
+class SameSizeVectorBSONElementCmp {
+public:
+    bool operator()(const std::vector<BSONElement>& l, const std::vector<BSONElement>& r) const {
+        // From below, we know these vector are all the same size.
+        tassert(11214702, "Vectors must be the same size", l.size() == r.size());
 
-    // These "array behavior" settings ensure we will stop and return any arrays we encounter.
-    const ElementPath eltPath(fieldNames[0].fullPath(),
-                              ElementPath::LeafArrayBehavior::kNoTraversal,
-                              ElementPath::NonLeafArrayBehavior::kMatchSubpath);
+        for (size_t i = 0; i < l.size(); i++) {
+            auto cmp = l[i].woCompare(r[i], false, nullptr /* stringComparator */);
+            if (cmp != 0) {
+                return cmp < 0;
+            }
+        }
+        return false;
+    }
+};
+}  // namespace
+
+// TODO SERVER-112198: Compute all NDVs in a single pass over the sample.
+size_t countNDV(const std::vector<FieldPath>& fieldNames, const std::vector<BSONObj>& docs) {
+    tassert(11214700, "Field names cannot be empty", !fieldNames.empty());
+    std::set<std::vector<BSONElement>, SameSizeVectorBSONElementCmp> distinctValues;
+
+    std::vector<BSONElement> fieldsInDoc;
+    fieldsInDoc.reserve(fieldNames.size());
 
     for (auto&& doc : docs) {
-        BSONElementIterator it(&eltPath, doc);
-        tassert(11158501, "Should always find at least one element at path in document", it.more());
+        fieldsInDoc.clear();
+        for (const auto& fieldName : fieldNames) {
+            // These "array behavior" settings ensure we stop and return any arrays we encounter.
+            const ElementPath eltPath(fieldName.fullPath(),
+                                      ElementPath::LeafArrayBehavior::kNoTraversal,
+                                      ElementPath::NonLeafArrayBehavior::kMatchSubpath);
+            BSONElementIterator it(&eltPath, doc);
+            tassert(
+                11158501, "Should always find at least one element at path in document", it.more());
 
-        const auto elt = it.next();
-        tassert(11158502,
-                "Encountered unexpected array in NDV computation",
-                elt.element().type() != BSONType::array);
-
-        if (distinctValues.contains(elt.element())) {
-            continue;
+            const auto elt = it.next();
+            tassert(11158502,
+                    "Encountered unexpected array in NDV computation",
+                    elt.element().type() != BSONType::array);
+            fieldsInDoc.push_back(elt.element());
         }
-        distinctValues.insert(elt.element());
+
+        tassert(11214701,
+                "Unexpected number of fields in tuple",
+                fieldsInDoc.size() == fieldNames.size());
+        distinctValues.insert(fieldsInDoc);
     }
     return distinctValues.size();
 }

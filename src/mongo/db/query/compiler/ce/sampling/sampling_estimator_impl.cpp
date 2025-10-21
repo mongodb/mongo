@@ -829,14 +829,14 @@ SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
 CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     const std::vector<FieldPath>& fieldNames) const {
-    tassert(11158503, "Only single-field NDV computation is supported", fieldNames.size() == 1);
     tassert(11158504, "Sample must be generated before calling estimateNDV()", _isSampleGenerated);
 
-    const auto& fieldName = fieldNames[0];
     if (!_topLevelSampleFieldNames.empty()) {
-        tassert(11158505,
-                "Sample must include the NDV fieldName as a top-level field.",
-                _topLevelSampleFieldNames.contains(fieldName.front()));
+        for (const auto& fieldName : fieldNames) {
+            tassert(11158505,
+                    "Sample must include the NDV fieldName as a top-level field.",
+                    _topLevelSampleFieldNames.contains(fieldName.front()));
+        }
     }
 
     // Obtain the NDV for the sample. If this is equal to the sample size, don't bother with NR
@@ -847,7 +847,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
         LOGV2_DEBUG(11228302,
                     5,
                     "SamplingCE NDV is equal to the sample size, outputting collection size",
-                    "fieldName"_attr = fieldName.fullPath(),
+                    "fieldNames"_attr = fieldNames,
                     "sampleNDV"_attr = sampleNDV,
                     "collectionCard"_attr = _collectionCard);
         return _collectionCard;
@@ -857,7 +857,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     LOGV2_DEBUG(11158506,
                 5,
                 "SamplingCE ndv (# unique values) for field",
-                "fieldName"_attr = fieldName.fullPath(),
+                "fieldNames"_attr = fieldNames,
                 "sampleNDV"_attr = sampleNDV,
                 "estimate"_attr = estimate);
 
@@ -865,7 +865,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
         LOGV2_DEBUG(11158507,
                     5,
                     "SamplingCE ndv exceeds collection size, rounding down",
-                    "fieldName"_attr = fieldName.fullPath(),
+                    "fieldNames"_attr = fieldNames,
                     "sampleNDV"_attr = sampleNDV,
                     "estimate"_attr = estimate,
                     "collectionCard"_attr = _collectionCard);
