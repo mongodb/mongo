@@ -432,11 +432,13 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     client.createCollWithOptions(nss, options);
 
     Date_t now = Date_t::now();
-    // Insert documents starting at 2x maxSpanSeconds prior to when we will run the TTL delete. As
-    // no document is going to go pass `now-maxSpanSeconds` all the inserted documents should be
-    // deleted by TTL.
+    // Insert documents starting at `2x maxSpanSeconds - 1` prior to when we will run the TTL
+    // delete. Since there are `maxSpanSeconds + 1` documents, we insert the documents such that the
+    // final document is safely below the `now-maxSpanSeconds` threshold, avoiding potential
+    // timestamp comparison issues seen sporadically on Windows platforms. As no document is going
+    // to go past `now-maxSpanSeconds`, all the inserted documents should be deleted by TTL.
     client.insertTimeseriesDocs(
-        nss, timeField, now - Seconds(maxSpanSeconds * 2), Seconds(1), documents);
+        nss, timeField, now - Seconds((maxSpanSeconds * 2) - 1), Seconds(1), documents);
     ASSERT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
