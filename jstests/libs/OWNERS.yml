@@ -81,3 +81,15 @@ filters:
   - "raw_operation_utils.js":
     approvers:
       - 10gen/server-collection-write-path
+  - "*.pem":
+    approvers:
+      - 10gen/server-security
+  - "*.sha1":
+    approvers:
+      - 10gen/server-security
+  - "*.sha256":
+    approvers:
+      - 10gen/server-security
+  - "*.pfx":
+    approvers:
+      - 10gen/server-security
