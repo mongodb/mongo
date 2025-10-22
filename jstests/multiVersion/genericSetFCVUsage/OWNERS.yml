@@ -101,3 +101,7 @@ filters:
     approvers:
       - 10gen/server-fcv
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "authoritative_database_metadata_on_FCV_transition.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+      - 10gen/server-catalog-and-routing-routing-and-topology

@@ -59,6 +59,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -68,6 +69,7 @@
 #include "mongo/db/local_catalog/database_holder.h"
 #include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/ddl/coll_mod_gen.h"
+#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/local_catalog/drop_collection.h"
 #include "mongo/db/local_catalog/drop_indexes.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
@@ -373,6 +375,65 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
     }()));
 }
 
+void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
+    // No shards should be added until we have forwarded the command to all shards.
+    Lock::SharedLock stableTopologyRegion =
+        ShardingCatalogManager::get(opCtx)->enterStableTopologyRegion(opCtx);
+
+    const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
+        opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    const auto& nss = NamespaceString::kConfigShardCatalogDatabasesNamespace;
+
+    for (const auto& shardType : opTimeWithShards.value) {
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+        if (shardStatus == ErrorCodes::ShardNotFound) {
+            continue;
+        }
+        const auto shard = uassertStatusOK(shardStatus);
+
+        // Build the listCollections command to find the collection's UUID.
+        ListCollections listCollectionsCmd;
+        listCollectionsCmd.setDbName(DatabaseName::kConfig);
+        listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+
+        const auto listCollRes = uassertStatusOK(
+            shard->runExhaustiveCursorCommand(opCtx,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              nss.dbName(),
+                                              listCollectionsCmd.toBSON(),
+                                              Milliseconds(-1)));
+
+        // If the collection doesn't exist, we're done.
+        if (listCollRes.docs.empty()) {
+            continue;
+        }
+
+        // Make noop write to be sure that we are the primary before sending the dropCollection.
+        sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
+
+        auto parsedResponse = ListCollectionsReplyItem::parse(listCollRes.docs[0]);
+
+        // Build and run the drop command using the uuid found as replay protection.
+        const auto uuid = parsedResponse.getInfo()->getUuid();
+        tassert(10289900,
+                "Expected uuid to be set for config.shard.catalog.databases collection",
+                uuid.has_value());
+        const auto dropCmd = BSON("drop" << nss.coll() << "collectionUUID" << *uuid
+                                         << "writeConcern" << BSON("w" << "majority"));
+
+        auto dropResponse = uassertStatusOK(
+            shard->runCommand(opCtx,
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              NamespaceString::kConfigShardCatalogDatabasesNamespace.dbName(),
+                              dropCmd,
+                              Shard::RetryPolicy::kIdempotent));
+
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(dropResponse));
+    }
+}
+
 /**
  * Sets the minimum allowed feature compatibility version for the cluster. The cluster should not
  * use any new features introduced in binary versions that are newer than the feature compatibility
@@ -621,6 +682,19 @@ public:
                 if (role && role->has(ClusterRole::ConfigServer) &&
                     requestedVersion > actualVersion) {
                     _fixConfigShardsTopologyTime(opCtx);
+                }
+
+                // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+                if (role && role->has(ClusterRole::ConfigServer) &&
+                    feature_flags::gShardAuthoritativeDbMetadataDDL
+                        .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                      actualVersion) &&
+                    !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                         .isUpgradingOrDowngrading()) {
+                    // Drop the authoritative database collection before transitioning to kUpgrading
+                    // to ensure we don't start from a state containing leftovers from a previous
+                    // upgrade.
+                    dropAuthoritativeDatabaseCollectionOnShards(opCtx);
                 }
 
                 if (role && role->has(ClusterRole::ConfigServer)) {
@@ -1886,18 +1960,12 @@ private:
         }
 
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-        if (isShardsvr &&
+        if (isConfigsvr &&
             !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabledOnVersion(requestedVersion)) {
-            // Dropping the authoritative collections (config.shard.catalog.X) as the final step of
-            // the downgrade ensures that no leftover data remains. This guarantees a clean
+            // Dropping the authoritative collections (config.shard.catalog.databases) as the final
+            // step of the downgrade ensures that no leftover data remains. This guarantees a clean
             // downgrade and makes it safe to upgrade again.
-            DropCollectionCoordinator::dropCollectionLocally(
-                opCtx,
-                NamespaceString::kConfigShardCatalogDatabasesNamespace,
-                true /* fromMigrate */,
-                false /* dropSystemCollections */,
-                boost::none,
-                false /* requireCollectionEmpty */);
+            dropAuthoritativeDatabaseCollectionOnShards(opCtx);
         }
 
         // TODO SERVER-94927: Remove once 9.0 becomes last lts.
