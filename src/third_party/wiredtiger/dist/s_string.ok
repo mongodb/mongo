@@ -828,6 +828,7 @@ foward
 fprintf
 fread
 free'd
+freopen
 fs
 fscanf
 fseek

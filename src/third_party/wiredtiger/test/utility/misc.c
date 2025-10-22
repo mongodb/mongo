@@ -403,6 +403,46 @@ testutil_wiredtiger_open(TEST_OPTS *opts, const char *home, const char *config,
 }
 
 #ifndef _WIN32
+
+/*
+ * testutil_timeout_wait --
+ *     Wait for a process up to a number of seconds, then time out.
+ */
+void
+testutil_timeout_wait(uint32_t timeout_seconds, pid_t pid)
+{
+    pid_t got;
+    uint32_t remaining_seconds;
+    int status;
+
+    remaining_seconds = timeout_seconds;
+    while (remaining_seconds > 0) {
+        if ((got = waitpid(pid, &status, WNOHANG)) == pid) {
+            if (WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS)
+                testutil_die(
+                  EINVAL, "child process %d exited with status %d", (int)pid, WEXITSTATUS(status));
+            if (WIFSIGNALED(status)) {
+#ifdef WCOREDUMP
+                if (WCOREDUMP(status))
+                    testutil_die(EINVAL, "child process %d killed by signal %d (core dumped)\n",
+                      (int)pid, WTERMSIG(status));
+#endif
+                testutil_die(
+                  EINVAL, "child process %d terminated with signal %d", (int)pid, WTERMSIG(status));
+            }
+            return;
+        } else if (got == -1)
+            testutil_die(errno, "waitpid");
+
+        --remaining_seconds;
+        sleep(1);
+    }
+    testutil_assert_errno(kill(pid, SIGKILL) == 0);
+    testutil_assert_errno(waitpid(pid, &status, 0) != -1);
+    testutil_die(EINVAL, "child process %d killed, timed out after " PRIu32 " seconds\n", (int)pid,
+      timeout_seconds);
+}
+
 /*
  * testutil_sleep_wait --
  *     Wait for a process up to a number of seconds.

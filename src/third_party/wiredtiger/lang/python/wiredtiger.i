@@ -32,6 +32,7 @@
  */
 %include <pybuffer.i>
 %include <cstring.i>
+%include <stdint.i>
 
 %define DOCSTRING
 "Python wrappers around the WiredTiger C API
@@ -1233,11 +1234,11 @@ SIDESTEP_METHOD(__wt_page_log, pl_get_complete_checkpoint_ext,
   (self, session, checkpoint_lsn, checkpoint_id, checkpoint_timestamp, checkpoint_metadata))
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_last_lsn,
-  (WT_SESSION *session, int *lsn),
+  (WT_SESSION *session, uint64_t *lsn),
   (self, session, lsn))
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_open_checkpoint,
-  (WT_SESSION *session, int *checkpoint_id),
+  (WT_SESSION *session, uint64_t *checkpoint_id),
   (self, session, checkpoint_id))
 
 SIDESTEP_METHOD(__wt_page_log, pl_open_handle,
@@ -1466,6 +1467,7 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 
 /* Convert 'int *' to output args for wiredtiger_version */
 %apply int *OUTPUT { int * };
+%apply uint64_t *OUTPUT { uint64_t * };
 %cstring_output_allocate(char **, );
 
 %rename(Cursor) __wt_cursor;

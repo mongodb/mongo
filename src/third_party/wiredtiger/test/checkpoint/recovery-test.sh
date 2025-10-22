@@ -45,6 +45,11 @@ while kill -STOP $pid ; do
 	cp $home/* $backup
 	kill -CONT $pid
 	cp $backup/* $recovery
+
+	# Timestamp must be set for disaggregate configuration.
+	if [ -n "$disagg_config" ]; then
+		disagg_config+=" -x"
+	fi
 	./${bin} $disagg_config -t r -D -v -h $recovery || exit 1
 done
 

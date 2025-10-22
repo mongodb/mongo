@@ -1667,8 +1667,9 @@ struct __wt_dsrc_stats {
     int64_t rec_page_delta_internal;
     int64_t rec_suffix_compression;
     int64_t rec_multiblock_internal;
+    int64_t rec_prefix_compression_delta;
+    int64_t rec_prefix_compression_full;
     int64_t rec_page_delta_leaf;
-    int64_t rec_prefix_compression;
     int64_t rec_multiblock_leaf;
     int64_t rec_overflow_key_leaf;
     int64_t rec_max_internal_page_deltas;

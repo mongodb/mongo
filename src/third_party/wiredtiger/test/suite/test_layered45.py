@@ -97,6 +97,8 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
         stat_cursor.close()
 
+        self.conn.close()
+
     def test_delete(self):
         self.session.create(self.uri, self.session_create_config())
 
@@ -162,6 +164,8 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
+        self.conn.close()
+
     def test_prepare_update(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.create(self.uri, self.session_create_config())
@@ -225,6 +229,8 @@ class test_layered45(wttest.WiredTigerTestCase):
         stat_cursor = session2.open_cursor('statistics:' + self.uri)
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
+
+        self.conn.close()
 
     def test_prepare_delete(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
@@ -291,6 +297,8 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
+        self.conn.close()
+
     def test_prepare_update_delete(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.create(self.uri, self.session_create_config())
@@ -356,3 +364,5 @@ class test_layered45(wttest.WiredTigerTestCase):
         stat_cursor = session2.open_cursor('statistics:' + self.uri)
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
+
+        self.conn.close()

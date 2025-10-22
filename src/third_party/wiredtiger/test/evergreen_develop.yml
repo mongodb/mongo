@@ -13,6 +13,7 @@ variables:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Release
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     database: WTPerformanceDataDB
+  tags: ["perf"]
   tasks:
     - name: compile
     - ".btree-perf"

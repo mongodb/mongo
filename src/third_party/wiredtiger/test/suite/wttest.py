@@ -567,6 +567,23 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
     def addTearDownAction(self, action):
         self.teardown_actions.append(action)
 
+    def verifyLayered(self):
+        # Need to check ".this" because SWIG proxies don't evaluate to None even after being freed.
+        if self.conn is None or self.conn.this is None:
+            self.conn = self.setUpConnectionOpen(".")
+        elif self.session is not None or self.session.this is not None:
+            # Ensure all cursors are closed by closing the session
+            self.session.close()
+
+        sess = self.conn.open_session()
+
+        cur = sess.open_cursor('metadata:', None, None)
+        while cur.next() == 0:
+            uri = cur.get_key()
+            if uri.startswith('layered:'):
+                self.verifyUntilSuccess(sess, uri)
+        cur.close()
+
     def tearDown(self, dueToRetry=False):
         teardown_failed = False
         teardown_msg = None
@@ -587,6 +604,12 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
                         teardown_msg += "; " + str(tmp[1])
 
         passed = not (self.failed() or teardown_failed)
+
+        if passed and self.__module__.startswith("test_layered"):
+            # FIXME-WT-15786: Handle the transient state where a follower that has not yet picked up
+            # its first checkpoint may fail with ENOENT due to missing its stable table.
+            if not re.match("test_layered(57|41|21|22|17)", str(self)):
+                self.verifyLayered()
 
         try:
             self.platform_api.tearDown(self)

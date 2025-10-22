@@ -305,6 +305,10 @@ struct __wti_reconcile {
     uint32_t count_internal_page_delta_key_deleted;
     uint32_t count_internal_page_delta_key_updated;
 
+    /* Stats for key bytes discarded using prefix compression.*/
+    uint32_t bytes_prefix_compression_delta;
+    uint32_t bytes_prefix_compression_full;
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WTI_REC_TIME_NEWEST_START_DURABLE_TS 0x01u
 #define WTI_REC_TIME_NEWEST_STOP_DURABLE_TS 0x02u

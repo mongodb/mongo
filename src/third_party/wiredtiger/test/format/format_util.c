@@ -174,35 +174,20 @@ track(const char *tag, uint64_t cnt)
 void
 path_setup(const char *home)
 {
-    size_t len;
-    const char *name;
-
     /* Home directory. */
-    g.home = dstrdup(home == NULL ? "RUNDIR" : home);
+    testutil_snprintf(g.home, sizeof(g.home), "%s", home != NULL ? home : "RUNDIR");
 
     /* Backup file. */
-    name = "WiredTiger.backup";
-    len = strlen(g.home) + strlen(name) + 2;
-    g.home_backup = dmalloc(len);
-    testutil_snprintf(g.home_backup, len, "%s/%s", g.home, name);
+    testutil_snprintf(g.home_backup, sizeof(g.home_backup), "%s/%s", g.home, "WiredTiger.backup");
 
     /* Configuration file. */
-    name = "CONFIG";
-    len = strlen(g.home) + strlen(name) + 2;
-    g.home_config = dmalloc(len);
-    testutil_snprintf(g.home_config, len, "%s/%s", g.home, name);
+    testutil_snprintf(g.home_config, sizeof(g.home_config), "%s/%s", g.home, "CONFIG");
 
     /* Key length configuration file. */
-    name = "CONFIG.keylen";
-    len = strlen(g.home) + strlen(name) + 2;
-    g.home_key = dmalloc(len);
-    testutil_snprintf(g.home_key, len, "%s/%s", g.home, name);
+    testutil_snprintf(g.home_key, sizeof(g.home_key), "%s/%s", g.home, "CONFIG.keylen");
 
     /* Statistics file. */
-    name = "OPERATIONS.stats";
-    len = strlen(g.home) + strlen(name) + 2;
-    g.home_stats = dmalloc(len);
-    testutil_snprintf(g.home_stats, len, "%s/%s", g.home, name);
+    testutil_snprintf(g.home_stats, sizeof(g.home_stats), "%s/%s", g.home, "OPERATIONS.stats");
 }
 
 /*

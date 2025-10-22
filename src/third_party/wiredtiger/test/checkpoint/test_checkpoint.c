@@ -124,9 +124,8 @@ main(int argc, char *argv[])
             strncpy(config_open, __wt_optarg, sizeof(config_open) - 1);
             break;
         case 'd': /* disaggregated storage options */
-            if (enable_disagg(__wt_optarg) != 0) {
-                return (usage());
-            }
+            g.opts.disagg_storage = true;
+            g.opts.disagg_mode = __wt_optarg;
             break;
         case 'D':
             g.debug_mode = true;
@@ -241,7 +240,19 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
 
+    /*
+     * Among other things, this initializes the random number generators in the option structure.
+     */
+    testutil_parse_end_opt(&g.opts);
+    /* Clean up on signal. */
+    (void)signal(SIGINT, onint);
+
+    testutil_work_dir_from_path(g.home, 512, (&g.opts)->home);
+
     if (g.opts.disagg_storage) {
+        if (enable_disagg(g.opts.disagg_mode) != 0)
+            return (usage());
+
         if (!g.use_timestamps) {
             fprintf(stderr, "disaggregated storage feature requires usage of timestamps (-x/-X)");
             return (EXIT_FAILURE);
@@ -263,15 +274,6 @@ main(int argc, char *argv[])
             return (EXIT_FAILURE);
         }
     }
-
-    /*
-     * Among other things, this initializes the random number generators in the option structure.
-     */
-    testutil_parse_end_opt(&g.opts);
-    /* Clean up on signal. */
-    (void)signal(SIGINT, onint);
-
-    testutil_work_dir_from_path(g.home, 512, (&g.opts)->home);
 
     /*
      * Always preserve home directory. Some tests rely on the home directory being present to
@@ -380,17 +382,14 @@ static int
 enable_disagg(const char *mode)
 {
     if (strcmp(mode, "leader") == 0) {
-        g.opts.disagg_storage = true;
         g.opts.disagg_switch_mode = false;
         g.opts.disagg_mode = "leader";
         g.opts.disagg_page_log = "palm";
     } else if (strcmp(mode, "follower") == 0) {
-        g.opts.disagg_storage = true;
         g.opts.disagg_mode = "follower";
         g.opts.disagg_switch_mode = false;
         g.opts.disagg_page_log = "palm";
     } else if (strcmp(mode, "switch") == 0) {
-        g.opts.disagg_storage = true;
         g.opts.disagg_switch_mode = true;
         /* For switch mode, randomly pick initial role */
         bool disagg_leader = (__wt_random(&g.opts.extra_rnd) % 2) == 0;
@@ -402,7 +401,8 @@ enable_disagg(const char *mode)
         return EINVAL;
     }
 
-    g.opts.palm_map_size_mb = 2048; /* Set 2GB map size for palm by default. */
+    g.opts.palm_map_size_mb = 2048;               /* Set 2GB map size for palm by default. */
+    g.opts.disagg_page_log_home = (char *)g.home; /* Set home directory for page log. */
 
     return 0;
 }

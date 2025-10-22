@@ -1072,7 +1072,8 @@ dsrc_stats = [
     ##########################################
     RecStat('rec_dictionary', 'dictionary matches'),
     RecStat('rec_multiblock_max', 'maximum blocks required for a page', 'max_aggregate,no_scale'),
-    RecStat('rec_prefix_compression', 'leaf page key bytes discarded using prefix compression', 'size'),
+    RecStat('rec_prefix_compression_delta', 'leaf delta page key bytes discarded using prefix compression', 'size'),
+    RecStat('rec_prefix_compression_full', 'leaf full page key bytes discarded using prefix compression', 'size'),
     RecStat('rec_suffix_compression', 'internal page key bytes discarded using suffix compression', 'size'),
 
     ##########################################

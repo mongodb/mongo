@@ -78,4 +78,3 @@ class test_layered03(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, None)
         while cursor.next() == 0:
             self.pr("Traversal retrieved: " + cursor.get_key() + ":" + cursor.get_value())
-

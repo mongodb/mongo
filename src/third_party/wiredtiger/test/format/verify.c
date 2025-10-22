@@ -62,9 +62,6 @@ table_verify(TABLE *table, void *arg)
      * On followers, verify returns ENOENT if the stable constituent is missing. Before the first
      * checkpoint is picked up or if the table has not been created locally, this is expected
      * behavior.
-     *
-     * FIXME-WT-15398: verify will always return ENOENT on followers until test/format supports
-     * checkpoint pickup.
      */
     testutil_assert(
       ret == 0 || ret == EBUSY || (g.disagg_storage_config && !g.disagg_leader && ret == ENOENT));

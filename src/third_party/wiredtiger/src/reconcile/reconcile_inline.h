@@ -84,6 +84,17 @@ __rec_page_delta_stats_clear(WTI_RECONCILE *r)
 }
 
 /*
+ * __rec_page_pfx_compression_stats_clear --
+ *     Clear page prefix compression statistics.
+ */
+static WT_INLINE void
+__rec_page_pfx_compression_stats_clear(WTI_RECONCILE *r)
+{
+    r->bytes_prefix_compression_delta = 0;
+    r->bytes_prefix_compression_full = 0;
+}
+
+/*
  * __rec_page_time_stats --
  *     Update statistics about this page.
  */

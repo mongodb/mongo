@@ -70,3 +70,9 @@ class test_layered33(wttest.WiredTigerTestCase):
         for i in range(0, 100):
             cursor.set_key(str(i))
             self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+
+        self.close_conn()
+
+        # Ignore "Removing local file due to disagg mode" messages printed by
+        # __wti_ensure_clean_startup_dir during disagg mode restarts.
+        self.ignoreStdoutPattern('local file')

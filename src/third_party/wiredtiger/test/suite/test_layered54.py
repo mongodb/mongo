@@ -72,7 +72,7 @@ class test_layered54(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return val
 
-    def insert(self, kv, ts):
+    def insert_or_update(self, kv, ts):
         cursor = self.session.open_cursor(self.uri, None, None)
         for k, v in kv.items():
             self.session.begin_transaction()
@@ -99,26 +99,32 @@ class test_layered54(wttest.WiredTigerTestCase):
         initial_value = "abc" * 10
         initial_ts = 5
         kv = {f'{initial_key}{i}': initial_value for i in range(1, self.nrows + 1)}
-        self.insert(kv, initial_ts)
+        self.insert_or_update(kv, initial_ts)
         self.session.checkpoint()
         # We should see suffix compression happened.
         self.assertGreater(self.get_stat(stat.dsrc.rec_suffix_compression, self.uri), 0)
-        # We should see prefix compression happened if it is configured.
+        # There's no prefix compression for delta yet.
+        self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_delta, self.uri), 0)
+        # We should see prefix compression for full page if it is configured.
         if (prefix_compression):
-            self.assertGreater(self.get_stat(stat.dsrc.rec_prefix_compression, self.uri), 0)
+            self.assertGreater(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
         else:
-            self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression, self.uri), 0)
+            self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
 
         # Re-open the connection to clear contents out of memory.
         self.reopen_disagg_conn(self.conn_config())
-        # Perform two small updates.
-        kv_modified = {f'{initial_key}{400}': "10abc", f'{initial_key}{800}': "220abc"}
-        self.insert(kv_modified, initial_ts + 1)
-        # Perform a checkpoint to write out a delta.
+        # Perform some updates.
+        kv_modified = {}
+        for i in range(1, 20):
+            kv_modified[f'{initial_key}{i}'] = '10abc'
+        self.insert_or_update(kv_modified, initial_ts + 1)
         self.session.checkpoint()
-        # Verify delta built.
         if (self.delta_type == 'both' or self.delta_type == 'leaf_only'):
             self.assertGreater(self.get_stat(stat.conn.rec_page_delta_leaf), 0)
+            # We should see prefix compression for delta and there's no prefix compression for full page.
+            if (prefix_compression):
+                self.assertGreater(self.get_stat(stat.dsrc.rec_prefix_compression_delta, self.uri), 0)
+                self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
             self.assertGreater(self.get_stat(stat.conn.rec_page_delta_internal), 0)
 

@@ -238,12 +238,6 @@ main(int argc, char *argv[])
         }
     argv += __wt_optind;
 
-    /* format.sh looks for this line in the log file, push it out quickly. */
-    if (!syntax_check) {
-        printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
-        fflush(stdout);
-    }
-
     /*
      * Initialize the RNGs. This is needed early because some random decisions are made while
      * reading configuration. There may be random seeds in the configuration, however, so we will
@@ -309,6 +303,21 @@ main(int argc, char *argv[])
      */
     if (quiet_flag || !isatty(1))
         GV(QUIET) = 1;
+
+    /* Configure the random number generators. */
+    config_random_generators();
+
+    /*
+     * If disagg is enabled in multi-node, this call forks additional follower processes. Code that
+     * follows runs in each process.
+     */
+    disagg_setup_multi_node();
+
+    /* format.sh looks for this line in the log file, push it out quickly. */
+    if (!syntax_check) {
+        printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
+        fflush(stdout);
+    }
 
     /* Configure the run. */
     config_run();
@@ -429,6 +438,8 @@ skip_operations:
     __wt_seconds(NULL, &now);
     printf("%s: successful run completed (%" PRIu64 " seconds)\n ", progname, now - start);
     fflush(stdout);
+
+    disagg_teardown_multi_node();
 
     config_clear();
 

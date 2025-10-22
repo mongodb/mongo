@@ -191,6 +191,8 @@ CONFIG configuration_list[] = {
 
 {"disagg.leaf_page_delta", "writing deltas for leaf pages", C_BOOL, 95, 0, 0}
 
+{"disagg.multi", "configure multiple nodes (leader & followers) for disaggregated storage", C_IGNORE | C_BOOL , 0, 0, 0}
+
 {"disagg.enabled", "configure disaggregated storage", C_IGNORE | C_BOOL | C_TABLE | C_TYPE_ROW, 0, 0, 0}
 
 {"disagg.layered", "use layered URI for any disaggregated tables", C_BOOL, 100, 1, 0}
