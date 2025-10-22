@@ -578,8 +578,9 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
     const auto& collectionPtr = distinctArgs.collections.getMainCollection();
 
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
-    // unwinds arrays and treats each element in an array as its own key.
-    const bool mayUnwindArrays =
+    // either unwinds arrays and treats each element in an array as its own key or ignores missing
+    // fields.
+    const bool mayUnwindArraysOrIgnoreMissing =
         !(distinctArgs.plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
     auto ii =
@@ -608,7 +609,12 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
                 continue;
             }
 
-            if (!mayUnwindArrays &&
+            // If we do not want to ignore missing fields then we cannot use a sparse index.
+            if (!mayUnwindArraysOrIgnoreMissing && desc->isSparse()) {
+                continue;
+            }
+
+            if (!mayUnwindArraysOrIgnoreMissing &&
                 isAnyComponentOfPathOrProjectionMultikey(
                     desc->keyPattern(),
                     ice->isMultikey(opCtx, collectionPtr),
