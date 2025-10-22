@@ -33,6 +33,7 @@ try {
         tlsMode: "requireTLS",
         tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
         tlsCAFile: "jstests/libs/trusted-ca.pem",
+        tlsClusterFile: "jstests/libs/trusted-client.pem",
         tlsAllowInvalidCertificates: "",
         tlsWeakCertificateValidation: "",
     };

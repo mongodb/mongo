@@ -14,14 +14,20 @@ import {
 
 const clientThumbprint = cat("jstests/libs/trusted-client.pem.digest.sha1");
 const serverThumbprint = cat("jstests/libs/trusted-server.pem.digest.sha1");
+const clusterServerThumbprint = cat("jstests/libs/trusted-cluster-server.pem.digest.sha1");
 const CLIENT = "CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 const SERVER = "CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+const CLUSTER_SERVER = "CN=Trusted Kernel Test Cluster Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 
 const testCases = [
+    // Configure server with only a certificateSelector - we expect this to be used instead of
+    // the --tlsCertificateKeyFile by the server for both ingress (server) and egress (client)
+    // traffic for both cluster and other communication
+    //
     {
-        selector: `thumbprint=${serverThumbprint}`,
-        expectIngressKeyUsed: SERVER,
-        expectEgressKeyUsed: SERVER,
+        selector: `thumbprint=${clusterServerThumbprint}`,
+        expectIngressKeyUsed: CLUSTER_SERVER,
+        expectEgressKeyUsed: CLUSTER_SERVER,
     },
     {
         selector: `thumbprint=${serverThumbprint}`,
@@ -141,6 +147,7 @@ requireSSLProvider("windows", function () {
         };
         assert.eq(0, importPfx("jstests\\libs\\trusted-client.pfx"));
         assert.eq(0, importPfx("jstests\\libs\\trusted-server.pfx"));
+        assert.eq(0, importPfx("jstests\\libs\\trusted-cluster-server.pfx"));
     }
 
     try {

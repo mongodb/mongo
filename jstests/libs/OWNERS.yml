@@ -96,3 +96,15 @@ filters:
   - "host_ipaddr.js":
     approvers:
       - 10gen/server-networking-and-observability
+  - "*.pem":
+    approvers:
+      - 10gen/server-security
+  - "*.sha1":
+    approvers:
+      - 10gen/server-security
+  - "*.sha256":
+    approvers:
+      - 10gen/server-security
+  - "*.pfx":
+    approvers:
+      - 10gen/server-security
