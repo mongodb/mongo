@@ -77,6 +77,8 @@ Download and install VS Code from [code.visualstudio.com](https://code.visualstu
 
 To clone the repository using SSH (recommended for contributors), you'll need SSH keys configured with GitHub.
 
+> **⚠️ Important:** Run all commands in this section on your **host machine** (not inside the container). SSH keys need to be set up before cloning the repository into the container.
+
 #### Check if you have SSH keys
 
 ```bash
