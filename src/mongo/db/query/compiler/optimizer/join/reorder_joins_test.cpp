@@ -29,9 +29,10 @@
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
-#include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -39,10 +40,10 @@ namespace mongo::join_ordering {
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join"};
 
-class ReorderGraphTest : public AggregationContextFixture {
+class ReorderGraphTest : public CatalogTestFixture {
 protected:
     std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss) {
-        auto expCtx = getExpCtx();
+        auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
@@ -82,7 +83,7 @@ TEST_F(ReorderGraphTest, SimpleGraph) {
     auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
     auto cq2 = makeCanonicalQuery(nss2);
     solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-    auto id2 = graph.addNode(nss1, std::move(cq2), FieldPath{"b"});
+    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
 
     std::vector<ResolvedPath> resolvedPaths{
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},

@@ -50,7 +50,9 @@ mongo_cc_unit_test(
     deps = [
         ":join_ordering",
         ":reorder_joins",
+        ":unit_test_helpers",
         "//src/mongo/db:query_exec",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
     ],
 )
@@ -95,6 +97,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":solution_storage",
+        ":unit_test_helpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
     ],
@@ -122,5 +125,19 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/query:canonical_query_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "unit_test_helpers",
+    srcs = [
+        "unit_test_helpers.cpp",
+    ],
+    hdrs = [
+        "unit_test_helpers.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/pipeline",
     ],
 )
