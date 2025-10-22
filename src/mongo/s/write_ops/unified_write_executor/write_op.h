@@ -43,7 +43,6 @@ enum WriteType {
     kInsert = BatchedCommandRequest::BatchType_Insert,
     kUpdate = BatchedCommandRequest::BatchType_Update,
     kDelete = BatchedCommandRequest::BatchType_Delete,
-    kFindAndMod,  // TODO SERVER-103949 will use this type or remove it.
 };
 
 using WriteOpId = size_t;
@@ -58,6 +57,8 @@ public:
     WriteOp(const BulkWriteCommandRequest& request, int index)
         : WriteOp(WriteOpRef{request, index}) {}
 
+    WriteOp(const write_ops::FindAndModifyCommandRequest& request) : WriteOp(WriteOpRef{request}) {}
+
     WriteOpId getId() const {
         return _ref.getIndex();
     }
@@ -66,7 +67,7 @@ public:
         return _ref.getNss();
     }
 
-    const boost::optional<UUID>& getCollectionUUID() const {
+    boost::optional<UUID> getCollectionUUID() const {
         return _ref.getCollectionUUID();
     }
 
@@ -78,26 +79,41 @@ public:
         return _ref.getEncryptionInformation();
     }
 
-    BulkWriteOpVariant getBulkWriteOp() const {
-        return _ref.visitOpData(
-            OverloadedVisitor{[&](const BSONObj& insertDoc) -> BulkWriteOpVariant {
-                                  return BulkWriteInsertOp(0, insertDoc);
-                              },
-                              [&](const write_ops::UpdateOpEntry& updateOp) -> BulkWriteOpVariant {
-                                  return bulk_write_common::toBulkWriteUpdate(updateOp);
-                              },
-                              [&](const write_ops::DeleteOpEntry& deleteOp) -> BulkWriteOpVariant {
-                                  return bulk_write_common::toBulkWriteDelete(deleteOp);
-                              },
-                              [&](const mongo::BulkWriteInsertOp& insertOp) -> BulkWriteOpVariant {
-                                  return insertOp;
-                              },
-                              [&](const mongo::BulkWriteUpdateOp& updateOp) -> BulkWriteOpVariant {
-                                  return updateOp;
-                              },
-                              [&](const mongo::BulkWriteDeleteOp& deleteOp) -> BulkWriteOpVariant {
-                                  return deleteOp;
+    bool isFindAndModify() const {
+        return getCommand().visitRequest(
+            OverloadedVisitor{[&](const BatchedCommandRequest&) { return false; },
+                              [&](const BulkWriteCommandRequest&) { return false; },
+                              [&](const write_ops::FindAndModifyCommandRequest&) {
+                                  return true;
                               }});
+    }
+
+    BulkWriteOpVariant getBulkWriteOp() const {
+        tassert(10394907,
+                "Unexpected findAndModify command to convert to bulkWrite op",
+                !isFindAndModify());
+        return _ref.visitOpData(OverloadedVisitor{
+            [&](const BSONObj& insertDoc) -> BulkWriteOpVariant {
+                return BulkWriteInsertOp(0, insertDoc);
+            },
+            [&](const write_ops::UpdateOpEntry& updateOp) -> BulkWriteOpVariant {
+                return bulk_write_common::toBulkWriteUpdate(updateOp);
+            },
+            [&](const write_ops::DeleteOpEntry& deleteOp) -> BulkWriteOpVariant {
+                return bulk_write_common::toBulkWriteDelete(deleteOp);
+            },
+            [&](const mongo::BulkWriteInsertOp& insertOp) -> BulkWriteOpVariant {
+                return insertOp;
+            },
+            [&](const mongo::BulkWriteUpdateOp& updateOp) -> BulkWriteOpVariant {
+                return updateOp;
+            },
+            [&](const mongo::BulkWriteDeleteOp& deleteOp) -> BulkWriteOpVariant {
+                return deleteOp;
+            },
+            [&](const write_ops::FindAndModifyCommandRequest&) -> BulkWriteOpVariant {
+                MONGO_UNREACHABLE;
+            }});
     }
 
     bool isMulti() const {

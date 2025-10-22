@@ -60,20 +60,19 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         case WriteType::kDelete: {
             tr = targeter.targetDelete(opCtx, op.getItemRef());
         } break;
-        case WriteType::kFindAndMod: {
-            MONGO_UNIMPLEMENTED;
-        } break;
         default: {
             MONGO_UNREACHABLE;
         } break;
     }
 
-    size_t nsIdx = BulkWriteCRUDOp(op.getBulkWriteOp()).getNsInfoIdx();
-    _stats.recordTargetingStats(tr.endpoints,
-                                nsIdx,
-                                targeter.isTargetedCollectionSharded(),
-                                targeter.getAproxNShardsOwningChunks(),
-                                op.getType());
+    if (!op.isFindAndModify()) {
+        size_t nsIdx = BulkWriteCRUDOp(op.getBulkWriteOp()).getNsInfoIdx();
+        _stats.recordTargetingStats(tr.endpoints,
+                                    nsIdx,
+                                    targeter.isTargetedCollectionSharded(),
+                                    targeter.getAproxNShardsOwningChunks(),
+                                    op.getType());
+    }
 
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
     const auto& cm = cri.getChunkManager();

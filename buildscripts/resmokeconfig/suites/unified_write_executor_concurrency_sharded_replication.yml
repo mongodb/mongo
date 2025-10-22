@@ -9,6 +9,14 @@ selector:
     - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
     - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
     - jstests/concurrency/fsm_workloads/query/globally_managed_cursors.js
+
+    # TODO SERVER-104122: Handle WCOS error in UWE.
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_update_shard_key.js
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_update_shard_key_kill_sessions.js
+
+    # TODO SERVER-111710: enable viewful timeseries
+    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
+
   exclude_with_any_tags:
     - requires_standalone
     - requires_replication

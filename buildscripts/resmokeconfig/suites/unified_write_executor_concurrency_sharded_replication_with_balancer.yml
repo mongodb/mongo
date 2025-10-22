@@ -41,7 +41,7 @@ selector:
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
     # TODO SERVER-111710: enable viewful timeseries
-    - jstests/concurrency/fsm_workloads/timeseries/*.js
+    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
 
   exclude_with_any_tags:
     - requires_standalone

@@ -92,6 +92,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -630,6 +631,57 @@ BSONObj makeExplainCmd(OperationContext* opCtx,
     return ClusterExplain::wrapAsExplain(appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj),
                                          verbosity);
 }
+
+/**
+ * If this command has 'let' parameters, then evaluate them once and stash them back on
+ * the original command object. Note that this isn't necessary outside of the case where
+ * we have a routing table because this is intended to prevent evaluating let parameters
+ * multiple times (which can only happen when executing against a sharded cluster).
+ */
+BSONObj expandLetParams(OperationContext* opCtx, const NamespaceString& nss, BSONObj cmdObj) {
+    auto letParams = getLet(cmdObj);
+    if (letParams) {
+        auto runtimeConstants = getLegacyRuntimeConstants(cmdObj);
+        BSONObj collation = getCollation(cmdObj);
+
+        const auto noCollationSpecified = collation.isEmpty();
+        auto&& cif = [&]() {
+            if (noCollationSpecified) {
+                return std::unique_ptr<CollatorInterface>{};
+            } else {
+                return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                           ->makeFromBSON(collation));
+            }
+        }();
+
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx)
+                          .collator(std::move(cif))
+                          .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+                          .ns(nss)
+                          .resolvedNamespace(ResolvedNamespaceMap{
+                              {nss, ResolvedNamespace(nss, std::vector<BSONObj>{})}})
+                          .fromRouter(true)
+                          .bypassDocumentValidation(true)
+                          .explain(boost::none /* verbosity */)
+                          .runtimeConstants(runtimeConstants)
+                          .letParameters(letParams)
+                          .build();
+
+        // Serialize variables before moving 'cmdObj' to avoid invalid access.
+        expCtx->variables.seedVariablesWithLetParameters(
+            expCtx.get(), *letParams, [](const Expression* expr) {
+                return expression::getDependencies(expr).hasNoRequirements();
+            });
+        auto letVars = Value(expCtx->variables.toBSON(expCtx->variablesParseState, *letParams));
+
+        MutableDocument cmdDoc(Document(std::move(cmdObj)));
+        cmdDoc[write_ops::FindAndModifyCommandRequest::kLetFieldName] = letVars;
+        cmdObj = cmdDoc.freeze().toBson();
+    }
+
+    return cmdObj;
+}
 }  // namespace
 
 Status FindAndModifyCmd::explain(OperationContext* opCtx,
@@ -782,13 +834,42 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     const NamespaceString originalNss(
         CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj));
 
-    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
-        return true;
-    }
-
     if (OptionalBool::parseFromBSON(originalCmdObj[kRawDataFieldName]) ||
         originalNss.isTimeseriesBucketsCollection()) {
         isRawDataOperation(opCtx) = true;
+    }
+
+    // Collect metrics.
+    _updateMetrics->collectMetrics(originalCmdObj);
+
+    if (unified_write_executor::isEnabled(opCtx)) {
+        // Evaluate let parameters once before forwarding to the shards for non-deterministic
+        // operators like $rand.
+        auto cmdObjForShard = expandLetParams(opCtx, originalNss, originalCmdObj);
+
+        auto request = write_ops::FindAndModifyCommandRequest::parse(
+            cmdObjForShard, IDLParserContext("ClusterFindAndModify"));
+        request.setNamespace(originalNss);
+
+        auto response = unified_write_executor::findAndModify(opCtx, request, originalCmdObj);
+        if (response.swReply.isOK()) {
+            auto& reply = response.swReply.getValue();
+            if (response.wce) {
+                reply.setWriteConcernError(response.wce->toBSON());
+            }
+            reply.serialize(&result);
+        } else {
+            if (response.wce && !result.hasField("writeConcernError")) {
+                result.append("writeConcernError", response.wce->toBSON());
+            }
+            uassertStatusOK(response.swReply.getStatus());
+        }
+
+        return true;
+    }
+
+    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
+        return true;
     }
 
     auto findAndModifyBody = [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
@@ -809,7 +890,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         const auto& cm = cri.getChunkManager();
 
         auto nss = originalNss;
-        auto cmdObj = originalCmdObj;
+        auto cmdObjForShard = originalCmdObj;
 
         auto isTrackedTimeseries = cri.hasRoutingTable() && cm.getTimeseriesFields();
         auto isTimeseriesLogicalRequest = false;
@@ -823,9 +904,6 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
         // writing to a sharded timeseries collection.
 
-        // Collect metrics.
-        _updateMetrics->collectMetrics(cmdObj);
-
         // Create an RAII object that prints the collection's shard key in the case of a tassert
         // or crash.
         ScopedDebugInfo shardKeyDiagnostics(
@@ -834,7 +912,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                 cm.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
 
         // Append mongoS' runtime constants to the command object before forwarding it to the shard.
-        auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
+        cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObjForShard);
 
         if (cri.hasRoutingTable()) {
             // If the request is for a view on a sharded legacy timeseries buckets collection, we
@@ -843,6 +921,12 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                 cmdObjForShard = replaceNamespaceByBucketNss(opCtx, cmdObjForShard, nss);
             }
 
+            // Evaluate let parameters once before forwarding to the shards for non-deterministic
+            // operators like $rand.
+            cmdObjForShard = expandLetParams(opCtx, nss, cmdObjForShard);
+
+            BSONObj query = cmdObjForShard.getObjectField("query");
+            const bool isUpsert = cmdObjForShard.getBoolField("upsert");
             auto letParams = getLet(cmdObjForShard);
             auto runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
             BSONObj collation = getCollation(cmdObjForShard);
@@ -853,33 +937,6 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                                                                        boost::none /* verbosity */,
                                                                        letParams,
                                                                        runtimeConstants);
-
-            // If this command has 'let' parameters, then evaluate them once and stash them back on
-            // the original command object. Note that this isn't necessary outside of the case where
-            // we have a routing table because this is intended to prevent evaluating let parameters
-            // multiple times (which can only happen when executing against a sharded cluster).
-            if (letParams) {
-                // Serialize variables before moving 'cmdObjForShard' to avoid invalid access.
-                expCtx->variables.seedVariablesWithLetParameters(
-                    expCtx.get(), *letParams, [](const Expression* expr) {
-                        return expression::getDependencies(expr).hasNoRequirements();
-                    });
-                auto letVars =
-                    Value(expCtx->variables.toBSON(expCtx->variablesParseState, *letParams));
-
-                MutableDocument cmdDoc(Document(std::move(cmdObjForShard)));
-                cmdDoc[write_ops::FindAndModifyCommandRequest::kLetFieldName] = letVars;
-                cmdObjForShard = cmdDoc.freeze().toBson();
-
-                // Reset the objects set up above as they are now invalid given that
-                // 'cmdObjForShard' has been changed.
-                letParams = getLet(cmdObjForShard);
-                runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
-                collation = getCollation(cmdObjForShard);
-            }
-
-            BSONObj query = cmdObjForShard.getObjectField("query");
-            const bool isUpsert = cmdObjForShard.getBoolField("upsert");
 
             if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                              nss,

@@ -33,14 +33,18 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/unified_write_executor/write_op.h"
 #include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
 namespace unified_write_executor {
 
-using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteCommandReply>;
+struct FindAndModifyCommandResponse {
+    StatusWith<write_ops::FindAndModifyCommandReply> swReply;
+    boost::optional<WriteConcernErrorDetail> wce;
+};
+using WriteCommandResponse =
+    std::variant<BatchedCommandResponse, BulkWriteCommandReply, FindAndModifyCommandResponse>;
 
 /**
  * This function will execute the specified write command and return a response.
@@ -60,6 +64,13 @@ BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandReques
 BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
                                 const BulkWriteCommandRequest& request,
                                 BSONObj originalCommand = BSONObj());
+
+/**
+ * Helper function for executing findAndModify commands.
+ */
+FindAndModifyCommandResponse findAndModify(OperationContext* opCtx,
+                                           const write_ops::FindAndModifyCommandRequest& request,
+                                           BSONObj originalCommand = BSONObj());
 
 /**
  * Unified write executor feature flag check. Also ensures we only have viewless timeseries

@@ -47,9 +47,25 @@ namespace mongo {
 namespace unified_write_executor {
 
 namespace {
-BulkWriteCommandReply parseBulkWriteCommandReply(const BSONObj& responseData) {
-    return BulkWriteCommandReply::parse(responseData,
-                                        IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
+void appendWriteConcern(OperationContext* opCtx, BSONObjBuilder& builder) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    auto writeConcern = getWriteConcernForShardRequest(opCtx);
+    // We don't append write concern in a transaction.
+    if (writeConcern && !inTransaction) {
+        builder.append(WriteConcernOptions::kWriteConcernField, writeConcern->toBSON());
+    }
+}
+
+DatabaseName getExecutionDatabase(const WriteBatch& batch) {
+    // If the batch is generated from a findAndModify command, we send to the requested database.
+    // Otherwise, we send to admin database because bulkWrite like commands may contain multiple
+    // namespaces.
+    if (batch.isFindAndModify()) {
+        auto namespaces = batch.getInvolvedNamespaces();
+        tassert(10394900, "Expected only a single namespace", namespaces.size() == 1);
+        return namespaces.begin()->dbName();
+    }
+    return DatabaseName::kAdmin;
 }
 }  // namespace
 
@@ -166,10 +182,11 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::map<WriteOpId, UUID>& sampleIds,
-    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
-    ShouldAppendWriteConcern shouldAppendWriteConcern,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-    FilterGenericArguments filterGenericArguments) const {
+    FilterGenericArguments filterGenericArguments,
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+    BSONObjBuilder builder;
     auto bulkRequest =
         buildBulkWriteRequestWithoutTxnInfo(opCtx,
                                             ops,
@@ -177,23 +194,120 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
                                             sampleIds,
                                             allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                                             filterGenericArguments);
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-    BSONObjBuilder builder;
     bulkRequest.serialize(&builder);
 
     if (shouldAppendLsidAndTxnNumber == ShouldAppendLsidAndTxnNumber{true}) {
         logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
     }
 
-    if (shouldAppendWriteConcern == ShouldAppendWriteConcern{true}) {
-        auto writeConcern = getWriteConcernForShardRequest(opCtx);
-        // We don't append write concern in a transaction.
-        if (writeConcern && !inTransaction) {
-            builder.append(WriteConcernOptions::kWriteConcernField, writeConcern->toBSON());
-        }
+    if (shouldAppendReadWriteConcern == ShouldAppendReadWriteConcern{true}) {
+        appendWriteConcern(opCtx, builder);
     }
 
     return builder.obj();
+}
+
+BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
+    OperationContext* opCtx,
+    const std::vector<WriteOp>& ops,
+    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::map<WriteOpId, UUID>& sampleIds,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+    tassert(10394901, "Expected a single write op for the findAndModify command", ops.size() == 1);
+    const auto& op = ops.front();
+    tassert(10394902, "Expected a findAndModify request", op.getCommand().isFindAndModifyCommand());
+
+    // Make a copy of the original request and clear attributes that we may append later.
+    auto request = op.getCommand().getFindAndModifyCommandRequest();
+    request.setLsid(boost::none);
+    request.setTxnNumber(boost::none);
+    request.setWriteConcern(boost::none);
+    request.setReadConcern(boost::none);
+
+    auto sampleIdIt = sampleIds.find(op.getId());
+    if (sampleIdIt != sampleIds.end()) {
+        request.setSampleId(sampleIdIt->second);
+    }
+
+    if (op.getType() == WriteType::kUpdate &&
+        allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
+        request.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+            *allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+    }
+
+    auto cmdObj = CommandHelpers::filterCommandRequestForPassthrough(request.toBSON());
+
+    if (!versionByNss.empty()) {
+        auto versionIt = versionByNss.find(op.getNss());
+        if (versionIt != versionByNss.end()) {
+            if (versionIt->second.shardVersion) {
+                cmdObj = appendShardVersion(cmdObj, *versionIt->second.shardVersion);
+            }
+            if (versionIt->second.databaseVersion) {
+                cmdObj = appendDbVersionIfPresent(cmdObj, *versionIt->second.databaseVersion);
+            }
+        }
+    }
+
+    if (shouldAppendReadWriteConcern == ShouldAppendReadWriteConcern{true}) {
+        cmdObj = applyReadWriteConcern(opCtx, true /* appendRC */, true /* appendWC */, cmdObj);
+    }
+
+    BSONObjBuilder builder(cmdObj);
+    if (shouldAppendLsidAndTxnNumber == ShouldAppendLsidAndTxnNumber{true}) {
+        logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
+    }
+
+    // Try to preserve the original command name alias to forward to shards.
+    cmdObj = builder.obj();
+    if (!_originalCmdObj.isEmpty() &&
+        _originalCmdObj.firstElementFieldNameStringData() !=
+            cmdObj.firstElementFieldNameStringData()) {
+
+        BSONObjBuilder builder;
+        BSONObjIterator it(cmdObj);
+        BSONElement firstElt = it.next();
+        builder.append(_originalCmdObj.firstElementFieldNameStringData(),
+                       firstElt.checkAndGetStringData());
+        while (it.more()) {
+            BSONElement elt = it.next();
+            builder.append(elt);
+        }
+        cmdObj = builder.obj();
+    }
+    return cmdObj;
+}
+
+BSONObj WriteBatchExecutor::buildRequest(
+    OperationContext* opCtx,
+    const std::vector<WriteOp>& ops,
+    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::map<WriteOpId, UUID>& sampleIds,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+    FilterGenericArguments filterGenericArguments,
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+    tassert(10394903, "Expected at least one write op", !ops.empty());
+    if (ops.front().isFindAndModify()) {
+        return buildFindAndModifyRequest(opCtx,
+                                         ops,
+                                         versionByNss,
+                                         sampleIds,
+                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                         shouldAppendLsidAndTxnNumber,
+                                         shouldAppendReadWriteConcern);
+    } else {
+        return buildBulkWriteRequest(opCtx,
+                                     ops,
+                                     versionByNss,
+                                     sampleIds,
+                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                     filterGenericArguments,
+                                     shouldAppendLsidAndTxnNumber,
+                                     shouldAppendReadWriteConcern);
+    }
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
@@ -207,27 +321,31 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 const SimpleWriteBatch& batch) {
     std::vector<AsyncRequestsSender::Request> requestsToSend;
     for (auto& [shardId, shardRequest] : batch.requestByShardId) {
-        auto bulkRequestObj = buildBulkWriteRequest(opCtx,
-                                                    shardRequest.ops,
-                                                    shardRequest.versionByNss,
-                                                    shardRequest.sampleIds,
-                                                    ShouldAppendLsidAndTxnNumber{true},
-                                                    ShouldAppendWriteConcern{true});
+        auto requestObj =
+            buildRequest(opCtx,
+                         shardRequest.ops,
+                         shardRequest.versionByNss,
+                         shardRequest.sampleIds,
+                         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                         FilterGenericArguments{false},
+                         ShouldAppendLsidAndTxnNumber{true},
+                         ShouldAppendReadWriteConcern{true});
         LOGV2_DEBUG(10605503,
                     4,
                     "Constructed request for shard",
-                    "request"_attr = bulkRequestObj,
+                    "request"_attr = requestObj,
                     "shardId"_attr = shardId);
-        requestsToSend.emplace_back(shardId, std::move(bulkRequestObj));
+        requestsToSend.emplace_back(shardId, std::move(requestObj));
     }
 
     // Note we check this rather than `isRetryableWrite()` because we do not want to retry
     // commands within retryable internal transactions.
     bool shouldRetry = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
+    auto databaseName = getExecutionDatabase(WriteBatch{batch});
     auto sender = MultiStatementTransactionRequestsSender(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        DatabaseName::kAdmin,
+        databaseName,
         std::move(requestsToSend),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kStrictlyNotIdempotent);
@@ -268,44 +386,23 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         sampleIds.emplace(writeOp.getId(), *batch.sampleId);
     }
 
-    auto cmdObj = buildBulkWriteRequest(opCtx,
-                                        {writeOp},
-                                        {},        /* versionByNss*/
-                                        sampleIds, /* sampleIds */
-                                        ShouldAppendLsidAndTxnNumber{false},
-                                        ShouldAppendWriteConcern{false},
-                                        allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+    auto cmdObj = buildRequest(opCtx,
+                               {writeOp},
+                               {},        /* versionByNss*/
+                               sampleIds, /* sampleIds */
+                               allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                               FilterGenericArguments{false},
+                               ShouldAppendLsidAndTxnNumber{false},
+                               ShouldAppendReadWriteConcern{false});
 
     boost::optional<WriteConcernErrorDetail> wce;
     auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
         opCtx, writeOp.getNss(), std::move(cmdObj), wce);
 
-    // If 'swRes' is OK but the response is empty, that means the two-phase write completed
-    // successfully without updating or deleting anything (because nothing matched the filter).
-    //
-    // In this case, we create a BulkWriteCommandReply containing a single reply item with an OK
-    // status and with n=0 (and with nModified=0 if 'op' is an update), and then we return a
-    // NoRetryWriteBatchResponse containing this BulkWriteCommandReply.
-    if (swRes.isOK() && swRes.getValue().getResponse().isEmpty()) {
-        BulkWriteReplyItem replyItem(0, swRes.getStatus());
-        replyItem.setN(0);
-        if (writeOp.getType() == WriteType::kUpdate) {
-            replyItem.setNModified(0);
-        }
+    auto swResponse = swRes.isOK() ? StatusWith{swRes.getValue().getResponse().getOwned()}
+                                   : StatusWith<BSONObj>{swRes.getStatus()};
 
-        auto cursor =
-            BulkWriteCommandResponseCursor(0 /*cursorId*/,
-                                           std::vector<BulkWriteReplyItem>{std::move(replyItem)},
-                                           NamespaceString::makeBulkWriteNSS(boost::none));
-        return NoRetryWriteBatchResponse{
-            BulkWriteCommandReply(std::move(cursor), 0, 0, 0, 0, 0, 0), std::move(wce), writeOp};
-    }
-
-    auto swBulkWriteResponse = swRes.isOK()
-        ? StatusWith{parseBulkWriteCommandReply(swRes.getValue().getResponse())}
-        : StatusWith<BulkWriteCommandReply>{swRes.getStatus()};
-
-    return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), writeOp};
+    return NoRetryWriteBatchResponse{std::move(swResponse), std::move(wce), writeOp};
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
@@ -313,38 +410,35 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 const InternalTransactionBatch& batch) {
     const WriteOp& writeOp = batch.op;
 
-    bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
-
     std::map<WriteOpId, UUID> sampleIds;
     if (batch.sampleId) {
         sampleIds.emplace(writeOp.getId(), *batch.sampleId);
     }
 
-    auto singleUpdateRequest =
-        buildBulkWriteRequestWithoutTxnInfo(opCtx,
-                                            {writeOp},
-                                            {}, /* versionByNss*/
-                                            sampleIds,
-                                            allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+    auto cmdObj = buildRequest(opCtx,
+                               {writeOp},
+                               {},          /* versionByNss*/
+                               sampleIds,   /* sampleIds */
+                               boost::none, /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */
+                               FilterGenericArguments{false},
+                               ShouldAppendLsidAndTxnNumber{false},
+                               ShouldAppendReadWriteConcern{false});
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     txn_api::SyncTransactionWithRetries txn(
         opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
-    BulkWriteCommandReply bulkWriteResponse;
+    BSONObj response;
 
-    // Execute the singleUpdateRequest (a bulkWrite command) in an internal transaction to
-    // perform the retryable timeseries update operation. This separate bulkWrite command will
-    // get executed on its own via unified_write_executor::bulkWrite() logic again as a transaction,
-    // which handles retries of all kinds. This function is just a client of the internal
-    // transaction spawned. As a result, we must only receive a single final (non-retryable)
-    // response for the timeseries update operation.
+    // Execute the `cmdObj` in an internal transaction to perform the retryable timeseries update
+    // operation. This separate write command will get executed on its own via UWE logic again as a
+    // transaction, which handles retries of all kinds. This function is just a client of the
+    // internal transaction spawned. As a result, we must only receive a single final
+    // (non-retryable) response for the timeseries update operation.
     auto swResult = txn.runNoThrow(
         opCtx, [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            auto updateResponse = txnClient.runCRUDOpSync(singleUpdateRequest);
-            bulkWriteResponse = std::move(updateResponse);
-
+            auto database = getExecutionDatabase(WriteBatch{batch});
+            response = txnClient.runCommandSync(database, cmdObj);
             return SemiFuture<void>::makeReady();
         });
 
@@ -357,11 +451,10 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         }
     }
 
-    auto swBulkWriteResponse = responseStatus.isOK()
-        ? StatusWith(std::move(bulkWriteResponse))
-        : StatusWith<BulkWriteCommandReply>(responseStatus);
+    auto swResponse =
+        responseStatus.isOK() ? StatusWith(response) : StatusWith<BSONObj>(responseStatus);
 
-    return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), writeOp};
+    return NoRetryWriteBatchResponse{std::move(swResponse), std::move(wce), writeOp};
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
@@ -370,21 +463,21 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     const WriteOp& writeOp = batch.op;
     const auto& nss = writeOp.getNss();
 
-    auto cmdObj = buildBulkWriteRequest(opCtx,
-                                        {writeOp},
-                                        {}, /* versionByNss */
-                                        {}, /* sampleIds */
-                                        ShouldAppendLsidAndTxnNumber{true},
-                                        ShouldAppendWriteConcern{false},
-                                        false, /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */
-                                        FilterGenericArguments{true});
+    auto cmdObj = buildRequest(opCtx,
+                               {writeOp},
+                               {},          /* versionByNss */
+                               {},          /* sampleIds */
+                               boost::none, /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */
+                               FilterGenericArguments{true},
+                               ShouldAppendLsidAndTxnNumber{true},
+                               ShouldAppendReadWriteConcern{false});
 
-    StatusWith<BulkWriteCommandReply> reply = [&]() {
+    StatusWith<BSONObj> reply = [&]() {
         try {
-            return StatusWith(coordinate_multi_update_util::parseBulkResponse(
-                coordinate_multi_update_util::executeCoordinateMultiUpdate(opCtx, nss, cmdObj)));
+            return StatusWith(
+                coordinate_multi_update_util::executeCoordinateMultiUpdate(opCtx, nss, cmdObj));
         } catch (const DBException& e) {
-            return StatusWith<BulkWriteCommandReply>(e.toStatus());
+            return StatusWith<BSONObj>(e.toStatus());
         }
     }();
 

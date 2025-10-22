@@ -83,8 +83,6 @@ void Stats::updateMetrics(OperationContext* opCtx) {
                 case WriteType::kDelete:
                     metricsWriteType = NumHostsTargetedMetrics::QueryType::kDeleteCmd;
                     break;
-                case WriteType::kFindAndMod:
-                    MONGO_UNIMPLEMENTED_TASSERT(10413602);
                 default:
                     MONGO_UNREACHABLE;
             }

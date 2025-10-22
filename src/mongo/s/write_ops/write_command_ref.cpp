@@ -74,7 +74,7 @@ boost::optional<std::int32_t> BatchWriteCommandRefImpl::getStmtId() const {
     return getRequest().getWriteCommandRequestBase().getStmtId();
 }
 
-const boost::optional<std::vector<std::int32_t>>& BatchWriteCommandRefImpl::getStmtIds() const {
+boost::optional<std::vector<std::int32_t>> BatchWriteCommandRefImpl::getStmtIds() const {
     return getRequest().getWriteCommandRequestBase().getStmtIds();
 }
 
@@ -124,7 +124,7 @@ boost::optional<std::int32_t> BulkWriteCommandRefImpl::getStmtId() const {
     return getRequest().getStmtId();
 }
 
-const boost::optional<std::vector<std::int32_t>>& BulkWriteCommandRefImpl::getStmtIds() const {
+boost::optional<std::vector<std::int32_t>> BulkWriteCommandRefImpl::getStmtIds() const {
     return getRequest().getStmtIds();
 }
 
@@ -181,7 +181,7 @@ const boost::optional<BSONObj>& BatchWriteCommandRefImpl::getCollation(int index
                           }});
 }
 
-const boost::optional<BSONObj>& BatchWriteCommandRefImpl::getConstants(int index) const {
+boost::optional<BSONObj> BatchWriteCommandRefImpl::getConstants(int index) const {
     using RetT = const boost::optional<BSONObj>&;
     return visitUpdateOpData(
         index, [&](const write_ops::UpdateOpEntry& updateOp) -> RetT { return updateOp.getC(); });
@@ -218,7 +218,7 @@ const NamespaceString& BatchWriteCommandRefImpl::getNss(int index) const {
     return getRequest().getNS();
 }
 
-const boost::optional<UUID>& BatchWriteCommandRefImpl::getCollectionUUID(int index) const {
+boost::optional<UUID> BatchWriteCommandRefImpl::getCollectionUUID(int index) const {
     return getRequest().getCollectionUUID();
 }
 
@@ -321,7 +321,7 @@ const boost::optional<BSONObj>& BulkWriteCommandRefImpl::getCollation(int index)
             }});
 }
 
-const boost::optional<BSONObj>& BulkWriteCommandRefImpl::getConstants(int index) const {
+boost::optional<BSONObj> BulkWriteCommandRefImpl::getConstants(int index) const {
     using RetT = const boost::optional<BSONObj>&;
     return visitUpdateOpData(
         index, [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getConstants(); });
@@ -359,7 +359,7 @@ const NamespaceString& BulkWriteCommandRefImpl::getNss(int index) const {
     return getRequest().getNsInfo()[nsInfoIdx].getNs();
 }
 
-const boost::optional<UUID>& BulkWriteCommandRefImpl::getCollectionUUID(int index) const {
+boost::optional<UUID> BulkWriteCommandRefImpl::getCollectionUUID(int index) const {
     auto nsInfoIdx = visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
     return getRequest().getNsInfo()[nsInfoIdx].getCollectionUUID();
 }
@@ -401,4 +401,120 @@ BSONObj BulkWriteCommandRefImpl::toBSON(int index) const {
     return visitOpData(index, [&](const auto& op) { return op.toBSON(); });
 }
 
+int FindAndModifyCommandRefImpl::estimateOpSizeInBytes(int index) const {
+    return 0;
+}
+
+bool FindAndModifyCommandRefImpl::getBypassDocumentValidation() const {
+    return getRequest().getBypassDocumentValidation().value_or(false);
+}
+
+const OptionalBool& FindAndModifyCommandRefImpl::getBypassEmptyTsReplacement() const {
+    return getRequest().getBypassEmptyTsReplacement();
+}
+
+const boost::optional<IDLAnyTypeOwned>& FindAndModifyCommandRefImpl::getComment() const {
+    return getRequest().getGenericArguments().getComment();
+}
+
+boost::optional<bool> FindAndModifyCommandRefImpl::getErrorsOnly() const {
+    return false;
+}
+
+const boost::optional<LegacyRuntimeConstants>&
+FindAndModifyCommandRefImpl::getLegacyRuntimeConstants() const {
+    static const boost::optional<LegacyRuntimeConstants> kMissingLegacyRuntimeConstants;
+    return kMissingLegacyRuntimeConstants;
+}
+
+const boost::optional<BSONObj>& FindAndModifyCommandRefImpl::getLet() const {
+    return getRequest().getLet();
+}
+
+boost::optional<std::int64_t> FindAndModifyCommandRefImpl::getMaxTimeMS() const {
+    return getRequest().getGenericArguments().getMaxTimeMS();
+}
+
+std::set<NamespaceString> FindAndModifyCommandRefImpl::getNssSet() const {
+    std::set<NamespaceString> nssSet;
+    nssSet.insert(getRequest().getNamespace());
+    return nssSet;
+}
+
+bool FindAndModifyCommandRefImpl::getOrdered() const {
+    return true;
+}
+
+boost::optional<std::int32_t> FindAndModifyCommandRefImpl::getStmtId() const {
+    return getRequest().getStmtId();
+}
+
+boost::optional<std::vector<std::int32_t>> FindAndModifyCommandRefImpl::getStmtIds() const {
+    return getRequest().getStmtId().map([](auto stmtId) { return std::vector<int32_t>{stmtId}; });
+}
+
+const boost::optional<std::vector<BSONObj>>& FindAndModifyCommandRefImpl::getArrayFilters(
+    int index) const {
+    return getRequest().getArrayFilters();
+}
+
+const boost::optional<BSONObj>& FindAndModifyCommandRefImpl::getCollation(int index) const {
+    return getRequest().getCollation();
+}
+
+boost::optional<BSONObj> FindAndModifyCommandRefImpl::getConstants(int index) const {
+    return boost::none;
+}
+
+const BSONObj& FindAndModifyCommandRefImpl::getFilter(int index) const {
+    return getRequest().getQuery();
+}
+
+const BSONObj& FindAndModifyCommandRefImpl::getDocument(int index) const {
+    return BSONObj::kEmptyObject;
+}
+
+bool FindAndModifyCommandRefImpl::getMulti(int index) const {
+    return false;
+}
+
+const NamespaceString& FindAndModifyCommandRefImpl::getNss(int index) const {
+    return getRequest().getNamespace();
+}
+
+boost::optional<UUID> FindAndModifyCommandRefImpl::getCollectionUUID(int index) const {
+    return boost::none;
+}
+
+BatchedCommandRequest::BatchType FindAndModifyCommandRefImpl::getOpType(int index) const {
+    if (getRequest().getUpdate()) {
+        return BatchedCommandRequest::BatchType_Update;
+    } else {
+        tassert(10394910,
+                "Expect 'remove' to be true for a findAndModify command",
+                getRequest().getRemove());
+        return BatchedCommandRequest::BatchType_Delete;
+    }
+}
+
+const write_ops::UpdateModification& FindAndModifyCommandRefImpl::getUpdateMods(int index) const {
+    static write_ops::UpdateModification emptyUpdateMod;
+    if (!getRequest().getUpdate()) {
+        return emptyUpdateMod;
+    }
+    return *getRequest().getUpdate();
+}
+
+bool FindAndModifyCommandRefImpl::getUpsert(int index) const {
+    return getRequest().getUpsert().value_or(false);
+}
+
+const boost::optional<mongo::EncryptionInformation>&
+FindAndModifyCommandRefImpl::getEncryptionInformation(int index) const {
+    return getRequest().getEncryptionInformation();
+}
+
+BSONObj FindAndModifyCommandRefImpl::toBSON(int index) const {
+    return getRequest().toBSON();
+}
 }  // namespace mongo

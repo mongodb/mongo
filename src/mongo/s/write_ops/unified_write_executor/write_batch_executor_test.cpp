@@ -494,6 +494,91 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
     future.default_timed_get();
 }
 
+TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) {
+    const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+
+    auto query = BSON("a" << 1);
+    auto sort = BSON("s" << 1);
+    auto remove = false;
+    auto update = BSON("$set" << BSON("b" << 1));
+    auto newParam = true;
+    auto fields = BSON("f" << 1);
+    auto upsert = true;
+    auto bypassDocumentValidation = false;
+    auto maxTimeMS = 1000;
+    auto collation = BSON("locale" << "en_US" << "numericOrdering" << true);
+    auto arrayFilters = BSON("x.a" << BSON("$gt" << 2));
+    auto hint = BSON("h" << 1);
+    auto comment = "comment";
+    auto let = BSON("l" << 1);
+    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nss1);
+    findAndModifyRequest.setQuery(query);
+    findAndModifyRequest.setSort(sort);
+    findAndModifyRequest.setRemove(remove);
+    findAndModifyRequest.setUpdate(write_ops::UpdateModification(update));
+    findAndModifyRequest.setNew(newParam);
+    findAndModifyRequest.setFields(fields);
+    findAndModifyRequest.setUpsert(upsert);
+    findAndModifyRequest.setBypassDocumentValidation(bypassDocumentValidation);
+    findAndModifyRequest.setMaxTimeMS(maxTimeMS);
+    findAndModifyRequest.setCollation(collation);
+    findAndModifyRequest.setArrayFilters(std::vector<BSONObj>{arrayFilters});
+    findAndModifyRequest.setHint(hint);
+    findAndModifyRequest.setComment(IDLAnyTypeOwned(BSON("key" << comment)["key"]));
+    findAndModifyRequest.setLet(let);
+    WriteCommandRef cmdRef(findAndModifyRequest);
+
+    auto batch = SimpleWriteBatch{{{shardId1,
+                                    {
+                                        {{nss1, nss1Shard1}},
+                                        {WriteOp(findAndModifyRequest)},
+                                    }}}};
+    auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
+    operationContext()->setLogicalSessionId(lsid);
+    auto txnNumber = 0;
+    operationContext()->setTxnNumber(txnNumber);
+
+    auto future = launchAsync([&]() {
+        MockRoutingContext rtx;
+        WriteBatchExecutor executor(cmdRef);
+        auto resps = executor.execute(operationContext(), rtx, {batch});
+
+        ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
+
+        auto& responses = get<SimpleWriteBatchResponse>(resps);
+
+        std::set<ShardId> expectedShardIds{shardId1};
+        ASSERT_EQ(1, responses.size());
+        for (auto& [shardId, response] : responses) {
+            ASSERT(expectedShardIds.contains(shardId));
+            ASSERT(response.swResponse.getStatus().isOK());
+            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+        }
+    });
+
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        BSONObjBuilder builder;
+        nss1Shard1.shardVersion->serialize("", &builder);
+        auto shardVersionBson = builder.obj().firstElement().Obj().getOwned();
+
+        ASSERT_BSONOBJ_EQ_UNORDERED(
+            BSON("findAndModify" << nss1.coll() << "query" << query << "fields" << fields << "sort"
+                                 << sort << "hint" << hint << "collation" << collation
+                                 << "arrayFilters" << BSON_ARRAY(arrayFilters) << "remove" << remove
+                                 << "update" << update << "lsid" << lsid.toBSON() << "upsert"
+                                 << upsert << "new" << newParam << "bypassDocumentValidation"
+                                 << bypassDocumentValidation << "let" << let << "maxTimeMS"
+                                 << maxTimeMS << "comment" << comment << "txnNumber" << txnNumber
+                                 << "databaseVersion" << nss1DbVersion.toBSON() << "shardVersion"
+                                 << shardVersionBson << "readConcern" << BSONObj() << "writeConcern"
+                                 << operationContext()->getWriteConcern().toBSON()),
+            request.cmdObj);
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
+}
 }  // namespace
 }  // namespace unified_write_executor
 }  // namespace mongo

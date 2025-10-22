@@ -56,7 +56,7 @@ struct EmptyBatchResponse {};
 using SimpleWriteBatchResponse = std::map<ShardId, ShardResponse>;
 
 struct NoRetryWriteBatchResponse {
-    StatusWith<BulkWriteCommandReply> swResponse;
+    StatusWith<BSONObj> swResponse;
     boost::optional<WriteConcernErrorDetail> wce;
     WriteOp op;
 };
@@ -73,13 +73,8 @@ public:
      * The scheduler uses this method to determine if it needs to provide a RoutingContext when
      * it calls execute().
      */
-    WriteBatchExecutor(WriteCommandRef cmdRef) : _cmdRef(cmdRef) {}
-
-    WriteBatchExecutor(const BatchedCommandRequest& request)
-        : WriteBatchExecutor(WriteCommandRef{request}) {}
-
-    WriteBatchExecutor(const BulkWriteCommandRequest& request)
-        : WriteBatchExecutor(WriteCommandRef{request}) {}
+    WriteBatchExecutor(WriteCommandRef cmdRef, BSONObj originalCmdObj = BSONObj())
+        : _cmdRef(cmdRef), _originalCmdObj(originalCmdObj) {}
 
     bool usesProvidedRoutingContext(const WriteBatch& batch) const;
 
@@ -92,7 +87,7 @@ public:
 
 private:
     enum class ShouldAppendLsidAndTxnNumber : bool {};
-    enum class ShouldAppendWriteConcern : bool {};
+    enum class ShouldAppendReadWriteConcern : bool {};
     enum class FilterGenericArguments : bool {};
 
     WriteBatchResponse _execute(OperationContext* opCtx,
@@ -120,20 +115,39 @@ private:
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
-        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none,
-        FilterGenericArguments filterGenericArguments = FilterGenericArguments{false}) const;
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+        FilterGenericArguments filterGenericArguments) const;
 
     BSONObj buildBulkWriteRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+        FilterGenericArguments filterGenericArguments,
         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
-        ShouldAppendWriteConcern shouldAppendWriteConcern,
-        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none,
-        FilterGenericArguments filterGenericArguments = FilterGenericArguments{false}) const;
+        ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
+
+    BSONObj buildFindAndModifyRequest(
+        OperationContext* opCtx,
+        const std::vector<WriteOp>& ops,
+        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const std::map<WriteOpId, UUID>& sampleIds,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+        ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+        ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
+
+    BSONObj buildRequest(OperationContext* opCtx,
+                         const std::vector<WriteOp>& ops,
+                         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+                         const std::map<WriteOpId, UUID>& sampleIds,
+                         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                         FilterGenericArguments filterGenericArguments,
+                         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+                         ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
 
     const WriteCommandRef _cmdRef;
+    const BSONObj _originalCmdObj;
 };
 
 }  // namespace unified_write_executor

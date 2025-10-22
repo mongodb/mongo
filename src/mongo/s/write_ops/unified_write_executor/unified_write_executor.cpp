@@ -46,9 +46,10 @@ namespace unified_write_executor {
 namespace {
 bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
     // When determining if a write command is non-verbose, we follow slightly different rules
-    // for batch write commands vs. bulk write commands. For batch write commands, we match the
-    // existing behavior of BatchWriteOp::buildClientResponse(). For bulk write commands, we
-    // match the existing behavior of ClusterBulkWriteCmd::Invocation::_populateCursorReply().
+    // for different write commands. For batch write commands, we match the existing behavior
+    // of BatchWriteOp::buildClientResponse(). For bulk write commands, we match the existing
+    // behavior of ClusterBulkWriteCmd::Invocation::_populateCursorReply(). For findAndModify
+    // commands, it is always "verbose" regardless of the write concern settings.
     const auto& wc = opCtx->getWriteConcern();
     return cmdRef.visitRequest(OverloadedVisitor{
         [&](const BatchedCommandRequest&) { return !wc.requiresWriteAcknowledgement(); },
@@ -56,7 +57,9 @@ bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
             return !wc.requiresWriteAcknowledgement() &&
                 (wc.syncMode == WriteConcernOptions::SyncMode::NONE ||
                  wc.syncMode == WriteConcernOptions::SyncMode::UNSET);
-        }});
+        },
+        [&](const write_ops::FindAndModifyCommandRequest&) { return false; },
+    });
 }
 }  // namespace
 
@@ -81,7 +84,7 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
         batcher = std::make_unique<UnorderedWriteOpBatcher>(producer, analyzer);
     }
 
-    WriteBatchExecutor executor(cmdRef);
+    WriteBatchExecutor executor(cmdRef, originalCommand);
     WriteBatchResponseProcessor processor(cmdRef, stats, isNonVerbose, originalCommand);
     WriteBatchScheduler scheduler(cmdRef, *batcher, executor, processor);
 
@@ -117,6 +120,25 @@ BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
     }
 
     return std::get<BulkWriteCommandReply>(
+        executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
+}
+
+FindAndModifyCommandResponse findAndModify(OperationContext* opCtx,
+                                           const write_ops::FindAndModifyCommandRequest& request,
+                                           BSONObj originalCommand) {
+    if (request.getEncryptionInformation()) {
+        StatusWith<write_ops::FindAndModifyCommandReply> swReply(
+            write_ops::FindAndModifyCommandReply{});
+        boost::optional<WriteConcernErrorDetail> wce = boost::none;
+        FLEBatchResult result = processFLEFindAndModify(opCtx, request, swReply, wce);
+        if (result == FLEBatchResult::kProcessed) {
+            return {swReply, wce};
+        }
+        // When FLE logic determines there is no need of processing, we fall through to the normal
+        // case.
+    }
+
+    return std::get<FindAndModifyCommandResponse>(
         executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
 }
 
