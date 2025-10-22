@@ -211,8 +211,8 @@ public:
         const {
         return _revealedIds;
     }
-    void setRevealedIds(stdx::unordered_map<std::string, std::vector<BSONObj>> unhash) {
-        _revealedIds = std::move(unhash);
+    void setRevealedIds(stdx::unordered_map<std::string, std::vector<BSONObj>> revealedIds) {
+        _revealedIds = std::move(revealedIds);
     }
 
     bool getRepaired() const {
