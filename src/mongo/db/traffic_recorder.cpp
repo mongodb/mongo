@@ -313,7 +313,7 @@ void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext
         auto sessions = getActiveSessions(svcCtx);
         // Record SessionStart events if exists any active session.
         for (const auto& [id, session] : sessions) {
-            observe(id, session, Message(), svcCtx, EventType::kSessionStart);
+            _observe(id, session, Message(), svcCtx, EventType::kSessionStart);
         }
     }
 }
@@ -322,7 +322,7 @@ void TrafficRecorder::stop(ServiceContext* svcCtx) {
     auto sessions = getActiveSessions(svcCtx);
     // Record SessionEnd events if exists any active session.
     for (const auto& [id, session] : sessions) {
-        observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
+        _observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
     }
 
     _shouldRecord.store(false);
@@ -337,18 +337,31 @@ void TrafficRecorder::stop(ServiceContext* svcCtx) {
     uassertStatusOK(recording->shutdown());
 }
 
+void TrafficRecorder::sessionStarted(const std::shared_ptr<transport::Session>& ts,
+                                     ServiceContext* svcCtx) {
+    auto id = ts->id();
+    auto session = ts->toBSON().toString();
+    _observe(id, session, Message(), svcCtx, EventType::kSessionStart);
+}
+void TrafficRecorder::sessionEnded(const std::shared_ptr<transport::Session>& ts,
+                                   ServiceContext* svcCtx) {
+    auto id = ts->id();
+    auto session = ts->toBSON().toString();
+    _observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
+}
+
 void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
                               const Message& message,
                               ServiceContext* svcCtx,
                               EventType eventType) {
-    observe(ts->id(), ts->toBSON().toString(), message, svcCtx, eventType);
+    _observe(ts->id(), ts->toBSON().toString(), message, svcCtx, eventType);
 }
 
-void TrafficRecorder::observe(uint64_t id,
-                              const std::string& session,
-                              const Message& message,
-                              ServiceContext* svcCtx,
-                              EventType eventType) {
+void TrafficRecorder::_observe(uint64_t id,
+                               const std::string& session,
+                               const Message& message,
+                               ServiceContext* svcCtx,
+                               EventType eventType) {
     if (!_shouldRecord.load()) {
         return;
     }

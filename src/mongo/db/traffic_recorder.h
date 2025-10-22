@@ -91,11 +91,8 @@ public:
     void start(const StartTrafficRecording& options, ServiceContext* svcCtx);
     void stop(ServiceContext* svcCtx);
 
-    void observe(uint64_t id,
-                 const std::string& session,
-                 const Message& message,
-                 ServiceContext* svcCtx,
-                 EventType eventType = EventType::kRegular);
+    void sessionStarted(const std::shared_ptr<transport::Session>& ts, ServiceContext* svcCtx);
+    void sessionEnded(const std::shared_ptr<transport::Session>& ts, ServiceContext* svcCtx);
 
     // This is the main interface to record a message. It also maintains open sessions in order to
     // record 'kSessionStart' and 'kSessionEnd' events.
@@ -164,6 +161,13 @@ protected:
         int64_t _written = 0;
         Status _result = Status::OK();
     };
+
+
+    void _observe(uint64_t id,
+                  const std::string& session,
+                  const Message& message,
+                  ServiceContext* svcCtx,
+                  EventType eventType);
 
     // Helper method to be overridden in tests
     virtual std::shared_ptr<Recording> _makeRecording(const StartTrafficRecording& options,
