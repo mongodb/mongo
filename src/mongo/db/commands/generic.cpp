@@ -248,6 +248,7 @@ public:
             BSONObjBuilder temp(b.subobjStart(command->getName()));
             temp.append("help", command->help());
             temp.append("requiresAuth", command->requiresAuth());
+            temp.append("requiresAuthzChecks", command->requiresAuthzChecks());
             temp.append("secondaryOk",
                         command->secondaryAllowed(opCtx->getServiceContext()) ==
                             Command::AllowedOnSecondary::kAlways);
