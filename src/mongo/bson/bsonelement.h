@@ -359,7 +359,7 @@ public:
     /**
      * size in bytes of the element's value (when applicable).
      */
-    int valuesize() const {
+    MONGO_COMPILER_ALWAYS_INLINE int valuesize() const {
         auto type = static_cast<uint8_t>(*_data);
         uint32_t mask = 1u << (type & 0x1fu);
         int32_t size = kFixedSizes[type];

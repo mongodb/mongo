@@ -367,63 +367,63 @@ public:
 
     void eof() {}
 
-    void append(bool val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(bool val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(int32_t val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(int32_t val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(int64_t val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(int64_t val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(Decimal128 val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(Decimal128 val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(double val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(double val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(Timestamp val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(Timestamp val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(Date_t val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(Date_t val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(OID val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(OID val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(StringData val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(StringData val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(const BSONBinData& val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(const BSONBinData& val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
-    void append(const BSONCode& val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(const BSONCode& val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }
 
     template <typename T>
-    void append(const BSONElement& val) {
+    MONGO_COMPILER_ALWAYS_INLINE void append(const BSONElement& val) {
         _last = CMaterializer::template materialize<T>(*_allocator, val);
         _collection.push_back(_last);
     }
