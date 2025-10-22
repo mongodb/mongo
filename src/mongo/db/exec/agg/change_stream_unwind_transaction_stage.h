@@ -155,14 +155,14 @@ private:
 
         // Helper for getNextTransactionOp(). Performs assertions on the document inside
         // applyOps.
-        void _assertExpectedTransactionEventFormat(const Document& d) const;
+        void _assertExpectedTransactionEventFormat(const Document& doc) const;
 
         // Traverse backwards through the oplog by starting at the entry at 'firstOpTime' and
         // following "prevOpTime" links until reaching the terminal "prevOpTime" value, and push the
         // OpTime value to '_txnOplogEntries' for each entry traversed, including the 'firstOpTime'
         // entry. Note that we follow the oplog links _backwards_ through the oplog (i.e., in
         // reverse chronological order) but because this is a stack, the iterator will process them
-        // in the opposite order, allowing iteration to proceed fowards and return operations in
+        // in the opposite order, allowing iteration to proceed forwards and return operations in
         // chronological order.
         void _collectAllOpTimesFromTransaction(OperationContext* opCtx, repl::OpTime firstOpTime);
 

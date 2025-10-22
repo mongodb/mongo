@@ -135,8 +135,8 @@ public:
 
     // Round number or pointer up to N-byte boundary. No change if already aligned.
     template <typename T>
-    static T align(T size) {
-        const intmax_t ALIGNMENT = 8;  // must be power of 2 and <= 16 (malloc alignment)
+    constexpr static T align(T size) {
+        constexpr intmax_t ALIGNMENT = 8;  // must be power of 2 and <= 16 (malloc alignment)
         // Can't use c++ cast because of conversion between intmax_t and both ints and pointers
         return (T)(((intmax_t)(size) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1));
     }

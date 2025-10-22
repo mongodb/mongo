@@ -321,7 +321,7 @@ Value Value::operator[](StringData name) const {
     if (getType() != BSONType::object)
         return Value();
 
-    return getDocument()[name];
+    return _storage.getDocument()[name];
 }
 
 void Value::_appendToBson(BSONObjBuilder& builder, StringData fieldName) const {

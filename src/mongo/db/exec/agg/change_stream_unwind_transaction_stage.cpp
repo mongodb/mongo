@@ -34,6 +34,7 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
@@ -121,7 +122,7 @@ GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {
         // occurred at once as part of a transaction. If we already have a transaction context
         // open, that would mean we are looking at an applyOps or commit nested within an
         // applyOps, which is not allowed in the oplog.
-        tassert(5543801, "Transaction iterator not found", !_txnIterator);
+        tassert(5543801, "Transaction iterator found, but expected none", !_txnIterator);
 
         // Once we initialize the transaction iterator, we can loop back to the top in order to
         // call 'getNextTransactionOp' on it. Note that is possible for the transaction iterator
@@ -135,14 +136,17 @@ GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {
 bool ChangeStreamUnwindTransactionStage::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
     auto opType = repl::OpType_parse(op.getStringData(), IDLParserContext("ChangeStreamEntry.op"));
-    auto commandVal = doc["o"];
 
-    if (opType != repl::OpTypeEnum::kCommand ||
-        (commandVal["applyOps"].missing() && commandVal["commitTransaction"].missing())) {
+    if (opType != repl::OpTypeEnum::kCommand) {
+        return false;
+    }
+
+    auto commandVal = doc["o"_sd];
+    if (commandVal["applyOps"_sd].missing() && commandVal["commitTransaction"_sd].missing()) {
         // We should never see an "abortTransaction" command at this point.
         tassert(5543802,
-                str::stream() << "Unexpected op at " << doc["ts"].getTimestamp().toString(),
-                opType != repl::OpTypeEnum::kCommand || commandVal["abortTransaction"].missing());
+                str::stream() << "Unexpected op at " << doc["ts"_sd].getTimestamp().toString(),
+                commandVal["abortTransaction"_sd].missing());
         return false;
     }
 
@@ -167,13 +171,14 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
     // multiOpType is kApplyOpsAppliedSeparately.  The latter indicates an applyOps that is part of
     // a retryable write and not a multi-document transaction.
     if (!applyOpsAppliedSeparately) {
-        Value lsidValue = input["lsid"];
-        DocumentSourceChangeStream::checkValueTypeOrMissing(lsidValue, "lsid", BSONType::object);
+        Value lsidValue = input[DocumentSourceChangeStream::kLsidField];
+        DocumentSourceChangeStream::checkValueTypeOrMissing(
+            lsidValue, DocumentSourceChangeStream::kLsidField, BSONType::object);
         _lsid =
             lsidValue.missing() ? boost::none : boost::optional<Document>(lsidValue.getDocument());
-        Value txnNumberValue = input["txnNumber"];
+        Value txnNumberValue = input[DocumentSourceChangeStream::kTxnNumberField];
         DocumentSourceChangeStream::checkValueTypeOrMissing(
-            txnNumberValue, "txnNumber", BSONType::numberLong);
+            txnNumberValue, DocumentSourceChangeStream::kTxnNumberField, BSONType::numberLong);
         _txnNumber = txnNumberValue.missing()
             ? boost::none
             : boost::optional<TxnNumber>(txnNumberValue.getLong());
@@ -191,8 +196,8 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::date);
     _wallTime = wallTime.getDate();
 
-    auto commandObj = input["o"].getDocument();
-    Value applyOps = commandObj["applyOps"];
+    auto commandObj = input["o"_sd].getDocument();
+    Value applyOps = commandObj["applyOps"_sd];
 
     if (!applyOps.missing()) {
         // We found an applyOps that implicitly commits a transaction. We include it in the
@@ -209,7 +214,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         // the transaction, but this entry does not have any updates in it, so we do not include
         // it in the '_txnOplogEntries' stack.
         tassert(5543803,
-                str::stream() << "Unexpected op at " << input["ts"].getTimestamp().toString(),
+                str::stream() << "Unexpected op at " << input["ts"_sd].getTimestamp().toString(),
                 !commandObj["commitTransaction"].missing());
 
         if (auto commitTimestamp = commandObj["commitTimestamp"]; !commitTimestamp.missing()) {
@@ -319,16 +324,16 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::getNextTransactionOp(
 }
 
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::
-    _assertExpectedTransactionEventFormat(const Document& d) const {
+    _assertExpectedTransactionEventFormat(const Document& doc) const {
+    Value op = doc["op"_sd];
     tassert(5543808,
             str::stream() << "Unexpected format for entry within a transaction oplog entry: "
                              "'op' field was type "
-                          << typeName(d["op"].getType()),
-            d["op"].getType() == BSONType::string);
+                          << typeName(op.getType()),
+            op.getType() == BSONType::string);
     tassert(5543809,
-            str::stream() << "Unexpected noop entry within a transaction "
-                          << redact(d["o"].toString()),
-            ValueComparator::kInstance.evaluate(d["op"] != Value("n"_sd)));
+            str::stream() << "Unexpected noop entry within a transaction " << redact(op.toString()),
+            op.getStringData() != "n"_sd);
 }
 
 Document ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addRequiredTransactionFields(
@@ -399,15 +404,15 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_collectAllOpTim
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedNamespaces(
     const Document& doc) {
     const auto dbCmdNs = NamespaceStringUtil::deserialize(boost::none /* tenantId */,
-                                                          doc["ns"].getStringData(),
+                                                          doc["ns"_sd].getStringData(),
                                                           SerializationContext::stateDefault());
-    if (doc["op"].getStringData() != "c") {
+    if (doc["op"_sd].getStringData() != "c"_sd) {
         _affectedNamespaces.insert(dbCmdNs);
         return;
     }
 
     constexpr std::array<StringData, 2> kCollectionField = {"create"_sd, "createIndexes"_sd};
-    const Document& object = doc["o"].getDocument();
+    const Document& object = doc["o"_sd].getDocument();
     for (const auto& fieldName : kCollectionField) {
         const auto field = object[fieldName];
         if (field.getType() == BSONType::string) {
