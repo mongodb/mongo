@@ -484,7 +484,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
             return;
         }
 
-        if (_cursor->isDead()) {
+        if (_cursor->isDead() || _cursor->wasError()) {
             if (!_cursor->tailable()) {
                 try {
                     auto opCtx = cc().makeOperationContext();

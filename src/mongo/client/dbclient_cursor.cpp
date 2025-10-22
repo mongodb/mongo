@@ -108,6 +108,12 @@ Message assembleCommandRequest(DBClientBase* client,
     auto opMsgRequest = OpMsgRequestBuilder::create(vts, dbName, builder.obj());
     return opMsgRequest.serialize();
 }
+
+bool isCursorClosedError(Status s) {
+    return s.code() == ErrorCodes::CursorNotFound || s.code() == ErrorCodes::QueryPlanKilled ||
+        s.code() == ErrorCodes::CursorKilled || s.code() == ErrorCodes::CappedPositionLost;
+}
+
 }  // namespace
 
 Message DBClientCursor::assembleInit() {
@@ -244,9 +250,18 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
     _batch.pos = 0;
 
     const auto replyObj = commandDataReceived(reply);
-    _cursorId = 0;  // Don't try to kill cursor if we get back an error.
 
-    auto cr = uassertStatusOK(CursorResponse::parseFromBSON(replyObj, nullptr, _ns.tenantId()));
+    StatusWith<CursorResponse> swCr =
+        CursorResponse::parseFromBSON(replyObj, nullptr, _ns.tenantId());
+    if (!swCr.isOK() && isCursorClosedError(swCr.getStatus())) {
+        // If the command failed because the cursor was already closed, then set the cursorId to 0
+        // so that we don't try to kill the cursor.
+        _cursorId = 0;
+    }
+
+    // All non-OK status have already been noticed & have set _wasError=true in commandDataReceived.
+    auto cr = uassertStatusOK(std::move(swCr));
+
     _cursorId = cr.getCursorId();
     uassert(50935,
             "Received a getMore response with a cursor id of 0 and the moreToCome flag set.",
@@ -444,7 +459,7 @@ DBClientCursor::~DBClientCursor() {
 
 void DBClientCursor::kill() {
     DESTRUCTOR_GUARD({
-        if (_cursorId && !globalInShutdownDeprecated()) {
+        if (_cursorId && !_ns.isEmpty() && !globalInShutdownDeprecated()) {
             auto killCursor = [&](auto&& conn) {
                 conn->killCursor(_ns, _cursorId);
             };

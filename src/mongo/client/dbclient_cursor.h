@@ -62,7 +62,9 @@ class AggregateCommandRequest;
 /**
  * The internal client's cursor representation for find or agg cursors. The cursor is iterated by
  * the caller using the 'more()' and 'next()' methods. Any necessary getMore requests are
- * constructed and issued internally.
+ * constructed and issued internally. The cursor is killed when the object is destroyed unless:
+ * - The last command (find, aggregate or getMore) returned an error that indicated the cursor is no
+ *   longer open on the server side.
  */
 class DBClientCursor {
     DBClientCursor(const DBClientCursor&) = delete;
@@ -180,6 +182,10 @@ public:
      */
     bool isDead() const {
         return _cursorId == 0;
+    }
+
+    bool wasError() const {
+        return _wasError;
     }
 
     bool isInitialized() const {

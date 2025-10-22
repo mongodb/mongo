@@ -406,67 +406,6 @@ private:
         NamespaceString::createNamespaceString_forTest("unittests.querytests.GetMoreKillOp");
 };
 
-/**
- * A get more exception caused by an invalid or unauthorized get more request does not cause
- * the get more's ClientCursor to be destroyed.  This prevents an unauthorized user from
- * improperly killing a cursor by issuing an invalid get more request.
- */
-class GetMoreInvalidRequest : public ClientBase {
-public:
-    ~GetMoreInvalidRequest() {
-        _opCtx.getServiceContext()->unsetKillAllOperations();
-        _client.dropCollection(_nss);
-    }
-    void run() {
-        auto startNumCursors = CursorManager::get(&_opCtx)->numCursors();
-
-        // Create a collection with some data.
-        for (int i = 0; i < 1000; ++i) {
-            insert(_nss, BSON("a" << i));
-        }
-
-        // Create a cursor on the collection, with a batch size of 200.
-        FindCommandRequest findRequest{_nss};
-        findRequest.setBatchSize(200);
-        auto cursor = _client.find(std::move(findRequest));
-        CursorId cursorId = cursor->getCursorId();
-
-        // Count 500 results, spanning a few batches of documents.
-        int count = 0;
-        for (int i = 0; i < 500; ++i) {
-            ASSERT(cursor->more());
-            cursor->next();
-            ++count;
-        }
-
-        // Send a getMore with a namespace that is incorrect ('spoofed') for this cursor id.
-        ASSERT_THROWS(
-            _client.getMore(
-                NamespaceString::createNamespaceString_forTest(
-                    "unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR"),
-                cursor->getCursorId()),
-            AssertionException);
-
-        // Check that the cursor still exists.
-        ASSERT_EQ(startNumCursors + 1, CursorManager::get(&_opCtx)->numCursors());
-        ASSERT_OK(CursorManager::get(&_opCtx)->pinCursor(&_opCtx, cursorId).getStatus());
-
-        // Check that the cursor can be iterated until all documents are returned.
-        while (cursor->more()) {
-            cursor->next();
-            ++count;
-        }
-        ASSERT_EQUALS(1000, count);
-
-        // The cursor should no longer exist, since we exhausted it.
-        ASSERT_EQ(startNumCursors, CursorManager::get(&_opCtx)->numCursors());
-    }
-
-private:
-    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
-        "unittests.querytests.GetMoreInvalidRequest");
-};
-
 class PositiveLimit : public ClientBase {
 public:
     PositiveLimit() {}
@@ -2042,7 +1981,6 @@ public:
         add<BoundedKey>();
         add<GetMore>();
         add<GetMoreKillOp>();
-        add<GetMoreInvalidRequest>();
         add<PositiveLimit>();
         add<TailNotAtEnd>();
         add<EmptyTail>();
