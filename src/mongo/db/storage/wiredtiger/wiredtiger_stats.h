@@ -88,7 +88,7 @@ private:
     // The time spent performing mandatory cache eviction.
     Microseconds _cacheTimeMandatory{0};
     // The duration of the last WT_SESSION API call.
-    Microseconds _storageExecutionTime{0};
+    Microseconds _storageEngineTime{0};
 };
 
 inline WiredTigerStats operator-(WiredTigerStats lhs, const WiredTigerStats& rhs) {

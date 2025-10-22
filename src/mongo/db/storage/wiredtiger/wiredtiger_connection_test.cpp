@@ -38,6 +38,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
+#include "mongo/util/tick_source_mock.h"
 
 #include <sstream>
 #include <string>
@@ -290,6 +291,34 @@ TEST(WiredTigerConnectionTest, SettingSessionCacheMaxToZeroDisablesSessionCachin
     // Destroying a session puts it in the session cache. Here, since we disabled session caching,
     // the session cache should still be empty.
     ASSERT_EQUALS(connection->getIdleSessionsCount(), 0U);
+}
+
+
+TEST(WiredTigerConnectionTest, RecordsEngineTime) {
+    WiredTigerConnectionHarnessHelper harnessHelper("");
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+
+    TickSourceMock<Microseconds> tickSourceMock;
+    tickSourceMock.setAdvanceOnRead(Microseconds{1});
+    {
+        auto session1 = connection->getUninterruptibleSession();
+        session1->setTickSource_forTest(&tickSourceMock);
+        session1->checkpoint(nullptr);
+
+        auto session2 = connection->getUninterruptibleSession();
+        session2->setTickSource_forTest(&tickSourceMock);
+        session2->checkpoint(nullptr);
+
+        WiredTigerSession sessionUncached(connection);
+        sessionUncached.setTickSource_forTest(&tickSourceMock);
+        sessionUncached.checkpoint(nullptr);
+
+        // Before returning anything to the cache, we have 0 total time.
+        ASSERT_EQ(connection->getTotalEngineTime(), Microseconds::zero());
+    }
+
+    // Once returned, we have the times from the 2 cached sessions, and not the uncached one.
+    ASSERT_EQ(connection->getTotalEngineTime(), Microseconds{2});
 }
 
 }  // namespace mongo

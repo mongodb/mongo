@@ -79,6 +79,9 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
         BSONObjBuilder subsection(bob.subobjStart("connectionStats"));
         subsection.appendNumber("cached idle session count",
                                 (long long)engine->getConnection().getIdleSessionsCount());
+        subsection.appendNumber(
+            "total engine time (ms)",
+            (long long)durationCount<Milliseconds>(engine->getConnection().getTotalEngineTime()));
     }
 
     return bob.obj();

@@ -166,7 +166,7 @@ protected:
         readAtKey(_readKey++);
     }
 
-    int64_t getStorageExecutionTime(WiredTigerSession& session) {
+    int64_t getStorageEngineTime(WiredTigerSession& session) {
         // Querying stats also advances the tick source
         tickSourceMock.setAdvanceOnRead(Microseconds{0});
         WiredTigerStats stats{session};
@@ -176,12 +176,12 @@ protected:
             return 0LL;
         }
 
-        auto storageExecutionTime = waitingObj["storageExecutionMicros"];
-        if (storageExecutionTime.eoo()) {
+        auto storageEngineTime = waitingObj["storageEngineMicros"];
+        if (storageEngineTime.eoo()) {
             return 0LL;
         }
 
-        return storageExecutionTime.Long();
+        return storageEngineTime.Long();
     }
 
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
@@ -329,35 +329,35 @@ TEST_F(WiredTigerStatsTest, Clone) {
     ASSERT_BSONOBJ_NE(stats.toBSON(), clone->toBSON());
 }
 
-TEST_F(WiredTigerStatsTest, StorageExecutionTime) {
-    ASSERT_EQ(getStorageExecutionTime(*_session), 0);
+TEST_F(WiredTigerStatsTest, StorageEngineTime) {
+    ASSERT_EQ(getStorageEngineTime(*_session), 0);
     tickSourceMock.setAdvanceOnRead(Microseconds{200});
     _session->checkpoint(nullptr);
 
-    auto storageExecutionTime = getStorageExecutionTime(*_session);
-    ASSERT_EQ(storageExecutionTime, 200);
+    auto storageEngineTime = getStorageEngineTime(*_session);
+    ASSERT_EQ(storageEngineTime, 200);
 
     tickSourceMock.setAdvanceOnRead(Microseconds{200});
     _session->checkpoint(nullptr);
 
-    storageExecutionTime = getStorageExecutionTime(*_session);
-    ASSERT_EQ(storageExecutionTime, 400);
+    storageEngineTime = getStorageEngineTime(*_session);
+    ASSERT_EQ(storageEngineTime, 400);
 }
 
-TEST_F(WiredTigerStatsTest, StorageExecutionTimeReuseCachedSession) {
+TEST_F(WiredTigerStatsTest, StorageEngineTimeReuseCachedSession) {
     ASSERT_EQ(_conn->getIdleSessionsCount(), 0);
 
     {
         // Creates a session which will be cached.
         auto session = _conn->getUninterruptibleSession();
         session->setTickSource_forTest(&tickSourceMock);
-        ASSERT_EQ(getStorageExecutionTime(*session), 0);
+        ASSERT_EQ(getStorageEngineTime(*session), 0);
 
         tickSourceMock.setAdvanceOnRead(Microseconds{200});
         session->checkpoint(nullptr);
 
-        auto storageExecutionTime = getStorageExecutionTime(*session);
-        ASSERT_EQ(storageExecutionTime, 200);
+        auto storageEngineTime = getStorageEngineTime(*session);
+        ASSERT_EQ(storageEngineTime, 200);
     }
 
     // Ensure the session is cached.
@@ -368,12 +368,12 @@ TEST_F(WiredTigerStatsTest, StorageExecutionTimeReuseCachedSession) {
         auto session = _conn->getUninterruptibleSession();
         ASSERT_EQ(_conn->getIdleSessionsCount(), 0);
 
-        ASSERT_EQ(getStorageExecutionTime(*session), 0);
+        ASSERT_EQ(getStorageEngineTime(*session), 0);
         tickSourceMock.setAdvanceOnRead(Microseconds{200});
         session->checkpoint(nullptr);
 
-        auto storageExecutionTime = getStorageExecutionTime(*session);
-        ASSERT_EQ(storageExecutionTime, 200);
+        auto storageEngineTime = getStorageEngineTime(*session);
+        ASSERT_EQ(storageEngineTime, 200);
     }
 }
 

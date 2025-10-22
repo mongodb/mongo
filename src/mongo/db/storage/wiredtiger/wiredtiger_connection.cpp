@@ -122,10 +122,14 @@ void WiredTigerConnection::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
     _prepareCommittedOrAbortedCond.notify_all();
 }
 
-
 size_t WiredTigerConnection::getIdleSessionsCount() {
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     return _sessions.size();
+}
+
+Microseconds WiredTigerConnection::getTotalEngineTime() {
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    return _totalEngineTime;
 }
 
 void WiredTigerConnection::closeExpiredIdleSessions(int64_t idleTimeMillis) {
@@ -248,7 +252,8 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
 
     invariant(session->cursorsOut() == 0);
     session->detachOperationContext();
-    session->_storageExecutionTime = Microseconds::zero();
+    Microseconds currentEngineTime(Microseconds::zero());
+    std::swap(currentEngineTime, session->_storageEngineTime);
 
     {
         // Release resources in the session we're about to cache.
@@ -267,6 +272,8 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
         if (static_cast<int32_t>(_sessions.size()) < _sessionCacheMax) {
             _sessions.emplace_back(std::move(session));
         }
+
+        _totalEngineTime += currentEngineTime;
     }
 
     if (_engine) {

@@ -114,6 +114,14 @@ public:
     size_t getIdleSessionsCount();
 
     /**
+     * Get the amount of time spent "inside" the engine, i.e. calling wiredtiger APIs.
+     *
+     * Note: This only counts "completed" sessions, time spent by active sessions is displayed in
+     * the curop until those sessions are returned to the connection's cache.
+     */
+    Microseconds getTotalEngineTime();
+
+    /**
      * Closes all cached sessions whose idle expiration time has been reached.
      */
     void closeExpiredIdleSessions(int64_t idleTimeMillis);
@@ -236,6 +244,7 @@ private:
     stdx::mutex _cacheLock;
     typedef std::vector<std::unique_ptr<WiredTigerSession>> SessionCache;
     SessionCache _sessions;
+    Microseconds _totalEngineTime;  // protected by _cacheLock
 
     // We track two epochs here:
     //  Engine epoch: bumped when the storage engine reloads. If out of sync, we return without

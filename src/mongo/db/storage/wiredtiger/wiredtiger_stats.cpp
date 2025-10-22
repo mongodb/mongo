@@ -77,7 +77,7 @@ WiredTigerStats::WiredTigerStats(WiredTigerSession& session) {
         updateCounter(key, WiredTigerUtil::castStatisticsValue<long long>(value));
     }
 
-    _storageExecutionTime = session.getStorageExecutionTime();
+    _storageEngineTime = session.getStorageEngineTime();
 }
 
 void WiredTigerStats::updateCounter(int32_t key_id, uint64_t value) {
@@ -136,7 +136,7 @@ void WiredTigerStats::appendToBsonObjBuilder(BSONObjBuilder& builder) const {
 
     if (_lockDhandleWait != 0 || _lockSchemaWait != 0 || _cacheTime.count() != 0 ||
         _cacheTimeInterruptible.count() != 0 || _cacheTimeMandatory.count() != 0 ||
-        _storageExecutionTime.count() != 0) {
+        _storageEngineTime.count() != 0) {
         BSONObjBuilder waitingSection(builder.subobjStart("timeWaitingMicros"));
         appendIfNonZero("handleLock", _lockDhandleWait, &waitingSection);
         appendIfNonZero("schemaLock", _lockSchemaWait, &waitingSection);
@@ -147,8 +147,8 @@ void WiredTigerStats::appendToBsonObjBuilder(BSONObjBuilder& builder) const {
         appendIfNonZero("cacheMandatoryMicros",
                         durationCount<Microseconds>(_cacheTimeMandatory),
                         &waitingSection);
-        appendIfNonZero("storageExecutionMicros",
-                        durationCount<Microseconds>(_storageExecutionTime),
+        appendIfNonZero("storageEngineMicros",
+                        durationCount<Microseconds>(_storageEngineTime),
                         &waitingSection);
     }
 }
@@ -188,7 +188,7 @@ WiredTigerStats& WiredTigerStats::operator+=(const WiredTigerStats& other) {
     _cacheTime += other._cacheTime;
     _cacheTimeInterruptible += other._cacheTimeInterruptible;
     _cacheTimeMandatory += other._cacheTimeMandatory;
-    _storageExecutionTime += other._storageExecutionTime;
+    _storageEngineTime += other._storageEngineTime;
 
     return *this;
 }
@@ -209,7 +209,7 @@ WiredTigerStats& WiredTigerStats::operator-=(const WiredTigerStats& other) {
     _cacheTime -= other._cacheTime;
     _cacheTimeInterruptible -= other._cacheTimeInterruptible;
     _cacheTimeMandatory -= other._cacheTimeMandatory;
-    _storageExecutionTime -= other._storageExecutionTime;
+    _storageEngineTime -= other._storageEngineTime;
 
     return (*this);
 }

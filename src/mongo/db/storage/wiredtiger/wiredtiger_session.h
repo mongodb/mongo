@@ -129,7 +129,7 @@ public:
 #define WRAPPED_WT_SESSION_METHOD(name)                                         \
     decltype(auto) name(auto&&... args) {                                       \
         Timer timer(_tickSource);                                               \
-        ON_BLOCK_EXIT([&] { _storageExecutionTime += timer.elapsed(); });       \
+        ON_BLOCK_EXIT([&] { _storageEngineTime += timer.elapsed(); });          \
         return _session->name(_session, std::forward<decltype(args)>(args)...); \
     }
 
@@ -261,8 +261,8 @@ public:
      */
     void detachOperationContext();
 
-    Microseconds getStorageExecutionTime() const {
-        return _storageExecutionTime;
+    Microseconds getStorageEngineTime() const {
+        return _storageEngineTime;
     }
 
     /**
@@ -326,7 +326,7 @@ private:
     Date_t _idleExpireTime;
 
     // Tracks the cumulative duration of WT_SESSION API calls.
-    Microseconds _storageExecutionTime;
+    Microseconds _storageEngineTime;
 
     // A set that contains the undo config strings for any reconfigurations we might have performed
     // on a session during the lifetime of this recovery unit. We use these to reset the session to
