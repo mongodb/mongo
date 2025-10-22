@@ -971,10 +971,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     RecordId prevRecordId;
 
     // In case validation occurs twice and the progress meter persists after index traversal
-    if (_progress.get(WithLock::withoutLock()) &&
-        _progress.get(WithLock::withoutLock())->isActive()) {
+    {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        _progress.get(lk)->finished();
+        if (_progress.get(lk) && _progress.get(lk)->isActive()) {
+            _progress.get(lk)->finished();
+        }
     }
 
     // Because the progress meter is intended as an approximation, it's sufficient to get the number
@@ -1228,13 +1229,15 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
                                     ValidateResults* results) {
     // The progress meter will be inactive after traversing the record store to allow the message
     // and the total to be set to different values.
-    if (!_progress.get(WithLock::withoutLock())->isActive()) {
-        const char* curopMessage = "Validate: scanning index entries";
+    {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        _progress.set(lk,
-                      CurOp::get(opCtx)->setProgress(
-                          lk, curopMessage, _keyBasedIndexConsistency.getTotalIndexKeys()),
-                      opCtx);
+        if (!_progress.get(lk)->isActive()) {
+            const char* curopMessage = "Validate: scanning index entries";
+            _progress.set(lk,
+                          CurOp::get(opCtx)->setProgress(
+                              lk, curopMessage, _keyBasedIndexConsistency.getTotalIndexKeys()),
+                          opCtx);
+        }
     }
 
     int64_t numKeys = _keyBasedIndexConsistency.traverseIndex(opCtx, index, _progress, results);
