@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -51,6 +52,39 @@ TEST(FieldPathTest, Simple) {
     ASSERT_EQUALS("foo", path.getFieldName(0));
     ASSERT_EQUALS("foo", path.fullPath());
     ASSERT_EQUALS("$foo", path.fullPathWithPrefix());
+}
+
+/** Accessing hashed field names from a FieldPath without precomputed hashes */
+DEATH_TEST_REGEX(FieldPathTest, AccessInvalidHashes, "Tripwire assertion.*11212700") {
+    FieldPath path("foo.bar.baz", false /* precomputeHashes */);
+    ASSERT_EQUALS(3U, path.getPathLength());
+    ASSERT_EQUALS("foo", path.getFieldName(0));
+    ASSERT_EQUALS("bar", path.getFieldName(1));
+    ASSERT_EQUALS("baz", path.getFieldName(2));
+    ASSERT_EQUALS("foo.bar.baz", path.fullPath());
+    ASSERT_EQUALS("$foo.bar.baz", path.fullPathWithPrefix());
+
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(0), AssertionException, 11212700);
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(1), AssertionException, 11212700);
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(2), AssertionException, 11212700);
+}
+
+/** Accessing hashed field names from a FieldPath with computed hashes */
+TEST(FieldPathTest, AccessValidHashes) {
+    FieldPath path("foo.bar.baz", true /* precomputeHashes */);
+    ASSERT_EQUALS(3U, path.getPathLength());
+    ASSERT_EQUALS("foo", path.getFieldName(0));
+    ASSERT_EQUALS("bar", path.getFieldName(1));
+    ASSERT_EQUALS("baz", path.getFieldName(2));
+    ASSERT_EQUALS("foo.bar.baz", path.fullPath());
+    ASSERT_EQUALS("$foo.bar.baz", path.fullPathWithPrefix());
+
+    ASSERT_EQ("foo", path.getFieldNameHashed(0).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(0)), path.getFieldNameHashed(0).hash());
+    ASSERT_EQ("bar", path.getFieldNameHashed(1).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(1)), path.getFieldNameHashed(1).hash());
+    ASSERT_EQ("baz", path.getFieldNameHashed(2).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(2)), path.getFieldNameHashed(2).hash());
 }
 
 /** FieldPath consisting of a '$' character. */
@@ -196,7 +230,7 @@ TEST(FieldPathTest, GetSubpath) {
     ASSERT_EQUALS("foo.bar.baz", path.getSubpath(2));
 }
 
-void checkConcatWorks(const FieldPath& head, const FieldPath& tail) {
+FieldPath concatAndCheck(const FieldPath& head, const FieldPath& tail) {
     FieldPath concat = head.concat(tail);
     ASSERT(concat == FieldPath::getFullyQualifiedPath(head.fullPath(), tail.fullPath()));
     ASSERT_EQ(concat.getPathLength(), head.getPathLength() + tail.getPathLength());
@@ -214,16 +248,17 @@ void checkConcatWorks(const FieldPath& head, const FieldPath& tail) {
             : tail.getFieldName(i - head.getPathLength());
         ASSERT_EQ(concat.getFieldName(i), expected);
     }
+    return concat;
 }
 
 TEST(FieldPathTest, Concat) {
-    checkConcatWorks("abc", "cde");
-    checkConcatWorks("abc.ef", "cde.ab");
-    checkConcatWorks("abc.$id", "cde");
-    checkConcatWorks("abc", "$id.x");
-    checkConcatWorks("some.long.path.with.many.parts", "another.long.ish.path");
-    checkConcatWorks("$db", "$id");
-    checkConcatWorks("$db.$id", "$id.$db");
+    concatAndCheck("abc", "cde");
+    concatAndCheck("abc.ef", "cde.ab");
+    concatAndCheck("abc.$id", "cde");
+    concatAndCheck("abc", "$id.x");
+    concatAndCheck("some.long.path.with.many.parts", "another.long.ish.path");
+    concatAndCheck("$db", "$id");
+    concatAndCheck("$db.$id", "$id.$db");
 }
 
 TEST(FieldPathTest, ConcatFailsIfExceedsMaxDepth) {
@@ -246,5 +281,114 @@ TEST(FieldPathTest, ConcatFailsIfExceedsMaxDepth) {
     FieldPath secondHalf(secondHalfStr);
     ASSERT_THROWS_CODE(firstHalf.concat(secondHalf), AssertionException, ErrorCodes::Overflow);
 }
+
+DEATH_TEST_REGEX(FieldPathTest,
+                 AccessHashesOfConcatenatedPathsThatAreNotComputed,
+                 "Tripwire assertion.*11212700") {
+    FieldPath head("some.long.path", false /* precomputeHashes */);
+    FieldPath tail("another.path", false /* precomputeHashes */);
+    FieldPath path = concatAndCheck(head, tail);
+
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(0), AssertionException, 11212700);
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(1), AssertionException, 11212700);
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(2), AssertionException, 11212700);
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(3), AssertionException, 11212700);
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(4), AssertionException, 11212700);
+}
+
+TEST(FieldPathTest, AccessHashesOfConcatenatedPathsThatAreFullyComputed) {
+    FieldPath head("some.long.path", true /* precomputeHashes */);
+    FieldPath tail("another.path", true /* precomputeHashes */);
+    FieldPath path = concatAndCheck(head, tail);
+
+    ASSERT_EQ("some", path.getFieldNameHashed(0).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(0)), path.getFieldNameHashed(0).hash());
+    ASSERT_EQ("long", path.getFieldNameHashed(1).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(1)), path.getFieldNameHashed(1).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(2).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(2)), path.getFieldNameHashed(2).hash());
+    ASSERT_EQ("another", path.getFieldNameHashed(3).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(3)), path.getFieldNameHashed(3).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(4).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(4)), path.getFieldNameHashed(4).hash());
+}
+
+DEATH_TEST_REGEX(FieldPathTest,
+                 AccessHashesOfConcatenatedPathsOnlyHeadHasComputedHashes,
+                 "Tripwire assertion.*11212700") {
+    FieldPath head("some.long.path", true /* precomputeHashes */);
+    FieldPath tail("another.path", false /* precomputeHashes */);
+    FieldPath path = concatAndCheck(head, tail);
+
+    ASSERT_EQ("some", path.getFieldNameHashed(0).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(0)), path.getFieldNameHashed(0).hash());
+    ASSERT_EQ("long", path.getFieldNameHashed(1).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(1)), path.getFieldNameHashed(1).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(2).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(2)), path.getFieldNameHashed(2).hash());
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(3), AssertionException, 11212700);
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(4), AssertionException, 11212700);
+}
+
+TEST(FieldPathTest, AccessHashesOfConcatenatedPathsOnlyTailHasComputedHashes) {
+    FieldPath head("some.long.path", false /* precomputeHashes */);
+    FieldPath tail("another.path", true /* precomputeHashes */);
+    FieldPath path = concatAndCheck(head, tail);
+
+    ASSERT_EQ("some", path.getFieldNameHashed(0).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(0)), path.getFieldNameHashed(0).hash());
+    ASSERT_EQ("long", path.getFieldNameHashed(1).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(1)), path.getFieldNameHashed(1).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(2).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(2)), path.getFieldNameHashed(2).hash());
+    ASSERT_EQ("another", path.getFieldNameHashed(3).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(3)), path.getFieldNameHashed(3).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(4).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(4)), path.getFieldNameHashed(4).hash());
+}
+
+DEATH_TEST_REGEX(FieldPathTest,
+                 AccessHashesOfMultiConcatenatedFieldPaths,
+                 "Tripwire assertion.*11212700") {
+    FieldPath one("some.long.path", true /* precomputeHashes */);
+    FieldPath two("another.path", false /* precomputeHashes */);
+    FieldPath three("here", true /* precomputeHashes */);
+    FieldPath four("is.another.path", false /* precomputeHashes */);
+    FieldPath five("finally.the.end.is.near", true /* precomputeHashes */);
+    FieldPath six("really", false /* precomputeHashes */);
+    FieldPath path = one.concat(two).concat(three).concat(four).concat(five).concat(six);
+
+    ASSERT_EQ("some.long.path.another.path.here.is.another.path.finally.the.end.is.near.really",
+              path.fullPath());
+    ASSERT_EQ("some", path.getFieldNameHashed(0).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(0)), path.getFieldNameHashed(0).hash());
+    ASSERT_EQ("long", path.getFieldNameHashed(1).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(1)), path.getFieldNameHashed(1).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(2).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(2)), path.getFieldNameHashed(2).hash());
+    ASSERT_EQ("another", path.getFieldNameHashed(3).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(3)), path.getFieldNameHashed(3).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(4).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(4)), path.getFieldNameHashed(4).hash());
+    ASSERT_EQ("here", path.getFieldNameHashed(5).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(5)), path.getFieldNameHashed(5).hash());
+    ASSERT_EQ("is", path.getFieldNameHashed(6).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(6)), path.getFieldNameHashed(6).hash());
+    ASSERT_EQ("another", path.getFieldNameHashed(7).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(7)), path.getFieldNameHashed(7).hash());
+    ASSERT_EQ("path", path.getFieldNameHashed(8).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(8)), path.getFieldNameHashed(8).hash());
+    ASSERT_EQ("finally", path.getFieldNameHashed(9).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(9)), path.getFieldNameHashed(9).hash());
+    ASSERT_EQ("the", path.getFieldNameHashed(10).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(10)), path.getFieldNameHashed(10).hash());
+    ASSERT_EQ("end", path.getFieldNameHashed(11).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(11)), path.getFieldNameHashed(11).hash());
+    ASSERT_EQ("is", path.getFieldNameHashed(12).key());
+    ASSERT_EQ(FieldNameHasher()(path.getFieldName(12)), path.getFieldNameHashed(12).hash());
+    ASSERT_EQ("near", path.getFieldNameHashed(13).key());
+    ASSERT_THROWS_CODE(path.getFieldNameHashed(14), AssertionException, 11212700);
+}
+
 }  // namespace
 }  // namespace mongo
