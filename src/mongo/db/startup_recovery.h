@@ -67,10 +67,9 @@ void runStartupRecovery(OperationContext* opCtx,
  * 'lastShutdownState': Indicates whether there was a clean or unclean shutdown before startup.
  * 'isStandalone': Whether the server is started up as a standalone.
  *
- * Both change stream change collections and change stream pre-images collections use unreplicated,
- * untimestamped truncates to remove expired documents, similar to the oplog. Unlike the oplog, the
- * collections aren't logged, and previously truncated data can unexpectedly surface after an
- * unclean shutdown.
+ * Change stream pre-images collections use unreplicated, untimestamped truncates to remove expired
+ * documents, similar to the oplog. Unlike the oplog, the collections aren't logged, and previously
+ * truncated data can unexpectedly surface after an unclean shutdown.
  *
  * To prevent ranges of inconsistent data, preemptively and liberally truncates all documents which
  * may have expired before the crash at startup. Errs on the side of caution by potentially

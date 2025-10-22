@@ -592,10 +592,10 @@ void assertReadConcernSupported(const CollectionPtr& coll,
     const auto readConcernLevel = readConcernArgs.getLevel();
     const auto& ns = coll->ns();
 
-    // Pre-images and change collection tables prune old content using untimestamped truncates. A
-    // read establishing a snapshot at a point in time (PIT) may see data inconsistent with that
-    // PIT: data that should have been present at that PIT will be missing if it was truncated,
-    // since a non-truncated operation effectively overwrites history.
+    // The pre-images collection prunes old content using untimestamped truncates. A read
+    // establishing a snapshot at a point in time (PIT) may see data inconsistent with that PIT:
+    // data that should have been present at that PIT will be missing if it was truncated, since a
+    // non-truncated operation effectively overwrites history.
     uassert(7829600,
             "Reading with readConcern snapshot from pre-images collection is "
             "not supported",

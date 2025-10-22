@@ -587,9 +587,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
     if (isOplog && csn->direction == 1) {
         // Takes Timestamp 'ts' as input, transforms it to the RecordIdBound and assigns it to the
-        // output parameter 'recordId'. The RecordId format for the change collection is a string,
-        // where as the RecordId format for the oplog is a long integer. The timestamp should be
-        // converted to the required format before assigning it to the 'recordId'.
+        // output parameter 'recordId'. The RecordId format for the oplog is a long integer. The
+        // timestamp should be converted to the required format before assigning it to the
+        // 'recordId'.
         auto assignRecordIdFromTimestamp = [&](auto& ts, auto* recordId) {
             auto keyFormat = KeyFormat::Long;
             auto status = record_id_helpers::keyForOptime(ts, keyFormat);
@@ -652,7 +652,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // won't affect the query results. In that case, we can say hasCompatibleCollation is true.
 
         RecordIdRange recordRange;
-        // min/max records may have been set if oplog or change collection.
+        // min/max records may have been set if oplog.
         recordRange.intersectRange(csn->minRecord, csn->maxRecord);
         bool compatibleCollation = handleRIDRangeScan(
             csn->filter.get(),

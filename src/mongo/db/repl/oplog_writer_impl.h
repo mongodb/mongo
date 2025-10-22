@@ -58,12 +58,11 @@ private:
  * Writes oplog entries.
  *
  * Primarily used to write batches of operations fetched from a sync source during steady
- * state replication and initial sync. Startup recovery can also use this to recover the
- * change collection.
+ * state replication and initial sync.
  *
  * When used for steady state replication, runs a thread that reads batches of operations
  * from an oplog buffer populated through the BackgroundSync interface and writes them to
- * the oplog and/or change collection.
+ * the oplog.
  */
 class OplogWriterImpl : public OplogWriter {
     OplogWriterImpl(const OplogWriterImpl&) = delete;
@@ -84,7 +83,7 @@ public:
                     const OplogWriter::Options& options);
 
     /**
-     * Writes a batch of oplog entries to the oplog and/or the change collections.
+     * Writes a batch of oplog entries to the oplog.
      *
      * Returns false if nothing is written, true otherwise.
      *
@@ -94,9 +93,8 @@ public:
     bool writeOplogBatch(OperationContext* opCtx, const std::vector<BSONObj>& ops) override;
 
     /**
-     * Schedules the writes of the oplog batch to the oplog and/or the change collections
-     * using the thread pool. Use waitForScheduledWrites() after calling this function to
-     * wait for the writes to complete.
+     * Schedules the writes of the oplog batch to the oplog using the thread pool.
+     * Use waitForScheduledWrites() after calling this function to wait for the writes to complete.
      *
      * Returns false if no write is scheduled, true otherwise.
      *

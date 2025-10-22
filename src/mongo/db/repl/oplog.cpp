@@ -849,8 +849,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const boost::optional<CreateCollCatalogIdentifier> replicatedCatalogIdentifier =
               extractReplicatedCatalogIdentifier(opCtx, entry);
 
-          // If a change collection is to be created, that is, the change streams are being enabled
-          // for a tenant, acquire exclusive tenant lock.
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX, Date_t::max(), boost::none);
 
           if (auto idIndexElem = cmd["idIndex"]) {

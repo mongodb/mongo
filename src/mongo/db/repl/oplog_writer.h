@@ -40,7 +40,7 @@ namespace mongo {
 namespace MONGO_MOD_PUB repl {
 
 /**
- * Writes oplog entries to the oplog and/or the change collection.
+ * Writes oplog entries to the oplog.
  */
 class MONGO_MOD_PUB OplogWriter {
     OplogWriter(const OplogWriter&) = delete;
@@ -105,7 +105,7 @@ public:
                  const OplogBuffer::Cost& cost);
 
     /**
-     * Writes a batch of oplog entries to the oplog and/or the change collections.
+     * Writes a batch of oplog entries to the oplog.
      *
      * Returns false if nothing is written, true otherwise.
      *
@@ -115,9 +115,8 @@ public:
     virtual bool writeOplogBatch(OperationContext* opCtx, const std::vector<BSONObj>& ops) = 0;
 
     /**
-     * Schedules the writes of the oplog batch to the oplog and/or the change collections
-     * using the thread pool. Use waitForScheduledWrites() after calling this function to
-     * wait for the writes to complete.
+     * Schedules the writes of the oplog batch to the oplog using the thread pool. Use
+     * waitForScheduledWrites() after calling this function to wait for the writes to complete.
      *
      * Returns false if no write is scheduled, true otherwise.
      *

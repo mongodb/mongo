@@ -822,19 +822,6 @@ TEST(RecordStoreTest, ClusteredRecordStore) {
     }
 }
 
-// Verify that the internal API is able to create a capped clustered record store
-// with change collection-like format. This test complements the clustered_capped_collection.js
-// which verifies that we prevent a user from creating a capped clustered collections when
-// enableTestCommands is disabled.
-TEST(RecordStoreTest, ClusteredCappedRecordStoreCreation) {
-    const auto harnessHelper = newRecordStoreHarnessHelper();
-    const std::string ns = "config.changes.c";
-    RecordStore::Options rsOptions = harnessHelper->clusteredRecordStoreOptions();
-    rsOptions.isCapped = true;
-    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, rsOptions);
-    invariant(rs->keyFormat() == KeyFormat::String);
-}
-
 TEST(RecordStoreTest, ClusteredCappedRecordStoreSeek) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     RecordStore::Options rsOptions = harnessHelper->clusteredRecordStoreOptions();

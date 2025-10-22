@@ -60,8 +60,8 @@ feature_flags:
         fcv_gated: true
     featureFlagUseReplicatedTruncatesForDeletions:
         description: >-
-            Feature flag to enable pre-image collection and change collection maintenance
-            using replicated truncates instead of unreplicated truncates.
+            Feature flag to enable pre-image collection maintenance using replicated
+            truncates instead of unreplicated truncates.
         cpp_varname: feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions
         default: false
         fcv_gated: true

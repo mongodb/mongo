@@ -138,7 +138,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                 "min"_attr = (!_params.minRecord) ? "none" : redact(_params.minRecord->toString()),
                 "max"_attr = (!_params.maxRecord) ? "none" : redact(_params.maxRecord->toString()));
     tassert(6521000,
-            "Expected an oplog or a change collection with 'shouldTrackLatestOplogTimestamp'",
+            "Expected oplog scan with 'shouldTrackLatestOplogTimestamp'",
             !_params.shouldTrackLatestOplogTimestamp || collPtr->ns().isOplog());
 
     if (params.assertTsHasNotFallenOff) {
@@ -184,8 +184,8 @@ BSONObj getFirstEntry(RecoveryUnit& ru, SeekableRecordCursor* newCursor) {
 };
 
 /**
- * Asserts that the timestamp has not already fallen off the oplog or change collection and then
- * returns an unpositioned cursor.
+ * Asserts that the timestamp has not already fallen off the oplog and then returns an unpositioned
+ * cursor.
  *
  * Throws OplogQueryMinTsMissing if tsToCheck no longer exists in the oplog.
  * Throws CollectionIsEmpty if the collection has no documents.
@@ -209,9 +209,6 @@ std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
         // If the first entry we see in the oplog is the replset initialization, then it doesn't
         // matter if its timestamp is later than the timestamp that should not have fallen off the
         // oplog; no events earlier can have fallen off this oplog.
-        // NOTE: A change collection can be created at any moment as such it might not have replset
-        // initialization message, as such this case is not fully applicable for the change
-        // collection.
         isNewRS = oplogEntryParser.getOpType() == repl::OpTypeEnum::kNoop &&
             oplogEntryParser.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg));
     } catch (const AssertionException& exception) {
@@ -406,24 +403,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     _workingSet->transitionToRecordIdAndObj(id);
 
     return returnIfMatches(member, id, out);
-}
-
-void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
-    const auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp();
-
-    // If we don't have a read timestamp, we take no action here.
-    if (!readTimestamp) {
-        return;
-    }
-
-    // Otherwise, verify that it is equal to or greater than the last recorded timestamp, and
-    // advance it accordingly.
-    tassert(
-        6663000,
-        "The read timestamp must always be greater than or equal to the last recorded timestamp",
-        *readTimestamp >= _latestOplogEntryTimestamp);
-    _latestOplogEntryTimestamp = *readTimestamp;
 }
 
 void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {

@@ -83,8 +83,10 @@ this lock to be held in exclusive mode.
 
 A resource of ResourceType Tenant is used when a database belongs to a tenant. It is used to synchronize
 change streams enablement and disablement for a tenant operation with other operations associated with the tenant.
-Enabling or disabling of change streams (by creating or dropping a change collection) for a tenant takes this lock
-in exclusive (X) mode. Acquiring this resource with an intent lock is an indication that the operation is doing reads (IS)
+Before v8.3, enabling or disabling of change streams (by creating or dropping a change collection)
+for a tenant used to take this lock in exclusive (X) mode. This use case does not exist in v8.3 and
+higher. Tenant locks are still present, but may be removed in the future.
+Acquiring this resource with an intent lock is an indication that the operation is doing reads (IS)
 or writes (IX) at the database or lower level.
 
 ### Database Lock

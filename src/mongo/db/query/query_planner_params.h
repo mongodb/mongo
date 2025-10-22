@@ -143,7 +143,7 @@ struct QueryPlannerParams {
         GENERATE_COVERED_IXSCANS = 1 << 4,
 
         // Set this to track the most recent timestamp seen by this cursor while scanning the
-        // oplog or change collection.
+        // oplog.
         TRACK_LATEST_OPLOG_TS = 1 << 5,
 
         // Set this so that collection scans on the oplog wait for visibility before reading.

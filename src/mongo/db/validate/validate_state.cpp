@@ -106,8 +106,8 @@ bool ValidateState::shouldEnforceFastCount() const {
             // during full validation despite its collection X lock. This can cause validate to
             // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
             // mode.
-            // The oplog entries are also written to the change collections and pre-images
-            // collections, these collections are also prone to fast count failures.
+            // The oplog entries are also written to the change stream pre-images collection. This
+            // collection is also prone to fast count failures.
             return false;
         } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
             // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an

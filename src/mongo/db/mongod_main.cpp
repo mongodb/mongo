@@ -1098,7 +1098,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     }
 
     // If not in standalone mode, start background tasks to:
-    //  * Periodically remove expired documents from change collections
+    //  * Periodically remove expired documents from change streams pre-images collection.
     if (!isStandalone) {
         if (serverGlobalParams.replicaSetConfigShardMaintenanceMode) {
             PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(serviceContext)->start();
