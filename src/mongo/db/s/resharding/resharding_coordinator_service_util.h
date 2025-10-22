@@ -162,12 +162,6 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
     boost::optional<ChunkVersion> chunkVersion,
     boost::optional<const BSONObj&> collation,
     boost::optional<bool> isUnsplittable);
-
-BSONObj createReshardingFieldsUpdateForOriginalNss(
-    OperationContext* opCtx,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<OID> newCollectionEpoch,
-    boost::optional<Timestamp> newCollectionTimestamp);
 }  // namespace resharding
 
 }  // namespace mongo

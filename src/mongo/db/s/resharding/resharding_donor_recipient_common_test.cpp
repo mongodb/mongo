@@ -283,11 +283,6 @@ protected:
             donorDoc);
         ASSERT(donorDoc.getMutableState().getState() == DonorStateEnum::kPreparingToDonate);
         ASSERT(donorDoc.getMutableState().getMinFetchTimestamp() == boost::none);
-        if (reshardingFields.getTelemetryContext()) {
-            ASSERT_TRUE(donorDoc.getMutableState().getTelemetryContext().has_value());
-            ASSERT_BSONOBJ_EQ(*donorDoc.getMutableState().getTelemetryContext(),
-                              *reshardingFields.getTelemetryContext());
-        }
     }
 
     void assertRecipientDocMatchesReshardingFields(
@@ -305,12 +300,6 @@ protected:
         ASSERT(recipientDoc.getMutableState().getState() ==
                RecipientStateEnum::kAwaitingFetchTimestamp);
         ASSERT(!recipientDoc.getCloneTimestamp());
-
-        if (reshardingFields.getTelemetryContext()) {
-            ASSERT_TRUE(recipientDoc.getMutableState().getTelemetryContext().has_value());
-            ASSERT_BSONOBJ_EQ(*recipientDoc.getMutableState().getTelemetryContext(),
-                              *reshardingFields.getTelemetryContext());
-        }
 
         const auto donorShards = reshardingFields.getRecipientFields()->getDonorShards();
         std::map<ShardId, DonorShardFetchTimestamp> donorShardMap;

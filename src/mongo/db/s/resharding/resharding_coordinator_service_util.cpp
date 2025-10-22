@@ -239,6 +239,150 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
     }
 }
 
+BSONObj createReshardingFieldsUpdateForOriginalNss(
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<OID> newCollectionEpoch,
+    boost::optional<Timestamp> newCollectionTimestamp) {
+    auto nextState = coordinatorDoc.getState();
+    switch (nextState) {
+        case CoordinatorStateEnum::kInitializing: {
+            // Append 'reshardingFields' to the config.collections entry for the original nss
+            TypeCollectionReshardingFields originalEntryReshardingFields(
+                coordinatorDoc.getReshardingUUID());
+            originalEntryReshardingFields.setState(coordinatorDoc.getState());
+            originalEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
+            originalEntryReshardingFields.setProvenance(
+                coordinatorDoc.getCommonReshardingMetadata().getProvenance());
+            originalEntryReshardingFields.setPerformVerification(
+                coordinatorDoc.getCommonReshardingMetadata().getPerformVerification());
+
+            return BSON("$set" << BSON(CollectionType::kReshardingFieldsFieldName
+                                       << originalEntryReshardingFields.toBSON()
+                                       << CollectionType::kUpdatedAtFieldName
+                                       << opCtx->getServiceContext()->getPreciseClockSource()->now()
+                                       << CollectionType::kAllowMigrationsFieldName << false));
+        }
+        case CoordinatorStateEnum::kPreparingToDonate: {
+            TypeCollectionDonorFields donorFields(coordinatorDoc.getTempReshardingNss(),
+                                                  coordinatorDoc.getReshardingKey(),
+                                                  resharding::extractShardIdsFromParticipantEntries(
+                                                      coordinatorDoc.getRecipientShards()));
+
+            BSONObjBuilder updateBuilder;
+            {
+                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+                {
+                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
+                                          TypeCollectionReshardingFields::kStateFieldName,
+                                      CoordinatorState_serializer(nextState));
+
+                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
+                                          TypeCollectionReshardingFields::kDonorFieldsFieldName,
+                                      donorFields.toBSON());
+
+                    setBuilder.append(CollectionType::kUpdatedAtFieldName,
+                                      opCtx->getServiceContext()->getPreciseClockSource()->now());
+                }
+
+                setBuilder.doneFast();
+            }
+
+            return updateBuilder.obj();
+        }
+        case CoordinatorStateEnum::kCommitting: {
+            // Update the config.collections entry for the original nss to reflect the new sharded
+            // collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard key,
+            // 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to newCollectionTimestamp. Also
+            // update the 'state' field and add the 'recipientFields' to the 'reshardingFields'
+            // section.
+            auto recipientFields = resharding::constructRecipientFields(coordinatorDoc);
+            BSONObj setFields =
+                BSON("uuid" << coordinatorDoc.getReshardingUUID() << "key"
+                            << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
+                            << newCollectionEpoch.value() << "lastmod"
+                            << opCtx->getServiceContext()->getPreciseClockSource()->now()
+                            << "reshardingFields.state"
+                            << CoordinatorState_serializer(coordinatorDoc.getState())
+                            << "reshardingFields.recipientFields" << recipientFields.toBSON());
+            if (newCollectionTimestamp.has_value()) {
+                setFields =
+                    setFields.addFields(BSON("timestamp" << newCollectionTimestamp.value()));
+            }
+            auto provenance = coordinatorDoc.getCommonReshardingMetadata().getProvenance();
+            if (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection) {
+                setFields = setFields.addFields(BSON("unsplittable" << true));
+            }
+
+            return BSON("$set" << setFields);
+        }
+        case mongo::CoordinatorStateEnum::kQuiesced:
+        case mongo::CoordinatorStateEnum::kDone:
+            // Remove 'reshardingFields' from the config.collections entry
+            return BSON(
+                "$unset" << BSON(CollectionType::kReshardingFieldsFieldName
+                                 << "" << CollectionType::kAllowMigrationsFieldName << "")
+                         << "$set"
+                         << BSON(CollectionType::kUpdatedAtFieldName
+                                 << opCtx->getServiceContext()->getPreciseClockSource()->now()));
+        default: {
+            // Update the 'state' field, and 'abortReason' field if it exists, in the
+            // 'reshardingFields' section.
+            BSONObjBuilder updateBuilder;
+            {
+                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+                setBuilder.append("reshardingFields.state",
+                                  std::string{CoordinatorState_serializer(nextState)});
+                setBuilder.append("lastmod",
+                                  opCtx->getServiceContext()->getPreciseClockSource()->now());
+
+                if (auto abortReason = coordinatorDoc.getAbortReason()) {
+                    // If the abortReason exists, include it in the update.
+                    setBuilder.append("reshardingFields.abortReason", *abortReason);
+
+                    auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
+                    setBuilder.append("reshardingFields.userCanceled",
+                                      abortStatus == ErrorCodes::ReshardCollectionAborted);
+                }
+
+                setBuilder.doneFast();
+
+                if (coordinatorDoc.getAbortReason()) {
+                    updateBuilder.append("$unset",
+                                         BSON(CollectionType::kAllowMigrationsFieldName << ""));
+                }
+            }
+
+            return updateBuilder.obj();
+        }
+    }
+}
+
+void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
+                                           const ReshardingCoordinatorDocument& coordinatorDoc,
+                                           boost::optional<OID> newCollectionEpoch,
+                                           boost::optional<Timestamp> newCollectionTimestamp,
+                                           TxnNumber txnNumber) {
+    auto writeOp = createReshardingFieldsUpdateForOriginalNss(
+        opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
+
+    auto request = BatchedCommandRequest::buildUpdateOp(
+        CollectionType::ConfigNS,
+        BSON(CollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss(),
+                                               SerializationContext::stateDefault())),  // query
+        writeOp,
+        false,  // upsert
+        false   // multi
+    );
+
+    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, CollectionType::ConfigNS, request, txnNumber);
+
+    assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
+}
+
 /*
  * Updates the collection UUID of the QueryAnalyzerDocument for a collection being resharded if
  * query sampling is enabled.
@@ -380,154 +524,6 @@ makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
 }  // namespace
 
 namespace resharding {
-
-BSONObj createReshardingFieldsUpdateForOriginalNss(
-    OperationContext* opCtx,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<OID> newCollectionEpoch,
-    boost::optional<Timestamp> newCollectionTimestamp) {
-    auto nextState = coordinatorDoc.getState();
-    switch (nextState) {
-        case CoordinatorStateEnum::kInitializing: {
-            // Append 'reshardingFields' to the config.collections entry for the original nss
-            TypeCollectionReshardingFields originalEntryReshardingFields(
-                coordinatorDoc.getReshardingUUID());
-            originalEntryReshardingFields.setState(coordinatorDoc.getState());
-            originalEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
-            originalEntryReshardingFields.setProvenance(
-                coordinatorDoc.getCommonReshardingMetadata().getProvenance());
-            originalEntryReshardingFields.setPerformVerification(
-                coordinatorDoc.getCommonReshardingMetadata().getPerformVerification());
-            if (coordinatorDoc.getTelemetryContext()) {
-                originalEntryReshardingFields.setTelemetryContext(
-                    *coordinatorDoc.getTelemetryContext());
-            }
-
-            return BSON("$set" << BSON(CollectionType::kReshardingFieldsFieldName
-                                       << originalEntryReshardingFields.toBSON()
-                                       << CollectionType::kUpdatedAtFieldName
-                                       << opCtx->getServiceContext()->getPreciseClockSource()->now()
-                                       << CollectionType::kAllowMigrationsFieldName << false));
-        }
-        case CoordinatorStateEnum::kPreparingToDonate: {
-            TypeCollectionDonorFields donorFields(coordinatorDoc.getTempReshardingNss(),
-                                                  coordinatorDoc.getReshardingKey(),
-                                                  resharding::extractShardIdsFromParticipantEntries(
-                                                      coordinatorDoc.getRecipientShards()));
-
-            BSONObjBuilder updateBuilder;
-            {
-                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
-                {
-                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
-                                          TypeCollectionReshardingFields::kStateFieldName,
-                                      CoordinatorState_serializer(nextState));
-
-                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
-                                          TypeCollectionReshardingFields::kDonorFieldsFieldName,
-                                      donorFields.toBSON());
-
-                    setBuilder.append(CollectionType::kUpdatedAtFieldName,
-                                      opCtx->getServiceContext()->getPreciseClockSource()->now());
-                }
-
-                setBuilder.doneFast();
-            }
-
-            return updateBuilder.obj();
-        }
-        case CoordinatorStateEnum::kCommitting: {
-            // Update the config.collections entry for the original nss to reflect the new sharded
-            // collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard key,
-            // 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to newCollectionTimestamp. Also
-            // update the 'state' field and add the 'recipientFields' to the 'reshardingFields'
-            // section.
-            auto recipientFields = resharding::constructRecipientFields(coordinatorDoc);
-            BSONObj setFields =
-                BSON("uuid" << coordinatorDoc.getReshardingUUID() << "key"
-                            << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
-                            << newCollectionEpoch.value() << "lastmod"
-                            << opCtx->getServiceContext()->getPreciseClockSource()->now()
-                            << "reshardingFields.state"
-                            << CoordinatorState_serializer(coordinatorDoc.getState())
-                            << "reshardingFields.recipientFields" << recipientFields.toBSON());
-            if (newCollectionTimestamp.has_value()) {
-                setFields =
-                    setFields.addFields(BSON("timestamp" << newCollectionTimestamp.value()));
-            }
-            auto provenance = coordinatorDoc.getCommonReshardingMetadata().getProvenance();
-            if (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection) {
-                setFields = setFields.addFields(BSON("unsplittable" << true));
-            }
-
-            return BSON("$set" << setFields);
-        }
-        case mongo::CoordinatorStateEnum::kQuiesced:
-        case mongo::CoordinatorStateEnum::kDone:
-            // Remove 'reshardingFields' from the config.collections entry
-            return BSON(
-                "$unset" << BSON(CollectionType::kReshardingFieldsFieldName
-                                 << "" << CollectionType::kAllowMigrationsFieldName << "")
-                         << "$set"
-                         << BSON(CollectionType::kUpdatedAtFieldName
-                                 << opCtx->getServiceContext()->getPreciseClockSource()->now()));
-        default: {
-            // Update the 'state' field, and 'abortReason' field if it exists, in the
-            // 'reshardingFields' section.
-            BSONObjBuilder updateBuilder;
-            {
-                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
-
-                setBuilder.append("reshardingFields.state",
-                                  std::string{CoordinatorState_serializer(nextState)});
-                setBuilder.append("lastmod",
-                                  opCtx->getServiceContext()->getPreciseClockSource()->now());
-
-                if (auto abortReason = coordinatorDoc.getAbortReason()) {
-                    // If the abortReason exists, include it in the update.
-                    setBuilder.append("reshardingFields.abortReason", *abortReason);
-
-                    auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
-                    setBuilder.append("reshardingFields.userCanceled",
-                                      abortStatus == ErrorCodes::ReshardCollectionAborted);
-                }
-
-                setBuilder.doneFast();
-
-                if (coordinatorDoc.getAbortReason()) {
-                    updateBuilder.append("$unset",
-                                         BSON(CollectionType::kAllowMigrationsFieldName << ""));
-                }
-            }
-
-            return updateBuilder.obj();
-        }
-    }
-}
-
-void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
-                                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                                           boost::optional<OID> newCollectionEpoch,
-                                           boost::optional<Timestamp> newCollectionTimestamp,
-                                           TxnNumber txnNumber) {
-    auto writeOp = resharding::createReshardingFieldsUpdateForOriginalNss(
-        opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
-
-    auto request = BatchedCommandRequest::buildUpdateOp(
-        CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName
-             << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss(),
-                                               SerializationContext::stateDefault())),  // query
-        writeOp,
-        false,  // upsert
-        false   // multi
-    );
-
-    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, CollectionType::ConfigNS, request, txnNumber);
-
-    assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
-}
 
 /**
  * Creates reshardingFields.recipientFields for the resharding operation. Note: these should not

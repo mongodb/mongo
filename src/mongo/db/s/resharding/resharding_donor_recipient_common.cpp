@@ -56,7 +56,6 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/otel/telemetry_context_serialization.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -316,10 +315,6 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
     DonorShardContext donorCtx;
     donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
-    if (reshardingFields.getTelemetryContext()) {
-        donorCtx.setTelemetryContext(*reshardingFields.getTelemetryContext());
-    }
-
     auto donorDoc = ReshardingDonorDocument{
         std::move(donorCtx), reshardingFields.getDonorFields()->getRecipientShardIds()};
 
@@ -352,10 +347,6 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
 
     RecipientShardContext recipientCtx;
     recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
-
-    if (reshardingFields.getTelemetryContext()) {
-        recipientCtx.setTelemetryContext(*reshardingFields.getTelemetryContext());
-    }
 
     auto recipientDoc =
         ReshardingRecipientDocument{std::move(recipientCtx),
