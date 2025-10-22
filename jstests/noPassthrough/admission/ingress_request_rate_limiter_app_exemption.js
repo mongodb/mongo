@@ -90,7 +90,7 @@ const testAppExemptionsWorkInReplSet = () => {
     primary.getDB("test").runCommand({ping: 1});  // Consume the single token.
     assert.commandFailedWithCode(
         primary.getDB("test").runCommand({ping: 1}),
-        ErrorCodes.RateLimitExceeded,
+        ErrorCodes.IngressRequestRateLimitExceeded,
         "Expected ping command to be rate limited",
     );
 
