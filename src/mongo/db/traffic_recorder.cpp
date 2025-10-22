@@ -340,21 +340,30 @@ void TrafficRecorder::_observe(uint64_t id,
         return;
     }
 
-    auto* tickSource = recording->getTickSource();
+    _observe(*recording, id, session, message, eventType);
+}
+
+void TrafficRecorder::_observe(Recording& recording,
+                               uint64_t id,
+                               const std::string& session,
+                               const Message& message,
+                               EventType eventType) {
+
+    auto* tickSource = recording.getTickSource();
     // Try to record the message
-    if (recording->pushRecord(id,
-                              session,
-                              tickSource->ticksTo<Microseconds>(tickSource->getTicks()) -
-                                  recording->startTime.load(),
-                              recording->order.addAndFetch(1),
-                              message,
-                              eventType)) {
+    if (recording.pushRecord(id,
+                             session,
+                             tickSource->ticksTo<Microseconds>(tickSource->getTicks()) -
+                                 recording.startTime.load(),
+                             recording.order.addAndFetch(1),
+                             message,
+                             eventType)) {
         return;
     }
 
     // If the recording isn't the one we have in hand bail (its been ended, or a new one has
     // been created
-    if (**_recording != recording) {
+    if (_recording->get() != &recording) {
         return;
     }
 
@@ -393,28 +402,28 @@ void TrafficRecorder::_start(ServiceContext* svcCtx) {
     auto sessions = getActiveSessions(svcCtx);
     // Record SessionStart events if any active sessions exist.
     for (const auto& [id, session] : sessions) {
-        _observe(id, session, Message(), EventType::kSessionStart);
+        _observe(*recording, id, session, Message(), EventType::kSessionStart);
     }
 }
 void TrafficRecorder::_stop(ServiceContext* svcCtx) {
+    // Take the recording, if it exists.
+    // Past this point, other operations cannot record events.
+    std::shared_ptr<Recording> recording = std::move(*_recording.synchronize());
+
+    uassert(ErrorCodes::BadValue, "Traffic recording not active", recording);
+
     // Record SessionEnd events if any active sessions exist.
     auto sessions = getActiveSessions(svcCtx);
 
     for (const auto& [id, session] : sessions) {
-        _observe(id, session, Message(), EventType::kSessionEnd);
+        _observe(*recording, id, session, Message(), EventType::kSessionEnd);
     }
 
     _shouldRecord.store(false);
 
-    auto recording = [&] {
-        auto rec = _recording.synchronize();
-        uassert(ErrorCodes::BadValue, "Traffic recording not active", *rec);
-
-        return std::move(*rec);
-    }();
-
     uassertStatusOK(recording->shutdown());
 }
+
 void TrafficRecorder::_fail() {
     _recording->reset();
 }

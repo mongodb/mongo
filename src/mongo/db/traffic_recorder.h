@@ -186,6 +186,12 @@ protected:
                   const Message& message,
                   EventType eventType);
 
+    void _observe(Recording& recording,
+                  uint64_t id,
+                  const std::string& session,
+                  const Message& message,
+                  EventType eventType);
+
     // Helper method to be overridden in tests
     virtual std::shared_ptr<Recording> _makeRecording(
         const StartTrafficRecording& options,
