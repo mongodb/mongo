@@ -61,6 +61,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <string>
@@ -90,8 +91,10 @@ void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
     db.getCursor().write<LittleEndian<uint32_t>>(fullSize);
 }
 
-TrafficRecorder::Recording::Recording(const StartTrafficRecording& options, TickSource* tickSource)
-    : _path(_getPath(std::string{options.getDestination()})),
+TrafficRecorder::Recording::Recording(const StartTrafficRecording& options,
+                                      std::filesystem::path globalRecordingDirectory,
+                                      TickSource* tickSource)
+    : _path(_getPath(globalRecordingDirectory, std::string{options.getDestination()})),
       _maxLogSize(options.getMaxFileSize()),
       _tickSource(tickSource) {
 
@@ -257,19 +260,20 @@ BSONObj TrafficRecorder::Recording::getStats() {
     return _trafficStats.toBSON();
 }
 
-std::string TrafficRecorder::Recording::_getPath(const std::string& filename) {
-    uassert(
-        ErrorCodes::BadValue, "Traffic recording filename must not be empty", !filename.empty());
+std::string TrafficRecorder::Recording::_getPath(std::filesystem::path globalRecordingDirectory,
+                                                 const std::string& recordingSubdir) {
+    uassert(ErrorCodes::BadValue,
+            "Traffic recording destination must have a non-empty value",
+            !recordingSubdir.empty());
 
-    if (gTrafficRecordingDirectory.back() == '/') {
-        gTrafficRecordingDirectory.pop_back();
-    }
-    auto parentPath = boost::filesystem::path(gTrafficRecordingDirectory);
-    auto path = parentPath / filename;
+    // Normalise as directory with trailing "/"
+    globalRecordingDirectory = globalRecordingDirectory.concat("/").lexically_normal();
+
+    auto path = globalRecordingDirectory / recordingSubdir;
 
     uassert(ErrorCodes::BadValue,
             "Traffic recording filename must be a simple filename",
-            path.parent_path() == parentPath);
+            path.parent_path().concat("/") == globalRecordingDirectory);
 
     return path.string();
 }
@@ -288,19 +292,22 @@ TrafficRecorder::TrafficRecorder() = default;
 TrafficRecorder::~TrafficRecorder() {}
 
 std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_makeRecording(
-    const StartTrafficRecording& options, TickSource* tickSource) const {
-    return std::make_shared<Recording>(options, tickSource);
+    const StartTrafficRecording& options,
+    std::filesystem::path globalRecordingDirectory,
+    TickSource* tickSource) const {
+    return std::make_shared<Recording>(options, globalRecordingDirectory, tickSource);
 }
 
 void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
+    auto globalRecordingDirectory = gTrafficRecordingDirectory;
     uassert(ErrorCodes::BadValue,
             "Traffic recording directory not set",
-            !gTrafficRecordingDirectory.empty());
+            !globalRecordingDirectory.empty());
 
     {
         auto rec = _recording.synchronize();
         uassert(ErrorCodes::BadValue, "Traffic recording already active", !*rec);
-        *rec = _makeRecording(options, svcCtx->getTickSource());
+        *rec = _makeRecording(options, globalRecordingDirectory, svcCtx->getTickSource());
 
         (*rec)->start();
     }
@@ -435,13 +442,21 @@ TrafficRecorderForTest::getCurrentRecording() const {
 
 
 std::shared_ptr<TrafficRecorder::Recording> TrafficRecorderForTest::_makeRecording(
-    const StartTrafficRecording& options, TickSource* tickSource) const {
+    const StartTrafficRecording& options,
+    std::filesystem::path globalRecordingDirectory,
+    TickSource* tickSource) const {
     return std::make_shared<TrafficRecorderForTest::RecordingForTest>(options, tickSource);
 }
 
 TrafficRecorderForTest::RecordingForTest::RecordingForTest(const StartTrafficRecording& options,
                                                            TickSource* tickSource)
-    : TrafficRecorder::Recording(options, tickSource) {}
+    : TrafficRecorder::Recording(options, gTrafficRecordingDirectory, tickSource) {}
+
+TrafficRecorderForTest::RecordingForTest::RecordingForTest(
+    const StartTrafficRecording& options,
+    std::filesystem::path globalRecordingDirectory,
+    TickSource* tickSource)
+    : TrafficRecorder::Recording(options, globalRecordingDirectory, tickSource) {}
 
 MultiProducerSingleConsumerQueue<TrafficRecordingPacket,
                                  TrafficRecorder::Recording::CostFunction>::Pipe&

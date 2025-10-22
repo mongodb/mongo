@@ -42,6 +42,7 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
+#include <filesystem>
 #include <memory>
 #include <queue>
 #include <string>
@@ -113,7 +114,9 @@ protected:
      */
     class Recording {
     public:
-        Recording(const StartTrafficRecording& options, TickSource* tickSource);
+        Recording(const StartTrafficRecording& options,
+                  std::filesystem::path globalRecordingDirectory,
+                  TickSource* tickSource);
         virtual ~Recording() = default;
 
         virtual void start();
@@ -146,7 +149,8 @@ protected:
 
 
     private:
-        static std::string _getPath(const std::string& filename);
+        static std::string _getPath(std::filesystem::path globalRecordingDirectory,
+                                    const std::string& recordingSubdir);
 
         const std::string _path;
         const int64_t _maxLogSize;
@@ -170,8 +174,10 @@ protected:
                   EventType eventType);
 
     // Helper method to be overridden in tests
-    virtual std::shared_ptr<Recording> _makeRecording(const StartTrafficRecording& options,
-                                                      TickSource* tickSource) const;
+    virtual std::shared_ptr<Recording> _makeRecording(
+        const StartTrafficRecording& options,
+        std::filesystem::path globalRecordingDirectory,
+        TickSource* tickSource) const;
 
     std::shared_ptr<Recording> _getCurrentRecording() const;
 
@@ -189,6 +195,9 @@ public:
     class RecordingForTest : public TrafficRecorder::Recording {
     public:
         RecordingForTest(const StartTrafficRecording& options, TickSource* tickSource);
+        RecordingForTest(const StartTrafficRecording& options,
+                         std::filesystem::path globalRecordingDirectory,
+                         TickSource* tickSource);
 
         // Accessor for testing purposes
         MultiProducerSingleConsumerQueue<TrafficRecordingPacket,
@@ -203,6 +212,7 @@ public:
     std::shared_ptr<RecordingForTest> getCurrentRecording() const;
 
     std::shared_ptr<Recording> _makeRecording(const StartTrafficRecording& options,
+                                              std::filesystem::path globalRecordingDirectory,
                                               TickSource* tickSource) const override;
 };
 }  // namespace mongo
