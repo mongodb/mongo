@@ -32,7 +32,6 @@
 #include "mongo/platform/bits.h"
 #include "mongo/platform/int128.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstdint>

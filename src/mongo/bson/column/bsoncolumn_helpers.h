@@ -40,20 +40,21 @@
 #include "mongo/bson/column/bsonobj_traversal.h"
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/column/simple8b_type_util.h"
-#include "mongo/util/modules.h"
 
 #include <concepts>
 
 #include <boost/container/small_vector.hpp>
 
-namespace mongo::bsoncolumn {
+namespace mongo {
+
+namespace bsoncolumn {
 
 /**
  * Interface for a buffer to receive decoded elements from block-based
  * BSONColumn decompression.
  */
 template <class T>
-concept Appendable MONGO_MOD_PUBLIC = requires(
+concept Appendable = requires(
     T& t, StringData strVal, BSONBinData binVal, BSONCode codeVal, BSONElement bsonVal, int32_t n) {
     t.append(true);
     t.append((int32_t)1);
@@ -117,12 +118,12 @@ concept Appendable MONGO_MOD_PUBLIC = requires(
  * materializePreallocated() instead of materialize().
  */
 template <class T>
-concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
-                                                 BSONElementStorage& alloc,
-                                                 StringData strVal,
-                                                 BSONBinData binVal,
-                                                 BSONCode codeVal,
-                                                 BSONElement bsonVal) {
+concept Materializer = requires(T& t,
+                                BSONElementStorage& alloc,
+                                StringData strVal,
+                                BSONBinData binVal,
+                                BSONCode codeVal,
+                                BSONElement bsonVal) {
     typename T::Element;
 
     { T::materialize(alloc, true) } -> std::same_as<typename T::Element>;
@@ -170,7 +171,7 @@ concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
  * to collect the position information of values within documents.
  */
 template <typename T>
-concept PositionInfoAppender MONGO_MOD_PUBLIC = requires(T& t, int32_t n) {
+concept PositionInfoAppender = requires(T& t, int32_t n) {
     { t.appendPositionInfo(n) } -> std::same_as<void>;
 };
 
@@ -731,7 +732,6 @@ public:
     }
 };
 
-namespace internal {
 /**
  * Implements the "materializer" concept such that the output elements are BSONElements.
  */
@@ -917,6 +917,12 @@ inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<OID
     return materialize(allocator, val.OID());
 }
 
+struct RootPath {
+    boost::container::small_vector<const char*, 1> elementsToMaterialize(BSONObj refObj) {
+        return {refObj.objdata()};
+    }
+};
+
 /**
  * Returns true if the given path is the root path. If it returns anything given the empty object,
  * then it's the root path.
@@ -925,5 +931,6 @@ template <class Path>
 bool isRootPath(Path& path) {
     return !path.elementsToMaterialize(BSONObj{}).empty();
 }
-}  // namespace internal
-}  // namespace mongo::bsoncolumn
+
+}  // namespace bsoncolumn
+}  // namespace mongo

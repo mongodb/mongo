@@ -806,7 +806,6 @@ bool BSONColumnBlockBased::contains(BSONType type) const {
     return false;
 }
 
-namespace internal {
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, bool val) {
     BSONElementStorage::Element e = allocator.allocate(BSONType::boolean, "", sizeof(uint8_t));
     DataView(e.value()).write<uint8_t>(val);
@@ -900,6 +899,5 @@ BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, 
     return e.element();
 }
 
-}  // namespace internal
 }  // namespace bsoncolumn
 }  // namespace mongo

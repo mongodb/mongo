@@ -369,7 +369,8 @@ void benchmarkBlockBasedDecompression(benchmark::State& state,
     auto decompress = [&](NoOpContainerForTest<BSONElement>& collection) {
         bsoncolumn::BSONColumnBlockBased col(bin);
         boost::intrusive_ptr allocator{new BSONElementStorage()};
-        col.decompress<bsoncolumn::internal::BSONElementMaterializer>(collection, allocator);
+        col.decompress<bsoncolumn::BSONElementMaterializer, NoOpContainerForTest<BSONElement>>(
+            collection, allocator);
         return true;
     };
 

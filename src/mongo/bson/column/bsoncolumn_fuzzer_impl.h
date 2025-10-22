@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/util/modules.h"
-
 #include <cstddef>
 
 namespace mongo::bsoncolumn {

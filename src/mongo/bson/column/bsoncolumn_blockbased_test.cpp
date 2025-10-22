@@ -32,9 +32,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo::bsoncolumn {
+namespace mongo {
+namespace bsoncolumn {
 namespace {
-using namespace mongo::bsoncolumn::internal;
 
 struct BSONColumnBlockBasedTest : public unittest::Test {
     BSONColumnBlockBased bsonColumnFromObjs(std::vector<BSONObj> objs) {
@@ -1009,4 +1009,5 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
 }
 
 }  // namespace
-}  // namespace mongo::bsoncolumn
+}  // namespace bsoncolumn
+}  // namespace mongo

@@ -60,7 +60,6 @@
 
 namespace mongo::bsoncolumn {
 namespace {
-using namespace mongo::bsoncolumn::internal;
 
 void assertBinaryEqual(BSONBinData finalizedColumn, const BufBuilder& buffer) {
     ASSERT_EQ(finalizedColumn.type, BinDataType::Column);

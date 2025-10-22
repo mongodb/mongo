@@ -30,7 +30,6 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/util/modules.h"
 
 #include <forward_list>
 
