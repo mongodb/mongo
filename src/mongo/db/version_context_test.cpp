@@ -153,10 +153,6 @@ TEST_F(VersionContextTest, UpdatingThrowsWhenAlreadyInitializedWithDifferentValu
 
 TEST_F(VersionContextTest, SerializeDeserialize) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
-    // Verify that an uninitialized VersionContext can be serialized and deserialized.
-    VersionContext vCtxA;
-    VersionContext vCtxB{vCtxA.toBSON()};
-    ASSERT_FALSE(getOFCV(vCtxB).has_value());
     // Verify that stable as well as transitory FCV states can be serialized and deserialized.
     const std::vector<FCV> fcvs{GenericFCV::kLatest, GenericFCV::kUpgradingFromLastLTSToLatest};
     for (const auto fcv : fcvs) {
@@ -183,8 +179,6 @@ VersionContext makeFromDowngradingOFCVString(StringData from, StringData to) {
 }
 
 TEST_F(VersionContextTest, DeserializeFromValidDocument) {
-    ASSERT_EQ(VersionContext{}, VersionContext{BSONObj()});
-
     // (Generic FCV reference): used for testing, should exist across LTS binary version
     ASSERT_EQ(VersionContext{GenericFCV::kLastLTS}, makeFromOFCVString(kLastLTSFCVString));
     ASSERT_EQ(VersionContext{GenericFCV::kLastContinuous},
@@ -208,7 +202,6 @@ TEST_F(VersionContextTest, DeserializeFromValidDocument) {
               makeFromDowngradingOFCVString(kLatestFCVString, kLastContinuousFCVString));
 
     // Parsing is not strict, so unknown fields are tolerated
-    ASSERT_EQ(VersionContext{}, VersionContext{BSON("dummy" << true)});
     ASSERT_EQ(VersionContext{GenericFCV::kLatest},
               VersionContext{BSON(VersionContextMetadata::kOFCVFieldName << kLatestFCVString
                                                                          << "dummy" << true)});
@@ -220,6 +213,10 @@ TEST_F(VersionContextTest, DeserializeFromValidDocument) {
 // Tests that deserializing an invalid input fails gracefully by throwing an exception.
 // This is important since VersionContext is exposed as a generic request argument.
 TEST_F(VersionContextTest, DeserializeFromInvalidDocument) {
+    ASSERT_THROWS_CODE(VersionContext{BSONObj()}, DBException, ErrorCodes::IDLFailedToParse);
+    ASSERT_THROWS_CODE(
+        VersionContext{BSON("dummy" << true)}, DBException, ErrorCodes::IDLFailedToParse);
+
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(""));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(" "));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("xyzzy"));

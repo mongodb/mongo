@@ -40,9 +40,6 @@ VersionContext::VersionContext(FCVSnapshot fcv)
     : _metadataOrTag(std::in_place_type<VersionContextMetadata>, fcv.getVersion()) {}
 
 VersionContext::VersionContext(const BSONObj& bsonObject) {
-    if (!bsonObject.hasField(VersionContextMetadata::kOFCVFieldName)) {
-        return;
-    }
     _metadataOrTag = VersionContextMetadata::parse(bsonObject);
 }
 
@@ -74,8 +71,7 @@ void VersionContext::resetToOperationWithoutOFCV() {
 
 BSONObj VersionContext::toBSON() const {
     return visit(
-        OverloadedVisitor{[](OperationWithoutOFCVTag) { return BSONObj(); },
-                          [](const VersionContextMetadata& metadata) { return metadata.toBSON(); },
+        OverloadedVisitor{[](const VersionContextMetadata& metadata) { return metadata.toBSON(); },
                           [](auto&&) -> BSONObj {
                               MONGO_UNREACHABLE_TASSERT(10083532);
                           }},
