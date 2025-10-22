@@ -726,11 +726,16 @@ void TransactionRouter::Router::processParticipantResponse(
                 return Participant::ReadOnly::kReadOnly;
             }
 
+            // Additional participants may not have the most up to date information, so we relax the
+            // assertion in this case. If a node is recruited to perform read-only work as part of a
+            // read operation on a shard it will always report that shard as read-only. If that
+            // shard then performs writes later that could cause this assertion to trigger without
+            // relaxing the constraint.
             uassert(51113,
                     str::stream() << "Participant shard " << shardIdToUpdate
                                   << " claimed to be read-only for a transaction after previously "
                                      "claiming to have done a write for the transaction",
-                    readOnlyCurrent == Participant::ReadOnly::kReadOnly);
+                    readOnlyCurrent == Participant::ReadOnly::kReadOnly || isAdditionalParticipant);
             return boost::none;
         }
 
@@ -750,7 +755,7 @@ void TransactionRouter::Router::processParticipantResponse(
 
             LOGV2_DEBUG(22881,
                         3,
-                        "Marking shard has having done a write",
+                        "Marking shard as having done a write",
                         "sessionId"_attr = _sessionId(),
                         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),

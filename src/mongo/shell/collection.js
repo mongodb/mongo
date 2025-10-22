@@ -1625,6 +1625,10 @@ DBCollection.prototype.countDocuments = function (query, options) {
         aggregateOptions.rawData = options.rawData;
     }
 
+    if (options.allowDiskUse) {
+        aggregateOptions.allowDiskUse = options.allowDiskUse;
+    }
+
     // Format cursor into an array.
     const res = this.aggregate(pipeline, aggregateOptions).toArray();
     if (res.length) {
