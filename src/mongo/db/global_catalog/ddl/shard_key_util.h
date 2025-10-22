@@ -219,6 +219,8 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
  * Returns true if the shard key is valid and already exists. Steps 1, 2 and 3 of the previous
  * function.
  *
+ * It throws an exception if a valid shard key index doesn't exist and it's not possible to create
+ * one.
  */
 bool validShardKeyIndexExists(OperationContext* opCtx,
                               const NamespaceString& nss,

@@ -25,7 +25,17 @@ const incompatibleShardKeyIndexes = [
     {
         key: {skey: 1, multiKeyField: 1},
         options: {},
-        isMultiKey: true,
+        makeItMultiKey: function (coll) {
+            coll.insert({skey: 10, multiKeyField: [1, 2, 3]});
+        },
+    },
+    {
+        key: {skey: 1},
+        options: {},
+        makeItMultiKey: function (coll) {
+            coll.insert({skey: [1, 2, 3]});
+        },
+        skeyFieldIsMultikey: true,
     },
     {
         key: {skey: 1, "a.$**": 1},
@@ -87,8 +97,10 @@ describe("testing incompatible shard key indexes", function () {
             beforeEach(() => {
                 this.coll.drop();
 
-                // Insert a document that will make the index on 'multiKeyField' multikey.
-                this.coll.insert({skey: 22, multiKeyField: [1, 2, 3]});
+                // Make the index multikey if necessary.
+                if (incompatibleShardKeyIndex.makeItMultiKey) {
+                    incompatibleShardKeyIndex.makeItMultiKey(this.coll);
+                }
 
                 // Create the incompatible index.
                 assert.commandWorked(
@@ -97,51 +109,50 @@ describe("testing incompatible shard key indexes", function () {
             });
 
             it("can't shard a non-empty collection with only an incompatible shard key index", () => {
-                const res = this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: shardKeyPattern});
-
                 this.coll.insert({skey: 33});
 
                 assert.commandFailedWithCode(
                     this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: shardKeyPattern}),
-                    ErrorCodes.InvalidOptions,
+                    [ErrorCodes.InvalidOptions],
                 );
             });
 
-            it("shardColleciont on an empty collection will attempt to create a shard key index", () => {
+            it("shardCollecion on an empty collection will attempt to create a shard key index", () => {
                 this.coll.deleteMany({});
 
-                if (incompatibleShardKeyIndex.isMultiKey) {
-                    // We can't test a multiKey index on an empty collection, since it would not
-                    // be multiKey.
-                    return;
+                if (incompatibleShardKeyIndex.makeItMultiKey) {
+                    this.coll.remove({});
                 }
 
                 const res = this.st.s.adminCommand({shardCollection: this.coll.getFullName(), key: shardKeyPattern});
 
-                assert.commandWorkedOrFailedWithCode(res, [
-                    ErrorCodes.InvalidOptions,
-                    ErrorCodes.IndexKeySpecsConflict,
-                ]);
-
-                if (res.ok) {
-                    // The shardCollection command succeeded, check that the shard key index was
-                    // created and it's not the incompatible index.
-
-                    assert(
-                        incompatibleShardKeyIndex.canCoexistWithShardKeyIndex,
-                        "reshardCollection succeeded when it should have failed",
-                    );
-
-                    const shardKeyIndex = this.coll.getIndexByKey(shardKeyPattern);
-                    const incompatibleIndex = this.coll.getIndexByKey(incompatibleShardKeyIndex.key);
-
-                    assert.neq(shardKeyIndex, null, "shard key index was not created");
-                    assert.neq(incompatibleIndex, null, "incompatible index is missing");
-                    assert.neq(incompatibleIndex, shardKeyIndex, "shard key index mustn't be the incompatible index");
+                if (!incompatibleShardKeyIndex.canCoexistWithShardKeyIndex) {
+                    assert.commandFailedWithCode(res, [
+                        ErrorCodes.IndexOptionsConflict,
+                        ErrorCodes.IndexKeySpecsConflict,
+                        ErrorCodes.InvalidOptions,
+                    ]);
+                    return;
                 }
+
+                assert.commandWorked(res);
+
+                // A valid shard key index should be implicitly created during the reshardCollection
+                // operation.
+                const shardKeyIndex = this.coll.getIndexByKey(shardKeyPattern);
+                const incompatibleIndex = this.coll.getIndexByKey(incompatibleShardKeyIndex.key);
+
+                assert.neq(shardKeyIndex, null, "shard key index was not created");
+                assert.neq(incompatibleIndex, null, "incompatible index is missing");
+                assert.neq(incompatibleIndex, shardKeyIndex, "shard key index mustn't be the incompatible index");
             });
 
             it("can't drop or hide last compatible shard key index", () => {
+                if (incompatibleShardKeyIndex.skeyFieldIsMultikey) {
+                    // Can't create a compatible shard key index if the shard key field is multikey.
+                    return;
+                }
+
                 // Shard the collection with a compatible shard key index.
                 let compatibleShardKeyIndex = shardKeyPattern;
                 if (!incompatibleShardKeyIndex.canCoexistWithShardKeyIndex) {
@@ -173,27 +184,30 @@ describe("testing incompatible shard key indexes", function () {
                     numInitialChunks: 1,
                 });
 
-                assert.commandWorkedOrFailedWithCode(res, [
-                    ErrorCodes.InvalidOptions,
-                    ErrorCodes.IndexKeySpecsConflict,
-                ]);
-
-                if (res.ok) {
-                    // The reshardCollection command succeeded, check that the shard key index was
-                    // created and it's not the incompatible index.
-
-                    assert(
-                        incompatibleShardKeyIndex.canCoexistWithShardKeyIndex,
-                        "reshardCollection succeeded when it should have failed",
-                    );
-
-                    const shardKeyIndex = this.coll.getIndexByKey(shardKeyPattern);
-                    const incompatibleIndex = this.coll.getIndexByKey(incompatibleShardKeyIndex.key);
-
-                    assert.neq(shardKeyIndex, null, "shard key index was not created");
-                    assert.neq(incompatibleIndex, null, "incompatible index is missing");
-                    assert.neq(incompatibleIndex, shardKeyIndex, "shard key index mustn't be the incompatible index");
+                if (!incompatibleShardKeyIndex.canCoexistWithShardKeyIndex) {
+                    assert.commandFailedWithCode(res, [
+                        ErrorCodes.IndexOptionsConflict,
+                        ErrorCodes.IndexKeySpecsConflict,
+                        ErrorCodes.InvalidOptions,
+                    ]);
+                    return;
                 }
+
+                assert.commandWorked(res);
+
+                // A valid shard key index should be implicitly created during the reshardCollection
+                // operation.
+                assert(
+                    incompatibleShardKeyIndex.canCoexistWithShardKeyIndex,
+                    "reshardCollection succeeded when it should have failed",
+                );
+
+                const shardKeyIndex = this.coll.getIndexByKey(shardKeyPattern);
+                const incompatibleIndex = this.coll.getIndexByKey(incompatibleShardKeyIndex.key);
+
+                assert.neq(shardKeyIndex, null, "shard key index was not created");
+                assert.neq(incompatibleIndex, null, "incompatible index is missing");
+                assert.neq(incompatibleIndex, shardKeyIndex, "shard key index mustn't be the incompatible index");
             });
 
             it("can't call refineCollectionShardKey with only an incompatible shard key index", () => {

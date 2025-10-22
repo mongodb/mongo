@@ -189,10 +189,16 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
 
     // 2. Check for a useful index
     bool hasUsefulIndexForKey = false;
+    bool indexPerfectlyMatchingShardKeyAlreadyExists = false;
     std::string allReasons;
     for (const auto& idx : indexes) {
         std::string reasons;
         BSONObj currentKey = idx["key"].embeddedObject();
+
+        if (shardKeyPattern.toBSON().woCompare(currentKey) == 0) {
+            indexPerfectlyMatchingShardKeyAlreadyExists = true;
+        }
+
         // Check 2.i. and 2.ii.
         if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
             shardKeyPattern.toBSON().isPrefixOf(currentKey,
@@ -261,7 +267,17 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
 
     if (hasUsefulIndexForKey) {
         // Check 2.iii Make sure that there is a useful, non-multikey index available.
-        behaviors.verifyUsefulNonMultiKeyIndex(nss, shardKeyPattern.toBSON());
+        try {
+            behaviors.verifyUsefulNonMultiKeyIndex(nss, shardKeyPattern.toBSON());
+        } catch (ExceptionFor<ErrorCodes::InvalidOptions>& e) {
+            if (indexPerfectlyMatchingShardKeyAlreadyExists) {
+                e.addContext(str::stream()
+                             << "can't shard collection because an index already exists on the "
+                                "shard key and it's a non shard key valid index.");
+                throw;
+            }
+            return false;
+        }
     }
 
     return hasUsefulIndexForKey;
