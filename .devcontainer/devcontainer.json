@@ -108,25 +108,23 @@
         },
         "C_Cpp.intelliSenseEngine": "disabled"
       },
-      "extensions": {
-        "recommendations": [
-          "llvm-vs-code-extensions.vscode-clangd",
-          "dbaeumer.vscode-eslint",
-          "ms-python.python",
-          "xaver.clang-format",
-          "cs128.cs128-clang-tidy",
-          "charliermarsh.ruff",
-          "ms-python.mypy-type-checker",
-          "esbenp.prettier-vscode",
-          "redhat.vscode-yaml",
-          "streetsidesoftware.code-spell-checker",
-          "jasonnutter.vscode-codeowners",
-          "bazelbuild.vscode-bazel",
-          "rioj7.command-variable",
-          "augustocdias.tasks-shell-input",
-          "ms-vscode.cpptools"
-        ]
-      }
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "dbaeumer.vscode-eslint",
+        "ms-python.python",
+        "xaver.clang-format",
+        "cs128.cs128-clang-tidy",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
+        "esbenp.prettier-vscode",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "jasonnutter.vscode-codeowners",
+        "bazelbuild.vscode-bazel",
+        "rioj7.command-variable",
+        "augustocdias.tasks-shell-input",
+        "ms-vscode.cpptools"
+      ]
     }
   }
 }
