@@ -482,7 +482,7 @@ public:
                         targetedWriteRequest.requestDbName,
                         std::move(arsRequestVector),
                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                        Shard::RetryPolicy::kNoRetry);
+                        Shard::RetryPolicy::kStrictlyNotIdempotent);
 
                     routingCtx.onRequestSentForNss(targetedWriteRequest.nss);
 
@@ -548,7 +548,7 @@ public:
                         targetedWriteRequest.requestDbName,
                         std::move(arsRequestVector),
                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                        Shard::RetryPolicy::kNoRetry);
+                        Shard::RetryPolicy::kStrictlyNotIdempotent);
 
                     routingCtx.onRequestSentForNss(targetedWriteRequest.nss);
 

@@ -454,7 +454,7 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
                 nss.dbName(),
                 requests,
                 readPref,
-                Shard::RetryPolicy::kNoRetry);
+                Shard::RetryPolicy::kStrictlyNotIdempotent);
 
             // Validate the RoutingContext once a request has been scheduled and sent to the shards
             // via the ARS.

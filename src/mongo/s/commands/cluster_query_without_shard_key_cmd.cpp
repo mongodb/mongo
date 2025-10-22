@@ -480,7 +480,7 @@ public:
                         request().getDbName(),
                         requests,
                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                        Shard::RetryPolicy::kNoRetry);
+                        Shard::RetryPolicy::kStrictlyNotIdempotent);
 
                     routingCtx.onRequestSentForNss(nss);
 
@@ -632,7 +632,7 @@ public:
                         request().getDbName(),
                         requests,
                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                        Shard::RetryPolicy::kNoRetry);
+                        Shard::RetryPolicy::kStrictlyNotIdempotent);
 
                     routingCtx.onRequestSentForNss(nss);
 

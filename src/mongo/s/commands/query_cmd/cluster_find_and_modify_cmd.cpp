@@ -1220,7 +1220,8 @@ void FindAndModifyCmd::_runCommand(
             nss.dbName(),
             requests,
             kPrimaryOnlyReadPreference,
-            isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+            isRetryableWrite ? Shard::RetryPolicy::kIdempotent
+                             : Shard::RetryPolicy::kStrictlyNotIdempotent);
 
         auto response = ars.next();
         invariant(ars.done());
