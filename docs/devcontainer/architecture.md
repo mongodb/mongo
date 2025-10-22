@@ -450,9 +450,20 @@ After the container starts, several commands run to finalize setup:
   "createDataDir": "sudo mkdir -p /data/db && sudo chown -R $(whoami): /data/db",
   "reportDockerServerPlatform": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_platform=$(docker version --format '\"{{.Server.Platform.Name}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
   "reportDockerServerVersion": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_version=$(docker version --format '\"{{.Server.Version}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
-  "reportArch": "echo \"\ncommon --bes_keywords=devcontainer:arch=$(uname -i)\" >> ${containerEnv:HOME}/.bazelrc"
+  "reportArch": "echo \"\ncommon --bes_keywords=devcontainer:arch=$(uname -i)\" >> ${containerEnv:HOME}/.bazelrc",
+  "fetchTags": "git fetch --tags || true"
 }
 ```
+
+**What these commands do:**
+
+- **fixVolumePerms**: Ensures proper ownership of mounted volumes
+- **venvActivation**: Configures shell to automatically activate Python virtual environment
+- **createDataDir**: Creates MongoDB data directory with proper permissions
+- **reportDockerServerPlatform**: Adds Docker platform info to Bazel telemetry
+- **reportDockerServerVersion**: Adds Docker version to Bazel telemetry
+- **reportArch**: Adds system architecture to Bazel telemetry
+- **fetchTags**: Fetches all git tags automatically
 
 ### From Workstation Feature
 
@@ -534,7 +545,8 @@ This sets:
 8. Create Python venv
 9. Install Poetry dependencies
 10. Create MongoDB data directory
-11. Report Docker info to Bazel
+11. Fetch git tags
+12. Report Docker info to Bazel
 
 **Runtime:**
 
