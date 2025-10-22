@@ -1,7 +1,7 @@
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
-load("//bazel:mongo_src_rules.bzl", "write_target")
+load("//bazel:utils.bzl", "write_target")
 
 def generate_config_header_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)

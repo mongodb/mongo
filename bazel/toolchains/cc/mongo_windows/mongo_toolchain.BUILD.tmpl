@@ -39,6 +39,14 @@ mongo_windows_cc_toolchain_config(
     supports_parse_showincludes = True,
 )
 
+exports_files(["rc_wrapper.cmd"])
+
+alias(
+    name = "rc",
+    actual = "rc_wrapper.cmd",
+    visibility = ["//visibility:public"]
+)
+
 cc_toolchain(
     name = "mongo_win_cc_toolchain",
     all_files = ":all_files",

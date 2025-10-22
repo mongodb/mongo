@@ -809,6 +809,32 @@ generate_config_header(
     template = "version_impl.tpl.cpp",
 )
 
+generate_config_header(
+    name = "rc_constants_gen",
+    checks = "//src/mongo/util:version_constants_gen.py",
+    cpp_defines = MONGO_GLOBAL_DEFINES,
+    cpp_linkflags = MONGO_GLOBAL_LINKFLAGS,
+    cpp_opts = MONGO_GLOBAL_COPTS,
+    extra_definitions = {
+        "MONGO_DISTMOD": "$(MONGO_DISTMOD)",
+        "MONGO_VERSION": "$(MONGO_VERSION)",
+        "GIT_COMMIT_HASH": "$(GIT_COMMIT_HASH)",
+    } | select({
+        "//bazel/config:js_engine_mozjs": {"js_engine_ver": "mozjs"},
+        "//conditions:default": {"js_engine_ver": "none"},
+    }) | select({
+        "//bazel/config:tcmalloc_google_enabled": {"MONGO_ALLOCATOR": "tcmalloc-google"},
+        "//bazel/config:tcmalloc_gperf_enabled": {"MONGO_ALLOCATOR": "tcmalloc-gperf"},
+        "//conditions:default": {"MONGO_ALLOCATOR": "system"},
+    }) | select({
+        "//bazel/config:build_enterprise_enabled": {"build_enterprise_enabled": "1"},
+        "//conditions:default": {},
+    }),
+    logfile = "rc_constants_gen.log",
+    output = "resource_constants.h",
+    template = "resource_constants.h.in",
+)
+
 mongo_cc_unit_test(
     name = "concurrent_shared_values_map_test",
     srcs = ["concurrent_shared_values_map_test.cpp"],

@@ -39,6 +39,9 @@ def main():
             )
             args += ["--build_enterprise=False", "--config=local"]
 
+        if any(arg.startswith("--include_mongot") for arg in args):
+            os.makedirs("mongot-localdev", exist_ok=True)
+
         engflow_auth(args)
 
         write_workstation_bazelrc(args)
