@@ -376,7 +376,7 @@ void executeChildBatches(
             requests,
             kPrimaryOnlyReadPreference,
             isRetryableWriteNotInInternalTxn ? Shard::RetryPolicy::kIdempotent
-                                             : Shard::RetryPolicy::kNoRetry);
+                                             : Shard::RetryPolicy::kStrictlyNotIdempotent);
         numSent += pendingBatches.size();
         LOGV2_DEBUG(9986806, 5, "Sent child batches", "numSent"_attr = numSent);
 

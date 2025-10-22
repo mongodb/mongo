@@ -230,7 +230,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         DatabaseName::kAdmin,
         std::move(requestsToSend),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+        shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kStrictlyNotIdempotent);
 
     // For each namespace 'nss' that is used by the current 'batch', inform the RoutingContext
     // that we are sending requests that involve 'nss'.

@@ -163,7 +163,7 @@ void executeChildBatches(
         DatabaseName::kAdmin,
         requests,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+        shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kStrictlyNotIdempotent);
 
     while (!ars.done()) {
         // Block until a response is available.
