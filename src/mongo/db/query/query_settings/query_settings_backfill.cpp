@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
 #include "mongo/executor/async_rpc.h"
@@ -118,7 +119,10 @@ ExecutorFuture<std::vector<QueryShapeHash>> dispatchBatchedInsert(
     std::shared_ptr<executor::TaskExecutor> executor) {
     auto request = makeInsertCommandRequest(std::move(documents));
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::InsertCommandRequest>>(
-        executor, CancellationToken::uncancelable(), std::move(request));
+        executor,
+        CancellationToken::uncancelable(),
+        std::move(request),
+        std::make_shared<DefaultRetryStrategy>());
     auto future = [&]() {
         if (MONGO_unlikely(alwaysFailBackfillInsertCommands.shouldFail())) {
             // Fake a "HostUnreachable" response if the failpoint is active.
