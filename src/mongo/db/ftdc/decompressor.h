@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/ftdc/block_compressor.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

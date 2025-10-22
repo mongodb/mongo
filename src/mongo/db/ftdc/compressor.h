@@ -35,6 +35,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/ftdc/block_compressor.h"
 #include "mongo/db/ftdc/config.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>

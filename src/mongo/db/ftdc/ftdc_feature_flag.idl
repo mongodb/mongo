@@ -29,6 +29,7 @@
 # Feature flag for FTDC.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo::feature_flags"
 
 imports:

@@ -39,6 +39,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>
@@ -57,7 +58,7 @@ namespace mongo {
  *
  * Provides an interface to collect BSONObjs from system providers
  */
-class FTDCCollectorInterface {
+class MONGO_MOD_OPEN FTDCCollectorInterface {
     FTDCCollectorInterface(const FTDCCollectorInterface&) = delete;
     FTDCCollectorInterface& operator=(const FTDCCollectorInterface&) = delete;
 

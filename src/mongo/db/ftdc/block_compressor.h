@@ -31,6 +31,7 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>

@@ -34,17 +34,18 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * Start Full Time Data Capture
  */
-void startMongoSFTDC(ServiceContext* serviceContext);
+MONGO_MOD_PUB void startMongoSFTDC(ServiceContext* serviceContext);
 
 /**
  * Stop Full Time Data Capture
  */
-void stopMongoSFTDC();
+MONGO_MOD_PUB void stopMongoSFTDC();
 
 }  // namespace mongo

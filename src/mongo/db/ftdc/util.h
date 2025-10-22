@@ -38,6 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/ftdc/decompressor.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -48,7 +49,7 @@
 
 namespace mongo {
 
-constexpr StringData kFTDCThreadName = "ftdc"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kFTDCThreadName = "ftdc"_sd;
 
 /**
  * Utilities for inflating and deflating BSON documents and metric arrays

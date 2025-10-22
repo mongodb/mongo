@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/ftdc/decompressor.h"
 #include "mongo/db/ftdc/util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/ftdc/collector.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>

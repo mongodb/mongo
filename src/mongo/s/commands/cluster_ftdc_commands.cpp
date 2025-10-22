@@ -101,9 +101,7 @@ public:
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
 
-        result.append(
-            "data",
-            FTDCController::get(opCtx->getServiceContext())->getMostRecentPeriodicDocument());
+        result.append("data", getMostRecentFTDCDocument(opCtx->getServiceContext()));
 
         return true;
     }

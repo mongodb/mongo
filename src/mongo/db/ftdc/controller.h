@@ -40,6 +40,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -301,5 +302,9 @@ private:
     // Background collection and writing thread
     stdx::thread _thread;
 };
+
+MONGO_MOD_NEEDS_REPLACEMENT inline BSONObj getMostRecentFTDCDocument(ServiceContext* svcCtx) {
+    return FTDCController::get(svcCtx)->getMostRecentPeriodicDocument();
+}
 
 }  // namespace mongo

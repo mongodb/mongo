@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -45,17 +46,17 @@ namespace mongo {
  * Start Full Time Data Capture
  * Starts 1 thread.
  */
-void startMongoDFTDC(ServiceContext* serviceContext);
+MONGO_MOD_PUB void startMongoDFTDC(ServiceContext* serviceContext);
 
 /**
  * Stop Full Time Data Capture
  */
-void stopMongoDFTDC();
+MONGO_MOD_PUB void stopMongoDFTDC();
 
 /**
  * Validation callback for setParameter
  */
-Status validateCollectionStatsNamespaces(std::vector<std::string> value,
-                                         const boost::optional<TenantId>& tenantId);
+MONGO_MOD_PUB Status validateCollectionStatsNamespaces(std::vector<std::string> value,
+                                                       const boost::optional<TenantId>& tenantId);
 
 }  // namespace mongo
