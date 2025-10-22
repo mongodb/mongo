@@ -216,7 +216,6 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
     auto cmdObj = [&]() {
         // Parse original write command and set _id as query filter for new command object.
         if (commandName == BulkWriteCommandRequest::kCommandName) {
-            invariant(bulkWriteRequest.has_value());
             auto op = BulkWriteCRUDOp(bulkWriteRequest->getOps()[0]);
 
             NamespaceInfoEntry newNsEntry = bulkWriteRequest->getNsInfo()[op.getNsInfoIdx()];

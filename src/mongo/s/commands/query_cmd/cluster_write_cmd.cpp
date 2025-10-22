@@ -424,7 +424,7 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
             return targeter.targetDelete(opCtx, targetingBatchItem).endpoints;
         }
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11052602);
     }();
 
     routing_context_utils::runAndValidate(
@@ -466,7 +466,9 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
                 uassertStatusOK(response.swResponse);
 
                 // If the response status was OK, the response must contain which host was targeted.
-                invariant(response.shardHostAndPort);
+                tassert(11052601,
+                        "Missing host and port from shard response.",
+                        response.shardHostAndPort);
                 results->push_back(std::move(response));
             }
         });

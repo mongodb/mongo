@@ -333,7 +333,8 @@ private:
     }
 
     UpdateMetrics* getUpdateMetrics() override {
-        invariant(_updateMetrics);
+        tassert(
+            11052600, str::stream() << "Missing UpdateMetrics in " << getName(), _updateMetrics);
         return &*_updateMetrics;
     }
 
