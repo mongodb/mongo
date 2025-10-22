@@ -29,10 +29,12 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
+namespace {
 std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
     auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
     ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
@@ -43,6 +45,7 @@ std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
     }
     return rawPipeline;
 }
+}  // namespace
 
 class PipelineAnalyzerTest : public AggregationContextFixture {
 protected:
@@ -63,7 +66,7 @@ protected:
     }
 };
 
-TEST_F(PipelineAnalyzerTest, CanOptimizeWithJoinReordering_noLocalForeignFeilds) {
+TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_noLocalForeignFeilds) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -73,20 +76,20 @@ TEST_F(PipelineAnalyzerTest, CanOptimizeWithJoinReordering_noLocalForeignFeilds)
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_TRUE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
-TEST_F(PipelineAnalyzerTest, CanOptimizeWithJoinReordering_singleLookupUnwind) {
+TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_singleLookupUnwind) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"}
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    ASSERT_TRUE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
-TEST_F(PipelineAnalyzerTest, CanOptimizeWithJoinReordering_noUnwind) {
+TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_noUnwind) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -95,10 +98,10 @@ TEST_F(PipelineAnalyzerTest, CanOptimizeWithJoinReordering_noUnwind) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_TRUE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
-TEST_F(PipelineAnalyzerTest, CanOptimizeWithJoinReordering_nonAbsorbableUnwind) {
+TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_nonAbsorbableUnwind) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -108,7 +111,7 @@ TEST_F(PipelineAnalyzerTest, CanOptimizeWithJoinReordering_nonAbsorbableUnwind) 
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_TRUE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
@@ -121,9 +124,11 @@ TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_FALSE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    AggJoinModel joinModel{std::move(pipeline)};
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.graph.numNodes(), 3);
     ASSERT_EQ(joinModel.graph.numEdges(), 2);
     ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
@@ -140,9 +145,11 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_FALSE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    AggJoinModel joinModel{std::move(pipeline)};
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.graph.numNodes(), 3);
     ASSERT_EQ(joinModel.graph.numEdges(), 2);
     ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
@@ -162,14 +169,18 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_FALSE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    AggJoinModel joinModel{std::move(pipeline)};
-    ASSERT_EQ(joinModel.graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.graph.numEdges(), 2);
-    ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
-    ASSERT_EQ(joinModel.graph.getNode(1).accessPath->getPrimaryMatchExpression()->debugString(),
-              "d $eq 11\n");
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_NOT_OK(swJoinModel);
+
+    // TODO SERVER-111910: re-enable this.
+    // auto& joinModel = swJoinModel.getValue();
+    // ASSERT_EQ(joinModel.graph.numNodes(), 3);
+    // ASSERT_EQ(joinModel.graph.numEdges(), 2);
+    // ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
+    // ASSERT_EQ(joinModel.graph.getNode(1).accessPath->getPrimaryMatchExpression()->debugString(),
+    //           "d $eq 11\n");
 }
 
 TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
@@ -183,12 +194,31 @@ TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_FALSE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    // We don't detect ineligibility here.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    AggJoinModel joinModel{std::move(pipeline)};
-    ASSERT_EQ(joinModel.graph.numNodes(), 1);
-    ASSERT_EQ(joinModel.graph.numEdges(), 0);
-    ASSERT_EQ(joinModel.resolvedPaths.size(), 0);
+    // But we fail to construct a model here, because $group isn't pushed into SBE.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::QueryFeatureNotAllowed);
+}
+
+TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$group: {_id: "$key", a: {$avg: "$c"}}},
+            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+
+    // We don't detect ineligibility here.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // But we fail to construct a model here, because $group isn't pushed into SBE.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::QueryFeatureNotAllowed);
 }
 
 TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
@@ -203,12 +233,135 @@ TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_FALSE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    AggJoinModel joinModel{std::move(pipeline)};
-    ASSERT_EQ(joinModel.graph.numNodes(), 1);
-    ASSERT_EQ(joinModel.graph.numEdges(), 0);
-    ASSERT_EQ(joinModel.resolvedPaths.size(), 0);
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_NOT_OK(swJoinModel);
+
+    // Ensure we haven't modified our pipeline.
+    auto serializedPipeline = pipeline->serializeToBson();
+    BSONObjBuilder bob;
+    {
+        BSONArrayBuilder bar(bob.subarrayStart("pipeline"));
+        for (auto&& stage : serializedPipeline) {
+            bar.append(stage);
+        }
+    }
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT,
+        R"({
+            "pipeline": [
+                {
+                    "$lookup": {
+                        "from": "A",
+                        "as": "fromA",
+                        "localField": "a",
+                        "foreignField": "b",
+                        "let": {},
+                        "pipeline": [
+                            {
+                                "$group": {
+                                    "_id": "$key",
+                                    "a": {
+                                        "$avg": "$c"
+                                    },
+                                    "$willBeMerged": false
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$fromA"
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "B",
+                        "as": "fromB",
+                        "localField": "a",
+                        "foreignField": "b"
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$fromB"
+                    }
+                }
+            ]
+        })",
+        bob.obj());
+}
+
+TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$lookup: {from: "B", localField: "b", foreignField: "b", as: "innerB"}}]}
+            },
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_NOT_OK(swJoinModel);
+
+    // Ensure we haven't modified our pipeline.
+    auto serializedPipeline = pipeline->serializeToBson();
+    BSONObjBuilder bob;
+    {
+        BSONArrayBuilder bar(bob.subarrayStart("pipeline"));
+        for (auto&& stage : serializedPipeline) {
+            bar.append(stage);
+        }
+    }
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT,
+        R"({
+            "pipeline": [
+                {
+                    "$lookup": {
+                        "from": "A",
+                        "as": "fromA",
+                        "localField": "a",
+                        "foreignField": "b",
+                        "let": {},
+                        "pipeline": [
+                            {
+                                "$lookup": {
+                                    "from": "B",
+                                    "as": "innerB",
+                                    "localField": "b",
+                                    "foreignField": "b"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$fromA"
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "B",
+                        "as": "fromB",
+                        "localField": "a",
+                        "foreignField": "b"
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$fromB"
+                    }
+                }
+            ]
+        })",
+        bob.obj());
 }
 
 TEST_F(PipelineAnalyzerTest, LongPrefix) {
@@ -224,9 +377,11 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_FALSE(AggJoinModel::canOptimizeWithJoinReordering(pipeline));
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    AggJoinModel joinModel{std::move(pipeline)};
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
     ASSERT_EQ(joinModel.graph.numNodes(), 3);
     ASSERT_EQ(joinModel.graph.numEdges(), 2);
     ASSERT_EQ(joinModel.resolvedPaths.size(), 3);

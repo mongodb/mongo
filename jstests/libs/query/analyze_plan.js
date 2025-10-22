@@ -171,44 +171,43 @@ function isPlainObject(value) {
     return value && typeof value == "object" && value.constructor === Object;
 }
 
-/**
- * Flattens the given plan by turning it into an array of stages/children. It excludes fields which
- * might differ in the explain across multiple executions of the same query.
- */
-export function flattenPlan(plan) {
-    const results = [];
+const kExplainChildFieldNames = [
+    "inputStage",
+    "inputStages",
+    "thenStage",
+    "elseStage",
+    "outerStage",
+    "stages",
+    "innerStage",
+    "child",
+    "leftChild",
+    "rightChild",
+];
 
+/**
+ * Removes unwanted/variable fields from the explain plan without altering the tree structure,
+ * and if flatten is set to true, turns the tree structure into an array (useful for plans where every node has one child).
+ */
+export function normalizePlan(plan, flatten = true) {
+    let results = [];
     if (!isPlainObject(plan)) {
         return results;
     }
-
-    const childFields = [
-        "inputStage",
-        "inputStages",
-        "thenStage",
-        "elseStage",
-        "outerStage",
-        "stages",
-        "innerStage",
-        "child",
-        "leftChild",
-        "rightChild",
-    ];
 
     // Expand this array if you find new fields which are inconsistent across different test runs.
     const ignoreFields = ["isCached", "indexVersion", "planNodeId"];
 
     // Iterates over the plan while ignoring the `ignoreFields`, to create flattened stages whenever
-    // `childFields` are encountered.
+    // `kExplainChildFieldNames` are encountered.
     const stack = [["root", {...plan}]];
     while (stack.length > 0) {
-        const [_, next] = stack.pop();
+        const [name, next] = stack.pop();
         ignoreFields.forEach((field) => delete next[field]);
 
-        for (const childField of childFields) {
+        for (const childField of kExplainChildFieldNames) {
             if (childField in next) {
                 const child = next[childField];
-                delete next[childField];
+                if (flatten) delete next[childField];
                 if (Array.isArray(child)) {
                     for (let i = 0; i < child.length; i++) {
                         stack.push([childField, child[i]]);
@@ -218,8 +217,11 @@ export function flattenPlan(plan) {
                 }
             }
         }
-
-        results.push(next);
+        if (flatten) {
+            results.push(next);
+        } else if (name == "root" && !flatten) {
+            results = plan;
+        }
     }
 
     return results;
@@ -229,11 +231,10 @@ export function flattenPlan(plan) {
  * Returns an object containing the winning plan and an array of rejected plans for the given
  * queryPlanner. Each of those plans is returned in its flattened form.
  */
-export function formatQueryPlanner(queryPlanner) {
-    return {
-        winningPlan: flattenPlan(getWinningPlanFromExplain(queryPlanner)),
-        rejectedPlans: queryPlanner.rejectedPlans.map(flattenPlan),
-    };
+export function formatQueryPlanner(queryPlanner, shouldFlatten = true) {
+    let winningPlan = normalizePlan(getWinningPlanFromExplain(queryPlanner), shouldFlatten);
+    let rejectedPlans = queryPlanner.rejectedPlans.map((plan) => normalizePlan(plan, shouldFlatten));
+    return {winningPlan, rejectedPlans};
 }
 
 /**
@@ -241,7 +242,7 @@ export function formatQueryPlanner(queryPlanner) {
  * formatted stages. It excludes fields which might differ in the explain across multiple executions
  * of the same query.
  */
-export function formatPipeline(pipeline) {
+export function formatPipeline(pipeline, shouldFlatten = true) {
     const results = [];
 
     // Pipeline must be an array of objects
@@ -261,7 +262,7 @@ export function formatPipeline(pipeline) {
         const stageName = keys[0];
         if (stageName == "$cursor") {
             const queryPlanner = stage[stageName].queryPlanner;
-            results.push({[stageName]: formatQueryPlanner(queryPlanner)});
+            results.push({[stageName]: formatQueryPlanner(queryPlanner, shouldFlatten)});
         } else {
             const stageCopy = {...stage[stageName]};
             ignoreFields.forEach((field) => delete stageCopy[field]);
@@ -287,7 +288,7 @@ function addIfPresent(field, src, dest, lambda = (i) => i) {
  * If queryPlanner contains an array of shards, this returns both the merger part and shards
  * part. Both are flattened.
  */
-function invertShards(queryPlanner) {
+function invertShards(queryPlanner, shouldFlatten = true) {
     const winningPlan = queryPlanner.winningPlan;
     const shards = winningPlan.shards;
     if (!Array.isArray(shards)) {
@@ -297,8 +298,8 @@ function invertShards(queryPlanner) {
     const topStage = {...winningPlan};
     delete topStage.shards;
 
-    const res = {mergerPart: flattenPlan(topStage), shardsPart: {}};
-    shards.forEach((shard) => (res.shardsPart[shard.shardName] = formatQueryPlanner(shard)));
+    const res = {mergerPart: normalizePlan(topStage, shouldFlatten), shardsPart: {}};
+    shards.forEach((shard) => (res.shardsPart[shard.shardName] = formatQueryPlanner(shard, shouldFlatten)));
 
     return res;
 }
@@ -307,31 +308,35 @@ function invertShards(queryPlanner) {
  * Returns a formatted version of the explain, excluding fields which might differ in the explain
  * across multiple executions of the same query (e.g. caching information or UUIDs).
  */
-export function formatExplainRoot(explain) {
+export function formatExplainRoot(explain, shouldFlatten = true) {
     let res = {};
     if (!isPlainObject(explain)) {
         return res;
     }
 
+    const formatExplainPipeline = (pipeline) => {
+        return formatPipeline(pipeline, shouldFlatten);
+    };
+
     addIfPresent("mergeType", explain, res);
     if ("splitPipeline" in explain) {
-        addIfPresent("mergerPart", explain.splitPipeline, res, formatPipeline);
-        addIfPresent("shardsPart", explain.splitPipeline, res, formatPipeline);
+        addIfPresent("mergerPart", explain.splitPipeline, res, formatExplainPipeline);
+        addIfPresent("shardsPart", explain.splitPipeline, res, formatExplainPipeline);
     }
 
     if ("shards" in explain) {
         for (const [shardName, shardExplain] of Object.entries(explain["shards"])) {
             res[shardName] =
                 "queryPlanner" in shardExplain
-                    ? formatQueryPlanner(shardExplain.queryPlanner)
-                    : formatPipeline(shardExplain.stages);
+                    ? formatQueryPlanner(shardExplain.queryPlanner, shouldFlatten)
+                    : formatExplainPipeline(shardExplain.stages);
         }
     } else if ("queryPlanner" in explain && "shards" in explain.queryPlanner.winningPlan) {
-        res = {...res, ...invertShards(explain.queryPlanner)};
+        res = {...res, ...invertShards(explain.queryPlanner, shouldFlatten)};
     } else if ("queryPlanner" in explain) {
-        res = {...res, ...formatQueryPlanner(explain.queryPlanner)};
+        res = {...res, ...formatQueryPlanner(explain.queryPlanner, shouldFlatten)};
     } else if ("stages" in explain) {
-        res.stages = formatPipeline(explain.stages);
+        res.stages = formatExplainPipeline(explain.stages);
     }
 
     addIfPresent("queryShapeHash", explain, res);

@@ -50,6 +50,8 @@ public:
     QueryPlanRankerModeEnum getPlanRankerMode() const;
     SamplingConfidenceIntervalEnum getConfidenceInterval() const;
     SamplingCEMethodEnum getInternalQuerySamplingCEMethod() const;
+    double getSamplingMarginOfError() const;
+    int64_t getNumChunksForChunkBasedSampling() const;
     SbeHashAggIncreasedSpillingModeEnum getSbeHashAggIncreasedSpillingMode() const;
 
     bool getSbeDisableGroupPushdownForOp() const;
@@ -68,6 +70,12 @@ public:
     size_t getMaxScansToExplodeForOp() const;
 
     /**
+     * Query knobs configuring join reordering.
+     */
+    bool isJoinOrderingEnabled() const;
+    size_t getRandomJoinOrderSeed() const;
+
+    /**
      * Returns whether we can push down fully compatible stages to sbe. This is only true when the
      * query knob is 'trySbeEngine'.
      */
@@ -80,6 +88,8 @@ private:
     QueryPlanRankerModeEnum _planRankerMode;
     SamplingConfidenceIntervalEnum _samplingConfidenceInterval;
     SamplingCEMethodEnum _samplingCEMethod;
+    int64_t _numChunksForChunkBasedSampling;
+    double _samplingMarginOfError;
     SbeHashAggIncreasedSpillingModeEnum _sbeHashAggIncreasedSpillingMode;
     size_t _planEvaluationMaxResults;
     size_t _plannerMaxIndexedSolutions;
@@ -89,6 +99,8 @@ private:
     bool _sbeDisableGroupPushdownValue;
     bool _sbeDisableLookupPushdownValue;
     bool _sbeDisableTimeSeriesValue;
+    bool _isJoinOrderingEnabled;
+    int64_t _randomJoinOrderSeed;
     int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;
 };
 }  // namespace mongo

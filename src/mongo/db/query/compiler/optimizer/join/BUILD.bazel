@@ -5,8 +5,11 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "agg_join_model.h",
     "agg_join_model.cpp",
+    "executor.h",
+    "executor.cpp",
     "single_table_access.cpp",
     "single_table_access.h",
+    "solution_storage.h",
 ])
 
 exports_files(

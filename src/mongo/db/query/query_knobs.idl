@@ -531,6 +531,15 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalRandomJoinOrderSeed:
+        description: "Select a seed for randomized join reordering."
+        set_at: [startup, runtime]
+        cpp_varname: "internalRandomJoinOrderSeed"
+        cpp_vartype: AtomicWord<int>
+        default: 44
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
     #
     # Query execution
     #

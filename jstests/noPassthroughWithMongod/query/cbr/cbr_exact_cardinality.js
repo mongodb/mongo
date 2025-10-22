@@ -3,7 +3,7 @@
  */
 
 import {
-    flattenPlan,
+    normalizePlan,
     getRejectedPlans,
     getWinningPlanFromExplain,
     isIndexOnly,
@@ -28,8 +28,8 @@ function randomInt() {
 
 // Helper to assert that each node in the winning plan has its cardinality correctly calculated.
 function assertAllStagesCorrectCardinality(explain) {
-    const flattenedPlan = flattenPlan(getWinningPlanFromExplain(explain));
-    const flattenedExecution = flattenPlan(explain["executionStats"]["executionStages"]);
+    const flattenedPlan = normalizePlan(getWinningPlanFromExplain(explain));
+    const flattenedExecution = normalizePlan(explain["executionStats"]["executionStages"]);
     assert.eq(flattenedPlan.length, flattenedExecution.length);
     for (let i = 0; i < flattenedPlan.length; i++) {
         assert.eq(flattenedPlan[i]["cardinalityEstimate"], flattenedExecution[i]["nReturned"]);

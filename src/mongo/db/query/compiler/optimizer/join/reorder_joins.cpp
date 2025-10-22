@@ -61,8 +61,12 @@ public:
             }
             MONGO_UNREACHABLE_TASSERT(11075702);
         }();
+        // Left field is a local field and potentially could come from already joined foreign
+        // collection, so its embedPath is important to handle here. Right field is a foreign field
+        // which comes from the current foreign collection, SBE does not expect it to be prefixed
+        // with the foreign's collection as field.
         return {.op = op,
-                .leftField = _resolvedPaths[pred.left].fieldName,
+                .leftField = expandEmbeddedPath(pred.left),
                 .rightField = _resolvedPaths[pred.right].fieldName};
     }
 
@@ -78,6 +82,15 @@ public:
     }
 
 private:
+    FieldPath expandEmbeddedPath(PathId pathId) {
+        const auto& resolvedPath = _resolvedPaths[pathId];
+        const auto& node = _joinGraph.getNode(_resolvedPaths[pathId].nodeId);
+        if (node.embedPath.has_value()) {
+            return node.embedPath->concat(resolvedPath.fieldName);
+        }
+        return resolvedPath.fieldName;
+    }
+
     const JoinGraph& _joinGraph;
     const std::vector<ResolvedPath>& _resolvedPaths;
 };

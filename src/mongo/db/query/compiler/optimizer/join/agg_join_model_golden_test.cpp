@@ -46,9 +46,15 @@ public:
         ctx.outStream() << "VARIATION " << variationName << std::endl;
         ctx.outStream() << "input " << toString(pipeline) << std::endl;
 
-        AggJoinModel joinModel{std::move(pipeline)};
+        auto joinModel = AggJoinModel::constructJoinModel(*pipeline);
 
-        ctx.outStream() << "output: " << joinModel.toString(/*pretty*/ true) << std::endl;
+        if (joinModel.isOK()) {
+            ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty*/ true)
+                            << std::endl;
+        } else {
+            ctx.outStream() << "output: " << joinModel.getStatus() << std::endl;
+        }
+
         ctx.outStream() << std::endl;
     }
 

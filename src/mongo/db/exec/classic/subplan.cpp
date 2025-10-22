@@ -215,21 +215,13 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
         rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
         using namespace cost_based_ranker;
-        auto samplingMode =
-            _query->getExpCtx()->getQueryKnobConfiguration().getInternalQuerySamplingCEMethod();
-        samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
-            _query->getOpCtx(),
-            multiCollectionAccessor,
-            yieldPolicy->getPolicy(),
-            samplingMode == SamplingCEMethodEnum::kRandom
-                ? ce::SamplingEstimatorImpl::SamplingStyle::kRandom
-                : ce::SamplingEstimatorImpl::SamplingStyle::kChunk,
+        samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+            *_query,
             CardinalityEstimate{
                 CardinalityType{plannerParams.mainCollectionInfo.collStats->getCardinality()},
                 EstimationSource::Metadata},
-            _query->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
-            samplingMarginOfError.load(),
-            internalQueryNumChunksForChunkBasedSampling.load());
+            yieldPolicy->getPolicy(),
+            multiCollectionAccessor);
         topLevelSampleFieldNames =
             ce::extractTopLevelFieldsFromMatchExpression(_query->getPrimaryMatchExpression());
     } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {

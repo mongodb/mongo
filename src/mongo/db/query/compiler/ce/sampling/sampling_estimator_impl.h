@@ -54,9 +54,18 @@ public:
     enum class SamplingStyle { kRandom = 1, kChunk = 2 };
 
     /**
+     * Factory function for creating a 'SamplingEstimator' for use in differet calls into CBR.
+     */
+    static std::unique_ptr<SamplingEstimator> makeDefaultSamplingEstimator(
+        CanonicalQuery& cq,
+        CardinalityEstimate collCard,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        const MultipleCollectionAccessor& collections);
+
+    /**
      * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
      * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
-     * sampling method.
+     * sampling method. Prefer the factory method above outside tests.
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
@@ -71,7 +80,7 @@ public:
      * This constructor allows the caller to specify the sample size if necessary. This constructor
      * is useful when a certain scale of sample is more appropriate, for example, the planner wants
      * to do preliminary data distribution analysis with a small sample size. Testing cases may
-     * require only a small sample.
+     * require only a small sample. Prefer the factory method above outside tests.
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
@@ -80,6 +89,7 @@ public:
                           SamplingStyle samplingStyle,
                           boost::optional<int> numChunks,
                           CardinalityEstimate collectionCard);
+
     ~SamplingEstimatorImpl() override;
 
     /**

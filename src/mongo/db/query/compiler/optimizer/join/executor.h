@@ -26,45 +26,29 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
-#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
-#include "mongo/db/query/compiler/optimizer/join/solution_storage.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 
-namespace mongo::optimizer {
+namespace mongo::join_ordering {
 
-using SamplingEstimatorMap =
-    stdx::unordered_map<NamespaceString, std::unique_ptr<ce::SamplingEstimator>>;
-
-/**
- * Struct containing results from 'singleTableAccessPlans()' function.
- */
-struct SingleTableAccessPlansResult {
-    join_ordering::QuerySolutionMap solns;
-    cost_based_ranker::EstimateMap estimate;
+struct JoinReorderedExecutorResult {
+    // Executor for pushed-down & reordered SBE prefix.
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> executor;
+    // Model describing the join graph extracted from a pipeline and the DocumentSource suffix that
+    // still needs to be attached to the executor.
+    AggJoinModel model;
 };
 
 /**
- * Constructor for sampling estimators per collection access.
+ * Attempts to apply join optimization to the given aggregation, but if it fails to extract a join
+ * model, falls back to preparing executors for the pipeline in the normal way.
  */
-optimizer::SamplingEstimatorMap makeSamplingEstimators(
-    const MultipleCollectionAccessor& collections,
-    const mongo::join_ordering::JoinGraph& model,
-    PlanYieldPolicy::YieldPolicy yieldPolicy);
-
-/**
- * Given a JoinGraph 'model' where each node links to a CanonicalQuery and a map of
- * 'SamplingEstimators' keyed by namespace, for each query, this function invokes the plan
- * enumerator and uses cost-based ranking (CBR) with sampling-based cardinality estimation. This
- * function returns a QuerySolution representing the best plan for each query along with an
- * 'EstimateMap' which contains cardinality and cost estimates for every QSN.
- */
-StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
+StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
+    const MultipleCollectionAccessor& mca,
+    const Pipeline& pipeline,
     OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    const mongo::join_ordering::JoinGraph& model,
-    const SamplingEstimatorMap& samplingEstimators);
-
-}  // namespace mongo::optimizer
+    boost::intrusive_ptr<ExpressionContext> expCtx);
+}  // namespace mongo::join_ordering

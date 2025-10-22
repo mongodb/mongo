@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
-#include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 
 namespace mongo::join_ordering {
 /** Represent an aggregation pipeline for join optimization. It takes a pipeline and parses a join
@@ -40,9 +40,37 @@ struct AggJoinModel {
     /** Returns false if we are sure that the pipeline cannot be optimized with join reordering,
      * true if we should try.
      */
-    static bool canOptimizeWithJoinReordering(const std::unique_ptr<Pipeline>& pipeline);
+    static bool pipelineEligibleForJoinReordering(const Pipeline& pipeline);
 
-    AggJoinModel(std::unique_ptr<Pipeline> pipeline);
+    /**
+     * Factory function to construct an AggJoinModel instance from a 'pipeline'. If construction
+     * succeeds, ownership of the pipeline will be transferred to the 'AggJoinModel'. If
+     * construction fails, a status is returned and the pipeline remains unmodified.
+     */
+    static StatusWith<AggJoinModel> constructJoinModel(const Pipeline& pipeline);
+
+    AggJoinModel(JoinGraph graph,
+                 std::vector<ResolvedPath> resolvedPaths,
+                 std::unique_ptr<Pipeline> prefix,
+                 std::unique_ptr<Pipeline> suffix)
+        : graph{std::move(graph)},
+          resolvedPaths{std::move(resolvedPaths)},
+          prefix{std::move(prefix)},
+          suffix{std::move(suffix)} {}
+
+    AggJoinModel(AggJoinModel&& other)
+        : graph{std::move(other.graph)},
+          resolvedPaths{std::move(other.resolvedPaths)},
+          prefix{std::move(other.prefix)},
+          suffix{std::move(other.suffix)} {}
+
+    AggJoinModel& operator=(AggJoinModel&& other) {
+        graph = std::move(other.graph);
+        resolvedPaths = std::move(other.resolvedPaths);
+        prefix = std::move(other.prefix);
+        suffix = std::move(other.suffix);
+        return *this;
+    }
 
     JoinGraph graph;
 
@@ -51,7 +79,7 @@ struct AggJoinModel {
     // Stages extracted for join optimization and pushed down to CanonicalQueries in JoinGraph.
     std::unique_ptr<Pipeline> prefix;
 
-    // Ramaining stages not extracted for join optiomization.
+    // Remaining stages not extracted for join optimization.
     std::unique_ptr<Pipeline> suffix;
 
     /**Serializes the Aggregation Join Model to BSON.*/
@@ -63,12 +91,5 @@ struct AggJoinModel {
     std::string toString(bool pretty) const {
         return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
     }
-
-private:
-    void build();
-
-    /** Creates a JoinGraph node for the pipeline's base collection.
-     */
-    boost::optional<NodeId> makeBaseNode();
 };
 }  // namespace mongo::join_ordering

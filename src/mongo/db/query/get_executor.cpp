@@ -460,23 +460,14 @@ public:
             std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
             if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
                 rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-                auto samplingMode = _cq->getExpCtx()
-                                        ->getQueryKnobConfiguration()
-                                        .getInternalQuerySamplingCEMethod();
-                samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
-                    _cq->getOpCtx(),
-                    getCollections(),
-                    _yieldPolicy,
-                    samplingMode == SamplingCEMethodEnum::kRandom
-                        ? ce::SamplingEstimatorImpl::SamplingStyle::kRandom
-                        : ce::SamplingEstimatorImpl::SamplingStyle::kChunk,
+                samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+                    *_cq,
                     CardinalityEstimate{
                         CardinalityType{
                             _plannerParams->mainCollectionInfo.collStats->getCardinality()},
                         EstimationSource::Metadata},
-                    _cq->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
-                    samplingMarginOfError.load(),
-                    internalQueryNumChunksForChunkBasedSampling.load());
+                    _yieldPolicy,
+                    getCollections());
             } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
                 exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
                     getCollections().getMainCollectionAcquisition(), *_cq, _opCtx);

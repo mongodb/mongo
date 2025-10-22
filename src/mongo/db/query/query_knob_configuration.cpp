@@ -58,6 +58,9 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
                             ->get<SamplingCEMethod>("internalQuerySamplingCEMethod")
                             ->_data.get();
 
+    _numChunksForChunkBasedSampling = internalQueryNumChunksForChunkBasedSampling.load();
+    _samplingMarginOfError = samplingMarginOfError.load();
+
     _sbeHashAggIncreasedSpillingMode =
         ServerParameterSet::getNodeParameterSet()
             ->get<SbeHashAggIncreasedSpillingMode>(
@@ -71,6 +74,9 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
     _internalQuerySpillingMinAvailableDiskSpaceBytes =
         static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed());
+
+    _isJoinOrderingEnabled = internalEnableJoinOptimization.load();
+    _randomJoinOrderSeed = internalRandomJoinOrderSeed.load();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -87,6 +93,22 @@ SamplingConfidenceIntervalEnum QueryKnobConfiguration::getConfidenceInterval() c
 
 SamplingCEMethodEnum QueryKnobConfiguration::getInternalQuerySamplingCEMethod() const {
     return _samplingCEMethod;
+}
+
+size_t QueryKnobConfiguration::getRandomJoinOrderSeed() const {
+    return _randomJoinOrderSeed;
+}
+
+bool QueryKnobConfiguration::isJoinOrderingEnabled() const {
+    return _isJoinOrderingEnabled;
+}
+
+double QueryKnobConfiguration::getSamplingMarginOfError() const {
+    return _samplingMarginOfError;
+}
+
+int64_t QueryKnobConfiguration::getNumChunksForChunkBasedSampling() const {
+    return _numChunksForChunkBasedSampling;
 }
 
 SbeHashAggIncreasedSpillingModeEnum QueryKnobConfiguration::getSbeHashAggIncreasedSpillingMode()

@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
@@ -151,11 +152,11 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     auto filter1 = fromjson("{a: 1, b: 1}");
     auto filter2 = fromjson("{a: 1, b: 1}");
 
-    std::vector<std::unique_ptr<CanonicalQuery>> queries;
-    queries.push_back(makeCanonicalQuery(nss1, filter1));
-    queries.push_back(makeCanonicalQuery(nss2, filter2));
-
-    auto swRes = singleTableAccessPlans(opCtx, mca, queries, estimators);
+    // Mock a JoinGraph for testing purposes.
+    join_ordering::JoinGraph graph;
+    graph.addNode(nss1, makeCanonicalQuery(nss1, filter1), boost::none);
+    graph.addNode(nss2, makeCanonicalQuery(nss2, filter2), boost::none);
+    auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators);
     ASSERT_OK(swRes);
 
     auto& res = swRes.getValue();

@@ -214,6 +214,16 @@ std::unique_ptr<sbe::PlanStage> makeProjectStage(std::unique_ptr<sbe::PlanStage>
         "makeBsonObj"_sd, sbe::makeEs(std::move(specExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
     return sbe::makeProjectStage(std::move(stage), 0 /* nodeId */, outputSlot, std::move(func));
 }
+
+inline SamplingEstimatorImpl::SamplingStyle getSamplingStyle(SamplingCEMethodEnum method) {
+    switch (method) {
+        case SamplingCEMethodEnum::kRandom:
+            return SamplingEstimatorImpl::SamplingStyle::kRandom;
+        case SamplingCEMethodEnum::kChunk:
+            return SamplingEstimatorImpl::SamplingStyle::kChunk;
+    }
+    MONGO_UNREACHABLE_TASSERT(11083904);
+}
 }  // namespace
 
 StringSet extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr) {
@@ -872,6 +882,23 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
         estimate = _collectionCard;
     }
     return estimate;
+}
+
+std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+    CanonicalQuery& cq,
+    CardinalityEstimate collCard,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    const MultipleCollectionAccessor& collections) {
+    const auto& qkc = cq.getExpCtx()->getQueryKnobConfiguration();
+    return std::unique_ptr<ce::SamplingEstimatorImpl>(
+        new ce::SamplingEstimatorImpl(cq.getOpCtx(),
+                                      collections,
+                                      yieldPolicy,
+                                      getSamplingStyle(qkc.getInternalQuerySamplingCEMethod()),
+                                      collCard,
+                                      qkc.getConfidenceInterval(),
+                                      qkc.getSamplingMarginOfError(),
+                                      qkc.getNumChunksForChunkBasedSampling()));
 }
 
 }  // namespace mongo::ce

@@ -29,33 +29,72 @@
 
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/query_planner.h"
 
 #include <fmt/format.h>
 
 namespace mongo::optimizer {
 
+optimizer::SamplingEstimatorMap makeSamplingEstimators(
+    const MultipleCollectionAccessor& collections,
+    const mongo::join_ordering::JoinGraph& graph,
+    PlanYieldPolicy::YieldPolicy yieldPolicy) {
+    const auto numNodes = graph.numNodes();
+
+    optimizer::SamplingEstimatorMap samplingEstimators;
+    samplingEstimators.reserve(numNodes);
+
+    for (size_t i = 0; i < numNodes; i++) {
+        const auto& node = graph.getNode(i);
+        const auto& nss = node.accessPath->nss();
+        if (samplingEstimators.find(nss) == samplingEstimators.end()) {
+            cost_based_ranker::CardinalityType numRecords{static_cast<double>(
+                collections.lookupCollection(nss)->getRecordStore()->numRecords())};
+            auto estimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+                *node.accessPath,
+                ce::CardinalityEstimate{numRecords, cost_based_ranker::EstimationSource::Metadata},
+                yieldPolicy,
+                collections);
+
+            // Generate a sample for the fields relevant to this join.
+            // TODO SERVER-112233: figure out based on join predicates which fields exactly we need.
+            estimator->generateSample(ce::ProjectionParams{ce::NoProjection{}});
+            samplingEstimators.emplace(nss, std::move(estimator));
+
+        } else {
+            continue;
+        }
+    }
+    return samplingEstimators;
+}
+
 StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
-    const std::vector<std::unique_ptr<CanonicalQuery>>& queries,
+    const mongo::join_ordering::JoinGraph& graph,
     const SamplingEstimatorMap& samplingEstimators) {
     join_ordering::QuerySolutionMap solns;
     cost_based_ranker::EstimateMap estimates;
 
-    for (auto&& query : queries) {
+    const auto numNodes = graph.numNodes();
+    for (size_t i = 0; i < numNodes; i++) {
+        const auto& node = graph.getNode(i);
+        auto& nss = node.accessPath->nss();
+
         QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
             .opCtx = opCtx,
-            .canonicalQuery = *query,
+            .canonicalQuery = *node.accessPath,
             .collections = collections,
             .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
         });
-        auto& nss = query->nss();
-        auto swSolns = QueryPlanner::plan(*query, params);
+
+        auto swSolns = QueryPlanner::plan(*node.accessPath, params);
         if (!swSolns.isOK()) {
             return swSolns.getStatus();
         }
-        auto swCbrResult = QueryPlanner::planWithCostBasedRanking(*query,
+        auto swCbrResult = QueryPlanner::planWithCostBasedRanking(*node.accessPath,
                                                                   params,
                                                                   samplingEstimators.at(nss).get(),
                                                                   nullptr /*exactCardinality*/,
@@ -71,7 +110,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
                 fmt::format("CBR failed to find best plan for nss: {}", nss.toStringForErrorMsg()));
         }
         // Save solution and corresponding estimates for the best plan
-        solns[query.get()] = std::move(cbrResult.solutions.front());
+        solns[node.accessPath.get()] = std::move(cbrResult.solutions.front());
         estimates.insert(cbrResult.estimates.begin(), cbrResult.estimates.end());
     }
 

@@ -85,6 +85,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
+#include "mongo/db/query/compiler/optimizer/join/executor.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/explain_options.h"
@@ -637,27 +638,14 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
     return pipelines;
 }
 
-std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutors(
+std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutorsForPipeline(
     const AggExState& aggExState,
     AggCatalogState& aggCatalogState,
-    std::unique_ptr<Pipeline> pipeline) {
-    const auto expCtx = pipeline->getContext();
-    const auto mainCollectionUUID = aggCatalogState.getUUID();
-    // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build query
-    // executor phase below (to be replaced with a $geoNearCursorStage later during the executor
-    // attach phase).
-    auto hasGeoNearStage =
-        !pipeline->empty() && dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
-
-    // Prepare a PlanExecutor to provide input into the pipeline, if needed. Add additional
-    // executors if needed to serve the aggregation (currently only includes search commands
-    // that generate metadata).
-    auto [executor, attachCallback, additionalExecutors] =
-        PipelineD::buildInnerQueryExecutor(aggCatalogState.getCollections(),
-                                           aggExState.getExecutionNss(),
-                                           &aggExState.getRequest(),
-                                           pipeline.get());
-
+    std::unique_ptr<Pipeline> pipeline,
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> executor,
+    PipelineD::AttachExecutorCallback attachCallback,
+    std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> additionalExecutors,
+    bool hasGeoNearStage) {
     std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     if (canOptimizeAwayPipeline(aggExState, pipeline.get(), executor.get(), hasGeoNearStage)) {
         // This pipeline is currently empty, but once completed it will have only one source,
@@ -693,7 +681,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
             // optimization is off.
             auto bounds = extractDocsNeededBounds(*pipelines.back().get());
             auto metadataPipe = search_helpers::prepareSearchForTopLevelPipelineLegacyExecutor(
-                expCtx,
+                pipelines.back()->getContext(),
                 pipelines.back().get(),
                 bounds,
                 aggExState.getRequest().getCursor().getBatchSize());
@@ -731,6 +719,38 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         execs.emplace_back(std::move(exec));
     }
 
+    return execs;
+}
+
+std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutors(
+    const AggExState& aggExState,
+    AggCatalogState& aggCatalogState,
+    std::unique_ptr<Pipeline> pipeline) {
+    const auto expCtx = pipeline->getContext();
+    const auto mainCollectionUUID = aggCatalogState.getUUID();
+
+    // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build query
+    // executor phase below (to be replaced with a $geoNearCursorStage later during the executor
+    // attach phase).
+    auto hasGeoNearStage = !pipeline->getSources().empty() &&
+        dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
+
+    // Prepare a PlanExecutor to provide input into the pipeline, if needed. Add additional
+    // executors if needed to serve the aggregation (currently only includes search commands
+    // that generate metadata).
+    auto [executor, attachCallback, additionalExecutors] =
+        PipelineD::buildInnerQueryExecutor(aggCatalogState.getCollections(),
+                                           aggExState.getExecutionNss(),
+                                           &aggExState.getRequest(),
+                                           pipeline.get());
+
+    auto execs = prepareExecutorsForPipeline(aggExState,
+                                             aggCatalogState,
+                                             std::move(pipeline),
+                                             std::move(executor),
+                                             attachCallback,
+                                             std::move(additionalExecutors),
+                                             hasGeoNearStage);
     tassert(6624353, "No executors", !execs.empty());
 
     {
@@ -1197,8 +1217,39 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         return swPipeline.getStatus();
     }
 
-    std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs =
-        prepareExecutors(aggExState, *aggCatalogState, std::move(swPipeline.getValue()));
+    std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
+    auto pipeline = std::move(swPipeline.getValue());
+
+    auto swResForJoin = join_ordering::getJoinReorderedExecutor(
+        aggCatalogState->getCollections(), *pipeline, aggExState.getOpCtx(), expCtx);
+    if (swResForJoin.isOK()) {
+        auto resForJoin = std::move(swResForJoin.getValue());
+        auto attachExecutorCallback =
+            [](const MultipleCollectionAccessor& collections,
+               std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+               Pipeline* pipeline,
+               const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
+                auto cursor =
+                    DocumentSourceCursor::create(collections,
+                                                 std::move(exec),
+                                                 catalogResourceHandle,
+                                                 pipeline->getContext(),
+                                                 DocumentSourceCursor::CursorType::kRegular,
+                                                 DocumentSourceCursor::ResumeTrackingType::kNone);
+                pipeline->addInitialSource(std::move(cursor));
+            };
+
+        // Attach pipeline suffix to SBE executor for join-reordered prefix of the pipeline.
+        execs = prepareExecutorsForPipeline(aggExState,
+                                            *aggCatalogState,
+                                            std::move(resForJoin.model.suffix),
+                                            std::move(resForJoin.executor),
+                                            attachExecutorCallback,
+                                            {} /* additionalExecutors */,
+                                            false /* hasGeoNear */);
+    } else {
+        execs = prepareExecutors(aggExState, *aggCatalogState, std::move(pipeline));
+    }
 
     // Dispose of the statsTracker to update stats for Top and CurOp.
     statsTracker.reset();

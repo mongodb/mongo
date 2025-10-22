@@ -2146,9 +2146,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
 
     // We assume that Pipeline::optimize() is called by this point so we can hopefully guarantee
     // that we have exactly one $match at the front of the pipeline.
-    if (auto* match = dynamic_cast<DocumentSourceMatch*>(pipeline.peekFront()); match) {
-        leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(match);
-        pipeline.popFront();
+    if (!pipeline.empty()) {
+        auto firstSource = pipeline.getSources().front().get();
+        if (auto* match = dynamic_cast<DocumentSourceMatch*>(firstSource); match) {
+            leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(match);
+            pipeline.popFront();
+        }
     }
 
     return createCanonicalQuery(expCtx,

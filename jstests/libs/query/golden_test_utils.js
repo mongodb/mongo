@@ -79,10 +79,16 @@ export function outputCountPlanAndResults(cmdObj, explain, expected, actualCount
  * a summary of the explain to markdown. By default the results will be sorted, but the original
  * order can be kept by setting `shouldSortResults` to false.
  */
-export function outputAggregationPlanAndResults(coll, pipeline, options = {}, shouldSortResults = true) {
+export function outputAggregationPlanAndResults(
+    coll,
+    pipeline,
+    options = {},
+    shouldSortResults = true,
+    shouldFlatten = true,
+) {
     const results = coll.aggregate(pipeline, options).toArray();
     const explain = coll.explain().aggregate(pipeline, options);
-    const flatPlan = formatExplainRoot(explain);
+    const flatPlan = formatExplainRoot(explain, shouldFlatten);
 
     subSection("Pipeline");
     code(tojson(pipeline));

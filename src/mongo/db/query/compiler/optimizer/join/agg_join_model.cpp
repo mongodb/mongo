@@ -29,13 +29,17 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo::join_ordering {
 namespace {
@@ -55,24 +59,26 @@ std::unique_ptr<CanonicalQuery> makeFullScanCQ(boost::intrusive_ptr<ExpressionCo
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcr)}});
 }
 
-std::unique_ptr<CanonicalQuery> makeCQFromLookup(
+StatusWith<std::unique_ptr<CanonicalQuery>> makeCQFromLookup(
     DocumentSourceLookUp* stage, boost::intrusive_ptr<ExpressionContext> pipelineExpCtx) {
     auto expCtx = stage->getSubpipelineExpCtx();
     if (stage->hasPipeline()) {
-        // TODO SERVER-111383: Copy the original stage to keep it untocuhed in case of any issue.
-        auto workingStage = stage->clone(pipelineExpCtx);
-        stage = dynamic_cast<DocumentSourceLookUp*>(workingStage.get());
-
-        pipeline_optimization::optimizePipeline(stage->getResolvedIntrospectionPipeline());
+        stage = dynamic_cast<DocumentSourceLookUp*>(stage);
         auto swCQ = createCanonicalQuery(
             expCtx, stage->getFromNs(), stage->getResolvedIntrospectionPipeline());
-        const bool allSubPipelineStagesPushedDown =
-            stage->getResolvedIntrospectionPipeline().getSources().empty();
-        if (swCQ.isOK() && allSubPipelineStagesPushedDown) {
-            return std::move(swCQ.getValue());
+        if (swCQ.isOK()) {
+            auto cq = std::move(swCQ.getValue());
+            if (!stage->getResolvedIntrospectionPipeline().getSources().empty()) {
+                // We failed to pushdown the whole subpipeline into SBE- bail out without modifying
+                // the document source.
+                return Status(ErrorCodes::QueryFeatureNotAllowed,
+                              "Join reordering is not enabled for $lookups with sub-pipelines that "
+                              "can't be fully pushed down into a CanonicalQuery");
+            }
+            return std::move(cq);
         }
         // Bail out.
-        return nullptr;
+        return swCQ;
     }
     return makeFullScanCQ(expCtx);
 }
@@ -90,10 +96,16 @@ std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
 }
 }  // namespace
 
-bool AggJoinModel::canOptimizeWithJoinReordering(const std::unique_ptr<Pipeline>& pipeline) {
+bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
     size_t numLookupsWithUnwind = 0;
 
-    for (auto&& stage : pipeline->getSources()) {
+    // Pipelines starting with $geoNear are not eligible.
+    if (!pipeline.getSources().empty() &&
+        dynamic_cast<DocumentSourceGeoNear*>(pipeline.peekFront())) {
+        return false;
+    }
+
+    for (auto&& stage : pipeline.getSources()) {
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(stage.get());
             // TODO SERVER-111164: once we start adding edge from $expr we need to remove check for
             // hasLocalFieldForeignFieldJoin().
@@ -103,25 +115,33 @@ bool AggJoinModel::canOptimizeWithJoinReordering(const std::unique_ptr<Pipeline>
         }
     }
 
-    return numLookupsWithUnwind < 2;
+    return numLookupsWithUnwind >= 2;
 }
 
-AggJoinModel::AggJoinModel(std::unique_ptr<Pipeline> pipeline) {
-    suffix = std::move(pipeline);
-    if (!canOptimizeWithJoinReordering(suffix)) {
-        build();
+StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeline) {
+    // Try to create a CanonicalQuery. We begin by cloning the pipeline (this includes
+    // sub-pipelines!) to ensure that if we bail out, this stays idempotent.
+    // TODO SERVER-111383: We should see if we can make createCanonicalQuery() idempotent instead.
+    auto expCtx = pipeline.getContext();
+    const auto& nss = expCtx->getNamespaceString();
+    auto clonedExpCtx = makeCopyFromExpressionContext(expCtx, nss);
+    auto suffix = pipeline.clone(clonedExpCtx);
+
+    auto swCQ = createCanonicalQuery(expCtx, nss, *suffix);
+    if (!swCQ.isOK()) {
+        // Bail out & return the failure status- we failed to generate a CanonicalQuery from a
+        // pipeline prefix.
+        return swCQ.getStatus();
     }
-}
 
-void AggJoinModel::build() {
-    prefix = createEmptyPipeline(suffix->getContext());
+    // Initialize the JoinGraph & base NodeId.
+    JoinGraph graph;
+    auto baseNodeId =
+        graph.addNode(expCtx->getNamespaceString(), std::move(swCQ.getValue()), boost::none);
 
-    auto baseNodeId = makeBaseNode();
-    if (!baseNodeId.has_value()) {
-        return;
-    }
-
-    PathResolver pathResolver{baseNodeId.value(), resolvedPaths};
+    auto prefix = createEmptyPipeline(suffix->getContext());
+    std::vector<ResolvedPath> resolvedPaths;
+    PathResolver pathResolver{baseNodeId, resolvedPaths};
 
     // Go through the pipeline trying to find the maximal chain of join optimization eligible
     // $lookup+$unwinds pairs and turning them into CanonicalQueries. At the end only ineligible for
@@ -137,13 +157,18 @@ void AggJoinModel::build() {
                 break;
             }
 
-            auto cq = makeCQFromLookup(lookup, lookup->getSubpipelineExpCtx());
-            if (!cq) {
+            if (lookup->hasPipeline()) {
+                // TODO SERVER-111910: Enable lookup with sub-pipelines for join-opt.
                 break;
             }
 
-            auto foreignNodeId =
-                graph.addNode(lookup->getFromNs(), std::move(cq), lookup->getAsField());
+            auto swCQ = makeCQFromLookup(lookup, lookup->getSubpipelineExpCtx());
+            if (!swCQ.isOK()) {
+                break;
+            }
+
+            auto foreignNodeId = graph.addNode(
+                lookup->getFromNs(), std::move(swCQ.getValue()), lookup->getAsField());
             pathResolver.addNode(foreignNodeId, lookup->getAsField());
 
             if (lookup->hasLocalFieldForeignFieldJoin()) {
@@ -171,17 +196,14 @@ void AggJoinModel::build() {
             break;
         }
     }
-}
 
-boost::optional<NodeId> AggJoinModel::makeBaseNode() {
-    auto expCtx = suffix->getContext();
-    const auto& baseColl = expCtx->getNamespaceString();
-    auto swCQ = createCanonicalQuery(expCtx, baseColl, *suffix);
-    if (!swCQ.isOK()) {
-        // Bail out.
-        return boost::none;
+    if (graph.numNodes() < 3) {
+        // We need at least 2 eligible $lookups and a fully SBE-pushed-down prefix.
+        return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
-    return graph.addNode(expCtx->getNamespaceString(), std::move(swCQ.getValue()), boost::none);
+
+    return AggJoinModel(
+        std::move(graph), std::move(resolvedPaths), std::move(prefix), std::move(suffix));
 }
 
 BSONObj AggJoinModel::toBSON() const {
