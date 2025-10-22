@@ -158,6 +158,16 @@ void ExecutionStatsController::incNumDuplicateBucketsReopened(long long incremen
     _globalStats.numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
 }
 
+void ExecutionStatsController::incNumBucketDocumentsTooLargeInsert(long long increment) {
+    _collectionStats->numBucketDocumentsTooLargeInsert.fetchAndAddRelaxed(increment);
+    _globalStats.numBucketDocumentsTooLargeInsert.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketDocumentsTooLargeUpdate(long long increment) {
+    _collectionStats->numBucketDocumentsTooLargeUpdate.fetchAndAddRelaxed(increment);
+    _globalStats.numBucketDocumentsTooLargeUpdate.fetchAndAddRelaxed(increment);
+}
+
 void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder) {
     builder.appendNumber("numBucketInserts", stats.numBucketInserts.load());
     builder.appendNumber("numBucketUpdates", stats.numBucketUpdates.load());
@@ -206,6 +216,11 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
         builder.appendNumber("numDuplicateBucketsReopened",
                              stats.numDuplicateBucketsReopened.load());
     }
+
+    builder.appendNumber("numBucketDocumentsTooLargeInsert",
+                         stats.numBucketDocumentsTooLargeInsert.load());
+    builder.appendNumber("numBucketDocumentsTooLargeUpdate",
+                         stats.numBucketDocumentsTooLargeUpdate.load());
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

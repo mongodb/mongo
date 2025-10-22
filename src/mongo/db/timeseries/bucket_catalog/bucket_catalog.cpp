@@ -150,9 +150,17 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                    const StringData::ComparatorInterface* comparator,
                                    const TimeseriesOptions& options,
                                    const BSONObj& doc,
-                                   CombineWithInsertsFromOtherClients combine) {
-    return internal::insert(
-        opCtx, catalog, ns, comparator, options, doc, combine, internal::AllowBucketCreation::kNo);
+                                   CombineWithInsertsFromOtherClients combine,
+                                   const AllowQueryBasedReopening reopening) {
+    return internal::insert(opCtx,
+                            catalog,
+                            ns,
+                            comparator,
+                            options,
+                            doc,
+                            combine,
+                            internal::AllowBucketCreation::kNo,
+                            reopening);
 }
 
 StatusWith<InsertResult> insert(OperationContext* opCtx,
@@ -162,6 +170,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 const TimeseriesOptions& options,
                                 const BSONObj& doc,
                                 CombineWithInsertsFromOtherClients combine,
+                                const AllowQueryBasedReopening reopening,
                                 ReopeningContext* reopeningContext) {
     return internal::insert(opCtx,
                             catalog,
@@ -171,6 +180,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                             doc,
                             combine,
                             internal::AllowBucketCreation::kYes,
+                            reopening,
                             reopeningContext);
 }
 
@@ -379,6 +389,14 @@ void clear(BucketCatalog& catalog, StringData dbName) {
     clear(catalog, [dbName = dbName.toString()](const NamespaceString& bucketNs) {
         return bucketNs.db() == dbName;
     });
+}
+
+void markBucketInsertTooLarge(BucketCatalog& catalog, const NamespaceString& ns) {
+    internal::getOrInitializeExecutionStats(catalog, ns).incNumBucketDocumentsTooLargeInsert();
+}
+
+void markBucketUpdateTooLarge(BucketCatalog& catalog, const NamespaceString& ns) {
+    internal::getOrInitializeExecutionStats(catalog, ns).incNumBucketDocumentsTooLargeUpdate();
 }
 
 BucketId extractBucketId(BucketCatalog& bucketCatalog,

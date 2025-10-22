@@ -62,6 +62,8 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketQueriesFailed;
     AtomicWord<long long> numBucketReopeningsFailed;
     AtomicWord<long long> numDuplicateBucketsReopened;
+    AtomicWord<long long> numBucketDocumentsTooLargeInsert;
+    AtomicWord<long long> numBucketDocumentsTooLargeUpdate;
 };
 
 class ExecutionStatsController {
@@ -97,6 +99,8 @@ public:
     void incNumBucketQueriesFailed(long long increment = 1);
     void incNumBucketReopeningsFailed(long long increment = 1);
     void incNumDuplicateBucketsReopened(long long increment = 1);
+    void incNumBucketDocumentsTooLargeInsert(long long increment = 1);
+    void incNumBucketDocumentsTooLargeUpdate(long long increment = 1);
 
 private:
     std::shared_ptr<ExecutionStats> _collectionStats;

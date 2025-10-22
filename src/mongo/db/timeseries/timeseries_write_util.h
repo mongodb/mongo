@@ -55,6 +55,11 @@ BSONObj makeNewDocumentForWrite(
     const boost::optional<const StringData::ComparatorInterface*>& comparator,
     boost::optional<Date_t> currentMinTime);
 
+enum class BucketReopeningPermittance {
+    kAllowed,
+    kDisallowed,
+};
+
 /**
  * Performs modifications atomically for a user command on a time-series collection.
  * Replaces the bucket document for a partial bucket modification and removes the bucket for a full

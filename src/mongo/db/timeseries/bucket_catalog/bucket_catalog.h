@@ -60,6 +60,12 @@ using StripeNumber = std::uint8_t;
 using ShouldClearFn = std::function<bool(const NamespaceString&)>;
 
 /**
+ * Mode enum to control whether getReopeningCandidate() will allow query-based
+ * reopening of buckets when attempting to accommodate a new measurement.
+ */
+enum class AllowQueryBasedReopening { kAllow, kDisallow };
+
+/**
  * Whether to allow inserts to be batched together with those from other clients.
  */
 enum class CombineWithInsertsFromOtherClients {
@@ -213,7 +219,8 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                    const StringData::ComparatorInterface* comparator,
                                    const TimeseriesOptions& options,
                                    const BSONObj& doc,
-                                   CombineWithInsertsFromOtherClients combine);
+                                   CombineWithInsertsFromOtherClients combine,
+                                   AllowQueryBasedReopening allowQueryBasedReopening);
 
 /**
  * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
@@ -231,6 +238,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 const TimeseriesOptions& options,
                                 const BSONObj& doc,
                                 CombineWithInsertsFromOtherClients combine,
+                                AllowQueryBasedReopening allowQueryBasedReopening,
                                 ReopeningContext* reopeningContext = nullptr);
 
 /**
@@ -299,6 +307,20 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns);
  * through the BucketStateRegistry.
  */
 void clear(BucketCatalog& catalog, StringData dbName);
+
+/**
+ * Increments an FTDC counter.
+ * Denotes an event where a generated time-series bucket document for insert exceeded the BSON
+ * size limit.
+ */
+void markBucketInsertTooLarge(BucketCatalog& catalog, const NamespaceString& ns);
+
+/**
+ * Increments an FTDC counter.
+ * Denotes an event where a generated time-series bucket document for update exceeded the BSON
+ * size limit.
+ */
+void markBucketUpdateTooLarge(BucketCatalog& catalog, const NamespaceString& ns);
 
 /**
  * Extracts the BucketId from a bucket document.

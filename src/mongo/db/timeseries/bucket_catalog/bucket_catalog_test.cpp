@@ -185,7 +185,8 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
                          _getCollator(ns),
                          _getTimeseriesOptions(ns),
                          BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     auto& batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     _commit(batch, numPreviouslyCommittedMeasurements);
 }
@@ -217,7 +218,8 @@ void BucketCatalogTest::_testMeasurementSchema(
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           timestampedDoc.obj(),
-                          CombineWithInsertsFromOtherClients::kAllow)
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow)
                        .isOK());
             auto post = _getExecutionStat(_ns1, kNumSchemaChanges);
 
@@ -301,7 +303,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch1));
 
@@ -313,7 +316,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_EQ(batch1, batch2);
     ASSERT(!claimWriteBatchCommitRights(*batch2));
@@ -345,7 +349,8 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
     auto bucketId = batch->bucketId;
@@ -360,21 +365,24 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now() << _metaField << "123"),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto result2 = insert(_opCtx,
                           *_bucketCatalog,
                           _ns1,
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now() << _metaField << BSONObj()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto result3 = insert(_opCtx,
                           *_bucketCatalog,
                           _ns2,
                           _getCollator(_ns2),
                           _getTimeseriesOptions(_ns2),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
 
     // Inserts should all be into three distinct buckets (and therefore batches).
     ASSERT_NE(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
@@ -414,7 +422,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
         _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
-        CombineWithInsertsFromOtherClients::kAllow);
+        CombineWithInsertsFromOtherClients::kAllow,
+        AllowQueryBasedReopening::kAllow);
     auto result2 = insert(
         _opCtx,
         *_bucketCatalog,
@@ -422,7 +431,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
         _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0))),
-        CombineWithInsertsFromOtherClients::kAllow);
+        CombineWithInsertsFromOtherClients::kAllow,
+        AllowQueryBasedReopening::kAllow);
 
     ASSERT_EQ(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
               stdx::get<SuccessfulInsertion>(result2.getValue()).batch);
@@ -448,7 +458,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
                BSON(_timeField << Date_t::now() << _metaField
                                << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
                                                                  << BSON("f" << 1 << "g" << 0))))),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
     auto result2 =
         insert(_opCtx,
                *_bucketCatalog,
@@ -458,7 +469,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
                BSON(_timeField << Date_t::now() << _metaField
                                << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
                                                                  << BSON("g" << 0 << "f" << 1))))),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
 
     ASSERT_EQ(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
               stdx::get<SuccessfulInsertion>(result2.getValue()).batch);
@@ -488,7 +500,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                                << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
                                                                  << BSON_ARRAY("123"
                                                                                << "456"))))),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
     auto result2 =
         insert(_opCtx,
                *_bucketCatalog,
@@ -499,7 +512,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                                << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
                                                                  << BSON_ARRAY("123"
                                                                                << "456"))))),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
 
     ASSERT_EQ(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
               stdx::get<SuccessfulInsertion>(result2.getValue()).batch);
@@ -526,14 +540,16 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now() << _metaField << BSONNULL),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto result2 = insert(_opCtx,
                           *_bucketCatalog,
                           _ns1,
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
 
     // Inserts should all be into three distinct buckets (and therefore batches).
     ASSERT_NE(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
@@ -592,7 +608,8 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
@@ -606,7 +623,8 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(batch1, batch2);
 
@@ -624,7 +642,8 @@ DEATH_TEST_F(BucketCatalogTest, CannotCommitWithoutRights, "invariant") {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     auto& batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
 
@@ -640,7 +659,8 @@ TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     auto& batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, batch->bucketId));
 
@@ -655,7 +675,8 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now() << "a" << 0),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     ASSERT(result.isOK());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     auto oldId = batch->bucketId;
@@ -672,7 +693,8 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                     _getCollator(_ns1),
                     _getTimeseriesOptions(_ns1),
                     BSON(_timeField << Date_t::now() << "a" << 1),
-                    CombineWithInsertsFromOtherClients::kAllow);
+                    CombineWithInsertsFromOtherClients::kAllow,
+                    AllowQueryBasedReopening::kAllow);
     ASSERT(result.isOK());
     batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     _commit(batch, 1);
@@ -685,7 +707,8 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                     _getCollator(_ns1),
                     _getTimeseriesOptions(_ns1),
                     BSON(_timeField << Date_t::now() << "a" << 2 << "b" << 2),
-                    CombineWithInsertsFromOtherClients::kAllow);
+                    CombineWithInsertsFromOtherClients::kAllow,
+                    AllowQueryBasedReopening::kAllow);
     ASSERT(result.isOK());
     batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     _commit(batch, 2);
@@ -700,7 +723,8 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                         _getCollator(_ns1),
                         _getTimeseriesOptions(_ns1),
                         BSON(_timeField << Date_t::now() << "a" << i),
-                        CombineWithInsertsFromOtherClients::kAllow);
+                        CombineWithInsertsFromOtherClients::kAllow,
+                        AllowQueryBasedReopening::kAllow);
         ASSERT(result.isOK());
         batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
         _commit(batch, i);
@@ -715,7 +739,8 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto& batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(oldId, batch2->bucketId);
     _commit(batch2, 0);
@@ -731,7 +756,8 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
@@ -745,7 +771,8 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(batch1, batch2);
 
@@ -766,7 +793,8 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
 
@@ -782,7 +810,8 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
                     _getCollator(_ns1),
                     _getTimeseriesOptions(_ns1),
                     BSON(_timeField << Date_t::now()),
-                    CombineWithInsertsFromOtherClients::kAllow);
+                    CombineWithInsertsFromOtherClients::kAllow,
+                    AllowQueryBasedReopening::kAllow);
     batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
@@ -809,7 +838,8 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
@@ -831,7 +861,8 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
@@ -845,7 +876,8 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(batch1, batch2);
     ASSERT_EQ(batch1->bucketId, batch2->bucketId);
@@ -870,7 +902,8 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
     ASSERT_NE(batch1, batch3);
     ASSERT_NE(batch2, batch3);
@@ -892,7 +925,8 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
 
@@ -912,7 +946,8 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = insert(_makeOperationContext().second.get(),
@@ -921,7 +956,8 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     auto result3 = insert(_makeOperationContext().second.get(),
@@ -930,7 +966,8 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
 
     auto result4 = insert(_makeOperationContext().second.get(),
@@ -939,7 +976,8 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kAllow);
+                          CombineWithInsertsFromOtherClients::kAllow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch4 = stdx::get<SuccessfulInsertion>(result4.getValue()).batch;
 
     ASSERT_NE(batch1, batch2);
@@ -959,7 +997,8 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = insert(_makeOperationContext().second.get(),
@@ -968,7 +1007,8 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     ASSERT(claimWriteBatchCommitRights(*batch1));
@@ -999,7 +1039,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = insert(_makeOperationContext().second.get(),
@@ -1008,7 +1049,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     auto result3 = insert(_makeOperationContext().second.get(),
@@ -1017,7 +1059,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
 
     ASSERT_EQ(batch1->bucketId, batch2->bucketId);
@@ -1057,7 +1100,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch4 = stdx::get<SuccessfulInsertion>(result4.getValue()).batch;
     ASSERT_NE(batch2->bucketId, batch4->bucketId);
 }
@@ -1069,7 +1113,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = insert(_makeOperationContext().second.get(),
@@ -1078,7 +1123,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 1 and 2 use the same bucket.
@@ -1102,7 +1148,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
     ASSERT_NE(batch1->bucketId, batch3->bucketId);
 }
@@ -1114,7 +1161,8 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
     auto result2 = insert(_makeOperationContext().second.get(),
@@ -1123,7 +1171,8 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
                           _getCollator(_ns1),
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
-                          CombineWithInsertsFromOtherClients::kDisallow);
+                          CombineWithInsertsFromOtherClients::kDisallow,
+                          AllowQueryBasedReopening::kAllow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 2 is the first batch to commit the time field.
@@ -1348,7 +1397,8 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
                          _getTimeseriesOptions(_ns1),
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":-100,"b":100})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
 
     // No buckets are closed.
     ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
@@ -1398,7 +1448,8 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
                          _getTimeseriesOptions(_ns1),
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":42,
                                                      "a":-100,"b":100})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
 
     // No buckets are closed.
     ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
@@ -1454,7 +1505,8 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
                          _getTimeseriesOptions(_ns1),
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":{},"b":{}})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
 
     // The reopened bucket gets closed as the schema is incompatible.
     ASSERT_EQ(1, stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.size());
@@ -1508,7 +1560,8 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
                          _getTimeseriesOptions(_ns1),
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":-100,"b":100})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
 
     // No buckets are closed.
     ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
@@ -1568,7 +1621,8 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
                          _getTimeseriesOptions(_ns1),
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":{},"b":{}})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
 
     // The reopened bucket gets closed as the schema is incompatible.
     ASSERT_EQ(1, stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.size());
@@ -1601,7 +1655,8 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
                              _getCollator(_ns1),
                              _getTimeseriesOptions(_ns1),
                              BSON(_timeField << Date_t::now() << _metaField << meta++),
-                             CombineWithInsertsFromOtherClients::kAllow);
+                             CombineWithInsertsFromOtherClients::kAllow,
+                             AllowQueryBasedReopening::kAllow);
         ASSERT_OK(result.getStatus());
         auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
         ASSERT(claimWriteBatchCommitRights(*batch));
@@ -1677,7 +1732,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
                       _getCollator(_ns1),
                       _getTimeseriesOptions(_ns1),
                       ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
-                      CombineWithInsertsFromOtherClients::kAllow);
+                      CombineWithInsertsFromOtherClients::kAllow,
+                      AllowQueryBasedReopening::kAllow);
         ASSERT_OK(result.getStatus());
         ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
         ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
@@ -1694,7 +1750,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
                              _getCollator(_ns1),
                              _getTimeseriesOptions(_ns1),
                              ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
-                             CombineWithInsertsFromOtherClients::kAllow);
+                             CombineWithInsertsFromOtherClients::kAllow,
+                             AllowQueryBasedReopening::kAllow);
         ASSERT_OK(result.getStatus());
         auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
         ASSERT(batch);
@@ -1714,7 +1771,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
                       _getCollator(_ns1),
                       _getTimeseriesOptions(_ns1),
                       ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
-                      CombineWithInsertsFromOtherClients::kAllow);
+                      CombineWithInsertsFromOtherClients::kAllow,
+                      AllowQueryBasedReopening::kAllow);
         ASSERT_OK(result.getStatus());
         ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
         ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
@@ -1730,7 +1788,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
                       _getCollator(_ns1),
                       _getTimeseriesOptions(_ns1),
                       ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}})"),
-                      CombineWithInsertsFromOtherClients::kAllow);
+                      CombineWithInsertsFromOtherClients::kAllow,
+                      AllowQueryBasedReopening::kAllow);
         ASSERT_OK(result.getStatus());
         ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
         ASSERT_TRUE(stdx::holds_alternative<std::monostate>(
@@ -1747,7 +1806,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
             _getCollator(_ns1),
             _getTimeseriesOptions(_ns1),
             ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}, "tag": "foo"})"),
-            CombineWithInsertsFromOtherClients::kAllow);
+            CombineWithInsertsFromOtherClients::kAllow,
+            AllowQueryBasedReopening::kAllow);
         ASSERT_OK(result.getStatus());
         ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
         ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
@@ -1770,7 +1830,8 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
                       _getCollator(_ns1),
                       _getTimeseriesOptions(_ns1),
                       ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
-                      CombineWithInsertsFromOtherClients::kAllow);
+                      CombineWithInsertsFromOtherClients::kAllow,
+                      AllowQueryBasedReopening::kAllow);
         ASSERT_OK(result.getStatus());
         ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
         ASSERT_TRUE(
@@ -1793,7 +1854,8 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
                _getCollator(_ns1),
                _getTimeseriesOptions(_ns1),
                ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}, "a": true})"),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result.getStatus());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
@@ -1812,7 +1874,8 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
                   _getCollator(_ns1),
                   _getTimeseriesOptions(_ns1),
                   ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}, "a": {}})"),
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result.getStatus());
     batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
@@ -1836,7 +1899,8 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result.getStatus());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
@@ -1872,6 +1936,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
                     _getTimeseriesOptions(_ns1),
                     ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
                     CombineWithInsertsFromOtherClients::kAllow,
+                    AllowQueryBasedReopening::kAllow,
                     &reopeningContext);
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(stdx::holds_alternative<SuccessfulInsertion>(result.getValue()));
@@ -1887,15 +1952,16 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumBucketsReopened));
     ASSERT_FALSE(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
 
-    // Verify that if we try another insert for the soft-closed bucket, we get a query-based
-    // reopening candidate.
+    // Verify that if we try another insert for the soft-closed bucket, we get a
+    // query-based reopening candidate.
     result = tryInsert(_opCtx,
                        *_bucketCatalog,
                        _ns1,
                        _getCollator(_ns1),
                        _getTimeseriesOptions(_ns1),
                        ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:35:40.000Z"}})"),
-                       CombineWithInsertsFromOtherClients::kAllow);
+                       CombineWithInsertsFromOtherClients::kAllow,
+                       AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(stdx::holds_alternative<ReopeningContext>(result.getValue()));
     ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
@@ -1915,7 +1981,8 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
                          _getCollator(_ns1),
                          _getTimeseriesOptions(_ns1),
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+                         CombineWithInsertsFromOtherClients::kAllow,
+                         AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result.getStatus());
     auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
@@ -1958,6 +2025,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
                     _getTimeseriesOptions(_ns1),
                     ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
                     CombineWithInsertsFromOtherClients::kAllow,
+                    AllowQueryBasedReopening::kAllow,
                     &reopeningContext);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::WriteConflict);
@@ -1975,7 +2043,8 @@ TEST_F(BucketCatalogTest, QueryBasedReopeningConflictsWithQueryBasedReopening) {
                   _getCollator(_ns1),
                   _getTimeseriesOptions(_ns1),
                   ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"a"})"),
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result1.getStatus());
     auto* context = stdx::get_if<ReopeningContext>(&result1.getValue());
     ASSERT(context);
@@ -1990,7 +2059,8 @@ TEST_F(BucketCatalogTest, QueryBasedReopeningConflictsWithQueryBasedReopening) {
                   _getCollator(_ns1),
                   _getTimeseriesOptions(_ns1),
                   ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:50.000Z"},"tag":"a"})"),
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result2.getStatus());
     ASSERT(stdx::holds_alternative<InsertWaiter>(result2.getValue()));
 }
@@ -2006,7 +2076,8 @@ TEST_F(BucketCatalogTest, ReopeningConflictsWithPreparedBatch) {
                _getCollator(_ns1),
                _getTimeseriesOptions(_ns1),
                ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"b"})"),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result1.getStatus());
     auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(batch1);
@@ -2023,7 +2094,8 @@ TEST_F(BucketCatalogTest, ReopeningConflictsWithPreparedBatch) {
                _getCollator(_ns1),
                _getTimeseriesOptions(_ns1),
                ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:45.000Z"},"tag":"b"})"),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result2.getStatus());
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT(batch2);
@@ -2038,7 +2110,8 @@ TEST_F(BucketCatalogTest, ReopeningConflictsWithPreparedBatch) {
                   _getCollator(_ns1),
                   _getTimeseriesOptions(_ns1),
                   ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:50.000Z"},"tag":"b"})"),
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result3.getStatus());
     ASSERT(stdx::holds_alternative<InsertWaiter>(result3.getValue()));
 }
@@ -2055,7 +2128,8 @@ TEST_F(BucketCatalogTest, PreparingBatchConflictsWithQueryBasedReopening) {
                   _getCollator(_ns1),
                   _getTimeseriesOptions(_ns1),
                   ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})"),
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result1->getStatus());
     auto* context = stdx::get_if<ReopeningContext>(&result1->getValue());
     ASSERT(context);
@@ -2069,7 +2143,8 @@ TEST_F(BucketCatalogTest, PreparingBatchConflictsWithQueryBasedReopening) {
                _getCollator(_ns1),
                _getTimeseriesOptions(_ns1),
                ::mongo::fromjson(R"({"time":{"$date":"2022-07-05T15:34:40.000Z"},"tag":"c"})"),
-               CombineWithInsertsFromOtherClients::kAllow);
+               CombineWithInsertsFromOtherClients::kAllow,
+               AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result2.getStatus());
     auto batch = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT(batch);
@@ -2114,7 +2189,8 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
                   _getCollator(_ns1),
                   options,
                   doc,
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result1->getStatus());
     auto* context = stdx::get_if<ReopeningContext>(&result1->getValue());
     ASSERT(context);
@@ -2130,7 +2206,8 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
                   _getCollator(_ns1),
                   options,
                   doc,
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result2->getStatus());
     ASSERT(stdx::holds_alternative<InsertWaiter>(result2->getValue()));
 }
@@ -2167,7 +2244,8 @@ TEST_F(BucketCatalogTest,
                   _getCollator(_ns1),
                   options,
                   doc1,
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result1->getStatus());
     auto* context1 = stdx::get_if<ReopeningContext>(&result1->getValue());
     ASSERT(context1);
@@ -2191,7 +2269,8 @@ TEST_F(BucketCatalogTest,
                   _getCollator(_ns1),
                   options,
                   doc2,
-                  CombineWithInsertsFromOtherClients::kAllow);
+                  CombineWithInsertsFromOtherClients::kAllow,
+                  AllowQueryBasedReopening::kAllow);
     ASSERT_OK(result2->getStatus());
     auto* context2 = stdx::get_if<ReopeningContext>(&result2->getValue());
     ASSERT(context2);

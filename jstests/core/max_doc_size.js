@@ -1,5 +1,8 @@
 // The {$set: {x: maxStr}}} update takes multiple seconds to execute.
-// @tags: [operations_longer_than_stepdown_interval]
+// @tags: [
+//   operations_longer_than_stepdown_interval,
+//   multiversion_incompatible,
+// ]
 
 /**
  * Confirms that:
@@ -51,7 +54,7 @@ coll.drop();
 assert.commandFailedWithCode(
     db.runCommand(
         {insert: coll.getName(), documents: [{_id: new ObjectId(), x: largerThanMaxString}]}),
-    2);
+    ErrorCodes.BSONObjectTooLarge);
 
 coll.drop();
 assert.commandFailedWithCode(db.runCommand({
@@ -68,5 +71,5 @@ assert.commandFailedWithCode(db.runCommand({
     ordered: true,
     updates: [{q: {_id: objectId}, u: {$set: {x: largerThanMaxString}}}]
 }),
-                             17419);
+                             [17419, ErrorCodes.BSONObjectTooLarge]);
 })();

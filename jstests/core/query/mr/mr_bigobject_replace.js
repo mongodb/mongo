@@ -9,6 +9,7 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
+//   multiversion_incompatible,
 // ]
 
 /**
@@ -63,7 +64,7 @@ function runTest(testOptions) {
     // In some cases we may see the javascript execution interrupted because it takes longer than
     // our default time limit, so we allow that possibility.
     assert.commandFailedWithCode(res,
-                                 [ErrorCodes.BadValue, ErrorCodes.Interrupted],
+                                 [ErrorCodes.BSONObjectTooLarge, ErrorCodes.Interrupted],
                                  "creating a document larger than 16MB didn't fail");
     if (res.code != ErrorCodes.Interrupted) {
         assert.lte(
