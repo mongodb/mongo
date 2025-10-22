@@ -48,6 +48,11 @@
     "fetchTags": "git fetch --tags || true"
   },
   "shutdownAction": "none",
+  "portsAttributes": {
+    "*": {
+      "requireLocalPort": true
+    }
+  },
   "customizations": {
     "vscode": {
       "settings": {
