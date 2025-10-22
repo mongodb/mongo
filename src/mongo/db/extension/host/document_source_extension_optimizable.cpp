@@ -33,7 +33,7 @@ namespace mongo::extension::host {
 
 Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& opts) const {
     if (!opts.isKeepingLiteralsUnchanged()) {
-        // TODO SERVER-111736 call into the ParseNode handle to serialize the query shape.
+        return Value(_parseNode.getQueryShape(opts));
     } else if (opts.isSerializingForExplain()) {
         return Value(_logicalStage.explain(*opts.verbosity));
     } else {

@@ -128,6 +128,7 @@ export default [
                 benchRun: true,
                 benchRunSync: true,
                 computeSHA256Block: true,
+                computeSHA256Hmac: true,
                 convertShardKeyToHashed: true,
                 fileExists: true,
                 getBuildInfo: true,

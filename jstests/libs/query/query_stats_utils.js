@@ -218,15 +218,15 @@ export function getQueryStatsWithTransform(
                 },
             },
             {$match: matchExpr},
-            // Sort on queryStats key so entries are in a deterministic order.
-            {$sort: {key: 1}},
+            // Sort on queryStats key, or custom sort, so entries are in a deterministic order.
+            {$sort: options.customSort || {key: 1}},
         ];
     } else {
         pipeline = [
             {$queryStats: {}},
             {$match: matchExpr},
-            // Sort on queryStats key so entries are in a deterministic order.
-            {$sort: {key: 1}},
+            // Sort on queryStats key, or custom sort, so entries are in a deterministic order.
+            {$sort: options.customSort || {key: 1}},
         ];
     }
     const result = conn.adminCommand({aggregate: 1, pipeline: pipeline, cursor: {}});

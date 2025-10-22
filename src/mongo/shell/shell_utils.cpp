@@ -441,6 +441,50 @@ BSONObj computeSHA256Block(const BSONObj& a, void* data) {
     return bob.obj();
 }
 
+BSONObj computeSHA256Hmac(const BSONObj& a, void* data) {
+    std::vector<ConstDataRange> blocks;
+
+    if (a.nFields() != 1) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "_computeSHA256Hmac takes exactly 1 argument, but was given "
+                                << a.nFields());
+    }
+
+    if (!a.firstElement().isABSONObj()) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "_computeSHA256Hmac given a non-object as an argument.");
+    }
+
+    auto cmdObj = a.firstElement().Obj();
+    static constexpr StringData kComputeSha256HmacKeyField = "key";
+    static constexpr StringData kComputeSha256HmacPayloadField = "payload";
+
+    uassert(
+        ErrorCodes::BadValue,
+        str::stream() << "_computeSHA256Hmac input must give an object with `key` field provided",
+        cmdObj.hasField(kComputeSha256HmacKeyField));
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "_computeSHA256Hmac `key` field must be sensitive BinData",
+            cmdObj[kComputeSha256HmacKeyField].isBinData(BinDataType::Sensitive));
+    ;
+    uassert(ErrorCodes::BadValue,
+            str::stream()
+                << "_computeSHA256Hmac input must give an object with `payload` field provided",
+            cmdObj.hasField(kComputeSha256HmacPayloadField));
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "_computeSHA256Hmac `payload` field must be a string",
+            cmdObj[kComputeSha256HmacPayloadField].type() == BSONType::string);
+
+    int keySize = 0;
+    std::string key = std::string(cmdObj[kComputeSha256HmacKeyField].binData(keySize), keySize);
+    auto payload = cmdObj[kComputeSha256HmacPayloadField].checkAndGetStringData();
+
+    auto hashed = SHA256Block::computeHmac(
+        (const uint8_t*)key.data(), key.size(), (const uint8_t*)payload.data(), payload.size());
+
+    return BSON("" << hashed.toString());
+}
+
 /**
  * This function computes a hash value for a document.
  * Specifically, this is the same hash function that is used to form a hashed index,
@@ -1231,6 +1275,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("interpreterVersion", interpreterVersion);
     scope.injectNative("getBuildInfo", getBuildInfo);
     scope.injectNative("computeSHA256Block", computeSHA256Block);
+    scope.injectNative("computeSHA256Hmac", computeSHA256Hmac);
     scope.injectNative("convertShardKeyToHashed", convertShardKeyToHashed);
     scope.injectNative("fileExists", fileExistsJS);
     scope.injectNative("isInteractive", isInteractive);
