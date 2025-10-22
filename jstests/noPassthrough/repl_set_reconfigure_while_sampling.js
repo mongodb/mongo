@@ -43,12 +43,20 @@ assert(samplingIsIncomplete(primary));
 
 // Add a member and reconfigure.
 const newNode = rst.add({
-    rsConfig: {priority: 0, votes: 0},
     setParameter: {
         "oplogSamplingAsyncEnabled": true,
     },
 });
 rst.reInitiate();
+
+// Add a new member and do a write that requires acknowledgement from both nodes.
+assert.commandWorked(
+    rst
+        .getPrimary()
+        .getDB("test")
+        .getCollection("markers")
+        .insert({a: 1}, {writeConcern: {w: 2}}),
+);
 
 // We were able to add a new member and we're still sampling.
 assert(samplingIsIncomplete(primary));
