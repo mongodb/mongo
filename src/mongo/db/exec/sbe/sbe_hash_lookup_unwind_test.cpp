@@ -34,7 +34,6 @@
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup_unwind.h"
 
-
 namespace mongo::sbe {
 
 class HashLookupUnwindStageTest : public HashLookupSharedTest {
@@ -47,16 +46,16 @@ public:
                       CollatorInterface* collator = nullptr) override {
         auto& stream = gctx.outStream();
         if (stream.tellp()) {
-            stream << std::endl;
+            stream << '\n';
         }
 
-        stream << "==== VARIATION: " << name << " ====" << std::endl;
+        stream << "==== VARIATION: " << name << " ====\n";
         if (collator) {
             stream << "COLLATOR: ";
             value::ValuePrinters::make(stream, printOptions).writeCollatorToStream(collator);
-            stream << std::endl;
+            stream << '\n';
         }
-        stream << "-- INPUTS:" << std::endl;
+        stream << "-- INPUTS:\n";
 
         // Build a scan for the outer loop.
         auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outer);
@@ -64,7 +63,7 @@ public:
         cloneAndEvalStage(stream,
                           {{outerScanSlots[0], "value"}, {outerScanSlots[1], "key"}},
                           outerScanStage.get());
-        stream << std::endl;
+        stream << '\n';
 
         // Build a scan for the inner loop.
         auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, inner);
@@ -72,7 +71,7 @@ public:
         cloneAndEvalStage(stream,
                           {{innerScanSlots[0], "value"}, {innerScanSlots[1], "key"}},
                           innerScanStage.get());
-        stream << std::endl;
+        stream << '\n';
 
         // Prepare and eval stage
         auto ctx = makeCompileCtx();
@@ -100,6 +99,7 @@ public:
                                                         kEmptyPlanNodeId);
 
         StageResultsPrinters::SlotNames slotNames;
+        slotNames.reserve(2);
         if (outerKeyOnly) {
             slotNames.emplace_back(outerScanSlots[1], "outer_key");
         } else {
@@ -308,6 +308,7 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
                                                     kEmptyPlanNodeId);
 
     value::SlotVector lookupSlots;
+    lookupSlots.reserve(2);
     lookupSlots.push_back(outerScanSlots[0]);
     lookupSlots.push_back(lookupStageOutputSlot);
     auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
@@ -317,6 +318,7 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
     std::vector<std::pair<value::TypeTags, value::Value>> flatValues;
     while (lookupStage->getNext() == PlanState::ADVANCED) {
         std::vector<std::pair<value::TypeTags, value::Value>> results{};
+        results.reserve(resultAccessors.size());
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
             flatValues.emplace_back(resultAccessors[i]->getCopyOfValue());
             results.emplace_back(flatValues.back());

@@ -44,17 +44,15 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     // Execute the stage normally.
     std::stringstream firstStream;
     StageResultsPrinters::make(firstStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string firstStr = firstStream.str();
-    stream << "--- First Stats" << std::endl;
+    stream << "--- First Stats\n";
     printHashLookupStats(stream, stage);
 
     // Execute the stage after reopen and verify that output is the same.
     stage->open(true);
     std::stringstream secondStream;
     StageResultsPrinters::make(secondStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string secondStr = secondStream.str();
-    ASSERT_EQ(firstStr, secondStr);
-    stream << "--- Second Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), secondStream.view());
+    stream << "--- Second Stats\n";
     printHashLookupStats(stream, stage);
 
     // Execute the stage after close and open and verify that output is the same.
@@ -62,9 +60,8 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->open(false);
     std::stringstream thirdStream;
     StageResultsPrinters::make(thirdStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string thirdStr = thirdStream.str();
-    ASSERT_EQ(firstStr, thirdStr);
-    stream << "--- Third Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), thirdStream.view());
+    stream << "--- Third Stats\n";
     printHashLookupStats(stream, stage);
 
     stage->close();
@@ -84,37 +81,33 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     stage->open(true);
     std::stringstream fourthStream;
     StageResultsPrinters::make(fourthStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string fourthStr = fourthStream.str();
-    ASSERT_EQ(firstStr, fourthStr);
-    stream << "--- Fourth Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), fourthStream.view());
+    stream << "--- Fourth Stats\n";
     printHashLookupStats(stream, stage);
-    stream << std::endl;
+    stream << '\n';
 
     // Execute the stage after close and open and verify that output is the same.
     stage->close();
     stage->open(false);
     std::stringstream fifthStream;
     StageResultsPrinters::make(fifthStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string fifthStr = fifthStream.str();
-    ASSERT_EQ(firstStr, fifthStr);
-    stream << "--- Fifth Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), fifthStream.view());
+    stream << "--- Fifth Stats\n";
     printHashLookupStats(stream, stage);
-    stream << std::endl;
+    stream << '\n';
 
     // Execute the stage after reopen and we have spilled to disk and verify that output is the
     // same.
     stage->open(true);
     std::stringstream sixthStream;
     StageResultsPrinters::make(sixthStream, printOptions).printStageResults(ctx, slotNames, stage);
-    std::string sixthStr = sixthStream.str();
-    ASSERT_EQ(firstStr, sixthStr);
-    stream << "--- Sixth Stats" << std::endl;
+    ASSERT_EQ(firstStream.view(), sixthStream.view());
+    stream << "--- Sixth Stats\n";
     printHashLookupStats(stream, stage);
-    stream << std::endl;
+    stream << '\n';
 
     stage->close();
 
-    stream << "-- OUTPUT ";
-    stream << firstStr;
+    stream << "-- OUTPUT " << firstStream.view();
 }  // prepareAndEvalStageWithReopen
 }  // namespace mongo::sbe

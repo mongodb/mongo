@@ -36,8 +36,6 @@
 
 #include <cstddef>
 
-#include <absl/container/inlined_vector.h>
-
 namespace mongo::sbe {
 
 template <typename T>
@@ -53,6 +51,7 @@ void StageResultsPrinter<T>::printStageResults(CompileCtx* ctx,
                                                PlanStage* stage) {
     tassert(6441701, "slots and names sizes must match", slots.size() == names.size());
     SlotNames slotNames;
+    slotNames.reserve(slots.size());
     size_t idx = 0;
     for (auto slot : slots) {
         slotNames.emplace_back(slot, names[idx++]);
@@ -66,19 +65,18 @@ void StageResultsPrinter<T>::printStageResults(CompileCtx* ctx,
                                                const SlotNames& slotNames,
                                                PlanStage* stage) {
     std::vector<value::SlotAccessor*> accessors;
+    accessors.reserve(slotNames.size());
     for (const auto& slot : slotNames) {
         accessors.push_back(stage->getAccessor(*ctx, slot.first));
     }
 
     printSlotNames(slotNames);
-    _stream << ":"
-            << "\n";
+    _stream << ":\n";
 
     size_t iter = 0;
     for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext(), iter++) {
         if (iter >= _options.arrayObjectOrNestingMaxDepth()) {
-            _stream << "..."
-                    << "\n";
+            _stream << "...\n";
             break;
         }
 
