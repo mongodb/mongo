@@ -31,13 +31,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/time_support.h"
 
@@ -46,20 +46,12 @@
 #include <deque>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <type_traits>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class OperationContext;
-
-
 // Keep "markers" against a collection to efficiently remove ranges of old records when the
 // collection grows. This class is meant to be used only with collections that have the following
 // requirements:
@@ -71,7 +63,8 @@ class OperationContext;
 // If these requirements hold then this class can be used to compute and maintain up-to-date markers
 // for ranges of deletions. These markers will be expired and returned to the deleter whenever the
 // implementation defined '_hasExcessMarkers' returns true.
-class CollectionTruncateMarkers : public std::enable_shared_from_this<CollectionTruncateMarkers> {
+class MONGO_MOD_OPEN CollectionTruncateMarkers
+    : public std::enable_shared_from_this<CollectionTruncateMarkers> {
 public:
     /** Markers represent "waypoints" of the collection that contain information between the current
      * marker and the previous one.
@@ -200,7 +193,7 @@ public:
      * If we were to use query framework scans here we would incur on a layering violation as the
      * storage layer shouldn't have to interact with the query (higher) layer in here.
      */
-    class CollectionIterator {
+    class MONGO_MOD_OPEN CollectionIterator {
     public:
         virtual ~CollectionIterator() = default;
 
@@ -225,6 +218,16 @@ public:
             return getRecordStore()->dataSize();
         }
     };
+
+    /**
+     * Creates an iterator over a record store. If tickSource and yieldInterval are supplied, the
+     * iterator will yield every yieldInterval ms.
+     */
+    static std::unique_ptr<CollectionIterator> makeIterator(
+        OperationContext* opCtx,
+        RecordStore* rs,
+        TickSource* tickSource,
+        boost::optional<Milliseconds> yieldInterval);
 
     // Creates the initial set of markers. This will decide whether to perform a collection scan or
     // sampling based on the size of the collection.
@@ -284,14 +287,17 @@ public:
     // The following methods are public only for use in tests.
     //
 
+    MONGO_MOD_PUBLIC
     int64_t currentBytes_forTest() const {
         return _currentBytes.load();
     }
 
+    MONGO_MOD_PUBLIC
     int64_t currentRecords_forTest() const {
         return _currentRecords.load();
     }
 
+    MONGO_MOD_PUBLIC
     std::deque<Marker> getMarkers_forTest() const {
         // Return a copy of the vector.
         return _markers;
@@ -382,7 +388,8 @@ protected:
  * This is useful in time-based expiration systems as there could be low activity collections
  * containing expired data that can't be removed until covered by a full marker.
  */
-class CollectionTruncateMarkersWithPartialExpiration : public CollectionTruncateMarkers {
+class MONGO_MOD_OPEN CollectionTruncateMarkersWithPartialExpiration
+    : public CollectionTruncateMarkers {
 public:
     /**
      * Partial marker expiration depends on tracking the highest seen RecordId and wall time
@@ -427,6 +434,7 @@ public:
                                                 int64_t countInserted,
                                                 bool oplogSamplingAsyncEnabled) final;
 
+    MONGO_MOD_PUBLIC
     std::pair<const RecordId&, const Date_t&> getHighestRecordMetrics_forTest() const {
         return {_highestRecordId, _highestWallTime};
     }
@@ -463,72 +471,4 @@ protected:
                              int64_t numRecordsAdded,
                              bool oplogSamplingAsyncEnabled);
 };
-
-/**
- * A Collection iterator meant to work with raw RecordStores. Whether this iterator yields between
- * calls to getNext()/getNextRandom(), or not, is decided by the child class.
- *
- * It is only safe to use when the user is not accepting any user operation. Some examples of when
- * this class can be used are during oplog initialisation, repair, recovery, etc.
- */
-class UnyieldableCollectionIterator : public CollectionTruncateMarkers::CollectionIterator {
-public:
-    UnyieldableCollectionIterator(OperationContext* opCtx, RecordStore* rs) : _rs(rs) {
-        reset(opCtx);
-    }
-
-    ~UnyieldableCollectionIterator() override = default;
-
-    boost::optional<std::pair<RecordId, BSONObj>> getNext() override {
-        auto record = _directionalCursor->next();
-        if (!record) {
-            return boost::none;
-        }
-        return std::make_pair(std::move(record->id), record->data.releaseToBson());
-    }
-
-    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() override {
-        auto record = _randomCursor->next();
-        if (!record) {
-            return boost::none;
-        }
-        return std::make_pair(std::move(record->id), record->data.releaseToBson());
-    }
-
-    RecordStore* getRecordStore() const final {
-        return _rs;
-    }
-
-    void reset(OperationContext* opCtx) final {
-        _directionalCursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-        _randomCursor = _rs->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-    }
-
-protected:
-    RecordStore* _rs;
-    std::unique_ptr<RecordCursor> _directionalCursor;
-    std::unique_ptr<RecordCursor> _randomCursor;
-};
-
-class YieldableCollectionIterator : public UnyieldableCollectionIterator {
-public:
-    YieldableCollectionIterator(OperationContext* opCtx,
-                                RecordStore* rs,
-                                TickSource* ticks,
-                                Milliseconds yieldInterval);
-
-    boost::optional<std::pair<RecordId, BSONObj>> getNext() final;
-
-    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final;
-
-private:
-    // Release resources held by the iterator, allowing other concurrent operations to proceed.
-    void _maybeYield();
-
-    OperationContext* _opCtx;
-    Timer _yieldTimer;
-    Milliseconds _yieldInterval;
-    RecordId _lastRecordId;
-};
-
 }  // namespace mongo

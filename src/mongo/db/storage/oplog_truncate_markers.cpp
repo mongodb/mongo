@@ -34,10 +34,10 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/system_tick_source.h"
 
 #include <memory>
 
@@ -90,18 +90,15 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
     // We need to read the whole oplog, override the recoveryUnit's oplogVisibleTimestamp.
     ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
         shard_role_details::getRecoveryUnit(opCtx), boost::none);
-
-    std::unique_ptr<CollectionTruncateMarkers::CollectionIterator> iterator;
-    if (gOplogSamplingAsyncEnabled && gOplogSamplingAsyncYieldIntervalMs >= 0) {
-        iterator = std::make_unique<YieldableCollectionIterator>(
-            opCtx, &rs, globalSystemTickSource(), Milliseconds(gOplogSamplingAsyncYieldIntervalMs));
-    } else {
-        iterator = std::make_unique<UnyieldableCollectionIterator>(opCtx, &rs);
-    }
+    auto yieldInterval = gOplogSamplingAsyncEnabled && gOplogSamplingAsyncYieldIntervalMs >= 0
+        ? boost::optional<Milliseconds>(gOplogSamplingAsyncYieldIntervalMs)
+        : boost::none;
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx, &rs, globalSystemTickSource(), yieldInterval);
 
     if (MONGO_unlikely(hangDuringOplogSampling.shouldFail())) {
         LOGV2(11211900,
-              "Hanging the oplog cap maintainer thread during intial sampling due "
+              "Hanging the oplog cap maintainer thread during initial sampling due "
               "to fail point");
         hangDuringOplogSampling.pauseWhileSet(opCtx);
     }

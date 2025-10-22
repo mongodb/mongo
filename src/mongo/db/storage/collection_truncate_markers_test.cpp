@@ -430,10 +430,11 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
 
         AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
 
-        UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
+        auto iterator = CollectionTruncateMarkers::makeIterator(
+            opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
 
         auto result = CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx.get(), iterator, kMinBytes, getIdAndWallTime);
+            opCtx.get(), *iterator, kMinBytes, getIdAndWallTime);
         ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
         ASSERT_GTE(result.timeTaken, Microseconds(0));
         ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
@@ -459,10 +460,11 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
     auto kMinBytesPerMarker = totalBytes / kNumMarkers;
     auto kRecordsPerMarker = totalRecords / kNumMarkers;
 
-    UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
 
     auto result = CollectionTruncateMarkers::createFromCollectionIterator(
-        opCtx.get(), iterator, kMinBytesPerMarker, getIdAndWallTime);
+        opCtx.get(), *iterator, kMinBytesPerMarker, getIdAndWallTime);
 
     ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
     ASSERT_GTE(result.timeTaken, Microseconds(0));
@@ -490,12 +492,13 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
 
     auto opCtx = getClient()->makeOperationContext();
     AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-    UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
 
     static constexpr auto kNumMarkers = 15;
     auto kMinBytesPerMarker = totalBytes / kNumMarkers;
-    long long numRecords = iterator.numRecords();
-    long long dataSize = iterator.dataSize();
+    long long numRecords = iterator->numRecords();
+    long long dataSize = iterator->dataSize();
     double avgRecordSize = double(dataSize) / double(numRecords);
     double estimatedRecordsPerMarker = std::ceil(kMinBytesPerMarker / avgRecordSize);
     double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
@@ -504,7 +507,7 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
     mockTickSource.setAdvanceOnRead(Milliseconds{500});
     unittest::LogCaptureGuard logs;
     CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
-                                                       iterator,
+                                                       *iterator,
                                                        estimatedRecordsPerMarker,
                                                        estimatedBytesPerMarker,
                                                        getIdAndWallTime,
@@ -523,7 +526,7 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
 
     auto opCtx = getClient()->makeOperationContext();
     AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-    YieldableCollectionIterator iterator(
+    auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
 
     AtomicWord<bool> hasYielded(false);
@@ -541,13 +544,13 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
     size_t seenRecords = 0;
     while (!hasYielded.load()) {
         mockTickSource.advance(Milliseconds(11));
-        if (iterator.getNext()) {
+        if (iterator->getNext()) {
             ++seenRecords;
         }
     }
     yieldNotifier.join();
 
-    while (iterator.getNext()) {
+    while (iterator->getNext()) {
         ++seenRecords;
     }
 

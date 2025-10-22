@@ -604,6 +604,74 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
     }
 }
 
+namespace {
+/**
+ * A Collection iterator meant to work with raw RecordStores. Whether this iterator yields between
+ * calls to getNext()/getNextRandom(), or not, is decided by the child class.
+ *
+ * It is only safe to use when the user is not accepting any user operation. Some examples of when
+ * this class can be used are during oplog initialisation, repair, recovery, etc.
+ */
+class UnyieldableCollectionIterator : public CollectionTruncateMarkers::CollectionIterator {
+public:
+    UnyieldableCollectionIterator(OperationContext* opCtx, RecordStore* rs) : _rs(rs) {
+        reset(opCtx);
+    }
+
+    ~UnyieldableCollectionIterator() override = default;
+
+    boost::optional<std::pair<RecordId, BSONObj>> getNext() override {
+        auto record = _directionalCursor->next();
+        if (!record) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(record->id), record->data.releaseToBson());
+    }
+
+    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() override {
+        auto record = _randomCursor->next();
+        if (!record) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(record->id), record->data.releaseToBson());
+    }
+
+    RecordStore* getRecordStore() const final {
+        return _rs;
+    }
+
+    void reset(OperationContext* opCtx) final {
+        _directionalCursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        _randomCursor = _rs->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    }
+
+protected:
+    RecordStore* _rs;
+    std::unique_ptr<RecordCursor> _directionalCursor;
+    std::unique_ptr<RecordCursor> _randomCursor;
+};
+
+class YieldableCollectionIterator : public UnyieldableCollectionIterator {
+public:
+    YieldableCollectionIterator(OperationContext* opCtx,
+                                RecordStore* rs,
+                                TickSource* ticks,
+                                Milliseconds yieldInterval);
+
+    boost::optional<std::pair<RecordId, BSONObj>> getNext() final;
+
+    boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final;
+
+private:
+    // Release resources held by the iterator, allowing other concurrent operations to proceed.
+    void _maybeYield();
+
+    OperationContext* _opCtx;
+    Timer _yieldTimer;
+    Milliseconds _yieldInterval;
+    RecordId _lastRecordId;
+};
+
 YieldableCollectionIterator::YieldableCollectionIterator(OperationContext* opCtx,
                                                          RecordStore* rs,
                                                          TickSource* ticks,
@@ -675,6 +743,18 @@ void YieldableCollectionIterator::_maybeYield() {
     invariant(_directionalCursor->restore(ru));
 
     _yieldTimer.reset();
+}
+}  // namespace
+
+std::unique_ptr<CollectionTruncateMarkers::CollectionIterator>
+CollectionTruncateMarkers::makeIterator(OperationContext* opCtx,
+                                        RecordStore* rs,
+                                        TickSource* ticks,
+                                        boost::optional<Milliseconds> yieldInterval) {
+    if (yieldInterval) {
+        return std::make_unique<YieldableCollectionIterator>(opCtx, rs, ticks, *yieldInterval);
+    }
+    return std::make_unique<UnyieldableCollectionIterator>(opCtx, rs);
 }
 
 }  // namespace mongo
