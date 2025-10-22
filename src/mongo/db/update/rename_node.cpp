@@ -119,10 +119,9 @@ Status RenameNode::init(BSONElement modExpr,
     FieldRef fromFieldRef(modExpr.fieldName());
     FieldRef toFieldRef(modExpr.String());
 
-    if (modExpr.valueStringData().find('\0') != std::string::npos) {
-        return Status(ErrorCodes::BadValue,
-                      "The 'to' field for $rename cannot contain an embedded null byte");
-    }
+    tassert(9867601,
+            "The 'to' field for $rename cannot contain an embedded null byte",
+            modExpr.valueStringData().find('\0') == std::string::npos);
 
     // Parsing {$rename: {'from': 'to'}} places nodes in the UpdateNode tree for both the "from" and
     // "to" paths via UpdateObjectNode::parseAndMerge(), which will enforce this isUpdatable

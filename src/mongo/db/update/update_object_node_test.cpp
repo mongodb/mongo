@@ -2621,14 +2621,16 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto update = BSON("$rename" << BSON("a.b" << embeddedNull));
 
         UpdateObjectNode root;
-        auto result = UpdateObjectNode::parseAndMerge(&root,
-                                                      modifiertable::ModifierType::MOD_RENAME,
-                                                      update["$rename"]["a.b"],
-                                                      expCtx,
-                                                      arrayFilters,
-                                                      foundIdentifiers);
-        ASSERT_NOT_OK(result);
-        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE_AND_WHAT(
+            UpdateObjectNode::parseAndMerge(&root,
+                                            modifiertable::ModifierType::MOD_RENAME,
+                                            update["$rename"]["a.b"],
+                                            expCtx,
+                                            arrayFilters,
+                                            foundIdentifiers),
+            AssertionException,
+            9867600,
+            "Field name can't contain null bytes");
     }
 
     {
@@ -2636,14 +2638,16 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto update = BSON("$rename" << BSON("a.b" << singleNullByte));
 
         UpdateObjectNode root;
-        auto result = UpdateObjectNode::parseAndMerge(&root,
-                                                      modifiertable::ModifierType::MOD_RENAME,
-                                                      update["$rename"]["a.b"],
-                                                      expCtx,
-                                                      arrayFilters,
-                                                      foundIdentifiers);
-        ASSERT_NOT_OK(result);
-        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE_AND_WHAT(
+            UpdateObjectNode::parseAndMerge(&root,
+                                            modifiertable::ModifierType::MOD_RENAME,
+                                            update["$rename"]["a.b"],
+                                            expCtx,
+                                            arrayFilters,
+                                            foundIdentifiers),
+            AssertionException,
+            9867600,
+            "Field name can't contain null bytes");
     }
 
     {
@@ -2651,14 +2655,16 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto update = BSON("$rename" << BSON("a.b" << leadingNullByte));
 
         UpdateObjectNode root;
-        auto result = UpdateObjectNode::parseAndMerge(&root,
-                                                      modifiertable::ModifierType::MOD_RENAME,
-                                                      update["$rename"]["a.b"],
-                                                      expCtx,
-                                                      arrayFilters,
-                                                      foundIdentifiers);
-        ASSERT_NOT_OK(result);
-        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE_AND_WHAT(
+            UpdateObjectNode::parseAndMerge(&root,
+                                            modifiertable::ModifierType::MOD_RENAME,
+                                            update["$rename"]["a.b"],
+                                            expCtx,
+                                            arrayFilters,
+                                            foundIdentifiers),
+            AssertionException,
+            9867600,
+            "Field name can't contain null bytes");
     }
 
     {
@@ -2666,14 +2672,16 @@ TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {
         auto update = BSON("$rename" << BSON("a.b" << trailingNullByte));
 
         UpdateObjectNode root;
-        auto result = UpdateObjectNode::parseAndMerge(&root,
-                                                      modifiertable::ModifierType::MOD_RENAME,
-                                                      update["$rename"]["a.b"],
-                                                      expCtx,
-                                                      arrayFilters,
-                                                      foundIdentifiers);
-        ASSERT_NOT_OK(result);
-        ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE_AND_WHAT(
+            UpdateObjectNode::parseAndMerge(&root,
+                                            modifiertable::ModifierType::MOD_RENAME,
+                                            update["$rename"]["a.b"],
+                                            expCtx,
+                                            arrayFilters,
+                                            foundIdentifiers),
+            AssertionException,
+            9867600,
+            "Field name can't contain null bytes");
     }
 }
 

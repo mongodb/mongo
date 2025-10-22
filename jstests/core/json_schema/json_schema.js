@@ -181,6 +181,26 @@ assert.eq([{_id: 8}, {_id: 9}],
               .sort({_id: 1})
               .toArray());
 
+// Test that $jsonSchema doesn't allow field names that contain null bytes.
+["\x00a",
+ "a\x00",
+ "\x00",
+ "\x00\x00\x00",
+ "a\x00\x01\x08a",
+ "\x00..",
+].forEach(fieldName => {
+    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: [fieldName]}}).itcount(),
+                          9867600);
+    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: ["$" + fieldName]}}).itcount(),
+                          9867600);
+    assert.throwsWithCode(
+        () => coll.find({$jsonSchema: {required: ["foo." + fieldName]}}).itcount(), 9867600);
+    assert.throwsWithCode(
+        () => coll.find({$jsonSchema: {required: ["$foo." + fieldName]}}).itcount(), 9867600);
+    assert.throwsWithCode(() => coll.find({$jsonSchema: {required: [".." + fieldName]}}).itcount(),
+                          9867600);
+});
+
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, obj: 3}));
 assert.commandWorked(coll.insert({_id: 1, obj: {f1: {f3: "str"}, f2: "str"}}));
