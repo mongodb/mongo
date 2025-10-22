@@ -604,7 +604,7 @@ buildvariants:
     # For now just unified write executor suites but tasks will be added as development continues.
     tasks:
       - name: unified_write_executor
-      - name: sharding_unified_write_executor
+      - name: unified_write_executor_sharding
       - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen
       - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
       - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_gen

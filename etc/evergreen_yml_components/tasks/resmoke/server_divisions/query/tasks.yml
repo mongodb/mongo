@@ -1671,7 +1671,7 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
-    name: sharding_unified_write_executor
+    name: unified_write_executor_sharding
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
