@@ -100,6 +100,7 @@ setupShardedCollection(st, dbName2, ns2, st.shard1.shardName);
 // shard1. Then it pauses the migration right before it enters the commit phase.
 
 jsTest.log("Starting migration.");
+pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
 const staticMongod = MongoRunner.runMongod({});
 const joinMoveChunk = moveChunkParallel(
@@ -111,7 +112,6 @@ const joinMoveChunk = moveChunkParallel(
     st.shard1.shardName,
     true /** expectSuccess */,
 );
-pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
 // Sends a versioned read through mongos1, the second router, to cause a refresh on the secondary of

@@ -130,3 +130,6 @@ filters:
   - "addshard*.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "safe_secondary_reads_causal_consistency.js":
+    approvers:
+      - 10gen/server-cluster-scalability
