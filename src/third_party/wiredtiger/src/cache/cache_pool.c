@@ -462,7 +462,7 @@ __wt_cache_pool_destroy(WT_SESSION_IMPL *session)
 
         /* Notify other participants if we were managing */
         if (FLD_ISSET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_MANAGER)) {
-            cp->pool_managed = 0;
+            __wt_tsan_suppress_store_uint8(&cp->pool_managed, 0);
             __wt_verbose(
               session, WT_VERB_SHARED_CACHE, "%s", "Shutting down shared cache manager connection");
         }
@@ -752,7 +752,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
             *adjustedp = true;
             if (grow) {
                 cache->cp_skip_count = WT_CACHE_POOL_BUMP_SKIPS;
-                entry->cache_size += adjustment;
+                __wt_tsan_suppress_add_uint64_v(&entry->cache_size, adjustment);
                 cp->currently_used += adjustment;
             } else {
                 cache->cp_skip_count = WT_CACHE_POOL_REDUCE_SKIPS;

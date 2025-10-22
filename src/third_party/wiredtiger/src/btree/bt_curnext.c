@@ -414,6 +414,7 @@ __cursor_row_next(
     WT_PAGE *page;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
+    WT_UPDATE *upd;
 
     key = &cbt->iface.key;
     page = cbt->ref->page;
@@ -479,7 +480,8 @@ restart_read_insert:
                 WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_next_early_exit);
             WT_RET(ret);
 
-            WT_RET(__wt_txn_read_upd_list(session, cbt, key, WT_RECNO_OOB, ins->upd));
+            upd = __wt_tsan_suppress_load_wt_update_ptr(&ins->upd);
+            WT_RET(__wt_txn_read_upd_list(session, cbt, key, WT_RECNO_OOB, upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
                 continue;

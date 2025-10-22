@@ -188,7 +188,8 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
             break;
 
         if (WT_IS_METADATA(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-          __wt_atomic_loadi32(&dhandle->session_inuse) != 0 || dhandle->timeofdeath == 0 ||
+          __wt_atomic_loadi32(&dhandle->session_inuse) != 0 ||
+          __wt_tsan_suppress_load_uint64(&dhandle->timeofdeath) == 0 ||
           now - dhandle->timeofdeath <= conn->sweep_idle_time)
             continue;
 

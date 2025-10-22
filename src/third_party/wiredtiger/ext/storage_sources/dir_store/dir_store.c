@@ -38,6 +38,7 @@
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
+#include <wt_internal.h>
 #include "queue.h"
 
 #ifndef WT_THOUSAND
@@ -840,7 +841,7 @@ dir_store_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
     if ((ret = dir_store_cache_path(file_system, object, &dest_path)) != 0)
         goto err;
 
-    dir_store->op_count++;
+    __wt_tsan_suppress_add_uint64(&dir_store->op_count, 1);
     /*
      * Link the object with the original dir_store object. The could be replaced by a file copy if
      * portability is an issue.
@@ -868,7 +869,7 @@ static int
 dir_store_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    FS2DS(file_system)->op_count++;
+    __wt_tsan_suppress_add_uint64(&FS2DS(file_system)->op_count, 1);
     return (dir_store_directory_list_internal(
       file_system, session, directory, prefix, 0, dirlistp, countp));
 }

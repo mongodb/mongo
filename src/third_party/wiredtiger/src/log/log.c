@@ -1960,7 +1960,7 @@ __wti_log_release(WT_SESSION_IMPL *session, WTI_LOGSLOT *slot, bool *freep)
     WT_ASSIGN_LSN(&log->write_start_lsn, &slot->slot_start_lsn);
     WT_ASSIGN_LSN(&log->write_lsn, &slot->slot_end_lsn);
 
-    WT_ASSERT(session, slot != log->active_slot);
+    WT_ASSERT(session, slot != __wt_tsan_suppress_load_wti_logslot_ptr(&log->active_slot));
     __wt_cond_signal(session, log->log_write_cond);
     F_CLR_ATOMIC_16(slot, WTI_SLOT_FLUSH);
 

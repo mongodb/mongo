@@ -1649,7 +1649,8 @@ struct __wt_update {
  * The memory size of an update: include some padding because this is such a common case that
  * overhead of tiny allocations can swamp our cache overhead calculation.
  */
-#define WT_UPDATE_MEMSIZE(upd) WT_ALIGN(WT_UPDATE_SIZE + (upd)->size, 32)
+#define WT_UPDATE_MEMSIZE(upd) \
+    WT_ALIGN(WT_UPDATE_SIZE + __wt_tsan_suppress_load_uint32(&(upd)->size), 32)
 
 /*
  * WT_UPDATE_VALUE --

@@ -498,7 +498,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
             *addr = mod->mod_replace;
             mod->mod_replace.block_cookie = NULL;
             mod->mod_replace.block_cookie_size = 0;
-            ref->addr = addr;
+            __wt_tsan_suppress_store_wt_addr_ptr(&ref->addr, addr);
         } else
             WT_ASSERT(
               session, WT_DELTA_ENABLED_FOR_PAGE(session, ref->page->type) && ref->addr != NULL);
@@ -884,8 +884,8 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * while checkpoint is operating on the HS file, we can end up in a situation where we exceed
      * the cache size limit.
      */
-    if (conn->txn_global.checkpoint_running_hs && !WT_IS_HS(btree->dhandle) &&
-      __wti_evict_hs_dirty(session) && __wt_cache_full(session)) {
+    if (__wt_tsan_suppress_load_bool_v(&conn->txn_global.checkpoint_running_hs) &&
+      !WT_IS_HS(btree->dhandle) && __wti_evict_hs_dirty(session) && __wt_cache_full(session)) {
         WT_STAT_CONN_INCR(session, cache_eviction_blocked_checkpoint_hs);
         return (__wt_set_return(session, EBUSY));
     }

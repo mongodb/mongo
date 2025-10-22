@@ -660,7 +660,7 @@ __verify_tree(
      * (just created), it won't have a disk image; if there is no disk image, there is no page
      * content to check.
      */
-    if (page->dsk != NULL) {
+    if (__wt_tsan_suppress_load_wt_page_header_ptr(&page->dsk) != NULL) {
         /*
          * Compare the write generation number on the page to the write generation number on the
          * parent. Since a parent page's reconciliation takes place once all of its child pages have

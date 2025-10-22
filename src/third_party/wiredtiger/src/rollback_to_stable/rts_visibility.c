@@ -88,7 +88,7 @@ __wti_rts_visibility_page_needs_abort(
     const char *tag;
     bool prepared, result;
 
-    addr = ref->addr;
+    addr = __wt_tsan_suppress_load_wt_addr_ptr(&ref->addr);
     mod = ref->page == NULL ? NULL : ref->page->modify;
     durable_ts = WT_TS_NONE;
     newest_txn = WT_TXN_NONE;

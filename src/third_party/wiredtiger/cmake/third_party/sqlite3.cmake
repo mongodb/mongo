@@ -40,6 +40,14 @@ set_target_properties(sqlite3_lib PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
+# Disable all sanitizers for sqlite3_lib when sanitizer build types are used
+string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPER)
+if(CMAKE_BUILD_TYPE_UPPER MATCHES "^(ASAN|UBSAN|MSAN|TSAN)$")
+    target_compile_options(sqlite3_lib PRIVATE
+        $<$<NOT:$<BOOL:${MSVC_C_COMPILER}>>:-fno-sanitize=all>
+    )
+endif()
+
 # Needed for SQLite3 on some platforms
 target_link_libraries(sqlite3_lib PUBLIC
     $<$<BOOL:${WT_POSIX}>:${HAVE_LIBPTHREAD}>

@@ -907,7 +907,7 @@ __wt_txn_pinned_stable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinne
      * data being pinned. If a checkpoint is starting and we have to use the checkpoint timestamp,
      * we take the minimum of it with the stable timestamp, which is what we want.
      */
-    checkpoint_ts = txn_global->checkpoint_timestamp;
+    checkpoint_ts = __wt_tsan_suppress_load_uint64(&txn_global->checkpoint_timestamp);
 
     if (checkpoint_ts != 0 && checkpoint_ts < pinned_stable_ts)
         *pinned_stable_tsp = checkpoint_ts;
@@ -1439,7 +1439,7 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
      */
     WT_RET(__wt_calloc(session, 1, allocsz, &upd));
     if (value != NULL && value->size != 0) {
-        upd->size = WT_STORE_SIZE(value->size);
+        __wt_tsan_suppress_store_uint32(&upd->size, WT_STORE_SIZE(value->size));
         memcpy(upd->data, value->data, value->size);
     }
     upd->type = (uint8_t)modify_type;
@@ -2071,7 +2071,8 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
      */
     if (publish) {
         WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->is_allocating, true);
-        WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->id, txn_global->current);
+        WT_RELEASE_WRITE_WITH_BARRIER(
+          txn_shared->id, __wt_tsan_suppress_load_uint64_v(&txn_global->current));
         id = __wt_atomic_fetch_addv64(&txn_global->current, 1);
         session->txn->id = id;
         WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->id, id);

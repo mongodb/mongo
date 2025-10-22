@@ -6,10 +6,15 @@
 # Stats are allowed to be fuzzy. Ignore races in TSan
 race:src/include/stat.h
 race:src/support/stat.c
+race:__wt_block_stat
+race:__wt_cache_stats_update
+race:__wt_checkpoint_timer_stats
+race:__wt_conn_stat_init
+race:__wt_evict_stats_update
 
 # These functions were created for fine-grained suppressions. Please search for appropriate FIXME tickets
 # around usages of these functions.
-race:__wt_tsan_suppress_load_uint32
+race:__wt_tsan_suppress_*
 
 # FIXME-WT-12734 this function copies an 8 byte struct which needs further investigation.
 race:__log_wrlsn_server
@@ -35,7 +40,7 @@ race:__sweep_mark
 # FIXME-WT-14948 Figure out concurrency control expectations around reconfigure
 race:conn_reconfig.c
 
-# FIXME-WT-14958 This Work has been split out into a separate ticket to keep PR sizes down.
+# FIXME-WT-14958 ex_backup warnings. This work has been split out into a separate ticket to keep PR sizes down.
 race:__wt_free_int
 race:__wt_free_update_list
 race:__wt_page_out
@@ -59,6 +64,25 @@ race:__wt_session_cursor_cache_sweep
 race:__wti_txn_update_pinned_timestamp
 race:__capacity_config
 
+# FIXME-WT-15772 Issues caused by lack of atomics synchornization for double-checked locking pattern in the TAILQ implementation.
+race:__rts_thread_run
+race:__prefetch_thread_run
+race:__sweep_discard_trees
+
+# FIXME-WT-15771 Issues caused by lack of synchronization between memory accesses and allocation
+race:__wt_page_alloc
+race:__wt_page_modify_alloc
+race:__wt_upd_alloc
+race:__sweep_discard_trees
+
+# FIXME-WT-15770 Fix python testing non-disagg TSAN warnings
+race:__wt_row_modify
+race:__split_multi_inmem
+race:__wt_leaf_page_can_split
+race:__split_insert
+race:__evict_page_dirty_update
+race:__cache_pool_server
+race:__drop_tiered
 
 # FIXME-WT-13075 Address these warnings separately as they may have perf impacts
 race:hazard.c

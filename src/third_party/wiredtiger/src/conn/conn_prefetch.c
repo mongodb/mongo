@@ -54,7 +54,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         }
 
         TAILQ_REMOVE(&conn->pfqh, pe, q);
-        --conn->prefetch_queue_count;
+        __wt_tsan_suppress_sub_uint64(&conn->prefetch_queue_count, 1);
 
         /*
          * If the cache is getting close to its eviction clean trigger, don't attempt to pre-fetch
@@ -218,7 +218,7 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     /* Unlock the ref. */
     WT_REF_SET_STATE(ref, WT_REF_DISK);
     TAILQ_INSERT_TAIL(&conn->pfqh, pe, q);
-    ++conn->prefetch_queue_count;
+    __wt_tsan_suppress_add_uint64(&conn->prefetch_queue_count, 1);
     __wt_spin_unlock(session, &conn->prefetch_lock);
     __wt_cond_signal(session, conn->prefetch_threads.wait_cond);
 
@@ -259,7 +259,7 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
             TAILQ_REMOVE(&conn->pfqh, pe, q);
             F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
             __wt_free(session, pe);
-            --conn->prefetch_queue_count;
+            __wt_tsan_suppress_sub_uint64(&conn->prefetch_queue_count, 1);
         }
     }
     if (all)
@@ -278,7 +278,7 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
      * activity to drain to prevent any invalid ref uses.
      */
     if (!all) {
-        while (((WT_BTREE *)dhandle->handle)->prefetch_busy > 0)
+        while (__wt_tsan_suppress_load_uint32_v(&((WT_BTREE *)dhandle->handle)->prefetch_busy) > 0)
             __wt_yield();
     }
 

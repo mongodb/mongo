@@ -53,6 +53,27 @@ __block_disagg_read_checksum_err(WT_SESSION_IMPL *session, const char *name, uin
 }
 
 /*
+ * __block_disagg_check_lsn_frontier --
+ *     Check that the LSN is not ahead of the materialization frontier.
+ */
+static void
+__block_disagg_check_lsn_frontier(WT_SESSION_IMPL *session, uint64_t lsn)
+{
+    uint64_t last_materialized_lsn;
+
+    WT_ACQUIRE_READ(
+      last_materialized_lsn, S2C(session)->disaggregated_storage.last_materialized_lsn);
+    if (last_materialized_lsn != WT_DISAGG_LSN_NONE && lsn > last_materialized_lsn) {
+        /* FIXME-WT-15818 Consider crashing upon this check failure. */
+        WT_STAT_CONN_INCR(session, disagg_block_read_ahead_frontier);
+        __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+          "LSN frontier violation: read LSN %" PRIu64
+          " is ahead of the materialization frontier at LSN %" PRIu64,
+          lsn, last_materialized_lsn);
+    }
+}
+
+/*
  * __block_disagg_read_multiple --
  *     Read a full page along with its deltas, into multiple buffers. The page is referenced by a
  *     page id, checkpoint id pair.
@@ -86,6 +107,7 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
     WT_STAT_CONN_INCR(session, disagg_block_get);
     WT_STAT_CONN_INCR(session, block_read);
     WT_STAT_CONN_INCRV(session, block_byte_read, size);
+    __block_disagg_check_lsn_frontier(session, lsn);
 
     if (F_ISSET(block_disagg, WT_BLOCK_DISAGG_HS)) {
         WT_STAT_CONN_INCR(session, disagg_block_hs_get);

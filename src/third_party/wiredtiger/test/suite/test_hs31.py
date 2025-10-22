@@ -167,3 +167,5 @@ class test_hs31(wttest.WiredTigerTestCase):
 
         hs_truncate = self.get_stat(stat.conn.cache_hs_key_truncate_onpage_removal)
         self.assertGreater(hs_truncate, 0)
+        hs_wrapup_next_pre_calls = self.get_stat(stat.conn.rec_hs_wrapup_next_prev_calls)
+        self.assertGreater(hs_wrapup_next_pre_calls, 0)

@@ -1005,6 +1005,7 @@ logpath
 logread
 logrec
 logsize
+logslot
 logtest
 lookaside
 lookups
@@ -1411,6 +1412,7 @@ truncations
 trylock
 tryrdlock
 trywrlock
+tsan
 tsc
 tupdate
 tw

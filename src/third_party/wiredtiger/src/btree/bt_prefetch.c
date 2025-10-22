@@ -61,7 +61,7 @@ __wti_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
     /* Load and decompress a set of pages into the block cache. */
     WT_INTL_FOREACH_BEGIN (session, ref->home, next_ref) {
         /* Don't let the pre-fetch queue get overwhelmed. */
-        if (conn->prefetch_queue_count > WT_MAX_PREFETCH_QUEUE ||
+        if (__wt_tsan_suppress_load_uint64(&conn->prefetch_queue_count) > WT_MAX_PREFETCH_QUEUE ||
           block_preload > WT_PREFETCH_QUEUE_PER_TRIGGER)
             break;
 

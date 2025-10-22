@@ -105,6 +105,14 @@ __schema_layered_worker_verify(WT_SESSION_IMPL *session, const char *uri,
     WT_WITHOUT_DHANDLE(session,
       stable_ret = __wt_schema_worker(session, stable_uri, file_func, name_func, cfg, open_flags));
 
+    /* On followers, it is possible not to have any stable table. This is a transient state. */
+    if (!conn->layered_table_manager.leader && stable_ret == ENOENT) {
+        __wt_verbose_level(session, WT_VERB_VERIFY, WT_VERBOSE_DEBUG_2,
+          "Verify (layered): %s stable table not found on follower, it can be a transient state.",
+          stable_uri);
+        stable_ret = 0;
+    }
+
     if (stable_ret != 0 && stable_ret != EBUSY)
         WT_ERR_MSG(session, stable_ret, "Verify (layered): %s stable table verification failed ",
           stable_uri);

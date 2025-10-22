@@ -301,7 +301,7 @@ __drop_tiered(
      * released and closed. We have to know if the table is busy or if the close is successful
      * before cleaning up the tiered information.
      */
-    tiered_tmp = *tiered;
+    __wt_tsan_suppress_memcpy(&tiered_tmp, tiered, sizeof(tiered_tmp));
 
     /*
      * We are about to close the dhandle. If that is successful we need to remove any tiered work

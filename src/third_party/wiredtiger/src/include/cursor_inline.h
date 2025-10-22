@@ -379,7 +379,7 @@ __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
 
     /* If we open a handle with a time of death set, clear it. */
     if (__wt_atomic_addi32(&dhandle->session_inuse, 1) == 1 && dhandle->timeofdeath != 0)
-        dhandle->timeofdeath = 0;
+        __wt_tsan_suppress_store_uint64(&dhandle->timeofdeath, 0);
 }
 
 /*

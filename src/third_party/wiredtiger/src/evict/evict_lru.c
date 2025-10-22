@@ -742,7 +742,7 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
      *
      * Avoid division by zero if the cache size has not yet been set in a shared cache.
      */
-    bytes_max = conn->cache_size + 1;
+    bytes_max = __wt_tsan_suppress_load_uint64_v(&conn->cache_size) + 1;
     bytes_inuse = __wt_cache_bytes_inuse(cache);
     if (__wt_evict_clean_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_CLEAN_HARD);
@@ -1166,7 +1166,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
     /*
      * We have disabled further eviction: wait for concurrent LRU eviction activity to drain.
      */
-    while (btree->evict_busy > 0)
+    while (__wt_tsan_suppress_load_uint32_v(&btree->evict_busy) > 0)
         __wt_yield();
 
     if (0) {

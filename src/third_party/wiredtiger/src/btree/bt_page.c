@@ -1108,7 +1108,7 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
 
     /* Allocate and initialize a new WT_PAGE. */
     WT_RET(__wt_page_alloc(session, dsk->type, alloc_entries, true, &page, flags));
-    page->dsk = dsk;
+    __wt_tsan_suppress_store_wt_page_header_ptr(&page->dsk, dsk);
     F_SET_ATOMIC_16(page, flags);
 
     /*
@@ -1311,8 +1311,8 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, bool *instantiate_updp,
          * If we skipped "quite a few" entries (threshold is arbitrary), and the tree is already
          * dirty and so will be written, mark the page dirty so it gets rewritten without them.
          */
-        if (btree->modified && skipped >= auxhdr.entries / 4 && skipped >= dsk->u.entries / 100 &&
-          skipped > 4) {
+        if (__wt_tsan_suppress_load_bool(&btree->modified) && skipped >= auxhdr.entries / 4 &&
+          skipped >= dsk->u.entries / 100 && skipped > 4) {
             WT_RET(__wt_page_modify_init(session, page));
             __wt_page_only_modify_set(session, page);
         }

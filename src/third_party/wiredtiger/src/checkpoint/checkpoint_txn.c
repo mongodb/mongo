@@ -539,7 +539,7 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
      * if we're transitioning to a shared cache via reconfigure. This avoids potential divide by
      * zero.
      */
-    if ((cache_size = conn->cache_size) < 10 * WT_MEGABYTE)
+    if ((cache_size = __wt_tsan_suppress_load_uint64_v(&conn->cache_size)) < 10 * WT_MEGABYTE)
         return;
 
     current_dirty = (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
@@ -915,7 +915,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
                   __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
                   __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string[1]));
             }
-            txn_global->checkpoint_timestamp = txn_global->stable_timestamp;
+            __wt_tsan_suppress_store_uint64(
+              &txn_global->checkpoint_timestamp, txn_global->stable_timestamp);
             if (!F_ISSET(conn, WT_CONN_RECOVERING))
                 txn_global->meta_ckpt_timestamp = txn_global->checkpoint_timestamp;
         } else if (!F_ISSET(conn, WT_CONN_RECOVERING))
@@ -1393,14 +1394,14 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (F_ISSET(hs_dhandle, WT_DHANDLE_OPEN)) {
         time_start_hs = __wt_clock(session);
-        conn->txn_global.checkpoint_running_hs = true;
+        __wt_tsan_suppress_store_bool_v(&conn->txn_global.checkpoint_running_hs, true);
         WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_HS);
 
         WT_WITH_DHANDLE(session, hs_dhandle, ret = __wt_checkpoint_file(session, cfg));
         if (hs_dhandle_shared != NULL)
             WT_WITH_DHANDLE(session, hs_dhandle_shared, ret = __wt_checkpoint_file(session, cfg));
 
-        conn->txn_global.checkpoint_running_hs = false;
+        __wt_tsan_suppress_store_bool_v(&conn->txn_global.checkpoint_running_hs, false);
         WT_ERR(ret);
 
         /*
@@ -2553,7 +2554,7 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
      * modified flag. The "unless reconciliation skips updates" problem is handled in the
      * reconciliation code: if reconciliation skips updates, it sets the modified flag itself.
      */
-    btree->modified = false;
+    __wt_tsan_suppress_store_bool(&btree->modified, false);
     WT_FULL_BARRIER();
 
     /* Tell logging that a file checkpoint is starting. */

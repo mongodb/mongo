@@ -113,7 +113,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
     /* Clear a checkpoint's pinned ID and timestamp. */
     if (WT_SESSION_IS_CHECKPOINT(session)) {
         __wt_atomic_storev64(&txn_global->checkpoint_txn_shared.pinned_id, WT_TXN_NONE);
-        txn_global->checkpoint_timestamp = WT_TS_NONE;
+        __wt_tsan_suppress_store_uint64(&txn_global->checkpoint_timestamp, WT_TS_NONE);
     }
 
     /* Leave the generation after releasing the snapshot. */
@@ -553,7 +553,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
           current_id - oldest_id > (10 * WT_THOUSAND) && oldest_session != NULL) {
             __wt_verbose(session, WT_VERB_TRANSACTION,
               "oldest id %" PRIu64 " pinned in session %" PRIu32 " [%s] with snap_min %" PRIu64,
-              oldest_id, oldest_session->id, oldest_session->lastop,
+              oldest_id, oldest_session->id,
+              __wt_tsan_suppress_load_const_char_ptr(&oldest_session->lastop),
               oldest_session->txn->snapshot_data.snap_min);
         }
     }
@@ -1758,7 +1759,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                 __wt_free(session, op->u.ref->page->modify->inst_updates);
             }
             if (op->u.ref->page_del != NULL)
-                op->u.ref->page_del->committed = true;
+                __wt_tsan_suppress_store_bool(&op->u.ref->page_del->committed, true);
             WT_REF_UNLOCK(op->u.ref, previous_state);
         }
         __wt_txn_op_free(session, op);

@@ -558,6 +558,7 @@ typedef uint64_t wt_timestamp_t;
 #endif
 
 #include "misc.h"
+#include "tsan_suppress.h"
 #include "mutex.h"
 
 #include "stat.h"         /* required by dhandle.h */

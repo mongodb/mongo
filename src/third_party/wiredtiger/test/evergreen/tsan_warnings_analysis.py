@@ -31,10 +31,6 @@ import re
 # and collect all the warnings the found under tsan logs.
 #
 # The TSAN configuration will need option log_path to create the tsan logs.
-#
-# FIXME-WT-15235: The current filtering of TSAN warnings, can hide true
-# positive warnings if they have the same summary but a different TSAN
-# trace.
 def get_line_last_modified_times(file_path, line_number):
     """
     Get the last modification time (UNIX timestamp) for the provided line and file using git blame.
