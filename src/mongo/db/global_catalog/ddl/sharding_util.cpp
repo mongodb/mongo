@@ -183,8 +183,6 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
     return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
 }
 
-
-// TODO SERVER-67593: Investigate if DBDirectClient can be used instead.
 Status createIndexOnCollection(OperationContext* opCtx,
                                const NamespaceString& ns,
                                const BSONObj& keys,
