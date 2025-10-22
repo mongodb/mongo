@@ -2077,9 +2077,10 @@ IndexProbeNode::IndexProbeNode(NamespaceString nssArg, IndexEntry indexArg)
     : nss(nssArg), index(indexArg) {}
 
 void IndexProbeNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
     *ss << "INDEX_PROBE\n";
     addIndent(ss, indent + 1);
-    *ss << "Namespace: " << toStringForLogging(nss) << " Index: " << index.identifier.toString();
+    *ss << "Namespace: " << toStringForLogging(nss) << " Index: " << index.keyPattern << "\n";
 }
 
 std::unique_ptr<QuerySolutionNode> IndexProbeNode::clone() const {
