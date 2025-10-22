@@ -67,6 +67,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -159,6 +160,100 @@ void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
         {*opCtx->getTxnNumber()},
         boost::none /* autocommit */,
         TransactionParticipant::TransactionActions::kNone);
+}
+
+/**
+ * Checks if any documents already exist in the given shard key range on the recipient shard.
+ * This is used to detect spurious documents that may have been incorrectly present due to
+ * historical reasons (e.g., inserts via direct connection) or unforeseen range deleter bugs.
+ *
+ * Returns the shard key of the first document found in the range, or boost::none if no documents
+ * exist.
+ */
+boost::optional<BSONObj> checkForExistingDocumentsInRange(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const UUID& collUuid,
+                                                          const BSONObj& shardKeyPattern,
+                                                          const BSONObj& min,
+                                                          const BSONObj& max) {
+    // Acquire collection to scan for existing documents.
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Cannot find collection " << nss.toStringForErrorMsg(),
+            collection.exists());
+
+    // Verify collection UUID matches (safety check).
+    uassert(ErrorCodes::InvalidUUID,
+            str::stream() << "Collection UUID mismatch during migration. Expected "
+                          << collUuid.toString() << " but found "
+                          << collection.getCollectionPtr()->uuid().toString(),
+            collection.uuid() == collUuid);
+
+    // Find a shard key prefixed index to use for the scan.
+    const auto shardKeyIdx = findShardKeyPrefixedIndex(
+        opCtx, collection.getCollectionPtr(), shardKeyPattern, false /* requireSingleKey */);
+
+    uassert(ErrorCodes::IndexNotFound,
+            str::stream() << "Could not find shard key index for pattern " << shardKeyPattern
+                          << " on collection " << nss.toStringForErrorMsg(),
+            shardKeyIdx);
+
+    // Use InternalPlanner to scan the shard key index within the range.
+    auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
+                                                   collection,
+                                                   *shardKeyIdx,
+                                                   min,
+                                                   max,
+                                                   BoundInclusion::kIncludeStartKeyOnly,
+                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                   InternalPlanner::FORWARD);
+
+    BSONObj doc;
+    PlanExecutor::ExecState state = exec->getNext(&doc, nullptr);
+
+    if (state == PlanExecutor::ADVANCED) {
+        // Found an index key in the range - reconstruct the shard key from index values:
+        // this avoids the need to load the full document in shardKeyIndexScan() with
+        // InternalPlanner::IXSCAN_FETCH. Index key format: {"": value1, "": value2, ...}, we need
+        // to map these to proper field names from the shard key pattern.
+
+        BSONObjBuilder shardKeyBuilder;
+        BSONObjIterator indexKeyIter(doc);
+        BSONObjIterator shardKeyPatternIter(shardKeyPattern);
+
+        // Map index key values to shard key field names.
+        while (indexKeyIter.more() && shardKeyPatternIter.more()) {
+            BSONElement indexValue = indexKeyIter.next();
+            BSONElement shardKeyField = shardKeyPatternIter.next();
+
+            // Append the index value with the proper field name from shard key pattern.
+            shardKeyBuilder.appendAs(indexValue, shardKeyField.fieldName());
+        }
+
+        BSONObj reconstructedShardKey = shardKeyBuilder.obj();
+
+        LOGV2_DEBUG(11095301,
+                    3,
+                    "Found index key in range, reconstructed shard key from index data",
+                    "indexKey"_attr = doc,
+                    "shardKeyPattern"_attr = shardKeyPattern,
+                    "reconstructedShardKey"_attr = reconstructedShardKey);
+
+        return reconstructedShardKey;
+    } else if (state == PlanExecutor::IS_EOF) {
+        // No documents found in the range.
+        return boost::none;
+    } else {
+        // Error occurred during scan.
+        uasserted(ErrorCodes::InternalError,
+                  str::stream() << "Error while scanning for existing documents in range [" << min
+                                << ", " << max << ") on collection " << nss.toStringForErrorMsg()
+                                << ": " << PlanExecutor::stateToStr(state));
+    }
 }
 
 template <typename Callable>
@@ -1449,6 +1544,37 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
             timing->done(2);
             migrateThreadHangAtStep2.pauseWhileSet();
+        }
+
+        // Check for existing documents in the range before starting cloning:
+        // this prevents mixing legitimate migration documents with spurious ones that may have
+        // been incorrectly present due to historical reasons or range deleter bugs.
+        {
+            auto existingDocShardKey =
+                checkForExistingDocumentsInRange(outerOpCtx,
+                                                 _nss,
+                                                 donorCollectionOptionsAndIndexes.uuid,
+                                                 _shardKeyPattern,
+                                                 range.getMin(),
+                                                 range.getMax());
+
+            if (existingDocShardKey) {
+                _setStateFail(
+                    str::stream()
+                    << "Migration aborted: found existing document in range being migrated. "
+                    << "Document with shard key " << *existingDocShardKey
+                    << " already exists in range [" << range.getMin() << ", " << range.getMax()
+                    << ") on recipient shard. Please investigate and remove "
+                    << "spurious documents before retrying migration.");
+                return;
+            }
+
+            LOGV2_DEBUG(11095300,
+                        3,
+                        "Pre-cloning check passed: no existing documents found in migration range",
+                        "nss"_attr = _nss,
+                        "range"_attr = range.toString(),
+                        "migrationId"_attr = _migrationId->toBSON());
         }
 
         {

@@ -15,6 +15,9 @@ filters:
   - "*migration_coordinator*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "migration_fails_with_spurious_documents.js":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "move_primary_clone.js":
     approvers:
       - 10gen/server-cluster-scalability

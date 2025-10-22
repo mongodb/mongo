@@ -482,6 +482,8 @@ last-continuous:
       ticket: SERVER-111406
     - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
       ticket: SERVER-112520
+    - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
+      ticket: SERVER-110953
   suites: null
 last-lts:
   all:
@@ -1021,4 +1023,6 @@ last-lts:
       ticket: SERVER-111406
     - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
       ticket: SERVER-112520
+    - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
+      ticket: SERVER-110953
   suites: null
