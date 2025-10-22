@@ -109,6 +109,7 @@ TrafficRecorder::Recording::Recording(const StartTrafficRecording& options,
 }
 
 void TrafficRecorder::Recording::start() {
+    _started.store(true);
     _trafficStats.setRunning(true);
     startTime.store(_tickSource->ticksTo<Microseconds>(_tickSource->getTicks()));
     _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
@@ -299,49 +300,12 @@ std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_makeRecording(
 }
 
 void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
-    auto globalRecordingDirectory = gTrafficRecordingDirectory;
-    uassert(ErrorCodes::BadValue,
-            "Traffic recording directory not set",
-            !globalRecordingDirectory.empty());
-
-    {
-        auto rec = _recording.synchronize();
-        uassert(ErrorCodes::BadValue, "Traffic recording already active", !*rec);
-        *rec = _makeRecording(options, globalRecordingDirectory, svcCtx->getTickSource());
-
-        (*rec)->start();
-    }
-
-    _shouldRecord.store(true);
-    {
-        // TODO SERVER-111903: Ensure all session starts are observed exactly once. A session
-        // starting just before this getActiveSessions call may be reported twice.
-        // For now, duplicate session starts are simpler to handle than omitted ones.
-        auto sessions = getActiveSessions(svcCtx);
-        // Record SessionStart events if exists any active session.
-        for (const auto& [id, session] : sessions) {
-            _observe(id, session, Message(), svcCtx, EventType::kSessionStart);
-        }
-    }
+    _prepare(options, svcCtx);
+    _start(svcCtx);
 }
 
 void TrafficRecorder::stop(ServiceContext* svcCtx) {
-    auto sessions = getActiveSessions(svcCtx);
-    // Record SessionEnd events if exists any active session.
-    for (const auto& [id, session] : sessions) {
-        _observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
-    }
-
-    _shouldRecord.store(false);
-
-    auto recording = [&] {
-        auto rec = _recording.synchronize();
-        uassert(ErrorCodes::BadValue, "Traffic recording not active", *rec);
-
-        return std::move(*rec);
-    }();
-
-    uassertStatusOK(recording->shutdown());
+    _stop(svcCtx);
 }
 
 void TrafficRecorder::sessionStarted(const std::shared_ptr<transport::Session>& ts,
@@ -400,6 +364,63 @@ void TrafficRecorder::_observe(uint64_t id,
 
     // We couldn't queue and it's still our recording.  No one else should try to queue
     _shouldRecord.store(false);
+}
+
+
+void TrafficRecorder::_prepare(const StartTrafficRecording& options, ServiceContext* svcCtx) {
+    auto globalRecordingDirectory = gTrafficRecordingDirectory;
+    uassert(ErrorCodes::BadValue,
+            "Traffic recording directory not set",
+            !globalRecordingDirectory.empty());
+
+    {
+        auto rec = _recording.synchronize();
+        uassert(ErrorCodes::BadValue, "Traffic recording already active", !*rec);
+        *rec = _makeRecording(options, globalRecordingDirectory, svcCtx->getTickSource());
+    }
+}
+
+void TrafficRecorder::_start(ServiceContext* svcCtx) {
+    std::shared_ptr<Recording> recording = _getCurrentRecording();
+
+    uassert(ErrorCodes::BadValue, "Traffic recording must be prepared before starting", recording);
+    uassert(ErrorCodes::BadValue,
+            "Traffic recording instance cannot be started repeatedly",
+            !recording->started());
+
+    recording->start();
+    _shouldRecord.store(true);
+
+    // TODO SERVER-111903: Ensure all session starts are observed exactly once. A session
+    // starting just before this getActiveSessions call may be reported twice.
+    // For now, duplicate session starts are simpler to handle than omitted ones.
+    auto sessions = getActiveSessions(svcCtx);
+    // Record SessionStart events if any active sessions exist.
+    for (const auto& [id, session] : sessions) {
+        _observe(id, session, Message(), svcCtx, EventType::kSessionStart);
+    }
+}
+void TrafficRecorder::_stop(ServiceContext* svcCtx) {
+    // Record SessionEnd events if any active sessions exist.
+    auto sessions = getActiveSessions(svcCtx);
+
+    for (const auto& [id, session] : sessions) {
+        _observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
+    }
+
+    _shouldRecord.store(false);
+
+    auto recording = [&] {
+        auto rec = _recording.synchronize();
+        uassert(ErrorCodes::BadValue, "Traffic recording not active", *rec);
+
+        return std::move(*rec);
+    }();
+
+    uassertStatusOK(recording->shutdown());
+}
+void TrafficRecorder::_fail() {
+    _recording->reset();
 }
 
 std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_getCurrentRecording() const {

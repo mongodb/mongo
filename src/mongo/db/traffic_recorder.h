@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder_gen.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/mutex.h"
@@ -122,6 +123,10 @@ protected:
         virtual void start();
         virtual Status shutdown();
 
+        bool started() const {
+            return _started.loadRelaxed();
+        }
+
         /**
          * pushRecord returns false if the queue was full.  This is ultimately fatal to the
          * recording
@@ -160,11 +165,17 @@ protected:
         stdx::thread _thread;
 
         stdx::mutex _mutex;
+        mongo::Atomic<bool> _started{false};
         bool _inShutdown = false;
         TrafficRecorderStats _trafficStats;
         int64_t _written = 0;
         Status _result = Status::OK();
     };
+
+    void _prepare(const StartTrafficRecording& options, ServiceContext* svcCtx);
+    void _start(ServiceContext* svcCtx);
+    void _stop(ServiceContext* svcCtx);
+    void _fail();
 
 
     void _observe(uint64_t id,
