@@ -80,6 +80,7 @@ public:
                     ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface,
                     ReplicationConsistencyMarkers* consistencyMarkers,
+                    Observer* observer,
                     const OplogWriter::Options& options);
 
     /**
@@ -157,6 +158,9 @@ private:
 
     // Not owned by us.
     ReplicationConsistencyMarkers* const _consistencyMarkers;
+
+    // Not owned by us.
+    Observer* const _observer;
 };
 
 }  // namespace repl

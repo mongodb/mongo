@@ -482,6 +482,7 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
                                           replCoord,
                                           storageInterface,
                                           consistencyMarkers,
+                                          &noopOplogWriterObserver,
                                           OplogWriter::Options(options.skipWritesToOplog));
 }
 
