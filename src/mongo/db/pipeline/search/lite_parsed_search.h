@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -37,26 +37,22 @@ namespace mongo {
  * A 'LiteParsed' representation of either a $search or $searchMeta stage.
  * This is the parent class for the $listSearchIndexes stage.
  */
-class LiteParsedSearchStage : public LiteParsedDocumentSourceNestedPipelines {
+class LiteParsedSearchStage : public LiteParsedDocumentSource {
 public:
     static std::unique_ptr<LiteParsedSearchStage> parse(const NamespaceString& nss,
                                                         const BSONElement& spec,
                                                         const LiteParserOptions& options) {
-        // Set the mongot stage's pipeline, if applicable.
-        auto pipelineElem = spec.Obj()["pipeline"];
-        boost::optional<LiteParsedPipeline> liteParsedPipeline;
-        if (pipelineElem) {
-            auto pipeline = parsePipelineFromBSON(pipelineElem);
-            liteParsedPipeline = LiteParsedPipeline(nss, pipeline);
-        }
+        return std::make_unique<LiteParsedSearchStage>(spec.fieldName(), std::move(nss));
+    }
 
-        return std::make_unique<LiteParsedSearchStage>(
-            spec.fieldName(), std::move(nss), std::move(liteParsedPipeline));
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
+        // There are no foreign namespaces.
+        return stdx::unordered_set<NamespaceString>{};
     }
 
     PrivilegeVector requiredPrivileges(bool isMongos,
                                        bool bypassDocumentValidation) const override {
-        return {Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find)};
+        return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::find)};
     }
 
     bool isInitialSource() const final {
@@ -76,10 +72,10 @@ public:
         transactionNotSupported(getParseTimeName());
     }
 
-    explicit LiteParsedSearchStage(std::string parseTimeName,
-                                   NamespaceString nss,
-                                   boost::optional<LiteParsedPipeline> pipeline)
-        : LiteParsedDocumentSourceNestedPipelines(
-              std::move(parseTimeName), std::move(nss), std::move(pipeline)) {}
+    explicit LiteParsedSearchStage(std::string parseTimeName, NamespaceString nss)
+        : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+
+private:
+    const NamespaceString _nss;
 };
 }  // namespace mongo
