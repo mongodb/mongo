@@ -60,3 +60,6 @@ filters:
   - "drop_sessions_collection.py":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "fuzz_runtime_parameters.py":
+    approvers:
+      - 10gen/server-programmability

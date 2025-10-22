@@ -7,6 +7,8 @@ import sys
 import threading
 import time
 
+from pymongo.errors import OperationFailure
+
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.generate_fuzz_config.mongo_fuzzer_configs import (
     generate_normal_mongo_parameters,
@@ -15,6 +17,7 @@ from buildscripts.resmokelib.testing.fixtures import interface as fixture_interf
 from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster, standalone
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
+from buildscripts.resmokelib.testing.retry import with_naive_retry
 
 
 def validate_runtime_parameter_spec(spec):
@@ -53,6 +56,10 @@ class RuntimeParametersState:
         """Return a dictionary of all parameters subject to runtime fuzzing suitable for use with getParameter."""
         return {key: 1 for key in self._params.keys()}
 
+    def get_keys(self):
+        """Returns all parameter names."""
+        return list(self._params.keys())
+
 
 class FuzzRuntimeParameters(interface.Hook):
     """Regularly connect to nodes and sends them a setParameter command."""
@@ -78,6 +85,8 @@ class FuzzRuntimeParameters(interface.Hook):
         """
         interface.Hook.__init__(self, hook_logger, fixture, FuzzRuntimeParameters.DESCRIPTION)
         self._mongod_param_state = None
+        self._mongos_param_state = None
+        self._cluster_param_state = None
         self._seed = seed
 
         self._fixture = fixture
@@ -109,6 +118,9 @@ class FuzzRuntimeParameters(interface.Hook):
             for param, val in config_fuzzer_params["mongos"].items()
             if "runtime" in val.get("fuzz_at", [])
         }
+
+        # Get cluster parameters
+        cluster_params = dict(config_fuzzer_params["cluster"].items())
 
         from buildscripts.resmokelib import config
 
@@ -149,11 +161,12 @@ class FuzzRuntimeParameters(interface.Hook):
 
         validate_runtime_parameter_spec(runtime_mongod_params)
         validate_runtime_parameter_spec(runtime_mongos_params)
+        validate_runtime_parameter_spec(cluster_params)
         # Construct the runtime state before the suite begins.
         # The initial lastSet time of each parameter is the start time of the suite.
         self._mongod_param_state = RuntimeParametersState(runtime_mongod_params, self._seed)
-
         self._mongos_param_state = RuntimeParametersState(runtime_mongos_params, self._seed)
+        self._cluster_param_state = RuntimeParametersState(cluster_params, self._seed)
 
         self._setParameter_thread = _SetParameterThread(
             self.logger,
@@ -163,6 +176,7 @@ class FuzzRuntimeParameters(interface.Hook):
             self._fixture,
             self._mongod_param_state,
             self._mongos_param_state,
+            self._cluster_param_state,
             lifecycle_interface.FlagBasedThreadLifecycle(),
             self._auth_options,
         )
@@ -187,6 +201,9 @@ class FuzzRuntimeParameters(interface.Hook):
         for mongos in self._mongos_fixtures:
             self._invoke_get_parameter_and_log(mongos)
 
+        if self._mongos_fixtures:
+            self._invoke_get_cluster_parameter_and_log(self._mongos_fixtures[0])
+
         self.logger.info("Resuming the runtime parameter fuzzing thread.")
         self._setParameter_thread.pause()
         self._setParameter_thread.resume()
@@ -206,6 +223,9 @@ class FuzzRuntimeParameters(interface.Hook):
 
         for mongos in self._mongos_fixtures:
             self._invoke_get_parameter_and_log(mongos)
+
+        if self._mongos_fixtures:
+            self._invoke_get_cluster_parameter_and_log(self._mongos_fixtures[0])
 
     def _add_fixture(self, fixture):
         if isinstance(fixture, standalone.MongoDFixture):
@@ -237,6 +257,16 @@ class FuzzRuntimeParameters(interface.Hook):
             get_result,
         )
 
+    def _invoke_get_cluster_parameter_and_log(self, node):
+        """Helper to print the current state of a cluster's fuzzable cluster parameters. Only usable once before_suite has initialized the runtime state of the parameters."""
+        client = fixture_interface.build_client(node, self._auth_options)
+        params_to_get = self._cluster_param_state.get_keys()
+        get_result = client.admin.command("getClusterParameter", params_to_get)
+        self.logger.info(
+            "Current state of fuzzable cluster parameters on cluster. Parameters: %s",
+            get_result,
+        )
+
 
 class _SetParameterThread(threading.Thread):
     def __init__(
@@ -248,6 +278,7 @@ class _SetParameterThread(threading.Thread):
         fixture,
         mongod_param_state,
         mongos_param_state,
+        cluster_param_state,
         lifecycle,
         auth_options=None,
     ):
@@ -261,6 +292,7 @@ class _SetParameterThread(threading.Thread):
         self._fixture = fixture
         self._mongod_param_state = mongod_param_state
         self._mongos_param_state = mongos_param_state
+        self._cluster_param_state = cluster_param_state
         self.__lifecycle = lifecycle
         self._auth_options = auth_options
         self._setparameter_interval_secs = 1
@@ -354,12 +386,34 @@ class _SetParameterThread(threading.Thread):
     def _do_set_parameter(self):
         mongod_params_to_set = self._mongod_param_state.generate_parameters()
         mongos_params_to_set = self._mongos_param_state.generate_parameters()
+        cluster_params_to_set = self._cluster_param_state.generate_parameters()
 
         def invoke_set_parameter(client, params):
             # Do nothing if there are no params to set this iteration.
             if not params:
                 return
             client.admin.command("setParameter", 1, **params)
+
+        def invoke_set_cluster_parameter(client, params):
+            for key, value in params.items():
+                try:
+                    with_naive_retry(
+                        lambda: client.admin.command("setClusterParameter", {key: value}),
+                        # Retry on
+                        #
+                        # ConflictingOperationInProgress
+                        #   as setClusterParameter is a DDL operation, it might clash with other
+                        #   operations
+                        #
+                        # AddOrRemoveShardInProgress
+                        #   setClusterParameter explicitly clashes with that one too
+                        extra_retryable_error_codes=[117, 414],
+                    )
+                except OperationFailure as exc:
+                    # BadValue (code 2) might happen when we do a downgrade and try to set a cluster
+                    # variable that is not supported in the given FCV
+                    if exc.code != 2:
+                        raise
 
         for repl_set in self._rs_fixtures:
             self.logger.info(
@@ -390,4 +444,14 @@ class _SetParameterThread(threading.Thread):
             )
             invoke_set_parameter(
                 fixture_interface.build_client(mongos, self._auth_options), mongos_params_to_set
+            )
+
+        if self._mongos_fixtures:
+            self.logger.info(
+                "Setting parameters cluster. Parameters: %s",
+                cluster_params_to_set,
+            )
+            invoke_set_cluster_parameter(
+                fixture_interface.build_client(self._mongos_fixtures[0], self._auth_options),
+                cluster_params_to_set,
             )

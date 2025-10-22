@@ -243,7 +243,7 @@ def _validate_config(parser: argparse.ArgumentParser):
 
 
 def _validate_params_spec(parser: argparse.ArgumentParser, spec: dict):
-    valid_fuzz_at_vals = {"startup", "runtime"}
+    valid_fuzz_at_vals = {"startup", "runtime", "cluster"}
     for key, value in spec.items():
         if "fuzz_at" not in value:
             parser.error(

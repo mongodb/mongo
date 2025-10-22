@@ -174,6 +174,12 @@ export const workerThread = (function () {
                 await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
             }
 
+            if (TestData.fuzzRuntimeParams) {
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_conflicting_operation_during_fuzztest.js"
+                );
+            }
+
             if (Cluster.isReplication(args.clusterOptions)) {
                 if (
                     args.clusterOptions.hasOwnProperty("sharded") &&

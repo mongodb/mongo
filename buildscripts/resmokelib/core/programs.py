@@ -437,6 +437,12 @@ def mongo_shell_program(
     if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
         test_data["fuzzMongodConfigs"] = True
 
+    if config.FUZZ_RUNTIME_PARAMS is not None and config.FUZZ_RUNTIME_PARAMS is not False:
+        test_data["fuzzRuntimeParams"] = True
+        eval_sb.append(
+            'await import("jstests/libs/override_methods/implicitly_retry_on_conflicting_operation_during_fuzztest.js")'
+        )
+
     for var_name in global_vars:
         _format_shell_vars(eval_sb, [var_name], global_vars[var_name])
 

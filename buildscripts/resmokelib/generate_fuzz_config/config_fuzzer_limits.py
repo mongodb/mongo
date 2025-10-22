@@ -595,6 +595,18 @@ config_fuzzer_params = {
             "fuzz_at": ["startup"],
         },
     },
+    "cluster": {
+        "configServerReadPreferenceForCatalogQueries": {
+            "choices": [{"mustAlwaysUseNearest": True}, {"mustAlwaysUseNearest": False}],
+            "period": 10,
+            "fuzz_at": ["cluster"],
+        },
+        "onlyTargetDataOwningShardsForMultiWrites": {
+            "choices": [{"enabled": True}, {"enabled": False}],
+            "period": 10,
+            "fuzz_at": ["cluster"],
+        },
+    },
 }
 
 config_fuzzer_extra_configs = {
