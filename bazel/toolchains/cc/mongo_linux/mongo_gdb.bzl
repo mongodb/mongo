@@ -73,16 +73,26 @@ def _gdb_download(ctx):
         """
 sh_binary(
     name = "gdb",
-    srcs = ["working_dir.sh"],
+    srcs = ["working_dir_gdb.sh"],
     data = ["%s/bin/gdb"],
     env = %s,
     visibility = ["//visibility:public"],
 )
-""" % (ctx.attr.version, python_env),
+
+sh_binary(
+    name = "gdbserver",
+    srcs = ["working_dir_gdbserver.sh"],
+    data = [
+        "gdb",
+        "%s/bin/gdbserver",
+    ],
+    visibility = ["//visibility:public"],
+)
+""" % (ctx.attr.version, python_env, ctx.attr.version),
     )
 
     ctx.file(
-        "working_dir.sh",
+        "working_dir_gdb.sh",
         """
 #!/bin/bash
 
@@ -98,6 +108,28 @@ fi
 cd $BUILD_WORKING_DIRECTORY
 ${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s/bin/gdb -iex "set auto-load safe-path %s/.gdbinit" "${@:1}"
 """ % (ctx.attr.version, ctx.attr.version, str(ctx.workspace_root)),
+    )
+
+    ctx.file(
+        "working_dir_gdbserver.sh",
+        """
+#!/bin/bash
+
+set -e
+
+RUNFILES_WORKING_DIRECTORY="$(pwd)"
+
+if [ -z $BUILD_WORKING_DIRECTORY ]; then
+    echo "ERROR: BUILD_WORKING_DIRECTORY was not set, was this run from bazel?"
+    exit 1
+fi
+
+cd $BUILD_WORKING_DIRECTORY
+
+# RUNTEST_PRESERVE_CWD forces us to reconstruct the binary path
+original_args="${@:1}"
+${RUNFILES_WORKING_DIRECTORY}/external/gdb_%s/%s/bin/gdbserver localhost:1234 ${TEST_SRCDIR}/_main/${original_args[0]} "${@:2}"
+""" % (ctx.attr.version, ctx.attr.version),
     )
 
     return None
@@ -133,8 +165,16 @@ def setup_gdb_toolchain_aliases(name = "setup_toolchains"):
         name = "gdb",
         actual = "@gdb_v5//:gdb",
     )
+    native.alias(
+        name = "gdbserver",
+        actual = "@gdb_v5//:gdbserver",
+    )
 
     native.alias(
         name = "gdb_v5",
         actual = "@gdb_v5//:gdb",
+    )
+    native.alias(
+        name = "gdbserver_v5",
+        actual = "@gdb_v5//:gdbserver",
     )
