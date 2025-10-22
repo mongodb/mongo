@@ -165,8 +165,6 @@ protected:
      */
     bool wasShardAlreadyTargetedWithDifferentShardVersion(NamespaceString nss,
                                                           Analysis& analysis) const {
-        // TODO SERVER-104264: Once we account for 'OnlyTargetDataOwningShardsForMultiWritesParam'
-        // cluster parameter, revisit this logic.
         for (const auto& shard : analysis.shardsAffected) {
             auto it = _batch->requestByShardId.find(shard.shardName);
             if (it != _batch->requestByShardId.end()) {

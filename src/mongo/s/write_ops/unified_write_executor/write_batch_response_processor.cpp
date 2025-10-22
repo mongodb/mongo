@@ -426,7 +426,7 @@ void WriteBatchResponseProcessor::processReplyItem(const WriteOp& op,
     const Status status = item.getStatus();
     if (status.isOK()) {
         _numOkResponses++;
-    } else if (!write_op_helpers::isRetryErrCode(status.code())) {
+    } else {
         _nErrors++;
     }
 }
@@ -550,9 +550,9 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
 
         if (status.isOK()) {
             result.successfulShardSet[op.getId()].insert(shardId);
-        } else if (write_op_helpers::isRetryErrCode(status.code())) {
-            // If we got a retryable error, we process it accordingly. We don't need to record the
-            // result from this shard as it'll be retried anyway.
+        } else if (write_op_helpers::isRetryErrCode(status.code()) && !inTransaction) {
+            // If we got a retryable error outside of a transaction we process it and don't add it
+            // to the reply items, since it will be retried later.
             auto retryResult = handleRetryableError(opCtx, routingCtx, op, item.getStatus());
             result.combine(std::move(retryResult));
             continue;
@@ -612,12 +612,6 @@ void WriteBatchResponseProcessor::updateApproximateSize(const BulkWriteReplyItem
     // If the response is not an error and 'errorsOnly' is set, then we should not store this reply
     // and therefore shouldn't count the size.
     if (item.getOk() && _cmdRef.getErrorsOnly() && *(_cmdRef.getErrorsOnly())) {
-        return;
-    }
-
-    // A retryable error will end up being retried by mongos so we should not consider this
-    // result final and count towards the maximum size limit for a response.
-    if (write_op_helpers::isRetryErrCode(item.getStatus().code())) {
         return;
     }
 
@@ -689,6 +683,7 @@ std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRep
     OperationContext* opCtx) {
 
     std::map<WriteOpId, BulkWriteReplyItem> aggregatedReplies;
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     for (auto& [opId, opResult] : _results) {
 
@@ -702,14 +697,17 @@ std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRep
         auto& replies = std::get<ReplyItemsByShard>(opResult.replies);
         tassert(10412306, "Expected at least one reply item", !replies.empty());
 
-        // If we only have one reply item and it's not a retryable error, we just use that as the
-        // reply. A single retryable error can be ignored as it means we have an unfinished
-        // operation in the case we aborted for some reason.
+        // If we only have one reply item, we just use that as the
+        // reply.
         if (replies.size() == 1) {
-            tassert(10412302,
-                    "Expected a successful reply or non-retryable error in operation replies",
-                    !write_op_helpers::isRetryErrCode(replies.begin()->second.getStatus().code()));
-            aggregatedReplies.emplace(opId, replies.begin()->second);
+            auto singleReply = replies.begin()->second;
+            tassert(
+                10412302,
+                str::stream() << "Expected a successful reply or non-retryable error in operation "
+                                 "replies outside of a transaction, but got"
+                              << redact(singleReply.getStatus()),
+                inTransaction || !write_op_helpers::isRetryErrCode(singleReply.getStatus().code()));
+            aggregatedReplies.emplace(opId, singleReply);
             continue;
         }
 
@@ -721,11 +719,13 @@ std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRep
             if (replyItem.getStatus().isOK()) {
                 successfulReplies.push_back(replyItem);
             } else {
-                tassert(
-                    10412303,
-                    "Expected a successful reply or non-retryable error in operation replies",
-                    !write_op_helpers::isRetryErrCode(replies.begin()->second.getStatus().code()));
-
+                tassert(10412303,
+                        str::stream()
+                            << "Expected a successful reply or non-retryable error in operation "
+                               "replies outside of a transaction, but got"
+                            << redact(replyItem.getStatus()),
+                        inTransaction ||
+                            !write_op_helpers::isRetryErrCode(replyItem.getStatus().code()));
                 errorReplies.push_back(replyItem);
             }
         }
@@ -748,7 +748,6 @@ std::map<WriteOpId, BulkWriteReplyItem> WriteBatchResponseProcessor::finalizeRep
             // interpreted as no-ops if the shard response had been instead a successful result
             // since they wouldn't have modified any data. As a result, we can swallow the errors
             // and treat them as a successful operation.
-            const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
             const bool canIgnoreErrors = write_op_helpers::shouldTargetAllShardsSVIgnored(
                                              inTransaction, _cmdRef.getOp(opId).getMulti()) &&
                 write_op_helpers::isSafeToIgnoreErrorInPartiallyAppliedOp(errorReply.getStatus());

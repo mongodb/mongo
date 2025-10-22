@@ -2042,6 +2042,57 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
     ASSERT_EQ(errors[0].getStatus(), Status(errorCode, errorMsg));
 }
 
+TEST_F(WriteBatchResponseProcessorTxnTest, RetryableErrorInReplyItemHaltsProcessing) {
+    auto request = BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("_id" << 1))},
+                                           {NamespaceInfoEntry(nss1)});
+
+    // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
+    RouterOperationContextSession rocs(opCtx);
+
+    Status staleCollStatus(
+        StaleConfigInfo(nss1, *shard1Endpoint.shardVersion, newShardVersion, shard1Name), "");
+
+    auto reply = makeReply();
+    reply.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, staleCollStatus}}, nss1));
+
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
+
+    // An error should have occurred.
+    ASSERT_TRUE(processor.getNumErrorsRecorded() > 0);
+
+    // Confirm the generated bulk reply and batched command response are both correct.
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 1);
+    ASSERT_EQ(clientReply.getNInserted(), 0);
+    ASSERT_EQ(clientReply.getNMatched(), 0);
+    ASSERT_EQ(clientReply.getNModified(), 0);
+
+    // Assert we don't return any results after the error.
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 1);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+    ASSERT_EQ(batch[0].getStatus(), staleCollStatus);
+
+    auto batchedCommandReply = processor.generateClientResponseForBatchedCommand(opCtx);
+    ASSERT_EQ(batchedCommandReply.getN(), 0);
+    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
+    const auto errors = batchedCommandReply.getErrDetails();
+    ASSERT_EQ(errors.size(), 1);
+    ASSERT_EQ(errors[0].getIndex(), 0);
+    ASSERT_EQ(errors[0].getStatus(), staleCollStatus);
+}
+
 TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientResponse) {
     auto request = BulkWriteCommandRequest(
         {BulkWriteInsertOp(0, BSON("_id" << 1)), BulkWriteInsertOp(0, BSON("_id" << 2))},
