@@ -486,17 +486,20 @@ TEST_F(CollectionValidationTest, HashPrefixesDuplicates) {
 TEST_F(CollectionValidationTest, HashPrefixesCases) {
     constexpr int kHashStringMaxLen = 64;
     ASSERT_DOES_NOT_THROW(
-        CollectionValidation::validateHashes({"aaa", "BBB", "cCc"}, /*equalLength=*/true));
+        CollectionValidation::validateHashes({"AAA1", "BBB1", "CCC1"}, /*equalLength=*/true));
     ASSERT_DOES_NOT_THROW(CollectionValidation::validateHashes(
-        {std::string(kHashStringMaxLen, 'a')}, /*equalLength=*/true));
+        {std::string(kHashStringMaxLen, 'A')}, /*equalLength=*/true));
 
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"aaa", "BBBB"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"a"}, /*equalLength=*/true),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"nothex"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"aaa", "AAA"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"AAA", "AAA"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(

@@ -66,6 +66,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -77,6 +78,7 @@
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/move/utility_core.hpp>
@@ -531,7 +533,6 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
 
     const size_t kHashStringMaxLen = SHA256Block().toHexString().size();
     auto hashPrefixLength = hashPrefixes[0].length();
-    std::vector<std::string> normalizedHashPrefixes;
     for (const auto& hashPrefix : hashPrefixes) {
         uassert(ErrorCodes::InvalidOptions,
                 "Hash prefixes should not be empty strings.",
@@ -545,21 +546,20 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
                 "Hash prefixes should not have different lengths.",
                 !equalLength || hashPrefix.length() == hashPrefixLength);
 
-        std::string normalizedHashPrefix;
         for (char c : hashPrefix) {
             uassert(ErrorCodes::InvalidOptions,
-                    fmt::format("Hash prefixes should only contain hex strings. Received: {}.",
-                                hashPrefix),
-                    ctype::isXdigit(c));
-            normalizedHashPrefix.push_back(ctype::toLower(c));
+                    fmt::format(
+                        "Hash prefixes should only contain upper case hex strings. Received: {}.",
+                        hashPrefix),
+                    ctype::isXdigit(c) && (ctype::isUpper(c) || ctype::isDigit(c)));
         }
-        normalizedHashPrefixes.push_back(std::move(normalizedHashPrefix));
     }
 
-    std::sort(normalizedHashPrefixes.begin(), normalizedHashPrefixes.end());
-    for (size_t i = 0; i < normalizedHashPrefixes.size() - 1; ++i) {
-        const auto& currentHashPrefix = normalizedHashPrefixes[i];
-        const auto& nextHashPrefix = normalizedHashPrefixes[i + 1];
+    std::vector<std::string> sortedHashPrefixes = hashPrefixes;
+    std::sort(sortedHashPrefixes.begin(), sortedHashPrefixes.end());
+    for (size_t i = 0; i < sortedHashPrefixes.size() - 1; ++i) {
+        const auto& currentHashPrefix = sortedHashPrefixes[i];
+        const auto& nextHashPrefix = sortedHashPrefixes[i + 1];
 
         if (currentHashPrefix.length() <= nextHashPrefix.length()) {
             uassert(ErrorCodes::InvalidOptions,
@@ -679,7 +679,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
     if (rawHashPrefixes) {
         hashPrefixes = std::vector<std::string>();
         for (const auto& e : rawHashPrefixes.Array()) {
-            hashPrefixes->push_back(e.String());
+            hashPrefixes->push_back(boost::algorithm::to_upper_copy(e.String()));
         }
         CollectionValidation::validateHashes(*hashPrefixes, /*equalLength=*/true);
         if (!hashPrefixes->size()) {
@@ -728,7 +728,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         }
         revealHashedIds = std::vector<std::string>();
         for (const auto& e : rawRevealHashedIdsArr) {
-            revealHashedIds->push_back(e.String());
+            revealHashedIds->push_back(boost::algorithm::to_upper_copy(e.String()));
         }
         CollectionValidation::validateHashes(*revealHashedIds, /*equalLength=*/false);
     }
