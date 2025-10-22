@@ -92,6 +92,14 @@ commands:
                 description: "max additional memory the recording is allowed to use"
                 default: 134217728
                 type: numBytes
+            startTime:
+                description: "Future time to start the recording"
+                optional: true
+                type: date
+            endTime:
+                description: "Future time to halt the recording"
+                optional: true
+                type: date
 
     stopTrafficRecording:
         description: "stop recording Command"

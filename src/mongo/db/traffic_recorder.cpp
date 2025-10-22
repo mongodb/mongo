@@ -52,6 +52,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/tick_source.h"
@@ -300,6 +301,24 @@ std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_makeRecording(
 }
 
 void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
+    uassert(ErrorCodes::BadValue,
+            "startTime and endTime should both be provided, or neither",
+            options.getStartTime().has_value() == options.getEndTime().has_value());
+
+    if (options.getStartTime().has_value()) {
+        auto start = *options.getStartTime();
+        auto end = *options.getEndTime();
+
+        uassert(ErrorCodes::BadValue,
+                "startTime should be in the future, and less than 1 day into the future",
+                start > Date_t::now() && start < (Date_t::now() + Days(1)));
+
+
+        uassert(ErrorCodes::BadValue,
+                "endTime should be after startTime, and less than 10 days into the future",
+                end > start && end < (Date_t::now() + Days(10)));
+    }
+
     _prepare(options, svcCtx);
     _start(svcCtx);
 }

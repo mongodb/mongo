@@ -216,3 +216,64 @@ function runTest(client, restartCommand) {
         removeFile(dirB);
     }
 }
+
+// Ensure startTrafficRecording validates startTime and endTime
+{
+    const path = MongoRunner.toRealDir("$dataDir/traffic_recording/");
+    let recordingDir = path + "/recordings/";
+
+    removeFile(recordingDir);
+    mkdir(recordingDir);
+
+    let m = MongoRunner.runMongod({auth: "", setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1}});
+
+    let db = m.getDB("admin");
+
+    db.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
+    db.auth("admin", "pass");
+
+    const nowPlusDays = (days) => {
+        const now = new Date();
+        const milliseconds = days * 24 * 60 * 60 * 1000;
+        return new Date(now.getTime() + milliseconds);
+    };
+
+    // No start or end time - allowed.
+    assert.commandWorked(db.runCommand({"startTrafficRecording": 1, "destination": "recordings"}));
+    assert.commandWorked(db.runCommand({"stopTrafficRecording": 1}));
+
+    // start time < 1 day in the future, end time > start time && end time < 10 days in the future -
+    // allowed.
+    assert.commandWorked(
+        db.runCommand({
+            "startTrafficRecording": 1,
+            "destination": "recordings",
+            startTime: nowPlusDays(0.5),
+            endTime: nowPlusDays(2),
+        }),
+    );
+    // Cancelling early is permitted.
+    assert.commandWorked(db.runCommand({"stopTrafficRecording": 1}));
+
+    const expectFailure = (params) => {
+        assert.commandFailedWithCode(
+            db.runCommand({"startTrafficRecording": 1, "destination": "recordings", ...params}),
+            ErrorCodes.BadValue,
+        );
+    };
+
+    // Only start.
+    expectFailure({startTime: nowPlusDays(0.5)});
+    // Only end.
+    expectFailure({endTime: nowPlusDays(2)});
+    // Starts too late.
+    expectFailure({startTime: nowPlusDays(1.5), endTime: nowPlusDays(2)});
+    // Ends too late.
+    expectFailure({startTime: nowPlusDays(0.5), endTime: nowPlusDays(20)});
+    // Both.
+    expectFailure({startTime: nowPlusDays(1.5), endTime: nowPlusDays(20)});
+
+    MongoRunner.stopMongod(m, null, {user: "admin", pwd: "pass"});
+
+    removeFile(recordingDir);
+}
