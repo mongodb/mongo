@@ -19,6 +19,7 @@ executor:
       eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       global_vars:
         TestData:
+          enableOTELTracing: false
           implicitlyShardOnCreateCollectionOnly: true
           runningWithBalancer: false
   fixture:

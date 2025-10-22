@@ -20,6 +20,7 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
+          enableOTELTracing: false
       setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   fixture:
     class: ShardedClusterFixture

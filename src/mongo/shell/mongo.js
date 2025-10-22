@@ -173,7 +173,17 @@ Mongo.prototype._setSecurityToken = function (token) {
 };
 
 Mongo.prototype.runCommand = function (dbname, cmd, options) {
-    return this._runCommandImpl(dbname, cmd, options, this._securityToken);
+    let cmdToSend = {...cmd};
+
+    if (
+        jsTestOptions().enableOTELTracing &&
+        jsTestOptions().traceCtx != null &&
+        !cmdToSend.hasOwnProperty("$traceCtx")
+    ) {
+        cmdToSend["$traceCtx"] = {traceparent: jsTestOptions().traceCtx};
+    }
+
+    return this._runCommandImpl(dbname, cmdToSend, options, this._securityToken);
 };
 
 /**

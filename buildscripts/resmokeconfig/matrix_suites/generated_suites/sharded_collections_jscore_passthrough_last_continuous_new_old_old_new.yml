@@ -17,6 +17,7 @@ executor:
       eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       global_vars:
         TestData:
+          enableOTELTracing: false
           mongosBinVersion: last-continuous
   fixture:
     class: ShardedClusterFixture

@@ -46,6 +46,7 @@ const auto getMongotMockStateDecoration = ServiceContext::declareDecoration<Mong
 const std::set<std::string> ignoredFields = {"lsid",
                                              "uid",
                                              "$db",
+                                             "$traceCtx",
                                              "comment",
                                              "cursorOptions.docsRequested",
                                              "docsRequested",

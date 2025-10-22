@@ -11,3 +11,7 @@ executor:
   config:
     shell_options:
       nodb: ""
+      global_vars:
+        TestData:
+          # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+          enableOTELTracing: false

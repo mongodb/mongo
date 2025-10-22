@@ -11,13 +11,14 @@ class WaitForReplication(interface.Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(self, hook_logger, fixture):
+    def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize WaitForReplication."""
         description = "WaitForReplication waits on a replica set"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
         self.hook_logger = hook_logger
         self.fixture = fixture
+        self.shell_options = shell_options
 
     def after_test(self, test, test_report):
         """Run mongo shell to call replSetTest.awaitReplication()."""
@@ -36,7 +37,10 @@ class WaitForReplication(interface.Hook):
                 }}
                 jsTestLog("Ignoring shutdown error in quiesce mode");
             }}"""
-        shell_options = {"nodb": "", "eval": js_cmds.format(client_conn)}
+        shell_options = {
+            **{"nodb": "", "eval": js_cmds.format(client_conn)},
+            **(self.shell_options or {}),
+        }
         shell_proc = core.programs.mongo_shell_program(
             self.hook_logger,
             test_name="wait_for_replication",

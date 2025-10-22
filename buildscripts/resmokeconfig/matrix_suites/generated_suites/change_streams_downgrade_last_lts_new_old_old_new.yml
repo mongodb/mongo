@@ -23,6 +23,7 @@ executor:
         await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
       global_vars:
         TestData:
+          enableOTELTracing: false
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true

@@ -43,6 +43,8 @@ executor:
           #          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
+          # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+          enableOTELTracing: false
       authenticationDatabase: local
       #      authenticationMechanism: SCRAM-SHA-256
       password: *keyFileData

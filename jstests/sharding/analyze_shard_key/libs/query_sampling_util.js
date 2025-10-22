@@ -191,6 +191,7 @@ export var QuerySamplingUtil = (function () {
         for (let key in subsetObj) {
             const value = subsetObj[key];
             if (typeof value === "object") {
+                assert(supersetObj.hasOwnProperty(key), {key, actual: supersetObj, expected: subsetObj});
                 assertSubObject(supersetObj[key], subsetObj[key]);
             } else {
                 assert.eq(supersetObj[key], subsetObj[key], {key, actual: supersetObj, expected: subsetObj});

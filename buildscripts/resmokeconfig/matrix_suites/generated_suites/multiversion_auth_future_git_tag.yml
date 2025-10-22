@@ -16,6 +16,7 @@ executor:
       global_vars:
         TestData:
           auth: true
+          enableOTELTracing: false
           keyFile: jstests/libs/authTestsKey
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
           setParameters:

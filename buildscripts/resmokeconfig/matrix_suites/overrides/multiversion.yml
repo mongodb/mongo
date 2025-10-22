@@ -6,6 +6,12 @@
         num_nodes: 3
         old_bin_version: last_lts
         mixed_bin_versions: new_new_old
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: replica_fixture_last_lts_new_old_new
   value:
@@ -14,6 +20,12 @@
         num_nodes: 3
         old_bin_version: last_lts
         mixed_bin_versions: new_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: replica_fixture_last_lts_old_new_new
   value:
@@ -22,6 +34,12 @@
         num_nodes: 3
         old_bin_version: last_lts
         mixed_bin_versions: old_new_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: replica_fixture_last_continuous_new_new_old
   value:
@@ -30,6 +48,12 @@
         num_nodes: 3
         old_bin_version: last_continuous
         mixed_bin_versions: new_new_old
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: replica_fixture_last_continuous_new_old_new
   value:
@@ -38,6 +62,12 @@
         num_nodes: 3
         old_bin_version: last_continuous
         mixed_bin_versions: new_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: replica_fixture_last_continuous_old_new_new
   value:
@@ -46,6 +76,12 @@
         num_nodes: 3
         old_bin_version: last_continuous
         mixed_bin_versions: old_new_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: sharded_fixture_last_lts_new_old_old_new
   value:
@@ -55,6 +91,12 @@
         num_rs_nodes_per_shard: 2
         old_bin_version: last_lts
         mixed_bin_versions: new_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: sharded_fixture_last_continuous_new_old_old_new
   value:
@@ -64,6 +106,12 @@
         num_rs_nodes_per_shard: 2
         old_bin_version: last_continuous
         mixed_bin_versions: new_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: sharded_fixture_last_lts_3_nodes
   value:
@@ -78,6 +126,8 @@
           global_vars:
             TestData:
               nonClusteredConfigTransactions: true
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 - name: sharded_fixture_last_continuous_3_nodes
   value:
@@ -92,6 +142,8 @@
           global_vars:
             TestData:
               nonClusteredConfigTransactions: true
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
 
 ### Suite-specific overrides ###
 - name: replica_sets_temporarily_disable_due_to_fcv_upgrade
@@ -345,3 +397,13 @@
             global_vars:
               TestData:
                 skipValidationOnInvalidViewDefinitions: true
+
+- name: otel_tracing
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false

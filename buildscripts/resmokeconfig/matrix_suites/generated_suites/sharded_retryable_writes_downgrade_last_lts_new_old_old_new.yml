@@ -26,6 +26,7 @@ executor:
         TestData:
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: majority
+          enableOTELTracing: false
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true

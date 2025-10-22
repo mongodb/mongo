@@ -14,6 +14,7 @@ executor:
       global_vars:
         TestData:
           clusterType: standalone
+          enableOTELTracing: false
           internalQueryAppendIdToSetWindowFieldsSort: true
           internalQueryMaxAllowedDensifyDocs: 1000
           traceExceptions: false

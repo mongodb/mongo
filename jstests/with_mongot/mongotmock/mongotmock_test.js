@@ -29,6 +29,7 @@ function ensureNoResponses() {
 
     // Now run a search command.
     let resp = assert.commandWorked(testDB.runCommand(searchCmd));
+    delete resp["$traceCtx"];
     assert.eq(resp, {ok: 1, foo: 1});
 
     // Run a getMore which succeeds.

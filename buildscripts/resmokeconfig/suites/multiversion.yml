@@ -36,3 +36,5 @@ executor:
         TestData:
           setParameters:
             bsonTestValidationVersion: 1
+          # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+          enableOTELTracing: false
