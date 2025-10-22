@@ -26,17 +26,39 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/executable_agg_stage.h"
+#pragma once
 
-#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
-ExtensionGetNextResult ExecAggStageHandle::getNext() {
-    ::MongoExtensionGetNextResult result{};
-    invokeCAndConvertStatusToException([&]() { return vtable().get_next(get(), &result); });
+/**
+ * LogicalAggStageHandle is an owned handle wrapper around a
+ * MongoExtensionLogicalAggStage.
+ */
+class LogicalAggStageHandle : public OwnedHandle<::MongoExtensionLogicalAggStage> {
+public:
+    LogicalAggStageHandle(::MongoExtensionLogicalAggStage* ptr)
+        : OwnedHandle<::MongoExtensionLogicalAggStage>(ptr) {
+        _assertValidVTable();
+    }
 
-    return convertCRepresentationToGetNextResult(&result);
-}
+    BSONObj serialize() const;
 
-}  // namespace mongo::extension::host_connector
+    /**
+     * Collects explain output at the specified verbosity from this logical stage.
+     */
+    BSONObj explain(ExplainOptions::Verbosity verbosity) const;
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            11173703, "ExtensionLogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
+        tassert(11239401, "ExtensionLogicalAggStage 'explain' is null", vtable.explain != nullptr);
+    }
+};
+}  // namespace mongo::extension

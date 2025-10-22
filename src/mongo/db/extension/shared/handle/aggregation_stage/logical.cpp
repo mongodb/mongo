@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -49,7 +49,7 @@ namespace {
 }
 }  // namespace
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
 BSONObj LogicalAggStageHandle::serialize() const {
     ::MongoExtensionByteBuf* buf;
@@ -81,4 +81,4 @@ BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosit
     return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
 }
 
-}  // namespace mongo::extension::host_connector
+}  // namespace mongo::extension

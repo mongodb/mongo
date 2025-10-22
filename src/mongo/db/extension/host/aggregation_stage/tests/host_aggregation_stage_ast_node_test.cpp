@@ -28,8 +28,8 @@
  */
 
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -64,10 +64,10 @@ class HostAstNodeVTableTest : public unittest::Test {
 public:
     // This special handle class is only used within this fixture so that we can unit test the
     // assertVTableConstraints functionality of the handle.
-    class TestHostAstNodeVTableHandle : public host_connector::AggStageAstNodeHandle {
+    class TestHostAstNodeVTableHandle : public AggStageAstNodeHandle {
     public:
         TestHostAstNodeVTableHandle(absl::Nonnull<::MongoExtensionAggStageAstNode*> astNode)
-            : host_connector::AggStageAstNodeHandle(astNode) {};
+            : AggStageAstNodeHandle(astNode) {};
 
         void assertVTableConstraints(const VTable_t& vtable) {
             _assertVTableConstraints(vtable);
@@ -88,7 +88,7 @@ TEST(HostAstNodeTest, GetSpec) {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
         std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
             "$_internalSearchIdLookup", spec.getOwned())));
-    auto handle = host_connector::AggStageAstNodeHandle{noOpAstNode};
+    auto handle = AggStageAstNodeHandle{noOpAstNode};
     ASSERT_TRUE(
         static_cast<host::HostAggStageAstNode*>(handle.get())->getIdLookupSpec().binaryEqual(spec));
 }
@@ -97,14 +97,14 @@ TEST(HostAstNodeTest, IsHostAllocated) {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
         std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
             "$_internalSearchIdLookup", BSONObj())));
-    auto handle = host_connector::AggStageAstNodeHandle{noOpAstNode};
+    auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ASSERT_TRUE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
 }
 
 TEST(HostAstNodeTest, IsNotHostAllocated) {
     auto noOpExtensionAstNode = new sdk::ExtensionAggStageAstNode(NoOpExtensionAstNode::make());
-    auto handle = host_connector::AggStageAstNodeHandle{noOpExtensionAstNode};
+    auto handle = AggStageAstNodeHandle{noOpExtensionAstNode};
 
     ASSERT_FALSE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
 }
@@ -132,7 +132,7 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsBind, "11113700") {
 
 DEATH_TEST(HostAstNodeTest, HostBindUnimplemented, "11133600") {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
-    auto handle = host_connector::AggStageAstNodeHandle{noOpAstNode};
+    auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionLogicalAggStage** bind = nullptr;
     handle.vtable().bind(noOpAstNode, bind);

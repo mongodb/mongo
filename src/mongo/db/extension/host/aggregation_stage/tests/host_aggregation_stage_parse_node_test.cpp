@@ -28,8 +28,8 @@
  */
 
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -69,10 +69,10 @@ class HostParseNodeVTableTest : public unittest::Test {
 public:
     // This special handle class is only used within this fixture so that we can unit test the
     // assertVTableConstraints functionality of the handle.
-    class TestHostParseNodeVTableHandle : public host_connector::AggStageParseNodeHandle {
+    class TestHostParseNodeVTableHandle : public AggStageParseNodeHandle {
     public:
         TestHostParseNodeVTableHandle(absl::Nonnull<::MongoExtensionAggStageParseNode*> parseNode)
-            : host_connector::AggStageParseNodeHandle(parseNode) {};
+            : AggStageParseNodeHandle(parseNode) {};
 
         void assertVTableConstraints(const VTable_t& vtable) {
             _assertVTableConstraints(vtable);
@@ -89,14 +89,14 @@ TEST(HostParseNodeTest, GetSpec) {
 
     // Get BSON spec through handle.
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make(spec));
-    auto handle = host_connector::AggStageParseNodeHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
     ASSERT_TRUE(
         static_cast<host::HostAggStageParseNode*>(handle.get())->getBsonSpec().binaryEqual(spec));
 }
 
 TEST(HostParseNodeTest, IsHostAllocated) {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = host_connector::AggStageParseNodeHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ASSERT_TRUE(host::HostAggStageParseNode::isHostAllocated(*handle.get()));
 }
@@ -104,7 +104,7 @@ TEST(HostParseNodeTest, IsHostAllocated) {
 TEST(HostParseNodeTest, IsNotHostAllocated) {
     auto noOpExtensionParseNode =
         new sdk::ExtensionAggStageParseNode(NoOpExtensionParseNode::make());
-    auto handle = host_connector::AggStageParseNodeHandle{noOpExtensionParseNode};
+    auto handle = AggStageParseNodeHandle{noOpExtensionParseNode};
 
     ASSERT_FALSE(host::HostAggStageParseNode::isHostAllocated(*handle.get()));
 }
@@ -147,7 +147,7 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "109776
 
 DEATH_TEST(HostParseNodeTest, HostGetQueryShapeUnimplemented, "10977800") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = host_connector::AggStageParseNodeHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ::MongoExtensionByteBuf* shape = {};
     handle.vtable().get_query_shape(noOpParseNode, nullptr, &shape);
@@ -155,7 +155,7 @@ DEATH_TEST(HostParseNodeTest, HostGetQueryShapeUnimplemented, "10977800") {
 
 DEATH_TEST(HostParseNodeTest, HostGetExpandedSizeUnimplemented, "11113803") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = host_connector::AggStageParseNodeHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ASSERT_EQ(handle.vtable().get_expanded_size(noOpParseNode), 0);
 
@@ -167,7 +167,7 @@ DEATH_TEST(HostParseNodeTest, HostGetExpandedSizeUnimplemented, "11113803") {
 
 DEATH_TEST(HostParseNodeTest, HostExpandUnimplemented, "10977801") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = host_connector::AggStageParseNodeHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ::MongoExtensionExpandedArray expanded = {};
     handle.vtable().expand(noOpParseNode, &expanded);

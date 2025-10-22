@@ -29,11 +29,14 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 
+#include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
+
 namespace mongo::extension::host {
 
 Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& opts) const {
     if (!opts.isKeepingLiteralsUnchanged()) {
-        return Value(_parseNode.getQueryShape(opts));
+        host_connector::QueryShapeOptsAdapter adapter{&opts};
+        return Value(_parseNode.getQueryShape(adapter));
     } else if (opts.isSerializingForExplain()) {
         return Value(_logicalStage.explain(*opts.verbosity));
     } else {

@@ -248,7 +248,7 @@ public:
 TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {
     auto rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToExtAstParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kExpandToExtAstName), std::move(rootHandle), _nss, LiteParserOptions{});
 
@@ -265,7 +265,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {
 TEST_F(DocumentSourceExtensionTest, ExpandToExtParse) {
     auto rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToExtParseParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kExpandToExtParseName), std::move(rootHandle), _nss, LiteParserOptions{});
 
@@ -282,7 +282,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtParse) {
 TEST_F(DocumentSourceExtensionTest, ExpandToHostParse) {
     auto rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToHostParseParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kExpandToHostParseName), std::move(rootHandle), _nss, LiteParserOptions{});
@@ -304,7 +304,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToHostParse) {
 TEST_F(DocumentSourceExtensionTest, ExpandToMixed) {
     auto rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToMixedParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kExpandToMixedName), std::move(rootHandle), _nss, LiteParserOptions{});
 
@@ -337,7 +337,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandedPipelineIsComputedOnce) {
 
     auto rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToExtParseParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kExpandToExtParseName), std::move(rootHandle), _nss, LiteParserOptions{});
 
@@ -385,7 +385,7 @@ public:
 TEST_F(DocumentSourceExtensionTest, ExpandPropagatesHostLiteParseFailure) {
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToHostParseBadSpecParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
 
     ASSERT_THROWS_CODE(
         [&] {
@@ -513,7 +513,7 @@ public:
 
 TEST_F(DocumentSourceExtensionTest, ExpandRecursesMultipleLevels) {
     auto rootParseNode = new sdk::ExtensionAggStageParseNode(std::make_unique<TopParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kTopName), std::move(rootHandle), _nss, LiteParserOptions{});
 
@@ -696,7 +696,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMaxDepthSucceeds) {
     auto depth = host::DocumentSourceExtension::LiteParsedExpandable::kMaxExpansionDepth;
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<DepthChainParseNode>(depth));
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(makeRecursiveDepthName(depth)),
@@ -717,7 +717,7 @@ DEATH_TEST_F(DocumentSourceExtensionTest, ExpandExceedsMaxDepthFails, "10955800"
     auto depth = host::DocumentSourceExtension::LiteParsedExpandable::kMaxExpansionDepth + 1;
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<DepthChainParseNode>(depth));
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
 
     [[maybe_unused]] host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(makeRecursiveDepthName(depth)),
@@ -729,7 +729,7 @@ DEATH_TEST_F(DocumentSourceExtensionTest, ExpandExceedsMaxDepthFails, "10955800"
 TEST_F(DocumentSourceExtensionTest, ExpandAdjacentCycleFails) {
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<AdjacentCycleParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
 
     ASSERT_THROWS_WITH_CHECK(
         [&] {
@@ -750,7 +750,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandAdjacentCycleFails) {
 
 TEST_F(DocumentSourceExtensionTest, ExpandNonAdjacentCycleFails) {
     auto* rootParseNode = new sdk::ExtensionAggStageParseNode(std::make_unique<NodeAParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
 
     ASSERT_THROWS_WITH_CHECK(
         [&] {
@@ -772,7 +772,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandNonAdjacentCycleFails) {
 TEST_F(DocumentSourceExtensionTest, ExpandSameStageOnDifferentBranchesSucceeds) {
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<TopSameNameChildrenParseNode>());
-    host_connector::AggStageParseNodeHandle rootHandle{rootParseNode};
+    AggStageParseNodeHandle rootHandle{rootParseNode};
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kTopSameNameChildren), std::move(rootHandle), _nss, LiteParserOptions{});

@@ -132,7 +132,7 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, expandedSizeNotOneFails, "1
         getExpCtx(),
         DocumentSource::allocateId(ExpandSizeTooBigStageDescriptor::kStageName),
         BSON(ExpandSizeTooBigStageDescriptor::kStageName << BSON("foo" << true)),
-        host_connector::AggStageDescriptorHandle(&_expandSizeTooBigStageDescriptor));
+        AggStageDescriptorHandle(&_expandSizeTooBigStageDescriptor));
 }
 
 DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, expandToParseNodeFails, "11164401") {
@@ -141,7 +141,7 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, expandToParseNodeFails, "11
         getExpCtx(),
         DocumentSource::allocateId(FirstStageNotAstStageDescriptor::kStageName),
         BSON(FirstStageNotAstStageDescriptor::kStageName << BSON("foo" << true)),
-        host_connector::AggStageDescriptorHandle(&_firstStageNotAstStageDescriptor));
+        AggStageDescriptorHandle(&_firstStageNotAstStageDescriptor));
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
@@ -150,7 +150,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
         getExpCtx(),
         DocumentSource::allocateId(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName),
         BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true)),
-        host_connector::AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
+        AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
 
     ASSERT_EQ(std::string(optimizable.getSourceName()),
               sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
@@ -162,7 +162,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecutio
         getExpCtx(),
         DocumentSource::allocateId(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName),
         BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true)),
-        host_connector::AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
+        AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
 
     // Test that an extension can provide its own implementation of serialize, that might change the
     // raw spec provided.

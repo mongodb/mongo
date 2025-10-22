@@ -30,8 +30,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
@@ -58,18 +58,17 @@ public:
     public:
         inline static constexpr int kMaxExpansionDepth = 10;
 
-        static std::unique_ptr<LiteParsedDocumentSource> parse(
-            host_connector::AggStageDescriptorHandle descriptor,
-            const NamespaceString& nss,
-            const BSONElement& spec,
-            const LiteParserOptions& options) {
+        static std::unique_ptr<LiteParsedDocumentSource> parse(AggStageDescriptorHandle descriptor,
+                                                               const NamespaceString& nss,
+                                                               const BSONElement& spec,
+                                                               const LiteParserOptions& options) {
             auto parseNode = descriptor.parse(spec.wrap());
             return std::make_unique<LiteParsedExpandable>(
                 spec.fieldName(), std::move(parseNode), nss, options);
         }
 
         LiteParsedExpandable(std::string stageName,
-                             host_connector::AggStageParseNodeHandle parseNode,
+                             AggStageParseNodeHandle parseNode,
                              const NamespaceString& nss,
                              const LiteParserOptions& options)
             : LiteParsedDocumentSource(std::move(stageName)),
@@ -135,13 +134,12 @@ public:
         class ExpansionValidationFrame;
 
         LiteParsedList expand();
-        static LiteParsedList expandImpl(
-            const host_connector::AggStageParseNodeHandle& parseNodeHandle,
-            ExpansionState& state,
-            const NamespaceString& nss,
-            const LiteParserOptions& options);
+        static LiteParsedList expandImpl(const AggStageParseNodeHandle& parseNodeHandle,
+                                         ExpansionState& state,
+                                         const NamespaceString& nss,
+                                         const LiteParserOptions& options);
 
-        host_connector::AggStageParseNodeHandle _parseNode;
+        AggStageParseNodeHandle _parseNode;
         NamespaceString _nss;
         LiteParserOptions _options;
         LiteParsedList _expanded;
@@ -153,7 +151,7 @@ public:
      */
     class LiteParsedExpanded : public LiteParsedDocumentSource {
     public:
-        LiteParsedExpanded(std::string stageName, host_connector::AggStageAstNodeHandle astNode)
+        LiteParsedExpanded(std::string stageName, AggStageAstNodeHandle astNode)
             : LiteParsedDocumentSource(std::move(stageName)), _astNode(std::move(astNode)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -180,7 +178,7 @@ public:
         }
 
     private:
-        host_connector::AggStageAstNodeHandle _astNode;
+        AggStageAstNodeHandle _astNode;
     };
 
     const char* getSourceName() const override;
@@ -198,7 +196,7 @@ public:
     Value serialize(const SerializationOptions& opts) const override = 0;
 
     // This method is invoked by extensions to register descriptor.
-    static void registerStage(host_connector::AggStageDescriptorHandle descriptor);
+    static void registerStage(AggStageDescriptorHandle descriptor);
 
     // Declare DocumentSourceExtension to be pure virtual.
     ~DocumentSourceExtension() override = 0;
@@ -206,7 +204,7 @@ public:
 private:
     static void registerStage(const std::string& name,
                               DocumentSource::Id id,
-                              host_connector::AggStageDescriptorHandle descriptor);
+                              AggStageDescriptorHandle descriptor);
 
     /**
      * Give access to DocumentSourceExtensionTest/LoadExtensionsTest to unregister parser.
@@ -223,7 +221,7 @@ protected:
                             const boost::intrusive_ptr<ExpressionContext>& exprCtx,
                             Id id,
                             BSONObj rawStage,
-                            mongo::extension::host_connector::AggStageDescriptorHandle descriptor);
+                            mongo::extension::AggStageDescriptorHandle descriptor);
 
     /**
      * NB : Here we keep a copy of the stage name to service getSourceName().
@@ -234,7 +232,7 @@ protected:
      **/
     const std::string _stageName;
     const Id _id;
-    const mongo::extension::host_connector::AggStageParseNodeHandle _parseNode;
+    const mongo::extension::AggStageParseNodeHandle _parseNode;
 
 private:
     // Do not support copy or move.

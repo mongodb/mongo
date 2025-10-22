@@ -29,10 +29,10 @@
 #pragma once
 
 #include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/ast_node.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/logical.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
 
@@ -43,25 +43,24 @@ public:
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Id id,
                                        BSONObj rawStage,
-                                       host_connector::AggStageDescriptorHandle staticDescriptor)
+                                       AggStageDescriptorHandle staticDescriptor)
         : DocumentSourceExtension(name, expCtx, id, rawStage, staticDescriptor),
           _logicalStage(validateAndCreateLogicalStage()) {}
 
     Value serialize(const SerializationOptions& opts) const override;
 
 private:
-    const host_connector::LogicalAggStageHandle _logicalStage;
+    const LogicalAggStageHandle _logicalStage;
 
-    host_connector::LogicalAggStageHandle validateAndCreateLogicalStage() {
-        std::vector<host_connector::VariantNodeHandle> expandedNodes = _parseNode.expand();
+    LogicalAggStageHandle validateAndCreateLogicalStage() {
+        std::vector<VariantNodeHandle> expandedNodes = _parseNode.expand();
 
         tassert(11164400,
                 str::stream() << "Source or transform stage " << _stageName
                               << " must expand into exactly one node.",
                 expandedNodes.size() == 1);
 
-        if (const auto* astNodeHandlePtr =
-                std::get_if<host_connector::AggStageAstNodeHandle>(&expandedNodes[0])) {
+        if (const auto* astNodeHandlePtr = std::get_if<AggStageAstNodeHandle>(&expandedNodes[0])) {
             return astNodeHandlePtr->bind();
         } else {
             tasserted(11164401,

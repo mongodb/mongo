@@ -64,8 +64,7 @@ static ExtensionGetNextResult convertCRepresentationToGetNextResult(
 }
 
 /**
- * ExecAggStageHandle is a wrapper around a
- * MongoExtensionExecAggStage.
+ * ExecAggStageHandle is a wrapper around a MongoExtensionExecAggStage.
  */
 class ExecAggStageHandle : public OwnedHandle<::MongoExtensionExecAggStage> {
 public:

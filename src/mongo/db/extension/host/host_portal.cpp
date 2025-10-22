@@ -29,15 +29,15 @@
 #include "mongo/db/extension/host/host_portal.h"
 
 #include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
 
 void HostPortal::registerStageDescriptor(const ::MongoExtensionAggStageDescriptor* descriptor) {
     tassert(
         10596400, "Got null stage descriptor during extension registration", descriptor != nullptr);
-    DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHandle(descriptor));
+    DocumentSourceExtension::registerStage(AggStageDescriptorHandle(descriptor));
 }
 
 ::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(

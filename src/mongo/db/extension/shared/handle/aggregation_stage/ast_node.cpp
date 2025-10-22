@@ -26,17 +26,18 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 
 #include "mongo/db/extension/shared/extension_status.h"
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
-AggStageParseNodeHandle AggStageDescriptorHandle::parse(BSONObj stageBson) const {
-    ::MongoExtensionAggStageParseNode* parseNodePtr;
-    // The API's contract mandates that parseNodePtr will only be allocated if status is OK.
-    invokeCAndConvertStatusToException(
-        [&]() { return vtable().parse(get(), objAsByteView(stageBson), &parseNodePtr); });
-    return AggStageParseNodeHandle(parseNodePtr);
+LogicalAggStageHandle AggStageAstNodeHandle::bind() const {
+    ::MongoExtensionLogicalAggStage* logicalStagePtr;
+
+    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
+    invokeCAndConvertStatusToException([&]() { return vtable().bind(get(), &logicalStagePtr); });
+
+    return LogicalAggStageHandle(logicalStagePtr);
 }
-}  // namespace mongo::extension::host_connector
+}  // namespace mongo::extension

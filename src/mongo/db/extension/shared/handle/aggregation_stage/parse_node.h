@@ -28,15 +28,14 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/handle.h"
-#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/util/modules.h"
 
 #include <vector>
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
 class AggStageParseNodeHandle;
 using VariantNodeHandle = std::variant<AggStageParseNodeHandle, AggStageAstNodeHandle>;
@@ -61,7 +60,7 @@ public:
         return StringData{stringView.data(), stringView.size()};
     }
 
-    BSONObj getQueryShape(const SerializationOptions& opts) const;
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts& opts) const;
 
     /**
      * Expands this parse node into its child nodes and returns them as a vector of host-side
@@ -97,4 +96,4 @@ private:
         return vtable().get_expanded_size(get());
     }
 };
-}  // namespace mongo::extension::host_connector
+}  // namespace mongo::extension

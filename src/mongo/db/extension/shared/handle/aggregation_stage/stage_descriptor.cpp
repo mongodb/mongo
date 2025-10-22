@@ -26,39 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
+#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/shared/handle/handle.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
-/**
- * LogicalAggStageHandle is an owned handle wrapper around a
- * MongoExtensionLogicalAggStage.
- */
-class LogicalAggStageHandle : public OwnedHandle<::MongoExtensionLogicalAggStage> {
-public:
-    LogicalAggStageHandle(::MongoExtensionLogicalAggStage* ptr)
-        : OwnedHandle<::MongoExtensionLogicalAggStage>(ptr) {
-        _assertValidVTable();
-    }
-
-    BSONObj serialize() const;
-
-    /**
-     * Collects explain output at the specified verbosity from this logical stage.
-     */
-    BSONObj explain(ExplainOptions::Verbosity verbosity) const;
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(
-            11173703, "ExtensionLogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
-        tassert(11239401, "ExtensionLogicalAggStage 'explain' is null", vtable.explain != nullptr);
-    }
-};
-}  // namespace mongo::extension::host_connector
+AggStageParseNodeHandle AggStageDescriptorHandle::parse(BSONObj stageBson) const {
+    ::MongoExtensionAggStageParseNode* parseNodePtr;
+    // The API's contract mandates that parseNodePtr will only be allocated if status is OK.
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().parse(get(), objAsByteView(stageBson), &parseNodePtr); });
+    return AggStageParseNodeHandle(parseNodePtr);
+}
+}  // namespace mongo::extension

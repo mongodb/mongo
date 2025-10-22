@@ -26,25 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 
-#include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
 MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 
-BSONObj AggStageParseNodeHandle::getQueryShape(const SerializationOptions& opts) const {
+BSONObj AggStageParseNodeHandle::getQueryShape(
+    const ::MongoExtensionHostQueryShapeOpts& opts) const {
     ::MongoExtensionByteBuf* buf;
     const auto& vtbl = vtable();
     auto* ptr = get();
-    host_connector::QueryShapeOptsAdapter optsCtx(&opts);
 
-    invokeCAndConvertStatusToException([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
+    invokeCAndConvertStatusToException([&]() { return vtbl.get_query_shape(ptr, &opts, &buf); });
 
     tassert(11188203, "buffer returned from get_query_shape must not be null", buf != nullptr);
 
@@ -124,4 +123,4 @@ std::vector<VariantNodeHandle> AggStageParseNodeHandle::expand() const {
     guard.dismiss();
     return expandedVec;
 }
-}  // namespace mongo::extension::host_connector
+}  // namespace mongo::extension

@@ -32,7 +32,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
-#include "mongo/db/extension/host_connector/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
 
@@ -104,7 +104,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expand() {
 }
 
 LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
-    const host_connector::AggStageParseNodeHandle& parseNodeHandle,
+    const AggStageParseNodeHandle& parseNodeHandle,
     ExpansionState& state,
     const NamespaceString& nss,
     const LiteParserOptions& options) {
@@ -123,7 +123,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
                 //   b) Extension-allocated parse node: Enter a validation frame for expansion
                 //      constraint enforcement (depth and cycles) and recurse on the parse node
                 //      handle, splicing the results of its expansion.
-                if constexpr (std::is_same_v<H, host_connector::AggStageParseNodeHandle>) {
+                if constexpr (std::is_same_v<H, AggStageParseNodeHandle>) {
                     if (host::HostAggStageParseNode::isHostAllocated(*handle.get())) {
                         const auto& spec =
                             static_cast<host::HostAggStageParseNode*>(handle.get())->getBsonSpec();
@@ -138,7 +138,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
                 }
                 // Case 2: AST node handle. Wrap in LiteParsedExpanded and append directly to the
                 // expanded result.
-                else if constexpr (std::is_same_v<H, host_connector::AggStageAstNodeHandle>) {
+                else if constexpr (std::is_same_v<H, AggStageAstNodeHandle>) {
                     outExpanded.emplace_back(
                         std::make_unique<DocumentSourceExtension::LiteParsedExpanded>(
                             std::string(handle.getName()), std::move(handle)));
@@ -151,7 +151,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
 }
 
 // static
-void DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHandle descriptor) {
+void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor.getName();
     auto id = DocumentSource::allocateId(nameStringData);
     auto nameAsString = std::string(nameStringData);
@@ -189,7 +189,7 @@ void DocumentSourceExtension::registerStage(host_connector::AggStageDescriptorHa
 // static
 void DocumentSourceExtension::registerStage(const std::string& name,
                                             DocumentSource::Id id,
-                                            host_connector::AggStageDescriptorHandle descriptor) {
+                                            AggStageDescriptorHandle descriptor) {
     DocumentSource::registerParser(
         name,
         [id, descriptor](BSONElement specElem,
@@ -209,7 +209,7 @@ DocumentSourceExtension::DocumentSourceExtension(
     const boost::intrusive_ptr<ExpressionContext>& exprCtx,
     Id id,
     BSONObj rawStage,
-    host_connector::AggStageDescriptorHandle staticDescriptor)
+    AggStageDescriptorHandle staticDescriptor)
     : DocumentSource(name, exprCtx),
       _stageName(std::string(name)),
       _id(id),
