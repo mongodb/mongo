@@ -2025,3 +2025,29 @@ tasks:
       - func: "set up venv"
       - func: "configure evergreen api credentials"
       - func: "do multiversion selection"
+
+  - name: create_todo_tickets
+    patchable: false
+    tags: []
+    exec_timeout_secs: 600 # 10 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - command: subprocess.exec
+        display_name: "create todo tickets"
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script.sh"
+            - "buildscripts/create_todo_tickets.py"
+            - "--path=."
+          env:
+            JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+            JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+            JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+            JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
