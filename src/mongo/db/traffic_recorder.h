@@ -93,8 +93,8 @@ public:
     void start(const StartTrafficRecording& options, ServiceContext* svcCtx);
     void stop(ServiceContext* svcCtx);
 
-    void sessionStarted(const std::shared_ptr<transport::Session>& ts, ServiceContext* svcCtx);
-    void sessionEnded(const std::shared_ptr<transport::Session>& ts, ServiceContext* svcCtx);
+    void sessionStarted(const std::shared_ptr<transport::Session>& ts);
+    void sessionEnded(const std::shared_ptr<transport::Session>& ts);
 
     // This is the main interface to record a message. It also maintains open sessions in order to
     // record 'kSessionStart' and 'kSessionEnd' events.
@@ -102,7 +102,6 @@ public:
     // in SERVER-106769
     void observe(const std::shared_ptr<transport::Session>& ts,
                  const Message& message,
-                 ServiceContext* svcCtx,
                  EventType eventType = EventType::kRegular);
 
     class TrafficRecorderSSS;
@@ -139,6 +138,10 @@ protected:
                         EventType eventType = EventType::kRegular);
 
         BSONObj getStats();
+
+        TickSource* getTickSource() const {
+            return _tickSource;
+        }
 
         AtomicWord<uint64_t> order{0};
         AtomicWord<Microseconds> startTime{
@@ -181,7 +184,6 @@ protected:
     void _observe(uint64_t id,
                   const std::string& session,
                   const Message& message,
-                  ServiceContext* svcCtx,
                   EventType eventType);
 
     // Helper method to be overridden in tests

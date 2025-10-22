@@ -411,7 +411,7 @@ public:
 
     void start() {
         // Record a session start event.
-        TrafficRecorder::get(_serviceContext).sessionStarted(session(), _serviceContext);
+        TrafficRecorder::get(_serviceContext).sessionStarted(session());
         _scheduleIteration();
     }
 
@@ -765,7 +765,7 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
     invariant(_work);
     invariant(!_work->in().empty());
 
-    TrafficRecorder::get(_serviceContext).observe(session(), _work->in(), _serviceContext);
+    TrafficRecorder::get(_serviceContext).observe(session(), _work->in());
 
     _work->decompressRequest();
 
@@ -827,7 +827,7 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
 
     toSink = work.compressResponse(toSink);
 
-    TrafficRecorder::get(_serviceContext).observe(session(), toSink, _serviceContext);
+    TrafficRecorder::get(_serviceContext).observe(session(), toSink);
 
     work.setOut(std::move(toSink));
 }
@@ -911,7 +911,7 @@ void SessionWorkflow::Impl::terminate() {
         return;
 
     // Record a session end event.
-    TrafficRecorder::get(_serviceContext).sessionEnded(session(), _serviceContext);
+    TrafficRecorder::get(_serviceContext).sessionEnded(session());
 
     session()->end();
 }
