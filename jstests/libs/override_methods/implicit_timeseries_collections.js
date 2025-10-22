@@ -5,10 +5,7 @@
  * removed when calling any find methods.
  */
 
-import {
-    sysCollNamePrefix,
-    transformIndexHintsForTimeseriesCollection,
-} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {transformIndexHintsForTimeseriesCollection} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {
     getAggPlanStages,
@@ -20,6 +17,7 @@ import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_in
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -295,7 +293,7 @@ const assertIndexScanStageInit = QuerySettingsIndexHintsTests.prototype.assertIn
 QuerySettingsIndexHintsTests.prototype.assertIndexScanStage = function (cmd, expectedIndex, ns) {
     return assertIndexScanStageInit.call(this, cmd, transformIndexHintsForTimeseriesCollection(expectedIndex), {
         ...ns,
-        coll: sysCollNamePrefix + ns.coll,
+        coll: getTimeseriesCollForDDLOps(db, db.getSiblingDB(ns.db)[ns.coll]).getName(),
     });
 };
 

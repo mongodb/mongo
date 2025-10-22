@@ -247,6 +247,7 @@ selector:
     - jstests/core/query/exists/exists9.js
     - jstests/core/query/sort/sort8.js
     - jstests/core/query/update/collation_update.js
+    - jstests/core/query/commands_with_uuid.js
     # Document size too big in the bucket format.
     - jstests/core/query/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
@@ -302,7 +303,8 @@ selector:
     - jstests/core/query/geo/geo_extra_fields.js
     # Test relies on creating a collection without an index, so notablescan leads to a failure.
     - jstests/core/query/notablescan_sbe_consistency.js
-
+    # Use godinsert command that is not supported on timeseries collections
+    - jstests/core/query/update/update_guarantee_id.js
   exclude_with_any_tags:
     - requires_sharding
     - requires_capped
