@@ -105,14 +105,16 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
 }  // namespace
 
 void initializeExecutionControl(ServiceContext* svcCtx) {
-    if (gConcurrentReadTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions ||
-        gConcurrentWriteTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions) {
-        gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
-    }
-
     auto algorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
         gStorageEngineConcurrencyAdjustmentAlgorithm,
         IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"});
+
+    if (algorithm == StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
+        (gConcurrentReadTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions ||
+         gConcurrentWriteTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions)) {
+        gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
+        algorithm = StorageEngineConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions;
+    }
 
     if (algorithm == StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
         hasNonDefaultTransactionConcurrencySettings()) {

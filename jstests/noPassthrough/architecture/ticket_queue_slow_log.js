@@ -19,6 +19,8 @@ const rst = new ReplSetTest({
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
             internalQueryExecYieldIterations: 1,
+            // Disable heuristic deprioritization to ensure readers are queued in the normal pool.
+            storageEngineHeuristicDeprioritizationEnabled: false,
         },
     },
 });

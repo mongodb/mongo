@@ -6,6 +6,9 @@
  *   requires_replication,  # Tickets can only be resized when using the WiredTiger engine.
  *   featureFlagMultipleTicketPoolsExecutionControl,
  *   requires_wiredtiger,
+ *   # The test deploys replica sets with a storage engine concurrency adjustment configured by each
+ *   # test case, which should not be overwritten and expect to have 'throughputProbing' as default.
+ *   incompatible_with_execution_control_with_prioritization,
  * ]
  */
 
@@ -117,6 +120,30 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             assert.eq(getParameterResult.storageEngineConcurrencyAdjustmentAlgorithm, kFixed);
 
             assertTicketSizing(mongod, {normalAllowed: true, lowPriorityAllowed: false});
+        });
+
+        it("should not override to 'fixed' algorithm when prioritization is set at startup", function () {
+            replTest = new ReplSetTest({
+                nodes: 1,
+                nodeOptions: {
+                    setParameter: {
+                        storageEngineConcurrencyAdjustmentAlgorithm: kFixedWithPrio,
+                        storageEngineConcurrentReadTransactions: 20,
+                    },
+                },
+            });
+            replTest.startSet();
+            replTest.initiate();
+            const mongod = replTest.getPrimary();
+
+            const getParameterResult = mongod.adminCommand({
+                getParameter: 1,
+                storageEngineConcurrencyAdjustmentAlgorithm: 1,
+            });
+            assert.commandWorked(getParameterResult);
+            assert.eq(getParameterResult.storageEngineConcurrencyAdjustmentAlgorithm, kFixedWithPrio);
+
+            assertTicketSizing(mongod, {normalAllowed: true, lowPriorityAllowed: true});
         });
 
         it(`should allow resizing all ticket types with '${kFixedWithPrio}'`, function () {
