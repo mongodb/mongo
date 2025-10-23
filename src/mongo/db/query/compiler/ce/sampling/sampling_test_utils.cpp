@@ -378,7 +378,7 @@ void printResult(DataConfiguration dataConfig,
     std::vector<std::string> queryValuesHigh;
     std::string matchExpression = "";
     std::vector<double> actualCardinality;
-    std::vector<double> Estimation;
+    std::vector<double> estimation;
     for (auto values : error.queryResults) {
         if (values.low.has_value()) {
             if (values.low->getTag() == sbe::value::TypeTags::StringBig ||
@@ -401,7 +401,7 @@ void printResult(DataConfiguration dataConfig,
             matchExpression = values.matchExpression.get();
         }
         actualCardinality.push_back(values.actualCardinality);
-        Estimation.push_back(values.estimatedCardinality);
+        estimation.push_back(values.estimatedCardinality);
     }
 
     builder << "QueryLow" << queryValuesLow;
@@ -415,10 +415,53 @@ void printResult(DataConfiguration dataConfig,
     builder << "samplingAlgoChunks" << ssSamplingAlgoChunks.str();
     builder << "numberOfChunks" << samplingAlgoAndChunks.second.value_or(0);
     builder << "ActualCardinality" << actualCardinality;
-    builder << "Estimation" << Estimation;
+    builder << "Estimation" << estimation;
+
+    // NDV
+    {
+        BSONObjBuilder fieldNDVBob(builder.subobjStart("fieldNDVs"));
+        for (auto&& [fieldName, errInfo] : error.fieldNDVResults) {
+            BSONObjBuilder subBob(fieldNDVBob.subobjStart(fieldName));
+
+            std::vector<double> actualNDV;
+            std::vector<double> estimatedNDV;
+            for (auto value : errInfo) {
+                actualNDV.push_back((int)value.actualNDV);
+                estimatedNDV.push_back(value.estimatedNDV);
+            }
+            subBob << "actualNDVs" << actualNDV;
+            subBob << "estimatedNDVs" << estimatedNDV;
+        }
+    }
 
     LOGV2(10545501, "Accuracy experiment", ""_attr = builder.obj());
 }
+
+namespace {
+// Generate data according to the provided configuration
+std::vector<BSONObj> getDataBSON(DataConfiguration dataConfig) {
+    std::vector<std::vector<mongo::stats::SBEValue>> allData;
+    generateDataBasedOnConfig(dataConfig, allData);
+    return SamplingEstimatorTest::createDocumentsFromSBEValue(
+        allData, dataConfig.collectionFieldsConfiguration);
+}
+
+// Create a new collection and insert the provided documents.
+MultipleCollectionAccessor createColl(const std::vector<BSONObj>& dataBSON,
+                                      OperationContext* opCtx) {
+    auto nss =
+        NamespaceString::createNamespaceString_forTest("SamplingCeAccuracyTest.TestCollection");
+
+    createCollAndInsertDocuments(opCtx, nss, dataBSON);
+
+    auto acquisition = acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_IX);
+    return MultipleCollectionAccessor(
+        acquisition, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+}
+}  // namespace
 
 void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
     DataConfiguration dataConfig,
@@ -427,25 +470,8 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
     const std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
         samplingAlgoAndChunks,
     bool printResults) {
-    // Generate data according to the provided configuration
-    std::vector<std::vector<mongo::stats::SBEValue>> allData;
-    generateDataBasedOnConfig(dataConfig, allData);
-
-    auto nss =
-        NamespaceString::createNamespaceString_forTest("SamplingCeAccuracyTest.TestCollection");
-
-    auto dataBSON = SamplingEstimatorTest::createDocumentsFromSBEValue(
-        allData, dataConfig.collectionFieldsConfiguration);
-
-    createCollAndInsertDocuments(operationContext(), nss, dataBSON);
-
-    auto acquisition =
-        acquireCollectionOrView(operationContext(),
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    operationContext(), nss, AcquisitionPrerequisites::kWrite),
-                                LockMode::MODE_IX);
-    auto collection = MultipleCollectionAccessor(
-        acquisition, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto dataBSON = getDataBSON(dataConfig);
+    const auto collection = createColl(dataBSON, operationContext());
 
     for (auto samplingAlgoAndChunk : samplingAlgoAndChunks) {
         for (auto sampleSize : sampleSizes) {
@@ -467,6 +493,54 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
             if (printResults) {
                 printResult(dataConfig, actualSampleSize, queryConfig, samplingAlgoAndChunk, error);
             }
+        }
+    }
+}
+
+void SamplingAccuracyTest::runNDVSamplingEstimatorTestConfiguration(
+    DataConfiguration dataConfig,
+    WorkloadConfiguration queryConfig,
+    int numIters,
+    const std::vector<SampleSizeDef> sampleSizes,
+    const std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
+        samplingAlgoAndChunks) {
+    // Generate data according to the provided configuration
+    const auto dataBSON = getDataBSON(dataConfig);
+    const auto collection = createColl(dataBSON, operationContext());
+
+    for (auto samplingAlgoAndChunk : samplingAlgoAndChunks) {
+        for (auto sampleSize : sampleSizes) {
+            double actualSampleSize = translateSampleDefToActualSampleSize(sampleSize);
+
+            // Calculate estimated & actual NDV for each field.
+            ErrorCalculationSummary summary;
+            for (const auto& qf : queryConfig.queryConfig.queryFields) {
+                const auto& fieldName = qf.fieldName;
+                std::vector<NDVErrorInfo> errors;
+                for (int i = 0; i < numIters; i++) {
+                    // Create sample from the provided collection
+                    SamplingEstimatorImpl samplingEstimator(
+                        operationContext(),
+                        collection,
+                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                        actualSampleSize,
+                        samplingAlgoAndChunk.first,
+                        samplingAlgoAndChunk.second,
+                        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+                    samplingEstimator.generateSample(ce::NoProjection{});
+
+
+                    auto actualNDV = countNDV({fieldName}, dataBSON);
+                    auto estimatedNDV = samplingEstimator.estimateNDV({fieldName});
+
+                    errors.push_back({.actualNDV = actualNDV,
+                                      .estimatedNDV = fmax(estimatedNDV.toDouble(), 1.0)});
+                }
+
+                summary.fieldNDVResults.insert({fieldName, errors});
+            }
+
+            printResult(dataConfig, actualSampleSize, queryConfig, samplingAlgoAndChunk, summary);
         }
     }
 }

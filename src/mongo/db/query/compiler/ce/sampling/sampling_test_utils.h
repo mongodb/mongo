@@ -230,6 +230,14 @@ public:
         std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
             samplingAlgoAndChunks,
         bool printResults = true);
+
+    void runNDVSamplingEstimatorTestConfiguration(
+        DataConfiguration dataConfig,
+        WorkloadConfiguration queryConfig,
+        int numIters,
+        std::vector<SampleSizeDef> sampleSizes,
+        std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
+            samplingAlgoAndChunks);
 };
 
 /**

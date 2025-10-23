@@ -78,9 +78,17 @@ struct QueryInfoAndResults {
     double estimatedCardinality;
 };
 
+struct NDVErrorInfo {
+    size_t actualNDV;
+    double estimatedNDV;
+};
+
 struct ErrorCalculationSummary {
     // query information and results.
     std::vector<QueryInfoAndResults> queryResults;
+
+    // Tracks error information for NDV estimates for every field in the sample.
+    std::map<std::string, std::vector<NDVErrorInfo>> fieldNDVResults;
 
     // total executed queries.
     size_t executedQueries = 0;
