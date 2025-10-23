@@ -10,6 +10,8 @@ import re
 import stat
 from typing import Any, Optional, Tuple
 
+from opentelemetry import trace
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from packaging import version
 
 from buildscripts.resmokelib import config, logging, utils
@@ -345,6 +347,15 @@ def mongo_shell_program(
         test_data["mongosTlsCertificateKeyFile"] = config.MONGOS_TLS_CERTIFICATE_KEY_FILE
 
     global_vars["TestData"] = test_data
+
+    if test_data.get("enableOTELTracing", True) and "traceCtx" not in test_data:
+        current_span = trace.get_current_span()
+        if current_span:
+            otelCtx = {}
+            TraceContextTextMapPropagator().inject(otelCtx)
+            test_data["traceCtx"] = otelCtx
+
+            logger.debug("Mongo Shell: Using trace context %s", otelCtx.get("traceparent"))
 
     if config.EVERGREEN_TASK_ID is not None:
         test_data["inEvergreen"] = True

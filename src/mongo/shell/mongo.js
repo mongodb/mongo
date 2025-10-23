@@ -175,12 +175,12 @@ Mongo.prototype._setSecurityToken = function (token) {
 Mongo.prototype.runCommand = function (dbname, cmd, options) {
     let cmdToSend = {...cmd};
 
-    if (
-        jsTestOptions().enableOTELTracing &&
-        jsTestOptions().traceCtx != null &&
-        !cmdToSend.hasOwnProperty("$traceCtx")
-    ) {
-        cmdToSend["$traceCtx"] = {traceparent: jsTestOptions().traceCtx};
+    if (jsTestOptions().enableOTELTracing && !cmdToSend.hasOwnProperty("$traceCtx")) {
+        if (jsTestOptions().traceCtx != null) {
+            cmdToSend["$traceCtx"] = jsTestOptions().traceCtx;
+        } else {
+            chatty("WARNING: OTEL tracing enabled but no trace context available.");
+        }
     }
 
     return this._runCommandImpl(dbname, cmdToSend, options, this._securityToken);

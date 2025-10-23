@@ -474,8 +474,7 @@ function jsTestOptions() {
 
             // TODO (SERVER-112812): Enable OpenTelemetry tracing.
             enableOTELTracing: false, // TestData.enableOTELTracing ?? !isMultiversion,
-            // TODO (SERVER-100133): Replace the mock 'traceCtx' with the actual one from resmoke.
-            traceCtx: TestData.traceCtx ?? "mockTraceCtx",
+            traceCtx: TestData.traceCtx || null,
         });
     }
     return _jsTestOptions;
