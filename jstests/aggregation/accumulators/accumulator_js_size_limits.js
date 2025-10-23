@@ -40,7 +40,7 @@ let res = runExample(1, {
     },
     lang: "js",
 });
-assert.commandFailedWithCode(res, [16493, 10334]);
+assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 10334]);
 
 // Accumulator tries to return BSON larger than 16MB from JS.
 assert(coll.drop());
