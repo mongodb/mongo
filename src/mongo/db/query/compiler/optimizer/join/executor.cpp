@@ -48,6 +48,11 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
         return false;
     }
 
+    if (!mca.hasMainCollection()) {
+        // We can't determine if the base collection is sharded.
+        return false;
+    }
+
     if (mca.getMainCollectionAcquisition().getShardingDescription().isSharded()) {
         // We don't permit a sharded base collection.
         return false;
