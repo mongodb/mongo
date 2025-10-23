@@ -240,7 +240,6 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: //src/...
-          # TODO(SERVER-99213): limit to --jobs 32 once fission is enabled by default in CI
           bazel_args: >-
             --config=opt
             --define GIT_COMMIT_HASH=nogitversion
