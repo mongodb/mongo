@@ -27,11 +27,6 @@ exports_files([
 
 npm_link_all_packages(name = "node_modules")
 
-npm_link_package(
-    name = "node_modules/eslint-plugin-mongodb",
-    src = "//buildscripts/eslint-plugin-mongodb:npm_package",
-)
-
 mongo_js_library(
     name = "eslintrc",
     srcs = ["eslint.config.mjs"],

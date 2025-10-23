@@ -6,6 +6,11 @@ settings:
 
 onlyBuiltDependencies: []
 
+dependencies:
+  eslint-plugin-mongodb:
+    specifier: file:buildscripts/eslint-plugin-mongodb
+    version: file:buildscripts/eslint-plugin-mongodb
+
 devDependencies:
   '@eslint/eslintrc':
     specifier: 3.2.0
@@ -605,3 +610,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
     dev: true
+
+  file:buildscripts/eslint-plugin-mongodb:
+    resolution: {directory: buildscripts/eslint-plugin-mongodb, type: directory}
+    name: eslint-plugin-mongodb
+    dev: false

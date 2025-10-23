@@ -34,6 +34,9 @@
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers-community/features/bazel:1": {},
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
     "ghcr.io/devcontainers/features/common-utils:2": {
       "username": "${localEnv:USER}"
     }
@@ -42,6 +45,7 @@
     "fixVolumePerms": "sudo chown -R $(whoami): ${containerEnv:HOME}/.config/engflow_auth && sudo chown -R $(whoami): ${containerEnv:HOME}/.cache",
     "venvActivation": "echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.bashrc && echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.zshrc;",
     "createDataDir": "sudo mkdir -p /data/db && sudo chown -R $(whoami): /data/db",
+    "installNodeModules": "bazel run @pnpm//:pnpm -- --dir ${containerWorkspaceFolder} install",
     "reportDockerServerPlatform": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_platform=$(docker version --format '\"{{.Server.Platform.Name}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
     "reportDockerServerVersion": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_version=$(docker version --format '\"{{.Server.Version}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
     "reportArch": "echo \"\ncommon --bes_keywords=devcontainer:arch=$(uname -i)\" >> ${containerEnv:HOME}/.bazelrc",
