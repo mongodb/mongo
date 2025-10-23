@@ -31,6 +31,9 @@
 
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries::write_ops {
 

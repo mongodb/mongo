@@ -34,16 +34,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 
 #include <boost/any.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
-namespace timeseries {
-namespace dotted_path_support {
+MONGO_MOD_PUBLIC;
+
+namespace mongo::timeseries::dotted_path_support {
 /**
  * Expands arrays and unpacks bucketed data along the specified path and adds all elements to the
  * 'elements' set.
@@ -112,6 +112,4 @@ std::ostream& operator<<(std::ostream& s, const Decision& i);
  * 'control.min.a.b.c', etc.
  */
 Decision fieldContainsArrayData(const BSONObj& bucketObj, StringData userField);
-}  // namespace dotted_path_support
-}  // namespace timeseries
-}  // namespace mongo
+}  // namespace mongo::timeseries::dotted_path_support

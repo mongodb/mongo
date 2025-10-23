@@ -34,11 +34,13 @@
 #include "mongo/db/local_catalog/ddl/coll_mod_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
-namespace timeseries {
+MONGO_MOD_PUBLIC;
+
+namespace mongo::timeseries {
 
 /**
  * Returns a CollMod on the underlying buckets collection of the time-series collection.
@@ -70,5 +72,4 @@ Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
                                                       bool performViewChange,
                                                       BSONObjBuilder* result);
 
-}  // namespace timeseries
-}  // namespace mongo
+}  // namespace mongo::timeseries

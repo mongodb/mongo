@@ -32,10 +32,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/util/modules.h"
 
+MONGO_MOD_PUBLIC;
 namespace mongo::timeseries {
-
-
 BSONObj generateTimeseriesValidator(int bucketVersion, StringData timeField);
 
 /**

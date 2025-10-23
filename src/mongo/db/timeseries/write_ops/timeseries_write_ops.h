@@ -32,6 +32,9 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries::write_ops {
 

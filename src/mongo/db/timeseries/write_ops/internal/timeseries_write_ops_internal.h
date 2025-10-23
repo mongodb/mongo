@@ -31,6 +31,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

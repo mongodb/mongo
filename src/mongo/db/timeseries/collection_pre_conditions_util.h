@@ -32,6 +32,9 @@
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries {
 
@@ -47,12 +50,7 @@ namespace mongo::timeseries {
 class CollectionPreConditions {
 public:
     explicit CollectionPreConditions(boost::optional<UUID> expectedUUID)
-        : _uuid(boost::none),
-          _isTimeseriesCollection(false),
-          _expectedUUID(expectedUUID),
-          _isViewlessTimeseriesCollection(false),
-          _isTimeseriesLogicalRequest(false),
-          _translatedNss(boost::none) {};
+        : _expectedUUID(expectedUUID) {}
 
     CollectionPreConditions(UUID collectionUUID,
                             bool isTimeseriesCollection,
@@ -63,9 +61,7 @@ public:
           _isTimeseriesCollection(isTimeseriesCollection),
           _expectedUUID(expectedUUID),
           _isViewlessTimeseriesCollection(isViewlessTimeseriesCollection),
-          _isTimeseriesLogicalRequest(false),
-          _translatedNss(translatedNss) {};
-    ~CollectionPreConditions() = default;
+          _translatedNss(translatedNss) {}
 
     /**
      * Returns whether an existing collection was found when constructing a CollectionPreConditions
@@ -155,12 +151,12 @@ public:
 
 private:
     boost::optional<UUID> _uuid;
-    bool _isTimeseriesCollection;
+    bool _isTimeseriesCollection = false;
     boost::optional<UUID> _expectedUUID;
     // TODO SERVER-101784 Remove the three fields below once 9.0 becomes LTS, at which point only
     // viewless time-series collections will exist.
-    bool _isViewlessTimeseriesCollection;
-    bool _isTimeseriesLogicalRequest;
+    bool _isViewlessTimeseriesCollection = false;
+    bool _isTimeseriesLogicalRequest = false;
     boost::optional<NamespaceString> _translatedNss;
 };
 

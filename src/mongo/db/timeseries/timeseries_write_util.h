@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/record_id.h"
@@ -44,16 +43,16 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/version_context.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
-#include <algorithm>
 #include <functional>
 #include <memory>
 #include <variant>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries {
 
@@ -76,6 +75,7 @@ void getOpTimeAndElectionId(OperationContext* opCtx,
  */
 std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
 determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches);
+
 /**
  * Performs modifications atomically for a user command on a time-series collection.
  *

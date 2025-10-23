@@ -33,9 +33,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries {
 

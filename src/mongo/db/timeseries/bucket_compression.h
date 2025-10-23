@@ -32,14 +32,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
-namespace mongo {
-
-namespace timeseries {
+MONGO_MOD_PUBLIC;
+namespace mongo::timeseries {
 
 /**
  * Returns a compressed timeseries bucket in v2 format for a given uncompressed v1 bucket and time
@@ -70,5 +68,4 @@ boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc);
  */
 bool isCompressedBucket(const BSONObj& bucketDoc);
 
-}  // namespace timeseries
-}  // namespace mongo
+}  // namespace mongo::timeseries

@@ -39,8 +39,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <functional>
@@ -48,7 +48,7 @@
 #include <vector>
 
 namespace mongo::timeseries {
-class TimeseriesTestFixture : public CatalogTestFixture {
+class MONGO_MOD_OPEN TimeseriesTestFixture : public CatalogTestFixture {
 public:
     static constexpr uint64_t kDefaultStorageCacheSizeBytes = 1024 * 1024 * 1024;
     static constexpr uint64_t kLimitedStorageCacheSizeBytes = 1024;

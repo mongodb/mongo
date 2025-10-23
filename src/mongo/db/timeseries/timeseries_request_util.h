@@ -34,7 +34,7 @@
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
-#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::timeseries {
 
@@ -54,7 +54,7 @@ template <typename T>
 concept HasGetIsTimeseriesNamespace = requires(const T& t) { t.getIsTimeseriesNamespace(); };
 
 template <typename T>
-concept IsRequestableOnTimeseries =
+concept IsRequestableOnTimeseries MONGO_MOD_PUBLIC =
     HasGetNs<T> || HasGetNamespace<T> || HasGetNsString<T> || HasGetNamespaceOrUUID<T>;
 
 
@@ -113,9 +113,9 @@ mongo::NamespaceStringOrUUID getNamespaceOrUUID(const T& request) {
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-bool isRawDataRequest(OperationContext* opCtx, const T& request) {
+MONGO_MOD_PUBLIC bool isRawDataRequest(OperationContext* opCtx, const T& request) {
     if (isRawDataOperation(opCtx)) {
-        // Explicitily requested raw data
+        // Explicitly requested raw data
         return true;
     }
 
@@ -154,7 +154,7 @@ bool isRawDataRequest(OperationContext* opCtx, const T& request) {
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-bool isTimeseriesRequest(OperationContext* opCtx, const T& request) {
+MONGO_MOD_PUBLIC bool isTimeseriesRequest(OperationContext* opCtx, const T& request) {
     if (isRawDataRequest(opCtx, request)) {
         return false;
     }
@@ -179,8 +179,8 @@ bool isTimeseriesRequest(OperationContext* opCtx, const T& request) {
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-std::pair<bool, NamespaceString> isTimeseriesViewRequest(OperationContext* opCtx,
-                                                         const T& request) {
+MONGO_MOD_PUBLIC std::pair<bool, NamespaceString> isTimeseriesViewRequest(OperationContext* opCtx,
+                                                                          const T& request) {
     auto nssOrUUID = getNamespaceOrUUID(request);
     auto isTimeseriesNamespaceFlag = getIsTimeseriesNamespaceFlag(request, nssOrUUID);
     auto lookupTimeseriesInfo =
@@ -207,11 +207,11 @@ std::pair<bool, NamespaceString> isTimeseriesViewRequest(OperationContext* opCtx
  */
 template <typename T>
 requires IsRequestableOnTimeseries<T>
-std::pair<CollectionPreConditions, bool> getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const T& request,
-    boost::optional<UUID> expectedUUID) {
+MONGO_MOD_PUBLIC std::pair<CollectionPreConditions, bool>
+getCollectionPreConditionsAndIsTimeseriesLogicalRequest(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        const T& request,
+                                                        boost::optional<UUID> expectedUUID) {
 
     const bool isRawDataReq = isRawDataRequest(opCtx, request);
     auto preConditions =

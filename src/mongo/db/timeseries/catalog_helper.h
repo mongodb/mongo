@@ -31,20 +31,16 @@
 
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+MONGO_MOD_PUBLIC;
 
-class NamespaceString;
-class OperationContext;
-
-/**
- * Namespace for helper functions related to time-series collections.
- */
-namespace timeseries {
+namespace mongo::timeseries {
 
 /**
  * This function is a wrapper of `acquireCollectionOrView`.
@@ -108,5 +104,4 @@ boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         bool convertToBucketsNamespace);
 
-}  // namespace timeseries
-}  // namespace mongo
+}  // namespace mongo::timeseries

@@ -33,16 +33,14 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <utility>
 
-namespace mongo {
+MONGO_MOD_PUBLIC;
 
-/**
- * Namespace for helper functions related to time-series collections.
- */
-namespace timeseries {
+namespace mongo::timeseries {
 
 /**
  * Evaluates whether the timeseries bucket's options are fixed (unchanged).
@@ -100,5 +98,4 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions);
  * are missing.
  */
 Status validateBucketingParameters(const TimeseriesOptions&);
-}  // namespace timeseries
-}  // namespace mongo
+}  // namespace mongo::timeseries

@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/write_ops/measurement.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/allocator.h"
 
 #include <memory>
@@ -41,7 +42,6 @@
 #include <vector>
 
 #include <boost/optional.hpp>
-
 
 /**
  * This file is organized by return type:

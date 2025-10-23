@@ -34,9 +34,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries {
 
