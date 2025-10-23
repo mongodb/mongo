@@ -95,8 +95,9 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     MaintenanceMode maintenanceMode;                   // --maintenanceMode
     bool replicaSetConfigShardMaintenanceMode{false};  // --replicaSetConfigShardMaintenanceMode
 
-    boost::optional<int> proxyPort;       // --proxyPort
-    bool doAutoBootstrapSharding{false};  // This is derived from other settings during startup.
+    boost::optional<int> proxyPort;        // --proxyPort
+    boost::optional<int> maintenancePort;  // --maintenancePort
+    bool doAutoBootstrapSharding{false};   // This is derived from other settings during startup.
 
     bool objcheck = true;  // --objcheck
 
