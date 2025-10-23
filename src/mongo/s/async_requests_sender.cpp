@@ -381,10 +381,9 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
                 shard->updateReplSetMonitor(rcr.response.target, status);
             }
 
-            bool isStartingTransaction = _cmdObj.getField("startTransaction").booleanSafe();
-            if (!_ars->_stopRetrying && !isStartingTransaction &&
-                _retryStrategy->recordFailureAndEvaluateShouldRetry(
-                    status, rcr.response.target, rcr.response.getErrorLabels())) {
+            if (_retryStrategy->recordFailureAndEvaluateShouldRetry(
+                    status, rcr.response.target, rcr.response.getErrorLabels()) &&
+                !_ars->_stopRetrying) {
                 LOGV2_DEBUG(
                     4615637,
                     1,
