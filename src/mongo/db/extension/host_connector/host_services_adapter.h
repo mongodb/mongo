@@ -30,7 +30,6 @@
 
 #include "mongo/db/extension/public/api.h"
 
-#include <memory>
 namespace mongo::extension::host_connector {
 /**
  * HostServicesAdapter is an implementation of ::MongoExtensionHostServices, providing host

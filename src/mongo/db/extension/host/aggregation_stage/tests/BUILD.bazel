@@ -13,12 +13,16 @@ mongo_cc_unit_test(
     srcs = [
         "host_aggregation_stage_ast_node_test.cpp",
         "host_aggregation_stage_parse_node_test.cpp",
+        "host_exec_agg_stage_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host_connector:extensions_host_connector",
+        "//src/mongo/db/extension/host_connector:host_services_adapter",
         "//src/mongo/db/extension/shared/handle/aggregation_stage",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:document_source_mock",
     ],
 )

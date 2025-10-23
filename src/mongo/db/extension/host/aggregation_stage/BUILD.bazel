@@ -13,6 +13,7 @@ mongo_cc_library(
     srcs = [],
     hdrs = [
         "ast_node.h",
+        "executable_agg_stage.h",
         "parse_node.h",
     ],
     deps = [

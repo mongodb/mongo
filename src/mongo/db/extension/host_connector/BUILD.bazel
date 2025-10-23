@@ -41,15 +41,18 @@ mongo_cc_library(
 mongo_cc_library(
     name = "host_services_adapter",
     srcs = [
+        "executable_agg_stage_adapter.cpp",
         "host_services_adapter.cpp",
     ],
     hdrs = [
+        "executable_agg_stage_adapter.h",
         "host_services_adapter.h",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo:core_headers_library",
         "//src/mongo/db/extension/host:host_services",
+        "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/sdk:sdk_cpp",
     ],

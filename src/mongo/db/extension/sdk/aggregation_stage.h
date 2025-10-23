@@ -481,6 +481,7 @@ private:
  */
 class ExecAggStage {
 public:
+    ExecAggStage() = default;
     virtual ~ExecAggStage() = default;
 
     virtual ExtensionGetNextResult getNext() = 0;

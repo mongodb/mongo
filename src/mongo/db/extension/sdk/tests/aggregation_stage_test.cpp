@@ -1093,6 +1093,31 @@ DEATH_TEST_F(AggStageTest, InvalidMongoExtensionGetNextResultCode, "10956803") {
         extension::host_connector::convertCRepresentationToGetNextResult(&result);
 };
 
+TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
+    ::MongoExtensionGetNextResult result = {
+        .code = static_cast<::MongoExtensionGetNextResultCode>(10), .result = nullptr};
+    ASSERT_THROWS_WITH_CHECK(
+        [&] {
+            [[maybe_unused]] auto converted =
+                extension::host_connector::convertCRepresentationToGetNextResult(&result);
+        }(),
+        AssertionException,
+        [](const AssertionException& ex) {
+            ASSERT_EQ(ex.code(), 10956803);
+            ASSERT_STRING_CONTAINS(
+                ex.reason(), str::stream() << "Invalid MongoExtensionGetNextResultCode: " << 10);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+    ASSERT_EQ(static_cast<::MongoExtensionGetNextResultCode>(10), result.code);
+    ASSERT_EQ(nullptr, result.result);
+
+    result = {.code = ::MongoExtensionGetNextResultCode::kAdvanced,
+              .result = new VecByteBuf(BSON("$adithi" << "{cats: 0}"))};
+    auto converted = extension::host_connector::convertCRepresentationToGetNextResult(&result);
+    ASSERT_EQ(GetNextCode::kAdvanced, converted.code);
+    ASSERT_BSONOBJ_EQ(BSON("$adithi" << "{cats: 0}"), converted.res.get());
+};
+
 DEATH_TEST_F(AggStageTest, InvalidGetNextCode, "10956804") {
     auto invalidExtensionExecAggStageGetNextCode =
         new extension::sdk::ExtensionExecAggStage(InvalidExtensionExecAggStageGetNextCode::make());
