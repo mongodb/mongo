@@ -1,22 +1,32 @@
-# Query Rewrites for Time-Series Collections
+# Query Rewrites for Timeseries Collections
 
-For a general overview about how time-series collection are implemented, see [db/timeseries/README.md](../../../db/timeseries/README.md). For sharding specific logic, see [db/s/README_timeseries.md](../../../db/s/README_timeseries.md).
-This section will focus on the query rewrites for time-series collections and the `$_internalUnpackBucket`
-aggregation stage, and assumes knowledge of time-series collections basics.
+For a general overview about how timeseries collection are implemented, see [db/timeseries/README.md][db readme]. For sharding
+specific logic, see [db/global_catalog/README_timeseries.md][catalog readme]. This document will focus on query translations and
+optimizations for timeseries collections and the `$_internalUnpackBucket` aggregation stage, and assumes knowledge of timeseries
+collections basics. We perform timeseries rewrites before and during optimizations. For clarity in this README and all query timeseries
+resources, when we are performing pre-optimization rewrites we will use the term _translations_, and we will use the term _rewrites_
+for timeseries optimizations.
 
-# Different Types of Time-Series Queries
+There are two different types of timeseries collections.
 
-## Viewful timeseries collections
+1. Legacy/viewful. Supported on all server versions below 9.0.
+2. Viewless. Projected to be supported on server versions 9.0+.
+
+## Pre 9.0: Legacy timeseries collections
+
+These timeseries collection have 2 namespaces that are automatically made when the collection is created. The user defined namespace
+will be a view, and `system.buckets.<namespace>` will store the timeseries documents in bucket document format. More details about the
+buckets can be found in [db/timeseries/README.md][db readme].
 
 ### Queries on the view
 
-Because the user-created time-series collection is a view, all queries against it (`find`, `count`, `distinct`
-and `aggregate`) are transformed into an aggregation request against the backing system collection with the
+Because the user-created timeseries collection is a view, all queries against it (`find`, `count`, `distinct`
+and `aggregate`) are transformed into an aggregation request against the backing `system.buckets.<namespace>` collection with the
 `$_internalUnpackBucket` stage prepended to the generated pipeline.
 
 The entrypoint for these aggregate operations is `runAggregate()` and then `runAggregateOnView()`. If
 all the validation checks pass, the view is then resolved. A resolved view will contain the original pipeline,
-the namespace of the collection underlying the view, and for time-series collections more information about
+the namespace of the collection underlying the view, and for timeseries collections more information about
 the buckets collection, such as if the buckets collection uses an extended range (dates pre 1970). The
 resolved view is turned into a new aggregation request, where an internal aggregation stage
 (`$_internalUnpackBucket`) is added as the first stage in the pipeline (see `asExpandedViewAggregation()`).
@@ -24,33 +34,102 @@ Then `runAggregate` is called again on this new request.
 
 ### Queries on the buckets collection
 
-Queries directly on the **buckets collection** are executed like non time-series collection
+Queries directly on the **buckets collection** are executed like non timeseries collection
 queries. However, prior to PM-3167 (on versions before 7.2), queries on the buckets collection are forced
 to run in the classic execution engine. In 7.2+, if the queries are eligible, they will run in SBE.
 
-Similar to non time-series collections, the `$_internalUnpackBucket` stage is not used when executing queries against the buckets
+Similar to non timeseries collections, the `$_internalUnpackBucket` stage is not used when executing queries against the buckets
 collection, because the buckets collection is not a view. We do not expect users to directly query
-the buckets collection, since the buckets collection is made automatically when users create time-series
-collections. Also, users should query the view to take advantage of time-series specific optimizations.
+the buckets collection, since the buckets collection is made automatically when users create timeseries
+collections. Also, users should query the view to take advantage of timeseries specific optimizations.
 
-## Viewless timeseries collections
+## 9.0+: Viewless timeseries collections
 
-[TODO (SERVER-102458)]: # "Update documentation on viewful vs viewless timeseries collections."
+<!-- TODO SERVER-102458 Make any necessary changes for post 9.0 timeseries cleanup. -->
 
-Like with queries against viewful timeseries collections, queries against viewless timeseries
-collections are also transformed into aggregation requests. Queries on the buckets now use the same
-namespace as the timeseries, with the differentiating factor being the `rawData` parameter being set
-to `true.`
+Unlike viewful timeseries collections, these collections have a **single** namespace, which the user defines. Therefore, there
+is no `system.buckets.<namespace>` collection and there is no view to resolve when querying viewless timeseries collections.
 
-When a query against a viewless timeseries collection is rewritten, the operation is automatically
-updated to have `rawData` set to true, to reflect that the rewritten query should execute against
-the buckets directly.
+### Queries that return user documents
 
-# $\_internalUnpackBucket Aggregation Stage Optimizations
+> [!NOTE]
+> This is the expected workflow for users.
+
+Like with queries against viewful timeseries collections, queries against viewless timeseries collections are also transformed
+into aggregation requests, since we still must prepend the `$_internalUnpackBucket` aggregation stage. `find`, `count`, and `distinct`
+will all check if the collection is timeseries by checking the collection catalog data (either `CollectionOrViewAcquisition` for the
+shard role, or `CollectionRoutingInfo` for the router role). If the collection is a timeseries collection, we will translate the command
+as an aggregation request.
+
+In the `aggregate` command, we also check if the collection is timeseries by checking the collection catalog data. During aggregation,
+after any views are resolved and the pipeline is parsed and validated, we will use the collection catalog data in
+[performPreOptimizationRewrites][pre op rewrites] to prepend the `$_internalUnpackBucket` stage. The pipeline will then set
+`_translatedForViewlessTimeseries` to true, since the timeseries translation **can only happen once** during the lifetime of a pipeline.
+
+### Queries that return raw buckets
+
+> [!NOTE]
+> This is not the expected workflow for users.
+
+Unlike viewful timeseries collections, we cannot query `system.buckets.<namespace>` directly because the namespace does not exist.
+To maintain this functionality, queries directly on the buckets use the same namespace as the timeseries collection and set the `rawData`
+field on the command object to `true`. Therefore, queries on `<namespace>` with `rawData = true` will return the same results as
+queries on `system.buckets.<namespace>`.
+
+### Considerations when working with viewless timeseries
+
+These were important lessons taken from SPM-4217, which added aggregation support for viewless timeseries.
+
+1. Detecting if a collection is timeseries now requires accessing collection catalog data. The collection catalog must be up to date,
+   since the correctness of timeseries queries depend on detecting that the collection is timeseries. Therefore, we recommend using the
+   shard role and the router role APIs to ensure the data from the catalog is up to date. Additionally, when accessing the catalog we must
+   consider all 3 scenarios:
+
+   - **Tracked collections**. If we are acting as a router, we can use `CollectionRoutingInfo` retrieved by a `RoutingContext`
+     (see [sharded_agg_helpers::finalizeAndMaybePreparePipelineForExecution][finalize func] for an example).
+   - **Untracked collections**. These are unsharded collections that live on the primary shard. The config server does not have
+     information about this collection, so we must contact the primary shard to check if the collection is timeseries.
+   - **Local collections**. If we are in a shard role or can perform a local read, we can use the local catalog. These can be
+     unsharded collections that live on that shard, or all collections in a non sharded cluster.
+
+2. We must consider how an aggregation stage or command should work when `rawData = true`. For example, `$out` errors if `rawData = true`
+   because `$out` cannot work on raw buckets ([code link][out]).
+3. Two `StageConstraint`s are important for defining timeseries behavior:
+
+   - `canRunOnTimeseries` should be set to `false` if the stage should error when run on a timeseries collection. For example,
+     `$search` can never run on a timeseries collection ([code link][search]).
+   - `consumesLogicalCollectionData` should be set to `false` if the stage processes collection metadata, internally created data such as
+     oplog entries, or has no input. If the first stage of the pipeline sets `consumesLogicalCollectionData` to `false`, then the
+     `$_internalUnpackBucket` stage will not be prepended ([code link][ts translation]). Examples are `$queue` and `$collStats`
+     ([code link][collstats]).
+
+## How collMod affects timeseries queries
+
+Users can run a `collMod` command at anytime, which can only increase the granularity value for timeseries collections. Increasing the
+granularity increases the value of `bucketMaxSpanSeconds`, which means that new buckets will span more time. Buckets already created
+do not change. `bucketMaxSpanSeconds` is used to push down `$match` predicates and target shards if the shard key is on `timeField`
+(which is a deprecated feature). But this value can change! A query that was already running when the `collMod` command was issued
+can use an older value of `bucketMaxSpanSeconds` and miss new writes during the aggregation (see
+[bucket_unpacking_with_sort_granularity_change.js][granularity test]).
+
+Similarly, a query can use an older value of granularity when targeting shards. If we are targeting shards with the old granularity
+value, we might miss buckets made with the new granularity value, which is acceptable if the query started before the `collMod` command.
+
+Conversely, if the query targets shards using the new granularity value, then our query predicate would span more time (since granularity
+can only increase), so we will target more shards than before. We can illustrate this with a simplified example (for more details see
+[sharding timeseries README][catalog readme]):
+
+To ensure we capture all relevant buckets we expand our query predicate by the value of`bucketMaxSpanSeconds`. So if `bucketMaxSpanSeconds`
+is `1 minute` and the query predicate is time equals 5:01pm, we will add and subtract `1 minute` to the query predicate and retrieve all
+buckets that hold measurements between 5:00-5:02pm. If `bucketMaxSpanSeconds` increases to `1 hour`, we will add and subtract `1 hour` in
+the query predicate to retrieve buckets with measurements between 4:00 - 6:00pm. This wider query predicate could require contacting more
+shards. During the `$_internalUnpackBucket` stage we will filter out all measurements that don't match the predicate.
+
+# Query optimizations for timeseries
 
 The `$_internalUnpackBucket` stage is implemented by `DocumentSourceInternalUnpackBucket` and, like
 all other document sources, provides the `doOptimizeAt()` function. This function contains most of the query rewrites
-and optimizations specific to time-series. The optimizations contained in this function are listed below. Most of
+and optimizations specific to timeseries. The optimizations contained in this function are listed below. Most of
 them aim to limit the number of buckets that need to be unpacked to satisfy the user's query and in some cases
 may remove the `$_internalBucketUnpack` stage completely. For example, removing the `$_internalBucketUnpack`
 stage and rewriting a `$group` stage has been seen to increase performance by 100x.
@@ -72,13 +151,14 @@ inputted `timeField` and `metaField` values will be different than what is store
 When implementing and testing query optimizations, the rewrites from the user `timeField` and `metaField` values
 to the buckets collection fields must be tested.
 
-Let's look at an example with a time-series collection created with these options: `{timeField: t, metaField: m}`.
+Let's look at an example with a timeseries collection created with these options: `{timeField: t, metaField: m}`.
 
 The `timeField` will be used in the `control` object in the buckets collection. The `control.min.<time field>`
 will be `control.min.t`, and `control.max.<time field>` will be `control.max.t`. The values for `t` in the
 user documents are stored in `data.t`.
 
-The meta-data field is always specified as `meta` in the buckets collection. We will return documents with the user-specified meta-data field (in this case `m`), but we will store the meta-data field values under
+The meta-data field is always specified as `meta` in the buckets collection. We will return documents with the user-specified meta-data field
+(in this case `m`), but we will store the meta-data field values under
 the field `meta` in the buckets collection. Therefore, when returning documents we will need to
 rewrite the field `meta` to the field the user expects: `m`. When optimizing queries, we will need to
 rewrite the field the user inserted (`m`) to the field the buckets collection stores: `meta`.
@@ -88,7 +168,7 @@ rewrite the field the user inserted (`m`) to the field the buckets collection st
 In 5.0+, a `$match` on the `metaField` that immediately follows the `$_internalUnpackBucket` stage is pushed
 before `$_internalUnpackBucket`.
 
-For example, for a time-series collections where the `metaField = tags`:
+For example, for a timeseries collections where the `metaField = tags`:
 
 ```
 // Query issued by the user:
@@ -106,9 +186,12 @@ find({tags: 34})
 In 5.0+, a `$sort` stage on the `metaField` that immediately follows the `$_internalUnpackBucket` stage is pushed
 before `$_internalUnpackBucket`.
 
-When swapping a `$sort` and a `$_internalUnpackBucketStage`, the `$sort` may have absorbed a `$limit` from the rest of the pipeline. In this case, we can swap the `$sort` (and its absorbed `$limit`) with the `$_internalUnpackBucketStage`, and we must also add a new `$limit` stage after the `$_internalUnpackBucketStage`. This reduces the number of fetched buckets and ensures that this limit is respected after the buckets have been unpacked. This is similar to the logic we follow when we see a standalone `$limit` stage; see the "$limit reorder section."
+When swapping a `$sort` and a `$_internalUnpackBucketStage`, the `$sort` may have absorbed a `$limit` from the rest of the pipeline. In this case,
+we can swap the `$sort` (and its absorbed `$limit`) with the `$_internalUnpackBucketStage`, and we must also add a new `$limit` stage after the
+`$_internalUnpackBucketStage`. This reduces the number of fetched buckets and ensures that this limit is respected after the buckets have been unpacked.
+This is similar to the logic we follow when we see a standalone `$limit` stage; see the "`$limit` reorder section."
 
-For example, for a time-series collections where the `metaField = tags`:
+For example, for a timeseries collections where the `metaField = tags`:
 
 ```
 // Query issued by the user:
@@ -131,7 +214,7 @@ In 5.2+ this rewrite was expanded. The `$geoNear` stage with a measurement field
 as `FETCH` + `INDEX` with a `$_internalBucketGeoWithin` filter inside the `FETCH` node. This optimization
 occurs in `DocumentSourceGeoNear::doOptimizeAt()`.
 
-For example, for a time-series collections where the `metaField = tags`:
+For example, for a timeseries collections where the `metaField = tags`:
 
 ```
 // Query issued by the user:
@@ -198,7 +281,7 @@ In addition to those, for fixed bucket collections there is:
 4. If the group key is a `$dateTrunc` expression on the `timeField`. See [fixed bucket collections](#fixed-bucketing-optimizations)
    for more details about fixed bucket collections.
 
-For example, for a time-series collections where the `metaField = tags`:
+For example, for a timeseries collections where the `metaField = tags`:
 
 ```
 // Query issued by the user:
@@ -255,7 +338,7 @@ In 7.1+ since the added group stage uses `{$sum: 1}`, the`$group` stage is rewri
 [control based rewrites for $group](#control-based-rewrites-for-group)). This rewrite does not apply
 if there is a filter on measurements or time.
 
-For example, for a time-series collections where the `metaField = tags`:
+For example, for a timeseries collections where the `metaField = tags`:
 
 ```
 // Query issued by the user:
@@ -293,7 +376,7 @@ In 6.0+, there are two optimizations:
    `$last/$bottom` accumulators are not eligible for a `DISTINCT_SCAN` unless there is an additional
    secondary index.
 
-For example, for a time-series collections where the `metaField = tags`:
+For example, for a timeseries collections where the `metaField = tags`:
 
 ```
 // Query issued by the user:
@@ -378,7 +461,7 @@ eventFilter: {time: {$lt: Date('2022-01-1')}}
 In 7.1+ there are two optimizations that apply if the buckets collection has fixed buckets. A collection
 has fixed buckets if the collection was created with `bucketMaxSpanSeconds` and `bucketRoundingSeconds`,
 and those parameters have not been changed. For more details about these parameters, see
-[db/timeseries/README.md](../../../db/timeseries/README.md#bucketing-parameters)
+[db/timeseries/README.md][db readme params]
 
 1. The `eventFilter` can be removed if the predicates use `$gte` and `$lt`, is on the `timeField`, and the
    predicate aligns with the bucket boundaries. This optimization allows further optimizations to apply.
@@ -610,7 +693,7 @@ Note there are active projects making changes to what is written below. This sec
 
 ## When pipelines are lowered to SBE
 
-At the time of writing, to be lowered to SBE a pipeline on a time-series collection must:
+At the time of writing, to be lowered to SBE a pipeline on a timeseries collection must:
 
 1. Limit the unpacked fields to a statically known set (must have the `includes` parameter in the unpack stage).
 2. Not include a `$sort` stage on the `timeField`.
@@ -634,9 +717,9 @@ The `TsBucketToCellBlockStage` takes in a bucket as a BSON document, selects the
 from the bucket’s `data` field and produces `CellBlock` values. A `CellBlock` contains all of the
 values at a certain field path. Some operations can be performed on these blocks as a whole in a
 vectorized manner. This process is called block processing, and it greatly improves the performance of queries
-over time-series collections. Currently, block processing supports the whole bucket filter and event filters.
+over timeseries collections. Currently, block processing supports the whole bucket filter and event filters.
 
-The `BlockToRowStage` is not specific to time-series. It takes in a block of values, which can be
+The `BlockToRowStage` is not specific to timeseries. It takes in a block of values, which can be
 `CellBlock` values. These values might have been already processed by block processing, and therefore
 the values inside the `CellBlock` might have changed from the initial data in the bucket. This stage produces
 a set of slots, where each slot at a given time holds a single value from the source `CellBlock`s.
@@ -666,4 +749,18 @@ Other SBE stages that process individual values can execute on slots `s3` and `s
 # References
 
 See:
-[MongoDB Blog: Time Series Data and MongoDB: Part 2 - Schema Design Best Practices](https://www.mongodb.com/blog/post/time-series-data-and-mongodb-part-2-schema-design-best-practices)
+[MongoDB Blog: Time Series Data and MongoDB: Part 2 - Schema Design Best Practices][mongo blog]
+
+<!-- Links -->
+
+[pre op rewrites]: https://github.com/mongodb/mongo/blob/1da17948466e00a7a7e1b99b7e1f722bbac66f32/src/mongo/db/pipeline/pipeline.h#L320-L326
+[finalize func]: https://github.com/mongodb/mongo/blob/1da17948466e00a7a7e1b99b7e1f722bbac66f32/src/mongo/db/pipeline/sharded_agg_helpers.h#L244
+[out]: https://github.com/mongodb/mongo/blob/42e3fa54f9aba2551c62d00cb83f774e66a86c50/src/mongo/db/pipeline/document_source_out.cpp#L137
+[search]: https://github.com/mongodb/mongo/blob/42e3fa54f9aba2551c62d00cb83f774e66a86c50/src/mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h#L73
+[ts translation]: https://github.com/mongodb/mongo/blob/42e3fa54f9aba2551c62d00cb83f774e66a86c50/src/mongo/db/query/timeseries/timeseries_translation.cpp#L153-L156
+[collstats]: https://github.com/mongodb/mongo/blob/42e3fa54f9aba2551c62d00cb83f774e66a86c50/src/mongo/db/pipeline/document_source_coll_stats.h#L142
+[granularity test]: https://github.com/mongodb/mongo/blob/a2b4c8032cba1955a0bd4fcfe2125bcb0e11f7de/jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
+[catalog readme]: ../../../db/global_catalog/README_timeseries.md
+[db readme]: ../../../db/timeseries/README.md
+[db readme params]: ../../../db/timeseries/README.md#bucketing-parameters
+[mongo blog]: https://www.mongodb.com/blog/post/timeseries-data-and-mongodb-part-2-schema-design-best-practices
