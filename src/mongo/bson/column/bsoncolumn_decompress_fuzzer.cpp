@@ -87,8 +87,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     // Attempt to decompress using the block-based API.
     try {
-        block.decompress<bsoncolumn::BSONElementMaterializer, std::vector<BSONElement>>(
-            blockBasedElems, allocator);
+        block.decompress<bsoncolumn::BSONElementMaterializer>(blockBasedElems, allocator);
     } catch (const DBException& e) {
         blockBasedError = e.toString();
     }

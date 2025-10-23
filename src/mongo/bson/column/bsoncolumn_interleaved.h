@@ -31,12 +31,13 @@
 
 #include "mongo/bson/column/bsoncolumn_helpers.h"
 #include "mongo/bson/column/bsonobj_traversal.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"
 
 #include <algorithm>
 #include <span>
 
-namespace mongo::bsoncolumn {
+namespace mongo::bsoncolumn::internal {
 
 /**
  * We are often dealing with vectors of buffers below, but there is almost always only one buffer.
@@ -1230,4 +1231,4 @@ void BlockBasedInterleavedDecompressor::flushPositionsToBuffers(
         }
     }
 }
-}  // namespace mongo::bsoncolumn
+}  // namespace mongo::bsoncolumn::internal
