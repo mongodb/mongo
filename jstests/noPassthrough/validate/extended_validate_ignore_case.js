@@ -28,6 +28,6 @@ resUpper = Object.entries(
 resLower = Object.entries(
     assert.commandWorked(coll.validate({collHash: true, revealHashedIds: "abcdef".split("")})).revealedIds,
 );
-assert.eq(resLower, resUpper, `Got different results. Lower: ${tojson(resLower)}, Upper: ${tojson(resUpper)}`);
+assert.sameMembers(resLower, resUpper, `Got different results. Lower: ${tojson(resLower)}, Upper: ${tojson(resUpper)}`);
 
 MongoRunner.stopMongod(conn);
