@@ -31,6 +31,7 @@
 
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/shard_role_api/post_resharding_placement.h"
 #include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -199,8 +200,9 @@ struct AcquiredCollection : AcquiredBase {
                        std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock,
                        std::shared_ptr<Lock::GlobalLock> globalLock,
                        AcquisitionLocks locksRequirements,
-                       boost::optional<ScopedCollectionDescription> collectionDescription,
-                       boost::optional<ScopedCollectionFilter> ownershipFilter,
+                       boost::optional<ScopedCollectionDescription>&& collectionDescription,
+                       boost::optional<ScopedCollectionFilter>&& ownershipFilter,
+                       boost::optional<PostReshardingCollectionPlacement>&& postReshardingPlacement,
                        boost::optional<DatabaseVersion> dbVersion,
                        boost::optional<ShardVersion> shardVersion,
                        CollectionPtr collectionPtr)
@@ -213,6 +215,7 @@ struct AcquiredCollection : AcquiredBase {
                        std::move(locksRequirements)),
           collectionDescription(std::move(collectionDescription)),
           ownershipFilter(std::move(ownershipFilter)),
+          postReshardingPlacement(std::move(postReshardingPlacement)),
           dbVersion(dbVersion),
           shardVersion(shardVersion),
           collectionPtr(std::move(collectionPtr)),
@@ -235,10 +238,12 @@ struct AcquiredCollection : AcquiredBase {
                              boost::none,
                              boost::none,
                              boost::none,
+                             boost::none,
                              std::move(collectionPtr)) {};
 
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
+    boost::optional<PostReshardingCollectionPlacement> postReshardingPlacement;
     boost::optional<DatabaseVersion> dbVersion;
     boost::optional<ShardVersion> shardVersion;
 

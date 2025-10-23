@@ -34,6 +34,7 @@
 #include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/post_resharding_placement.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
 #include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state.h"
@@ -242,6 +243,12 @@ public:
     // Sharding catalog services
     const ScopedCollectionDescription& getShardingDescription() const;
     const boost::optional<ScopedCollectionFilter>& getShardingFilter() const;
+    // Post-resharding placement information.
+    // Only available when:
+    // - The collection is actively being resharded
+    // - Acquiring with write intent
+    // Represents the future collection's placement after the resharding will complete.
+    const boost::optional<PostReshardingCollectionPlacement>& getPostReshardingPlacement() const;
     const boost::optional<DatabaseVersion>& getDatabaseVersion() const;
     const boost::optional<ShardVersion>& getShardVersion() const;
 

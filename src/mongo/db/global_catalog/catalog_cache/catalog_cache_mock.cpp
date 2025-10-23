@@ -140,14 +140,16 @@ CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoSharded(
     DatabaseVersion dbVersion,
     KeyPattern shardKeyPattern,
     std::vector<Chunk> chunks,
-    ExtraCollectionOptions extraOptions) {
+    ExtraCollectionOptions extraOptions,
+    boost::optional<ReshardingFields> reshardingFields) {
     return _makeCollectionRoutingInfoTracked(nss,
                                              dbPrimaryShard,
                                              dbVersion,
                                              shardKeyPattern,
                                              chunks,
                                              false /*unsplittable*/,
-                                             extraOptions);
+                                             extraOptions,
+                                             reshardingFields);
 }
 
 CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
@@ -157,7 +159,8 @@ CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
     KeyPattern shardKeyPattern,
     std::vector<Chunk> chunks,
     bool unsplittable,
-    ExtraCollectionOptions extraOptions) {
+    ExtraCollectionOptions extraOptions,
+    boost::optional<ReshardingFields> reshardingFields) {
     const auto collectionUUID = UUID::gen();
     const auto collectionEpoch = OID::gen();
     const Timestamp collectionTimestamp(1, 0);
@@ -189,7 +192,7 @@ CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
                                             collectionEpoch,
                                             collectionTimestamp,
                                             optTimeseriesFields,
-                                            boost::none /*reshardingFields*/,
+                                            reshardingFields,
                                             true /*allowMigrations*/,
                                             chunkTypes);
 

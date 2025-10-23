@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/local_catalog/catalog_helper.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection_uuid_mismatch.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/storage/exceptions.h"
@@ -422,6 +424,7 @@ struct SnapshotedServices {
     std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> collectionPtrOrView;
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
+    boost::optional<PostReshardingCollectionPlacement> postReshardingPlacement;
 };
 
 SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
@@ -452,13 +455,24 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
               *placementConcern.getShardVersion()))
         : boost::none;
 
+    auto optPostReshardingPlacement = [&]() -> boost::optional<PostReshardingCollectionPlacement> {
+        auto reshardingKeyPattern = collectionDescription.getReshardingKeyIfShouldForwardOps();
+        bool isWriteOperation = prerequisites.operationType != AcquisitionPrerequisites::kRead;
+        if (isWriteOperation && reshardingKeyPattern) {
+            return PostReshardingCollectionPlacement{opCtx, collectionDescription};
+        }
+        return boost::none;
+    }();
+
     // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr.
     if (holds_alternative<CollectionPtr>(collOrView) && collectionDescription.isSharded()) {
         get<CollectionPtr>(collOrView).setShardKeyPattern(collectionDescription.getKeyPattern());
     }
 
-    return SnapshotedServices{
-        std::move(collOrView), std::move(collectionDescription), std::move(optOwnershipFilter)};
+    return SnapshotedServices{std::move(collOrView),
+                              std::move(collectionDescription),
+                              std::move(optOwnershipFilter),
+                              std::move(optPostReshardingPlacement)};
 }
 
 const Lock::GlobalLockOptions kLockFreeReadsGlobalLockOptions{[] {
@@ -553,6 +567,7 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                      std::move(acquisitionRequest.acquisitionLocks),
                      std::move(snapshotedServices.collectionDescription),
                      std::move(snapshotedServices.ownershipFilter),
+                     std::move(snapshotedServices.postReshardingPlacement),
                      std::move(placementConcernDbVersion),
                      std::move(placementConcernShardVersion),
                      std::move(get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
@@ -1018,6 +1033,22 @@ const boost::optional<ScopedCollectionFilter>& CollectionAcquisition::getShardin
             _acquiredCollection->collectionDescription &&
                 _acquiredCollection->collectionDescription->isSharded());
     return _acquiredCollection->ownershipFilter;
+}
+
+const boost::optional<PostReshardingCollectionPlacement>&
+CollectionAcquisition::getPostReshardingPlacement() const {
+    // The collectionDescription will only not be set if the caller has acquired the acquisition
+    // using the kLocalCatalogOnlyWithPotentialDataLoss placement concern
+    tassert(11178204,
+            "Getting post-resharding placement on non-sharded or invalid collection",
+            _acquiredCollection->collectionDescription &&
+                _acquiredCollection->collectionDescription->isSharded());
+
+    tassert(11178205,
+            "Getting post-resharding placement for a read operation is invalid",
+            _acquiredCollection->prerequisites.operationType != AcquisitionPrerequisites::kRead);
+
+    return _acquiredCollection->postReshardingPlacement;
 }
 
 const boost::optional<DatabaseVersion>& CollectionAcquisition::getDatabaseVersion() const {
@@ -1954,6 +1985,8 @@ void restoreTransactionResourcesToOperationContext(
                     std::move(reacquiredServicesSnapshot.collectionDescription);
                 acquiredCollection.ownershipFilter =
                     std::move(reacquiredServicesSnapshot.ownershipFilter);
+                acquiredCollection.postReshardingPlacement =
+                    std::move(reacquiredServicesSnapshot.postReshardingPlacement);
             }
 
             // Check if this operation is a direct connection and if it is authorized to be one
@@ -2054,6 +2087,35 @@ void restoreTransactionResourcesToOperationContext(
                                                     "shard role yield",
                                                     ex.reason(),
                                                     NamespaceStringOrUUID(NamespaceString::kEmpty));
+                // Try again to restore.
+                continue;
+            } catch (const ExceptionFor<ErrorCodes::ShardCannotRefreshDueToLocksHeld>& ex) {
+                // We attempted to acquire unknown routing information related to temporary nss and
+                // a refresh is required. This is not possible when locks are acquired. We release
+                // the acquisition, refresh and re-acquire.
+                bool isMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
+                if (isMultiDocumentTransaction) {
+                    // In a multi document transaction is not possible to release the locks until
+                    // commit. The only way to manage this case is to abort the transaction and
+                    // retry. This logic is already managed by the entry-point, so we can simply
+                    // throw.
+                    throw;
+                }
+                // Release locks
+                Locker::LockSnapshot lockSnapshot;
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+                shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
+                transactionResources.yielded.emplace(
+                    TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+                const auto refreshInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+                const auto refreshStatus = Grid::get(opCtx)
+                                               ->catalogCache()
+                                               ->getCollectionRoutingInfo(opCtx,
+                                                                          refreshInfo->getNss(),
+                                                                          false /*allowLocks=*/)
+                                               .getStatus();
+                // Forward refreshing error to the entry point.
+                uassertStatusOK(refreshStatus);
                 // Try again to restore.
                 continue;
             }

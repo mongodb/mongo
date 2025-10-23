@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -106,10 +107,12 @@ protected:
     void setUp() override;
 
     void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss);
-    void installShardedCollectionMetadata(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const DatabaseVersion& dbVersion,
-                                          std::vector<ChunkType> chunks);
+    void installShardedCollectionMetadata(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const DatabaseVersion& dbVersion,
+        std::vector<ChunkType> chunks,
+        boost::optional<ReshardingFields> reshardingField = boost::none);
 
     const DatabaseName dbNameTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     const DatabaseVersion dbVersionTestDb{UUID::gen(), Timestamp(1, 0)};
@@ -196,10 +199,12 @@ void ShardRoleTest::installUnshardedCollectionMetadata(OperationContext* opCtx,
         ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
 }
 
-void ShardRoleTest::installShardedCollectionMetadata(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const DatabaseVersion& dbVersion,
-                                                     std::vector<ChunkType> chunks) {
+void ShardRoleTest::installShardedCollectionMetadata(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const DatabaseVersion& dbVersion,
+    std::vector<ChunkType> chunks,
+    boost::optional<ReshardingFields> reshardingFields) {
     ASSERT(!chunks.empty());
 
     const auto uuid = [&] {
@@ -221,7 +226,7 @@ void ShardRoleTest::installShardedCollectionMetadata(OperationContext* opCtx,
                                            epoch,
                                            timestamp,
                                            boost::none /* timeseriesFields */,
-                                           boost::none /* resharding Fields */,
+                                           reshardingFields,
                                            true /* allowMigrations */,
                                            chunks);
 
@@ -3279,6 +3284,335 @@ TEST_F(ShardRoleTest, AcquireCollectionStashStepdownRestoreSucceedsInDbDirectCli
             ASSERT_TRUE(acquisitionInDbDirectClient.exists());
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// PostReshardingPlacement
+class ShardRoleTestForResharding : public ShardRoleTest {
+public:
+    const ShardId kDestinedShardName = ShardId("shard1");
+
+    // Uses an internal counter as operation time.You must specify at for every call time whether
+    // you expect it to refresh and returned the mocked refresh data or throw.
+    class CatalogCacheMockForShardRoleTest : public CatalogCacheMock {
+    public:
+        enum OperationType { kThrowShardCannotRefreshDueToLockHeld, kMockRefreshAndReturn };
+
+        CatalogCacheMockForShardRoleTest(ServiceContext* serviceContext,
+                                         std::shared_ptr<CatalogCacheLoader> loader)
+            : CatalogCacheMock(serviceContext, loader) {}
+
+        StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   bool allowLocks) override {
+            invariant(!_operations.empty(),
+                      "Missing operation in the queue for the mocked getCollectionRoutingInfo");
+
+            auto next = _operations.front();
+            _operations.pop();
+
+            auto result = [&]() -> StatusWith<CollectionRoutingInfo> {
+                switch (next) {
+                    case OperationType::kThrowShardCannotRefreshDueToLockHeld:
+                        return Status(ShardCannotRefreshDueToLocksHeldInfo(nss),
+                                      "CatalogCacheMockForShardRoleTest throws "
+                                      "ShardCannotRefreshDueToLocksHeld");
+                    case OperationType::kMockRefreshAndReturn:
+                        return CatalogCacheMock::getCollectionRoutingInfo(opCtx, nss, allowLocks);
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            }();
+            _callsNum++;
+            return result;
+        }
+
+        void addToQueue(OperationType op) {
+            _operations.push(op);
+        }
+
+        int getTotalCalls() {
+            return _callsNum;
+        }
+
+    private:
+        std::queue<OperationType> _operations;
+        int _callsNum = 0;
+    };
+
+    struct ReshardingInfo {
+        NamespaceString tempNss;
+        ShardVersion shardVersion;
+    };
+
+    void setUp() override;
+
+    ReshardingInfo startResharding(const NamespaceString& nss,
+                                   const UUID& uuid,
+                                   ShardId destinedShard,
+                                   ShardVersion shardVersion);
+
+    CatalogCacheMockForShardRoleTest* _catalogCacheMock{nullptr};
+};
+
+void ShardRoleTestForResharding::setUp() {
+    ShardRoleTest::setUp();
+
+    // Initialize catalog cache mock.
+    auto catalogCacheMock = std::make_unique<CatalogCacheMockForShardRoleTest>(
+        getServiceContext(), std::make_shared<ShardServerCatalogCacheLoaderMock>());
+    _catalogCacheMock = catalogCacheMock.get();
+    auto grid = Grid::get(getServiceContext());
+    grid->setCatalogCache_forTest(std::move(catalogCacheMock));
+    grid->setInitialized_forTest();
+}
+
+//  1. Creates the temporary nss(1 chunk on a different shard),
+//  2. Updates the metadata of the sharded collections
+//  3. Registers the temporary collection  on the mocked cache to control the refresh.
+//  Note this won't actually set up the entire resharding environment, but just enough to test
+//  the shard role api library
+ShardRoleTestForResharding::ReshardingInfo ShardRoleTestForResharding::startResharding(
+    const NamespaceString& nss,
+    const UUID& uuid,
+    ShardId destinedShard,
+    ShardVersion shardVersion) {
+    // Placement changes
+    const auto newShardVersion = [&]() {
+        auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
+        newPlacementVersion.incMajor();
+        return ShardVersionFactory::make(newPlacementVersion);
+    }();
+    // Create temporary nss and register it's sharding metadata
+    auto newKey = "skey_new";
+    const KeyPattern keyPattern{BSON(newKey << 1)};
+    const ShardKeyPattern newShardKey{BSON(newKey << 1)};
+    auto tempNss = NamespaceString::createNamespaceString_forTest(
+        nss.db_forTest(),
+        fmt::format(
+            "{}{}", NamespaceString::kTemporaryReshardingCollectionPrefix, uuid.toString()));
+
+    createTestCollection(operationContext(), tempNss);
+
+    auto tmpCollectionMetadata = CatalogCacheMock::makeCollectionRoutingInfoSharded(
+        tempNss,
+        destinedShard,
+        dbVersionTestDb,
+        keyPattern,
+        {{ChunkRange(BSON(newKey << MINKEY), BSON(newKey << MAXKEY)), destinedShard}});
+    _catalogCacheMock->setCollectionReturnValue(tempNss, tmpCollectionMetadata);
+
+    // Create resharding fields
+    TypeCollectionReshardingFields reshardingFields;
+    reshardingFields.setReshardingUUID(UUID::gen());
+    reshardingFields.setDonorFields(
+        TypeCollectionDonorFields{tempNss, newShardKey.toBSON(), {kMyShardName, destinedShard}});
+    reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
+
+    // Install metadata for the collection being resharded
+    installShardedCollectionMetadata(
+        operationContext(),
+        nss,
+        dbVersionTestDb,
+        {ChunkType(uuid,
+                   ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
+                   newShardVersion.placementVersion(),
+                   kMyShardName)},
+        reshardingFields);
+
+    // return new version
+    return ReshardingInfo{tempNss, newShardVersion};
+}
+
+DEATH_TEST_REGEX_F(ShardRoleTestForResharding,
+                   AcquireCollectionUnshardedForbiddenReshardingPlacementAccess,
+                   "Tripwire assertion.*11178204") {
+    auto acquisition = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(
+            operationContext(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    (void)acquisition.getPostReshardingPlacement();
+}
+
+DEATH_TEST_REGEX_F(ShardRoleTestForResharding,
+                   AcquireCollectionForReadForbiddenReshardingPlacementAccess,
+                   "Tripwire assertion.*11178205") {
+    PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
+    const auto acquisition = acquireCollection(operationContext(),
+                                               {nssShardedCollection1,
+                                                placementConcern,
+                                                repl::ReadConcernArgs(),
+                                                AcquisitionPrerequisites::kRead},
+                                               MODE_IS);
+
+    (void)acquisition.getPostReshardingPlacement();
+}
+
+TEST_F(ShardRoleTestForResharding,
+       AcquireShardedCollectionNotBeingReshardedReturnsNoReshardingPlacement) {
+    const auto nss = nssShardedCollection1;
+
+    // Start a multi-document transaction
+    operationContext()->setInMultiDocumentTransaction();
+
+    // Acquire a collection
+    PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
+    auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+
+    ASSERT_TRUE(acquisition.exists());
+    ASSERT_FALSE(acquisition.getPostReshardingPlacement().has_value());
+}
+
+TEST_F(ShardRoleTestForResharding, AcquireCollectionBeingReshardedReturnsReshardingPlacement) {
+    auto nss = nssShardedCollection1;
+    const auto uuid = getCollectionUUID(operationContext(), nss);
+    auto reshardingInfo =
+        startResharding(nss, uuid, kDestinedShardName, shardVersionShardedCollection1);
+
+    // Simulate available metadata for the temporary nss
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kMockRefreshAndReturn);
+
+    // Acquire a collection
+    PlacementConcern placementConcern{{}, reshardingInfo.shardVersion};
+    auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+
+    ASSERT_TRUE(acquisition.exists());
+    ASSERT_TRUE(acquisition.getPostReshardingPlacement().has_value());
+}
+
+
+TEST_F(ShardRoleTestForResharding,
+       AcquireCollectionBeingReshardedThrowShardCannotRefreshDueToLockHeldForTmpNss) {
+    auto nss = nssShardedCollection1;
+    const auto uuid = getCollectionUUID(operationContext(), nss);
+    auto reshardingInfo =
+        startResharding(nss, uuid, kDestinedShardName, shardVersionShardedCollection1);
+
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kThrowShardCannotRefreshDueToLockHeld);
+
+    // Acquire a collection
+    PlacementConcern placementConcern{{}, reshardingInfo.shardVersion};
+
+    ASSERT_THROWS_WITH_CHECK(
+        acquireCollection(
+            operationContext(),
+            {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+            MODE_IX),
+        ShardCannotRefreshDueToLocksHeldException,
+        [&](const ShardCannotRefreshDueToLocksHeldException& ex) {
+            const auto refreshInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+            ASSERT(refreshInfo);
+            ASSERT_EQ(refreshInfo->getNss(), reshardingInfo.tempNss);
+        });
+}
+
+// Like the unit-test before but we simulate a refresh
+TEST_F(ShardRoleTestForResharding,
+       AcquireCollectionBeingReshardedThrowShardCannotRefreshDueToLockHeldForTmpNss2) {
+    auto nss = nssShardedCollection1;
+    const auto uuid = getCollectionUUID(operationContext(), nss);
+    auto reshardingInfo =
+        startResharding(nss, uuid, kDestinedShardName, shardVersionShardedCollection1);
+
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kThrowShardCannotRefreshDueToLockHeld);
+
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kMockRefreshAndReturn);
+
+    // Acquiring the collection the first time will forward the error
+    PlacementConcern placementConcern{{}, reshardingInfo.shardVersion};
+    ASSERT_THROWS_WITH_CHECK(
+        acquireCollection(
+            operationContext(),
+            {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+            MODE_IX),
+        ShardCannotRefreshDueToLocksHeldException,
+        [&](const ShardCannotRefreshDueToLocksHeldException& ex) {
+            const auto refreshInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+            ASSERT(refreshInfo);
+            ASSERT_EQ(refreshInfo->getNss(), reshardingInfo.tempNss);
+        });
+
+    // Re-acquire a collection will work
+    auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+
+    ASSERT_TRUE(acquisition.exists());
+    ASSERT_TRUE(acquisition.getPostReshardingPlacement().has_value());
+}
+
+TEST_F(ShardRoleTestForResharding,
+       restoreCollectionBeingReshardedNeverThrowsShardCannotRefreshDueToLockHeld) {
+    auto nss = nssShardedCollection1;
+    const auto uuid = getCollectionUUID(operationContext(), nss);
+    auto reshardingInfo =
+        startResharding(nss, uuid, kDestinedShardName, shardVersionShardedCollection1);
+
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kMockRefreshAndReturn);
+
+    PlacementConcern placementConcern{{}, reshardingInfo.shardVersion};
+    auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+
+    ASSERT_TRUE(acquisition.exists());
+    ASSERT_TRUE(acquisition.getPostReshardingPlacement().has_value());
+
+    // Simulate the catalog cache throwing ShardCannotRefreshDueToLockHeld for the first attempt and
+    // the correct metadata at the second. Restore never throws and self-handles the exception.
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kThrowShardCannotRefreshDueToLockHeld);
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kMockRefreshAndReturn);
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kMockRefreshAndReturn);
+
+    auto yieldedResources = yieldTransactionResourcesFromOperationContext(operationContext());
+
+    ASSERT(_catalogCacheMock->getTotalCalls() == 1);
+    restoreTransactionResourcesToOperationContext(operationContext(), std::move(yieldedResources));
+
+    ASSERT_TRUE(acquisition.exists());
+    ASSERT_TRUE(acquisition.getPostReshardingPlacement().has_value());
+}
+
+TEST_F(ShardRoleTestForResharding, TestGetDestinedRecipient) {
+    auto nss = nssShardedCollection1;
+    const auto uuid = getCollectionUUID(operationContext(), nss);
+    auto reshardingInfo =
+        startResharding(nss, uuid, kDestinedShardName, shardVersionShardedCollection1);
+
+    // Simulate available metadata for the temporary nss
+    _catalogCacheMock->addToQueue(
+        CatalogCacheMockForShardRoleTest::OperationType::kMockRefreshAndReturn);
+
+    // Acquire a collection
+    PlacementConcern placementConcern{{}, reshardingInfo.shardVersion};
+    auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+
+    ASSERT_TRUE(acquisition.exists());
+    ASSERT_TRUE(acquisition.getPostReshardingPlacement().has_value());
+    auto destShardId = acquisition.getPostReshardingPlacement()->getReshardingDestinedRecipient(
+        BSON("skey_new" << 1 << "y" << 10));
+    ASSERT_EQ(destShardId, kDestinedShardName);
 }
 
 }  // namespace

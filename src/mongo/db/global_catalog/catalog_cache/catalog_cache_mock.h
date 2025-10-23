@@ -102,7 +102,8 @@ public:
         DatabaseVersion dbVersion,
         KeyPattern shardKeyPattern,
         std::vector<Chunk> chunks,
-        ExtraCollectionOptions extraOptions = {});
+        ExtraCollectionOptions extraOptions = {},
+        boost::optional<ReshardingFields> reshardingFields = boost::none);
 
     static CachedDatabaseInfo makeDatabaseInfo(const DatabaseName& dbName,
                                                const ShardId& dbPrimaryShard,
@@ -121,7 +122,8 @@ private:
         KeyPattern shardKeyPattern,
         std::vector<Chunk> chunks,
         bool unsplittable,
-        ExtraCollectionOptions extraOptions = {});
+        ExtraCollectionOptions extraOptions = {},
+        boost::optional<ReshardingFields> reshardingFields = boost::none);
 };
 
 }  // namespace mongo

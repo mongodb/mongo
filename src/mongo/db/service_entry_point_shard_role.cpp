@@ -683,7 +683,7 @@ private:
     boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
-    bool _refreshedCatalogCache = false;
+    int _refreshedCatalogCacheAttempts = 0;
     bool _awaitedShardingInitialization = false;
     bool _cannotRetry = false;
 
@@ -2025,15 +2025,15 @@ StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) 
             return refreshStatus;
         }
     } else if (execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld &&
-               !_refreshedCatalogCache) {
+               _refreshedCatalogCacheAttempts < 10) {
         const auto refreshInfo = execError.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
         tassert(8462305, "ShardCannotRefreshDueToLocksHeld must have extraInfo", refreshInfo);
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
         const auto refreshStatus =
             service_entry_point_shard_role_helpers::refreshCatalogCache(opCtx, *refreshInfo);
+        _refreshedCatalogCacheAttempts++;
         if (refreshStatus.isOK()) {
-            _refreshedCatalogCache = true;
             return true;
         } else {
             LOGV2_WARNING(8462302,
