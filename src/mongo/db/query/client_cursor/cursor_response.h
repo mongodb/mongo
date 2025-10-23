@@ -91,13 +91,14 @@ public:
     }
 
     size_t bytesUsed() const {
-        invariant(_active);
+        tassert(
+            11177213, "bytesUsed() can only be called on an active CursorResponseBuilder", _active);
         return _batch->len();
     }
 
     MONGO_COMPILER_ALWAYS_INLINE void append(const BSONObj& obj) {
-        invariant(_active);
-
+        tassert(
+            11177214, "append() can only be called on an active CursorResponseBuilder", _active);
         _batch->append(obj);
         _numDocs++;
     }

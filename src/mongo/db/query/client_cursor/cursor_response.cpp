@@ -84,8 +84,7 @@ void CursorResponseBuilder::done(CursorId cursorId,
                                  const NamespaceString& cursorNamespace,
                                  boost::optional<CursorMetrics> metrics,
                                  const SerializationContext& serializationContext) {
-    invariant(_active);
-
+    tassert(11177212, "done() can only be called on an active CursorResponseBuilder", _active);
     _batch.reset();
     if (!_postBatchResumeToken.isEmpty()) {
         _cursorObject->append(kPostBatchResumeTokenField, _postBatchResumeToken);

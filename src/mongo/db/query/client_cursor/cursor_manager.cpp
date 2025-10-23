@@ -388,7 +388,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     // Make sure the PlanExecutor isn't registered, since we will register the ClientCursor wrapping
     // it.
-    invariant(cursorParams.exec);
+    tassert(11177210, "cursorParams.exec must not be null", cursorParams.exec);
     cursorParams.exec.get_deleter().dismissDisposal();
 
     // Note we must hold the registration lock from now until insertion into '_cursorMap' to ensure
