@@ -266,7 +266,7 @@ private:
     bool _shouldEndCatalogSnapshotOrBatch(
         OperationContext* opCtx,
         const CollectionPtr& collection,
-        StringData indexName,
+        const BSONObj& indexKeyPattern,
         const key_string::Value& currKeyStringWithoutRecordId,
         const BSONObj& currKeyStringBson,
         int64_t numKeysInSnapshot,

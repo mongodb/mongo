@@ -1381,7 +1381,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         // next snapshot's starting key.
         finishSnapshot = _shouldEndCatalogSnapshotOrBatch(opCtx,
                                                           collection,
-                                                          indexName,
+                                                          index->keyPattern(),
                                                           currKeyStringWithRecordId,
                                                           currKeyStringBson,
                                                           numKeysInSnapshot,
@@ -1415,7 +1415,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
     OperationContext* opCtx,
     const CollectionPtr& collection,
-    StringData indexName,
+    const BSONObj& indexKeyPattern,
     const key_string::Value& currKeyStringWithRecordId,
     const BSONObj& currKeyStringBson,
     const int64_t numKeysInSnapshot,
@@ -1445,8 +1445,6 @@ bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
         return true;
     }
 
-    const IndexDescriptor* indexDescriptor =
-        collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
     const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
 
@@ -1459,7 +1457,7 @@ bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
         "comparing current keystring to next keystring",
         "curr"_attr = currKeyStringBson,
         "next"_attr = key_string::rehydrateKey(
-            indexDescriptor->keyPattern(),
+            indexKeyPattern,
             _keyStringToBsonSafeHelper(nextIndexKeyWithRecordId.get().keyString, ordering)));
 
     const bool isDistinctNextKeyString = currKeyStringWithRecordId.compareWithoutRecordId(
