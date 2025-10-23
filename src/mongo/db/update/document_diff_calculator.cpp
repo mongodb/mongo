@@ -411,63 +411,42 @@ void IndexUpdateIdentifier::determineAffectedIndexes(const FieldRef& path,
 void IndexUpdateIdentifier::determineAffectedIndexes(DocumentDiffReader* reader,
                                                      FieldRef& fieldRef,
                                                      IndexSet& indexesToUpdate) const {
-    boost::optional<StringData> delItem;
-    while ((delItem = reader->nextDelete())) {
-        FieldRef::FieldRefTempAppend tempAppend(fieldRef, *delItem);
-        determineAffectedIndexes(fieldRef, indexesToUpdate);
-
-        // Early exit if possible.
-        if (indexesToUpdate.count() == _numIndexes) {
-            return;
-        }
-    }
-
-    boost::optional<BSONElement> updItem;
-    while ((updItem = reader->nextUpdate())) {
-        FieldRef::FieldRefTempAppend tempAppend(fieldRef, updItem->fieldNameStringData());
-        determineAffectedIndexes(fieldRef, indexesToUpdate);
-
-        // Early exit.
-        if (indexesToUpdate.count() == _numIndexes) {
-            return;
-        }
-    }
-
-    boost::optional<BSONElement> insItem;
-    while ((insItem = reader->nextInsert())) {
-        FieldRef::FieldRefTempAppend tempAppend(fieldRef, insItem->fieldNameStringData());
-        determineAffectedIndexes(fieldRef, indexesToUpdate);
-
-        // Early exit if possible.
-        if (indexesToUpdate.count() == _numIndexes) {
-            return;
-        }
-    }
-
-    boost::optional<BSONElement> binaryItem;
-    while ((binaryItem = reader->nextBinary())) {
-        FieldRef::FieldRefTempAppend tempAppend(fieldRef, binaryItem->fieldNameStringData());
-        determineAffectedIndexes(fieldRef, indexesToUpdate);
-
-        // Early exit if possible.
-        if (indexesToUpdate.count() == _numIndexes) {
-            return;
-        }
-    }
-
-    for (auto subItem = reader->nextSubDiff(); subItem; subItem = reader->nextSubDiff()) {
-        FieldRef::FieldRefTempAppend tempAppend(fieldRef, subItem->first);
+    boost::optional<DocumentDiffReader::Modification> item;
+    bool done = false;
+    auto innerVisit = [this, &done, &fieldRef, &indexesToUpdate](auto subItem) -> void {
         visit(OverloadedVisitor{[this, &fieldRef, &indexesToUpdate](DocumentDiffReader& item) {
                                     determineAffectedIndexes(&item, fieldRef, indexesToUpdate);
                                 },
                                 [this, &fieldRef, &indexesToUpdate](ArrayDiffReader& item) {
                                     determineAffectedIndexes(&item, fieldRef, indexesToUpdate);
                                 }},
-              subItem->second);
+              subItem.second);
+    };
+    while ((item = reader->next()).has_value()) {
+        visit(OverloadedVisitor{
+                  [this, &done, &fieldRef, &indexesToUpdate](StringData& sdItem) -> void {
+                      FieldRef::FieldRefTempAppend tempAppend(fieldRef, sdItem);
+                      determineAffectedIndexes(fieldRef, indexesToUpdate);
+                      done = done || (indexesToUpdate.count() == _numIndexes);
+                  },
+                  [this, &done, &fieldRef, &indexesToUpdate](BSONElement& beItem) -> void {
+                      FieldRef::FieldRefTempAppend tempAppend(fieldRef,
+                                                              beItem.fieldNameStringData());
+                      determineAffectedIndexes(fieldRef, indexesToUpdate);
+                      done = done || (indexesToUpdate.count() == _numIndexes);
+                  },
+                  [this, &done, &fieldRef, &indexesToUpdate, &innerVisit](
+                      std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>&
+                          subItem) -> void {
+                      FieldRef::FieldRefTempAppend tempAppend(fieldRef, subItem.first);
+                      innerVisit(subItem);
+                      done = done || (indexesToUpdate.count() == _numIndexes);
+                  }},
+              *item);
 
         // Early exit if possible.
-        if (indexesToUpdate.count() == _numIndexes) {
-            return;
+        if (done) {
+            break;
         }
     }
 }

@@ -136,6 +136,14 @@ public:
     boost::optional<BSONElement> nextBinary();
     boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>
     nextSubDiff();
+    /**
+     * Calls all of the above 'next*' methods.
+     */
+    using Modification =
+        std::variant<StringData,
+                     BSONElement,
+                     std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>;
+    boost::optional<Modification> next();
 
 private:
     Diff _diff;
