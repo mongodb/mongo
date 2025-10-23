@@ -160,9 +160,10 @@ public:
     int32_t numOfTicketsUsed() const;
 
     /**
-     * Bumps the delinquency counters to all ticket holders (read and write pools).
+     * Bumps the delinquency counters to all ticket holders (read and write pools) and the
+     * de-prioritization stats.
      */
-    void incrementDelinquencyStats(OperationContext* opCtx);
+    void incrementStats(OperationContext* opCtx);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'.
@@ -214,6 +215,11 @@ private:
      * write transactions dynamically.
      */
     ThroughputProbing _throughputProbing;
+
+    /**
+     * Counts the total number of operations deprioritized.
+     */
+    AtomicWord<std::int64_t> _opsDeprioritized;
 };
 
 }  // namespace admission

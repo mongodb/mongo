@@ -362,6 +362,7 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
     boost::optional<BSONObjBuilder> writeStats;
     int32_t readOut = 0, readAvailable = 0, readTotalTickets = 0;
     int32_t writeOut = 0, writeAvailable = 0, writeTotalTickets = 0;
+    b.append("totalDeprioritizations", _opsDeprioritized.loadRelaxed());
 
     for (size_t i = 0; i < _holders.size(); ++i) {
         const auto priority = static_cast<AdmissionContext::Priority>(i);
@@ -446,7 +447,7 @@ int32_t TicketingSystem::numOfTicketsUsed() const {
     return total;
 }
 
-void TicketingSystem::incrementDelinquencyStats(OperationContext* opCtx) {
+void TicketingSystem::incrementStats(OperationContext* opCtx) {
     auto& admCtx = ExecutionAdmissionContext::get(opCtx);
 
     auto priority = admCtx.getPriorityLowered() ? AdmissionContext::Priority::kLow
@@ -467,6 +468,10 @@ void TicketingSystem::incrementDelinquencyStats(OperationContext* opCtx) {
                 stats.delinquentAcquisitions.loadRelaxed(),
                 Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
                 Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
+    }
+
+    if (admCtx.getPriorityLowered()) {
+        _opsDeprioritized.fetchAndAddRelaxed(1);
     }
 }
 
