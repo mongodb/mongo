@@ -2216,6 +2216,16 @@ tasks:
         vars:
           unit_test_args: -v 2 -R cursor13 join02 join07 schema03 timestamp22
 
+  - name: unit-test-hook-timing-stress-log
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 --hook timing_stress_log_conn_close
+
   - name: unit-test-hook-tiered
     tags: ["python"]
     depends_on:
@@ -5423,6 +5433,7 @@ buildvariants:
     - name: unit-test-hook-tiered
     - name: unit-test-hook-tiered-with-delays
     - name: unit-test-hook-tiered-timestamp
+    - name: unit-test-hook-timing-stress-log
     - name: unit-test-hook-timestamp
     - name: test-prepare-hs03-hook-timestamp
     - name: spinlock-gcc-test
@@ -5850,6 +5861,7 @@ buildvariants:
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
       distros: amazon2-arm64-large
+    - name: unit-test-hook-timing-stress-log
     - name: wtperf-test
     - name: long-test
       distros: amazon2-arm64-large

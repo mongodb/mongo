@@ -418,7 +418,11 @@ __wti_log_slot_switch(
             WT_TRET(__wt_panic(session, ret, "log slot switch fatal error"));
 
         WT_RET(WT_SESSION_CHECK_PANIC(session));
-        if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+        /*
+         * If the connection is closing, the logging system has finished running, all threads except
+         * for the connection closing thread can early exit.
+         */
+        if (F_ISSET(S2C(session), WT_CONN_CLOSING) && session->id != 0)
             break;
     } while (F_ISSET(myslot, WT_MYSLOT_CLOSE) || (retry && ret == EBUSY));
     return (ret);

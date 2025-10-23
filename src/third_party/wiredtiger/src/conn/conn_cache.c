@@ -353,12 +353,26 @@ __wti_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
     WT_STAT_SET(session, stats, cache_bytes_other, __wt_cache_bytes_other(cache));
     WT_STAT_SET(session, stats, cache_bytes_updates, __wt_cache_bytes_updates(cache));
-
-    WT_STAT_SET(session, stats, cache_eviction_maximum_gen_gap, cache->evict_max_gen_gap);
+    WT_STAT_SET(session, stats, cache_eviction_maximum_clean_page_size_per_checkpoint,
+      cache->evict_max_clean_page_size_per_checkpoint);
+    WT_STAT_SET(session, stats, cache_eviction_maximum_dirty_page_size_per_checkpoint,
+      cache->evict_max_dirty_page_size_per_checkpoint);
+    WT_STAT_SET(session, stats, cache_eviction_maximum_updates_page_size_per_checkpoint,
+      cache->evict_max_updates_page_size_per_checkpoint);
     WT_STAT_SET(session, stats, cache_eviction_maximum_page_size, cache->evict_max_page_size);
     WT_STAT_SET(session, stats, cache_eviction_maximum_milliseconds, cache->evict_max_ms);
+    WT_STAT_SET(session, stats, cache_eviction_maximum_milliseconds_per_checkpoint,
+      cache->evict_max_ms_per_checkpoint);
     WT_STAT_SET(
       session, stats, cache_reentry_hs_eviction_milliseconds, cache->reentry_hs_eviction_ms);
+    WT_STAT_SET(
+      session, stats, cache_eviction_maximum_unvisited_gen_gap, cache->evict_max_unvisited_gen_gap);
+    WT_STAT_SET(session, stats, cache_eviction_maximum_unvisited_gen_gap_per_checkpoint,
+      cache->evict_max_unvisited_gen_gap_per_checkpoint);
+    WT_STAT_SET(
+      session, stats, cache_eviction_maximum_visited_gen_gap, cache->evict_max_visited_gen_gap);
+    WT_STAT_SET(session, stats, cache_eviction_maximum_visited_gen_gap_per_checkpoint,
+      cache->evict_max_visited_gen_gap_per_checkpoint);
     WT_STAT_SET(
       session, stats, cache_pages_dirty, cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
