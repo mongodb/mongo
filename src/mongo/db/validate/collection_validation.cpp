@@ -161,10 +161,16 @@ void _validateIndexes(OperationContext* opCtx,
                                           ->findIndexByIdent(opCtx, indexIdent)
                                           ->indexName();
 
+        const IndexType indexType = validateState->getCollection()
+                                        ->getIndexCatalog()
+                                        ->findIndexByIdent(opCtx, indexIdent)
+                                        ->getIndexType();
+
         LOGV2_PROD_ONLY_OPTIONS(20296,
                                 {LogComponent::kIndex},
                                 "Validating index consistency",
-                                "index"_attr = indexName,
+                                "indexName"_attr = indexName,
+                                "indexType"_attr = indexType,
                                 logAttrs(validateState->nss()));
 
         int64_t numTraversedKeys;

@@ -55,6 +55,14 @@ enum IndexType {
 };
 
 /**
+ * Converts an IndexType to a string.
+ *
+ * This function is used strictly for logging and makes no assumptions about which `IndexType`s
+ * are valid.
+ */
+std::string toString(IndexType indexType);
+
+/**
  * We use the std::string representation of index names all over the place, so we declare them all
  * once here.
  */
