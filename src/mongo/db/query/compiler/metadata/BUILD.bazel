@@ -33,3 +33,31 @@ mongo_cc_unit_test(
         ":query_metadata",
     ],
 )
+
+mongo_cc_library(
+    name = "arrayness_trie",
+    srcs = [
+        "arrayness_trie.cpp",
+    ],
+    hdrs = [
+        "arrayness_trie.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/pipeline:field_path",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "arrayness_trie_test",
+    srcs = [
+        "arrayness_trie_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":arrayness_trie",
+        "//src/mongo/db/index:index_access_method",
+    ],
+)
