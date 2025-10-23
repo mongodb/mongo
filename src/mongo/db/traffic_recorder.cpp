@@ -327,21 +327,21 @@ void TrafficRecorder::stop(ServiceContext* svcCtx) {
     _stop(svcCtx);
 }
 
-void TrafficRecorder::sessionStarted(const std::shared_ptr<transport::Session>& ts) {
-    auto id = ts->id();
-    auto session = ts->toBSON().toString();
+void TrafficRecorder::sessionStarted(const transport::Session& ts) {
+    auto id = ts.id();
+    auto session = ts.toBSON().toString();
     _observe(id, session, Message(), EventType::kSessionStart);
 }
-void TrafficRecorder::sessionEnded(const std::shared_ptr<transport::Session>& ts) {
-    auto id = ts->id();
-    auto session = ts->toBSON().toString();
+void TrafficRecorder::sessionEnded(const transport::Session& ts) {
+    auto id = ts.id();
+    auto session = ts.toBSON().toString();
     _observe(id, session, Message(), EventType::kSessionEnd);
 }
 
-void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
+void TrafficRecorder::observe(const transport::Session& ts,
                               const Message& message,
                               EventType eventType) {
-    _observe(ts->id(), ts->toBSON().toString(), message, eventType);
+    _observe(ts.id(), ts.toBSON().toString(), message, eventType);
 }
 
 void TrafficRecorder::_observe(uint64_t id,

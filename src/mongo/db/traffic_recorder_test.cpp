@@ -111,26 +111,28 @@ TEST(TrafficRecorderTest, CorrectOffsets) {
     auto mockSession =
         std::make_shared<MockSessionWithBSON>(HostAndPort(), SockAddr(), SockAddr(), nullptr);
 
+    auto& session = *mockSession;
+
     Message message = Message();
     message.setData(dbQuery, "test_query");
 
-    trafficRecorder.observe(mockSession, message);
+    trafficRecorder.observe(session, message);
 
     mockClock.advance(Microseconds(500));
 
-    trafficRecorder.observe(mockSession, message);
+    trafficRecorder.observe(session, message);
 
     mockClock.advance(Milliseconds(10));
 
-    trafficRecorder.observe(mockSession, message);
+    trafficRecorder.observe(session, message);
 
     mockClock.advance(Microseconds(1));
 
-    trafficRecorder.observe(mockSession, message);
+    trafficRecorder.observe(session, message);
 
     mockClock.advance(Seconds(1'000'000'000));
 
-    trafficRecorder.observe(mockSession, message);
+    trafficRecorder.observe(session, message);
 
     TrafficRecorderTestUtil::verifyRecordedOffsets(trafficRecorder,
                                                    {0, 500, 10500, 10501, 1'000'000'000'010'501});

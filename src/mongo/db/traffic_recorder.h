@@ -93,14 +93,14 @@ public:
     void start(const StartTrafficRecording& options, ServiceContext* svcCtx);
     void stop(ServiceContext* svcCtx);
 
-    void sessionStarted(const std::shared_ptr<transport::Session>& ts);
-    void sessionEnded(const std::shared_ptr<transport::Session>& ts);
+    void sessionStarted(const transport::Session& ts);
+    void sessionEnded(const transport::Session& ts);
 
     // This is the main interface to record a message. It also maintains open sessions in order to
     // record 'kSessionStart' and 'kSessionEnd' events.
     // TODO SERVER-106769: change usage of TickSource/std::chrono::steady_clock to solution proposed
     // in SERVER-106769
-    void observe(const std::shared_ptr<transport::Session>& ts,
+    void observe(const transport::Session& ts,
                  const Message& message,
                  EventType eventType = EventType::kRegular);
 
