@@ -1150,7 +1150,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           {logv2::LogTruncation::Disabled},
                                           kMalformedMinMaxTimeseriesBucket,
                                           logAttrs(coll->ns()),
-                                          "bucketId"_attr = record->id,
+                                          "recordId"_attr = record->id,
                                           "error"_attr =
                                               containsMixedSchemaDataResponse.getStatus());
                 } else if (containsMixedSchemaDataResponse.isOK() &&
@@ -1163,14 +1163,20 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                               {logv2::LogTruncation::Disabled},
                                               kExpectedMixedSchemaTimeseriesWarning,
                                               logAttrs(coll->ns()),
-                                              "bucketId"_attr = record->id);
+                                              "recordId"_attr = record->id);
                     } else if (!mixedSchemaAllowed &&
                                results->addError(kUnexpectedMixedSchemaTimeseriesError)) {
+                        const auto& controlField =
+                            recordBson.getField(timeseries::kBucketControlFieldName).Obj();
+                        int count =
+                            controlField.getIntField(timeseries::kBucketControlCountFieldName);
                         LOGV2_WARNING_OPTIONS(8469902,
                                               {logv2::LogTruncation::Disabled},
                                               kUnexpectedMixedSchemaTimeseriesError,
                                               logAttrs(coll->ns()),
-                                              "bucketId"_attr = record->id);
+                                              "recordId"_attr = record->id,
+                                              "objSize"_attr = recordBson.objsize(),
+                                              "measurementCount"_attr = count);
                     }
                 }
             }
