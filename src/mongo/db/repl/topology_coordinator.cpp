@@ -2321,13 +2321,43 @@ void TopologyCoordinator::fillHelloForReplSet(std::shared_ptr<HelloResponse> res
 
     invariant(!_rsConfig.members().empty());
 
+    bool promoteHidden = true;
+    if (_rsConfig.getAutoPromoteHidden()) {
+        for (int i = 0; i < _rsConfig.getNumMembers(); i++) {
+            const auto& memberCfg = _rsConfig.getMemberAt(i);
+            if (memberCfg.isHidden()) {
+                // Only consider non-hidden secondaries for health check
+                continue;
+            }
+            const auto& memberData = _memberData.at(i);
+            // Check if this is a healthy secondary
+            bool isHealthySecondary = false;
+            if (i == _selfIndex) {
+                // For self, we are always "up", just check if we are secondary
+                isHealthySecondary = myState.secondary();
+            } else {
+                // For other members, check both state and health from heartbeat data
+                isHealthySecondary = memberData.getState().secondary() && memberData.up();
+            }
+            
+            if (isHealthySecondary) {
+                promoteHidden = false;
+                break;
+            }
+        }
+    } else {
+        promoteHidden = false;
+    }
+
     for (const auto& member : _rsConfig.members()) {
-        if (member.isHidden() || member.getSecondaryDelay() > Seconds{0}) {
+        if (member.getSecondaryDelay() > Seconds{0}) {
             continue;
         }
         auto hostView = member.getHostAndPort(horizonString);
 
-        if (member.isElectable()) {
+        if (member.isHidden() && promoteHidden) {
+            response->addHost(std::move(hostView));
+        } else if (member.isElectable()) {
             response->addHost(std::move(hostView));
         } else if (member.isArbiter()) {
             response->addArbiter(std::move(hostView));
@@ -2359,7 +2389,7 @@ void TopologyCoordinator::fillHelloForReplSet(std::shared_ptr<HelloResponse> res
     if (selfConfig.getSecondaryDelay() > Seconds(0)) {
         response->setSecondaryDelaySecs(selfConfig.getSecondaryDelay());
     }
-    if (selfConfig.isHidden()) {
+    if (selfConfig.isHidden() && !promoteHidden) {
         response->setIsHidden(true);
     }
     if (!selfConfig.shouldBuildIndexes()) {
