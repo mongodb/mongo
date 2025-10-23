@@ -184,6 +184,7 @@ common --flag_alias=win_min_version=//bazel/config:win_min_version
 common --flag_alias=build_atlas=//bazel/config:build_atlas
 common --flag_alias=dtlto=//bazel/config:dtlto
 common --flag_alias=all_headers=//bazel/config:all_headers
+common --flag_alias=evg=//bazel/config:evg
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.
@@ -235,6 +236,7 @@ common --//bazel/config:libunwind=auto
 common --//bazel/config:dtlto=False
 common --//bazel/config:pgo_profile_use=False
 common --//bazel/config:bolt_profile_use=False
+common --//bazel/config:evg=False
 common --jobs=300
 common:macos --jobs=auto
 common:windows --jobs=auto
@@ -351,6 +353,7 @@ common:opt_profiled --enable_platform_specific_config=true
 --config=evg
 common:evg --config=opt
 common:evg --fission=no
+common:evg --evg=True
 common:evg --//bazel/config:opt=auto
 common:evg --//bazel/config:separate_debug=True
 common:evg --enable_platform_specific_config=true

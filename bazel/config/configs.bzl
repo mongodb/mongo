@@ -817,3 +817,17 @@ create_dwp = rule(
     implementation = lambda ctx: create_dwp_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# evg
+# =========
+
+evg_provider = provider(
+    doc = "Enable development-only pretty stacktraces",
+    fields = ["enabled"],
+)
+
+evg = rule(
+    implementation = lambda ctx: evg_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
