@@ -1608,6 +1608,8 @@ mongo_cc_library(
         ":server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/util:stop_token",
+        "//src/mongo/db/traffic_recorder/utils:task_scheduler",
         "//src/mongo/rpc",
         "//src/third_party/abseil-cpp:absl_crc32c",
     ],
