@@ -129,6 +129,7 @@ post:
   - func: "save unsymbolized stacktraces and local invocation"
   - func: "save mongo coredumps"
   - func: "generate hang analyzer tasks"
+  - func: "attach bazel invocation text"
   - func: "save failed unittests"
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"

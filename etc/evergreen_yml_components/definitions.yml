@@ -2965,6 +2965,37 @@ functions:
       display_name: Command To Run Failed Unit Tests on Workstation
       optional: true
 
+  "upload bazel build invocation": &upload_bazel_build_invocation
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/.bazel_build_invocation
+      remote_file: ${project}/${build_variant}/${revision}/unittests/${build_id}-${task_name}-${execution}/bazel_build_invocation.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Build Command
+      optional: true
+
+  "upload engflow link": &upload_engflow_link
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/.engflow_link
+      remote_file: ${project}/${build_variant}/${revision}/unittests/${build_id}-${task_name}-${execution}/engflow_link.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: EngFlow Link
+      optional: true
+
+  "attach bazel invocation text":
+    - *f_expansions_write
+    - *upload_bazel_build_invocation
+    - *upload_engflow_link
+
   "save failed unittests":
     - *f_expansions_write
     - *gather_failed_unittests_resmoke

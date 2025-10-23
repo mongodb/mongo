@@ -229,6 +229,11 @@ bazel_evergreen_shutils::ensure_server_and_print_pid() {
     bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY"
 }
 
+bazel_evergreen_shutils::write_last_engflow_link() {
+    engflow_link=$(grep -Eo 'https://[a-zA-Z0-9./?_=-]+' ${last_command_log_path} | grep 'sodalite\.cluster\.engflow\.com' | tail -n 1)
+    echo ${engflow_link} >.engflow_link
+}
+
 # Generic retry wrapper:
 #   $1: attempts
 #   $3: bazel binary
@@ -244,6 +249,9 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
     shift
 
     local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "${evergreen_remote_exec:-}")"
+
+    # Get command log path for usage afterwards
+    last_command_log_path=$(bazel info command_log)
 
     # Everything else is the Bazel subcommand + flags (and possibly redirections/pipes).
     # We *intentionally* keep it as raw words and reassemble to a single string for eval.

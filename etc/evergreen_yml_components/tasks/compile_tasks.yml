@@ -51,6 +51,7 @@ variables:
       - func: "save code coverage data"
       - func: "save mongo coredumps"
       - func: "generate hang analyzer tasks"
+      - func: "attach bazel invocation text"
       - func: "save failed unittests"
       - func: "save bazel headers"
       - func: "save bazel jvm dump"

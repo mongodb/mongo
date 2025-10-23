@@ -59,6 +59,8 @@ if [[ "$RET" == "0" ]]; then
     fi
 fi
 
+bazel_evergreen_shutils::write_last_engflow_link
+
 set -o errexit
 
 # The --config flag needs to stay consistent between invocations to avoid evicting the previous results.

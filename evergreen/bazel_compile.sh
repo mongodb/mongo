@@ -121,11 +121,16 @@ bazel_evergreen_shutils::ensure_server_and_print_pid "$BAZEL_BINARY"
 ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} ${patch_compile_flags:-}"
 echo "${ALL_FLAGS}" >.bazel_build_flags
 
+# Save the entire bazel build invocation to attach to the task for re-running locally
+echo "bazel build ${ALL_FLAGS} ${targets}" >.bazel_build_invocation
+
 set +o errexit
 
 bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
     build ${ALL_FLAGS} ${targets}
 RET=$?
+
+bazel_evergreen_shutils::write_last_engflow_link
 
 set -o errexit
 
