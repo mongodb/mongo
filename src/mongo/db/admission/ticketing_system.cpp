@@ -79,28 +79,21 @@ Status updateSettings(const std::string& op, Updater&& updater) {
 
 bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
                                          ExecutionAdmissionContext* admCtx) {
-    if (!gStorageEngineHeuristicDeprioritizationEnabled.load()) {
-        // If the heuristic is not enabled, we do not de-prioritize based on the number of yields.
-        return false;
-    }
-
     const auto priority = admCtx->getPriority();
 
-    if (priority == AdmissionContext::Priority::kExempt) {
-        // It is illegal to demote a high-priority (exempt) operation to a low-priority operation.
+    // Check for all conditions that prevent a downgrade:
+    //      1. The heuristic must be enabled via its server parameter.
+    //      2. We don't deprioritize operations within a multi-document transaction.
+    //      3. It is illegal to demote a high-priority (exempt) operation.
+    //      4. The operation is already low-priority (no-op).
+    if (!gStorageEngineHeuristicDeprioritizationEnabled.load() ||
+        opCtx->inMultiDocumentTransaction() || priority == AdmissionContext::Priority::kExempt ||
+        priority == AdmissionContext::Priority::kLow) {
         return false;
     }
 
-    if (priority == AdmissionContext::Priority::kLow) {
-        // Fast exit for those operations that are manually marked as low-priority.
-        return false;
-    }
-
-    if (admCtx->getAdmissions() >= gStorageEngineHeuristicNumYieldsDeprioritizeThreshold.load()) {
-        return true;
-    }
-
-    return false;
+    // If the op is eligible, downgrade it if it has yielded enough times to meet the threshold.
+    return admCtx->getAdmissions() >= gStorageEngineHeuristicNumYieldsDeprioritizeThreshold.load();
 }
 
 }  // namespace

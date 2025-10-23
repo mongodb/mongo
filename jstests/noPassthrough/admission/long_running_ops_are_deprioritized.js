@@ -117,4 +117,24 @@ const testIndexedLongRunningRegexIsDeprioritized = function () {
 };
 testIndexedLongRunningRegexIsDeprioritized();
 
+const testMultiDocumentTransactionIsNotDeprioritized = function () {
+    // TODO (SERVER-110400): Use traceability to verify the priority of multidocument txn.
+
+    // Even though this transaction contains an operation that would normally be deprioritized (an
+    // unbounded collection scan), the transaction itself should run with normal priority.
+    const lowPriorityBefore = numLowPriorityReads();
+
+    const session = db.getMongo().startSession();
+    const sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
+
+    session.startTransaction();
+    // Perform an unbounded collection scan within the transaction.
+    assert.eq(numDocs, sessionColl.find().hint({$natural: 1}).itcount());
+    assert.commandWorked(session.commitTransaction_forTesting());
+    session.endSession();
+
+    assert.eq(numLowPriorityReads(), lowPriorityBefore, "Multi-document transaction should not be deprioritized");
+};
+testMultiDocumentTransactionIsNotDeprioritized();
+
 rst.stopSet();
