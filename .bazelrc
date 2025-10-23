@@ -569,6 +569,9 @@ common --define=GIT_COMMIT_HASH="nogitversion"
 # Default retry downloads three times
 common --experimental_repository_downloader_retries=3
 
+# Place golden test output files where buildscripts/golden_tests.py can find them
+common --test_env=GOLDEN_TEST_CONFIG_PATH
+
 # TODO(WT-12780): delete this once wiredtiger switches to /.bazelrc.evergreen.
 try-import %workspace%/.bazelrc.evergreen_engflow_creds
 
@@ -592,6 +595,3 @@ try-import %workspace%/.bazelrc.bazelisk
 
 # Flags synced from Flag Sync
 try-import %workspace%/.bazelrc.sync
-
-# Place golden test output files where buildscripts/golden_tests.py can find them
-test --test_env=GOLDEN_TEST_CONFIG_PATH
