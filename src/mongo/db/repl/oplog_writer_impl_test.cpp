@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/oplog_writer_impl.h"
 
-#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
 #include "mongo/db/repl/oplog_writer.h"
@@ -56,15 +55,6 @@ BSONObj makeRawInsertOplogEntry(int t, const NamespaceString& nss) {
     return entry.getEntry().getRaw();
 }
 
-class CountOpsObserver : public OplogWriterImpl::Observer {
-public:
-    void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
-                                std::vector<InsertStatement>::const_iterator end) final {
-        oplogCollDocsCount.addAndFetch(std::distance(begin, end));
-    }
-
-    AtomicWord<int> oplogCollDocsCount{0};
-};
 
 class JournalListenerMock : public JournalListener {
 public:
@@ -114,12 +104,12 @@ protected:
     StorageInterface* getStorageInterface() const;
     ReplicationConsistencyMarkers* getConsistencyMarkers() const;
     JournalListenerMock* getJournalListener() const;
+    int getOplogDocsCount() const;
 
     ServiceContext* _serviceContext;
     ServiceContext::UniqueOperationContext _opCtxHolder;
     std::unique_ptr<ThreadPool> _workerPool;
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
-    std::unique_ptr<CountOpsObserver> _observer;
 };
 
 void OplogWriterImplTest::setUp() {
@@ -144,14 +134,18 @@ void OplogWriterImplTest::setUp() {
     repl::createOplog(opCtx());
 
     _workerPool = makeReplWorkerPool();
-    _observer = std::make_unique<CountOpsObserver>();
+}
+
+int OplogWriterImplTest::getOplogDocsCount() const {
+    AutoGetOplogFastPath oplogRead(opCtx(), OplogAccessMode::kRead);
+    const auto& oplog = oplogRead.getCollection();
+    return oplog->getRecordStore()->numRecords();
 }
 
 void OplogWriterImplTest::tearDown() {
     _opCtxHolder = {};
     _workerPool = {};
     _consistencyMarkers = {};
-    _observer = {};
     StorageInterface::set(_serviceContext, {});
     ServiceContextMongoDTest::tearDown();
 }
@@ -190,7 +184,6 @@ DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
-                                &noopOplogWriterObserver,
                                 options);
 
     // Writing an empty batch should hit an invariant.
@@ -207,7 +200,6 @@ TEST_F(OplogWriterImplTest, WriteOplogCollection) {
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
-                                _observer.get(),
                                 options);
 
     std::vector<BSONObj> ops;
@@ -218,7 +210,7 @@ TEST_F(OplogWriterImplTest, WriteOplogCollection) {
 
     // Verify that the batch is only written to the oplog collection.
     ASSERT(written);
-    ASSERT_EQ(2, _observer->oplogCollDocsCount.load());
+    ASSERT_EQ(2, getOplogDocsCount());
 }
 
 TEST_F(OplogWriterImplTest, SkipWriteToOplogCollection) {
@@ -231,7 +223,6 @@ TEST_F(OplogWriterImplTest, SkipWriteToOplogCollection) {
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
-                                _observer.get(),
                                 options);
 
     std::vector<BSONObj> ops;
@@ -242,7 +233,7 @@ TEST_F(OplogWriterImplTest, SkipWriteToOplogCollection) {
 
     // Verify that the batch is not written any collection.
     ASSERT(!written);
-    ASSERT_EQ(0, _observer->oplogCollDocsCount.load());
+    ASSERT_EQ(0, getOplogDocsCount());
 }
 
 TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
@@ -255,7 +246,6 @@ TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
                                 getReplCoord(),
                                 getStorageInterface(),
                                 getConsistencyMarkers(),
-                                &noopOplogWriterObserver,
                                 options);
 
     auto curOpTime = OpTime(Timestamp(2, 2), 1);

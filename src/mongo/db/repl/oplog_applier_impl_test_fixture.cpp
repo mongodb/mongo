@@ -418,6 +418,28 @@ Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     return Status::OK();
 }
 
+long OplogApplierImplTest::getOplogSize() {
+    AutoGetOplogFastPath oplogRead(_opCtx.get(), OplogAccessMode::kRead);
+    const auto& oplog = oplogRead.getCollection();
+    return oplog->getRecordStore()->numRecords();
+}
+
+BSONObj getOplogDoc(OperationContext* opCtx, bool forward) {
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+    const auto& oplog = oplogRead.getCollection();
+    auto cursor = oplog->getRecordStore()->getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward);
+    return cursor->next()->data.getOwned().toBson();
+}
+
+BSONObj OplogApplierImplTest::getFirstOplogDoc() {
+    return getOplogDoc(_opCtx.get(), /*forward=*/true);
+}
+
+BSONObj OplogApplierImplTest::getLastOplogDoc() {
+    return getOplogDoc(_opCtx.get(), /*forward=*/false);
+}
+
 void checkTxnTable(OperationContext* opCtx,
                    const LogicalSessionId& lsid,
                    const TxnNumber& txnNum,

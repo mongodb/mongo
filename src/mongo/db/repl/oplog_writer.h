@@ -59,9 +59,6 @@ public:
         const bool skipWritesToOplogColl;
     };
 
-    // Used to report oplog write progress.
-    class MONGO_MOD_PRIVATE Observer;
-
     /**
      * Constructs this OplogWriter with specific options.
      */
@@ -165,28 +162,5 @@ private:
     // Configures this OplogWriter.
     const Options _options;
 };
-
-/**
- * The OplogWriter reports its progress using the Observer interface.
- */
-class MONGO_MOD_PRIVATE OplogWriter::Observer {
-public:
-    virtual ~Observer() = default;
-
-    virtual void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
-                                        std::vector<InsertStatement>::const_iterator end) = 0;
-};
-
-/**
- * An Observer implementation that does nothing.
- */
-class MONGO_MOD_PRIVATE NoopOplogWriterObserver : public OplogWriter::Observer {
-public:
-    void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
-                                std::vector<InsertStatement>::const_iterator end) final {}
-};
-
-extern NoopOplogWriterObserver noopOplogWriterObserver;
-
 }  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

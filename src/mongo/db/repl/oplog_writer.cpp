@@ -34,8 +34,6 @@
 namespace mongo {
 namespace repl {
 
-NoopOplogWriterObserver noopOplogWriterObserver;
-
 OplogWriter::OplogWriter(executor::TaskExecutor* executor,
                          OplogBuffer* writeBuffer,
                          const Options& options)

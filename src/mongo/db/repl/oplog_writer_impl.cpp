@@ -33,7 +33,6 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_util.h"
@@ -57,8 +56,7 @@ auto& oplogWriterMetric = *MetricBuilder<OplogWriterStats>{"repl.write"}.setPred
 
 Status insertDocsToOplog(OperationContext* opCtx,
                          std::vector<InsertStatement>::const_iterator begin,
-                         std::vector<InsertStatement>::const_iterator end,
-                         OplogWriter::Observer* observer) {
+                         std::vector<InsertStatement>::const_iterator end) {
     WriteUnitOfWork wuow(opCtx);
     boost::optional<AutoGetOplogFastPath> autoOplog;
 
@@ -93,15 +91,6 @@ Status insertDocsToOplog(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
-        opCtx->getServiceContext()->getOpObserver()->onInserts(opCtx,
-                                                               oplogColl,
-                                                               begin,
-                                                               end,
-                                                               /*recordIds=*/{},
-                                                               /*fromMigrate=*/
-                                                               std::vector(count, false),
-                                                               /*defaultFromMigrate=*/false);
-        observer->onWriteOplogCollection(begin, end);
     }
 
     wuow.commit();
@@ -163,15 +152,13 @@ OplogWriterImpl::OplogWriterImpl(executor::TaskExecutor* executor,
                                  ReplicationCoordinator* replCoord,
                                  StorageInterface* storageInterface,
                                  ReplicationConsistencyMarkers* consistencyMarkers,
-                                 Observer* observer,
                                  const OplogWriter::Options& options)
     : OplogWriter(executor, writeBuffer, options),
       _applyBuffer(applyBuffer),
       _workerPool(workerPool),
       _replCoord(replCoord),
       _storageInterface(storageInterface),
-      _consistencyMarkers(consistencyMarkers),
-      _observer(observer) {}
+      _consistencyMarkers(consistencyMarkers) {}
 
 void OplogWriterImpl::_run() {
     // We don't start data replication for arbiters at all and it's not allowed to reconfig
@@ -347,7 +334,7 @@ void OplogWriterImpl::_writeOplogBatchForRange(OperationContext* opCtx,
     fassert(8792300,
             storage_helpers::insertBatchAndHandleRetry(
                 opCtx, nsOrUUID, docs, [&](auto* opCtx, auto begin, auto end) {
-                    return insertDocsToOplog(opCtx, begin, end, _observer);
+                    return insertDocsToOplog(opCtx, begin, end);
                 }));
 }
 
