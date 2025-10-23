@@ -45,6 +45,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/sharding_cluster_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -63,6 +64,15 @@ namespace {
 const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockManager>();
 
 MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
+
+Milliseconds optimisticRecoveryWaitTimeout() {
+    auto* optimisticRecoveryWaitTimeoutParam =
+        ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<DDLLockOptimisticRecoveryWaitTimeoutParam>>(
+                "ddlLockOptimisticRecoveryWaitTimeout");
+
+    return optimisticRecoveryWaitTimeoutParam->getValue(/* TenantID */ boost::none).getTimeInMs();
+}
 
 }  // namespace
 
@@ -93,8 +103,29 @@ void DDLLockManager::_lock(OperationContext* opCtx,
                            bool waitForRecovery) {
     Timer waitingTime;
 
+    tassert(
+        10432500,
+        "Operation context must be interruptable on stepdowns and stepups when acquiring DDL lock",
+        opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+
     {
         stdx::unique_lock<Latch> lock{_mutex};
+
+        // Optimistically wait for a short period of time to reach the recovered state.
+        // If it failed, let's take the global lock to make sure we are still primary.
+        const auto optimisticWaitDeadline =
+            std::min(deadline, Date_t::now() + optimisticRecoveryWaitTimeout());
+        if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, optimisticWaitDeadline, [&] {
+                return _state == State::kPrimaryAndRecovered || !waitForRecovery;
+            })) {
+            lock.unlock();
+            Lock::GlobalLock globalLock(opCtx, LockMode::MODE_IX);
+            uassert(ErrorCodes::NotWritablePrimary,
+                    "Not a primary when trying to acquire DDL lock",
+                    repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
+            lock.lock();
+        }
+
         // Wait for primary and DDL recovered state
         if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, deadline, [&] {
                 return _state == State::kPrimaryAndRecovered || !waitForRecovery;
