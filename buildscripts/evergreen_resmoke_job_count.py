@@ -39,7 +39,7 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"change_streams_mongos_sessions_passthrough", "factor": 0.25},
     {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
     {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
-    {"task": r"noPassthrough", "factor": 0.75},
+    {"task": r"noPassthrough", "factor": 0.25},
     {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.125},
     {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
     {
