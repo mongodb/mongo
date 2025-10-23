@@ -71,12 +71,13 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
     }
 
     // If this is not an update, replace or delete, then just pass along the result.
-    const auto kOpTypeField = DocumentSourceChangeStream::kOperationTypeField;
-    const auto opType = input.getDocument()[kOpTypeField];
-    DocumentSourceChangeStream::checkValueType(opType, kOpTypeField, BSONType::string);
-    if (opType.getStringData() != DocumentSourceChangeStream::kUpdateOpType &&
-        opType.getStringData() != DocumentSourceChangeStream::kReplaceOpType &&
-        opType.getStringData() != DocumentSourceChangeStream::kDeleteOpType) {
+    const auto opType = input.getDocument()[DocumentSourceChangeStream::kOperationTypeField];
+    DocumentSourceChangeStream::checkValueType(
+        opType, DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
+    if (auto opTypeValue = opType.getStringData();
+        opTypeValue != DocumentSourceChangeStream::kUpdateOpType &&
+        opTypeValue != DocumentSourceChangeStream::kReplaceOpType &&
+        opTypeValue != DocumentSourceChangeStream::kDeleteOpType) {
         return input;
     }
 

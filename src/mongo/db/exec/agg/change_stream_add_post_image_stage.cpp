@@ -88,7 +88,7 @@ GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
     }
     auto opTypeVal = assertFieldHasType(
         input.getDocument(), DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
-    if (opTypeVal.getString() != DocumentSourceChangeStream::kUpdateOpType) {
+    if (opTypeVal.getStringData() != DocumentSourceChangeStream::kUpdateOpType) {
         return input;
     }
 
@@ -158,8 +158,8 @@ NamespaceString ChangeStreamAddPostImageStage::assertValidNamespace(
     auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::string);
     auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::string);
     NamespaceString nss(NamespaceStringUtil::deserialize(pExpCtx->getNamespaceString().tenantId(),
-                                                         dbName.getString(),
-                                                         collectionName.getString(),
+                                                         dbName.getStringData(),
+                                                         collectionName.getStringData(),
                                                          pExpCtx->getSerializationContext()));
 
     // Change streams on an entire database only need to verify that the database names match. If
@@ -177,21 +177,20 @@ NamespaceString ChangeStreamAddPostImageStage::assertValidNamespace(
 
 boost::optional<Document> ChangeStreamAddPostImageStage::generatePostImage(
     const Document& updateOp) const {
+    auto fullDocumentBeforeChange =
+        updateOp[DocumentSourceChangeStreamAddPostImage::kFullDocumentBeforeChangeFieldName];
+
     // If the 'fullDocumentBeforeChange' is present and null, then we already tried and failed to
     // look up a pre-image. We can't compute the post-image without it, so return early.
-    if (updateOp[DocumentSourceChangeStreamAddPostImage::kFullDocumentBeforeChangeFieldName]
-            .getType() == BSONType::null) {
+    if (fullDocumentBeforeChange.getType() == BSONType::null) {
         return boost::none;
     }
 
     // Otherwise, obtain the pre-image from the information in the input document.
     auto preImage = [&]() -> boost::optional<Document> {
         // Check whether we have already looked up the pre-image document.
-        if (!updateOp[DocumentSourceChangeStreamAddPostImage::kFullDocumentBeforeChangeFieldName]
-                 .missing()) {
-            return updateOp
-                [DocumentSourceChangeStreamAddPostImage::kFullDocumentBeforeChangeFieldName]
-                    .getDocument();
+        if (!fullDocumentBeforeChange.missing()) {
+            return fullDocumentBeforeChange.getDocument();
         }
 
         // Otherwise, we need to look it up ourselves. Extract the preImageId field.
@@ -211,19 +210,17 @@ boost::optional<Document> ChangeStreamAddPostImageStage::generatePostImage(
     }
 
     // Raw oplog update spec field must be provided for the update commands.
-    tassert(
-        5869002,
-        "Raw oplog update spec was missing or invalid in change stream",
-        updateOp[DocumentSourceChangeStreamAddPostImage::kRawOplogUpdateSpecFieldName].isObject());
+    auto rawOplogUpdateSpec =
+        updateOp[DocumentSourceChangeStreamAddPostImage::kRawOplogUpdateSpecFieldName];
+    tassert(5869002,
+            "Raw oplog update spec was missing or invalid in change stream",
+            rawOplogUpdateSpec.isObject());
 
     // Setup the UpdateDriver for performing the post-image computation.
     UpdateDriver updateDriver(pExpCtx);
-    const auto rawOplogUpdateSpec =
-        updateOp[DocumentSourceChangeStreamAddPostImage::kRawOplogUpdateSpecFieldName]
-            .getDocument()
-            .toBson();
     const auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(
-        rawOplogUpdateSpec, {false /* mustCheckExistenceForInsertOperations */});
+        rawOplogUpdateSpec.getDocument().toBson(),
+        {false /* mustCheckExistenceForInsertOperations */});
     // UpdateDriver only expects to apply a diff in the context of oplog application.
     updateDriver.setFromOplogApplication(true);
     updateDriver.parse(updateMod, {});
