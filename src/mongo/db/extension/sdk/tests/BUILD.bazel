@@ -22,6 +22,7 @@ mongo_cc_unit_test(
     srcs = [
         "aggregation_stage_test.cpp",
         "host_services_test.cpp",
+        "operation_metrics_test.cpp",
         "query_execution_context_test.cpp",
         "versioned_extension_test.cpp",
     ],
@@ -31,6 +32,7 @@ mongo_cc_unit_test(
         "//src/mongo:base",
         "//src/mongo/db/extension/host_connector:extensions_host_connector",
         "//src/mongo/db/extension/host_connector:host_services_adapter",
+        "//src/mongo/db/extension/host_connector/handle:host_handles",
         "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/extension/shared/handle",
         "//src/mongo/db/extension/shared/handle/aggregation_stage",

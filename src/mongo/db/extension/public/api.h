@@ -225,6 +225,45 @@ typedef struct MongoExtensionHostQueryShapeOptsVTable {
 } MongoExtensionHostQueryShapeOptsVTable;
 
 /**
+ * Operation metrics exposed by extensions.
+ *
+ * This struct represents performance and execution statistics collected during extension
+ * operations. Extensions can implement this interface to track and report various arbitrary metrics
+ * about their execution, such as timing information, resource usage, or operation counts. The host
+ * will periodically query these metrics for monitoring, diagnostics, and performance analysis
+ * purposes.
+ *
+ * Extensions are responsible for implementing the collection and aggregation of metrics,
+ * while the host is responsible for periodically retrieving, persisting, and exposing these metrics
+ * through MongoDB's monitoring interfaces.
+ */
+typedef struct MongoExtensionOperationMetrics {
+    const struct MongoExtensionOperationMetricsVTable* vtable;
+} MongoExtensionOperationMetrics;
+
+typedef struct MongoExtensionOperationMetricsVTable {
+    /**
+     * Destroy `metrics` and free any related resources.
+     */
+    void (*destroy)(MongoExtensionOperationMetrics* metrics);
+
+    /**
+     * Serializes the collected metrics into an arbitrary BSON object. Ownership is allocated by the
+     * extension and transferred to the host.
+     */
+    MongoExtensionStatus* (*serialize)(const MongoExtensionOperationMetrics* metrics,
+                                       MongoExtensionByteBuf** output);
+
+    /**
+     * Updates and aggregates existing metrics with current execution metrics. Note that the
+     * `arguments` byte view can be any format - for example, an opaque pointer, a serialized BSON
+     * message, a serialized struct, etc.
+     */
+    MongoExtensionStatus* (*update)(MongoExtensionOperationMetrics* metrics,
+                                    MongoExtensionByteView arguments);
+} MongoExtensionOperationMetricsVTable;
+
+/**
  * Possible explain verbosity levels.
  */
 typedef enum MongoExtensionExplainVerbosity : uint32_t {

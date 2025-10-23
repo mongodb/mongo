@@ -1,0 +1,25 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
+mongo_cc_library(
+    name = "host_handles",
+    srcs = [
+    ],
+    hdrs = [
+        "host_operation_metrics_handle.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/extension/public:api",
+        "//src/mongo/db/extension/shared",
+        "//src/mongo/db/extension/shared/handle",
+    ],
+)
