@@ -76,8 +76,6 @@ public:
 protected:
     AuthorizationManager* authzManager;
     ServiceContext::UniqueOperationContext operationContext;
-    RAIIServerParameterControllerForTest featureFlagController{
-        "featureFlagPreventDirectShardDDLsDuringPromotion", true};
 };
 
 TEST_F(DirectConnectionDDLHookTestReplicaSet, BasicRegisterUnauthorizedShardingDisabledWithNss) {
@@ -117,8 +115,6 @@ public:
 
 protected:
     AuthorizationManager* authzManager;
-    RAIIServerParameterControllerForTest featureFlagController{
-        "featureFlagPreventDirectShardDDLsDuringPromotion", true};
 };
 
 TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpAuthorizedDirectShardOpsWithNss) {

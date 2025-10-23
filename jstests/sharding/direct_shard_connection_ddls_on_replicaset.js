@@ -3,7 +3,7 @@
  * @tags: [
  *   # The test caches authenticated connections, so we do not support stepdowns
  *   does_not_support_stepdowns,
- *   featureFlagPreventDirectShardDDLsDuringPromotion
+ *   requires_fcv_83
  * ]
  */
 

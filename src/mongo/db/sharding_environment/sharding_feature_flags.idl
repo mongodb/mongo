@@ -237,5 +237,6 @@ feature_flags:
     featureFlagPreventDirectShardDDLsDuringPromotion:
         description: "Enable the prevention of direct shard connection DDL operations during addShard"
         cpp_varname: feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
