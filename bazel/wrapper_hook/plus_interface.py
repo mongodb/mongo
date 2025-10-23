@@ -1,3 +1,4 @@
+import difflib
 import os
 import pathlib
 import platform
@@ -183,7 +184,20 @@ def test_runner_interface(
                     ):
                         bin_targets.append(bin_target)
                         real_target = bin_target
-                replacements[arg] = [real_target]
+                if not real_target:
+                    # Target not found - suggest similar ones and pass through
+                    suggestions = difflib.get_close_matches(test_name, sources_to_bin.keys(), n=5)
+                    error_msg = f"WARNING: Target '{arg}' not found"
+                    if suggestions:
+                        error_msg += "\n\nDid you mean one of these?\n"
+                        for suggestion in suggestions:
+                            error_msg += f"  +{suggestion}\n"
+                    else:
+                        error_msg += " and no similar targets."
+                    print(error_msg, file=sys.stderr)
+                    # Pass through the argument unchanged: it might be an important argument
+                else:
+                    replacements[arg] = [real_target]
             else:
                 # defer source targets to see if we can skip redundant tests
                 source_targets[test_name] = [arg, real_target]
