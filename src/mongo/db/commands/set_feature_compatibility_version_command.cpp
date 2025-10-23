@@ -56,6 +56,7 @@
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/drop_collection_coordinator.h"
+#include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
@@ -373,6 +374,30 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
         request.setWriteConcern(defaultMajorityWriteConcern());
         return request;
     }()));
+}
+
+// TODO (SERVER-98118): Remove once v9.0 become last-lts.
+void _resetPlacementHistory(OperationContext* opCtx, const FCV requestedVersion) {
+    // TODO (SERVER-108188): Avoid resetting config.placementHistory if its initialization metadata
+    // already bring the expected version.
+    if (!feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabledOnVersion(
+            requestedVersion)) {
+        return;
+    }
+
+    ConfigsvrResetPlacementHistory configsvrRequest;
+    configsvrRequest.setDbName(DatabaseName::kAdmin);
+    configsvrRequest.setWriteConcern(defaultMajorityWriteConcern());
+
+    const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
+    const auto response =
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                DatabaseName::kAdmin,
+                                configsvrRequest.toBSON(),
+                                Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 
 void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
@@ -701,6 +726,19 @@ public:
                     // Waiting for recovery here to avoid waiting for recovery while holding the
                     // fcvChangeRegion
                     ShardingDDLCoordinatorService::getService(opCtx)->waitForRecovery(opCtx);
+
+                    if (requestedVersion <= actualVersion) {
+                        // A background initialization of config.placementHistory may be setting
+                        // cluster parameters (a condition that may cause this command to fail with
+                        // a CannotDowngrade error in the checks performed under the
+                        // fcvChangeRegion); perform a best-effort drain to avoid the scenario.
+                        ShardingDDLCoordinatorService::getService(opCtx)
+                            ->waitForOngoingCoordinatorsToFinish(
+                                opCtx, [](const ShardingDDLCoordinator& instance) -> bool {
+                                    return instance.operationType() ==
+                                        DDLCoordinatorTypeEnum::kInitializePlacementHistory;
+                                });
+                    }
                 }
 
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
@@ -737,11 +775,11 @@ public:
 
                 // If this is a config server, then there must be no active
                 // SetClusterParameterCoordinator instances active when downgrading.
-                if (role && role->has(ClusterRole::ConfigServer)) {
+                if (role && role->has(ClusterRole::ConfigServer) &&
+                    requestedVersion < actualVersion) {
                     uassert(ErrorCodes::CannotDowngrade,
                             "Cannot downgrade while cluster server parameters are being set",
-                            (requestedVersion > actualVersion ||
-                             ConfigsvrCoordinatorService::getService(opCtx)
+                            (ConfigsvrCoordinatorService::getService(opCtx)
                                  ->areAllCoordinatorsOfTypeFinished(
                                      opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter)));
                 }
@@ -1902,6 +1940,19 @@ private:
             feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
                 requestedVersion)) {
             _createConfigSessionsCollectionLocally(opCtx);
+        }
+
+        // The content of config.placementHistory needs to be recomputed after ensuring that all
+        // shards (including a possible embedded config server) reached the kComplete FCV phase, so
+        // that the routine has to be invoked here (rather than embedding it within
+        // _upgradeServerMetadata()).
+        // Such a choice takes also into account the possibility that a series of config server
+        // stepdown events causes the cluster to reach the "FCV upgraded" state without never
+        // executing _resetPlacementHistory(): if this occurs, change stream readers will still have
+        // the capability of detecting the issue at targeting time and lazily remediate it.
+        // TODO (SERVER-98118): Remove once v9.0 become last-lts.
+        if (isConfigsvr) {
+            _resetPlacementHistory(opCtx, requestedVersion);
         }
 
         // TODO (SERVER-97816): Remove once 9.0 becomes last lts.
