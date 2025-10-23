@@ -35,6 +35,8 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 
@@ -62,7 +64,10 @@ class RateLimiter {
         WindowBasedPolicy(WindowBasedPolicy&&) = delete;
         WindowBasedPolicy& operator=(WindowBasedPolicy&&) = delete;
         ~WindowBasedPolicy() = default;
-        WindowBasedPolicy() = default;
+        WindowBasedPolicy() {
+            ObservableMutexRegistry::get().add(
+                "QueryStats::RateLimiter::WindowBasedPolicy::_windowMutex", _windowMutex);
+        };
         /*
          * Getter for the sampling rate.
          */
@@ -125,7 +130,7 @@ class RateLimiter {
         /*
          * Mutex used when reading/writing the window.
          */
-        stdx::mutex _windowMutex;
+        ObservableMutex<stdx::mutex> _windowMutex;
     };
 
     struct SampleBasedPolicy {
