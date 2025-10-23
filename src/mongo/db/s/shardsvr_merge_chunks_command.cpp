@@ -198,6 +198,11 @@ public:
             return false;
         }
 
+        if (SimpleBSONObjComparator::kInstance.evaluate(minKey >= maxKey)) {
+            errmsg = "the specified max bound must be greater than the specified min bound";
+            return false;
+        }
+
         OID epoch;
         if (!FieldParser::extract(cmdObj, epochField, &epoch, &errmsg)) {
             return false;
