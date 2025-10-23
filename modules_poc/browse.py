@@ -534,7 +534,8 @@ class FilesTree(Tree):
 
         def seek(file):
             for row in tree.root.children:
-                if row.data.name == file.name:
+                # rows separating marked and unmarked files have None in row.data
+                if type(row.data) == File and row.data.name == file.name:
                     tree.center_scroll = True
                     row.expand()
                     tree.move_cursor(row, animate=True)
