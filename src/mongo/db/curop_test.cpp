@@ -657,8 +657,9 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();
         ASSERT_FALSE(state.hasField("delinquencyInfo"));
-        // Field numInterruptChecks should be always shown.
+        // Field numInterruptChecks and priorityLowered should be always shown.
         ASSERT_TRUE(state.hasField("numInterruptChecks"));
+        ASSERT_TRUE(state.hasField("priorityLowered"));
     }
 
     // If the delinquent stats are not zero, they *are* included in the state.
@@ -694,6 +695,38 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
                   200 - interval.count());
         ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(),
                   200 - interval.count());
+    }
+}
+
+TEST(CurOpTest, ReportStateIncludesPriorityLowered) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+    curOp->ensureStarted();
+
+    // 1. Check the default state.
+    // The 'priorityLowered' field should always be present and default to 'false'.
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+
+        ASSERT_TRUE(state.hasField("priorityLowered"));
+        ASSERT_FALSE(state["priorityLowered"].Bool());
+    }
+
+    // 2. Lower the operation's priority via the ExecutionAdmissionContext.
+    ExecutionAdmissionContext::get(opCtx.get()).priorityLowered();
+
+    // 3. Check the state again.
+    // The 'priorityLowered' field should now be 'true'.
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+
+        ASSERT_TRUE(state.hasField("priorityLowered"));
+        ASSERT_TRUE(state["priorityLowered"].Bool());
     }
 }
 

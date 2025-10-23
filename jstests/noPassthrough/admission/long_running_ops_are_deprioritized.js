@@ -118,8 +118,6 @@ const testIndexedLongRunningRegexIsDeprioritized = function () {
 testIndexedLongRunningRegexIsDeprioritized();
 
 const testMultiDocumentTransactionIsNotDeprioritized = function () {
-    // TODO (SERVER-110400): Use traceability to verify the priority of multidocument txn.
-
     // Even though this transaction contains an operation that would normally be deprioritized (an
     // unbounded collection scan), the transaction itself should run with normal priority.
     const lowPriorityBefore = numLowPriorityReads();

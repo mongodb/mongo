@@ -1143,6 +1143,9 @@ void CurOp::reportState(BSONObjBuilder* builder,
     if (!parent() && isStarted()) {
         builder->append("numInterruptChecks", opCtx->numInterruptChecks());
         const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+
+        builder->append("priorityLowered", admCtx.getPriorityLowered());
+
         const auto* stats = opCtx->overdueInterruptCheckStats();
         if (admCtx.getDelinquentAcquisitions() > 0 ||
             (stats && stats->overdueInterruptChecks.loadRelaxed() > 0)) {

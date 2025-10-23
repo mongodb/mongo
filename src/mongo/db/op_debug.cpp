@@ -465,6 +465,9 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("numInterruptChecks", opCtx->numInterruptChecks());
 
         const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+
+        pAttrs->add("priorityLowered", admCtx.getPriorityLowered());
+
         // Note that we don't record delinquency stats around ticketing when in a
         // multi-document transaction, since operations within multi-document transactions hold
         // tickets for a long time by design and reporting them as delinquent will just create
