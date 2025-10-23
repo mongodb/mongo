@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/metadata/arrayness_trie.h"
 
+using namespace mongo::multikey_paths;
+
 namespace mongo {
 
 void PathArrayness::addPath(FieldPath path, MultikeyComponents multikeyPath) {
@@ -42,9 +44,35 @@ bool PathArrayness::isPathArray(FieldPath path) const {
     return true;
 }
 
+void PathArrayness::TrieNode::visualizeTrie(std::string fieldName, int depth) const {
+    for (int i = 0; i < depth; ++i) {
+        std::cout << "  ";
+    }
+
+    std::cout << fieldName << "(" << _isArray << ")" << std::endl;
+
+    // Recursively print children
+    for (auto it = _children.begin(); it != _children.end(); ++it) {
+        it->second->visualizeTrie(it->first, depth + 1);
+    }
+}
+
 void PathArrayness::TrieNode::insertPath(const FieldPath& path,
                                          const MultikeyComponents& multikeyPath,
-                                         size_t depth) {}
+                                         size_t depth) {
+    if (depth >= path.getPathLength()) {
+        return;
+    }
+
+    // Insert the top level field.
+    std::string fieldNameToInsert = std::string(path.getFieldName(depth));
+    if (!_children.contains(fieldNameToInsert)) {
+        _children.insert({fieldNameToInsert, new TrieNode(multikeyPath.count(depth))});
+    }
+
+    // Recursively invoke the remaining path.
+    _children.at(fieldNameToInsert)->insertPath(path, multikeyPath, ++depth);
+}
 
 PathArrayness build(std::vector<IndexEntry> entries) {
     PathArrayness root;

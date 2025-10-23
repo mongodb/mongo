@@ -60,7 +60,7 @@ public:
      * Debugging helper to visualize trie.
      */
     void visualizeTrie() const {
-        _root->visualizeTrie();
+        _root->visualizeTrie("");
     }
 
 private:
@@ -95,7 +95,7 @@ private:
         /**
          * Debugging helper to visualize trie.
          */
-        void visualizeTrie(int depth = 0) const;
+        void visualizeTrie(std::string fieldName, int depth = 0) const;
 
     private:
         /**

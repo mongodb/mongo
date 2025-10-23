@@ -74,7 +74,9 @@ using MultikeyPaths = boost::container::small_vector<MultikeyComponents, kFewCom
 
 namespace multikey_paths {
 
-std::string toString(MultikeyPaths paths);
+std::string toString(const MultikeyPaths& paths);
+
+std::string multikeyComponentsToString(const MultikeyComponents& paths);
 
 /**
  * Encodes 'paths' as binary data and appends it to 'builder'.

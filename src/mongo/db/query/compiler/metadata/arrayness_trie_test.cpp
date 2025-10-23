@@ -29,21 +29,54 @@
 
 #include "mongo/db/query/compiler/metadata/arrayness_trie.h"
 
-#include "mongo/db/field_ref.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-
 TEST(ArraynessTrie, InsertIntoTrie) {
-    FieldPath field_ABC("a.b.c"_sd);
 
-    MultikeyComponents multikeyPaths{2U};
+    // Array: ["a"]
+    FieldPath field_A("a");
+    MultikeyComponents multikeyPaths_A{0U};
 
-    PathArrayness pathArrayness;
+    // Array: ["a", "a.b.c"]
+    FieldPath field_ABC("a.b.c");
+    MultikeyComponents multikeyPaths_ABC{{0U, 2U}};
 
-    pathArrayness.addPath(field_ABC, multikeyPaths);
+    // Array: ["a", "a.b.d"]
+    FieldPath field_ABD("a.b.d");
+    MultikeyComponents multikeyPaths_ABD{{0U, 2U}};
+
+    // Array: ["a", "a.b.c"]
+    FieldPath field_ABCJ("a.b.c.j");
+    MultikeyComponents multikeyPaths_ABCJ{{0U, 2U}};
+
+    // Array: ["a"]
+    FieldPath field_ABDE("a.b.d.e");
+    MultikeyComponents multikeyPaths_ABDE{0U};
+
+    // Array: []
+    FieldPath field_BDE("b.d.e");
+    MultikeyComponents multikeyPaths_BDE{};
+
+    std::vector<FieldPath> fields{field_A, field_ABC, field_ABD, field_ABCJ, field_ABDE, field_BDE};
+    std::vector<MultikeyComponents> multikeyness{multikeyPaths_A,
+                                                 multikeyPaths_ABC,
+                                                 multikeyPaths_ABD,
+                                                 multikeyPaths_ABCJ,
+                                                 multikeyPaths_ABDE,
+                                                 multikeyPaths_BDE};
+
+    PathArrayness trie;
+
+    for (size_t i = 0; i < fields.size(); i++) {
+        trie.addPath(fields[i], multikeyness[i]);
+    }
+
+    trie.visualizeTrie();
+
+    ASSERT_EQ(trie.isPathArray(field_A), true);
 }
 
 }  // namespace mongo
