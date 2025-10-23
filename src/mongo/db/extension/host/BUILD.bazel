@@ -100,6 +100,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:parse_options_mongo_extension",
         "//src/mongo/db/extension/test_examples:sharded_execution_serialization_mongo_extension",
         "//src/mongo/db/extension/test_examples:test_options_mongo_extension",
+        "//src/mongo/db/extension/test_examples:toaster_mongo_extension",
     ],
     tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({

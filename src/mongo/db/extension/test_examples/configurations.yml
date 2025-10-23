@@ -11,3 +11,7 @@ extensions:
     extensionOptions:
       checkMax: true
       max: 10
+  toaster:
+    extensionOptions:
+      maxToasterHeat: 5
+      allowBagels: false

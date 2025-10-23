@@ -35,6 +35,7 @@ extensions_with_config(
         ":debug_logging_mongo_extension",
         ":parse_options_mongo_extension",
         ":test_options_mongo_extension",
+        ":toaster_mongo_extension",
         ":extension_errors_mongo_extension",
         ":shapify_mongo_extension",
         ":sharded_execution_serialization_mongo_extension",
@@ -79,6 +80,7 @@ extensions_with_config(
     for extension_name in [
         "test_options",
         "parse_options",
+        "toaster",
     ]
 ]
 
