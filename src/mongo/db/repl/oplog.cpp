@@ -92,6 +92,7 @@
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -103,6 +104,7 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -134,6 +136,7 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
@@ -557,6 +560,23 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
 
     WriteUnitOfWork wuow(opCtx);
     if (slot.isNull()) {
+        // Declaring Write intent ensures we are the primary node and this operation will be
+        // interrupted by StepDown. Only a primary node should be able to allocate optimes for new
+        // entries in the oplog.
+        boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            try {
+                writeGuard.emplace(opCtx);
+            } catch (const DBException& ex) {
+                printStackTrace();
+                LOGV2_ERROR(11006000,
+                            "Could not acquire write intent when trying to reserve optime",
+                            "opCtx"_attr = opCtx->getOpID(),
+                            "reason"_attr = ex.toStatus());
+                throw;
+            }
+        }
+
         slot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
         // It would be better to make the oplogEntry a const reference. But because in some cases, a
         // new OpTime needs to be assigned within the WUOW as explained earlier, we instead pass
