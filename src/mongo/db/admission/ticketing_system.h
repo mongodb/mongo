@@ -71,7 +71,7 @@ public:
     static constexpr auto kLowPriorityName = "lowPriority"_sd;
     static constexpr auto kNormalPriorityName = "normalPriority"_sd;
 
-    enum class Operation { kRead = 0, kWrite };
+    enum class OperationType { kRead = 0, kWrite };
 
     struct RWTicketHolder {
         std::unique_ptr<TicketHolder> read;
@@ -129,7 +129,7 @@ public:
     /**
      * Sets the maximum queue depth for operations of a given priority and type.
      */
-    void setMaxQueueDepth(AdmissionContext::Priority p, Operation o, int32_t depth);
+    void setMaxQueueDepth(AdmissionContext::Priority p, OperationType o, int32_t depth);
 
     /**
      * Sets the maximum number of concurrent transactions (i.e., available tickets) for a given
@@ -137,7 +137,7 @@ public:
      */
     void setConcurrentTransactions(OperationContext* opCtx,
                                    AdmissionContext::Priority p,
-                                   Operation o,
+                                   OperationType o,
                                    int32_t transactions);
 
     /**
@@ -168,7 +168,7 @@ public:
      * Attempts to acquire a ticket within a deadline, 'until'.
      */
     boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
-                                               Operation o,
+                                               OperationType o,
                                                Date_t until) const;
 
     /**
@@ -181,7 +181,7 @@ private:
     /**
      * Returns the appropriate TicketHolder based on the given priority and operation type.
      */
-    TicketHolder* _getHolder(AdmissionContext::Priority p, Operation o) const;
+    TicketHolder* _getHolder(AdmissionContext::Priority p, OperationType o) const;
 
     /**
      * Encapsulates the ticketing system's concurrency mode and the logic that defines its behavior.

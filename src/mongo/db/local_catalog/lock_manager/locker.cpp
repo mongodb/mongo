@@ -1133,8 +1133,8 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
 
     _ticket = _ticketingSystem->waitForTicketUntil(
         opCtx,
-        isSharedLockMode(mode) ? admission::TicketingSystem::Operation::kRead
-                               : admission::TicketingSystem::Operation::kWrite,
+        isSharedLockMode(mode) ? admission::TicketingSystem::OperationType::kRead
+                               : admission::TicketingSystem::OperationType::kWrite,
         deadline);
 
     if (!_ticket) {

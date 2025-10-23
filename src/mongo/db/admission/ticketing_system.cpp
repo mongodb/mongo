@@ -102,7 +102,7 @@ Status TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth(
     std::int32_t newWriteMaxQueueDepth) {
     return updateSettings("write max queue depth", [=](Client*, TicketingSystem* ticketingSystem) {
         ticketingSystem->setMaxQueueDepth(
-            AdmissionContext::Priority::kNormal, Operation::kWrite, newWriteMaxQueueDepth);
+            AdmissionContext::Priority::kNormal, OperationType::kWrite, newWriteMaxQueueDepth);
         return Status::OK();
     });
 }
@@ -111,7 +111,7 @@ Status TicketingSystem::NormalPrioritySettings::updateReadMaxQueueDepth(
     std::int32_t newReadMaxQueueDepth) {
     return updateSettings("read max queue depth", [=](Client*, TicketingSystem* ticketingSystem) {
         ticketingSystem->setMaxQueueDepth(
-            AdmissionContext::Priority::kNormal, Operation::kRead, newReadMaxQueueDepth);
+            AdmissionContext::Priority::kNormal, OperationType::kRead, newReadMaxQueueDepth);
         return Status::OK();
     });
 }
@@ -127,7 +127,7 @@ Status TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransaction
             }
             ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
                                                        AdmissionContext::Priority::kNormal,
-                                                       Operation::kWrite,
+                                                       OperationType::kWrite,
                                                        newWriteTransactions);
             return Status::OK();
         });
@@ -144,7 +144,7 @@ Status TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions
             }
             ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
                                                        AdmissionContext::Priority::kNormal,
-                                                       Operation::kRead,
+                                                       OperationType::kRead,
                                                        newReadTransactions);
             return Status::OK();
         });
@@ -178,7 +178,7 @@ Status TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth(
                           "without prioritization"};
         }
         ticketingSystem->setMaxQueueDepth(
-            AdmissionContext::Priority::kLow, Operation::kWrite, newWriteMaxQueueDepth);
+            AdmissionContext::Priority::kLow, OperationType::kWrite, newWriteMaxQueueDepth);
         return Status::OK();
     });
 }
@@ -193,7 +193,7 @@ Status TicketingSystem::LowPrioritySettings::updateReadMaxQueueDepth(
                           "without prioritization"};
         }
         ticketingSystem->setMaxQueueDepth(
-            AdmissionContext::Priority::kLow, Operation::kRead, newReadMaxQueueDepth);
+            AdmissionContext::Priority::kLow, OperationType::kRead, newReadMaxQueueDepth);
         return Status::OK();
     });
 }
@@ -215,7 +215,7 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions(
             }
             ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
                                                        AdmissionContext::Priority::kLow,
-                                                       Operation::kWrite,
+                                                       OperationType::kWrite,
                                                        newWriteTransactions);
             return Status::OK();
         });
@@ -238,7 +238,7 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions(
             }
             ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
                                                        AdmissionContext::Priority::kLow,
-                                                       Operation::kRead,
+                                                       OperationType::kRead,
                                                        newReadTransactions);
             return Status::OK();
         });
@@ -288,7 +288,9 @@ bool TicketingSystem::usesPrioritization() const {
     return _state.loadRelaxed().usesPrioritization();
 }
 
-void TicketingSystem::setMaxQueueDepth(AdmissionContext::Priority p, Operation o, int32_t depth) {
+void TicketingSystem::setMaxQueueDepth(AdmissionContext::Priority p,
+                                       OperationType o,
+                                       int32_t depth) {
     auto* holder = _getHolder(p, o);
     invariant(holder != nullptr);
     holder->setMaxQueueDepth(depth);
@@ -296,7 +298,7 @@ void TicketingSystem::setMaxQueueDepth(AdmissionContext::Priority p, Operation o
 
 void TicketingSystem::setConcurrentTransactions(OperationContext* opCtx,
                                                 AdmissionContext::Priority p,
-                                                Operation o,
+                                                OperationType o,
                                                 int32_t transactions) {
     auto* holder = _getHolder(p, o);
     invariant(holder != nullptr);
@@ -339,19 +341,19 @@ void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
 
     setConcurrentTransactions(opCtx,
                               AdmissionContext::Priority::kNormal,
-                              Operation::kRead,
+                              OperationType::kRead,
                               gConcurrentReadTransactions.load());
     setConcurrentTransactions(opCtx,
                               AdmissionContext::Priority::kNormal,
-                              Operation::kWrite,
+                              OperationType::kWrite,
                               gConcurrentWriteTransactions.load());
     setConcurrentTransactions(opCtx,
                               AdmissionContext::Priority::kLow,
-                              Operation::kRead,
+                              OperationType::kRead,
                               gConcurrentReadLowPriorityTransactions.load());
     setConcurrentTransactions(opCtx,
                               AdmissionContext::Priority::kLow,
-                              Operation::kWrite,
+                              OperationType::kWrite,
                               gConcurrentWriteLowPriorityTransactions.load());
 }
 
@@ -451,7 +453,7 @@ void TicketingSystem::incrementDelinquencyStats(OperationContext* opCtx) {
                                                 : AdmissionContext::Priority::kNormal;
     {
         const auto& stats = admCtx.readDelinquencyStats();
-        _getHolder(priority, Operation::kRead)
+        _getHolder(priority, OperationType::kRead)
             ->incrementDelinquencyStats(
                 stats.delinquentAcquisitions.loadRelaxed(),
                 Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
@@ -460,7 +462,7 @@ void TicketingSystem::incrementDelinquencyStats(OperationContext* opCtx) {
 
     {
         const auto& stats = admCtx.writeDelinquencyStats();
-        _getHolder(priority, Operation::kWrite)
+        _getHolder(priority, OperationType::kWrite)
             ->incrementDelinquencyStats(
                 stats.delinquentAcquisitions.loadRelaxed(),
                 Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
@@ -469,7 +471,7 @@ void TicketingSystem::incrementDelinquencyStats(OperationContext* opCtx) {
 }
 
 boost::optional<Ticket> TicketingSystem::waitForTicketUntil(OperationContext* opCtx,
-                                                            Operation o,
+                                                            OperationType o,
                                                             Date_t until) const {
     ExecutionAdmissionContext* admCtx = &ExecutionAdmissionContext::get(opCtx);
 
@@ -508,7 +510,7 @@ void TicketingSystem::startThroughputProbe() {
     _throughputProbing.start();
 }
 
-TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, Operation o) const {
+TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, OperationType o) const {
     if (p == AdmissionContext::Priority::kExempt) {
         // Redirect kExempt priority to the normal ticket pool as it bypasses acquisition.
         return _getHolder(AdmissionContext::Priority::kNormal, o);
@@ -518,7 +520,7 @@ TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, Operatio
     invariant(index < _holders.size());
 
     const auto& rwHolder = _holders[index];
-    return (o == Operation::kRead) ? rwHolder.read.get() : rwHolder.write.get();
+    return (o == OperationType::kRead) ? rwHolder.read.get() : rwHolder.write.get();
 }
 
 bool TicketingSystem::TicketingState::usesPrioritization() const {
