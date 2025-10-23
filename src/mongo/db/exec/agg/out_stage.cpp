@@ -217,9 +217,10 @@ void OutStage::initialize() {
 
     createTemporaryCollection();
 
-    // Save the collection UUID to detect if it was dropped during execution. Timeseries will detect
-    // this when inserting as it doesn't implicity create collections on insert.
-    if (!_timeseries) {
+    // Save the collection UUID to detect if it was dropped during execution. Viewful timeseries
+    // will detect this when inserting as it doesn't implicitly create collections on insert.
+    // TODO SERVER-111600 remove this conditional once 9.0 becomes last LTS.
+    if (!_timeseries || _viewlessTimeseriesEnabled) {
         _tempNsUUID = pExpCtx->getMongoProcessInterface()->fetchCollectionUUIDFromPrimary(
             pExpCtx->getOperationContext(), _tempNs);
     }
@@ -342,9 +343,10 @@ void OutStage::renameTemporaryCollection() {
     const NamespaceString& outputNs = makeBucketNsIfLegacyTimeseries(_outputNs);
 
     // Use the UUID to catch a mismatch if the temp collection was dropped and recreated in case of
-    // stepdown. Timeseries has it's own handling for this case as the dropped temp collection isn't
-    // implicitly recreated.
-    if (!_timeseries) {
+    // stepdown. Viewful timeseries has it's own handling for this case as the dropped temp
+    // collection isn't implicitly recreated.
+    // TODO SERVER-111600 remove this conditional once 9.0 becomes last LTS.
+    if (!_timeseries || _viewlessTimeseriesEnabled) {
         tassert(8085301, "No uuid found for $out temporary namespace", _tempNsUUID);
         const UUID currentTempNsUUID =
             pExpCtx->getMongoProcessInterface()->fetchCollectionUUIDFromPrimary(

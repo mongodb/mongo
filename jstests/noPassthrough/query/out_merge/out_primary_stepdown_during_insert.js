@@ -4,16 +4,13 @@
  * primary and is deleted during step down which can result in incomplete $out results being
  * returned to the user. This test asserts that an error is thrown.
  *
- * @tags: [
- *   # TODO SERVER-112061 re-enable this test in viewless timeseries suites
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
- * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const sourceCollName = "sourceColl";
 
@@ -30,9 +27,8 @@ function setUpFn(db) {
     insertDocuments(db[sourceCollName]);
 }
 
-function runTest(connInfo) {
+function runTest(connInfo, isSharded) {
     const db = connInfo.conn.getDB("test");
-    setUpFn(db);
     connInfo.awaitReplication();
 
     for (const failpoint of ["hangWhileBuildingDocumentSourceOutBatch", "hangDollarOutAfterInsert"]) {
@@ -40,10 +36,11 @@ function runTest(connInfo) {
         // false.
         for (const isTimeseries of [false, true]) {
             for (const useAPIStrict of [false, true]) {
-                jsTestLog(
-                    "Testing " +
-                        (isTimeseries ? " timeseries " : " normal ") +
-                        " collection with apiStrict set to " +
+                setUpFn(db);
+                jsTest.log.info(
+                    "Starting to test " +
+                        (isTimeseries ? "timeseries " : "normal ") +
+                        "collection with apiStrict set to " +
                         useAPIStrict +
                         " and with failpoint " +
                         failpoint +
@@ -89,7 +86,7 @@ function runTest(connInfo) {
 
                 // Step down the primary and keep checking for a new primary
                 assert.soon(function () {
-                    jsTestLog("Stepping down primary");
+                    jsTest.log.info("Stepping down primary");
                     // Stepdown the primary.
                     let initialPrimary = connInfo.getPrimary();
                     assert.commandWorked(initialPrimary.adminCommand({replSetStepDown: 60, force: true}));
@@ -102,12 +99,25 @@ function runTest(connInfo) {
 
                 fp.off();
                 awaitAgg();
+
+                // No temporary collections should be left behind after $out fails. There is a known bug
+                // (see SERVER-112874) for viewful timeseries on a sharded cluster, so we avoid validating
+                // this case.
+                if (!isSharded || !isTimeseries || areViewlessTimeseriesEnabled(db)) {
+                    const collNames = db.getCollectionNames();
+                    const temporaryAggCollections = collNames.filter((coll) => coll.includes("tmp.agg_out"));
+                    assert.eq(
+                        temporaryAggCollections.length,
+                        0,
+                        "Temporary agg collection unexpectedly left behind: " + tojson(temporaryAggCollections),
+                    );
+                }
             }
         }
     }
 }
 
-jsTestLog("Testing against a replica set");
+jsTest.log.info("Testing against a replica set");
 let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -119,10 +129,10 @@ let connInfo = {
     getNodeRunningOut: () => rst.getSecondary(),
     awaitReplication: () => rst.awaitReplication(),
 };
-runTest(connInfo);
+runTest(connInfo, false);
 rst.stopSet();
 
-jsTestLog("Testing against a sharded cluster");
+jsTest.log.info("Testing against a sharded cluster");
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}, initiateWithDefaultElectionTimeout: true});
 connInfo = {
     conn: st.s,
@@ -131,5 +141,5 @@ connInfo = {
     getNodeRunningOut: () => st.s,
     awaitReplication: () => st.awaitReplicationOnShards(),
 };
-runTest(connInfo);
+runTest(connInfo, true);
 st.stop();
