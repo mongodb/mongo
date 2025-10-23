@@ -592,6 +592,42 @@ bool haveAcquiredConsistentCatalogAndSnapshot(const CollectionCatalog* catalogBe
         replTermBeforeSnapshot == replTermAfterSnapshot;
 }
 
+/**
+ * This function is responsible for acquiring an in-memory version of the CollectionCatalog and
+ * opening a snapshot such that the data contained in the in-memory CollectionCatalog matches the
+ * data in the durable catalog in that snapshot.
+ *
+ * It is used by readers who do not have any collection locks (a.k.a lock-free readers), and so
+ * there may be ongoing DDL operations concurrent with this function being called. This means we
+ * must take care to handle cases where the state of the catalog changes during the course of
+ * execution of this function.
+ *
+ * The high-level algorithm here is:
+ *  * Get the latest version of the catalog
+ *  * Open a snapshot
+ *  * Get the latest version of the catalog and check if it changed since opening the snapshot. If
+ *    it did, we need to retry, because that means that the version of the durable catalog that
+ *    would be read from the snapshot would be different from the in-memory CollectionCatalog.
+ *
+ * Note that it is still possible for the version of the CollectionCatalog obtained to be
+ * different from the durable catalog if there's a DDL operation pending commit at precisely the
+ * right time. This is okay because the CollectionCatalog tracks DDL entries pending commit and
+ * lock-free readers will check this state for the namespace they care about before deciding whether
+ * to use an entry from the CollectionCatalog or whether to read catalog information directly from
+ * the durable catalog instead.
+ *
+ * Also note that this retry algorithm is only necessary for readers who are not reading with a
+ * timestamp. Readers at points in time in the past (e.g. readers with the kProvided ReadSource)
+ * always will read directly from the durable catalog, and so it is not important for the in-memory
+ * CollectionCatalog to match the durable catalog for these readers. In the future, we may want to
+ * consider separating the code paths for timestamped and untimestamped writes, but for now, both
+ * cases flow through this same function.
+ *
+ * We also check for replication state changes before and after opening a snapshot, since the
+ * replication state determines the whether readers without a timestamp must read from the storage
+ * engine without a timestamp or whether they should read at the last applied timestamp. If the
+ * replication state changes, the opened snapshot is abandoned and the process is retried.
+ */
 std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(
     OperationContext* opCtx,
     const NamespaceStringOrUUIDRequests& acquisitionRequests,
@@ -1803,7 +1839,11 @@ void restoreTransactionResourcesToOperationContext(
         // Reestablish a consistent catalog snapshot (multi document transactions don't yield).
         auto [requests, isWriteAcquisition] = toNamespaceStringOrUUIDs(
             transactionResources.acquiredCollections, transactionResources.acquiredViews);
-        auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests, isWriteAcquisition);
+
+        bool isSnapshotOpen = shard_role_details::getRecoveryUnit(opCtx)->isActive();
+        auto catalog = isSnapshotOpen
+            ? CollectionCatalog::get(opCtx)
+            : getConsistentCatalogAndSnapshot(opCtx, requests, isWriteAcquisition);
 
         // The catalog epoch changes every time a replication rollback is performed. If a rollback
         // occurs while the query is yielded, the query might be resumed on a earlier point in

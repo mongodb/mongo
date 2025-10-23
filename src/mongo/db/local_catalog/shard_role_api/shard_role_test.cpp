@@ -54,6 +54,7 @@
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 #include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state_mock.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
+#include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/member_state.h"
@@ -3233,6 +3234,51 @@ TEST_F(ShardRoleTest, StashTransactionResourcesForMultiDocumentTransactionDouble
     // Acquisition should still be valid
     ASSERT_TRUE(acquisition.exists());
     ASSERT_EQ(nss, acquisition.nss());
+}
+
+TEST_F(ShardRoleTest, AcquireCollectionStashStepdownRestoreSucceedsInDbDirectClient) {
+    auto nss = nssShardedCollection1;
+
+    // Acquire a collection
+    PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
+    auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead},
+        MODE_IS);
+
+    ASSERT_TRUE(acquisition.exists());
+    ASSERT_TRUE(shard_role_details::getRecoveryUnit(operationContext())->isActive());
+    // Simulate a open a DBDirectClient
+    StashTransactionResourcesForDBDirect stashedTxnResources(operationContext());
+    operationContext()->getClient()->setInDirectClient(true);
+    {
+        ASSERT_TRUE(shard_role_details::TransactionResources::get(operationContext()).isEmpty());
+        ShardRoleTransactionResourcesStasherForPipeline stasher;
+        {
+            // Re-do the acquisition - this will cause recursive locking while sharding the same
+            // snapshot
+            auto acquisitionInDbDirectClient = acquireCollection(
+                operationContext(),
+                {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead},
+                MODE_IS);
+
+            // Stash transaction resources - the snapshot won't be abandoned due to recursive
+            // locking
+            stashTransactionResourcesFromOperationContext(operationContext(), &stasher);
+
+            ASSERT_TRUE(shard_role_details::getRecoveryUnit(operationContext())->isActive());
+
+            // Simulate stepdown - will cause the read source to change on restore
+            auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+            ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+            // Restore transaction resources - since a snapshot is already open, we should not try
+            // to change the read source or we would invariant
+            HandleTransactionResourcesFromStasher handler(operationContext(), &stasher);
+
+            ASSERT_TRUE(acquisitionInDbDirectClient.exists());
+        }
+    }
 }
 
 }  // namespace
