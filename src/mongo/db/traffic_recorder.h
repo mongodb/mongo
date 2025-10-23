@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/traffic_recorder/utils/task_scheduler.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/atomic_word.h"
@@ -49,7 +48,6 @@
 #include <queue>
 #include <string>
 
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
 
 namespace mongo {
@@ -73,7 +71,6 @@ struct TrafficRecordingPacket {
 class DataBuilder;
 void appendPacketHeader(DataBuilder& builder, const TrafficRecordingPacket& packet);
 
-
 /**
  * A service context level global which captures packet capture through the transport layer if it is
  * enabled.  The service is intended to be turned on and off via startTrafficRecording and
@@ -88,6 +85,7 @@ public:
 
     static TrafficRecorder& get(ServiceContext* svc);
 
+    TrafficRecorder();
     virtual ~TrafficRecorder();
 
     // Start and stop block until the associate operation has succeeded or failed
@@ -145,10 +143,6 @@ protected:
             return _tickSource;
         }
 
-        boost::optional<std::pair<Date_t, Date_t>> getScheduledTimeWindow() const {
-            return _scheduledTimes;
-        }
-
         AtomicWord<uint64_t> order{0};
         AtomicWord<Microseconds> startTime{
             Microseconds::zero()};  // Start time of the recording in microseconds since the epoch.
@@ -169,8 +163,6 @@ protected:
         const std::string _path;
         const int64_t _maxLogSize;
 
-        boost::optional<std::pair<Date_t, Date_t>> _scheduledTimes = boost::none;
-
         TickSource* _tickSource;
 
         stdx::thread _thread;
@@ -183,14 +175,9 @@ protected:
         Status _result = Status::OK();
     };
 
-    using LockedRecordingHandle =
-        decltype(std::declval<mongo::synchronized_value<std::shared_ptr<Recording>>>()
-                     .synchronize());
-
-    [[nodiscard]] LockedRecordingHandle _prepare(const StartTrafficRecording& options,
-                                                 ServiceContext* svcCtx);
-    void _start(LockedRecordingHandle handle, ServiceContext* svcCtx);
-    void _stop(LockedRecordingHandle handle, ServiceContext* svcCtx);
+    void _prepare(const StartTrafficRecording& options, ServiceContext* svcCtx);
+    void _start(ServiceContext* svcCtx);
+    void _stop(ServiceContext* svcCtx);
     void _fail();
 
 
@@ -216,7 +203,6 @@ protected:
     AtomicWord<bool> _shouldRecord = false;
 
     mongo::synchronized_value<std::shared_ptr<Recording>> _recording;
-    std::unique_ptr<TaskScheduler> _worker = makeTaskScheduler("TrafficRecorderScheduler");
 };
 
 class TrafficRecorderForTest : public TrafficRecorder {
