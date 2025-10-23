@@ -32,6 +32,8 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/local_catalog/ddl/direct_connection_ddl_hook.h"
 #include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
+#include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/session/session_killer.h"
 
 namespace mongo {
 namespace {
@@ -68,6 +70,13 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrDrainOngoingDDLOperations can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+            // Kill ongoing multi-doc transactions in case they have already run a DDL operation
+            // like create collection but have not yet committed. We do this before waiting for DDLs
+            // so that we don't bother waiting on a DDL which is part of a transaction that we will
+            // kill anyways.
+            killOngoingTransactions(opCtx);
+            // Drain any ongoing DDL operations. This should be fast since replica set level DDL
+            // operations are generally short.
             waitForOngoingDDLOperationsToComplete(opCtx);
         }
 
@@ -89,6 +98,13 @@ public:
                         ->isAuthorizedForActionsOnResource(
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
                             ActionType::internal));
+        }
+
+        void killOngoingTransactions(OperationContext* opCtx) {
+            SessionKiller::Matcher matcherAllSessions(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+            killSessionsAbortUnpreparedTransactions(
+                opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToAddShard);
         }
 
         void waitForOngoingDDLOperationsToComplete(OperationContext* opCtx) {

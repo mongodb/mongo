@@ -972,6 +972,11 @@ error_codes:
       name: StreamProcessorAtlasConnectionErrorDuringFirstStart,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
+  - {
+      code: 471,
+      name: InterruptedDueToAddShard,
+      categories: [Interruption, RetriableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 

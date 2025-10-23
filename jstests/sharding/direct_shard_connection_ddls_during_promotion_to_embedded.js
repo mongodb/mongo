@@ -11,6 +11,7 @@
 import {before, beforeEach, afterEach, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 const testCommands = [
     {
@@ -218,6 +219,11 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             configsvr: "",
         });
 
+        jsTest.log.info("Recreating a connection via regular user");
+        let newConn = new Mongo(this.configRS.getPrimary().host);
+        this.testDBDirectConnection = newConn.getDB("testDB");
+        assert(this.testDBDirectConnection.auth("user", "x"), "Authentication failed");
+
         jsTest.log.info("Checking that sharding is not yet initialized on the config server replica set");
         this.configRS.asCluster(this.configRS.getPrimary(), () => {
             const res = assert.commandWorked(this.configRS.getPrimary().getDB("admin").runCommand({shardingState: 1}));
@@ -249,9 +255,7 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         jsTest.log.info("Waiting hangAfterShardingInitialization");
         shardInitializationFP.wait();
 
-        const userDirectConnection = new Mongo(this.configRS.getPrimary().host);
-        this.testDBDirectConnection = userDirectConnection.getDB("testDB");
-        assert(this.testDBDirectConnection.auth("user", "x"), "Authentication failed");
+        jsTest.log.info("Checking that direct DDLs are disallowed without special permissions");
         testCommands.forEach((testCommand) => {
             jsTest.log.info(
                 `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
@@ -330,15 +334,32 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
         promotionParallelShell();
     });
 
+    it("Transactions are aborted during promotion", () => {
+        jsTest.log.info("Start a transaction");
+        let session = this.testDBDirectConnection.getMongo().startSession();
+        session.startTransaction({
+            writeConcern: {w: "majority"},
+        });
+        assert.commandWorked(session.getDatabase("testDB").createCollection("foo"));
+
+        jsTest.log.info("Promote to sharded");
+        const adminDBMongosConnection = this.mongos.getDB("admin");
+        assert(adminDBMongosConnection.auth("admin", "x"), "Authentication failed");
+        assert.commandWorked(adminDBMongosConnection.adminCommand({"transitionFromDedicatedConfigServer": 1}));
+
+        jsTest.log.info("Check that the transaction was aborted");
+        const res = session.getDatabase("testDB").runCommand({insert: "foo", documents: [{x: 1}]});
+        assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+        assert(TxnUtil.isTransientTransactionError(res));
+    });
+
     it("Direct DDLs after promotion", () => {
         jsTest.log.info("Promoting replica set to sharded cluster with embedded config server");
         const adminDBMongosConnection = this.mongos.getDB("admin");
         assert(adminDBMongosConnection.auth("admin", "x"), "Authentication failed");
         assert.commandWorked(adminDBMongosConnection.adminCommand({"transitionFromDedicatedConfigServer": 1}));
 
-        const userDirectConnection = new Mongo(this.configRS.getPrimary().host);
-        this.testDBDirectConnection = userDirectConnection.getDB("testDB");
-        assert(this.testDBDirectConnection.auth("user", "x"), "Authentication failed");
+        jsTest.log.info("Checking that direct DDLs are disallowed without special permissions");
         testCommands.forEach((testCommand) => {
             jsTest.log.info(
                 `Checking that ${testCommand.name} is not allowed without directShardOperations permissions`,
