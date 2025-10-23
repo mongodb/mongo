@@ -290,7 +290,16 @@ typedef enum MongoExtensionAggStageType : uint32_t {
      * NoOp stage.
      */
     kNoOp = 0,
+
+    /**
+     * Desugar stage.
+     */
     kDesugar = 1,
+
+    /**
+     * Source stage.
+     */
+    kSource = 2,
 } MongoExtensionAggStageType;
 
 /**

@@ -171,6 +171,7 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
     // TODO SERVER-112178: Add case for DocumentSourceExtensionExpandable.
     switch (descriptor.getType()) {
         case MongoExtensionAggStageType::kNoOp:
+        case MongoExtensionAggStageType::kSource:
             registerStage(nameAsString, id, descriptor);
             break;
         default:

@@ -709,6 +709,18 @@ TEST_F(AggStageTest, DesugarToEmptyDescriptorParseTest) {
     ASSERT_TRUE(std::holds_alternative<extension::AggStageAstNodeHandle>(expanded[0]));
 }
 
+TEST_F(AggStageTest, SourceStageParseTest) {
+    auto descriptor = std::make_unique<ExtensionAggStageDescriptor>(
+        shared_test_stages::SourceAggStageDescriptor::make());
+    auto handle = extension::AggStageDescriptorHandle{descriptor.get()};
+
+    BSONObj stageBson =
+        BSON(shared_test_stages::SourceAggStageDescriptor::kStageName << BSON("foo" << true));
+    auto parseNodeHandle = handle.parse(stageBson);
+    ASSERT_EQ(shared_test_stages::SourceAggStageDescriptor::kStageName, handle.getName());
+    ASSERT_EQ(::MongoExtensionAggStageType::kSource, handle.getType());
+}
+
 class FieldPathQueryShapeParseNode : public sdk::AggStageParseNode {
 public:
     static constexpr StringData kStageName = "$fieldPathQueryShape";

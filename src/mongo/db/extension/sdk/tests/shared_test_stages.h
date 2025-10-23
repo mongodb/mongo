@@ -42,6 +42,7 @@ namespace mongo::extension::sdk::shared_test_stages {
  * Referenced by sdk/tests/aggregation_stage_test.cpp and host/document_source_extension_test.cpp.
  */
 static constexpr std::string_view kNoOpName = "$noOp";
+static constexpr std::string_view kSourceName = "$sourceStage";
 
 class NoOpLogicalAggStage : public sdk::LogicalAggStage {
 public:
@@ -104,7 +105,6 @@ public:
         : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
-
         uassert(10596406,
                 "Failed to parse $noOpExtension, $noOpExtension expects an object.",
                 stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
@@ -117,6 +117,79 @@ public:
 
     static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
         return std::make_unique<NoOpAggStageDescriptor>();
+    }
+};
+
+class SourceLogicalAggStage : public sdk::LogicalAggStage {
+public:
+    SourceLogicalAggStage() {}
+
+    BSONObj serialize() const override {
+        return BSON(std::string(kSourceName) << "serializedForExecution");
+    }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+};
+
+class SourceAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    SourceAggStageAstNode() : sdk::AggStageAstNode(kSourceName) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<SourceLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<SourceAggStageAstNode>();
+    }
+};
+
+class SourceAggStageParseNode : public sdk::AggStageParseNode {
+public:
+    SourceAggStageParseNode() : sdk::AggStageParseNode(kSourceName) {}
+
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(
+            new sdk::ExtensionAggStageAstNode(std::make_unique<SourceAggStageAstNode>()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<SourceAggStageParseNode>();
+    }
+};
+
+class SourceAggStageDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string(kSourceName);
+
+    SourceAggStageDescriptor()
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kSource) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
+        uassert(10956900,
+                "Failed to parse $sourceExtension, $sourceExtension expects an object.",
+                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
+        auto stageDefinition = stageBson.getField(kStageName).Obj();
+        return std::make_unique<SourceAggStageParseNode>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
+        return std::make_unique<SourceAggStageDescriptor>();
     }
 };
 

@@ -82,6 +82,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:explain_mongo_extension",
         "//src/mongo/db/extension/test_examples:extension_errors_mongo_extension",
         "//src/mongo/db/extension/test_examples:foo_mongo_extension",
+        "//src/mongo/db/extension/test_examples:foo_source_mongo_extension",
         "//src/mongo/db/extension/test_examples:host_version_fails_bad_extension",
         "//src/mongo/db/extension/test_examples:host_version_succeeds_mongo_extension",
         "//src/mongo/db/extension/test_examples:initialize_version_fails_bad_extension",

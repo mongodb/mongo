@@ -39,6 +39,7 @@ extensions_with_config(
         ":shapify_mongo_extension",
         ":sharded_execution_serialization_mongo_extension",
         ":explain_mongo_extension",
+        ":foo_source_mongo_extension",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -63,6 +64,7 @@ extensions_with_config(
     )
     for extension_name in [
         "foo",
+        "foo_source",
         "foo_v2",
         "bar",
     ]

@@ -165,7 +165,7 @@ public:
         }
 
         bool isInitialSource() const override {
-            // TODO SERVER-109569 Change this to return true if the stage is a source stage.
+            // TODO SERVER-112779 Change this to return true if the stage is a source stage.
             return false;
         }
 
