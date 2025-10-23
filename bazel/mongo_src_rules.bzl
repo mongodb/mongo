@@ -1099,19 +1099,35 @@ def mongo_cc_test(
       minimum_test_resources: a dict of key/value pairs defining execution
         requirements for the test. The only currently supported key is "cpu_cores".
     """
+    minimum_core_count = 1
     if "cpu_cores" in minimum_test_resources:
-        if minimum_test_resources["cpu_cores"] == 2:
-            exec_properties = exec_properties | select({
-                "@platforms//cpu:x86_64": {
-                    "test.Pool": "large_mem_2core_x86_64",
-                },
-                "@platforms//cpu:aarch64": {
-                    "test.Pool": "large_memory_2core_arm64",
-                },
-                "//conditions:default": {},
-            })
-        elif minimum_test_resources["cpu_cores"] > 2:
-            fail("minimum_test_resources[\"cpu_cores\"] > 2 is not supported")
+        minimum_core_count = minimum_test_resources["cpu_cores"]
+
+    if minimum_core_count == 2:
+        exec_properties = exec_properties | select({
+            "@platforms//cpu:x86_64": {
+                "test.Pool": "large_mem_2core_x86_64",
+            },
+            "@platforms//cpu:aarch64": {
+                "test.Pool": "large_memory_2core_arm64",
+            },
+            "//conditions:default": {},
+        })
+    elif minimum_core_count > 2:
+        fail("minimum_test_resources[\"cpu_cores\"] > 2 is not supported")
+    else:
+        # TSAN will use more memory and EngFlow currently does not surface a good
+        # error message to users when an OOM occurs.
+        # TOOD(SERVER-112889): Remove this once OOM errors are better surfaced by EngFlow
+        exec_properties = exec_properties | select({
+            "//bazel/config:tsan_enabled_x86_64": {
+                "test.Pool": "large_mem_x86_64",
+            },
+            "//bazel/config:tsan_enabled_arm64": {
+                "test.Pool": "large_memory_arm64",
+            },
+            "//conditions:default": {},
+        })
 
     _mongo_cc_binary_and_test(
         name,
