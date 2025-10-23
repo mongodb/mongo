@@ -1045,9 +1045,9 @@ const testScenarios = [
 testScenarios.forEach(testScenario => {
     jsTestLog("Testing scenario: " + tojson(testScenario));
 
-    // Drop the collection so the '$$ROOT' does not pick documents from the last test
+    // Clear the collection so the '$$ROOT' does not pick documents from the last test
     // scenario.
-    collection.drop();
+    collection.deleteMany({});
 
     // Insert the document to the collection if the field 'doc' exists in the
     // test-scenario dictionary.
