@@ -203,7 +203,7 @@ __conn_page_history_reporter(void *arg)
         /* Sleep for one second. Can be woken up early, e.g., for shutdown. */
         __wt_cond_wait(session, page_history->report_cond, WT_MILLION, NULL);
 
-        WT_ACQUIRE_READ(shutdown, page_history->report_shutdown);
+        shutdown = __wt_atomic_load_bool_acquire(&page_history->report_shutdown);
         if (shutdown)
             break;
 
@@ -244,7 +244,7 @@ __wti_conn_page_history_config(WT_SESSION_IMPL *session, const char **cfg, bool 
     if (!enabled && previous_enabled) {
 
         /* Stop the reporting thread. */
-        WT_RELEASE_WRITE(page_history->report_shutdown, (bool)true);
+        __wt_atomic_store_bool_release(&page_history->report_shutdown, true);
         __wt_cond_signal(session, page_history->report_cond);
         WT_RET(__wt_thread_join(session, &page_history->report_tid));
         page_history->report_tid_set = false;
@@ -271,13 +271,13 @@ __wti_conn_page_history_config(WT_SESSION_IMPL *session, const char **cfg, bool 
         }
 
         /* Start the reporting thread. */
-        WT_RELEASE_WRITE(page_history->report_shutdown, (bool)false);
+        __wt_atomic_store_bool_release(&page_history->report_shutdown, false);
         WT_RET(__wt_thread_create(session, &page_history->report_tid, __conn_page_history_reporter,
           page_history->report_session));
         page_history->report_tid_set = true;
     }
 
-    WT_RELEASE_WRITE(page_history->enabled, enabled);
+    __wt_atomic_store_bool_release(&page_history->enabled, enabled);
     return (0);
 }
 
@@ -299,7 +299,7 @@ __wti_conn_page_history_destroy(WT_SESSION_IMPL *session)
     }
 
     if (page_history->report_tid_set) {
-        WT_RELEASE_WRITE(page_history->report_shutdown, (bool)true);
+        __wt_atomic_store_bool_release(&page_history->report_shutdown, true);
         __wt_cond_signal(session, page_history->report_cond);
         WT_TRET(__wt_thread_join(session, &page_history->report_tid));
         page_history->report_tid_set = false;
@@ -338,17 +338,17 @@ __wt_conn_page_history_track_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     WT_ACQUIRE_BARRIER();
 
-    (void)__wt_atomic_add64(&page_history->global_evict_count, 1);
+    (void)__wt_atomic_add_uint64(&page_history->global_evict_count, 1);
 
     /* So far this works only for disaggregated storage, as we don't have page IDs without it. */
     if (page->disagg_info == NULL) {
-        (void)__wt_atomic_add64(&page_history->global_evict_count_local, 1);
+        (void)__wt_atomic_add_uint64(&page_history->global_evict_count_local, 1);
         return (0);
     }
 
     page_id = page->disagg_info->block_meta.page_id;
     if (page_id == WT_BLOCK_INVALID_PAGE_ID) {
-        (void)__wt_atomic_add64(&page_history->global_evict_count_no_page_id, 1);
+        (void)__wt_atomic_add_uint64(&page_history->global_evict_count_no_page_id, 1);
         return (0);
     }
 
@@ -390,11 +390,11 @@ __wt_conn_page_history_track_read(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     WT_ACQUIRE_BARRIER();
 
-    current_global_read_count = __wt_atomic_add64(&page_history->global_read_count, 1);
+    current_global_read_count = __wt_atomic_add_uint64(&page_history->global_read_count, 1);
 
     /* So far this works only for disaggregated storage, as we don't have page IDs without it. */
     if (page->disagg_info == NULL) {
-        (void)__wt_atomic_add64(&page_history->global_read_count_local, 1);
+        (void)__wt_atomic_add_uint64(&page_history->global_read_count_local, 1);
         return (0);
     }
 
@@ -425,7 +425,7 @@ __wt_conn_page_history_track_read(WT_SESSION_IMPL *session, WT_PAGE *page)
     item->num_reads++;
 
     if (item->num_reads > 1)
-        (void)__wt_atomic_add64(&page_history->global_reread_count, 1);
+        (void)__wt_atomic_add_uint64(&page_history->global_reread_count, 1);
 
 err:
     if (item != NULL)

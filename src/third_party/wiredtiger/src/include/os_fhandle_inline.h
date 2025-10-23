@@ -72,8 +72,9 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
     /* Make sure we don't try to shrink the file during backup. */
     if (handle->fh_size != NULL) {
         WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
-        WT_ASSERT(
-          session, cur_size <= offset || __wt_atomic_load64(&S2C(session)->hot_backup_start) == 0);
+        WT_ASSERT(session,
+          cur_size <= offset ||
+            __wt_atomic_load_uint64_relaxed(&S2C(session)->hot_backup_start) == 0);
     }
 #endif
     if (handle->fh_extend_nolock != NULL)
@@ -166,8 +167,9 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
     /* Make sure we don't try to shrink the file during backup. */
     if (handle->fh_size != NULL) {
         WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
-        WT_ASSERT(
-          session, cur_size <= offset || __wt_atomic_load64(&S2C(session)->hot_backup_start) == 0);
+        WT_ASSERT(session,
+          cur_size <= offset ||
+            __wt_atomic_load_uint64_relaxed(&S2C(session)->hot_backup_start) == 0);
     }
 #endif
     if (handle->fh_truncate != NULL)
@@ -207,7 +209,7 @@ __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, con
 
     time_stop = __wt_clock(session);
     __wt_stat_msecs_hist_incr_fswrite(session, WT_CLOCKDIFF_MS(time_stop, time_start));
-    (void)__wt_atomic_addv64(&fh->written, len);
+    (void)__wt_atomic_add_uint64_v(&fh->written, len);
     WT_STAT_CONN_DECR_ATOMIC(session, thread_write_active);
     return (ret);
 }

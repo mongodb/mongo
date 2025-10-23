@@ -71,7 +71,8 @@ typedef enum { WT_OPCTX_TRANSACTION, WT_OPCTX_RECONCILATION } WT_OP_CONTEXT;
                                                   &S2C(s)->txn_global.txn_shared_list[(s)->id])
 
 #define WT_SESSION_IS_CHECKPOINT(s) \
-    (!WT_SESSION_IS_DEFAULT(s) && (s)->id == __wt_atomic_loadv32(&S2C(s)->txn_global.checkpoint_id))
+    (!WT_SESSION_IS_DEFAULT(s) &&   \
+      (s)->id == __wt_atomic_load_uint32_v_relaxed(&S2C(s)->txn_global.checkpoint_id))
 
 /*
  * Perform an operation at the specified isolation level.
@@ -81,41 +82,44 @@ typedef enum { WT_OPCTX_TRANSACTION, WT_OPCTX_RECONCILATION } WT_OP_CONTEXT;
  * while this operation is in progress). Check for those cases: the bugs they cause are hard to
  * debug.
  */
-#define WT_WITH_TXN_ISOLATION(s, iso, op)                                                        \
-    do {                                                                                         \
-        WT_TXN_ISOLATION saved_iso = (s)->isolation;                                             \
-        WT_TXN_ISOLATION saved_txn_iso = (s)->txn->isolation;                                    \
-        WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(s);                                    \
-        WT_TXN_SHARED saved_txn_shared = *txn_shared;                                            \
-        uint64_t txn_shared_id = __wt_atomic_loadv64(&txn_shared->id);                           \
-        uint64_t txn_shared_metadata_pinned = __wt_atomic_loadv64(&txn_shared->metadata_pinned); \
-        uint64_t txn_shared_pinned_id = __wt_atomic_loadv64(&txn_shared->pinned_id);             \
-        uint64_t saved_txn_shared_id = __wt_atomic_loadv64(&saved_txn_shared.id);                \
-        uint64_t saved_txn_shared_metadata_pinned =                                              \
-          __wt_atomic_loadv64(&saved_txn_shared.metadata_pinned);                                \
-        uint64_t saved_txn_shared_pinned_id = __wt_atomic_loadv64(&saved_txn_shared.pinned_id);  \
-                                                                                                 \
-        /* The following variables are only used inside an assert. */                            \
-        WT_UNUSED(txn_shared_id);                                                                \
-        WT_UNUSED(txn_shared_metadata_pinned);                                                   \
-        WT_UNUSED(txn_shared_pinned_id);                                                         \
-        WT_UNUSED(saved_txn_shared_id);                                                          \
-                                                                                                 \
-        (s)->txn->forced_iso++;                                                                  \
-        (s)->isolation = (s)->txn->isolation = (iso);                                            \
-        op;                                                                                      \
-        (s)->isolation = saved_iso;                                                              \
-        (s)->txn->isolation = saved_txn_iso;                                                     \
-        WT_ASSERT((s), (s)->txn->forced_iso > 0);                                                \
-        (s)->txn->forced_iso--;                                                                  \
-        WT_ASSERT((s),                                                                           \
-          txn_shared_id == saved_txn_shared_id &&                                                \
-            (txn_shared_metadata_pinned == saved_txn_shared_metadata_pinned ||                   \
-              saved_txn_shared_metadata_pinned == WT_TXN_NONE) &&                                \
-            (txn_shared_pinned_id == saved_txn_shared_pinned_id ||                               \
-              saved_txn_shared_pinned_id == WT_TXN_NONE));                                       \
-        __wt_atomic_storev64(&txn_shared->metadata_pinned, saved_txn_shared_metadata_pinned);    \
-        __wt_atomic_storev64(&txn_shared->pinned_id, saved_txn_shared_pinned_id);                \
+#define WT_WITH_TXN_ISOLATION(s, iso, op)                                                          \
+    do {                                                                                           \
+        WT_TXN_ISOLATION saved_iso = (s)->isolation;                                               \
+        WT_TXN_ISOLATION saved_txn_iso = (s)->txn->isolation;                                      \
+        WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(s);                                      \
+        WT_TXN_SHARED saved_txn_shared = *txn_shared;                                              \
+        uint64_t txn_shared_id = __wt_atomic_load_uint64_v_relaxed(&txn_shared->id);               \
+        uint64_t txn_shared_metadata_pinned =                                                      \
+          __wt_atomic_load_uint64_v_relaxed(&txn_shared->metadata_pinned);                         \
+        uint64_t txn_shared_pinned_id = __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id); \
+        uint64_t saved_txn_shared_id = __wt_atomic_load_uint64_v_relaxed(&saved_txn_shared.id);    \
+        uint64_t saved_txn_shared_metadata_pinned =                                                \
+          __wt_atomic_load_uint64_v_relaxed(&saved_txn_shared.metadata_pinned);                    \
+        uint64_t saved_txn_shared_pinned_id =                                                      \
+          __wt_atomic_load_uint64_v_relaxed(&saved_txn_shared.pinned_id);                          \
+                                                                                                   \
+        /* The following variables are only used inside an assert. */                              \
+        WT_UNUSED(txn_shared_id);                                                                  \
+        WT_UNUSED(txn_shared_metadata_pinned);                                                     \
+        WT_UNUSED(txn_shared_pinned_id);                                                           \
+        WT_UNUSED(saved_txn_shared_id);                                                            \
+                                                                                                   \
+        (s)->txn->forced_iso++;                                                                    \
+        (s)->isolation = (s)->txn->isolation = (iso);                                              \
+        op;                                                                                        \
+        (s)->isolation = saved_iso;                                                                \
+        (s)->txn->isolation = saved_txn_iso;                                                       \
+        WT_ASSERT((s), (s)->txn->forced_iso > 0);                                                  \
+        (s)->txn->forced_iso--;                                                                    \
+        WT_ASSERT((s),                                                                             \
+          txn_shared_id == saved_txn_shared_id &&                                                  \
+            (txn_shared_metadata_pinned == saved_txn_shared_metadata_pinned ||                     \
+              saved_txn_shared_metadata_pinned == WT_TXN_NONE) &&                                  \
+            (txn_shared_pinned_id == saved_txn_shared_pinned_id ||                                 \
+              saved_txn_shared_pinned_id == WT_TXN_NONE));                                         \
+        __wt_atomic_store_uint64_v_relaxed(                                                        \
+          &txn_shared->metadata_pinned, saved_txn_shared_metadata_pinned);                         \
+        __wt_atomic_store_uint64_v_relaxed(&txn_shared->pinned_id, saved_txn_shared_pinned_id);    \
     } while (0)
 
 struct __wt_txn_shared {

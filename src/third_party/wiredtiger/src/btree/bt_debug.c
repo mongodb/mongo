@@ -889,7 +889,7 @@ __debug_tree_shape_info(WT_REF *ref, char *buf, size_t len)
     const char *unit;
 
     page = ref->page;
-    v = __wt_atomic_loadsize(&page->memory_footprint);
+    v = __wt_atomic_load_size_relaxed(&page->memory_footprint);
 
     if (v > WT_GIGABYTE) {
         v /= WT_GIGABYTE;
@@ -1302,9 +1302,10 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
     if (split_gen != 0)
         WT_RET(ds->f(ds, " | split_gen: %" PRIu64, split_gen));
     if (mod != NULL)
-        WT_RET(ds->f(ds, " | page_state: %" PRIu32, __wt_atomic_load32(&mod->page_state)));
-    WT_RET(
-      ds->f(ds, " | page_mem_size: %" WT_SIZET_FMT, __wt_atomic_loadsize(&page->memory_footprint)));
+        WT_RET(
+          ds->f(ds, " | page_state: %" PRIu32, __wt_atomic_load_uint32_relaxed(&mod->page_state)));
+    WT_RET(ds->f(ds, " | page_mem_size: %" WT_SIZET_FMT,
+      __wt_atomic_load_size_relaxed(&page->memory_footprint)));
     if (page->disagg_info != NULL) {
         WT_RET(ds->f(ds, "\n\t> page_id: %" PRIu64, page->disagg_info->block_meta.page_id));
         WT_RET(ds->f(ds, " | disagg_lsn: %" PRIu64, page->disagg_info->block_meta.disagg_lsn));

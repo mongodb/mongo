@@ -151,9 +151,11 @@ __wt_page_modify_update_timestamp(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /* Race is OK here as it is an approximate value. */
     wt_timestamp_t newest_seen_timestamp =
-      __wt_atomic_load64(&S2C(session)->txn_global.newest_seen_timestamp);
-    if (newest_seen_timestamp > __wt_atomic_load64(&page->modify->newest_commit_timestamp))
-        __wt_atomic_store64(&page->modify->newest_commit_timestamp, newest_seen_timestamp);
+      __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.newest_seen_timestamp);
+    if (newest_seen_timestamp >
+      __wt_atomic_load_uint64_relaxed(&page->modify->newest_commit_timestamp))
+        __wt_atomic_store_uint64_relaxed(
+          &page->modify->newest_commit_timestamp, newest_seen_timestamp);
 }
 
 /*

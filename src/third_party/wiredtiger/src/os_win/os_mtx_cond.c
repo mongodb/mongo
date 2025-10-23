@@ -49,7 +49,7 @@ __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs
 
     /* Fast path if already signalled. */
     *signalled = true;
-    if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
+    if (__wt_atomic_add_int32(&cond->waiters, 1) == 0)
         return;
 
     __wt_verbose_debug2(session, WT_VERB_MUTEX, "wait %s", cond->name);
@@ -106,7 +106,7 @@ skipping:
         }
     }
 
-    (void)__wt_atomic_subi32(&cond->waiters, 1);
+    (void)__wt_atomic_sub_int32(&cond->waiters, 1);
 
     if (locked)
         LeaveCriticalSection(&cond->mtx);
@@ -142,7 +142,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
      * Fast path if we are in (or can enter), a state where the next waiter will return immediately
      * as already signaled.
      */
-    if (cond->waiters == -1 || (cond->waiters == 0 && __wt_atomic_casi32(&cond->waiters, 0, -1)))
+    if (cond->waiters == -1 || (cond->waiters == 0 && __wt_atomic_cas_int32(&cond->waiters, 0, -1)))
         return;
 
     EnterCriticalSection(&cond->mtx);

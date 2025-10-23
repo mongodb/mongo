@@ -155,9 +155,9 @@ __wti_block_configure_first_fit(WT_BLOCK *block, bool on)
      * first-fit allocation as long as any operation wants it.
      */
     if (on)
-        (void)__wt_atomic_add32(&block->allocfirst, 1);
+        (void)__wt_atomic_add_uint32(&block->allocfirst, 1);
     else
-        (void)__wt_atomic_sub32(&block->allocfirst, 1);
+        (void)__wt_atomic_sub_uint32(&block->allocfirst, 1);
 }
 
 /*

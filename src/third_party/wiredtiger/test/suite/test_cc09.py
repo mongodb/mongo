@@ -98,8 +98,8 @@ class test_cc09(test_cc_base):
         # disk to clear the obsolete content if allowed to.
         self.wait_for_cc_to_run()
 
-        cc_read_stat = self.get_stat(stat.conn.checkpoint_cleanup_pages_read_obsolete_tw)
-        cc_dirty_stat = self.get_stat(stat.conn.checkpoint_cleanup_pages_obsolete_tw)
+        cc_read_stat = self.get_stat(stat.dsrc.checkpoint_cleanup_pages_read_obsolete_tw, uri)
+        cc_dirty_stat = self.get_stat(stat.dsrc.checkpoint_cleanup_pages_obsolete_tw, uri)
 
         # We may be expecting cleanup but we have to be in one of the valid scenarios for checkpoint
         # cleanup to do something.

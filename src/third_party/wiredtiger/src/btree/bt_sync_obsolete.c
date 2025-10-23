@@ -26,7 +26,7 @@ __sync_obsolete_limit_reached(WT_SESSION_IMPL *session)
     btree = S2BT(session);
 
     /* Check current progress against max. */
-    if (__wt_atomic_load32(&btree->checkpoint_cleanup_obsolete_tw_pages) >=
+    if (__wt_atomic_load_uint32_relaxed(&btree->checkpoint_cleanup_obsolete_tw_pages) >=
       conn->heuristic_controls.checkpoint_cleanup_obsolete_tw_pages_dirty_max)
         return (true);
 
@@ -34,9 +34,9 @@ __sync_obsolete_limit_reached(WT_SESSION_IMPL *session)
      * If the current btree has not contributed to the cleanup yet, only process it if we can track
      * another btree.
      */
-    if (__wt_atomic_load32(&btree->eviction_obsolete_tw_pages) == 0 &&
-      __wt_atomic_load32(&btree->checkpoint_cleanup_obsolete_tw_pages) == 0 &&
-      __wt_atomic_load32(&conn->heuristic_controls.obsolete_tw_btree_count) >=
+    if (__wt_atomic_load_uint32_relaxed(&btree->eviction_obsolete_tw_pages) == 0 &&
+      __wt_atomic_load_uint32_relaxed(&btree->checkpoint_cleanup_obsolete_tw_pages) == 0 &&
+      __wt_atomic_load_uint32_relaxed(&conn->heuristic_controls.obsolete_tw_btree_count) >=
         conn->heuristic_controls.obsolete_tw_btree_max)
         return (true);
 
@@ -183,11 +183,11 @@ __sync_obsolete_inmem_evict_or_mark_dirty(WT_SESSION_IMPL *session, WT_REF *ref)
          * Save that another tree has been processed if that's the first time it gets cleaned and
          * update the number of pages made dirty for that tree.
          */
-        if (__wt_atomic_load32(&btree->eviction_obsolete_tw_pages) == 0 &&
-          __wt_atomic_load32(&btree->checkpoint_cleanup_obsolete_tw_pages) == 0)
-            __wt_atomic_addv32(&conn->heuristic_controls.obsolete_tw_btree_count, 1);
+        if (__wt_atomic_load_uint32_relaxed(&btree->eviction_obsolete_tw_pages) == 0 &&
+          __wt_atomic_load_uint32_relaxed(&btree->checkpoint_cleanup_obsolete_tw_pages) == 0)
+            __wt_atomic_add_uint32_v(&conn->heuristic_controls.obsolete_tw_btree_count, 1);
 
-        __wt_atomic_addv32(&btree->checkpoint_cleanup_obsolete_tw_pages, 1);
+        __wt_atomic_add_uint32_v(&btree->checkpoint_cleanup_obsolete_tw_pages, 1);
         WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_obsolete_tw);
     }
 
@@ -331,7 +331,7 @@ __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
          * ref's state. There's nothing to do for in-memory pages as we don't change those.
          */
         if (WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)) && previous_state != new_state)
-            __wt_atomic_addv8(&ref->ref_changes, 1);
+            __wt_atomic_add_uint8_v(&ref->ref_changes, 1);
         WT_REF_UNLOCK(ref, new_state);
         WT_RET(ret);
     } else

@@ -21,9 +21,9 @@ __tiered_flush_state(WT_SESSION_IMPL *session, uint32_t type, bool incr)
         return;
     conn = S2C(session);
     if (incr)
-        (void)__wt_atomic_addv32(&conn->flush_state, 1);
+        (void)__wt_atomic_add_uint32_v(&conn->flush_state, 1);
     else
-        (void)__wt_atomic_subv32(&conn->flush_state, 1);
+        (void)__wt_atomic_sub_uint32_v(&conn->flush_state, 1);
 }
 
 /*

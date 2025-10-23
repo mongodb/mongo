@@ -126,7 +126,7 @@ thread_rwlock(void *arg)
         /*
          * Do a tiny amount of work inside the lock so the compiler can't optimize everything away.
          */
-        (void)__wt_atomic_add64(&counter, 1);
+        (void)__wt_atomic_add_uint64(&counter, 1);
 
 #ifdef CHECK_CORRECTNESS
         if (writelock)

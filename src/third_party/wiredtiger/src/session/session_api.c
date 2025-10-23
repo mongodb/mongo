@@ -175,7 +175,7 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
              */
             WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
             WT_ASSERT(session,
-              __wt_atomic_loadv64(&txn_shared->pinned_id) != WT_TXN_NONE ||
+              __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id) != WT_TXN_NONE ||
                 (WT_BTREE_PREFIX(cursor->uri) &&
                   WT_DHANDLE_IS_CHECKPOINT(((WT_CURSOR_BTREE *)cursor)->dhandle)));
 #endif
@@ -245,7 +245,7 @@ __session_clear(WT_SESSION_IMPL *session)
      */
     memset(session, 0, WT_SESSION_CLEAR_SIZE);
 
-    __wt_atomic_store32(&session->hazards.inuse, 0);
+    __wt_atomic_store_uint32_relaxed(&session->hazards.inuse, 0);
     session->hazards.num_active = 0;
 }
 /*
@@ -454,8 +454,9 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
      * not be at the end of the array, step toward the beginning of the array until we reach an
      * active session.
      */
-    while (WT_CONN_SESSIONS_GET(conn)[__wt_atomic_load32(&conn->session_array.cnt) - 1].active == 0)
-        if (__wt_atomic_sub32(&conn->session_array.cnt, 1) == 0)
+    while (WT_CONN_SESSIONS_GET(conn)[__wt_atomic_load_uint32_relaxed(&conn->session_array.cnt) - 1]
+             .active == 0)
+        if (__wt_atomic_sub_uint32(&conn->session_array.cnt, 1) == 0)
             break;
 
     __wt_spin_unlock(session, &conn->api_lock);
@@ -791,7 +792,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, co
      */
     WT_ASSERT(session,
       WT_IS_URI_HS(uri) ||
-        (WT_IS_URI_METADATA(uri) && __wt_atomic_loadvbool(&txn_global->checkpoint_running)) ||
+        (WT_IS_URI_METADATA(uri) &&
+          __wt_atomic_load_bool_v_relaxed(&txn_global->checkpoint_running)) ||
         session->hs_cursor_counter == 0 || F_ISSET(session, WT_SESSION_INTERNAL) ||
         (S2BT_SAFE(session) != NULL && F_ISSET(S2BT(session), WT_BTREE_VERIFY)));
 
@@ -1003,7 +1005,7 @@ __session_blocking_checkpoint(WT_SESSION_IMPL *session)
          * This loop only checks objects that are declared volatile, therefore no barriers are
          * needed.
          */
-        if (!__wt_atomic_loadvbool(&txn_global->checkpoint_running) ||
+        if (!__wt_atomic_load_bool_v_relaxed(&txn_global->checkpoint_running) ||
           txn_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
             break;
     }
@@ -2357,16 +2359,17 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
     /* Assign pinned to the lesser of id or snap_min */
-    if (__wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE &&
-      __wt_atomic_loadv64(&txn_shared->id) < __wt_atomic_loadv64(&txn_shared->pinned_id))
-        pinned = __wt_atomic_loadv64(&txn_shared->id);
+    if (__wt_atomic_load_uint64_v_relaxed(&txn_shared->id) != WT_TXN_NONE &&
+      __wt_atomic_load_uint64_v_relaxed(&txn_shared->id) <
+        __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id))
+        pinned = __wt_atomic_load_uint64_v_relaxed(&txn_shared->id);
     else
-        pinned = __wt_atomic_loadv64(&txn_shared->pinned_id);
+        pinned = __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id);
 
     if (pinned == WT_TXN_NONE)
         *prange = 0;
     else
-        *prange = __wt_atomic_loadv64(&S2C(session)->txn_global.current) - pinned;
+        *prange = __wt_atomic_load_uint64_v_relaxed(&S2C(session)->txn_global.current) - pinned;
 
 err:
     API_END_RET(session, ret);
@@ -2567,8 +2570,9 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * session count on error, as long as we don't mark this session as active, we'll clean it up on
      * close.
      */
-    if (i >= __wt_atomic_load32(&conn->session_array.cnt)) /* Defend against off-by-one errors. */
-        __wt_atomic_store32(&conn->session_array.cnt, i + 1);
+    if (i >= __wt_atomic_load_uint32_relaxed(
+               &conn->session_array.cnt)) /* Defend against off-by-one errors. */
+        __wt_atomic_store_uint32_relaxed(&conn->session_array.cnt, i + 1);
 
     /* Find the set of methods appropriate to this session. */
     if (F_ISSET_ATOMIC_32(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
@@ -2635,7 +2639,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         WT_ERR(
           __wt_calloc_def(session, WT_SESSION_INITIAL_HAZARD_SLOTS, &session_ret->hazards.arr));
         session_ret->hazards.size = WT_SESSION_INITIAL_HAZARD_SLOTS;
-        __wt_atomic_store32(&session_ret->hazards.inuse, 0);
+        __wt_atomic_store_uint32_relaxed(&session_ret->hazards.inuse, 0);
         session_ret->hazards.num_active = 0;
     }
 

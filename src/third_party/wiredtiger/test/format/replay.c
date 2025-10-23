@@ -124,7 +124,7 @@ replay_maximum_committed(void)
      * be behind. So we use a cached value most of the time.
      */
     ts = g.replay_cached_committed;
-    if (ts == 0 || __wt_atomic_addv32(&g.replay_calculate_committed, 1) % 20 == 0) {
+    if (ts == 0 || __wt_atomic_add_uint32_v(&g.replay_calculate_committed, 1) % 20 == 0) {
         WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
         testutil_check(pthread_rwlock_wrlock(&g.lane_lock));
         for (lane = 0; lane < LANE_COUNT; ++lane) {
@@ -254,7 +254,7 @@ replay_pick_timestamp(TINFO *tinfo)
              * the predictable run.
              */
             testutil_assert(g.timestamp_copy == g.timestamp);
-            ts = __wt_atomic_addv64(&g.timestamp, 1);
+            ts = __wt_atomic_add_uint64_v(&g.timestamp, 1);
             g.timestamp_copy = g.timestamp;
             lane = LANE_NUMBER(ts);
             WT_ACQUIRE_READ_WITH_BARRIER(in_use, g.lanes[lane].in_use);

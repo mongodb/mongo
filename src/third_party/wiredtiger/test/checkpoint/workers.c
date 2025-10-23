@@ -473,7 +473,7 @@ real_worker(THREAD_DATA *td)
                             base_ts = g.ts_stable + 1;
                         next_rnd = __wt_random(&td->data_rnd);
                         if (g.prepare && next_rnd % 2 == 0) {
-                            prepared_id = __wt_atomic_addv64(&g.prepared_id, 1);
+                            prepared_id = __wt_atomic_add_uint64_v(&g.prepared_id, 1);
                             testutil_snprintf(buf, sizeof(buf),
                               "prepare_timestamp=%" PRIx64 ",prepared_id=%" PRIx64, base_ts,
                               prepared_id);

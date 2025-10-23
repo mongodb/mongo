@@ -56,7 +56,7 @@ thread_func(void *arg)
     uint64_t *obj_data;
 
     opts = (TEST_OPTS *)arg;
-    thr_idx = __wt_atomic_fetch_addv64(&opts->next_threadid, 1);
+    thr_idx = __wt_atomic_fetch_add_uint64_v(&opts->next_threadid, 1);
     ts = g_ts;
     obj_data = dcalloc((NR_OBJECTS / NR_THREADS + 1) * NR_FIELDS, sizeof(*obj_data));
 

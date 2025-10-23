@@ -877,7 +877,7 @@ err:
     }
     __wt_free(session, cursor->value_format);
     __wt_cursor_close(cursor);
-    __wt_atomic_sub32(&S2C(session)->version_cursor_count, 1);
+    __wt_atomic_sub_uint32(&S2C(session)->version_cursor_count, 1);
 
     API_END_RET(session, ret);
 }
@@ -944,7 +944,7 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
         __wt_txn_pinned_timestamp(session, &pinned_ts);
         txn_global->version_cursor_pinned_timestamp = pinned_ts;
     }
-    (void)__wt_atomic_add32(&conn->version_cursor_count, 1);
+    (void)__wt_atomic_add_uint32(&conn->version_cursor_count, 1);
     __wt_writeunlock(session, &txn_global->rwlock);
 
     /* Open the file cursor to check the key and value format. */

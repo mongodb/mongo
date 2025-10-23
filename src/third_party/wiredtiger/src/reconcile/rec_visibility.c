@@ -607,7 +607,7 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
         if (upd->txnid == WT_TXN_ABORTED)
             continue;
 
-        WT_ACQUIRE_READ(prepare_state, prev_upd->prepare_state);
+        prepare_state = __wt_atomic_load_uint8_v_acquire(&prev_upd->prepare_state);
         char ts_string[4][WT_TS_INT_STRING_SIZE];
         WT_ASSERT_ALWAYS(session,
           prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED ||
@@ -663,7 +663,7 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
      */
     if (vpack != NULL && !WT_TIME_WINDOW_HAS_PREPARE(&(vpack->tw))) {
         char ts_string[4][WT_TS_INT_STRING_SIZE];
-        WT_ACQUIRE_READ(prepare_state, prev_upd->prepare_state);
+        prepare_state = __wt_atomic_load_uint8_v_acquire(&prev_upd->prepare_state);
         if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw)) {
             WT_ASSERT_ALWAYS(session,
               prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED ||
@@ -696,7 +696,7 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
                 return (EBUSY);
             }
         } else {
-            WT_ACQUIRE_READ(prepare_state, prev_upd->prepare_state);
+            prepare_state = __wt_atomic_load_uint8_v_acquire(&prev_upd->prepare_state);
             /*
              * Rollback to stable may recover updates from the history store that is out of order to
              * the on-disk value. Normally these updates have the WT_UPDATE_RESTORED_FROM_HS flag on
@@ -765,7 +765,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
     max_ts = WT_TS_NONE;
     max_txn = WT_TXN_NONE;
     is_hs_page = F_ISSET(session->dhandle, WT_DHANDLE_HS);
-    session_txnid = __wt_atomic_loadv64(&WT_SESSION_TXN_SHARED(session)->id);
+    session_txnid = __wt_atomic_load_uint64_v_relaxed(&WT_SESSION_TXN_SHARED(session)->id);
     *write_prepare = false;
 
     for (upd = first_upd; upd != NULL; upd = upd->next) {
@@ -775,7 +775,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
          * need to reset the state for each update.
          */
         *write_prepare = false;
-        WT_ACQUIRE_READ(txnid, upd->txnid);
+        txnid = __wt_atomic_load_uint64_v_acquire(&upd->txnid);
         if (txnid == WT_TXN_ABORTED) {
             if (!F_ISSET(conn, WT_CONN_PRESERVE_PREPARED))
                 continue;
@@ -865,7 +865,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
          * Only checkpoint should ever encounter resolving prepared transactions. If it does, then
          * it needs to wait to see whether they should be included or not.
          */
-        WT_ACQUIRE_READ(prepare_state, upd->prepare_state);
+        prepare_state = __wt_atomic_load_uint8_v_acquire(&upd->prepare_state);
 
         /*
          * Don't write any update that is not stable if precise checkpoint is enabled.
@@ -1103,7 +1103,7 @@ __rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_U
     if (upd->type == WT_UPDATE_TOMBSTONE) {
         WT_TIME_WINDOW_SET_STOP(select_tw, upd, write_prepare);
         tombstone = upd_select->tombstone = upd;
-        WT_ACQUIRE_READ(tombstone_txnid, tombstone->txnid);
+        tombstone_txnid = __wt_atomic_load_uint64_v_acquire(&tombstone->txnid);
         if (tombstone_txnid == WT_TXN_ABORTED)
             tombstone_txnid = tombstone->upd_saved_txnid;
         /*
@@ -1117,7 +1117,7 @@ __rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_U
         if (write_prepare || !__wt_txn_upd_visible_all(session, upd)) {
             uint64_t next_txnid = WT_TXN_NONE;
             for (; upd->next != NULL; upd = upd->next) {
-                WT_ACQUIRE_READ(next_txnid, upd->next->txnid);
+                next_txnid = __wt_atomic_load_uint64_v_acquire(&upd->next->txnid);
                 if (next_txnid != WT_TXN_ABORTED) {
                     write_start_prepare = write_prepare && next_txnid == tombstone_txnid;
                     break;
@@ -1133,7 +1133,7 @@ __rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_U
                     continue;
 
                 /* We may see a locked prepare state if we race with prepare rollback. */
-                WT_ACQUIRE_READ(prepare_state, upd->next->prepare_state);
+                prepare_state = __wt_atomic_load_uint8_v_acquire(&upd->next->prepare_state);
                 if (prepare_state != WT_PREPARE_INPROGRESS && prepare_state != WT_PREPARE_LOCKED) {
                     write_start_prepare = false;
                     continue;
@@ -1321,7 +1321,8 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      */
     WT_ASSERT_ALWAYS(session,
       !WT_IS_METADATA(session->dhandle) || upd == NULL || upd->txnid == WT_TXN_NONE ||
-        upd->txnid != __wt_atomic_loadv64(&S2C(session)->txn_global.checkpoint_txn_shared.id) ||
+        upd->txnid !=
+          __wt_atomic_load_uint64_v_relaxed(&S2C(session)->txn_global.checkpoint_txn_shared.id) ||
         WT_SESSION_IS_CHECKPOINT(session),
       "Metadata updates written from a checkpoint in a concurrent session");
 

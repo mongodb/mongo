@@ -571,6 +571,7 @@ const char __WT_CONFIG_CHOICE_failpoint_eviction_split[] = "failpoint_eviction_s
 const char __WT_CONFIG_CHOICE_failpoint_history_store_delete_key_from_ts[] =
   "failpoint_history_store_delete_key_from_ts";
 const char __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup[] = "failpoint_rec_before_wrapup";
+const char __WT_CONFIG_CHOICE_failpoint_rec_split_write[] = "failpoint_rec_split_write";
 const char __WT_CONFIG_CHOICE_history_store_checkpoint_delay[] = "history_store_checkpoint_delay";
 const char __WT_CONFIG_CHOICE_history_store_search[] = "history_store_search";
 const char __WT_CONFIG_CHOICE_history_store_sweep_race[] = "history_store_sweep_race";
@@ -604,17 +605,17 @@ static const char *confchk_timing_stress_for_test_choices[] = {
   __WT_CONFIG_CHOICE_compact_slow, __WT_CONFIG_CHOICE_conn_close_stress_log_printf,
   __WT_CONFIG_CHOICE_evict_reposition, __WT_CONFIG_CHOICE_failpoint_eviction_split,
   __WT_CONFIG_CHOICE_failpoint_history_store_delete_key_from_ts,
-  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_history_store_checkpoint_delay,
-  __WT_CONFIG_CHOICE_history_store_search, __WT_CONFIG_CHOICE_history_store_sweep_race,
-  __WT_CONFIG_CHOICE_live_restore_clean_up, __WT_CONFIG_CHOICE_open_index_slow,
-  __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2, __WT_CONFIG_CHOICE_prefetch_3,
-  __WT_CONFIG_CHOICE_prefix_compare, __WT_CONFIG_CHOICE_prepare_checkpoint_delay,
-  __WT_CONFIG_CHOICE_prepare_resolution_1, __WT_CONFIG_CHOICE_prepare_resolution_2,
-  __WT_CONFIG_CHOICE_session_alter_slow, __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage,
-  __WT_CONFIG_CHOICE_split_1, __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3,
-  __WT_CONFIG_CHOICE_split_4, __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6,
-  __WT_CONFIG_CHOICE_split_7, __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish,
-  NULL};
+  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_failpoint_rec_split_write,
+  __WT_CONFIG_CHOICE_history_store_checkpoint_delay, __WT_CONFIG_CHOICE_history_store_search,
+  __WT_CONFIG_CHOICE_history_store_sweep_race, __WT_CONFIG_CHOICE_live_restore_clean_up,
+  __WT_CONFIG_CHOICE_open_index_slow, __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2,
+  __WT_CONFIG_CHOICE_prefetch_3, __WT_CONFIG_CHOICE_prefix_compare,
+  __WT_CONFIG_CHOICE_prepare_checkpoint_delay, __WT_CONFIG_CHOICE_prepare_resolution_1,
+  __WT_CONFIG_CHOICE_prepare_resolution_2, __WT_CONFIG_CHOICE_session_alter_slow,
+  __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage, __WT_CONFIG_CHOICE_split_1,
+  __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3, __WT_CONFIG_CHOICE_split_4,
+  __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6, __WT_CONFIG_CHOICE_split_7,
+  __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish, NULL};
 const char __WT_CONFIG_CHOICE_api[] = "api";
 const char __WT_CONFIG_CHOICE_backup[] = "backup";
 const char __WT_CONFIG_CHOICE_block[] = "block";
@@ -796,7 +797,7 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     "\"conn_close_stress_log_printf\",\"evict_reposition\","
     "\"failpoint_eviction_split\","
     "\"failpoint_history_store_delete_key_from_ts\","
-    "\"failpoint_rec_before_wrapup\","
+    "\"failpoint_rec_before_wrapup\",\"failpoint_rec_split_write\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"live_restore_clean_up\","
     "\"open_index_slow\",\"prefetch_1\",\"prefetch_2\",\"prefetch_3\""
@@ -2888,17 +2889,17 @@ static const char *confchk_timing_stress_for_test2_choices[] = {
   __WT_CONFIG_CHOICE_compact_slow, __WT_CONFIG_CHOICE_conn_close_stress_log_printf,
   __WT_CONFIG_CHOICE_evict_reposition, __WT_CONFIG_CHOICE_failpoint_eviction_split,
   __WT_CONFIG_CHOICE_failpoint_history_store_delete_key_from_ts,
-  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_history_store_checkpoint_delay,
-  __WT_CONFIG_CHOICE_history_store_search, __WT_CONFIG_CHOICE_history_store_sweep_race,
-  __WT_CONFIG_CHOICE_live_restore_clean_up, __WT_CONFIG_CHOICE_open_index_slow,
-  __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2, __WT_CONFIG_CHOICE_prefetch_3,
-  __WT_CONFIG_CHOICE_prefix_compare, __WT_CONFIG_CHOICE_prepare_checkpoint_delay,
-  __WT_CONFIG_CHOICE_prepare_resolution_1, __WT_CONFIG_CHOICE_prepare_resolution_2,
-  __WT_CONFIG_CHOICE_session_alter_slow, __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage,
-  __WT_CONFIG_CHOICE_split_1, __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3,
-  __WT_CONFIG_CHOICE_split_4, __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6,
-  __WT_CONFIG_CHOICE_split_7, __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish,
-  NULL};
+  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_failpoint_rec_split_write,
+  __WT_CONFIG_CHOICE_history_store_checkpoint_delay, __WT_CONFIG_CHOICE_history_store_search,
+  __WT_CONFIG_CHOICE_history_store_sweep_race, __WT_CONFIG_CHOICE_live_restore_clean_up,
+  __WT_CONFIG_CHOICE_open_index_slow, __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2,
+  __WT_CONFIG_CHOICE_prefetch_3, __WT_CONFIG_CHOICE_prefix_compare,
+  __WT_CONFIG_CHOICE_prepare_checkpoint_delay, __WT_CONFIG_CHOICE_prepare_resolution_1,
+  __WT_CONFIG_CHOICE_prepare_resolution_2, __WT_CONFIG_CHOICE_session_alter_slow,
+  __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage, __WT_CONFIG_CHOICE_split_1,
+  __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3, __WT_CONFIG_CHOICE_split_4,
+  __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6, __WT_CONFIG_CHOICE_split_7,
+  __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish, NULL};
 const char __WT_CONFIG_CHOICE_dsync[] = "dsync";
 const char __WT_CONFIG_CHOICE_fsync[] = "fsync";
 
@@ -3113,7 +3114,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
     "\"conn_close_stress_log_printf\",\"evict_reposition\","
     "\"failpoint_eviction_split\","
     "\"failpoint_history_store_delete_key_from_ts\","
-    "\"failpoint_rec_before_wrapup\","
+    "\"failpoint_rec_before_wrapup\",\"failpoint_rec_split_write\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"live_restore_clean_up\","
     "\"open_index_slow\",\"prefetch_1\",\"prefetch_2\",\"prefetch_3\""
@@ -3183,17 +3184,17 @@ static const char *confchk_timing_stress_for_test3_choices[] = {
   __WT_CONFIG_CHOICE_compact_slow, __WT_CONFIG_CHOICE_conn_close_stress_log_printf,
   __WT_CONFIG_CHOICE_evict_reposition, __WT_CONFIG_CHOICE_failpoint_eviction_split,
   __WT_CONFIG_CHOICE_failpoint_history_store_delete_key_from_ts,
-  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_history_store_checkpoint_delay,
-  __WT_CONFIG_CHOICE_history_store_search, __WT_CONFIG_CHOICE_history_store_sweep_race,
-  __WT_CONFIG_CHOICE_live_restore_clean_up, __WT_CONFIG_CHOICE_open_index_slow,
-  __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2, __WT_CONFIG_CHOICE_prefetch_3,
-  __WT_CONFIG_CHOICE_prefix_compare, __WT_CONFIG_CHOICE_prepare_checkpoint_delay,
-  __WT_CONFIG_CHOICE_prepare_resolution_1, __WT_CONFIG_CHOICE_prepare_resolution_2,
-  __WT_CONFIG_CHOICE_session_alter_slow, __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage,
-  __WT_CONFIG_CHOICE_split_1, __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3,
-  __WT_CONFIG_CHOICE_split_4, __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6,
-  __WT_CONFIG_CHOICE_split_7, __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish,
-  NULL};
+  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_failpoint_rec_split_write,
+  __WT_CONFIG_CHOICE_history_store_checkpoint_delay, __WT_CONFIG_CHOICE_history_store_search,
+  __WT_CONFIG_CHOICE_history_store_sweep_race, __WT_CONFIG_CHOICE_live_restore_clean_up,
+  __WT_CONFIG_CHOICE_open_index_slow, __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2,
+  __WT_CONFIG_CHOICE_prefetch_3, __WT_CONFIG_CHOICE_prefix_compare,
+  __WT_CONFIG_CHOICE_prepare_checkpoint_delay, __WT_CONFIG_CHOICE_prepare_resolution_1,
+  __WT_CONFIG_CHOICE_prepare_resolution_2, __WT_CONFIG_CHOICE_session_alter_slow,
+  __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage, __WT_CONFIG_CHOICE_split_1,
+  __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3, __WT_CONFIG_CHOICE_split_4,
+  __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6, __WT_CONFIG_CHOICE_split_7,
+  __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish, NULL};
 
 static const char *confchk_verbose14_choices[] = {__WT_CONFIG_CHOICE_all, __WT_CONFIG_CHOICE_api,
   __WT_CONFIG_CHOICE_backup, __WT_CONFIG_CHOICE_block, __WT_CONFIG_CHOICE_block_cache,
@@ -3389,7 +3390,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
     "\"conn_close_stress_log_printf\",\"evict_reposition\","
     "\"failpoint_eviction_split\","
     "\"failpoint_history_store_delete_key_from_ts\","
-    "\"failpoint_rec_before_wrapup\","
+    "\"failpoint_rec_before_wrapup\",\"failpoint_rec_split_write\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"live_restore_clean_up\","
     "\"open_index_slow\",\"prefetch_1\",\"prefetch_2\",\"prefetch_3\""
@@ -3462,17 +3463,17 @@ static const char *confchk_timing_stress_for_test4_choices[] = {
   __WT_CONFIG_CHOICE_compact_slow, __WT_CONFIG_CHOICE_conn_close_stress_log_printf,
   __WT_CONFIG_CHOICE_evict_reposition, __WT_CONFIG_CHOICE_failpoint_eviction_split,
   __WT_CONFIG_CHOICE_failpoint_history_store_delete_key_from_ts,
-  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_history_store_checkpoint_delay,
-  __WT_CONFIG_CHOICE_history_store_search, __WT_CONFIG_CHOICE_history_store_sweep_race,
-  __WT_CONFIG_CHOICE_live_restore_clean_up, __WT_CONFIG_CHOICE_open_index_slow,
-  __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2, __WT_CONFIG_CHOICE_prefetch_3,
-  __WT_CONFIG_CHOICE_prefix_compare, __WT_CONFIG_CHOICE_prepare_checkpoint_delay,
-  __WT_CONFIG_CHOICE_prepare_resolution_1, __WT_CONFIG_CHOICE_prepare_resolution_2,
-  __WT_CONFIG_CHOICE_session_alter_slow, __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage,
-  __WT_CONFIG_CHOICE_split_1, __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3,
-  __WT_CONFIG_CHOICE_split_4, __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6,
-  __WT_CONFIG_CHOICE_split_7, __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish,
-  NULL};
+  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_failpoint_rec_split_write,
+  __WT_CONFIG_CHOICE_history_store_checkpoint_delay, __WT_CONFIG_CHOICE_history_store_search,
+  __WT_CONFIG_CHOICE_history_store_sweep_race, __WT_CONFIG_CHOICE_live_restore_clean_up,
+  __WT_CONFIG_CHOICE_open_index_slow, __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2,
+  __WT_CONFIG_CHOICE_prefetch_3, __WT_CONFIG_CHOICE_prefix_compare,
+  __WT_CONFIG_CHOICE_prepare_checkpoint_delay, __WT_CONFIG_CHOICE_prepare_resolution_1,
+  __WT_CONFIG_CHOICE_prepare_resolution_2, __WT_CONFIG_CHOICE_session_alter_slow,
+  __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage, __WT_CONFIG_CHOICE_split_1,
+  __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3, __WT_CONFIG_CHOICE_split_4,
+  __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6, __WT_CONFIG_CHOICE_split_7,
+  __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish, NULL};
 
 static const char *confchk_verbose15_choices[] = {__WT_CONFIG_CHOICE_all, __WT_CONFIG_CHOICE_api,
   __WT_CONFIG_CHOICE_backup, __WT_CONFIG_CHOICE_block, __WT_CONFIG_CHOICE_block_cache,
@@ -3660,7 +3661,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
     "\"conn_close_stress_log_printf\",\"evict_reposition\","
     "\"failpoint_eviction_split\","
     "\"failpoint_history_store_delete_key_from_ts\","
-    "\"failpoint_rec_before_wrapup\","
+    "\"failpoint_rec_before_wrapup\",\"failpoint_rec_split_write\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"live_restore_clean_up\","
     "\"open_index_slow\",\"prefetch_1\",\"prefetch_2\",\"prefetch_3\""
@@ -3729,17 +3730,17 @@ static const char *confchk_timing_stress_for_test5_choices[] = {
   __WT_CONFIG_CHOICE_compact_slow, __WT_CONFIG_CHOICE_conn_close_stress_log_printf,
   __WT_CONFIG_CHOICE_evict_reposition, __WT_CONFIG_CHOICE_failpoint_eviction_split,
   __WT_CONFIG_CHOICE_failpoint_history_store_delete_key_from_ts,
-  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_history_store_checkpoint_delay,
-  __WT_CONFIG_CHOICE_history_store_search, __WT_CONFIG_CHOICE_history_store_sweep_race,
-  __WT_CONFIG_CHOICE_live_restore_clean_up, __WT_CONFIG_CHOICE_open_index_slow,
-  __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2, __WT_CONFIG_CHOICE_prefetch_3,
-  __WT_CONFIG_CHOICE_prefix_compare, __WT_CONFIG_CHOICE_prepare_checkpoint_delay,
-  __WT_CONFIG_CHOICE_prepare_resolution_1, __WT_CONFIG_CHOICE_prepare_resolution_2,
-  __WT_CONFIG_CHOICE_session_alter_slow, __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage,
-  __WT_CONFIG_CHOICE_split_1, __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3,
-  __WT_CONFIG_CHOICE_split_4, __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6,
-  __WT_CONFIG_CHOICE_split_7, __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish,
-  NULL};
+  __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup, __WT_CONFIG_CHOICE_failpoint_rec_split_write,
+  __WT_CONFIG_CHOICE_history_store_checkpoint_delay, __WT_CONFIG_CHOICE_history_store_search,
+  __WT_CONFIG_CHOICE_history_store_sweep_race, __WT_CONFIG_CHOICE_live_restore_clean_up,
+  __WT_CONFIG_CHOICE_open_index_slow, __WT_CONFIG_CHOICE_prefetch_1, __WT_CONFIG_CHOICE_prefetch_2,
+  __WT_CONFIG_CHOICE_prefetch_3, __WT_CONFIG_CHOICE_prefix_compare,
+  __WT_CONFIG_CHOICE_prepare_checkpoint_delay, __WT_CONFIG_CHOICE_prepare_resolution_1,
+  __WT_CONFIG_CHOICE_prepare_resolution_2, __WT_CONFIG_CHOICE_session_alter_slow,
+  __WT_CONFIG_CHOICE_sleep_before_read_overflow_onpage, __WT_CONFIG_CHOICE_split_1,
+  __WT_CONFIG_CHOICE_split_2, __WT_CONFIG_CHOICE_split_3, __WT_CONFIG_CHOICE_split_4,
+  __WT_CONFIG_CHOICE_split_5, __WT_CONFIG_CHOICE_split_6, __WT_CONFIG_CHOICE_split_7,
+  __WT_CONFIG_CHOICE_split_8, __WT_CONFIG_CHOICE_tiered_flush_finish, NULL};
 
 static const char *confchk_verbose16_choices[] = {__WT_CONFIG_CHOICE_all, __WT_CONFIG_CHOICE_api,
   __WT_CONFIG_CHOICE_backup, __WT_CONFIG_CHOICE_block, __WT_CONFIG_CHOICE_block_cache,
@@ -3927,7 +3928,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
     "\"conn_close_stress_log_printf\",\"evict_reposition\","
     "\"failpoint_eviction_split\","
     "\"failpoint_history_store_delete_key_from_ts\","
-    "\"failpoint_rec_before_wrapup\","
+    "\"failpoint_rec_before_wrapup\",\"failpoint_rec_split_write\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"live_restore_clean_up\","
     "\"open_index_slow\",\"prefetch_1\",\"prefetch_2\",\"prefetch_3\""

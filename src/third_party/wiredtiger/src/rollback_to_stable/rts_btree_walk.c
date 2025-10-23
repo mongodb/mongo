@@ -473,8 +473,8 @@ __wti_rts_btree_walk_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
      * reflect that the tree only contains stable data. The fields are set in a way to ensure RTS
      * does not mark the btree as dirty when checkpoint is happening.
      */
-    oldest_id = __wt_atomic_loadv64(&conn->txn_global.oldest_id);
-    stable_timestamp = __wt_atomic_loadv64(&conn->txn_global.stable_timestamp);
+    oldest_id = __wt_atomic_load_uint64_v_relaxed(&conn->txn_global.oldest_id);
+    stable_timestamp = __wt_atomic_load_uint64_v_relaxed(&conn->txn_global.stable_timestamp);
     WT_ASSERT(session, oldest_id > WT_TXN_NONE);
     btree->rec_max_txn = oldest_id - 1;
     btree->rec_max_timestamp = stable_timestamp;

@@ -246,7 +246,7 @@ append_insert_op(SHARED_CONFIG *cfg, WT_SESSION *session, WT_CURSOR *cursor, INF
 
     value = &_value;
 
-    keyno = __wt_atomic_add64(&cfg->key_range, 1);
+    keyno = __wt_atomic_add_uint64(&cfg->key_range, 1);
     if (cfg->ftype == ROW) {
         testutil_snprintf(keybuf, sizeof(keybuf), "%016" PRIu64, keyno);
         cursor->set_key(cursor, keybuf);

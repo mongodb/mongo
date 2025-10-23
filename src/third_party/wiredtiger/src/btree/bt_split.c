@@ -711,7 +711,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
              * the prefetch thread would crash if it sees a freed ref.
              */
             if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
-                WT_ACQUIRE_READ(ref_changes, next_ref->ref_changes);
+                ref_changes = __wt_atomic_load_uint8_v_acquire(&next_ref->ref_changes);
             else
                 ref_changes = 0;
             if (ref_changes == 0 && next_ref != ref &&
@@ -1287,7 +1287,7 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
      * Deepen the tree if the page's memory footprint is larger than the maximum size for a page in
      * memory (presumably putting eviction pressure on the cache).
      */
-    if (__wt_atomic_loadsize(&page->memory_footprint) > btree->maxmempage)
+    if (__wt_atomic_load_size_relaxed(&page->memory_footprint) > btree->maxmempage)
         return (true);
 
     /*
@@ -1878,7 +1878,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
     }
 
     if (WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)))
-        __wt_atomic_addv8(&ref->ref_changes, 1);
+        __wt_atomic_add_uint8_v(&ref->ref_changes, 1);
 
     switch (page->type) {
     case WT_PAGE_COL_INT:
@@ -2500,7 +2500,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi, bool 
 
     /* Swap the new page into place. */
     if (WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)))
-        __wt_atomic_addv8(&ref->ref_changes, 1);
+        __wt_atomic_add_uint8_v(&ref->ref_changes, 1);
     ref->page = new->page;
 
     if (change_ref_state)

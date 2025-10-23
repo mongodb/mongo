@@ -145,7 +145,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
          * which means we want the previous value seen, not the current value.
          */
         WT_RET(__wti_rec_cell_build_val(
-          session, r, cbulk->last->data, cbulk->last->size, &tw, cbulk->rle));
+          session, r, cbulk->last->data, cbulk->last->size, &tw, cbulk->rle, NULL));
 
     /* Boundary: split or write the page. */
     if (WTI_CROSSING_SPLIT_BND(r, val->len))
@@ -235,7 +235,7 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
-        WT_ACQUIRE_READ(prev_ref_changes, ref->ref_changes);
+        prev_ref_changes = __wt_atomic_load_uint8_v_acquire(&ref->ref_changes);
 
         /* Update the starting record number in case we split. */
         r->recno = ref->ref_recno;
@@ -333,7 +333,7 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
          * the internal page.
          */
         if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
-            __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
+            __wt_atomic_cas_uint8_v(&ref->ref_changes, prev_ref_changes, 0);
     }
     WT_INTL_FOREACH_END;
 
@@ -434,7 +434,7 @@ __rec_col_fix_addtw(
     key->len = key->cell_len + key->buf.size;
 
     /* Pack the value, which is empty, but with a time window. */
-    WT_RET(__wti_rec_cell_build_val(session, r, NULL, 0, tw, 0));
+    WT_RET(__wti_rec_cell_build_val(session, r, NULL, 0, tw, 0, NULL));
 
     /* Figure how much space we need, and reallocate the page if about to run out. */
     len = key->len + val->len;
@@ -1183,7 +1183,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SALVAGE_COOK
         val->len = val->cell_len + value->size;
         *ovfl_usedp = true;
     } else
-        WT_RET(__wti_rec_cell_build_val(session, r, value->data, value->size, tw, rle));
+        WT_RET(__wti_rec_cell_build_val(session, r, value->data, value->size, tw, rle, NULL));
 
     /* Boundary: split or write the page. */
     if (__wti_rec_need_split(r, val->len))

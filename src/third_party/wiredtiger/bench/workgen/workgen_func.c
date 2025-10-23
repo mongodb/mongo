@@ -47,19 +47,19 @@ typedef struct workgen_random_state {
 uint32_t
 workgen_atomic_add32(uint32_t *vp, uint32_t v)
 {
-    return (__wt_atomic_add32(vp, v));
+    return (__wt_atomic_add_uint32(vp, v));
 }
 
 uint64_t
 workgen_atomic_add64(uint64_t *vp, uint64_t v)
 {
-    return (__wt_atomic_add64(vp, v));
+    return (__wt_atomic_add_uint64(vp, v));
 }
 
 uint32_t
 workgen_atomic_sub32(uint32_t *vp, uint32_t v)
 {
-    return (__wt_atomic_sub32(vp, v));
+    return (__wt_atomic_sub_uint32(vp, v));
 }
 
 void

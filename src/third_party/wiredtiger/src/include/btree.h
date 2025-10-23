@@ -207,12 +207,13 @@ struct __wt_btree {
  * WT_SESSION_BTREE_SYNC_SAFE checks whether it is safe to perform an operation that would conflict
  * with a sync.
  */
-#define WT_BTREE_SYNCING(btree) (__wt_atomic_load_enum(&(btree)->syncing) != WT_BTREE_SYNC_OFF)
+#define WT_BTREE_SYNCING(btree) \
+    (__wt_atomic_load_enum_relaxed(&(btree)->syncing) != WT_BTREE_SYNC_OFF)
 #define WT_SESSION_BTREE_SYNC(session) \
-    (__wt_atomic_load_pointer(&S2BT(session)->sync_session) == (session))
-#define WT_SESSION_BTREE_SYNC_SAFE(session, btree)                        \
-    (__wt_atomic_load_enum(&(btree)->syncing) != WT_BTREE_SYNC_RUNNING || \
-      __wt_atomic_load_pointer(&(btree)->sync_session) == (session))
+    (__wt_atomic_load_ptr_relaxed(&S2BT(session)->sync_session) == (session))
+#define WT_SESSION_BTREE_SYNC_SAFE(session, btree)                                \
+    (__wt_atomic_load_enum_relaxed(&(btree)->syncing) != WT_BTREE_SYNC_RUNNING || \
+      __wt_atomic_load_ptr_relaxed(&(btree)->sync_session) == (session))
 
     wt_shared uint64_t bytes_dirty_intl;    /* Bytes in dirty internal pages. */
     wt_shared uint64_t bytes_dirty_leaf;    /* Bytes in dirty leaf pages. */

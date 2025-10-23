@@ -43,8 +43,8 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
       next_walk != NULL) {
         ++seen_count;
         page = next_walk->page;
-        if (__wt_atomic_loadsize(&page->memory_footprint) > max_pagesize)
-            max_pagesize = __wt_atomic_loadsize(&page->memory_footprint);
+        if (__wt_atomic_load_size_relaxed(&page->memory_footprint) > max_pagesize)
+            max_pagesize = __wt_atomic_load_size_relaxed(&page->memory_footprint);
 
         if (__wt_page_is_modified(page))
             ++pages_dirty;
@@ -79,12 +79,13 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 
         if (page->evict_pass_gen == 0) {
             unvisited_age_gap_sum +=
-              (__wt_atomic_load64(&evict->evict_pass_gen) - page->cache_create_gen);
+              (__wt_atomic_load_uint64_relaxed(&evict->evict_pass_gen) - page->cache_create_gen);
             ++unvisited_count;
         } else {
             visited_age_gap_sum +=
-              (__wt_atomic_load64(&evict->evict_pass_gen) - page->cache_create_gen);
-            gen_gap = __wt_atomic_load64(&evict->evict_pass_gen) - page->evict_pass_gen;
+              (__wt_atomic_load_uint64_relaxed(&evict->evict_pass_gen) - page->cache_create_gen);
+            gen_gap =
+              __wt_atomic_load_uint64_relaxed(&evict->evict_pass_gen) - page->evict_pass_gen;
             if (gen_gap > gen_gap_max)
                 gen_gap_max = gen_gap;
             gen_gap_sum += gen_gap;
@@ -136,14 +137,14 @@ __wt_evict_cache_stat_walk(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Set statistics that don't require walking the cache. */
-    WT_STAT_DSRC_SET(
-      session, cache_state_gen_current, __wt_atomic_load64(&conn->evict->evict_pass_gen));
+    WT_STAT_DSRC_SET(session, cache_state_gen_current,
+      __wt_atomic_load_uint64_relaxed(&conn->evict->evict_pass_gen));
 
     /* Root page statistics */
     WT_INTL_INDEX_GET_SAFE(btree->root.page, root_idx);
     WT_STAT_DSRC_SET(session, cache_state_root_entries, root_idx->entries);
-    WT_STAT_DSRC_SET(
-      session, cache_state_root_size, __wt_atomic_loadsize(&btree->root.page->memory_footprint));
+    WT_STAT_DSRC_SET(session, cache_state_root_size,
+      __wt_atomic_load_size_relaxed(&btree->root.page->memory_footprint));
 
     __evict_stat_walk(session);
 }

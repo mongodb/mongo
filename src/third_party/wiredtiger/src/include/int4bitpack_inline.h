@@ -38,8 +38,6 @@ typedef struct __4b_unpack_context {
     const uint8_t **pp;
     const uint8_t *end;
     const uint8_t *start; /* start of input buffer for safety */
-    uint64_t result;
-    int shift;
     int nibble; /* 0: next read from low nibble of current byte, 1: next read from high nibble */
 } WT_4B_UNPACK_CONTEXT;
 
@@ -57,6 +55,18 @@ __4b_pack_init(WT_4B_PACK_CONTEXT *ctx, uint8_t **pp, uint8_t *end)
 }
 
 /*
+ * __4b_pack_end --
+ *     Internal helpers: Finalize packing.
+ */
+static WT_INLINE void
+__4b_pack_end(WT_4B_PACK_CONTEXT *ctx)
+{
+    if (ctx->nibble == 1)
+        /* We have written a low nibble but not yet the high nibble: advance the pointer. */
+        (*ctx->pp)++;
+}
+
+/*
  * __4b_unpack_init --
  *     Internal helpers: initialize context.
  */
@@ -66,9 +76,19 @@ __4b_unpack_init(WT_4B_UNPACK_CONTEXT *ctx, const uint8_t **pp, const uint8_t *e
     ctx->pp = pp;
     ctx->end = end;
     ctx->start = *pp;
-    ctx->result = 0;
-    ctx->shift = 0;
     ctx->nibble = 0; /* start aligned: low nibble first */
+}
+
+/*
+ * __4b_unpack_end --
+ *     Internal helpers: Finalize unpacking.
+ */
+static WT_INLINE void
+__4b_unpack_end(WT_4B_UNPACK_CONTEXT *ctx)
+{
+    if (ctx->nibble == 1)
+        /* We have read a low nibble but not yet the high nibble: advance the pointer. */
+        (*ctx->pp)++;
 }
 
 /*
@@ -84,13 +104,11 @@ __4b_pack_put_chunk(WT_4B_PACK_CONTEXT *ctx, uint8_t chunk)
         if (ctx->end != NULL && *ctx->pp >= ctx->end)
             return (ENOMEM);
         *(*ctx->pp) = chunk;
-        (*ctx->pp)++;
         ctx->nibble = 1;
     } else {
         /* Update the previously appended byte's high nibble. */
-        if (*ctx->pp == ctx->start)
-            return (EINVAL); /* should not happen */
-        *(*ctx->pp - 1) = (uint8_t)((*(*ctx->pp - 1)) | (uint8_t)(chunk << 4));
+        **ctx->pp = (uint8_t)(**ctx->pp | (uint8_t)(chunk << 4));
+        (*ctx->pp)++; /* May advance past end but it's fine. */
         ctx->nibble = 0;
     }
     return (0);
@@ -153,12 +171,11 @@ __4b_unpack_posint_ctx(WT_4B_UNPACK_CONTEXT *ctx, uint64_t *out)
 
     for (;;) {
         uint8_t chunk;
-        if (__4b_unpack_get_chunk(ctx, &chunk) != 0)
-            return (EINVAL);
+        WT_RET(__4b_unpack_get_chunk(ctx, &chunk));
         uint64_t val = (uint64_t)(chunk & 0x7U);
         if (shift != 0)
-            val += 1;        /* carry from saved "+1 on decode" rule */
-        n += (val << shift); /* use + to allow carry */
+            val = (val + 1) << shift;
+        n += val; /* use + to allow carry */
         shift += 3;
         if ((chunk & 0x8U) == 0)
             break; /* last chunk */
@@ -193,8 +210,6 @@ __4b_nibbles_for_posint(uint64_t x)
  *
  * Possible extensions:
  * - Add functions for packing and unpacking more numbers.
- * - Add functions for packing and unpacking arrays
- *   (see encode_array() and decode_array() in test/packing/int4bpack-test.c).
  * - Optional: Add support for negative integers.
  */
 
@@ -209,6 +224,7 @@ __wt_4b_pack_posint1(uint8_t **pp, uint8_t *end, uint64_t x1)
 
     __4b_pack_init(&ctx, pp, end);
     WT_RET(__4b_pack_posint_ctx(&ctx, x1));
+    __4b_pack_end(&ctx);
     return (0);
 }
 
@@ -224,6 +240,24 @@ __wt_4b_pack_posint2(uint8_t **pp, uint8_t *end, uint64_t x1, uint64_t x2)
     __4b_pack_init(&ctx, pp, end);
     WT_RET(__4b_pack_posint_ctx(&ctx, x1));
     WT_RET(__4b_pack_posint_ctx(&ctx, x2));
+    __4b_pack_end(&ctx);
+    return (0);
+}
+
+/*
+ * __wt_4b_pack_array --
+ *     Packs an array of positive variable-length integers.
+ */
+static WT_INLINE int
+__wt_4b_pack_array(uint8_t **pp, uint8_t *end, const uint64_t *vals, size_t n)
+{
+    WT_4B_PACK_CONTEXT ctx;
+    size_t i;
+
+    __4b_pack_init(&ctx, pp, end);
+    for (i = 0; i < n; ++i)
+        WT_RET(__4b_pack_posint_ctx(&ctx, vals[i]));
+    __4b_pack_end(&ctx);
     return (0);
 }
 
@@ -238,6 +272,7 @@ __wt_4b_unpack_posint1(const uint8_t **pp, const uint8_t *end, uint64_t *x1)
 
     __4b_unpack_init(&ctx, pp, end);
     WT_RET(__4b_unpack_posint_ctx(&ctx, x1));
+    __4b_unpack_end(&ctx);
     return (0);
 }
 
@@ -253,6 +288,24 @@ __wt_4b_unpack_posint2(const uint8_t **pp, const uint8_t *end, uint64_t *x1, uin
     __4b_unpack_init(&ctx, pp, end);
     WT_RET(__4b_unpack_posint_ctx(&ctx, x1));
     WT_RET(__4b_unpack_posint_ctx(&ctx, x2));
+    __4b_unpack_end(&ctx);
+    return (0);
+}
+
+/*
+ * __wt_4b_unpack_array --
+ *     Unpacks an array of positive variable-length integers.
+ */
+static WT_INLINE int
+__wt_4b_unpack_array(const uint8_t **pp, const uint8_t *end, uint64_t *vals, size_t n)
+{
+    WT_4B_UNPACK_CONTEXT ctx;
+    size_t i;
+
+    __4b_unpack_init(&ctx, pp, end);
+    for (i = 0; i < n; ++i)
+        WT_RET(__4b_unpack_posint_ctx(&ctx, &vals[i]));
+    __4b_unpack_end(&ctx);
     return (0);
 }
 
@@ -275,6 +328,21 @@ __wt_4b_size_posint2(uint64_t x1, uint64_t x2)
 {
     return (__4b_nibbles_for_posint(x1) + __4b_nibbles_for_posint(x2) + 1) >>
       1; /* ceil((n1+n2)/2) */
+}
+
+/*
+ * __wt_4b_size_array --
+ *     Return the packed size of an array of unsigned integers in bytes.
+ */
+static WT_INLINE size_t
+__wt_4b_size_array(const uint64_t *vals, size_t n)
+{
+    size_t nibbles = 0;
+    size_t i;
+
+    for (i = 0; i < n; ++i)
+        nibbles += __4b_nibbles_for_posint(vals[i]);
+    return (nibbles + 1) >> 1; /* ceil(nibbles/2) */
 }
 
 /*

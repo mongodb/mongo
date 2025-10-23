@@ -61,7 +61,7 @@ static uint64_t wtperf_value_range(WTPERF *);
 static inline uint64_t
 get_next_incr(WTPERF *wtperf)
 {
-    return (__wt_atomic_add64(&wtperf->insert_key, 1));
+    return (__wt_atomic_add_uint64(&wtperf->insert_key, 1));
 }
 
 /*
@@ -752,7 +752,7 @@ op_err:
 
         /* Update the log-like table. */
         if (opts->log_like_table && (*op != WORKER_READ && *op != WORKER_TRUNCATE)) {
-            log_id = __wt_atomic_add64(&wtperf->log_like_table_key, 1);
+            log_id = __wt_atomic_add_uint64(&wtperf->log_like_table_key, 1);
             log_table_cursor->set_key(log_table_cursor, log_id);
             log_table_cursor->set_value(log_table_cursor, value_buf);
             if ((ret = log_table_cursor->insert(log_table_cursor)) != 0) {

@@ -28,7 +28,7 @@
 static WT_INLINE void
 __wt_tsan_suppress_store_uint8(uint8_t *vp, uint8_t v)
 {
-    __wt_atomic_store8(vp, v);
+    __wt_atomic_store_uint8_relaxed(vp, v);
 }
 
 /*
@@ -38,7 +38,7 @@ __wt_tsan_suppress_store_uint8(uint8_t *vp, uint8_t v)
 static WT_INLINE uint32_t
 __wt_tsan_suppress_load_uint32(uint32_t *vp)
 {
-    return (__wt_atomic_load32(vp));
+    return (__wt_atomic_load_uint32_relaxed(vp));
 }
 
 /*
@@ -48,7 +48,7 @@ __wt_tsan_suppress_load_uint32(uint32_t *vp)
 static WT_INLINE void
 __wt_tsan_suppress_store_uint32(uint32_t *vp, uint32_t v)
 {
-    __wt_atomic_store32(vp, v);
+    __wt_atomic_store_uint32_relaxed(vp, v);
 }
 
 /*
@@ -58,7 +58,7 @@ __wt_tsan_suppress_store_uint32(uint32_t *vp, uint32_t v)
 static WT_INLINE uint32_t
 __wt_tsan_suppress_load_uint32_v(volatile uint32_t *vp)
 {
-    return (__wt_atomic_loadv32(vp));
+    return (__wt_atomic_load_uint32_v_relaxed(vp));
 }
 
 /*
@@ -68,7 +68,7 @@ __wt_tsan_suppress_load_uint32_v(volatile uint32_t *vp)
 static WT_INLINE uint64_t
 __wt_tsan_suppress_load_uint64(uint64_t *vp)
 {
-    return (__wt_atomic_load64(vp));
+    return (__wt_atomic_load_uint64_relaxed(vp));
 }
 
 /*
@@ -78,7 +78,7 @@ __wt_tsan_suppress_load_uint64(uint64_t *vp)
 static WT_INLINE uint64_t
 __wt_tsan_suppress_load_uint64_v(volatile uint64_t *vp)
 {
-    return (__wt_atomic_loadv64(vp));
+    return (__wt_atomic_load_uint64_v_relaxed(vp));
 }
 
 /*
@@ -88,7 +88,7 @@ __wt_tsan_suppress_load_uint64_v(volatile uint64_t *vp)
 static WT_INLINE void
 __wt_tsan_suppress_store_uint64(uint64_t *vp, uint64_t v)
 {
-    __wt_atomic_store64(vp, v);
+    __wt_atomic_store_uint64_relaxed(vp, v);
 }
 
 /*
@@ -128,7 +128,7 @@ __wt_tsan_suppress_add_uint64_v(volatile uint64_t *var, uint64_t value)
 static WT_INLINE void
 __wt_tsan_suppress_store_int64(int64_t *vp, int64_t v)
 {
-    __wt_atomic_storei64(vp, v);
+    __wt_atomic_store_int64_relaxed(vp, v);
 }
 
 /*
@@ -158,7 +158,7 @@ __wt_tsan_suppress_sub_int64(int64_t *var, int64_t value)
 static WT_INLINE bool
 __wt_tsan_suppress_load_bool(bool *vp)
 {
-    return (__wt_atomic_loadbool(vp));
+    return (__wt_atomic_load_bool_relaxed(vp));
 }
 
 /*
@@ -168,7 +168,7 @@ __wt_tsan_suppress_load_bool(bool *vp)
 static WT_INLINE void
 __wt_tsan_suppress_store_bool(bool *vp, bool v)
 {
-    __wt_atomic_storebool(vp, v);
+    __wt_atomic_store_bool_relaxed(vp, v);
 }
 
 /*
@@ -178,7 +178,7 @@ __wt_tsan_suppress_store_bool(bool *vp, bool v)
 static WT_INLINE bool
 __wt_tsan_suppress_load_bool_v(volatile bool *vp)
 {
-    return (__wt_atomic_loadvbool(vp));
+    return (__wt_atomic_load_bool_v_relaxed(vp));
 }
 
 /*
@@ -188,7 +188,7 @@ __wt_tsan_suppress_load_bool_v(volatile bool *vp)
 static WT_INLINE void
 __wt_tsan_suppress_store_bool_v(volatile bool *vp, bool v)
 {
-    __wt_atomic_storevbool(vp, v);
+    __wt_atomic_store_bool_v_relaxed(vp, v);
 }
 
 /*
@@ -198,7 +198,7 @@ __wt_tsan_suppress_store_bool_v(volatile bool *vp, bool v)
 static WT_INLINE void *
 __wt_tsan_suppress_load_pointer(void **vp)
 {
-    return (__wt_atomic_load_pointer(vp));
+    return (__wt_atomic_load_ptr_relaxed(vp));
 }
 
 /*
@@ -208,7 +208,7 @@ __wt_tsan_suppress_load_pointer(void **vp)
 static WT_INLINE void
 __wt_tsan_suppress_store_pointer(void **vp, void *v)
 {
-    __wt_atomic_store_pointer(vp, v);
+    __wt_atomic_store_ptr_relaxed(vp, v);
 }
 
 /*
@@ -228,7 +228,7 @@ __wt_tsan_suppress_memcpy(void *dest, void *src, size_t count)
 static WT_INLINE WT_ADDR *
 __wt_tsan_suppress_load_wt_addr_ptr(void **vp)
 {
-    return (WT_ADDR *)(__wt_atomic_load_pointer(vp));
+    return (WT_ADDR *)(__wt_atomic_load_ptr_relaxed(vp));
 }
 
 /*
@@ -238,7 +238,7 @@ __wt_tsan_suppress_load_wt_addr_ptr(void **vp)
 static WT_INLINE void
 __wt_tsan_suppress_store_wt_addr_ptr(void **vp, WT_ADDR *v)
 {
-    __wt_atomic_store_pointer(vp, v);
+    __wt_atomic_store_ptr_relaxed(vp, v);
 }
 
 /*
@@ -248,7 +248,7 @@ __wt_tsan_suppress_store_wt_addr_ptr(void **vp, WT_ADDR *v)
 static WT_INLINE WTI_LOGSLOT *
 __wt_tsan_suppress_load_wti_logslot_ptr(WTI_LOGSLOT **vp)
 {
-    return (__wt_atomic_load_pointer(vp));
+    return (__wt_atomic_load_ptr_relaxed(vp));
 }
 
 /*
@@ -258,7 +258,7 @@ __wt_tsan_suppress_load_wti_logslot_ptr(WTI_LOGSLOT **vp)
 static WT_INLINE WT_PAGE_MODIFY *
 __wt_tsan_suppress_load_wt_page_modify_ptr(WT_PAGE_MODIFY **vp)
 {
-    return (__wt_atomic_load_pointer(vp));
+    return (__wt_atomic_load_ptr_relaxed(vp));
 }
 
 /*
@@ -268,7 +268,7 @@ __wt_tsan_suppress_load_wt_page_modify_ptr(WT_PAGE_MODIFY **vp)
 static WT_INLINE const WT_PAGE_HEADER *
 __wt_tsan_suppress_load_wt_page_header_ptr(const WT_PAGE_HEADER **vp)
 {
-    return (__wt_atomic_load_pointer(vp));
+    return (__wt_atomic_load_ptr_relaxed(vp));
 }
 
 /*
@@ -278,7 +278,7 @@ __wt_tsan_suppress_load_wt_page_header_ptr(const WT_PAGE_HEADER **vp)
 static WT_INLINE void
 __wt_tsan_suppress_store_wt_page_header_ptr(const WT_PAGE_HEADER **vp, const WT_PAGE_HEADER *v)
 {
-    __wt_atomic_store_pointer(vp, v);
+    __wt_atomic_store_ptr_relaxed(vp, v);
 }
 
 /*
@@ -288,7 +288,7 @@ __wt_tsan_suppress_store_wt_page_header_ptr(const WT_PAGE_HEADER **vp, const WT_
 static WT_INLINE WT_UPDATE *
 __wt_tsan_suppress_load_wt_update_ptr(WT_UPDATE **vp)
 {
-    return (__wt_atomic_load_pointer(vp));
+    return (__wt_atomic_load_ptr_relaxed(vp));
 }
 
 /*
@@ -298,5 +298,5 @@ __wt_tsan_suppress_load_wt_update_ptr(WT_UPDATE **vp)
 static WT_INLINE const char *
 __wt_tsan_suppress_load_const_char_ptr(const char **vp)
 {
-    return (__wt_atomic_load_pointer(vp));
+    return (__wt_atomic_load_ptr_relaxed(vp));
 }

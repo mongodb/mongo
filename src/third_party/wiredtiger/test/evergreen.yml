@@ -2361,6 +2361,18 @@ tasks:
         vars:
           unit_test_args: -v 2 --extra-long
 
+  # FIXME-WT-15652 Remove PALM tests when PALite is fully validated.
+  # Run the tests with PALM for comparison with PALite to catch discrepancies.
+  - name: unit-test-palm
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 page_log=palm
+
   # Run the tests that uses suite_random with a random starting seed
   - name: unit-test-random-seed
     tags: ["python"]
@@ -6841,6 +6853,7 @@ buildvariants:
     - name: spinlock-pthread-adaptive-test
       distros: ubuntu2004-arm64-large
     - name: unit-test
+    - name: unit-test-palm
     - name: unit-test-extra-long
       distros: ubuntu2004-arm64-large
     - name: unit-test-zstd
@@ -7236,6 +7249,7 @@ buildvariants:
     - name: spinlock-pthread-adaptive-test
       distros: amazon2023-arm64-latest-large-m8g
     - name: unit-test
+    - name: unit-test-palm
     - name: unit-test-extra-long
       distros: amazon2023-arm64-latest-large-m8g
     - name: unit-test-zstd

@@ -40,7 +40,7 @@ __rec_hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
      */
     if (WT_VERBOSE_ISSET(session, WT_VERB_HS) ||
       (ckpt_gen_current > ckpt_gen_last &&
-        __wt_atomic_casv64(&cache->hs_verb_gen_write, ckpt_gen_last, ckpt_gen_current))) {
+        __wt_atomic_cas_uint64_v(&cache->hs_verb_gen_write, ckpt_gen_last, ckpt_gen_current))) {
         WT_IGNORE_RET(__wt_evict_clean_needed(session, &pct_full));
         WT_IGNORE_RET(__wt_evict_dirty_needed(session, &pct_dirty));
 
@@ -781,7 +781,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
         check_prepared =
           F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) && WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw);
         if (check_prepared) {
-            WT_ACQUIRE_READ(txnid_prepared, list->onpage_upd->txnid);
+            txnid_prepared = __wt_atomic_load_uint64_v_acquire(&list->onpage_upd->txnid);
             /*
              * No need to check the following updates as prepared because they must have all been
              * rolled back.

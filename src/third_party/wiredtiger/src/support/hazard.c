@@ -95,28 +95,28 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
     if (session->hazards.num_active >= session->hazards.size) {
         WT_ASSERT(session,
           session->hazards.num_active == session->hazards.size &&
-            __wt_atomic_load32(&session->hazards.inuse) == session->hazards.size);
+            __wt_atomic_load_uint32_relaxed(&session->hazards.inuse) == session->hazards.size);
         WT_RET(hazard_grow(session));
     }
 
     /*
      * If there are no available hazard pointer slots, make another one visible.
      */
-    if (session->hazards.num_active >= __wt_atomic_load32(&session->hazards.inuse)) {
+    if (session->hazards.num_active >= __wt_atomic_load_uint32_relaxed(&session->hazards.inuse)) {
         WT_ASSERT(session,
-          session->hazards.num_active == __wt_atomic_load32(&session->hazards.inuse) &&
-            __wt_atomic_load32(&session->hazards.inuse) < session->hazards.size);
+          session->hazards.num_active == __wt_atomic_load_uint32_relaxed(&session->hazards.inuse) &&
+            __wt_atomic_load_uint32_relaxed(&session->hazards.inuse) < session->hazards.size);
         /*
          * If we've grown the hazard array the inuse counter can be incremented beyond the size of
          * the old hazard array. We need to ensure the new hazard array pointer is visible before
          * this increment of the inuse counter and do so with a release barrier in the hazard grow
          * logic.
          */
-        hp = &session->hazards.arr[__wt_atomic_fetch_add32(&session->hazards.inuse, 1)];
+        hp = &session->hazards.arr[__wt_atomic_fetch_add_uint32(&session->hazards.inuse, 1)];
     } else {
         WT_ASSERT(session,
-          session->hazards.num_active < __wt_atomic_load32(&session->hazards.inuse) &&
-            __wt_atomic_load32(&session->hazards.inuse) <= session->hazards.size);
+          session->hazards.num_active < __wt_atomic_load_uint32_relaxed(&session->hazards.inuse) &&
+            __wt_atomic_load_uint32_relaxed(&session->hazards.inuse) <= session->hazards.size);
 
         /*
          * There must be an empty slot in the array, find it. Skip most of the active slots by
@@ -125,7 +125,8 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
          * the array.
          */
         for (hp = session->hazards.arr + session->hazards.num_active;; ++hp) {
-            if (hp >= session->hazards.arr + __wt_atomic_load32(&session->hazards.inuse))
+            if (hp >=
+              session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse))
                 hp = session->hazards.arr;
             if (hp->ref == NULL)
                 break;
@@ -195,7 +196,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * Clear the caller's hazard pointer. The common pattern is LIFO, so do a reverse search.
      */
-    for (hp = session->hazards.arr + __wt_atomic_load32(&session->hazards.inuse) - 1;
+    for (hp = session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse) - 1;
          hp >= session->hazards.arr; --hp)
         if (hp->ref == ref) {
             /*
@@ -203,7 +204,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_REF *ref)
              * the page, be it writes or reads, occur while we are holding the hazard pointer and
              * thus preventing the page from being freed.
              */
-            WT_RELEASE_WRITE(hp->ref, NULL);
+            __wt_atomic_store_ptr_release(&hp->ref, NULL);
 
             /*
              * If this was the last hazard pointer in the session, reset the size so that checks can
@@ -240,7 +241,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
      * hazard pointer count, but this is a useful diagnostic.
      */
     for (found = false, hp = session->hazards.arr;
-         hp < session->hazards.arr + __wt_atomic_load32(&session->hazards.inuse); ++hp)
+         hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
         if (hp->ref != NULL) {
             found = true;
             break;
@@ -265,7 +266,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
      * would be).
      */
     for (hp = session->hazards.arr;
-         hp < session->hazards.arr + __wt_atomic_load32(&session->hazards.inuse); ++hp)
+         hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
         if (hp->ref != NULL) {
             hp->ref = NULL;
             --session->hazards.num_active;
@@ -438,7 +439,7 @@ __hazard_dump(WT_SESSION_IMPL *session)
     WT_HAZARD *hp;
 
     for (hp = session->hazards.arr;
-         hp < session->hazards.arr + __wt_atomic_load32(&session->hazards.inuse); ++hp)
+         hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
         if (hp->ref != NULL)
             __wt_errx(session, "session %p: hazard pointer %p: %s, line %d", (void *)session,
               (void *)hp->ref, hp->func, hp->line);

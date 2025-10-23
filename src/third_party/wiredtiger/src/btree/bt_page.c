@@ -624,7 +624,7 @@ __wt_page_block_meta_assign(WT_SESSION_IMPL *session, WT_PAGE_BLOCK_META *meta)
      * Allocate an interim page ID. If the page is actually being loaded from disk, it's ok to waste
      * some IDs for now.
      */
-    page_id = __wt_atomic_fetch_add64(&btree->next_page_id, 1);
+    page_id = __wt_atomic_fetch_add_uint64(&btree->next_page_id, 1);
     WT_ASSERT(session, page_id >= WT_BLOCK_MIN_PAGE_ID);
 
     meta->page_id = page_id;
@@ -740,8 +740,8 @@ err:
 
     /* Increment the cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size, false);
-    (void)__wt_atomic_add64(&S2C(session)->cache->pages_inmem, 1);
-    page->cache_create_gen = __wt_atomic_load64(&S2C(session)->evict->evict_pass_gen);
+    (void)__wt_atomic_add_uint64(&S2C(session)->cache->pages_inmem, 1);
+    page->cache_create_gen = __wt_atomic_load_uint64_relaxed(&S2C(session)->evict->evict_pass_gen);
 
     *pagep = page;
     return (0);

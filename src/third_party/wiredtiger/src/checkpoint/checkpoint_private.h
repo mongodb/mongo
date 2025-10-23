@@ -75,7 +75,7 @@ struct __wti_ckpt_thread {
     WT_SESSION_IMPL *session; /* session associated with thread */
     wt_thread_t tid;          /* thread id */
     bool tid_set;             /* thread set */
-#define WT_CKPT_LOGSIZE(conn) (__wt_atomic_loadi64(&(conn)->ckpt.server.logsize) != 0)
+#define WT_CKPT_LOGSIZE(conn) (__wt_atomic_load_int64_relaxed(&(conn)->ckpt.server.logsize) != 0)
     wt_shared wt_off_t logsize; /* thread log size period */
     bool signalled;             /* thread signalled */
     uint64_t usecs;             /* thread timer */

@@ -17,13 +17,11 @@ typedef uint64_t value_t;
 #define ATOMIC_DEFINE(var, value) static atomic_t var = value
 
 static void atomic_store_release(atomic_t* var, value_t value) {
-    WT_RELEASE_WRITE(*var, value);
+    __wt_atomic_store_uint64_release(var, value);
 }
 
 static value_t atomic_load_acquire(atomic_t* var) {
-    value_t result;
-    WT_ACQUIRE_READ(result, *var);
-    return result;
+    return __wt_atomic_load_uint64_acquire(var);
 }
 
 static const char *get_mode(void) {

@@ -92,7 +92,7 @@ wts_prepare_discover(WT_CONNECTION *conn)
              * Commit with a timestamp greater than the prepare timestamp. We use the current
              * timestamp + 10 to ensure it's newer
              */
-            ts = __wt_atomic_addv64(&g.timestamp, 10);
+            ts = __wt_atomic_add_uint64_v(&g.timestamp, 10);
             testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, ts));
             testutil_check(
               session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_DURABLE, ts));

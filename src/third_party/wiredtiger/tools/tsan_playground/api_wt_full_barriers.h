@@ -18,13 +18,13 @@ typedef uint64_t value_t;
 
 static void atomic_store_release(atomic_t* var, value_t value) {
     WT_FULL_BARRIER();
-    __wt_atomic_store64(var, value);
+    __wt_atomic_store_uint64_relaxed(var, value);
 }
 
 static value_t atomic_load_acquire(atomic_t* var) {
     value_t result;
 
-    result = __wt_atomic_load64(var);
+    result = __wt_atomic_load_uint64_relaxed(var);
     WT_FULL_BARRIER();
 
     return result;

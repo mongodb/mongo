@@ -203,7 +203,7 @@ err:
 void
 __wti_blkcache_get_read_handle(WT_BLOCK *block)
 {
-    __wt_atomic_add32(&block->read_count, 1);
+    __wt_atomic_add_uint32(&block->read_count, 1);
 }
 
 /*
@@ -215,6 +215,6 @@ __wt_blkcache_release_handle(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *la
 {
     WT_ASSERT(session, block->read_count > 0);
     *last_release = false;
-    if (__wt_atomic_sub32(&block->read_count, 1) == 0)
+    if (__wt_atomic_sub_uint32(&block->read_count, 1) == 0)
         *last_release = true;
 }

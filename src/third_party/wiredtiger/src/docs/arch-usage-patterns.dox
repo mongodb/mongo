@@ -34,13 +34,13 @@ become stale.
 \code{.c}
     void write {
         s->payload = 5;
-        WT_RELEASE_WRITE(s->ready, true);
+        __wt_atomic_store_bool_release(&s->ready, true);
     }
 
     void read {
         bool ready;
 
-        WT_ACQUIRE_READ(ready, s->ready);
+        ready = __wt_atomic_load_bool_acquire(&s->ready);
         if (ready) {
             var = s->payload;
         }
@@ -142,7 +142,7 @@ used as it provides a much simpler interface for developers when reading and deb
 \code{.c}
     void example_WwS(int *W, int *S) {
         // The initial read from S must take place before the write to W.
-        WT_ACQUIRE_READ(initial_s_value, *S);
+        initial_s_value = __wt_atomic_load_int32_acquire(S);
         *W = new_value;
 
         // This full barrier ensures the write to W is visible to other threads *before*
@@ -205,7 +205,7 @@ Threads that fail to claim the flag \c F must decide whether to continue, abort 
 
 @subsection win-the-race-example Example
 In \c __wt_cache_pool_server all threads attempt to set the \c pool_managed flag with a call to
-\c __wt_atomic_cas8(&cp->pool_managed, 0, 1) and only the successful thread is allowed then to set
+\c __wt_atomic_cas_uint8_relaxed(&cp->pool_managed, 0, 1) and only the successful thread is allowed then to set
 the \c WT_CACHE_POOL_MANAGER flag and perform the duties of the pool manager.
 
 @subsection win-the-race-pseudocode Example Pseudocode

@@ -609,7 +609,7 @@ commit_transaction(TINFO *tinfo, bool prepared)
         if (GV(RUNS_PREDICTABLE_REPLAY))
             ts = replay_commit_ts(tinfo);
         else
-            ts = __wt_atomic_addv64(&g.timestamp, 1);
+            ts = __wt_atomic_add_uint64_v(&g.timestamp, 1);
         testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, ts));
 
         if (prepared)
@@ -653,7 +653,7 @@ rollback_transaction(TINFO *tinfo, bool prepared)
         if (GV(RUNS_PREDICTABLE_REPLAY))
             ts = replay_rollback_ts(tinfo);
         else
-            ts = __wt_atomic_addv64(&g.timestamp, 1);
+            ts = __wt_atomic_add_uint64_v(&g.timestamp, 1);
 
         testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_ROLLBACK, ts));
     }
@@ -679,7 +679,7 @@ prepare_transaction(TINFO *tinfo)
 
     ++tinfo->prepare;
 
-    prepared_id = __wt_atomic_addv64(&g.prepared_id, 1);
+    prepared_id = __wt_atomic_add_uint64_v(&g.prepared_id, 1);
     if (GV(RUNS_PREDICTABLE_REPLAY))
         ts = replay_prepare_ts(tinfo);
     else
@@ -689,7 +689,7 @@ prepare_transaction(TINFO *tinfo)
          * the stable timestamp. The subsequent commit will increment it again, ensuring
          * correctness.
          */
-        ts = __wt_atomic_addv64(&g.timestamp, 1);
+        ts = __wt_atomic_add_uint64_v(&g.timestamp, 1);
     testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_PREPARE, ts));
     testutil_check(session->prepared_id_transaction_uint(session, prepared_id));
     ret = session->prepare_transaction(session, NULL);
@@ -1171,8 +1171,8 @@ rollback_retry:
                 op = REMOVE;
                 if (TV(OPS_TRUNCATE) && tinfo->ops > truncate_op) {
                     /* Limit test runs to a maximum of 4 truncation operations at a time. */
-                    if (__wt_atomic_addv64(&g.truncate_cnt, 1) > 4)
-                        (void)__wt_atomic_subv64(&g.truncate_cnt, 1);
+                    if (__wt_atomic_add_uint64_v(&g.truncate_cnt, 1) > 4)
+                        (void)__wt_atomic_sub_uint64_v(&g.truncate_cnt, 1);
                     else
                         op = TRUNCATE;
 
@@ -1373,7 +1373,7 @@ skip_operation:
 
         /* Release the truncate operation counter. */
         if (op == TRUNCATE)
-            (void)__wt_atomic_subv64(&g.truncate_cnt, 1);
+            (void)__wt_atomic_sub_uint64_v(&g.truncate_cnt, 1);
 
         /* Drain any pending column-store inserts. */
         if (g.column_store_config)
@@ -2136,7 +2136,7 @@ col_insert_resolve(TABLE *table, void *arg)
             if (*p > 0 && *p <= max_rows + 1) {
                 if (*p == max_rows + 1)
                     testutil_assert(
-                      __wt_atomic_casv32(&table->rows_current, max_rows, max_rows + 1));
+                      __wt_atomic_cas_uint32_v(&table->rows_current, max_rows, max_rows + 1));
                 *p = 0;
                 --cip->insert_list_cnt;
                 break;

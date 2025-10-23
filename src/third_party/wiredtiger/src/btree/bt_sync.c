@@ -157,7 +157,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
     internal_bytes = leaf_bytes = 0;
     internal_pages = leaf_pages = 0;
-    saved_pinned_id = __wt_atomic_loadv64(&WT_SESSION_TXN_SHARED(session)->pinned_id);
+    saved_pinned_id = __wt_atomic_load_uint64_v_relaxed(&WT_SESSION_TXN_SHARED(session)->pinned_id);
     time_start = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT) ? __wt_clock(session) : 0;
 
     switch (syncop) {
@@ -200,10 +200,10 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              */
             page = walk->page;
             if (__wt_page_is_modified(page) &&
-              __wt_atomic_load64(&page->modify->update_txn) < oldest_id) {
+              __wt_atomic_load_uint64_relaxed(&page->modify->update_txn) < oldest_id) {
                 if (txn->isolation == WT_ISO_READ_COMMITTED)
                     __wt_txn_get_snapshot(session);
-                leaf_bytes += __wt_atomic_loadsize(&page->memory_footprint);
+                leaf_bytes += __wt_atomic_load_size_relaxed(&page->memory_footprint);
                 ++leaf_pages;
                 WT_ERR(__wt_reconcile(session, walk, NULL, WT_REC_CHECKPOINT));
             }
@@ -240,21 +240,21 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * wait for any problematic eviction or page splits to complete.
          */
         WT_ASSERT(session,
-          __wt_atomic_load_enum(&btree->syncing) == WT_BTREE_SYNC_OFF &&
-            __wt_atomic_load_pointer(&btree->sync_session) == NULL);
+          __wt_atomic_load_enum_relaxed(&btree->syncing) == WT_BTREE_SYNC_OFF &&
+            __wt_atomic_load_ptr_relaxed(&btree->sync_session) == NULL);
 
-        __wt_atomic_store_pointer(&btree->sync_session, session);
-        __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_WAIT);
+        __wt_atomic_store_ptr_relaxed(&btree->sync_session, session);
+        __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_WAIT);
         __wt_gen_next_drain(session, WT_GEN_EVICT);
-        __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_RUNNING);
+        __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_RUNNING);
 
         /*
          * Reset the number of obsolete time window pages to let the eviction threads and checkpoint
          * cleanup operation to continue marking the clean obsolete time window pages as dirty once
          * the checkpoint is finished.
          */
-        __wt_atomic_store32(&btree->eviction_obsolete_tw_pages, 0);
-        __wt_atomic_store32(&btree->checkpoint_cleanup_obsolete_tw_pages, 0);
+        __wt_atomic_store_uint32_relaxed(&btree->eviction_obsolete_tw_pages, 0);
+        __wt_atomic_store_uint32_relaxed(&btree->checkpoint_cleanup_obsolete_tw_pages, 0);
         is_hs = WT_IS_HS(btree->dhandle);
 
         /* Add in history store reconciliation for standard files. */
@@ -316,13 +316,13 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             }
 
             if (is_internal) {
-                internal_bytes += __wt_atomic_loadsize(&page->memory_footprint);
+                internal_bytes += __wt_atomic_load_size_relaxed(&page->memory_footprint);
                 ++internal_pages;
                 /* Slow down checkpoints. */
                 if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT))
                     __wt_sleep(0, 10 * WT_THOUSAND);
             } else {
-                leaf_bytes += __wt_atomic_loadsize(&page->memory_footprint);
+                leaf_bytes += __wt_atomic_load_size_relaxed(&page->memory_footprint);
                 ++leaf_pages;
             }
 
@@ -366,7 +366,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             /* Update checkpoint IO tracking data. */
             if (__wt_checkpoint_verbose_timer_started(session))
                 __wt_checkpoint_progress_stats(
-                  session, __wt_atomic_loadsize(&page->memory_footprint));
+                  session, __wt_atomic_load_size_relaxed(&page->memory_footprint));
         }
 
         /*
@@ -414,8 +414,8 @@ err:
         __wt_txn_release_snapshot(session);
 
     /* Clear the checkpoint flag. */
-    __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_OFF);
-    __wt_atomic_store_pointer(&btree->sync_session, NULL);
+    __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_OFF);
+    __wt_atomic_store_ptr_relaxed(&btree->sync_session, NULL);
 
     __wt_spin_unlock(session, &btree->flush_lock);
 

@@ -47,7 +47,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
       session, stats, cache_bytes_dirty_internal, __wt_btree_dirty_intl_inuse(session));
     WT_STATP_DSRC_SET(session, stats, cache_bytes_dirty_total,
       __wt_cache_bytes_plus_overhead(
-        S2C(session)->cache, __wt_atomic_load64(&btree->bytes_dirty_total)));
+        S2C(session)->cache, __wt_atomic_load_uint64_relaxed(&btree->bytes_dirty_total)));
     WT_STATP_DSRC_SET(session, stats, cache_bytes_inuse, __wt_btree_bytes_inuse(session));
 
     WT_STATP_DSRC_SET(

@@ -81,7 +81,7 @@ __wt_lsn_string(WT_LSN *lsn, size_t len, char *buf)
 static WT_INLINE uint32_t
 __wt_lsn_file(WT_LSN *lsn)
 {
-    return (__wt_atomic_load32(&lsn->l.file));
+    return (__wt_atomic_load_uint32_relaxed(&lsn->l.file));
 }
 
 /*
@@ -91,7 +91,7 @@ __wt_lsn_file(WT_LSN *lsn)
 static WT_INLINE uint32_t
 __wt_lsn_offset(WT_LSN *lsn)
 {
-    return (__wt_atomic_load32(&lsn->l.offset));
+    return (__wt_atomic_load_uint32_relaxed(&lsn->l.offset));
 }
 
 /*

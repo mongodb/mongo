@@ -91,7 +91,7 @@ TEST_CASE("Chunk cache bitmap: __chunkcache_bitmap_find_free", "[bitmap]")
                 size_t bit_index;
                 for (uint32_t j = 0; j < iterations; j++) {
                     if (__ut_chunkcache_bitmap_alloc(session_impl, &bit_index) == 0)
-                        __wt_atomic_add64(&allocations_made, 1);
+                        __wt_atomic_add_uint64(&allocations_made, 1);
                 }
             });
         }
@@ -122,7 +122,7 @@ TEST_CASE("Chunk cache bitmap: __chunkcache_bitmap_find_free", "[bitmap]")
                 for (uint32_t j = 0; j < iterations; j++) {
 
                     if (__ut_chunkcache_bitmap_alloc(session_impl, &bit_index) == 0)
-                        __wt_atomic_add64(&allocations_made, 1);
+                        __wt_atomic_add_uint64(&allocations_made, 1);
                 }
             });
 
@@ -138,7 +138,7 @@ TEST_CASE("Chunk cache bitmap: __chunkcache_bitmap_find_free", "[bitmap]")
                           if ((chunkcache->free_bitmap[bit_index / 8] &
                                 (uint8_t)(0x01 << (bit_index % 8))) != 0) {
                               __ut_chunkcache_bitmap_free(session_impl, bit_index);
-                              __wt_atomic_sub64(&allocations_made, 1);
+                              __wt_atomic_sub_uint64(&allocations_made, 1);
                           }
                       }
                   }

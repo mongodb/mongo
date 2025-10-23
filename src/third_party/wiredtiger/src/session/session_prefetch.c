@@ -28,8 +28,8 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
     }
 
     /* Disable pre-fetch work on tiered tables. */
-    if (__wt_atomic_load_enum(&session->dhandle->type) == WT_DHANDLE_TYPE_TIERED ||
-      __wt_atomic_load_enum(&session->dhandle->type) == WT_DHANDLE_TYPE_TIERED_TREE)
+    if (__wt_atomic_load_enum_relaxed(&session->dhandle->type) == WT_DHANDLE_TYPE_TIERED ||
+      __wt_atomic_load_enum_relaxed(&session->dhandle->type) == WT_DHANDLE_TYPE_TIERED_TREE)
         return (false);
 
     if (S2C(session)->prefetch_queue_count > WT_MAX_PREFETCH_QUEUE)

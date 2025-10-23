@@ -65,7 +65,7 @@ __capacity_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     cap = &conn->capacity;
     cap->chunkcache = chunkcache;
-    __wt_atomic_store64(&cap->total, total);
+    __wt_atomic_store_uint64_relaxed(&cap->total, total);
     if (total != 0) {
         /*
          * We've been given a total capacity, set the capacity of all the subsystems.
@@ -276,7 +276,7 @@ __capacity_reserve(
 
     if (capacity != 0) {
         res_len = WT_RESERVATION_NS(bytes, capacity);
-        res_value = __wt_atomic_add64(reservation, res_len);
+        res_value = __wt_atomic_add_uint64(reservation, res_len);
         if (now_ns > res_value && now_ns - res_value > WT_BILLION)
             /*
              * If the reservation clock is out of date, bring it to within a second of a current
@@ -390,14 +390,15 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes, WT_THROTTLE_TYP
         WT_STAT_CONN_INCRV(session, capacity_bytes_read, bytes);
         break;
     }
-    total_capacity = __wt_atomic_load64(&cap->total);
+    total_capacity = __wt_atomic_load_uint64_relaxed(&cap->total);
 
     /*
      * Right now no subsystem can be individually turned off, but it is certainly a possibility to
      * consider one subsystem may be turned off at some point in the future. If this subsystem is
      * not throttled there's nothing to do.
      */
-    if (__wt_atomic_load64(&cap->total) == 0 || capacity == 0 || F_ISSET(conn, WT_CONN_RECOVERING))
+    if (__wt_atomic_load_uint64_relaxed(&cap->total) == 0 || capacity == 0 ||
+      F_ISSET(conn, WT_CONN_RECOVERING))
         return;
 
     /*
@@ -405,7 +406,7 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes, WT_THROTTLE_TYP
      * under recovery. And if we are recovering, we don't reach this code.
      */
     if (type != WT_THROTTLE_READ) {
-        (void)__wt_atomic_addv64(&cap->written, bytes);
+        (void)__wt_atomic_add_uint64_v(&cap->written, bytes);
         __capacity_signal(session);
     }
 
@@ -460,12 +461,12 @@ again:
                 new_res = best_res;
             WT_ASSERT(session, steal_capacity != 0);
             new_res += WT_STEAL_FRACTION(WT_BILLION) + WT_RESERVATION_NS(bytes, steal_capacity);
-            if (!__wt_atomic_casv64(steal, best_res, new_res)) {
+            if (!__wt_atomic_cas_uint64_v(steal, best_res, new_res)) {
                 /*
                  * Give up our reservations and try again. We won't try to steal the next time.
                  */
-                (void)__wt_atomic_sub64(reservation, WT_RESERVATION_NS(bytes, capacity));
-                (void)__wt_atomic_sub64(
+                (void)__wt_atomic_sub_uint64(reservation, WT_RESERVATION_NS(bytes, capacity));
+                (void)__wt_atomic_sub_uint64(
                   &cap->reservation_total, WT_RESERVATION_NS(bytes, total_capacity));
                 goto again;
             }
@@ -475,7 +476,8 @@ again:
              * before adding that many bytes to the acquiring subsystem's capacity.
              */
             stolen_bytes = WT_STEAL_FRACTION(steal_capacity);
-            res_value = __wt_atomic_sub64(reservation, WT_RESERVATION_NS(stolen_bytes, capacity));
+            res_value =
+              __wt_atomic_sub_uint64(reservation, WT_RESERVATION_NS(stolen_bytes, capacity));
         }
     }
     if (res_value < res_total_value)

@@ -8,10 +8,10 @@
 
 #include "wt_internal.h"
 
-#define WT_DHANDLE_CAN_DISCARD(dhandle)                           \
-    (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) && \
-      __wt_atomic_loadi32(&(dhandle)->session_inuse) == 0 &&      \
-      __wt_atomic_load32(&(dhandle)->references) == 0)
+#define WT_DHANDLE_CAN_DISCARD(dhandle)                                 \
+    (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) &&       \
+      __wt_atomic_load_int32_relaxed(&(dhandle)->session_inuse) == 0 && \
+      __wt_atomic_load_uint32_relaxed(&(dhandle)->references) == 0)
 
 /*
  * __sweep_file_dhandle_check_and_reset_tod --
@@ -72,7 +72,7 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
          * handles alive because of those cases, but if we see multiple cursors open, clear the time
          * of death.
          */
-        if (__wt_atomic_loadi32(&dhandle->session_inuse) > 1)
+        if (__wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 1)
             dhandle->timeofdeath = 0;
 
         /*
@@ -80,7 +80,7 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
          * move on.
          */
         if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ||
-          __wt_atomic_loadi32(&dhandle->session_inuse) > 0 || dhandle->timeofdeath != 0)
+          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 0 || dhandle->timeofdeath != 0)
             continue;
 
         /* For table dhandles, skip expiration if associated file dhandles exist. */
@@ -184,11 +184,11 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
         /*
          * Ignore open files once the btree file count is below the minimum number of handles.
          */
-        if (__wt_atomic_load32(&conn->open_btree_count) < conn->sweep_handles_min)
+        if (__wt_atomic_load_uint32_relaxed(&conn->open_btree_count) < conn->sweep_handles_min)
             break;
 
         if (WT_IS_METADATA(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-          __wt_atomic_loadi32(&dhandle->session_inuse) != 0 ||
+          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) != 0 ||
           __wt_tsan_suppress_load_uint64(&dhandle->timeofdeath) == 0 ||
           now - dhandle->timeofdeath <= conn->sweep_idle_time)
             continue;
@@ -196,7 +196,7 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
         /*
          * For tables, we need to hold the table lock to avoid racing with cursor opens.
          */
-        if (__wt_atomic_load_enum(&dhandle->type) == WT_DHANDLE_TYPE_TABLE)
+        if (__wt_atomic_load_enum_relaxed(&dhandle->type) == WT_DHANDLE_TYPE_TABLE)
             WT_WITH_TABLE_WRITE_LOCK(
               session, WT_WITH_DHANDLE(session, dhandle, ret = __sweep_expire_one(session)));
         else
@@ -303,7 +303,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
         if (!WT_DHANDLE_CAN_DISCARD(dhandle))
             continue;
 
-        if (__wt_atomic_load_enum(&dhandle->type) == WT_DHANDLE_TYPE_TABLE)
+        if (__wt_atomic_load_enum_relaxed(&dhandle->type) == WT_DHANDLE_TYPE_TABLE)
             WT_WITH_TABLE_WRITE_LOCK(session,
               WT_WITH_HANDLE_LIST_WRITE_LOCK(
                 session, WT_WITH_DHANDLE(session, dhandle, ret = __sweep_remove_one(session))));
@@ -345,7 +345,7 @@ __sweep_check_session_callback(
     WT_UNUSED(exit_walkp);
 
     last = array_session->last_cursor_big_sweep;
-    last_sweep = __wt_atomic_load64(&array_session->last_sweep);
+    last_sweep = __wt_atomic_load_uint64_relaxed(&array_session->last_sweep);
 
     /*
      * Get the earlier of the two timestamps, as they refer to sweeps of two different data
@@ -467,7 +467,7 @@ __sweep_server(void *arg)
          * never become idle.
          */
         if (conn->sweep_idle_time != 0 &&
-          __wt_atomic_load32(&conn->open_btree_count) >= conn->sweep_handles_min)
+          __wt_atomic_load_uint32_relaxed(&conn->open_btree_count) >= conn->sweep_handles_min)
             WT_ERR(__sweep_expire(session, now));
 
         WT_ERR(__sweep_discard_trees(session, &dead_handles));

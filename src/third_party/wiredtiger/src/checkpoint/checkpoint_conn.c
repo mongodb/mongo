@@ -30,7 +30,7 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 
     WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
     ckpt_logsize = (wt_off_t)cval.val;
-    __wt_atomic_storei64(&conn->ckpt.server.logsize, ckpt_logsize);
+    __wt_atomic_store_int64_relaxed(&conn->ckpt.server.logsize, ckpt_logsize);
 
     /*
      * The checkpoint configuration requires a wait time and/or a log size, if neither is set, we're
@@ -43,7 +43,7 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
          * subsystem has already been initialized.
          */
         if (ckpt_logsize != 0 && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
-            __wt_atomic_storei64(
+            __wt_atomic_store_int64_relaxed(
               &conn->ckpt.server.logsize, WT_MAX(ckpt_logsize, conn->log_mgr.file_max));
         /* Checkpoints are incompatible with in-memory configuration */
         WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
@@ -105,7 +105,7 @@ __ckpt_server(void *arg)
          * Reset the log file size counters if the checkpoint wasn't skipped.
          */
         if (checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT) &&
-          __wt_atomic_loadi64(&conn->ckpt.server.logsize)) {
+          __wt_atomic_load_int64_relaxed(&conn->ckpt.server.logsize)) {
             __wt_log_written_reset(session);
             conn->ckpt.server.signalled = false;
 
@@ -240,7 +240,7 @@ __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize)
 
     conn = S2C(session);
     WT_ASSERT(session, WT_CKPT_LOGSIZE(conn));
-    if (logsize >= __wt_atomic_loadi64(&conn->ckpt.server.logsize) &&
+    if (logsize >= __wt_atomic_load_int64_relaxed(&conn->ckpt.server.logsize) &&
       !conn->ckpt.server.signalled) {
         __wt_cond_signal(session, conn->ckpt.server.cond);
         conn->ckpt.server.signalled = true;

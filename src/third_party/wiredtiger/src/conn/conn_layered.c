@@ -266,7 +266,7 @@ __disagg_put_meta(WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *ite
 
     if (lsnp != NULL)
         *lsnp = put_args.lsn;
-    __wt_atomic_addv64(&disagg->num_meta_put, 1);
+    __wt_atomic_add_uint64_v(&disagg->num_meta_put, 1);
     return (0);
 }
 
@@ -315,8 +315,8 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
     WT_ERR(__disagg_put_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, buf, &lsn));
 
     /* Do the bookkeeping. */
-    WT_RELEASE_WRITE(disagg->last_checkpoint_meta_lsn, lsn);
-    WT_RELEASE_WRITE(disagg->last_checkpoint_timestamp, checkpoint_timestamp);
+    __wt_atomic_store_uint64_release(&disagg->last_checkpoint_meta_lsn, lsn);
+    __wt_atomic_store_uint64_release(&disagg->last_checkpoint_timestamp, checkpoint_timestamp);
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Wrote disaggregated checkpoint metadata: lsn=%" PRIu64 ", timestamp=%" PRIu64
@@ -372,7 +372,8 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     /* We should not pick up a checkpoint with an earlier LSN. */
-    WT_ACQUIRE_READ(current_meta_lsn, conn->disaggregated_storage.last_checkpoint_meta_lsn);
+    current_meta_lsn =
+      __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_meta_lsn);
     if (meta_lsn < current_meta_lsn)
         WT_RET_MSG(session, EINVAL,
           "Attempting to pick up an older checkpoint: current metadata LSN = %" PRIu64
@@ -575,10 +576,12 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
      * Update the checkpoint metadata LSN. This doesn't require further synchronization, because the
      * updates are protected by the checkpoint lock.
      */
-    WT_RELEASE_WRITE(conn->disaggregated_storage.last_checkpoint_meta_lsn, meta_lsn);
+    __wt_atomic_store_uint64_release(
+      &conn->disaggregated_storage.last_checkpoint_meta_lsn, meta_lsn);
 
     /* Update the checkpoint timestamp. */
-    WT_RELEASE_WRITE(conn->disaggregated_storage.last_checkpoint_timestamp, checkpoint_timestamp);
+    __wt_atomic_store_uint64_release(
+      &conn->disaggregated_storage.last_checkpoint_timestamp, checkpoint_timestamp);
 
     /* Remember the root config of the last checkpoint. */
     __wt_free(session, conn->disaggregated_storage.last_checkpoint_root);
@@ -750,7 +753,7 @@ __wt_layered_table_manager_add_table(WT_SESSION_IMPL *session, uint32_t ingest_i
      * There is a bootstrapping problem. Use the global oldest ID as a starting point. Nothing can
      * have been written into the ingest table, so it will be a conservative choice.
      */
-    entry->checkpoint_txn_id = __wt_atomic_loadv64(&conn->txn_global.oldest_id);
+    entry->checkpoint_txn_id = __wt_atomic_load_uint64_v_relaxed(&conn->txn_global.oldest_id);
 
     /*
      * It's safe to just reference the same string. The lifecycle of the layered tree is longer than
@@ -1024,12 +1027,12 @@ __wti_disagg_set_last_materialized_lsn(WT_SESSION_IMPL *session, uint64_t lsn)
     uint64_t cur_lsn;
 
     disagg = &S2C(session)->disaggregated_storage;
-    WT_ACQUIRE_READ(cur_lsn, disagg->last_materialized_lsn);
+    cur_lsn = __wt_atomic_load_uint64_acquire(&disagg->last_materialized_lsn);
 
     if (cur_lsn > lsn)
         return (EINVAL); /* Can't go backwards. */
 
-    WT_RELEASE_WRITE(disagg->last_materialized_lsn, lsn);
+    __wt_atomic_store_uint64_release(&disagg->last_materialized_lsn, lsn);
     return (0);
 }
 
@@ -1556,8 +1559,10 @@ __wt_disagg_advance_checkpoint(WT_SESSION_IMPL *session, bool ckpt_success)
         return (0);
 
     WT_RET(__wt_scr_alloc(session, 0, &meta));
-    WT_ACQUIRE_READ(meta_lsn, conn->disaggregated_storage.last_checkpoint_meta_lsn);
-    WT_ACQUIRE_READ(checkpoint_timestamp, conn->disaggregated_storage.cur_checkpoint_timestamp);
+    meta_lsn =
+      __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_meta_lsn);
+    checkpoint_timestamp =
+      __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.cur_checkpoint_timestamp);
     WT_ASSERT(session, meta_lsn > 0); /* The metadata page should be written by now. */
 
     if (ckpt_success) {
@@ -1568,8 +1573,8 @@ __wt_disagg_advance_checkpoint(WT_SESSION_IMPL *session, bool ckpt_success)
         WT_ERR(__wt_buf_fmt(session, meta, "metadata_lsn=%" PRIu64, meta_lsn));
         WT_ERR(disagg->npage_log->page_log->pl_complete_checkpoint_ext(disagg->npage_log->page_log,
           &session->iface, 0, (uint64_t)checkpoint_timestamp, meta, NULL));
-        WT_RELEASE_WRITE(
-          conn->disaggregated_storage.last_checkpoint_timestamp, checkpoint_timestamp);
+        __wt_atomic_store_uint64_release(
+          &conn->disaggregated_storage.last_checkpoint_timestamp, checkpoint_timestamp);
 
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
           "Completed disaggregated storage checkpoint: lsn=%" PRIu64 ", timestamp=%" PRIu64 " %s",
@@ -1660,8 +1665,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
     prev_upd = tombstone = upd = upds = NULL;
     WT_TIME_WINDOW_INIT(&tw);
 
-    WT_ACQUIRE_READ(
-      last_checkpoint_timestamp, S2C(session)->disaggregated_storage.last_checkpoint_timestamp);
+    last_checkpoint_timestamp = __wt_atomic_load_uint64_acquire(
+      &S2C(session)->disaggregated_storage.last_checkpoint_timestamp);
     WT_RET(__layered_table_get_constituent_cursor(session, entry->ingest_id, &stable_cursor));
     cbt = (WT_CURSOR_BTREE *)stable_cursor;
     if (last_checkpoint_timestamp != WT_TS_NONE)
@@ -2002,7 +2007,7 @@ __layered_update_gc_ingest_tables_prune_timestamps(
                       session, layered_table, prune_timestamp, ckpt_inuse);
 
                     WT_ASSERT(session, prune_timestamp >= btree->prune_timestamp);
-                    WT_RELEASE_WRITE(btree->prune_timestamp, prune_timestamp);
+                    __wt_atomic_store_uint64_release(&btree->prune_timestamp, prune_timestamp);
                     layered_table->last_ckpt_inuse = ckpt_inuse;
 
                     WT_ERR(__wt_session_release_dhandle(session));

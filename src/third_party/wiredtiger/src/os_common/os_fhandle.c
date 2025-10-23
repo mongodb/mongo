@@ -138,7 +138,7 @@ __handle_search(WT_SESSION_IMPL *session, const char *name, WT_FH *newfh, WT_FH 
     if (!found && newfh != NULL) {
         newfh->name_hash = hash;
         WT_FILE_HANDLE_INSERT(conn, newfh, bucket);
-        (void)__wt_atomic_add32(&conn->open_file_count, 1);
+        (void)__wt_atomic_add_uint32(&conn->open_file_count, 1);
 
         ++newfh->ref;
         *fhp = newfh;
@@ -332,7 +332,7 @@ __handle_close(WT_SESSION_IMPL *session, WT_FH *fh, bool locked)
     /* Remove from the list. */
     bucket = fh->name_hash & (conn->hash_size - 1);
     WT_FILE_HANDLE_REMOVE(conn, fh, bucket);
-    (void)__wt_atomic_sub32(&conn->open_file_count, 1);
+    (void)__wt_atomic_sub_uint32(&conn->open_file_count, 1);
 
     if (locked)
         __wt_spin_unlock(session, &conn->fh_lock);

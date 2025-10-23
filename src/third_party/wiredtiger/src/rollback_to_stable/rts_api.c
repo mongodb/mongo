@@ -136,7 +136,7 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
 
     WT_ASSERT_ALWAYS(session,
       (txn_global->has_pinned_timestamp ||
-        !__wt_atomic_loadbool(&txn_global->has_oldest_timestamp)),
+        !__wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp)),
       "Database has no pinned timestamp but an oldest timestamp. Pinned timestamp is required to "
       "find out the global visibility/obsolete of an update.");
 

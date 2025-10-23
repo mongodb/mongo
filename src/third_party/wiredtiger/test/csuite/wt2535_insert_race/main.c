@@ -171,7 +171,7 @@ thread_insert_race(void *arg)
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
 
     /* Wait until all the threads are ready to go. */
-    (void)__wt_atomic_add64(&ready_counter, 1);
+    (void)__wt_atomic_add_uint64(&ready_counter, 1);
     for (;; __wt_yield()) {
         WT_ACQUIRE_READ_WITH_BARRIER(ready_counter_local, ready_counter);
         if (ready_counter_local >= opts->nthreads)

@@ -189,7 +189,7 @@ __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
         break;
     }
 
-    (void)__wt_atomic_subi32(&op->btree->dhandle->session_inuse, 1);
+    (void)__wt_atomic_sub_int32(&op->btree->dhandle->session_inuse, 1);
 
     op->type = WT_TXN_OP_NONE;
     op->flags = 0;
@@ -544,7 +544,7 @@ __wt_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN 
          * connection close, only during a full checkpoint. A clean close may not update any
          * metadata LSN and we do not want to remove log files in that case.
          */
-        if (__wt_atomic_load64(&conn->hot_backup_start) == 0 &&
+        if (__wt_atomic_load_uint64_relaxed(&conn->hot_backup_start) == 0 &&
           (!F_ISSET(&conn->log_mgr, WT_LOG_RECOVER_DIRTY) ||
             F_ISSET(&conn->log_mgr, WT_LOG_FORCE_DOWNGRADE)) &&
           txn->full_ckpt)

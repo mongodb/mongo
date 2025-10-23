@@ -222,7 +222,7 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     conn->evict_sample_inmem = cval.val != 0;
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.evict_use_softptr", &cval));
-    __wt_atomic_storebool(&conn->evict_use_npos, cval.val != 0);
+    __wt_atomic_store_bool_relaxed(&conn->evict_use_npos, cval.val != 0);
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.legacy_page_visit_strategy", &cval));
     conn->evict_legacy_page_visit_strategy = cval.val != 0;
@@ -251,7 +251,8 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
      * value is 100     -> 100
      */
     WT_RET(__wt_config_gets(session, cfg, "eviction.cache_tolerance_for_app_eviction", &cval));
-    __wt_atomic_store8(&cache->cache_eviction_controls.cache_tolerance_for_app_eviction,
+    __wt_atomic_store_uint8_relaxed(
+      &cache->cache_eviction_controls.cache_tolerance_for_app_eviction,
       (((uint8_t)cval.val / 10) * 10));
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.incremental_app_eviction", &cval));
@@ -267,7 +268,7 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
         F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK);
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.app_eviction_min_cache_fill_ratio", &cval));
-    __wt_atomic_store8(
+    __wt_atomic_store_uint8_relaxed(
       &cache->cache_eviction_controls.app_eviction_min_cache_fill_ratio, (uint8_t)cval.val);
 
     /*
@@ -318,7 +319,7 @@ __wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
      * eviction; don't let it happen by accident.
      */
     evict->read_gen_oldest = WT_READGEN_START_VALUE;
-    __wt_atomic_store64(&evict->read_gen, WT_READGEN_START_VALUE);
+    __wt_atomic_store_uint64_relaxed(&evict->read_gen, WT_READGEN_START_VALUE);
 
     WT_RET(__wt_cond_auto_alloc(
       session, "evict server", 10 * WT_THOUSAND, WT_MILLION, &evict->evict_cond));
@@ -405,34 +406,35 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
     evict = conn->evict;
     stats = conn->stats;
 
-    WT_STATP_CONN_SET(
-      session, stats, eviction_maximum_page_size, __wt_atomic_load64(&evict->evict_max_page_size));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_page_size,
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_page_size));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_clean_page_size_per_checkpoint,
-      __wt_atomic_load64(&evict->evict_max_clean_page_size_per_checkpoint));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_clean_page_size_per_checkpoint));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_dirty_page_size_per_checkpoint,
-      __wt_atomic_load64(&evict->evict_max_dirty_page_size_per_checkpoint));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_dirty_page_size_per_checkpoint));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_updates_page_size_per_checkpoint,
-      __wt_atomic_load64(&evict->evict_max_updates_page_size_per_checkpoint));
-    WT_STATP_CONN_SET(
-      session, stats, eviction_maximum_milliseconds, __wt_atomic_load64(&evict->evict_max_ms));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_updates_page_size_per_checkpoint));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_milliseconds,
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_ms));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_milliseconds_per_checkpoint,
-      __wt_atomic_load64(&evict->evict_max_ms_per_checkpoint));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_ms_per_checkpoint));
     WT_STATP_CONN_SET(
       session, stats, eviction_reentry_hs_eviction_milliseconds, evict->reentry_hs_eviction_ms);
     WT_STATP_CONN_SET(session, stats, eviction_maximum_unvisited_gen_gap,
-      __wt_atomic_load64(&evict->evict_max_unvisited_gen_gap));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_unvisited_gen_gap));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_unvisited_gen_gap_per_checkpoint,
-      __wt_atomic_load64(&evict->evict_max_unvisited_gen_gap_per_checkpoint));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_unvisited_gen_gap_per_checkpoint));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_visited_gen_gap,
-      __wt_atomic_load64(&evict->evict_max_visited_gen_gap));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_visited_gen_gap));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_visited_gen_gap_per_checkpoint,
-      __wt_atomic_load64(&evict->evict_max_visited_gen_gap_per_checkpoint));
-    WT_STATP_CONN_SET(session, stats, eviction_state, __wt_atomic_load32(&evict->flags));
+      __wt_atomic_load_uint64_relaxed(&evict->evict_max_visited_gen_gap_per_checkpoint));
+    WT_STATP_CONN_SET(
+      session, stats, eviction_state, __wt_atomic_load_uint32_relaxed(&evict->flags));
     WT_STATP_CONN_SET(session, stats, eviction_aggressive_set, evict->evict_aggressive_score);
     WT_STATP_CONN_SET(session, stats, eviction_empty_score, evict->evict_empty_score);
 
     WT_STATP_CONN_SET(session, stats, eviction_active_workers,
-      __wt_atomic_load32(&conn->evict_threads.current_threads));
+      __wt_atomic_load_uint32_relaxed(&conn->evict_threads.current_threads));
     WT_STATP_CONN_SET(
       session, stats, eviction_stable_state_workers, evict->evict_tune_workers_best);
 
@@ -440,7 +442,7 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
      * The number of files with active walks ~= number of hazard pointers in the walk session. Note:
      * reading without locking.
      */
-    if (__wt_atomic_loadbool(&conn->evict_server_running))
+    if (__wt_atomic_load_bool_relaxed(&conn->evict_server_running))
         WT_STATP_CONN_SET(
           session, stats, eviction_walks_active, evict->walk_session->hazards.num_active);
 }

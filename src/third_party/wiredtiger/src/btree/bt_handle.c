@@ -620,8 +620,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
 
     btree->modified = false; /* Clean */
 
-    __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_OFF);   /* Not syncing */
-    btree->checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT); /* Checkpoint generation */
+    __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_OFF); /* Not syncing */
+    btree->checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT);       /* Checkpoint generation */
 
     /*
      * The first time we open a btree, we'll be initializing the write gen to the connection-wide
@@ -686,8 +686,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     if (F_ISSET(session, WT_SESSION_IMPORT))
         btree->modified = true;
 
-    WT_ACQUIRE_READ(
-      btree->checkpoint_timestamp, conn->disaggregated_storage.last_checkpoint_timestamp);
+    btree->checkpoint_timestamp =
+      __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_timestamp);
     if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
         btree->prune_timestamp = btree->checkpoint_timestamp;
 

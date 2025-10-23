@@ -565,10 +565,10 @@ __posix_file_read_mmap(
       file_handle->name, pfh->fd, offset, len, (void *)pfh->mmap_buf, pfh->mmap_size);
 
     /* Indicate that we might be using the mapped area */
-    (void)__wt_atomic_addv32(&pfh->mmap_usecount, 1);
+    (void)__wt_atomic_add_uint32_v(&pfh->mmap_usecount, 1);
     /* Check after incrementing use count if we raced a resizing thread. */
     if (pfh->mmap_resizing) {
-        (void)__wt_atomic_subv32(&pfh->mmap_usecount, 1);
+        (void)__wt_atomic_sub_uint32_v(&pfh->mmap_usecount, 1);
         goto use_syscall;
     }
 
@@ -584,7 +584,7 @@ __posix_file_read_mmap(
     }
 
     /* Signal that we are done using the mapped buffer. */
-    (void)__wt_atomic_subv32(&pfh->mmap_usecount, 1);
+    (void)__wt_atomic_sub_uint32_v(&pfh->mmap_usecount, 1);
 
     if (mmap_success)
         return (0);
@@ -730,10 +730,10 @@ __posix_file_write_mmap(
         goto use_syscall;
 
     /* Indicate that we might be using the mapped area */
-    (void)__wt_atomic_addv32(&pfh->mmap_usecount, 1);
+    (void)__wt_atomic_add_uint32_v(&pfh->mmap_usecount, 1);
     /* Check after incrementing use count if we raced a resizing thread. */
     if (pfh->mmap_resizing) {
-        (void)__wt_atomic_subv32(&pfh->mmap_usecount, 1);
+        (void)__wt_atomic_sub_uint32_v(&pfh->mmap_usecount, 1);
         goto use_syscall;
     }
 
@@ -749,7 +749,7 @@ __posix_file_write_mmap(
     }
 
     /* Signal that we are done using the mapped buffer. */
-    (void)__wt_atomic_subv32(&pfh->mmap_usecount, 1);
+    (void)__wt_atomic_sub_uint32_v(&pfh->mmap_usecount, 1);
 
     if (mmap_success)
         return (0);
@@ -1078,7 +1078,7 @@ wait:
     while (pfh->mmap_resizing == 1)
         __wt_spin_backoff(&yield_count, &sleep_usec);
 
-    if (__wt_atomic_casv32(&pfh->mmap_resizing, 0, 1) == false)
+    if (__wt_atomic_cas_uint32_v(&pfh->mmap_resizing, 0, 1) == false)
         goto wait;
 
     *remap = true;
@@ -1107,7 +1107,7 @@ __wti_posix_release_without_remap(WT_FILE_HANDLE *file_handle)
         return;
 
     /* Signal that we are done resizing the buffer */
-    (void)__wt_atomic_subv32(&pfh->mmap_resizing, 1);
+    (void)__wt_atomic_sub_uint32_v(&pfh->mmap_resizing, 1);
 }
 
 /*
@@ -1136,5 +1136,5 @@ __wti_posix_remap_resize_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_sessio
     WT_STAT_CONN_INCRV(session, block_remap_file_resize, 1);
 
     /* Signal that we are done resizing the buffer */
-    (void)__wt_atomic_subv32(&pfh->mmap_resizing, 1);
+    (void)__wt_atomic_sub_uint32_v(&pfh->mmap_resizing, 1);
 }

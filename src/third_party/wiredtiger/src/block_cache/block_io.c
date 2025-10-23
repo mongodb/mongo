@@ -225,7 +225,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *b
             WT_STAT_DSRC_INCR(session, compress_read);
         WT_STAT_CONN_DSRC_INCRV(session, cache_bytes_read, dsk->mem_size);
         WT_STAT_SESSION_INCRV(session, bytes_read, dsk->mem_size);
-        (void)__wt_atomic_add64(&S2C(session)->cache->bytes_read, dsk->mem_size);
+        (void)__wt_atomic_add_uint64(&S2C(session)->cache->bytes_read, dsk->mem_size);
     }
 
     /*
@@ -327,7 +327,7 @@ verify:
 err:
     /* If we pulled the block from the block cache, decrement its reference count. */
     if (blkcache_found)
-        (void)__wt_atomic_subv32(&blkcache_item->ref_count, 1);
+        (void)__wt_atomic_sub_uint32_v(&blkcache_item->ref_count, 1);
 
     /* Free the temporary buffers allocated for disagg. */
     for (i = 0; i < results_count; i++)
@@ -515,7 +515,7 @@ __wt_blkcache_read_multi(WT_SESSION_IMPL *session, WT_ITEM **buf, size_t *buf_co
 
         WT_STAT_CONN_DSRC_INCRV(session, cache_bytes_read, dsk->mem_size);
         WT_STAT_SESSION_INCRV(session, bytes_read, dsk->mem_size);
-        (void)__wt_atomic_add64(&S2C(session)->cache->bytes_read, dsk->mem_size);
+        (void)__wt_atomic_add_uint64(&S2C(session)->cache->bytes_read, dsk->mem_size);
     }
 
     /* Decrypt. */
@@ -629,7 +629,7 @@ err:
 
     /* If we pulled the block from the block cache, decrement its reference count. */
     if (blkcache_found)
-        (void)__wt_atomic_subv32(&blkcache_item->ref_count, 1);
+        (void)__wt_atomic_sub_uint32_v(&blkcache_item->ref_count, 1);
 
     return (ret);
 }
@@ -809,7 +809,7 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *
     WT_STAT_CONN_DSRC_INCR(session, cache_write);
     WT_STAT_CONN_DSRC_INCRV(session, cache_bytes_write, mem_size);
     WT_STAT_SESSION_INCRV(session, bytes_write, mem_size);
-    (void)__wt_atomic_add64(&S2C(session)->cache->bytes_written, mem_size);
+    (void)__wt_atomic_add_uint64(&S2C(session)->cache->bytes_written, mem_size);
 
     if (dsk != NULL) {
         if (dsk->type == WT_PAGE_COL_INT || dsk->type == WT_PAGE_ROW_INT) {

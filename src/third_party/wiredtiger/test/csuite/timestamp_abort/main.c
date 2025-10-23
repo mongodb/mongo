@@ -850,7 +850,7 @@ rollback:
         if (use_ts) {
             if (WT_TS_NONE == active_timestamps[td->threadnum]) {
                 uint32_t current_progress =
-                  __wt_atomic_add32(&thread_sync_conds.workload_progress, 1);
+                  __wt_atomic_add_uint32(&thread_sync_conds.workload_progress, 1);
                 printf("Thread %" PRIu32 " reach syncing point, overall progress: %u/%u. \n",
                   td->threadnum, current_progress, nth);
                 if (current_progress == nth) {
@@ -863,7 +863,8 @@ rollback:
             }
             WT_RELEASE_WRITE_WITH_BARRIER(active_timestamps[td->threadnum], active_ts);
         } else {
-            uint32_t current_progress = __wt_atomic_add32(&thread_sync_conds.workload_progress, 1);
+            uint32_t current_progress =
+              __wt_atomic_add_uint32(&thread_sync_conds.workload_progress, 1);
             /* When timestamps are not in use, we don't need to sync all threads before starting the
              * checkpoint thread. Use the first thread to notify the checkpoint thread to start. */
             if (current_progress == 1) {

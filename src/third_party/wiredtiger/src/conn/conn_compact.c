@@ -546,7 +546,7 @@ __background_compact_server(void *arg)
         /* If the server is configured to run once, stop it after a full iteration. */
         if (full_iteration && run_once) {
             __wt_spin_lock(session, &conn->background_compact.lock);
-            __wt_atomic_storebool(&conn->background_compact.running, false);
+            __wt_atomic_store_bool_relaxed(&conn->background_compact.running, false);
             running = false;
             WT_STAT_CONN_SET(session, background_compact_running, running);
             __wt_spin_unlock(session, &conn->background_compact.lock);
@@ -590,7 +590,7 @@ __background_compact_server(void *arg)
             break;
 
         __wt_spin_lock(session, &conn->background_compact.lock);
-        running = __wt_atomic_loadbool(&conn->background_compact.running);
+        running = __wt_atomic_load_bool_relaxed(&conn->background_compact.running);
 
         /* The server has been signalled to change state. */
         if (conn->background_compact.signalled) {
@@ -677,7 +677,7 @@ __background_compact_server(void *arg)
              */
             else if (ret == WT_ERROR) {
                 __wt_spin_lock(session, &conn->background_compact.lock);
-                running = __wt_atomic_loadbool(&conn->background_compact.running);
+                running = __wt_atomic_load_bool_relaxed(&conn->background_compact.running);
                 __wt_spin_unlock(session, &conn->background_compact.lock);
                 if (!running) {
                     WT_STAT_CONN_INCR(session, background_compact_interrupted);
@@ -764,7 +764,7 @@ __wti_background_compact_server_destroy(WT_SESSION_IMPL *session)
 
     FLD_CLR(conn->server_flags, WT_CONN_SERVER_COMPACT);
     if (conn->background_compact.tid_set) {
-        __wt_atomic_storebool(&conn->background_compact.running, false);
+        __wt_atomic_store_bool_relaxed(&conn->background_compact.running, false);
         __wt_cond_signal(session, conn->background_compact.cond);
         WT_TRET(__wt_thread_join(session, &conn->background_compact.tid));
         conn->background_compact.tid_set = false;
@@ -812,7 +812,7 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     if (conn->background_compact.signalled)
         WT_ERR_MSG(session, EBUSY, "Background compact is busy processing a previous command");
 
-    running = __wt_atomic_loadbool(&conn->background_compact.running);
+    running = __wt_atomic_load_bool_relaxed(&conn->background_compact.running);
 
     WT_ERR(__wt_config_getones(session, config, "background", &cval));
     enable = cval.val;
@@ -840,7 +840,7 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     }
 
     /* The background compaction has been signalled successfully, update its state. */
-    __wt_atomic_storebool(&conn->background_compact.running, enable);
+    __wt_atomic_store_bool_relaxed(&conn->background_compact.running, enable);
     __wt_free(session, conn->background_compact.config);
     conn->background_compact.config = stripped_config;
     stripped_config = NULL;

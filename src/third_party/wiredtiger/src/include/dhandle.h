@@ -42,9 +42,9 @@
 /* The metadata cursor's data handle. */
 #define WT_SESSION_META_DHANDLE(s) (((WT_CURSOR_BTREE *)((s)->meta_cursor))->dhandle)
 
-#define WT_DHANDLE_ACQUIRE(dhandle) (void)__wt_atomic_add32(&(dhandle)->references, 1)
+#define WT_DHANDLE_ACQUIRE(dhandle) (void)__wt_atomic_add_uint32(&(dhandle)->references, 1)
 
-#define WT_DHANDLE_RELEASE(dhandle) (void)__wt_atomic_sub32(&(dhandle)->references, 1)
+#define WT_DHANDLE_RELEASE(dhandle) (void)__wt_atomic_sub_uint32(&(dhandle)->references, 1)
 
 #define WT_DHANDLE_NEXT(session, dhandle, head, field)                                     \
     do {                                                                                   \
@@ -120,9 +120,9 @@ struct __wt_data_handle {
 
     wt_shared enum wt_dhandle_type type;
 
-#define WT_DHANDLE_BTREE(dhandle)                                        \
-    (__wt_atomic_load_enum(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE || \
-      __wt_atomic_load_enum(&(dhandle)->type) == WT_DHANDLE_TYPE_TIERED)
+#define WT_DHANDLE_BTREE(dhandle)                                                \
+    (__wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE || \
+      __wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_TIERED)
 
     bool compact_skip; /* If the handle failed to compact */
 

@@ -57,7 +57,7 @@ __wt_gen_init(WT_SESSION_IMPL *session)
      * All generations start at 1, a session with a generation of 0 isn't using the resource.
      */
     for (i = 0; i < WT_GENERATIONS; ++i)
-        __wt_atomic_storev64(&S2C(session)->generations[i], 1);
+        __wt_atomic_store_uint64_v_relaxed(&S2C(session)->generations[i], 1);
 
     /* Ensure threads see the state change. */
     WT_RELEASE_BARRIER();
@@ -72,7 +72,7 @@ __wt_gen_next_drain(WT_SESSION_IMPL *session, int which)
 {
     uint64_t v;
 
-    v = __wt_atomic_addv64(&S2C(session)->generations[which], 1);
+    v = __wt_atomic_add_uint64_v(&S2C(session)->generations[which], 1);
 
     __gen_drain(session, which, v);
 }
@@ -317,9 +317,10 @@ __wt_session_gen_enter(WT_SESSION_IMPL *session, int which)
      * Don't enter a generation we're already in, it will likely result in code intended to be
      * protected by a generation running outside one.
      */
-    WT_ASSERT(session, __wt_atomic_loadv64(&session->generations[which]) == 0);
+    WT_ASSERT(session, __wt_atomic_load_uint64_v_relaxed(&session->generations[which]) == 0);
     WT_ASSERT(session, session->active);
-    WT_ASSERT(session, session->id < __wt_atomic_load32(&S2C(session)->session_array.cnt));
+    WT_ASSERT(
+      session, session->id < __wt_atomic_load_uint32_relaxed(&S2C(session)->session_array.cnt));
 
     /*
      * Assign the thread's resource generation, ensuring threads waiting on a resource to drain see
@@ -332,9 +333,10 @@ __wt_session_gen_enter(WT_SESSION_IMPL *session, int which)
      * can result in the generation drain and generation oldest code not working correctly.
      */
     do {
-        __wt_atomic_storev64(&session->generations[which], __wt_gen(session, which));
+        __wt_atomic_store_uint64_v_relaxed(&session->generations[which], __wt_gen(session, which));
         WT_FULL_BARRIER();
-    } while (__wt_atomic_loadv64(&session->generations[which]) != __wt_gen(session, which));
+    } while (
+      __wt_atomic_load_uint64_v_relaxed(&session->generations[which]) != __wt_gen(session, which));
 }
 
 /*
@@ -345,7 +347,8 @@ void
 __wt_session_gen_leave(WT_SESSION_IMPL *session, int which)
 {
     WT_ASSERT(session, session->active);
-    WT_ASSERT(session, session->id < __wt_atomic_load32(&S2C(session)->session_array.cnt));
+    WT_ASSERT(
+      session, session->id < __wt_atomic_load_uint32_relaxed(&S2C(session)->session_array.cnt));
 
     /* Ensure writes made by this thread are visible. */
     WT_RELEASE_WRITE_WITH_BARRIER(session->generations[which], 0);
@@ -383,8 +386,8 @@ __stash_discard(WT_SESSION_IMPL *session, int which)
         if (stash->gen >= oldest)
             break;
 
-        (void)__wt_atomic_sub64(&conn->stashed_bytes, stash->len);
-        (void)__wt_atomic_sub64(&conn->stashed_objects, 1);
+        (void)__wt_atomic_sub_uint64(&conn->stashed_bytes, stash->len);
+        (void)__wt_atomic_sub_uint64(&conn->stashed_objects, 1);
 
         /*
          * It's a bad thing if another thread is in this memory after we free it, make sure nothing
@@ -446,8 +449,8 @@ __wt_stash_add(WT_SESSION_IMPL *session, int which, uint64_t generation, void *p
     stash->len = len;
     stash->gen = generation;
 
-    (void)__wt_atomic_add64(&conn->stashed_bytes, len);
-    (void)__wt_atomic_add64(&conn->stashed_objects, 1);
+    (void)__wt_atomic_add_uint64(&conn->stashed_bytes, len);
+    (void)__wt_atomic_add_uint64(&conn->stashed_objects, 1);
 
     /* See if we can free any previous entries. */
     if (session_stash->cnt > 1)

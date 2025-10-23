@@ -450,9 +450,9 @@ retry:
      *
      * We may see a locked prepare state if we race with prepare rollback.
      */
-    WT_ACQUIRE_READ(prepare_state, modify->prepare_state);
+    prepare_state = __wt_atomic_load_uint8_v_acquire(&modify->prepare_state);
     if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
-        WT_ACQUIRE_READ(txnid, modify->txnid);
+        txnid = __wt_atomic_load_uint64_v_acquire(&modify->txnid);
         /* The update may be already aborted. Get the saved transaction id. */
         if (txnid == WT_TXN_ABORTED)
             txnid = modify->upd_saved_txnid;

@@ -17,7 +17,7 @@
 static WT_INLINE uint64_t
 __wt_gen(WT_SESSION_IMPL *session, int which)
 {
-    return (__wt_atomic_loadv64(&S2C(session)->generations[which]));
+    return (__wt_atomic_load_uint64_v_relaxed(&S2C(session)->generations[which]));
 }
 
 /*
@@ -29,7 +29,7 @@ __wt_gen_next(WT_SESSION_IMPL *session, int which, uint64_t *genp)
 {
     uint64_t gen;
 
-    gen = __wt_atomic_addv64(&S2C(session)->generations[which], 1);
+    gen = __wt_atomic_add_uint64_v(&S2C(session)->generations[which], 1);
     if (genp != NULL)
         *genp = gen;
 }
@@ -41,5 +41,5 @@ __wt_gen_next(WT_SESSION_IMPL *session, int which, uint64_t *genp)
 static WT_INLINE uint64_t
 __wt_session_gen(WT_SESSION_IMPL *session, int which)
 {
-    return (__wt_atomic_loadv64(&session->generations[which]));
+    return (__wt_atomic_load_uint64_v_relaxed(&session->generations[which]));
 }

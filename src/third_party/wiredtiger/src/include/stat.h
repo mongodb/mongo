@@ -202,20 +202,20 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
         if (WT_STAT_ENABLED(session))                                     \
             __wt_tsan_suppress_sub_int64(&(stat)->fld, (int64_t)(value)); \
     } while (0)
-#define WT_STAT_DECRV_ATOMIC_BASE(session, stat, fld, value)          \
-    do {                                                              \
-        if (WT_STAT_ENABLED(session))                                 \
-            (void)__wt_atomic_subi64(&(stat)->fld, (int64_t)(value)); \
+#define WT_STAT_DECRV_ATOMIC_BASE(session, stat, fld, value)             \
+    do {                                                                 \
+        if (WT_STAT_ENABLED(session))                                    \
+            (void)__wt_atomic_sub_int64(&(stat)->fld, (int64_t)(value)); \
     } while (0)
 #define WT_STAT_INCRV_BASE(session, stat, fld, value)                     \
     do {                                                                  \
         if (WT_STAT_ENABLED(session))                                     \
             __wt_tsan_suppress_add_int64(&(stat)->fld, (int64_t)(value)); \
     } while (0)
-#define WT_STAT_INCRV_ATOMIC_BASE(session, stat, fld, value)          \
-    do {                                                              \
-        if (WT_STAT_ENABLED(session))                                 \
-            (void)__wt_atomic_addi64(&(stat)->fld, (int64_t)(value)); \
+#define WT_STAT_INCRV_ATOMIC_BASE(session, stat, fld, value)             \
+    do {                                                                 \
+        if (WT_STAT_ENABLED(session))                                    \
+            (void)__wt_atomic_add_int64(&(stat)->fld, (int64_t)(value)); \
     } while (0)
 
 /*

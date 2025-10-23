@@ -1350,7 +1350,7 @@ __wt_meta_ckptlist_set(
     if (ckptlsn_str != NULL)
         WT_ERR(__wt_buf_catfmt(session, buf, ",checkpoint_lsn=(%s)", ckptlsn_str));
 
-    if (__wt_atomic_load_enum(&dhandle->type) == WT_DHANDLE_TYPE_TIERED)
+    if (__wt_atomic_load_enum_relaxed(&dhandle->type) == WT_DHANDLE_TYPE_TIERED)
         WT_ERR(__wt_tiered_set_metadata(session, (WT_TIERED *)dhandle, buf));
 
     WT_ERR(__ckpt_set(session, fname, buf->mem, has_lsn));

@@ -30,7 +30,7 @@ static WT_INLINE void
 __spin_init_internal(WT_SPINLOCK *t, const char *name)
 {
     t->name = name;
-    __wt_atomic_store32(&t->session_id, WT_SESSION_ID_INVALID);
+    __wt_atomic_store_uint32_relaxed(&t->session_id, WT_SESSION_ID_INVALID);
     t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
     t->stat_session_usecs_off = -1;
     t->initialized = 1;
@@ -176,7 +176,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
     ret = pthread_mutex_trylock(&t->lock);
     if (ret == 0)
-        __wt_atomic_store32(&t->session_id, WT_SPIN_SESSION_ID_SAFE(session));
+        __wt_atomic_store_uint32_relaxed(&t->session_id, WT_SPIN_SESSION_ID_SAFE(session));
     return (ret);
 }
 
@@ -191,7 +191,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
     if ((ret = pthread_mutex_lock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_lock: %s", t->name));
-    __wt_atomic_store32(&t->session_id, WT_SPIN_SESSION_ID_SAFE(session));
+    __wt_atomic_store_uint32_relaxed(&t->session_id, WT_SPIN_SESSION_ID_SAFE(session));
 }
 #endif
 
@@ -204,7 +204,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_DECL_RET;
 
-    __wt_atomic_store32(&t->session_id, WT_SESSION_ID_INVALID);
+    __wt_atomic_store_uint32_relaxed(&t->session_id, WT_SESSION_ID_INVALID);
     if ((ret = pthread_mutex_unlock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_unlock: %s", t->name));
 }
@@ -302,7 +302,7 @@ static WT_INLINE bool
 __wt_spin_locked(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
-    return (__wt_atomic_load32(&t->session_id) != WT_SESSION_ID_INVALID);
+    return (__wt_atomic_load_uint32_relaxed(&t->session_id) != WT_SESSION_ID_INVALID);
 }
 
 /*
@@ -312,7 +312,7 @@ __wt_spin_locked(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static WT_INLINE bool
 __wt_spin_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
-    return (__wt_atomic_load32(&t->session_id) == WT_SPIN_SESSION_ID_SAFE(session));
+    return (__wt_atomic_load_uint32_relaxed(&t->session_id) == WT_SPIN_SESSION_ID_SAFE(session));
 }
 
 /*

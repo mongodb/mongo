@@ -353,7 +353,7 @@ __wt_conf_compile(
     /*
      * The entry compiled. Now put it into the connection array if there's room.
      */
-    compiled_entry = __wt_atomic_fetch_addv32(&conn->conf_size, 1);
+    compiled_entry = __wt_atomic_fetch_add_uint32_v(&conn->conf_size, 1);
     if (compiled_entry >= conn->conf_max)
         WT_ERR_MSG(session, EINVAL,
           "Error compiling '%s', overflowed maximum compile slots of %" PRIu32, format,

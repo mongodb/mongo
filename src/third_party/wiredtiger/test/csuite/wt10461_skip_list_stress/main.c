@@ -143,11 +143,11 @@ thread_search_insert_run(void *arg)
     testutil_snprintf((char *)check_key.data, CHECK_KEY_SIZE, "00");
     check_key.size = CHECK_KEY_SIZE;
 
-    __wt_atomic_addv32(&active_search_insert_threads, 1);
+    __wt_atomic_add_uint32_v(&active_search_insert_threads, 1);
     while (inserts_finished == false)
         WT_IGNORE_RET(
           __wt_search_insert((WT_SESSION_IMPL *)session, cbt, cbt->ins_head, &check_key));
-    __wt_atomic_subv32(&active_search_insert_threads, 1);
+    __wt_atomic_sub_uint32_v(&active_search_insert_threads, 1);
 
     cursor->close(cursor);
     session->close(session, "");

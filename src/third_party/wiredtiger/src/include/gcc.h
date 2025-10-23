@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <assert.h>
+
 #define WT_PTRDIFFT_FMT "td" /* ptrdiff_t format string */
 #define WT_SIZET_FMT "zu"    /* size_t format string */
 
@@ -40,177 +42,6 @@
   (((__clang_major__ == 3) && (__clang_minor__ <= 5)) || (__clang_major__ < 3))
 #error "Clang versions 3.5 and earlier are unsupported by WiredTiger"
 #endif
-
-#define WT_ATOMIC_CAS(ptr, oldp, newv) \
-    __atomic_compare_exchange_n(ptr, oldp, newv, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#define WT_ATOMIC_CAS_FUNC(name, vp_arg, old_arg, newv_arg)             \
-    static inline bool __wt_atomic_cas##name(vp_arg, old_arg, newv_arg) \
-    {                                                                   \
-        return (WT_ATOMIC_CAS(vp, &old, newv));                         \
-    }
-WT_ATOMIC_CAS_FUNC(8, uint8_t *vp, uint8_t old, uint8_t newv)
-WT_ATOMIC_CAS_FUNC(v8, volatile uint8_t *vp, uint8_t old, volatile uint8_t newv)
-WT_ATOMIC_CAS_FUNC(16, uint16_t *vp, uint16_t old, uint16_t newv)
-WT_ATOMIC_CAS_FUNC(v16, volatile uint16_t *vp, uint16_t old, volatile uint16_t newv)
-WT_ATOMIC_CAS_FUNC(32, uint32_t *vp, uint32_t old, uint32_t newv)
-WT_ATOMIC_CAS_FUNC(v32, volatile uint32_t *vp, uint32_t old, volatile uint32_t newv)
-WT_ATOMIC_CAS_FUNC(i32, int32_t *vp, int32_t old, int32_t newv)
-WT_ATOMIC_CAS_FUNC(iv32, volatile int32_t *vp, int32_t old, volatile int32_t newv)
-WT_ATOMIC_CAS_FUNC(64, uint64_t *vp, uint64_t old, uint64_t newv)
-WT_ATOMIC_CAS_FUNC(v64, volatile uint64_t *vp, uint64_t old, volatile uint64_t newv)
-WT_ATOMIC_CAS_FUNC(i64, int64_t *vp, int64_t old, int64_t newv)
-WT_ATOMIC_CAS_FUNC(iv64, volatile int64_t *vp, int64_t old, volatile int64_t newv)
-WT_ATOMIC_CAS_FUNC(size, size_t *vp, size_t old, size_t newv)
-
-/*
- * __wt_atomic_cas_ptr --
- *     Pointer compare and swap.
- */
-static inline bool
-__wt_atomic_cas_ptr(void *vp, void *old, void *newv)
-{
-    return (WT_ATOMIC_CAS((void **)vp, &old, newv));
-}
-
-#define WT_ATOMIC_FUNC(name, ret, vp_arg, v_arg)                                                  \
-    static inline ret __wt_atomic_add##name(vp_arg, v_arg)                                        \
-    {                                                                                             \
-        return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));                                     \
-    }                                                                                             \
-    static inline ret __wt_atomic_add##name##_relaxed(vp_arg, v_arg)                              \
-    {                                                                                             \
-        return (__atomic_add_fetch(vp, v, __ATOMIC_RELAXED));                                     \
-    }                                                                                             \
-    static inline ret __wt_atomic_fetch_add##name(vp_arg, v_arg)                                  \
-    {                                                                                             \
-        return (__atomic_fetch_add(vp, v, __ATOMIC_SEQ_CST));                                     \
-    }                                                                                             \
-    static inline ret __wt_atomic_sub##name(vp_arg, v_arg)                                        \
-    {                                                                                             \
-        return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));                                     \
-    }                                                                                             \
-    /*                                                                                            \
-     * !!!                                                                                        \
-     * The following atomic functions are ATOMIC_RELAXED while the preceding calls are            \
-     * ATOMIC_SEQ_CST. Mixing RELAXED and SEQ_CST means we will *not* get sequentially consistent \
-     * guarantees.                                                                                \
-     * Historically WiredTiger mixed the SEQ_CST calls above with non-atomic accesses to memory,  \
-     * and these non-atomic calls are being replaced with atomic calls. Using these new atomic    \
-     * functions with SEQ_CST memory ordering comes with a moderate performance cost so we're     \
-     * using RELAXED to maintain performance. In future these atomics will need to be reviewed    \
-     * and selectively moved to the appropriate memory ordering.                                  \
-     */                                                                                           \
-    static inline ret __wt_atomic_load##name(vp_arg)                                              \
-    {                                                                                             \
-        return (__atomic_load_n(vp, __ATOMIC_RELAXED));                                           \
-    }                                                                                             \
-    static inline void __wt_atomic_store##name(vp_arg, v_arg)                                     \
-    {                                                                                             \
-        __atomic_store_n(vp, v, __ATOMIC_RELAXED);                                                \
-    }
-WT_ATOMIC_FUNC(8, uint8_t, uint8_t *vp, uint8_t v)
-WT_ATOMIC_FUNC(v8, uint8_t, volatile uint8_t *vp, volatile uint8_t v)
-WT_ATOMIC_FUNC(16, uint16_t, uint16_t *vp, uint16_t v)
-WT_ATOMIC_FUNC(v16, uint16_t, volatile uint16_t *vp, volatile uint16_t v)
-WT_ATOMIC_FUNC(32, uint32_t, uint32_t *vp, uint32_t v)
-WT_ATOMIC_FUNC(v32, uint32_t, volatile uint32_t *vp, volatile uint32_t v)
-WT_ATOMIC_FUNC(i32, int32_t, int32_t *vp, int32_t v)
-WT_ATOMIC_FUNC(iv32, int32_t, volatile int32_t *vp, volatile int32_t v)
-WT_ATOMIC_FUNC(64, uint64_t, uint64_t *vp, uint64_t v)
-WT_ATOMIC_FUNC(v64, uint64_t, volatile uint64_t *vp, volatile uint64_t v)
-WT_ATOMIC_FUNC(i64, int64_t, int64_t *vp, int64_t v)
-WT_ATOMIC_FUNC(iv64, int64_t, volatile int64_t *vp, volatile int64_t v)
-WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
-
-/*
- * We can't use the WT_ATOMIC_FUNC macro for booleans as __atomic_add_fetch and __atomic_sub_fetch
- * don't accept booleans when compiling with clang. Define them individually.
- */
-
-/*
- * __wt_atomic_loadbool --
- *     Atomically read a boolean.
- */
-static inline bool
-__wt_atomic_loadbool(bool *vp)
-{
-    return (__atomic_load_n(vp, __ATOMIC_RELAXED));
-}
-
-/*
- * __wt_atomic_storebool --
- *     Atomically set a boolean.
- */
-static inline void
-__wt_atomic_storebool(bool *vp, bool v)
-{
-    __atomic_store_n(vp, v, __ATOMIC_RELAXED);
-}
-
-/*
- * __wt_atomic_loadvbool --
- *     Atomically read a volatile boolean.
- */
-static inline bool
-__wt_atomic_loadvbool(volatile bool *vp)
-{
-    return (__atomic_load_n(vp, __ATOMIC_RELAXED));
-}
-
-/*
- * __wt_atomic_storevbool --
- *     Atomically set a volatile boolean.
- */
-static inline void
-__wt_atomic_storevbool(volatile bool *vp, bool v)
-{
-    __atomic_store_n(vp, v, __ATOMIC_RELAXED);
-}
-
-/*
- * We can't use the WT_ATOMIC_FUNC or __wt_atomic_load/store_generic macros for doubles, since these
- * interfaces support only integers and pointers on some compilers. Define them individually.
- */
-
-/*
- * __wt_atomic_load_double --
- *     Atomically read a double variable.
- */
-static inline double
-__wt_atomic_load_double(double *vp)
-{
-    double value;
-    __atomic_load(vp, &value, __ATOMIC_RELAXED);
-    return (value);
-}
-
-/*
- * __wt_atomic_store_double --
- *     Atomically set a double variable.
- */
-static inline void
-__wt_atomic_store_double(double *vp, double v)
-{
-    __atomic_store(vp, &v, __ATOMIC_RELAXED);
-}
-
-/*
- * Generic atomic functions that accept any type. The typed macros above should be preferred since
- * they provide better type checking.
- */
-#define __wt_atomic_load_enum(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)
-#define __wt_atomic_store_enum(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELAXED)
-#define __wt_atomic_and_generic(vp, v) __atomic_and_fetch(vp, v, __ATOMIC_RELAXED)
-#define __wt_atomic_or_generic(vp, v) __atomic_or_fetch(vp, v, __ATOMIC_RELAXED)
-#define __wt_atomic_load_generic(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)
-#define __wt_atomic_store_generic(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELAXED)
-
-/*
- * These pointer specific macros behave identically to the generic ones above, but better
- * communicate intent and should be preferred over generic.
- */
-#define __wt_atomic_load_pointer(vp) __wt_atomic_load_generic(vp)
-#define __wt_atomic_store_pointer(vp, v) __wt_atomic_store_generic(vp, v)
 
 /* Compile read-write barrier */
 #define WT_COMPILER_BARRIER() __asm__ volatile("" ::: "memory")
@@ -370,28 +201,29 @@ __wt_atomic_store_double(double *vp, double v)
 #endif
 
 /*
- * WT_ACQUIRE_READ --
+ * This macro is for internal use within this document only. For all other cases, please use
+ * __wt_atomic_load_<type>_acquire(...)
  *
  * The below assembly implements the read-acquire semantic. Acquire semantics prevent memory
  * reordering of the read-acquire with any load or store that follows it in program order.
  *
  * The if branches get removed at compile time as the sizeof instruction evaluates at compile time.
  * The inline assembly results in a loss of type checking, to circumvent this we utilize an
- * unreachable if (0) block which contains the direct assignment. This forces the compiler to type
- * check. We also statically assert that both types match in size to avoid potential loss of sign
- * when loading from a smaller type to a larger type.
+ * unreachable if (0) block which contains the direct assignment. This forces the compiler to
+ * type check. We also statically assert that both types match in size to avoid potential loss
+ * of sign when loading from a smaller type to a larger type.
  *
  * Depending on the size of the given type we choose the appropriate ldapr variant, additionally the
  * W register variants are used if possible which map to the lower word of the associated X
  * register. Finally the "Q" constraint is used for the given input operand, this instructs the
- * compiler to generate offset free ldapr instructions. ldapr instructions, prior to version RCpc 3,
- * don't support offsets.
+ * compiler to generate offset free ldapr instructions. ldapr instructions, prior to version
+ * RCpc 3, don't support offsets.
  *
  * The flag HAVE_RCPC is determined by the build system, if this macro is removed in the future be
  * sure to remove that part of the compilation.
  */
 #if defined(HAVE_RCPC) && !defined(TSAN_BUILD)
-#define WT_ACQUIRE_READ(v, val)                                                                    \
+#define ACQUIRE_READ(v, val)                                                                       \
     do {                                                                                           \
         if (0) {                                                                                   \
             static_assert(sizeof((v)) == sizeof((val)), "sizes of provided variables must match"); \
@@ -408,22 +240,24 @@ __wt_atomic_store_double(double *vp, double v)
         }                                                                                          \
     } while (0)
 #else
-#define WT_ACQUIRE_READ(v, val) (v) = __atomic_load_n(&(val), __ATOMIC_ACQUIRE)
+#define ACQUIRE_READ(v, val) (v) = __atomic_load_n(&(val), __ATOMIC_ACQUIRE)
 #endif
 
 /*
- * WT_RELEASE_WRITE --
+ * This macro is for internal use within this document only. For all other cases, please use
+ * __wt_atomic_store_<type>_release(...)
  *
  * Write to a memory location using the ARM stlr instruction. This is also known as a write-release
- * operation, and has the following semantics: Release semantics prevent memory reordering of the
- * write-release with any read or write operation that precedes it in program order.
+ * operation, and has the following semantics: Release semantics prevent memory reordering of
+ * the write-release with any read or write operation that precedes it in program order.
  *
  * Usage of this macro should be paired with an associated WT_ACQUIRE_READ. As with the acquire
- * version we avoid type checking loss by defining an unreachable if block, we also guard against
- * misuse by statically asserting that the destination is the same size as the value being written.
+ * version we avoid type checking loss by defining an unreachable if block, we also guard
+ * against misuse by statically asserting that the destination is the same size as the value
+ * being written.
  */
 #if defined(HAVE_RCPC) && !defined(TSAN_BUILD)
-#define WT_RELEASE_WRITE(v, val)                                                                   \
+#define RELEASE_WRITE(v, val)                                                                      \
     do {                                                                                           \
         if (0) {                                                                                   \
             static_assert(sizeof((v)) == sizeof((val)), "sizes of provided variables must match"); \
@@ -440,5 +274,149 @@ __wt_atomic_store_double(double *vp, double v)
         }                                                                                          \
     } while (0)
 #else
-#define WT_RELEASE_WRITE(v, val) __atomic_store_n(&(v), (val), __ATOMIC_RELEASE)
+#define RELEASE_WRITE(v, val) __atomic_store_n(&(v), (val), __ATOMIC_RELEASE)
 #endif
+
+/*
+ * This macro is for internal use within this document only. For all other cases, please use
+ * __wt_atomic_cas_<type>(...)
+ */
+#define ATOMIC_CAS(ptr, oldp, newv) \
+    __atomic_compare_exchange_n(ptr, oldp, newv, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+
+#define WT_ATOMIC_FUNC_STORE_LOAD(suffix, _type)                                           \
+    static inline _type __wt_atomic_load_##suffix##_relaxed(_type *vp)                     \
+    {                                                                                      \
+        return (__atomic_load_n(vp, __ATOMIC_RELAXED));                                    \
+    }                                                                                      \
+    static inline void __wt_atomic_store_##suffix##_relaxed(_type *vp, _type v)            \
+    {                                                                                      \
+        __atomic_store_n(vp, v, __ATOMIC_RELAXED);                                         \
+    }                                                                                      \
+    static inline _type __wt_atomic_load_##suffix##_acquire(_type *vp)                     \
+    {                                                                                      \
+        _type result;                                                                      \
+        ACQUIRE_READ(result, *(vp));                                                       \
+        return (result);                                                                   \
+    }                                                                                      \
+    static inline void __wt_atomic_store_##suffix##_release(_type *vp, _type v)            \
+    {                                                                                      \
+        RELEASE_WRITE(*(vp), v);                                                           \
+    }                                                                                      \
+    static inline _type __wt_atomic_load_##suffix##_v_relaxed(volatile _type *vp)          \
+    {                                                                                      \
+        return (__atomic_load_n(vp, __ATOMIC_RELAXED));                                    \
+    }                                                                                      \
+    static inline void __wt_atomic_store_##suffix##_v_relaxed(volatile _type *vp, _type v) \
+    {                                                                                      \
+        __atomic_store_n(vp, v, __ATOMIC_RELAXED);                                         \
+    }                                                                                      \
+    static inline _type __wt_atomic_load_##suffix##_v_acquire(volatile _type *vp)          \
+    {                                                                                      \
+        _type result;                                                                      \
+        ACQUIRE_READ(result, *(vp));                                                       \
+        return (result);                                                                   \
+    }                                                                                      \
+    static inline void __wt_atomic_store_##suffix##_v_release(volatile _type *vp, _type v) \
+    {                                                                                      \
+        RELEASE_WRITE(*(vp), v);                                                           \
+    }
+
+#define WT_ATOMIC_CAS_FUNC(suffix, _type)                                                      \
+    static inline bool __wt_atomic_cas_##suffix(_type *vp, _type old, _type newv)              \
+    {                                                                                          \
+        return (ATOMIC_CAS(vp, &old, newv));                                                   \
+    }                                                                                          \
+    static inline bool __wt_atomic_cas_##suffix##_v(volatile _type *vp, _type old, _type newv) \
+    {                                                                                          \
+        return (ATOMIC_CAS(vp, &old, newv));                                                   \
+    }
+
+#define WT_ATOMIC_FUNC(suffix, _type)                                                   \
+    static inline _type __wt_atomic_add_##suffix(_type *vp, _type v)                    \
+    {                                                                                   \
+        return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));                           \
+    }                                                                                   \
+    static inline _type __wt_atomic_add_##suffix##_relaxed(_type *vp, _type v)          \
+    {                                                                                   \
+        return (__atomic_add_fetch(vp, v, __ATOMIC_RELAXED));                           \
+    }                                                                                   \
+    static inline _type __wt_atomic_fetch_add_##suffix(_type *vp, _type v)              \
+    {                                                                                   \
+        return (__atomic_fetch_add(vp, v, __ATOMIC_SEQ_CST));                           \
+    }                                                                                   \
+    static inline _type __wt_atomic_sub_##suffix(_type *vp, _type v)                    \
+    {                                                                                   \
+        return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));                           \
+    }                                                                                   \
+    static inline _type __wt_atomic_add_##suffix##_v(volatile _type *vp, _type v)       \
+    {                                                                                   \
+        return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));                           \
+    }                                                                                   \
+    static inline _type __wt_atomic_fetch_add_##suffix##_v(volatile _type *vp, _type v) \
+    {                                                                                   \
+        return (__atomic_fetch_add(vp, v, __ATOMIC_SEQ_CST));                           \
+    }                                                                                   \
+    static inline _type __wt_atomic_sub_##suffix##_v(volatile _type *vp, _type v)       \
+    {                                                                                   \
+        return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));                           \
+    }                                                                                   \
+    WT_ATOMIC_CAS_FUNC(suffix, _type)                                                   \
+    WT_ATOMIC_FUNC_STORE_LOAD(suffix, _type)
+
+WT_ATOMIC_FUNC(uint8, uint8_t)
+WT_ATOMIC_FUNC(uint16, uint16_t)
+WT_ATOMIC_FUNC(uint32, uint32_t)
+WT_ATOMIC_FUNC(uint64, uint64_t)
+WT_ATOMIC_FUNC(int8, int8_t)
+WT_ATOMIC_FUNC(int16, int16_t)
+WT_ATOMIC_FUNC(int32, int32_t)
+WT_ATOMIC_FUNC(int64, int64_t)
+WT_ATOMIC_FUNC(size, size_t)
+
+WT_ATOMIC_FUNC_STORE_LOAD(bool, bool)
+
+/*
+ * __wt_atomic_load_double_relaxed --
+ *     Atomically read a double variable.
+ */
+static inline double
+__wt_atomic_load_double_relaxed(double *vp)
+{
+    double value;
+    __atomic_load(vp, &value, __ATOMIC_RELAXED);
+    return (value);
+}
+
+/*
+ * __wt_atomic_store_double_relaxed --
+ *     Atomically set a double variable.
+ */
+static inline void
+__wt_atomic_store_double_relaxed(double *vp, double v)
+{
+    __atomic_store(vp, &v, __ATOMIC_RELAXED);
+}
+
+#define __wt_atomic_load_enum_relaxed(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)
+#define __wt_atomic_store_enum_relaxed(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELAXED)
+
+#define __wt_atomic_load_ptr_relaxed(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)
+#define __wt_atomic_store_ptr_relaxed(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELAXED)
+#define __wt_atomic_load_ptr_acquire(vp) __atomic_load_n(vp, __ATOMIC_ACQUIRE)
+#define __wt_atomic_store_ptr_release(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELEASE)
+
+/*
+ * __wt_atomic_cas_ptr --
+ *     Pointer compare and swap.
+ */
+static inline bool
+__wt_atomic_cas_ptr(void *vp, void *old, void *newv)
+{
+    return (ATOMIC_CAS((void **)vp, &old, newv));
+}
+
+#define __wt_atomic_and_generic_relaxed(vp, v) __atomic_and_fetch(vp, v, __ATOMIC_RELAXED)
+#define __wt_atomic_or_generic_relaxed(vp, v) __atomic_or_fetch(vp, v, __ATOMIC_RELAXED)
+#define __wt_atomic_load_generic_relaxed(vp) __atomic_load_n(vp, __ATOMIC_RELAXED)
+#define __wt_atomic_store_generic_relaxed(vp, v) __atomic_store_n(vp, v, __ATOMIC_RELAXED)

@@ -127,7 +127,7 @@ op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
             testutil_check(ret);
             break;
         }
-        (void)__wt_atomic_add64(&worker_busy, 1);
+        (void)__wt_atomic_add_uint64(&worker_busy, 1);
     }
     if (cursor == NULL)
         return;
@@ -152,7 +152,7 @@ op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
         *cpp = cursor;
     }
 
-    (void)__wt_atomic_add64(&worker, 1);
+    (void)__wt_atomic_add_uint64(&worker, 1);
 }
 
 /*
@@ -212,12 +212,12 @@ vthread(void *arg)
             i = __wt_random(&rnd) % uris;
             ret = session->verify(session, uri_list[i], NULL);
             if (ret == EBUSY) {
-                (void)__wt_atomic_add64(&verify_busy, 1);
+                (void)__wt_atomic_add_uint64(&verify_busy, 1);
                 continue;
             }
 
             testutil_check(ret);
-            (void)__wt_atomic_add64(&verify, 1);
+            (void)__wt_atomic_add_uint64(&verify, 1);
             break;
         }
     }

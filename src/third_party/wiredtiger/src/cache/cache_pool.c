@@ -256,7 +256,7 @@ __cache_pool_server(void *arg)
             break;
 
         /* Try to become the managing thread */
-        if (__wt_atomic_cas8(&cp->pool_managed, 0, 1)) {
+        if (__wt_atomic_cas_uint8(&cp->pool_managed, 0, 1)) {
             FLD_SET_ATOMIC_16(cache->pool_flags_atomic, WT_CACHE_POOL_MANAGER);
             __wt_verbose(session, WT_VERB_SHARED_CACHE, "%s", "Cache pool switched manager thread");
         }
@@ -563,7 +563,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
          *
          * Count pages read, using virtual memory page size.
          */
-        tmp = __wt_atomic_load64(&cache->bytes_read) / (uint64_t)entry->page_size;
+        tmp = __wt_atomic_load_uint64_relaxed(&cache->bytes_read) / (uint64_t)entry->page_size;
         if (tmp >= cache->cp_saved_read)
             reads = tmp - cache->cp_saved_read;
         else

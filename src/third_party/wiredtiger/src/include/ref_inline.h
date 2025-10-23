@@ -92,7 +92,7 @@ __ref_track_state(
 static WT_INLINE WT_REF_STATE
 __ref_get_state(WT_REF *ref)
 {
-    return (__wt_atomic_loadv8(&ref->__state));
+    return (__wt_atomic_load_uint8_v_relaxed(&ref->__state));
 }
 
 #define WT_REF_GET_STATE(ref) __ref_get_state((ref))
@@ -114,7 +114,7 @@ __ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE old_state,
 
     WT_ASSERT(session, old_state != new_state);
 
-    cas_result = __wt_atomic_casv8(&ref->__state, old_state, new_state);
+    cas_result = __wt_atomic_cas_uint8_v(&ref->__state, old_state, new_state);
 
 #ifdef HAVE_REF_TRACK
     /*
