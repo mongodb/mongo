@@ -134,6 +134,16 @@ protected:
         return ttlMonitor->getTTLDeletedKeys_forTest();
     }
 
+    long long getTTLExaminedDocuments() {
+        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
+        return ttlMonitor->getTTLExaminedDocuments_forTest();
+    }
+
+    long long getTTLExaminedKeys() {
+        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
+        return ttlMonitor->getTTLExaminedKeys_forTest();
+    }
+
     long long getInvalidTTLIndexSkips() {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
         return ttlMonitor->getInvalidTTLIndexSkips_forTest();
@@ -285,6 +295,9 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
+    auto initTTLExaminedDocuments = getTTLExaminedDocuments();
+    auto initTTLExaminedKeys = getTTLExaminedKeys();
+
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
@@ -292,6 +305,10 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount * 2);
+
+    // The query planner only reports docs/keys examined to find documents to delete.
+    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + docCount);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
@@ -310,10 +327,14 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx());
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
     auto initTTLPasses = getTTLPasses();
     auto initTTLSubPasses = getTTLSubPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
+    auto initTTLExaminedDocuments = getTTLExaminedDocuments();
+    auto initTTLExaminedKeys = getTTLExaminedKeys();
+
     doTTLPassForTest(Date_t::now());
 
     // No documents are removed, no passes are incremented.
@@ -322,6 +343,10 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     ASSERT_EQ(getTTLSubPasses(), initTTLSubPasses);
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+
+    // The query planner only reports docs/keys examined to find documents to delete.
+    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments);
+    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
@@ -344,6 +369,9 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
+    auto initTTLExaminedDocuments = getTTLExaminedDocuments();
+    auto initTTLExaminedKeys = getTTLExaminedKeys();
+
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
@@ -353,6 +381,11 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     // For a clustered collection without additional indexes, 0 keys deleted is valid.
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+
+    // The query planner only reports docs/keys examined to find documents to delete.
+    // For a clustered collection without additional indexes, 0 keys examined is valid.
+    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
@@ -377,6 +410,9 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
+    auto initTTLExaminedDocuments = getTTLExaminedDocuments();
+    auto initTTLExaminedKeys = getTTLExaminedKeys();
+
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
@@ -386,6 +422,11 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     // For a clustered collection with 1 additional index, 1 deleted key per document is valid.
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
+
+    // The query planner only reports docs/keys examined to find documents to delete.
+    // As the index on _id is clustered, only the keys examined on the foo index are counted.
+    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + 50);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
@@ -405,6 +446,9 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
+    auto initTTLExaminedDocuments = getTTLExaminedDocuments();
+    auto initTTLExaminedKeys = getTTLExaminedKeys();
+
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
@@ -412,6 +456,10 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
+
+    // The query planner only reports docs/keys examined to find documents to delete.
+    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + docCount);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
@@ -444,6 +492,9 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
+    auto initTTLExaminedDocuments = getTTLExaminedDocuments();
+    auto initTTLExaminedKeys = getTTLExaminedKeys();
+
     doTTLPassForTest(now);
 
     // Everything should be deleted.
@@ -454,6 +505,11 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     // In this case, the number of documents deleted is the number of timeseries buckets (i.e. 2)
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + 2);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+
+    // The query planner only reports docs/keys examined to find documents to delete.
+    // For a clustered collection without additional indexes, 0 keys examined is valid.
+    ASSERT_GT(getTTLExaminedDocuments(), initTTLExaminedDocuments);
+    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
@@ -481,6 +537,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
+
     doTTLPassForTest(now);
 
     // All documents remain after the TTL pass.
@@ -616,6 +673,9 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     const auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     const auto initTTLDeletedKeys = getTTLDeletedKeys();
+    const auto initTTLExaminedDocuments = getTTLExaminedDocuments();
+    const auto initTTLExaminedKeys = getTTLExaminedKeys();
+
     doTTLPassForTest(Date_t::now());
 
     // No documents are removed.
@@ -623,6 +683,10 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+
+    // The query planner only reports docs/keys examined to find documents to delete.
+    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments);
+    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 
     // A non-TTL index doesn't contribute to the number of skipped invalid TTL indexes.
     ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);

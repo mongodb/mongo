@@ -73,6 +73,8 @@ public:
     MONGO_MOD_PRIVATE long long getTTLSubPasses_forTest();
     MONGO_MOD_PRIVATE long long getTTLDeletedDocuments_forTest();
     MONGO_MOD_PRIVATE long long getTTLDeletedKeys_forTest();
+    MONGO_MOD_PRIVATE long long getTTLExaminedDocuments_forTest();
+    MONGO_MOD_PRIVATE long long getTTLExaminedKeys_forTest();
     MONGO_MOD_PRIVATE long long getInvalidTTLIndexSkips_forTest();
 
 private:

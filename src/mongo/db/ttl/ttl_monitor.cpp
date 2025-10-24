@@ -117,6 +117,10 @@ auto& ttlSubPasses = *MetricBuilder<Counter64>{"ttl.subPasses"};
 auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
 auto& ttlDeletedKeys = *MetricBuilder<Counter64>{"ttl.deletedKeys"};
 
+// Tracks the number of documents and keys examined in TTL passes.
+auto& ttlExaminedDocuments = *MetricBuilder<Counter64>{"ttl.examinedDocuments"};
+auto& ttlExaminedKeys = *MetricBuilder<Counter64>{"ttl.examinedKeys"};
+
 // Tracks the number of TTL deletes skipped due to a TTL secondary index being present, but not
 // valid for TTL removal. A non-zero value indicates there is a TTL non-conformant index present and
 // users must manually modify the secondary index to utilize automatic TTL deletion.
@@ -615,6 +619,9 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
         PlanSummaryStats summaryStats;
         const auto& explainer = exec->getPlanExplainer();
         explainer.getSummaryStats(&summaryStats);
+        ttlExaminedDocuments.increment(summaryStats.totalDocsExamined);
+        ttlExaminedKeys.increment(summaryStats.totalKeysExamined);
+
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
                                         duration,
@@ -764,6 +771,9 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
         PlanSummaryStats summaryStats;
         const auto& explainer = exec->getPlanExplainer();
         explainer.getSummaryStats(&summaryStats);
+        ttlExaminedDocuments.increment(summaryStats.totalDocsExamined);
+        ttlExaminedKeys.increment(summaryStats.totalKeysExamined);
+
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
                                         duration,
@@ -823,6 +833,14 @@ long long TTLMonitor::getTTLDeletedDocuments_forTest() {
 
 long long TTLMonitor::getTTLDeletedKeys_forTest() {
     return ttlDeletedKeys.get();
+}
+
+long long TTLMonitor::getTTLExaminedDocuments_forTest() {
+    return ttlExaminedDocuments.get();
+}
+
+long long TTLMonitor::getTTLExaminedKeys_forTest() {
+    return ttlExaminedKeys.get();
 }
 
 long long TTLMonitor::getInvalidTTLIndexSkips_forTest() {
