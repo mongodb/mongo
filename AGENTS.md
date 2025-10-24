@@ -32,9 +32,9 @@ evergreen/**
 jstests/**
 src/mongo/dbtests/**
 src/mongo/unittests/**
-src/mongo/**/*_test*.cpp
-src/mongo/**/*_mock*.cpp
-src/mongo/**/*_bm*.cpp
+src/mongo/**/*_test*
+src/mongo/**/*_mock*
+src/mongo/**/*_bm*
 src/mongo/tools/mongo_tidy_checks/**
 modules_poc/**
 ```
@@ -43,7 +43,8 @@ modules_poc/**
 
 ✅ ALLOWED:
 
-- `src/mongo/db/query/planner_test.cpp` → matches `src/mongo/**/*_test*.cpp`
+- `src/mongo/db/query/planner_test.cpp` → matches `src/mongo/**/*_test*`
+- `src/mongo/db/query/planner_bm_utils.h` → matches `src/mongo/**/*_bm*`
 - `src/mongo/unittests/bson_test.cpp` → matches `src/mongo/unittests/**`
 - `buildscripts/install.py` → matches `**/*.py`
 
