@@ -1385,7 +1385,8 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
                 bucket.keptOpenDueToLargeMeasurements = true;
                 info.stats.incNumBucketsKeptOpenDueToLargeMeasurements();
             }
-            return {RolloverAction::kNone, RolloverReason::kNone};
+
+            // Fall through to remaining checks
         } else {
             if (effectiveMaxSize == gTimeseriesBucketMaxSize) {
                 info.stats.incNumBucketsClosedDueToSize();
