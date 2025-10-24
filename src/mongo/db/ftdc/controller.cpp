@@ -233,9 +233,12 @@ void FTDCController::triggerRotate() {
 }
 
 void FTDCController::start(Service* service) {
-    LOGV2(20625,
-          "Initializing full-time diagnostic data capture",
-          "dataDirectory"_attr = _path.generic_string());
+    const auto initPath = [&] {
+        // FTDC is initialized after `TransportLayer`, so avoid a read-after-write on `_path`.
+        stdx::lock_guard lk(_mutex);
+        return _path.generic_string();
+    }();
+    LOGV2(20625, "Initializing full-time diagnostic data capture", "dataDirectory"_attr = initPath);
 
     // Start the thread
     _thread = stdx::thread([this, service] { doLoop(service); });
@@ -353,7 +356,11 @@ void FTDCController::doLoop(Service* service) try {
         // Delay initialization of FTDCFileManager until we are sure the user has enabled
         // FTDC
         if (!_mgr) {
-            auto swMgr = FTDCFileManager::create(&_config, _path, &_rotateCollectors, client);
+            const auto path = [&] {
+                stdx::lock_guard lk(_mutex);
+                return _path;
+            }();
+            auto swMgr = FTDCFileManager::create(&_config, path, &_rotateCollectors, client);
 
             _mgr = uassertStatusOK(std::move(swMgr));
         }
