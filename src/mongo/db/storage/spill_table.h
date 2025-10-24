@@ -155,6 +155,8 @@ public:
 
     std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall();
 
+    RecordStore* getRecordStore_forTest();
+
 protected:
     std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;

@@ -109,6 +109,8 @@ public:
 
     Timestamp getBackupCheckpointTimestamp() override;
 
+    BSONObj getStatus(OperationContext* opCtx) const override;
+
     Status disableIncrementalBackup() override;
 
     StatusWith<std::unique_ptr<StreamingCursor>> beginNonBlockingBackup(
@@ -347,14 +349,13 @@ private:
     void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
                                                      const Timestamp& timestamp);
 
-    class RemoveDBChange;
-
     // Main KVEngine instance used for all user tables.
     // This must be the first member so it is destroyed last.
     std::unique_ptr<KVEngine> _engine;
 
     // KVEngine instance that is used for creating SpillTables.
     std::unique_ptr<KVEngine> _spillEngine;
+    Atomic<long long> _spillTableDropRetries{0};
 
     const StorageEngineOptions _options;
 

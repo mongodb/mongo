@@ -607,6 +607,26 @@ Timestamp StorageEngineImpl::getBackupCheckpointTimestamp() {
     return _engine->getBackupCheckpointTimestamp();
 }
 
+
+BSONObj StorageEngineImpl::getStatus(OperationContext* opCtx) const {
+    const auto oldestRequiredTimestampForCrashRecovery = getOplogNeededForCrashRecovery();
+    const auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
+
+    BSONObjBuilder bob;
+    bob.append("name", storageGlobalParams.engine);
+    bob.append("supportsCommittedReads", true);
+    bob.append("oldestRequiredTimestampForCrashRecovery",
+               oldestRequiredTimestampForCrashRecovery.value_or(Timestamp()));
+    bob.append("dropPendingIdents", static_cast<long long>(getNumDropPendingIdents()));
+    bob.append("dropSpillTableRetries", _spillTableDropRetries.load());
+    bob.append("supportsSnapshotReadConcern", supportsReadConcernSnapshot());
+    bob.append("readOnly", !opCtx->getServiceContext()->userWritesAllowed());
+    bob.append("persistent", !isEphemeral());
+    bob.append("backupCursorOpen", backupCursorHooks->isBackupCursorOpen());
+
+    return bob.obj();
+}
+
 Status StorageEngineImpl::disableIncrementalBackup() {
     LOGV2(9538600, "Disabling incremental backup");
     return _engine->disableIncrementalBackup();
@@ -688,9 +708,10 @@ void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, StringData ident) {
             uassertStatusOK(status);
         }
 
+        _spillTableDropRetries.fetchAndAddRelaxed(1);
         logAndBackoff(10327300,
                       logv2::LogComponent::kStorage,
-                      logv2::LogSeverity::Log(),
+                      logv2::LogSeverity::Debug(1),
                       retries,
                       "Failed to drop spill table, retrying",
                       "error"_attr = status);
