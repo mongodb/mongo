@@ -902,7 +902,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
         auto shardVersion = [&] {
             auto sv = cm.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
                                            : ShardVersion::UNSHARDED();
-            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            if (auto txnRouter = TransactionRouter::get(opCtx);
+                txnRouter && opCtx->inMultiDocumentTransaction()) {
                 if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {
                     sv.setPlacementConflictTime(*optOriginalPlacementConflictTime);
                 }

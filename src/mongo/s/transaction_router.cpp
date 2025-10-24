@@ -838,6 +838,7 @@ boost::optional<LogicalTime> TransactionRouter::Router::getSelectedAtClusterTime
 }
 
 boost::optional<LogicalTime> TransactionRouter::Router::getPlacementConflictTime() const {
+    invariant(isInitialized());
     return o().placementConflictTimeForNonSnapshotReadConcern.map(
         [](const auto& x) { return x.getTime(); });
 }

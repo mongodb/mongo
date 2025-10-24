@@ -501,6 +501,7 @@ mongo_cc_unit_test(
         "//src/mongo/s:mongos_topology_coordinator_test.cpp",
         "//src/mongo/s:query_analysis_sample_tracker_test.cpp",
         "//src/mongo/s:query_analysis_sampler_test.cpp",
+        "//src/mongo/s:router_role_test.cpp",
         "//src/mongo/s:routing_table_cache_gossip_metadata_hook_test.cpp",
         "//src/mongo/s:routing_table_history_test.cpp",
         "//src/mongo/s:sessions_collection_sharded_test.cpp",

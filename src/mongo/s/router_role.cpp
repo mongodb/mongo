@@ -45,6 +45,7 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -54,6 +55,19 @@ namespace sharding {
 namespace router {
 
 RouterBase::RouterBase(ServiceContext* service) : _service(service) {}
+
+void RouterBase::_initTxnRouterIfNeeded(OperationContext* opCtx) {
+    bool activeTxnParticipantAddParticipants =
+        opCtx->isActiveTransactionParticipant() && opCtx->inMultiDocumentTransaction();
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (txnRouter && activeTxnParticipantAddParticipants) {
+        auto opCtxTxnNum = opCtx->getTxnNumber();
+        invariant(opCtxTxnNum);
+        txnRouter.beginOrContinueTxn(
+            opCtx, *opCtxTxnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+    }
+}
 
 DBPrimaryRouter::DBPrimaryRouter(ServiceContext* service, const DatabaseName& db)
     : RouterBase(service), _dbName(db) {}

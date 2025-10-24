@@ -58,7 +58,9 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
         auto shardVersion = [&] {
             auto sv =
                 isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNSHARDED();
-            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+
+            if (auto txnRouter = TransactionRouter::get(opCtx);
+                txnRouter && opCtx->inMultiDocumentTransaction()) {
                 if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {
                     sv.setPlacementConflictTime(*optOriginalPlacementConflictTime);
                 }
