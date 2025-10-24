@@ -463,14 +463,25 @@ BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion) {
         return cmdObj;
     }
     BSONObjBuilder cmdWithDbVersion(std::move(cmdObj));
-    cmdWithDbVersion.append("databaseVersion", dbVersion.toBSON());
+    cmdWithDbVersion.append(DatabaseVersion::kDatabaseVersionField, dbVersion.toBSON());
     return cmdWithDbVersion.obj();
+}
+
+void appendDbVersionIfPresent(BSONObjBuilder& cmd, DatabaseVersion dbVersion) {
+    if (dbVersion.isFixed()) {
+        return;
+    }
+    cmd.append(DatabaseVersion::kDatabaseVersionField, dbVersion.toBSON());
 }
 
 BSONObj appendShardVersion(BSONObj cmdObj, ShardVersion version) {
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
-    version.serialize(ShardVersion::kShardVersionField, &cmdWithVersionBob);
+    appendShardVersion(cmdWithVersionBob, version);
     return cmdWithVersionBob.obj();
+}
+
+void appendShardVersion(BSONObjBuilder& cmd, ShardVersion version) {
+    version.serialize(ShardVersion::kShardVersionField, &cmd);
 }
 
 BSONObj applyReadWriteConcern(OperationContext* opCtx,

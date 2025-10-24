@@ -621,7 +621,7 @@ BSONObj TransactionRouter::appendFieldsForContinueTransaction(
             shardVersion->setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
         }
 
-        shardVersion->serialize(ShardVersion::kShardVersionField, &cmdBob);
+        appendShardVersion(cmdBob, shardVersion.get());
     }
 
     if (auto databaseVersion = strippedFields.databaseVersion) {
@@ -2519,7 +2519,7 @@ BSONObj TransactionRouter::appendFieldsForStartTransaction(
             shardVersion->setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
         }
 
-        shardVersion->serialize(ShardVersion::kShardVersionField, &cmdBob);
+        appendShardVersion(cmdBob, shardVersion.get());
     }
 
     if (auto databaseVersion = strippedFields.databaseVersion) {

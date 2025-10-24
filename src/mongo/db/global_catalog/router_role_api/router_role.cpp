@@ -32,6 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -88,7 +89,7 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
         BSONObjBuilder dbvBuilder(builder->subobjStart(DatabaseVersion::kDatabaseVersionField));
         dbVersion.serialize(&dbvBuilder);
     }
-    ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, builder);
+    appendShardVersion(*builder, ShardVersion::UNSHARDED());
 }
 
 CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {
@@ -346,7 +347,7 @@ void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shar
             dbVersion.serialize(&dbvBuilder);
         }
     }
-    cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, builder);
+    appendShardVersion(*builder, cri.getShardVersion(shardId));
 }
 
 CollectionRouter::CollectionRouter(ServiceContext* service,

@@ -240,12 +240,12 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
         : boost::none;
 
     // Helper methods for appending additional attributes to the shard command.
-    auto appendShardVersion = [&](const auto& shardId, auto& cmdBuilder) {
+    auto appendVersions = [&](const auto& shardId, auto& cmdBuilder) {
         if (cri.hasRoutingTable()) {
-            cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmdBuilder);
+            appendShardVersion(cmdBuilder, cri.getShardVersion(shardId));
         } else if (!query.nss().isOnInternalDb()) {
-            ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);
-            cmdBuilder.append("databaseVersion", cri.getDbVersion().toBSON());
+            appendShardVersion(cmdBuilder, ShardVersion::UNSHARDED());
+            appendDbVersionIfPresent(cmdBuilder, cri.getDbVersion());
         }
     };
 
@@ -269,7 +269,7 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 
         BSONObjBuilder cmdBuilder;
         findCommandToForward->serialize(&cmdBuilder);
-        appendShardVersion(shardId, cmdBuilder);
+        appendVersions(shardId, cmdBuilder);
         appendSampleId(shardId, cmdBuilder);
 
         auto cmdObj = isRawDataOperation(opCtx) &&

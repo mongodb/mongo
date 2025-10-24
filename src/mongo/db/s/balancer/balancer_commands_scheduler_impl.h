@@ -284,7 +284,7 @@ public:
             .append(kEstimatedValue, _estimatedValue)
             .append(kMaxSizeValue, _maxSize);
 
-        _version.serialize(ShardVersion::kShardVersionField, &commandBuilder);
+        appendShardVersion(commandBuilder, _version);
 
         return commandBuilder.obj();
     }

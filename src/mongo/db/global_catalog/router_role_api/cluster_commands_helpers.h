@@ -184,9 +184,31 @@ BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInf
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion);
 
 /**
+ * Appends the database version to the command BSON object if it's not Fixed.
+ *
+ * @param cmd The BSON object builder to append the database version to
+ * @param dbVersion The database version to conditionally serialize and append
+ *
+ * Use generic_argument_util::setDbVersionIfPresent() instead if the BSON is generated from an
+ * IDL-command struct.
+ *
+ * TODO SERVER-91373: Typed commands need to set dbversion using
+ * generic_argument_util::setDbVersionIfPresent() instead of appendDbVersionIfPresent().
+ */
+void appendDbVersionIfPresent(BSONObjBuilder& cmd, DatabaseVersion dbVersion);
+
+/**
  * Returns a copy of 'cmdObj' with 'version' appended.
  */
 BSONObj appendShardVersion(BSONObj cmdObj, ShardVersion version);
+
+/**
+ * Appends the shard version to the command BSON object.
+ *
+ * @param cmd The BSON object builder to append the database version to
+ * @param version The shard version to serialize and append
+ */
+void appendShardVersion(BSONObjBuilder& cmd, ShardVersion version);
 
 /**
  * Returns a copy of 'cmdObj' with the read/writeConcern from the OpCtx appended, unless the
