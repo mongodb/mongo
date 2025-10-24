@@ -652,6 +652,7 @@ observability.commands:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/commands/parse_log_component_settings*
     - src/mongo/db/commands/xray_commands*
@@ -704,6 +705,7 @@ networking.commands:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/commands/command_mirroring_test.cpp
     - src/mongo/db/commands/conn_pool_stats.cpp
