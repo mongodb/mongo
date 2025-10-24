@@ -103,6 +103,26 @@ protected:
     CollectionValidationDiskTest() : CollectionValidationTest(Options{}.inMemory(false)) {}
 };
 
+struct ForegroundValidateTestResults {
+    bool valid{true};
+    int numRecords{0};
+    int numInvalidDocuments{0};
+    int numNonCompliantDocuments{0};
+    int numErrors{0};
+    int numWarnings{0};
+    auto operator<=>(const ForegroundValidateTestResults&) const = default;
+};
+
+inline std::string stringify_forTest(const ForegroundValidateTestResults& fgRes) {
+    return fmt::format(
+        "{{valid={}, numRecords={}, numInvalidDocuments={}, numErrors={}, numWarnings={}}}",
+        fgRes.valid,
+        fgRes.numRecords,
+        fgRes.numInvalidDocuments,
+        fgRes.numErrors,
+        fgRes.numWarnings);
+}
+
 /**
  * Calls validate on collection nss with both kValidateFull and kValidateNormal validation levels
  * and verifies the results.
@@ -112,15 +132,14 @@ protected:
 std::vector<ValidateResults> foregroundValidate(
     const NamespaceString& nss,
     OperationContext* opCtx,
-    bool valid,
-    int numRecords,
-    int numInvalidDocuments,
-    int expectedNumErrors,
+    const ForegroundValidateTestResults& expected,
     std::initializer_list<CollectionValidation::ValidateMode> modes =
         {CollectionValidation::ValidateMode::kForeground,
          CollectionValidation::ValidateMode::kForegroundFull},
     CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone) {
+
     std::vector<ValidateResults> results;
+
     for (auto mode : modes) {
         ValidateResults validateResults;
         ASSERT_OK(CollectionValidation::validate(
@@ -136,7 +155,7 @@ std::vector<ValidateResults> foregroundValidate(
 
         // The total number of errors is: those in the top-level results plus the sum of
         // all index-specific errors.
-        std::size_t observedNumErrors = validateResults.getErrors().size() +
+        const int observedNumErrors = validateResults.getErrors().size() +
             std::accumulate(validateResults.getIndexResultsMap().begin(),
                             validateResults.getIndexResultsMap().end(),
                             0,
@@ -144,14 +163,14 @@ std::vector<ValidateResults> foregroundValidate(
                                 return current + ivr.second.getErrors().size();
                             });
 
-        ASSERT_EQ(validateResults.isValid(), valid) << validateResultsObj;
-        ASSERT_EQ(observedNumErrors, static_cast<long unsigned int>(expectedNumErrors))
-            << validateResultsObj;
+        const ForegroundValidateTestResults actual{
+            .valid = validateResults.isValid(),
+            .numRecords = validateResultsObj.getIntField("nrecords"),
+            .numInvalidDocuments = validateResultsObj.getIntField("nInvalidDocuments"),
+            .numErrors = observedNumErrors,
+            .numWarnings = static_cast<int>(validateResults.getWarnings().size())};
 
-        ASSERT_EQ(validateResultsObj.getIntField("nrecords"), numRecords) << validateResultsObj;
-        ASSERT_EQ(validateResultsObj.getIntField("nInvalidDocuments"), numInvalidDocuments)
-            << validateResultsObj;
-
+        ASSERT_EQ(expected, actual) << validateResultsObj;
         results.push_back(std::move(validateResults));
     }
     return results;
@@ -201,6 +220,34 @@ int insertDataRange(OperationContext* opCtx, const int startIDNum, const int end
     return insertDataRangeForNumFields(kNss, opCtx, startIDNum, endIDNum - startIDNum, 0);
 }
 
+int setUpDataOfGivenSize(OperationContext* opCtx,
+                         int targetBsonSize,
+                         const NamespaceString& nss = kNss) {
+    ASSERT_TRUE(opCtx);
+    AutoGetCollection coll(opCtx, nss, MODE_IX);
+
+    // Build a temporary BSON object to determine the overhead. This overhead will need to be
+    // subtracted from the test objects to set their sizes close to limits.
+    const int overhead = std::invoke([] {
+        BSONObjBuilder builder;
+        std::string testStr("test");
+        builder.append("_id", testStr);
+        return builder.obj().objsize() - testStr.size();
+    });
+
+    BSONObjBuilder builder;
+    builder.append("_id", std::string(targetBsonSize - overhead, 'a'));
+    BSONObj oversizeObj = builder.obj();
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, *coll, InsertStatement(oversizeObj), nullptr))
+            << "Failed to insert object of size " << targetBsonSize;
+        wuow.commit();
+    }
+    return 1;
+}
+
 /**
  * Inserts a single invalid document into the kNss collection and then returns that count.
  */
@@ -238,10 +285,11 @@ BSONObj resultToBSON(const ValidateResults& vr) {
 TEST_F(CollectionValidationTest, ValidateEmpty) {
     foregroundValidate(kNss,
                        operationContext(),
-                       /*valid*/ true,
-                       /*numRecords*/ 0,
-                       /*numInvalidDocuments*/ 0,
-                       /*numErrors*/ 0);
+                       {.valid = true,
+                        .numRecords = 0,
+                        .numInvalidDocuments = 0,
+                        .numErrors = 0,
+                        .numWarnings = 0});
 }
 
 // Verify calling validate() on a nonempty collection with different validation levels.
@@ -249,10 +297,10 @@ TEST_F(CollectionValidationTest, Validate) {
     auto opCtx = operationContext();
     foregroundValidate(kNss,
                        opCtx,
-                       /*valid*/ true,
-                       /*numRecords*/ insertDataRange(opCtx, 0, 5),
-                       /*numInvalidDocuments*/ 0,
-                       /*numErrors*/ 0);
+                       {.valid = true,
+                        .numRecords = insertDataRange(opCtx, 0, 5),
+                        .numInvalidDocuments = 0,
+                        .numErrors = 0});
 }
 
 // Verify calling validate() on a collection with an invalid document.
@@ -260,10 +308,10 @@ TEST_F(CollectionValidationTest, ValidateError) {
     auto opCtx = operationContext();
     foregroundValidate(kNss,
                        opCtx,
-                       /*valid*/ false,
-                       /*numRecords*/ setUpInvalidData(opCtx),
-                       /*numInvalidDocuments*/ 1,
-                       /*numErrors*/ 1);
+                       {.valid = false,
+                        .numRecords = setUpInvalidData(opCtx),
+                        .numInvalidDocuments = 1,
+                        .numErrors = 1});
 }
 
 // Verify calling validate() with enforceFastCount=true.
@@ -271,11 +319,75 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCount) {
     auto opCtx = operationContext();
     foregroundValidate(kNss,
                        opCtx,
-                       /*valid*/ true,
-                       /*numRecords*/ insertDataRange(opCtx, 0, 5),
-                       /*numInvalidDocuments*/ 0,
-                       /*numErrors*/ 0,
+                       {.valid = true,
+                        .numRecords = insertDataRange(opCtx, 0, 5),
+                        .numInvalidDocuments = 0,
+                        .numErrors = 0},
                        {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount});
+}
+
+TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeUserLimit) {
+    auto opCtx = operationContext();
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = true,
+                        .numRecords = setUpDataOfGivenSize(opCtx, BSONObjMaxUserSize),
+                        .numInvalidDocuments = 0,
+                        .numErrors = 0,
+                        .numWarnings = 0},
+                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+}
+
+TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeOverUserLimit) {
+    auto opCtx = operationContext();
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = false,
+                        .numRecords = setUpDataOfGivenSize(opCtx, BSONObjMaxUserSize + 1),
+                        .numInvalidDocuments = 1,
+                        .numErrors = 1,
+                        .numWarnings = 0},
+                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+}
+
+TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeInternalLimit) {
+    auto opCtx = operationContext();
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = false,
+                        .numRecords = setUpDataOfGivenSize(opCtx, BSONObjMaxInternalSize),
+                        .numInvalidDocuments = 1,
+                        .numErrors = 1,
+                        .numWarnings = 0},
+                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+}
+
+TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeOverInternalLimit) {
+    auto opCtx = operationContext();
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = false,
+                        .numRecords = setUpDataOfGivenSize(opCtx, BSONObjMaxInternalSize + 1),
+                        .numInvalidDocuments = 1,
+                        .numErrors = 1,
+                        .numWarnings = 0},
+                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+}
+
+TEST_F(CollectionValidationTest, ValidateCollectionDocumentMixedSizes) {
+    auto opCtx = operationContext();
+    setUpDataOfGivenSize(opCtx, BSONObjMaxInternalSize);
+    setUpDataOfGivenSize(opCtx, BSONObjMaxInternalSize + 1);
+    setUpDataOfGivenSize(opCtx, BSONObjMaxUserSize);
+    setUpDataOfGivenSize(opCtx, BSONObjMaxUserSize + 1);
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = false,
+                        .numRecords = 4,
+                        .numInvalidDocuments = 3,
+                        .numErrors = 1,
+                        .numWarnings = 0},
+                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
 }
 
 TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErrors) {
@@ -285,10 +397,11 @@ TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErro
     foregroundValidate(
         kNss,
         opCtx,
-        /*valid*/ false,
-        /*numRecords*/ std::numeric_limits<int32_t>::min(),           // uninitialized
-        /*numInvalidDocuments*/ std::numeric_limits<int32_t>::min(),  // uninitialized
-        /*numErrors*/ 1,
+        {.valid = false,
+         .numRecords = std::numeric_limits<int32_t>::min(),           // uninitialized
+         .numInvalidDocuments = std::numeric_limits<int32_t>::min(),  // uninitialized
+         .numErrors = 1,
+         .numWarnings = 1},
         {CollectionValidation::ValidateMode::kForegroundFull});
 }
 
@@ -356,8 +469,13 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
                                                  repl::OpTime::kUninitializedTerm));
 
     // Validate the collection here as a sanity check before we modify the index contents in-place.
-    foregroundValidate(
-        kNss, opCtx, /*valid*/ true, /*numRecords*/ 1, /*numInvalidDocuments*/ 0, /*numErrors*/ 0);
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = true,
+                        .numRecords = 1,
+                        .numInvalidDocuments = 0,
+                        .numErrors = 0,
+                        .numWarnings = 0});
 
     // Update existing entry in index to pre-4.2 format without record id in key string.
     {
@@ -411,10 +529,11 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
 
     const auto results = foregroundValidate(kNss,
                                             opCtx,
-                                            /*valid*/ true,
-                                            /*numRecords*/ 1,
-                                            /*numInvalidDocuments*/ 0,
-                                            /*numErrors*/ 0);
+                                            {.valid = true,
+                                             .numRecords = 1,
+                                             .numInvalidDocuments = 0,
+                                             .numErrors = 0,
+                                             .numWarnings = 1});
     ASSERT_EQ(results.size(), 2);
 
     for (const auto& validateResults : results) {

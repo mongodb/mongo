@@ -116,6 +116,9 @@ static constexpr const char* kTimeseriesValidationInconsistencyReason =
 static constexpr const char* kBSONValidationNonConformantReason =
     "Detected one or more documents in this collection not conformant to BSON specifications. For "
     "more info, see logs with log id 6825900";
+static constexpr const char* kBSONValidationObjectTooLargeReason =
+    "Detected one or more documents in this collection exceeding BSON object size limit. For more "
+    "info, see logs with log id 10869900";
 static constexpr const char* kTimeseriesBucketingParametersChangedInconsistencyReason =
     "A time series bucketing parameter was changed in this collection but "
     "timeseriesBucketingParametersChanged is not true. For more info, see logs with log id "
@@ -738,26 +741,56 @@ void computeMDHash(const BSONObj& mdField, SHA256Block& metadataHash) {
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordId& recordId,
                                        const RecordData& record,
-                                       long long* nNonCompliantDocuments,
+                                       long long& nNonCompliantDocuments,
+                                       long long& nInvalidDocuments,
                                        size_t* dataSize,
                                        ValidateResults* results,
                                        ValidationVersion validationVersion) {
-    Status status = validateBSON(
-        record.data(), record.size(), _validateState->getBSONValidateMode(), validationVersion);
-    if (!status.isOK()) {
-        if (status.code() != ErrorCodes::NonConformantBSON) {
-            return status;
+    {
+        Status bsonValidationStatus = validateBSON(
+            record.data(), record.size(), _validateState->getBSONValidateMode(), validationVersion);
+
+        if (!bsonValidationStatus.isOK()) {
+            if (bsonValidationStatus.code() == ErrorCodes::NonConformantBSON) {
+
+                LOGV2_WARNING_OPTIONS(6825900,
+                                      {logv2::LogTruncation::Disabled},
+                                      "Document is not conformant to BSON specifications",
+                                      "recordId"_attr = recordId,
+                                      "reason"_attr = bsonValidationStatus);
+                ++nNonCompliantDocuments;
+                results->addWarning(kBSONValidationNonConformantReason);
+            } else {
+                return bsonValidationStatus;  // Error is not related to BSON compliance
+            }
+        } else if (!_validateState->nss().isOplog()) {
+            // Additionally check size if the BSON object is compliant. Do not run this check on the
+            // oplog as entries are expected to exceed the max allowed user size. Use the internal
+            // size for internal collections.
+            const auto objSizeLimit = _validateState->nss().isOnInternalDb()
+                ? BSONObjMaxInternalSize
+                : BSONObjMaxUserSize;
+            Status sizeValidationStatus = record.toBson().validateBSONObjSize(objSizeLimit);
+
+            if (!sizeValidationStatus.isOK()) {
+                if (sizeValidationStatus.code() == ErrorCodes::BSONObjectTooLarge) {
+                    LOGV2_ERROR_OPTIONS(10869900,
+                                        {logv2::LogTruncation::Disabled},
+                                        "Document BSON object is too large.",
+                                        "recordId"_attr = recordId,
+                                        "ns"_attr = _validateState->nss(),
+                                        "reason"_attr = sizeValidationStatus);
+                    ++nInvalidDocuments;
+                    results->addError(kBSONValidationObjectTooLargeReason,
+                                      /*stopValidation=*/false);
+                } else {
+                    return sizeValidationStatus;  // Error is not related to BSON size limitations
+                }
+            }
         }
-        LOGV2_WARNING_OPTIONS(6825900,
-                              {logv2::LogTruncation::Disabled},
-                              "Document is not conformant to BSON specifications",
-                              "recordId"_attr = recordId,
-                              "reason"_attr = status);
-        (*nNonCompliantDocuments)++;
-        results->addWarning(kBSONValidationNonConformantReason);
     }
 
-    BSONObj recordBson = record.toBson();
+    const BSONObj recordBson = record.toBson();
     *dataSize = recordBson.objsize();
 
     if (MONGO_unlikely(_validateState->logDiagnostics())) {
@@ -1031,7 +1064,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         Status status = validateRecord(opCtx,
                                        record->id,
                                        record->data,
-                                       &nNonCompliantDocuments,
+                                       nNonCompliantDocuments,
+                                       nInvalid,
                                        &validatedSize,
                                        results,
                                        validationVersion);
