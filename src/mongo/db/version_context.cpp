@@ -44,11 +44,11 @@ VersionContext::VersionContext(const BSONObj& bsonObject) {
 }
 
 VersionContext& VersionContext::operator=(const VersionContext& other) {
-    if (*this == other) {
-        return *this;
+    if (*this != other) {
+        _assertOFCVNotInitialized();
+        _metadataOrTag = other._metadataOrTag;
     }
-    _assertOFCVNotInitialized();
-    _metadataOrTag = other._metadataOrTag;
+    _canPropagateAcrossShards = other._canPropagateAcrossShards;
     return *this;
 }
 
@@ -67,6 +67,7 @@ void VersionContext::setOperationFCV(FCVSnapshot fcv) {
 void VersionContext::resetToOperationWithoutOFCV() {
     invariant(isInitialized());
     _metadataOrTag = OperationWithoutOFCVTag{};
+    _canPropagateAcrossShards = false;
 }
 
 BSONObj VersionContext::toBSON() const {

@@ -137,6 +137,31 @@ public:
 
     friend bool operator==(const VersionContext& lhs, const VersionContext& rhs);
 
+    bool canPropagateAcrossShards() const {
+        return _canPropagateAcrossShards;
+    }
+
+    /**
+     * If true, this instance can be serialized in network commands to shards in a sharded cluster.
+     *
+     * It may only be enabled by durable operations (e.g. ShardingDDLCoordinator), which setFCV can
+     * reliably track and drain. In contrast, standalone operations can not safely enable this flag,
+     * because it may be killed, and setFCV is unaware that it may still be serialized in a command.
+     *
+     * Misusing this API can lead to a subtle failure mode, where a delayed/replayed network command
+     * can arrive after a FCV transition, and perform a write with a wrong (stale) OFCV, and persist
+     * inconsistent data as a result.
+     *
+     * Please include a Catalog and Routing member on the code review before enabling this flag.
+     * This flag is only for safety and is not considered in comparisons or BSON serialization.
+     */
+    [[nodiscard]] VersionContext withPropagationAcrossShards_UNSAFE() const {
+        invariant(std::holds_alternative<VersionContextMetadata>(_metadataOrTag));
+        VersionContext copy = *this;
+        copy._canPropagateAcrossShards = true;
+        return copy;
+    }
+
 private:
     void _assertOFCVNotInitialized() const;
 
@@ -145,6 +170,8 @@ private:
     std::
         variant<OperationWithoutOFCVTag, OutsideOperationTag, IgnoreOFCVTag, VersionContextMetadata>
             _metadataOrTag;
+
+    bool _canPropagateAcrossShards = false;
 };
 
 /**

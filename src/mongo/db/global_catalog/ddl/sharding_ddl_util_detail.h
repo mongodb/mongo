@@ -71,6 +71,9 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     }
     // TODO SERVER-99655: isInitialized() will always be true once DDL coordinators always use OFCV
     if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+        tassert(11144300,
+                "Expected VersionContext with propagation across shards",
+                vCtx.canPropagateAcrossShards());
         originalOpts->cmd.setVersionContext(vCtx);
     }
     originalOpts->cmd.setMayBypassWriteBlocking(

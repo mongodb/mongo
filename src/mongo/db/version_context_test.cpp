@@ -241,4 +241,45 @@ TEST_F(VersionContextTest, DeserializeFromInvalidDocument) {
     ASSERT_THROWS_BAD_VALUE(makeFromDowngradingOFCVString(kLatestFCVString, kLatestFCVString));
 }
 
+// Tests the behavior of the in-memory flag for propagation of VersionContext across shards
+TEST_F(VersionContextTest, PropagationAcrossShardsFlag) {
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    const auto vCtx = VersionContext(GenericFCV::kLatest);
+    const auto vCtxWithPropagation = vCtx.withPropagationAcrossShards_UNSAFE();
+
+    // The flag is disabled by default
+    ASSERT_FALSE(VersionContext().canPropagateAcrossShards());
+    ASSERT_FALSE(kNoVersionContext.canPropagateAcrossShards());
+    ASSERT_FALSE(kVersionContextIgnored_UNSAFE.canPropagateAcrossShards());
+    ASSERT_FALSE(vCtx.canPropagateAcrossShards());
+
+    // Can create a VersionContext with the flag enabled
+    ASSERT_TRUE(vCtxWithPropagation.canPropagateAcrossShards());
+
+    // Copy and assignment conserve the flag
+    ASSERT_TRUE(VersionContext{vCtxWithPropagation}.canPropagateAcrossShards());
+
+    {
+        VersionContext myVCtx;
+        myVCtx = vCtxWithPropagation;
+        ASSERT_TRUE(myVCtx.canPropagateAcrossShards());
+        myVCtx = vCtx;
+        ASSERT_FALSE(myVCtx.canPropagateAcrossShards());
+    }
+
+    // Resetting VersionContext disables the flag
+    {
+        VersionContext myVCtx{vCtxWithPropagation};
+        myVCtx.resetToOperationWithoutOFCV();
+        ASSERT_FALSE(myVCtx.canPropagateAcrossShards());
+    }
+
+    // Equality comparison ignores the flag
+    ASSERT_EQ(vCtx, vCtxWithPropagation);
+
+    // The flag is similarly not serialized or deserialized
+    ASSERT_BSONOBJ_EQ(vCtx.toBSON(), vCtxWithPropagation.toBSON());
+    ASSERT_FALSE(VersionContext{vCtxWithPropagation.toBSON()}.canPropagateAcrossShards());
+}
+
 }  // namespace mongo

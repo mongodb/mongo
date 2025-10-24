@@ -54,6 +54,9 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
         }
 
         if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+            tassert(11144301,
+                    "Expected VersionContext with propagation across shards",
+                    vCtx.canPropagateAcrossShards());
             metadataBob->append(GenericArguments::kVersionContextFieldName, vCtx.toBSON());
         }
 

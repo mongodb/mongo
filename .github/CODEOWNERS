@@ -2947,6 +2947,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/async_requests_sender* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/s/**/async_rpc_shard* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/s/**/load_balancer_support* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/s/**/client_metadata_propagation_egress_hook* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/s/**/balancer_feature_flag* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/sharding_task_executor_pool* @10gen/server-networking-and-observability @svc-auto-approve-bot
 

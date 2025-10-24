@@ -118,7 +118,17 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
             !requestArgs.getVersionContext() || hasInternalAuthorization());
     if (requestArgs.getVersionContext()) {
         ClientLock lg(opCtx->getClient());
-        VersionContext::setFromMetadata(lg, opCtx, *requestArgs.getVersionContext());
+        // Enable a versionContext we received through a network request to transitively propagate
+        // to other shards as part of network commands. This is safe because the original operation
+        // that enabled propagation must be durable, subject to draining by setFCV, and retry until
+        // all cluster-wide work it dispatches is done. So if _this_ operation starts propagating
+        // versionContext in a sub-command and is then killed (ostensibly leaving a versionContext
+        // in-flight that setFCV won't wait for), the draining by cluster-wide setFCV still waits
+        // for the original operation, which has to keep retrying until it completes all work.
+        // Once the work is done, any replayed commands become a no-op (or e.g. rejected via replay
+        // protection), so they do no harm even if they are admitted with an stale versionContext.
+        VersionContext::setFromMetadata(
+            lg, opCtx, requestArgs.getVersionContext()->withPropagationAcrossShards_UNSAFE());
     }
 }
 }  // namespace
