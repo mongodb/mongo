@@ -788,7 +788,8 @@ public:
         }
 
         const auto privileges = uassertStatusOK(
-            auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
+            auth::getPrivilegesForAggregate(opCtx,
+                                            AuthorizationSession::get(opCtx->getClient()),
                                             distinctAggRequest.getNamespace(),
                                             distinctAggRequest,
                                             false /* isMongos */));

@@ -96,7 +96,8 @@ Status checkAuthForReleaseMemory(AuthorizationSession* authSession,
 
 // Attempts to get the privileges necessary to run the aggregation pipeline specified in
 // 'request' on the namespace 'ns' either directly on mongoD or via mongoS.
-StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* authSession,
+StatusWith<PrivilegeVector> getPrivilegesForAggregate(OperationContext* opCtx,
+                                                      AuthorizationSession* authSession,
                                                       const NamespaceString& ns,
                                                       const AggregateCommandRequest& request,
                                                       bool isMongos);

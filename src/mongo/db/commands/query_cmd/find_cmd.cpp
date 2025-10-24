@@ -1017,6 +1017,7 @@ public:
             // checked on getMore and explain will not open a cursor.
             const auto privileges = verbosity ? PrivilegeVector{}
                                               : uassertStatusOK(auth::getPrivilegesForAggregate(
+                                                    opCtx,
                                                     AuthorizationSession::get(opCtx->getClient()),
                                                     aggRequest.getNamespace(),
                                                     aggRequest,

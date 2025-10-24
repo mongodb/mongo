@@ -515,7 +515,7 @@ public:
         _admissionTicket = boost::none;
 
         // Perform authorization verification checks in test environments.
-        _performAuthorizationVerificationChecks(status);
+        _performAuthorizationVerificationChecks(_execContext.getOpCtx(), status);
 
         if (MONGO_unlikely(!status.isOK()))
             _handleFailure(std::move(status));
@@ -666,7 +666,7 @@ private:
                                                           bool startOrContinueTransaction);
 
     // Performs authorization verification checks in test environments.
-    void _performAuthorizationVerificationChecks(const Status& status);
+    void _performAuthorizationVerificationChecks(OperationContext* opCtx, const Status& status);
 
     const HandleRequest::ExecutionContext& _execContext;
     AuthorizationContractGuard _contractGuard;
@@ -2178,7 +2178,8 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     }
 }
 
-void ExecCommandDatabase::_performAuthorizationVerificationChecks(const Status& status) {
+void ExecCommandDatabase::_performAuthorizationVerificationChecks(OperationContext* opCtx,
+                                                                  const Status& status) {
     if (MONGO_likely(!TestingProctor::instance().isEnabled() ||
                      _execContext.client().isInDirectClient())) {
         return;
@@ -2193,7 +2194,9 @@ void ExecCommandDatabase::_performAuthorizationVerificationChecks(const Status& 
     // opted out. Note: Commands may exit early or auth may be disabled.
     auto authManager = AuthorizationManager::get(_execContext.getOpCtx()->getService());
     if (status.isOK() && authManager->isAuthEnabled() &&
-        gFeatureFlagMandatoryAuthzChecks.isEnabled() &&
+        gFeatureFlagMandatoryAuthzChecks.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         _execContext.getCommand()->requiresAuthzChecks()) {
 
         invariant(authzSession->getAuthorizationContract().isPermissionChecked(),

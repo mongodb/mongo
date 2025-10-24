@@ -118,7 +118,8 @@ public:
                                                       serializationCtx);
 
         auto privileges = uassertStatusOK(
-            auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
+            auth::getPrivilegesForAggregate(opCtx,
+                                            AuthorizationSession::get(opCtx->getClient()),
                                             aggregationRequest.getNamespace(),
                                             aggregationRequest,
                                             false));

@@ -85,7 +85,8 @@ Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
         boost::none,
         serializationContext);
 
-    auto statusWithPrivs = getPrivilegesForAggregate(authzSession, viewOnNs, request, isMongos);
+    auto statusWithPrivs =
+        getPrivilegesForAggregate(opCtx, authzSession, viewOnNs, request, isMongos);
     PrivilegeVector privileges = uassertStatusOK(statusWithPrivs);
     if (!authzSession->isAuthorizedForPrivileges(privileges)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
@@ -340,7 +341,8 @@ Status checkAuthForCollMod(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* authSession,
+StatusWith<PrivilegeVector> getPrivilegesForAggregate(OperationContext* opCtx,
+                                                      AuthorizationSession* authSession,
                                                       const NamespaceString& nss,
                                                       const AggregateCommandRequest& request,
                                                       bool isMongos) {
@@ -382,7 +384,9 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* auth
         PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(
             isMongos, request.getBypassDocumentValidation().value_or(false));
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
-        if (MONGO_unlikely(gFeatureFlagMandatoryAuthzChecks.isEnabled())) {
+        if (gFeatureFlagMandatoryAuthzChecks.isEnabledUseLatestFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             invariant((!(liteParsedDocSource->requiresAuthzChecks() && currentPrivs.empty())),
                       "Must specify authorization checks for this stage: " +
                           pipelineStage.firstElementFieldNameStringData() +

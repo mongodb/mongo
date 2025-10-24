@@ -55,8 +55,8 @@ TEST_F(ListSearchIndexesAuthTest, CanAggregateListSearchIndexesWithSearchIndexes
 
     BSONArray pipeline = BSON_ARRAY(BSON("$listSearchIndexes" << BSONObj()));
     auto aggReq = buildAggReq(nss, pipeline);
-    PrivilegeVector privileges =
-        uassertStatusOK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+    PrivilegeVector privileges = uassertStatusOK(
+        auth::getPrivilegesForAggregate(_opCtx.get(), authzSession.get(), nss, aggReq, false));
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
@@ -67,8 +67,8 @@ TEST_F(ListSearchIndexesAuthTest, CannotAggregateListSearchIndexesWithoutSearchI
 
     BSONArray pipeline = BSON_ARRAY(BSON("$listSearchIndexes" << BSONObj()));
     auto aggReq = buildAggReq(nss, pipeline);
-    PrivilegeVector privileges =
-        uassertStatusOK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+    PrivilegeVector privileges = uassertStatusOK(
+        auth::getPrivilegesForAggregate(_opCtx.get(), authzSession.get(), nss, aggReq, false));
     ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 

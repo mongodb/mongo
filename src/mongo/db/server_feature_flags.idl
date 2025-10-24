@@ -203,8 +203,9 @@ feature_flags:
     featureFlagMandatoryAuthzChecks:
         description: "Feature flag to enable mandatory authorization checks on command and agg stages"
         cpp_varname: gFeatureFlagMandatoryAuthzChecks
-        default: false
-        fcv_gated: false
+        default: true
+        version: 8.3
+        fcv_gated: true
     featureFlagSupportOverloadRetryability:
         description: "Feature flag to enable support overload retryability in server-based clients"
         cpp_varname: gFeatureFlagSupportOverloadRetryability
