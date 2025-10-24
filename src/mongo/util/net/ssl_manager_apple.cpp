@@ -1248,8 +1248,9 @@ CFUniquePtr<::CFArrayRef> CreateSecTrustPolicies(const std::string& remoteHost,
     CFUniquePtr<::CFMutableArrayRef> policiesMutable(
         ::CFArrayCreateMutable(nullptr, 2, &::kCFTypeArrayCallBacks));
 
-    // Basic X509 policy.
-    CFUniquePtr<::SecPolicyRef> cfX509Policy(::SecPolicyCreateBasicX509());
+    // SSL certificate chain validation policy.
+    bool isValidatingServerCert = !remoteHost.empty();
+    CFUniquePtr<::SecPolicyRef> cfX509Policy(::SecPolicyCreateSSL(isValidatingServerCert, nullptr));
     ::CFArrayAppendValue(policiesMutable.get(), cfX509Policy.get());
 
     // Set Revocation policy.

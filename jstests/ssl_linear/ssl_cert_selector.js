@@ -15,12 +15,12 @@ requireSSLProvider('windows', function() {
         runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
         // Import a pfx file since it contains both a cert and private key and is easy to import
         // via command line.
-        runProgram("certutil.exe",
-                   "-importpfx",
-                   "-f",
-                   "-p",
-                   "qwerty",
-                   "jstests\\libs\\trusted-client.pfx");
+        const importPfx = function(pfxFile) {
+            return runProgram("certutil.exe", "-importpfx", "-f", "-p", "qwerty", pfxFile);
+        };
+        assert.eq(0, importPfx("jstests\\libs\\trusted-client.pfx"));
+        assert.eq(0, importPfx("jstests\\libs\\trusted-server.pfx"));
+        assert.eq(0, importPfx("jstests\\libs\\trusted-cluster-server.pfx"));
     }
 
     try {
