@@ -80,6 +80,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
+#include "mongo/db/version_context_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -126,7 +127,11 @@ repl::OpTime logOperation(OperationContext* opCtx,
         oplogEntry->setWallClockTime(getWallClockTimeForOpLog(opCtx));
     }
     if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
-        oplogEntry->setVersionContext(vCtx);
+        if (feature_flags::gReplicateOFCVInOplog.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            oplogEntry->setVersionContext(vCtx);
+        }
     }
     auto& times = OpObserver::Times::get(opCtx).reservedOpTimes;
     auto opTime = operationLogger->logOp(opCtx, oplogEntry);

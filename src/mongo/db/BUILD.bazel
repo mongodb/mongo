@@ -1505,6 +1505,11 @@ idl_generator(
 )
 
 idl_generator(
+    name = "version_context_feature_flags_gen",
+    src = "version_context_feature_flags.idl",
+)
+
+idl_generator(
     name = "version_context_gen",
     src = "version_context.idl",
     deps = [
@@ -1709,6 +1714,7 @@ mongo_cc_library(
         "shutdown_in_progress_quiesce_info.cpp",
         "tenant_id.cpp",
         "version_context.cpp",
+        "version_context_feature_flags_gen",
         "version_context_metadata_gen",
         "write_concern_idl.cpp",
         "write_concern_options.cpp",

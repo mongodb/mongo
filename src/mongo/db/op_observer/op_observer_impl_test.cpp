@@ -1563,7 +1563,7 @@ TEST_F(OpObserverTest, EntriesIncludeVersionContextDecoration) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
-    auto expectedVCtx = VersionContext{multiversion::GenericFCV::kLastLTS};
+    auto expectedVCtx = VersionContext{multiversion::GenericFCV::kLastContinuous};
     auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
 
     // Write to the oplog.
