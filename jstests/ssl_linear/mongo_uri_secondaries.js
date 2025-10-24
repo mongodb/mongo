@@ -23,6 +23,7 @@ try {
         sslMode: 'requireSSL',
         sslPEMKeyFile: 'jstests/libs/trusted-server.pem',
         sslCAFile: 'jstests/libs/trusted-ca.pem',
+        sslClusterFile: 'jstests/libs/trusted-client.pem',
         sslAllowInvalidCertificates: '',
         sslWeakCertificateValidation: '',
     };

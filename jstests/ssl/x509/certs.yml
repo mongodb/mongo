@@ -149,6 +149,32 @@ certs:
   description: Client certificate containing multivalue RDNs
   Issuer: 'ca.pem'
 
+- name: 'client_with_serverAuth_eku.pem'
+  description: Client certificate configured with serverAuth EKU (should be disallowed when received on ingress connections)
+  Subject: {OU: 'KernelUser', CN: 'client'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth]
+
+- name: 'client_without_eku.pem'
+  description: Client certificate configured with no EKUs
+  Subject: {OU: 'KernelUser', CN: 'client'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+
+- name: 'client_with_serverAuth_and_clientAuth_eku.pem'
+  description: Client certificate configured with both serverAuth and clientAuth EKUs
+  Subject: {OU: 'KernelUser', CN: 'client'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth, serverAuth]
+
 - name: 'client_privatekey.pem'
   description: General purpose client certificate with roles.
   Subject: {CN: 'client', emailAddress: 'example@mongodb.com', title: 'A Test Certificate'}
@@ -286,6 +312,44 @@ certs:
       DNS: localhost
       IP: 127.0.0.1
 
+- name: 'server_with_clientAuth_eku.pem'
+  description: General purpose server certificate file with clientAuth EKU (should be disallowed when received on egress connections)
+  Subject: {CN: 'server'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+    authorityKeyIdentifier: issuer
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+
+- name: 'server_with_serverAuth_eku.pem'
+  description: General purpose server certificate file with serverAuth EKU only
+  Subject: {CN: 'server'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth]
+    authorityKeyIdentifier: issuer
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+
+- name: 'server_without_eku.pem'
+  description: General purpose server certificate file without any EKUs
+  Subject: {CN: 'server'}
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    authorityKeyIdentifier: issuer
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+
 - name: 'server_no_subject.pem'
   description: Server certificate with empty Subject, but critical SAN.
   explicit_subject: true
@@ -296,9 +360,9 @@ certs:
     extendedKeyUsage: [serverAuth, clientAuth]
     authorityKeyIdentifier: issuer
     subjectAltName:
-        critical: true
-        DNS: localhost
-        IP: ['127.0.0.1', '::1']
+      critical: true
+      DNS: localhost
+      IP: ['127.0.0.1', '::1']
 
 - name: 'server_no_subject_no_SAN.pem'
   description: Server certificate with empty Subject, and no SANs.
@@ -893,6 +957,20 @@ certs:
         - 'localhost'
         - 'splithorizon1'
         - 'splithorizon2'
+      IP: 127.0.0.1
+
+# trusted-cluster-server.pfx created by mkspecial.sh
+- name: 'trusted-cluster-server.pem'
+  description: Server cluster certificate for trusted chain.
+  Subject: {CN: 'Trusted Kernel Test Cluster Server'}
+  Issuer: 'trusted-ca.pem'
+  pkcs12:
+    passphrase: 'qwerty'
+    name: 'trusted-cluster-server.pfx'
+  extensions:
+    extendedKeyUsage: [clientAuth, serverAuth]
+    subjectAltName:
+      DNS: localhost
       IP: 127.0.0.1
 
 ###

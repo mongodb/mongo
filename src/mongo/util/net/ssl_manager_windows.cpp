@@ -1722,16 +1722,27 @@ Status validatePeerCertificate(const std::string& remoteHost,
 
     // szOID_PKIX_KP_SERVER_AUTH ("1.3.6.1.5.5.7.3.1") - means the certificate can be used for
     // server authentication
-    LPSTR usage[] = {
+    LPSTR serverUsage[] = {
         const_cast<LPSTR>(szOID_PKIX_KP_SERVER_AUTH),
+    };
+
+    // szOID_PKIX_KP_CLIENT_AUTH ("1.3.6.1.5.5.7.3.2") - means the certificate can be used for
+    // client authentication
+    LPSTR clientUsage[] = {
+        const_cast<LPSTR>(szOID_PKIX_KP_CLIENT_AUTH),
     };
 
     // If remoteHost is not empty, then this is running on the client side, and we want to verify
     // the server cert.
     if (!remoteHost.empty()) {
         certChainPara.RequestedUsage.dwType = USAGE_MATCH_TYPE_AND;
-        certChainPara.RequestedUsage.Usage.cUsageIdentifier = _countof(usage);
-        certChainPara.RequestedUsage.Usage.rgpszUsageIdentifier = usage;
+        certChainPara.RequestedUsage.Usage.cUsageIdentifier = _countof(serverUsage);
+        certChainPara.RequestedUsage.Usage.rgpszUsageIdentifier = serverUsage;
+    }  // else, this is running on the server side, validate the client cert
+    else {
+        certChainPara.RequestedUsage.dwType = USAGE_MATCH_TYPE_AND;
+        certChainPara.RequestedUsage.Usage.cUsageIdentifier = _countof(clientUsage);
+        certChainPara.RequestedUsage.Usage.rgpszUsageIdentifier = clientUsage;
     }
 
     certChainPara.dwUrlRetrievalTimeout = gTLSOCSPVerifyTimeoutSecs * 1000;
