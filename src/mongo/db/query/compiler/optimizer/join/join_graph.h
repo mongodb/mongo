@@ -85,7 +85,8 @@ struct JoinPredicate {
     BSONObj toBSON() const;
 };
 
-/** Represents a join edge between two sets of collections.
+/**
+ * Represents an undirected join edge between two sets of collections.
  *
  * Only one-to-one connections are currently supported. To prepare for future many-to-many join edge
  * support, the left and right sides are defined as NodeSets.
@@ -105,6 +106,12 @@ struct JoinEdge {
     /** Serializes the Join Edge to BSON.
      */
     BSONObj toBSON() const;
+
+    /**
+     * Return a new edge with left/right node sets and predicates swapped. This is useful for code
+     * which relies on the order of the predicates of the edge, despite the edge being undirected.
+     */
+    JoinEdge reverseEdge() const;
 };
 
 /** A join graph is a logical model that represents the joins in a query. It consists of join nodes

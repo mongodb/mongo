@@ -122,6 +122,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         std::move(accessPlans.solns),
         model.graph,
         model.resolvedPaths,
+        mca,
         expCtx->getQueryKnobConfiguration().getRandomJoinOrderSeed());
 
     // Lower to SBE.

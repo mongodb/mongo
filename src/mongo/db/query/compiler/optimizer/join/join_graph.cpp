@@ -76,6 +76,14 @@ BSONObj JoinEdge::toBSON() const {
     return result.obj();
 }
 
+JoinEdge JoinEdge::reverseEdge() const {
+    JoinEdge ret{.left = right, .right = left};
+    for (auto&& pred : predicates) {
+        ret.predicates.push_back({.op = pred.op, .left = pred.right, .right = pred.left});
+    }
+    return ret;
+}
+
 std::vector<EdgeId> JoinGraph::getJoinEdges(NodeSet left, NodeSet right) const {
     std::vector<EdgeId> result;
 

@@ -29,11 +29,21 @@
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/random_utils.h"
 
 namespace mongo::join_ordering {
 
 namespace {
+
+/**
+ * Represent sargable predicate that can be the RHS of an indexed nested loop join.
+ */
+struct IndexedJoinPredicate {
+    QSNJoinPredicate::ComparisonOp op;
+    FieldPath field;
+};
+
 class ReorderContext {
 public:
     ReorderContext(const JoinGraph& joinGraph, const std::vector<ResolvedPath>& resolvedPaths)
@@ -70,15 +80,27 @@ public:
                 .rightField = _resolvedPaths[pred.right].fieldName};
     }
 
-    std::vector<QSNJoinPredicate> makeJoinPreds(const std::vector<EdgeId>& edges) {
+    std::vector<QSNJoinPredicate> makeJoinPreds(const JoinEdge& edge) {
         std::vector<QSNJoinPredicate> preds;
-        preds.reserve(edges.size());
-        for (auto&& edgeId : edges) {
-            for (auto&& pred : _joinGraph.getEdge(edgeId).predicates) {
-                preds.push_back(makePhysicalPredicate(pred));
-            }
+        preds.reserve(edge.predicates.size());
+        for (auto pred : edge.predicates) {
+            preds.push_back(makePhysicalPredicate(pred));
         }
         return preds;
+    }
+
+    std::vector<IndexedJoinPredicate> makeIndexedJoinPreds(const JoinEdge& edge,
+                                                           NodeId currentNode) {
+        tassert(11233804, "left edge expected only one node", edge.left.count() == 1);
+        tassert(11233805, "right edge expected only one node", edge.right.count() == 1);
+        std::vector<IndexedJoinPredicate> res;
+        for (auto&& pred : edge.predicates) {
+            res.push_back({
+                .op = QSNJoinPredicate::ComparisonOp::Eq,
+                .field = _resolvedPaths[pred.right].fieldName,
+            });
+        }
+        return res;
     }
 
 private:
@@ -95,12 +117,61 @@ private:
     const std::vector<ResolvedPath>& _resolvedPaths;
 };
 
+bool indexSatisfiesJoinPredicates(const IndexCatalogEntry& ice,
+                                  std::vector<IndexedJoinPredicate>& joinPreds) {
+    auto desc = ice.descriptor();
+    if (desc->isHashedIdIndex() || desc->hidden() || desc->isPartial() || desc->isSparse() ||
+        !desc->collation().isEmpty() || dynamic_cast<WildcardAccessMethod*>(ice.accessMethod())) {
+        return false;
+    }
+    StringDataSet indexedPaths;
+    for (auto&& elem : desc->keyPattern()) {
+        indexedPaths.insert(elem.fieldNameStringData());
+    }
+
+    for (auto&& joinPred : joinPreds) {
+        if (!indexedPaths.contains(joinPred.field.fullPath())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+boost::optional<IndexEntry> indexSatisfyingJoinPredicates(
+    const IndexCatalog& indexCatalog, std::vector<IndexedJoinPredicate>& joinPreds) {
+    auto it = indexCatalog.getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
+    while (it->more()) {
+        auto ice = it->next();
+        auto desc = ice->descriptor();
+        // TODO SERVER-112939: Pick best available index to make this function deterministic in
+        // prescense of multiple indexes which can serve as the probe side.
+        if (indexSatisfiesJoinPredicates(*ice, joinPreds)) {
+            return IndexEntry{desc->keyPattern(),
+                              desc->getIndexType(),
+                              desc->version(),
+                              false /*isMultikey*/,
+                              {} /*multikeyPaths*/,
+                              {} /*multikeySet*/,
+                              desc->isSparse(),
+                              desc->unique(),
+                              IndexEntry::Identifier{desc->indexName()},
+                              ice->getFilterExpression(),
+                              desc->infoObj(),
+                              ice->getCollator(),
+                              nullptr /*wildcardProjection*/,
+                              ice->shared_from_this()};
+        }
+    }
+    return boost::none;
+}
+
 }  // namespace
 
 std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
     QuerySolutionMap solns,
     const JoinGraph& joinGraph,
     const std::vector<ResolvedPath>& resolvedPaths,
+    const MultipleCollectionAccessor& mca,
     int seed) {
     random_utils::PseudoRandomGenerator rand(seed);
     ReorderContext ctx(joinGraph, resolvedPaths);
@@ -122,21 +193,58 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
         auto current = frontier.back();
         auto& currentNode = joinGraph.getNode(current);
 
-        // Update solution to join the current node. For now always use a NLJ.
+        // Update solution to join the current node.
         if (!soln) {
+            // This is the first node we encountered.
             // TODO SERVER-111913: Avoid this clone
             soln = solns.at(currentNode.accessPath.get())->root()->clone();
         } else {
+            // Generate an INLJ if possible, otherwise generate a NLJ.
+
             // TODO SERVER-111913: Avoid this clone
             auto rhs = solns.at(currentNode.accessPath.get())->root()->clone();
             NodeSet currentNodeSet{};
             currentNodeSet.set(current);
             auto edges = joinGraph.getJoinEdges(visited, currentNodeSet);
-            soln = std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(soln),
-                                                                 std::move(rhs),
-                                                                 ctx.makeJoinPreds(edges),
-                                                                 boost::none,
-                                                                 currentNode.embedPath);
+
+            // TODO SERVER-111798: Support join graphs with cycles
+            tassert(11233801,
+                    "expecting a single edge between visted set and current node. random reorderer "
+                    "does not support cycles yet",
+                    edges.size() == 1);
+            auto edge = joinGraph.getEdge(edges[0]);
+
+            // Ensure that edge is oriented the same way as the join (right side corresponds to
+            // Index Probe side). This order is important for generating the 'QSNJoinPredicate'
+            // which is order sensitive. Note that is a "cheating" a little bit because 'JoinEdge'
+            // is logically an undirected edge in the graph but implemented with left/right ordered
+            // members. We are exploiting this implementation detail to avoid doing duplicate work
+            // of determining the orientation in making the 'IndexedJoinPredicate' and the
+            // 'QSNJoinPredicate' below.
+            if (edge.left.test(current)) {
+                edge = edge.reverseEdge();
+            }
+            auto joinPreds = ctx.makeIndexedJoinPreds(edge, current);
+
+            // Attempt to use INLJ if possible, otherwise fallback to NLJ.
+            if (auto indexEntry = indexSatisfyingJoinPredicates(
+                    *mca.lookupCollection(currentNode.collectionName)->getIndexCatalog(),
+                    joinPreds);
+                indexEntry.has_value()) {
+                rhs = std::make_unique<FetchNode>(std::make_unique<IndexProbeNode>(
+                    currentNode.collectionName, std::move(indexEntry.value())));
+                soln = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(soln),
+                                                                            std::move(rhs),
+                                                                            ctx.makeJoinPreds(edge),
+                                                                            boost::none,
+                                                                            currentNode.embedPath);
+            } else {
+                soln = std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(soln),
+                                                                     std::move(rhs),
+                                                                     ctx.makeJoinPreds(edge),
+                                                                     boost::none,
+                                                                     currentNode.embedPath);
+            }
         }
 
         frontier.pop_back();
