@@ -556,8 +556,12 @@ std::vector<TestOptions> makeBasicTestOptions() {
                     RAIIServerParameterControllerForTest cloneNoRefreshFeatureFlagController(
                         "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
 
-                    testOptions.push_back(
-                        {isAlsoDonor, skipCloningAndApplying, skipCloning, driveCloneNoRefresh});
+                    bool noChunksToCopy = skipCloningAndApplying || skipCloning;
+                    testOptions.push_back({isAlsoDonor,
+                                           skipCloningAndApplying,
+                                           skipCloning,
+                                           noChunksToCopy,
+                                           driveCloneNoRefresh});
                 }
             }
         }
@@ -865,12 +869,13 @@ public:
         auto status = recipient.awaitChangeStreamsMonitorStartedForTest().getNoThrow(opCtx);
         if (recipientDoc.getPerformVerification() && !recipientDoc.getSkipCloningAndApplying()) {
             ASSERT_OK(status);
+
+            if (!_noChunksToCopy) {
+                // Only mock writes during the 'applying' state if the recipient has chunks to copy.
+                writeToCollection(opCtx, recipientDoc, _numInserts, _numDeletes, _numUpdates);
+            }
         } else {
             ASSERT_EQ(status, ErrorCodes::IllegalOperation);
-        }
-        if (!_noChunksToCopy) {
-            // Only mock writes during the 'applying' state if the recipient has chunks to copy.
-            writeToCollection(opCtx, recipientDoc, _numInserts, _numDeletes, _numUpdates);
         }
     }
 
@@ -1441,8 +1446,8 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
                                                           RecipientStateEnum::kStrictConsistency};
 
         notifyToStartCloning(opCtx.get(), *recipient, doc);
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
@@ -1718,8 +1723,8 @@ TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
         ASSERT_FALSE(isPausedOrShutdown);
         recipient = *maybeRecipient;
 
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
@@ -1870,8 +1875,8 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
             }
             stateTransitionsGuard.unset(RecipientStateEnum::kApplying);
 
-            stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
             awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+            stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
             stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
             awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
@@ -1914,8 +1919,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
         auto recipient = RecipientStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
 
         notifyToStartCloning(rawOpCtx, *recipient, doc);
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
@@ -1976,9 +1981,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
         auto recipient = RecipientStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
 
         notifyToStartCloning(rawOpCtx, *recipient, doc);
-
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
@@ -2435,8 +2439,8 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
         RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
@@ -2601,8 +2605,8 @@ TEST_F(ReshardingRecipientServiceTest, TestVerifyCollectionOptionsHappyPath) {
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartCloning(opCtx.get(), *recipient, doc);
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
@@ -2679,8 +2683,8 @@ TEST_F(ReshardingRecipientServiceTest,
         tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
 
         notifyToStartCloning(opCtx.get(), *recipient, doc);
-        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
         stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
 
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
