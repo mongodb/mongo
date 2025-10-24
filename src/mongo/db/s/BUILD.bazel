@@ -1636,6 +1636,8 @@ mongo_cc_unit_test(
         "//src/mongo/executor:mock_async_rpc",
         "//src/mongo/idl:cluster_server_parameter_common",
         "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/otel",
+        "//src/mongo/otel/traces:tracing",
         "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/util:version_impl",
     ],

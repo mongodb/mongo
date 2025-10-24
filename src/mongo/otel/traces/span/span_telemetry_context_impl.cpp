@@ -59,9 +59,15 @@ void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
                                          TextMapCarrier& carrier) const {
     auto baggage = opentelemetry::baggage::GetBaggage(_ctx);
 
-    // Baggage is not a set and we do not want duplicate keys, so we must remove the existing key if
-    // it exists.
-    baggage = baggage->Delete(keepSpanKey);
+    // TODO: SERVER-112886 Technically calling Delete without the key existing is valid but this
+    // causes issues in dynamic builds. Once SERVER-112886 is resolved and the fix is available in
+    // the OTEL library we can remove the check for key existing.
+    std::string keepSpanValue;
+    if (baggage->GetValue(keepSpanKey, keepSpanValue)) {
+        // Baggage is not a map and we do not want duplicate keys, so we must remove the existing
+        // key if it exists.
+        baggage = baggage->Delete(keepSpanKey);
+    }
 
     auto value = _keepSpan ? trueValue : falseValue;
     baggage = baggage->Set(keepSpanKey, value);
