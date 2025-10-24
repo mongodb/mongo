@@ -1,7 +1,10 @@
 // Upsert without shard key targeted to a single shard must run in a transaction or retryable write
 // if the upsert doc does not belong on the initial shard.
-// @tags: [assumes_unsharded_collection]
-
+// @tags: [
+//   assumes_unsharded_collection,
+//   # TODO SERVER-111930 Support recording query stats for updates with simple ID query
+//   known_query_shape_computation_problem,
+// ]
 //
 // Upsert behavior tests for field extraction
 //

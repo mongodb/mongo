@@ -12,6 +12,8 @@
 //   requires_profiling,
 //   # Uses $where operation.
 //   requires_scripting,
+//   # TODO SERVER-112352 Re-parse error when using $where in an update
+//   known_query_shape_computation_problem,
 // ]
 
 // We turn off gossiping the mongo shell's clusterTime because it causes the slow command log
