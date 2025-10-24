@@ -38,10 +38,11 @@ namespace mongo::random_utils {
 PseudoRandom& getRNG();
 
 /**
- * Helper for generating pseudo-random order of vector.
+ * Helper for generating pseudo-random order of vector *in tests* in place of std::shuffle for
+ * consistent, platform-independent results.
  *
- * For example, used in testing with a fixed seed to ensure a consistent random order that is
- * platform-independent.
+ * Warning: The implementation below uses modulo as a simple, platform-independent way to get a
+ * close-to-uniform distribution.
  */
 class PseudoRandomGenerator {
 public:
