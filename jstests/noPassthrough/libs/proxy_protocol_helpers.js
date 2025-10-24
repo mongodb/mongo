@@ -18,15 +18,15 @@ export const connectAndHello = (port, isRouter) => {
 export const timeoutEmptyConnection = (ingressPort, egressPort, isRouter) => {
     // Use the connection to set a lower proxy header timeout and validate that empty connections
     // timeout.
-    const conn =
-        new Mongo(`mongodb://127.0.0.1:${ingressPort}${isRouter ? '/?loadBalanced=true' : ''}`);
-    const proxyTimeoutFailPoint = configureFailPoint(conn, "asioTransportLayer1sProxyTimeout");
+    const conn = new Mongo(`mongodb://127.0.0.1:${ingressPort}${isRouter ? "/?loadBalanced=true" : ""}`);
+    const previousParameter = conn.adminCommand({getParameter: 1, proxyProtocolTimeoutSecs: 1});
+    conn.adminCommand({setParameter: 1, proxyProtocolTimeoutSecs: 1});
 
     // runProgram blocks until the program is complete. nc should be finished when the server times
     // out the connection that doesn't send data after 1 second, otherwise the test will hang.
     assert.eq(0, runProgram("bash", "-c", `cat </dev/tcp/127.0.0.1/${egressPort}`));
 
-    proxyTimeoutFailPoint.off();
+    conn.adminCommand({setParameter: 1, proxyProtocolTimeoutSecs: previousParameter.proxyProtocolTimeoutSecs});
 };
 
 export const emptyMessageTest = (ingressPort, egressPort, node, isRouter) => {
@@ -55,8 +55,7 @@ export const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
         const pid = _startMongoProgram(
             'bash',
             '-c',
-            `head -c ${Math.floor(Math.random() * 5000)} /dev/urandom >/dev/tcp/127.0.0.1/${
-                egressPort}`);
+            `head -c ${Math.floor(Math.random() * 5000)} /dev/urandom >/dev/tcp/127.0.0.1/${egressPort}`);
 
         // Connecting to the to the proxy port still succeeds within a reasonable time
         // limit.
@@ -66,7 +65,7 @@ export const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
         connectAndHello(node.port, isRouter);
 
         assert.soon(() => !checkProgram(pid).alive,
-                    "Server should have closed connection with invalid proxy protocol header");
+            "Server should have closed connection with invalid proxy protocol header");
     }
 };
 
@@ -75,7 +74,12 @@ export const testProxyProtocolReplicaSet = (ingressPort, egressPort, version, te
     proxy_server.start();
 
     const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
-    rs.startSet({setParameter: {featureFlagMongodProxyProcolSupport: true}});
+    rs.startSet({
+        setParameter: {
+            "logComponentVerbosity": { network: 5 },
+            "featureFlagMongodProxyProcolSupport": true,
+        },
+    });
     rs.initiate();
 
     testFn(ingressPort, egressPort, rs.getPrimary(), false);

@@ -30,9 +30,8 @@ function sendHelloMaybeLB(node, port, loadBalanced, count) {
 
     if (loadBalanced) {
         assert(checkLog.checkContainsWithCountJson(
-                   node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
-               `Did not find log id ${tojson(kLoadBalancerNoOpMessage)} ${
-                   tojson(count)} times in the log`);
+            node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
+            `Did not find log id ${tojson(kLoadBalancerNoOpMessage)} ${tojson(count)} times in the log`);
     }
 }
 
@@ -46,8 +45,7 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
         assert(false, 'Client was unable to connect to the load balancer port');
     } catch (err) {
         assert(checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true),
-               `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${
-                   tojson(id)} times in the log`);
+            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${tojson(id)} times in the log`);
     }
 }
 
@@ -77,7 +75,14 @@ function basicTest(ingressPort, egressPort, node) {
 
 function standardPortTest(ingressPort, egressPort, version) {
     const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
-    rs.startSet({setParameter: {featureFlagMongodProxyProcolSupport: true}});
+    rs.startSet({
+        setParameter: {
+            "logComponentVerbosity": { "network": { "verbosity": 5 } },
+            "proxyProtocolTimeoutSecs": 10,
+            "proxyProtocolMaximumWaitBackoffMillis": 500,
+            "featureFlagMongodProxyProcolSupport": true,
+        },
+    });
     rs.initiate();
 
     const node = rs.getPrimary();
