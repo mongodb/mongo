@@ -44,8 +44,9 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
     while (ptr < end) {
         const uint8_t control = *ptr;
         if (control == stdx::to_underlying(BSONType::eoo)) {
-            uassert(
-                8295703, "BSONColumn data ended without reaching end of buffer", ptr + 1 == end);
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "BSONColumn data ended without reaching end of buffer",
+                    ptr + 1 == end);
             buffer.eof();
             return;
         } else if (isUncompressedLiteralControlByte(control)) {
@@ -219,7 +220,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
                         ptr, end, buffer);
                     break;
                 default:
-                    uasserted(8295704, "Type not implemented");
+                    uasserted(ErrorCodes::InvalidBSONColumn, "Type not implemented");
                     break;
             }
         } else if (isInterleavedStartControlByte(control)) {
@@ -236,7 +237,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
             ptr = decompressor.decompress(std::span{&path, 1});
             ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(ptr, end, buffer);
         } else {
-            uasserted(8295706, "Unexpected control");
+            uasserted(ErrorCodes::InvalidBSONColumn, "Unexpected control");
         }
     }
 }

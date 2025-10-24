@@ -282,9 +282,9 @@ const char* BlockBasedInterleavedDecompressor::decompress(
         findScalar.traverse(refObj);
     }
 
-    // If we are in interleaved mode, there must be at least one scalar field in the reference
-    // object.
-    uassert(8884002, "Invalid BSONColumn encoding", !scalarElems.empty());
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Interleaved mode requires at least one scalar field in the reference object",
+            !scalarElems.empty());
 
     // For each path, we can use a fast implementation if it just decompresses a single scalar field
     // to a buffer. Paths that don't match any elements in the reference object will just get a
@@ -411,13 +411,15 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
 
         // Sanity check: make sure that the number of elements we found during traversal matches the
         // number of elements requested for materialization by the caller.
-        uassert(9071200, "Request for unknown element", elemToBuffer.size() == foundElems);
+        uassert(ErrorCodes::InvalidBSONColumn,
+                "Request for unknown element",
+                elemToBuffer.size() == foundElems);
     }
 
     // Advance past the reference object to the compressed data of the first field.
     control += refObj.objsize() + 1;
-    uassert(8625732,
-            "Invalid BSON Column encoding",
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Advancing past the reference object went past end of buffer",
             control < _end && *control != stdx::to_underlying(BSONType::eoo));
 
     using SOAlloc = BSONSubObjectAllocator<BlockBasedSubObjectFinisher<Buffer>>;
@@ -493,15 +495,18 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
             } else {
                 // If interleaved mode is ending, it means there were streams of different lengths,
                 // since moreData(), which checks the first field, must have returned true.
-                uassert(8884000,
-                        "Invalid BSON Column encoding",
+                uassert(ErrorCodes::InvalidBSONColumn,
+                        "Interleaved mode streams have different lengths, but control indicates "
+                        "end of interleaved mode",
                         *control != stdx::to_underlying(BSONType::eoo));
 
                 // No more deltas for this scalar field. The next control byte is guaranteed
                 // to belong to this scalar field, since traversal order is fixed.
                 auto result = state.loadControl(_allocator, control);
                 control += result.size;
-                uassert(8625731, "Invalid BSON Column encoding", _control < _end);
+                uassert(ErrorCodes::InvalidBSONColumn,
+                        "Expecting a next control byte, but buffer has ended",
+                        _control < _end);
                 decodingStateElem = result.element;
             }
 
@@ -582,9 +587,10 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
         flushPositionsToBuffers(bufferToPositions);
     }
 
-    // Once we finish with interleaved mode, verify all decoders are exhausted.
     for (auto iter = decoderStates.begin() + 1; iter != decoderStates.end(); ++iter) {
-        uassert(9215000, "Invalid BSON Column interleaved encoding", !moreData(*iter, control));
+        uassert(ErrorCodes::InvalidBSONColumn,
+                "Interleaved mode has ended without exhausting all decoders",
+                !moreData(*iter, control));
     }
 
     invariant(*control == stdx::to_underlying(BSONType::eoo),
@@ -727,7 +733,8 @@ struct BlockBasedInterleavedDecompressor::FastDecodingState {
                 _lastValue.emplace<std::monostate>(std::monostate{});
                 break;
             default:
-                uasserted(8910801, "Type not implemented");
+                uasserted(ErrorCodes::InvalidBSONColumn,
+                          "Type not implemented in FastDecodingState");
                 break;
         }
     }
@@ -1013,7 +1020,8 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
             }
             break;
         default:
-            uasserted(8910800, "Type not implemented");
+            uasserted(ErrorCodes::InvalidBSONColumn,
+                      "Type not implemented in fast path decompression");
             break;
     }
 
@@ -1032,8 +1040,8 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
     // mode.
     BSONObj refObj{control + 1};
     control += refObj.objsize() + 1;
-    uassert(8625730,
-            "Invalid BSON Column encoding",
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Reading past end of buffer while advancing past reference object in decompressFast",
             control < _end && *control != stdx::to_underlying(BSONType::eoo));
 
     /**
@@ -1108,8 +1116,9 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
     // At this point all the scalar streams should have had the same number of elements.
     size_t valueCount = heap.front()._valueCount;
     for (auto&& state : std::span{heap}.subspan(1)) {
-        uassert(
-            8884001, "Invalid BSONColumn interleaved encoding", valueCount == state._valueCount);
+        uassert(ErrorCodes::InvalidBSONColumn,
+                "Mismatch in number of values decompressed in interleaved mode",
+                valueCount == state._valueCount);
     }
 
     // If there were paths that don't match anything, call appendMissing().

@@ -210,13 +210,15 @@ void BSONColumn::Iterator::_initializeInterleaving() {
             return true;
         });
     t.traverse(interleaved.referenceObj);
-    uassert(6067610, "Invalid BSONColumn encoding", !interleaved.states.empty());
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Invalid BSONColumn encoding during initialization of interleaved mode",
+            !interleaved.states.empty());
 
     _control += interleaved.referenceObj.objsize() + 1;
 
     // Interleaved mode should contain at least one object
-    uassert(9232700,
-            "Invalid BSON Column interleaved encoding",
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "BSON Column interleaved encoding should contain at least one object",
             _control < _end && *_control != stdx::to_underlying(BSONType::eoo));
     _incrementInterleaved(interleaved);
 }
@@ -252,7 +254,9 @@ void BSONColumn::Iterator::_incrementRegular(Regular& regular) {
 
     // We don't have any more delta values in current block so we need to load next control byte.
     // Validate that we are not reading out of bounds
-    uassert(6067602, "Invalid BSON Column encoding", _control < _end);
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Invalid BSON Column encoding has overflowed buffer",
+            _control < _end);
 
     // Decoders are exhausted, load next control byte. If we are at EOO then decoding is done.
     if (*_control == stdx::to_underlying(BSONType::eoo)) {
@@ -296,7 +300,9 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
         [this, &stateIt, &stateEnd, &processed](const BSONElement& referenceField) {
             // Called for every scalar field in the reference interleaved BSONObj. We have as many
             // decoding states as scalars.
-            uassert(6067603, "Invalid BSON Column interleaved encoding", stateIt != stateEnd);
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Wrong number of interleaved states in BSON Column encoding",
+                    stateIt != stateEnd);
             auto& state = *(stateIt++);
 
             // Remember the iterator position before writing anything. This is to detect that
@@ -359,19 +365,23 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     if (!res) {
         // Exit interleaved mode and load as regular. Re-instantiate the state and set last known
         // value.
-        uassert(6067604, "Invalid BSON Column interleaved encoding", processed == 0);
+        uassert(ErrorCodes::InvalidBSONColumn,
+                "Cannot load regular mode after processing interleaved mode",
+                processed == 0);
 
         // Before exiting interleaved mode, verify all of the decoders are exhausted.
         while (stateIt != stateEnd) {
             auto& state = *stateIt;
             if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
                 d64 && d64->pos.valid()) {
-                uassert(
-                    8902201, "Invalid BSON Column interleaved encoding", !((++d64->pos).more()));
+                uassert(ErrorCodes::InvalidBSONColumn,
+                        "Not all 64-bit BSON Column interleaved encoding decoders are exhausted",
+                        !((++d64->pos).more()));
             } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
                        d128 && d128->pos.valid()) {
-                uassert(
-                    8902202, "Invalid BSON Column interleaved encoding", !((++d128->pos).more()));
+                uassert(ErrorCodes::InvalidBSONColumn,
+                        "Not all 128-bit BSON Column interleaved encoding decoders are exhausted",
+                        !((++d128->pos).more()));
             }
             stateIt++;
         }
@@ -385,7 +395,9 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     }
 
     // There should have been as many interleaved states as scalar fields.
-    uassert(6067605, "Invalid BSON Column interleaved encoding", stateIt == stateEnd);
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Too many interleaved states in BSON Column encoding",
+            stateIt == stateEnd);
 
     // Store built BSONObj in the decompressed list
     auto [objdata, objsize] = contiguous.done();
@@ -404,7 +416,9 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
 
 void BSONColumn::Iterator::_handleEOO() {
     ++_control;
-    uassert(7482200, "Invalid BSONColumn encoding", _control == _end);
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Final EOO found before reaching end of buffer",
+            _control == _end);
     _index = kEndIndex;
     _decompressed = {};
 }
@@ -482,7 +496,9 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
     // Setup decoder for this range of Simple-8b blocks
     uint8_t blocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
     int size = sizeof(uint64_t) * blocks;
-    uassert(6067608, "Invalid BSON Column encoding", buffer + size + 1 < end);
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Control block would overflow buffer",
+            buffer + size + 1 < end);
 
     // Instantiate decoder and load first value, every Simple-8b block should have at least one
     // value
@@ -491,8 +507,8 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
               [&](DecodingState::Decoder64& d64) {
                   // Simple-8b delta block, load its scale factor and validate for sanity
                   d64.scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
-                  uassert(6067606,
-                          "Invalid control byte in BSON Column",
+                  uassert(ErrorCodes::InvalidBSONColumn,
+                          "Invalid control byte in 64-bit BSON Column",
                           d64.scaleIndex != bsoncolumn::kInvalidScaleIndex);
 
                   // If Double, scale last value according to this scale factor
@@ -500,10 +516,12 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
                   if (type == BSONType::numberDouble) {
                       auto encoded =
                           Simple8bTypeUtil::encodeDouble(lastValue._numberDouble(), d64.scaleIndex);
-                      uassert(6067607, "Invalid double encoding in BSON Column", encoded);
+                      uassert(ErrorCodes::InvalidBSONColumn,
+                              "Invalid double encoding in BSON Column",
+                              encoded);
                       d64.lastEncodedValue = *encoded;
                   } else {
-                      uassert(8827800,
+                      uassert(ErrorCodes::InvalidBSONColumn,
                               "Unexpected control for type in BSONColumn",
                               d64.scaleIndex == Simple8bTypeUtil::kMemoryAsInteger);
                   }
@@ -515,8 +533,8 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
                   deltaElem = loadDelta(allocator, d64);
               },
               [&](DecodingState::Decoder128& d128) {
-                  uassert(8838600,
-                          "Invalid control byte in BSON Column",
+                  uassert(ErrorCodes::InvalidBSONColumn,
+                          "Invalid control byte in 128-bit BSON Column",
                           bsoncolumn::scaleIndexForControlByte(control) ==
                               Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -621,7 +639,8 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
         case BSONType::array:
         case BSONType::eoo:  // EOO indicates the end of an interleaved object.
         default:             // Unsupported type for deltas should throw an assertion
-            uasserted(6785500, "Invalid delta in BSON Column encoding");
+            uasserted(ErrorCodes::InvalidBSONColumn,
+                      "Invalid delta in 64-bit BSON Column encoding");
     }
 
     return elem.element();
@@ -651,7 +670,7 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
                 auto elem = allocator.allocate(type, fieldName, last.valuesize());
                 // The first 5 bytes in binData is a count and subType, copy them from previous
                 memcpy(elem.value(), last.value(), 5);
-                uassert(8412601,
+                uassert(ErrorCodes::InvalidBSONColumn,
                         "BinData length should not exceed 16 in a delta encoding",
                         last.valuestrsize() <= 16);
                 Simple8bTypeUtil::decodeBinary(
@@ -670,7 +689,8 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
             default:
                 // No other types should use int128
                 // Unsupported type for deltas should throw an assertion
-                uasserted(8412600, "Invalid delta in BSON Column encoding");
+                uasserted(ErrorCodes::InvalidBSONColumn,
+                          "Invalid delta in 128-bit BSON Column encoding");
         }
     }()
                         .element();
@@ -703,7 +723,7 @@ BSONColumn::BSONColumn(BSONBinData bin)
 }
 
 void BSONColumn::_initialValidate() {
-    uassert(6067609, "Invalid BSON Column encoding", _size > 0);
+    uassert(ErrorCodes::InvalidBSONColumn, "BSON Column encoding is empty", _size > 0);
 }
 
 BSONColumn::Iterator BSONColumn::begin() const {
@@ -754,13 +774,14 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
         } else if (bsoncolumn::isInterleavedStartControlByte(*byteIter)) {
 
             // TODO SERVER-74926 add interleaved support
-            uasserted(6580401,
+            uasserted(ErrorCodes::InvalidBSONColumn,
                       "Interleaved mode not yet supported for BSONColumn::contains_forTest.");
         } else { /* Simple-8b Delta Block */
             uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
             int simple8bBlockSize = sizeof(uint64_t) * numBlocks;
-            uassert(
-                6580400, "Invalid BSON Column encoding", byteIter + simple8bBlockSize < columnEnd);
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Simple8b block would overflow buffer",
+                    byteIter + simple8bBlockSize < columnEnd);
 
             // skip simple8b control blocks
             byteIter += simple8bBlockSize;

@@ -90,6 +90,10 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         block.decompress<bsoncolumn::BSONElementMaterializer>(blockBasedElems, allocator);
     } catch (const DBException& e) {
         blockBasedError = e.toString();
+        invariant(e.code() == ErrorCodes::InvalidBSONColumn,
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ", the block based API failed with unexpected error code "
+                                << e.code());
     }
 
     // Attempt to decompress using the iterator API.
@@ -99,6 +103,10 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         };
     } catch (const DBException& e) {
         iteratorError = e.toString();
+        invariant(e.code() == ErrorCodes::InvalidBSONColumn,
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ", the iterator API failed with unexpected error code "
+                                << e.code());
     }
 
     // If one API failed, then both APIs must fail.

@@ -208,8 +208,8 @@ public:
                 isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
-            uassert(8873800,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while decompressing deltas",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -277,8 +277,8 @@ public:
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uassert(8762800,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while decompressing primitive deltas",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -338,8 +338,8 @@ public:
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uassert(8762801,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while decompressing delta-of-deltas",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -401,11 +401,13 @@ public:
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
             scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
-            uassert(8762802,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while decompressing doubles",
                     scaleIndex != bsoncolumn::kInvalidScaleIndex);
             auto encodedDouble = Simple8bTypeUtil::encodeDouble(last, scaleIndex);
-            uassert(8295701, "Invalid double encoding in BSON Column", encodedDouble);
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid double encoding in BSON Column",
+                    encodedDouble);
             lastValue = *encodedDouble;
 
             elemCount += simple8b::visitAll<int64_t>(
@@ -441,8 +443,8 @@ public:
                 break;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uassert(8915000,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while decompressing missing values",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -503,8 +505,8 @@ public:
                 break;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uassert(8762803,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while decompressing literals",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -513,8 +515,9 @@ public:
                 size,
                 lastNonRLEBlock,
                 [&buffer](const Encoding v) {
-                    uassert(
-                        8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
+                    uassert(ErrorCodes::InvalidBSONColumn,
+                            "Post literal delta blocks should only contain skip or 0",
+                            v == 0);
                     buffer.appendLast();
                 },
                 [&buffer]() { buffer.appendLast(); },
@@ -548,8 +551,8 @@ public:
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uassert(9095623,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while reading last delta",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -573,8 +576,8 @@ public:
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uassert(9095624,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while reading last delta-of-delta",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -600,11 +603,13 @@ public:
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
             scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
-            uassert(9095625,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while reading last double",
                     scaleIndex != bsoncolumn::kInvalidScaleIndex);
             auto encodedDouble = Simple8bTypeUtil::encodeDouble(last, scaleIndex);
-            uassert(9095626, "Invalid double encoding in BSON Column", encodedDouble);
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid double encoding in BSON Column while reading last double",
+                    encodedDouble);
             lastValue = *encodedDouble;
             lastValue =
                 simple8b::add(lastValue, simple8b::sum<int64_t>(ptr + 1, size, lastNonRLEBlock));
@@ -635,8 +640,8 @@ public:
                     return ptr;
 
                 uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-                uassert(9095627,
-                        "Invalid control byte in BSON Column",
+                uassert(ErrorCodes::InvalidBSONColumn,
+                        "Invalid control byte in BSON Column while reading last string",
                         bsoncolumn::scaleIndexForControlByte(control) ==
                             Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -660,8 +665,8 @@ public:
 
 
                 uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-                uassert(9095628,
-                        "Invalid control byte in BSON Column",
+                uassert(ErrorCodes::InvalidBSONColumn,
+                        "Invalid control byte in BSON Column while reading last string",
                         bsoncolumn::scaleIndexForControlByte(control) ==
                             Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -694,8 +699,8 @@ public:
                 break;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-            uassert(9095629,
-                    "Invalid control byte in BSON Column",
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Invalid control byte in BSON Column while validating literals",
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -704,8 +709,9 @@ public:
                 size,
                 lastNonRLEBlock,
                 [](int64_t v) {
-                    uassert(
-                        9095630, "Post literal delta blocks should only contain skip or 0", v == 0);
+                    uassert(ErrorCodes::InvalidBSONColumn,
+                            "Post literal delta blocks should only contain skip or 0",
+                            v == 0);
                 },
                 []() {},
                 []() {});
