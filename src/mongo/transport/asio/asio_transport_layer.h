@@ -248,6 +248,9 @@ public:
 private:
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
 
+    // Tokens help with tracking the number of pending proxy sessions.
+    using TokenType = ScopeGuard<std::function<void()>>;
+
     void _acceptConnection(GenericAcceptor& acceptor);
 
     template <typename Endpoint>
@@ -261,6 +264,10 @@ private:
         std::shared_ptr<SSLManagerInterface>& manager,
         SSLParams::SSLModes sslMode,
         bool asyncOCSPStaple) const;
+
+    // Returns a token to track the number of connections pending the proxy protocol header. If the
+    // server has already accepted too many of such connections, returns `nullptr`.
+    std::unique_ptr<TokenType> _makeParseProxyTokenIfPossible();
 
     void _runListener() noexcept;
 
@@ -315,7 +322,7 @@ private:
     // The real incoming port in case of _listenerOptions.port==0 (ephemeral).
     int _listenerPort = 0;
 
-    bool _isShutdown = false;
+    AtomicWord<bool> _isShutdown{false};
 
     const std::unique_ptr<TimerService> _timerService;
 
@@ -326,6 +333,14 @@ private:
     // Tracks the number of connections that are dropped by the client before the server gets to
     // process them (e.g. perform TLS handshake).
     Counter64 _discardedDueToClientDisconnect;
+
+    // Tracks the current number of sessions that were accepted from the proxy port and are pending
+    // the proxy protocol header.
+    int64_t _numConnectionsPendingProxyHeader{0};
+
+    // Counts the aggregate number of proxy connections that were dropped due to the server reaching
+    // the maximum number of proxy connections pending proxy protocol header.
+    Counter64 _discardedDueToMaximumPendingOnProxyHeader;
 };
 
 }  // namespace transport

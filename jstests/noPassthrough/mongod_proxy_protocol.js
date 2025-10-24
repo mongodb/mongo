@@ -1,7 +1,7 @@
 /**
  * Verify mongod support proxy protocol connections.
  * @tags: [
- *   requires_fcv_70,
+ *    requires_fcv_70,
  *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *    grpc_incompatible,
@@ -72,7 +72,14 @@ function basicTest(ingressPort, egressPort, node) {
 
 function standardPortTest(ingressPort, egressPort, version) {
     const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
-    rs.startSet({setParameter: {featureFlagMongodProxyProcolSupport: true}});
+    rs.startSet({
+        setParameter: {
+            "logComponentVerbosity": {"network": {"verbosity": 5}},
+            "proxyProtocolTimeoutSecs": 10,
+            "proxyProtocolMaximumWaitBackoffMillis": 500,
+            "featureFlagMongodProxyProcolSupport": true,
+        },
+    });
     rs.initiate();
 
     const node = rs.getPrimary();

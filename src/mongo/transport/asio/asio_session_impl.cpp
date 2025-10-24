@@ -36,8 +36,10 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/net/socket_utils.h"
@@ -140,6 +142,13 @@ size_t writeToStream(Stream& stream, MutableBufferSequence buffers, std::error_c
         stream,
         std::move(buffers),
         ec);
+}
+
+int getExceptionLogSeverityLevel() {
+    static logv2::SeveritySuppressor logSeverity{
+        Seconds{30}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(1)};
+
+    return logSeverity().toInt();
 }
 }  // namespace
 
@@ -483,9 +492,9 @@ auto CommonAsioSession::getSocket() -> GenericSocket& {
 ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
     invariant(_isIngressSession);
     invariant(reactor);
-    const Backoff kExponentialBackoff(Milliseconds(2), Milliseconds::max());
-    const Seconds proxyHeaderTimeout =
-        MONGO_unlikely(asioTransportLayer1sProxyTimeout.shouldFail()) ? Seconds(1) : Seconds(120);
+    const Backoff kExponentialBackoff(Milliseconds(gProxyProtocolMaximumWaitBackoffMillis.load()),
+                                      Milliseconds::max());
+    const Seconds proxyHeaderTimeout{Seconds(gProxyProtocolTimeoutSecs.load())};
     const Date_t deadline = reactor->now() + proxyHeaderTimeout;
 
     auto buffer = std::make_shared<std::array<char, kProxyProtocolHeaderSizeUpperBound>>();
@@ -534,8 +543,10 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
             opportunisticRead(_socket, asio::buffer(buffer.get(), results->bytesParsed)).get();
         })
         .onError([this](Status s) {
-            LOGV2_ERROR(
-                6067900, "Error while parsing proxy protocol header", "error"_attr = redact(s));
+            LOGV2_DEBUG(6067900,
+                        getExceptionLogSeverityLevel(),
+                        "Error while parsing proxy protocol header",
+                        "error"_attr = redact(s));
             end();
             return s;
         });

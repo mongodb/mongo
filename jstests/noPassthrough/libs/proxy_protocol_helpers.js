@@ -22,13 +22,15 @@ const timeoutEmptyConnection = (ingressPort, egressPort, isRouter) => {
     // timeout.
     const conn =
         new Mongo(`mongodb://127.0.0.1:${ingressPort}${isRouter ? '/?loadBalanced=true' : ''}`);
-    const proxyTimeoutFailPoint = configureFailPoint(conn, "asioTransportLayer1sProxyTimeout");
+    const previousParameter = conn.adminCommand({getParameter: 1, proxyProtocolTimeoutSecs: 1});
+    conn.adminCommand({setParameter: 1, proxyProtocolTimeoutSecs: 1});
 
     // runProgram blocks until the program is complete. nc should be finished when the server times
     // out the connection that doesn't send data after 1 second, otherwise the test will hang.
     assert.eq(0, runProgram("bash", "-c", `cat </dev/tcp/127.0.0.1/${egressPort}`));
 
-    proxyTimeoutFailPoint.off();
+    conn.adminCommand(
+        {setParameter: 1, proxyProtocolTimeoutSecs: previousParameter.proxyProtocolTimeoutSecs});
 };
 
 const emptyMessageTest = (ingressPort, egressPort, node, isRouter) => {
@@ -77,7 +79,12 @@ const testProxyProtocolReplicaSet = (ingressPort, egressPort, version, testFn) =
     proxy_server.start();
 
     const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
-    rs.startSet({setParameter: {featureFlagMongodProxyProcolSupport: true}});
+    rs.startSet({
+        setParameter: {
+            "logComponentVerbosity": {network: 5},
+            "featureFlagMongodProxyProcolSupport": true,
+        },
+    });
     rs.initiate();
 
     testFn(ingressPort, egressPort, rs.getPrimary(), false);

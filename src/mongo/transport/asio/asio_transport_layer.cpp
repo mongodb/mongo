@@ -30,6 +30,8 @@
 
 #include "mongo/transport/asio/asio_transport_layer.h"
 
+#include <functional>
+
 #include <fmt/format.h>
 #include <fstream>
 
@@ -50,6 +52,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
@@ -63,6 +66,7 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/strong_weak_finish_line.h"
 
@@ -1353,6 +1357,8 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
         bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
     }
+    bob->append("connsRejectedDueToMaxPendingProxyProtocolHeader",
+                _discardedDueToMaximumPendingOnProxyHeader.get());
 }
 
 void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
@@ -1373,7 +1379,7 @@ void AsioTransportLayer::_runListener() noexcept {
     setThreadName("listener");
 
     stdx::unique_lock lk(_mutex);
-    if (_isShutdown) {
+    if (_isShutdown.load()) {
         return;
     }
 
@@ -1407,7 +1413,7 @@ void AsioTransportLayer::_runListener() noexcept {
         _listener.cv.notify_all();
     });
 
-    while (!_isShutdown) {
+    while (!_isShutdown.load()) {
         lk.unlock();
         _acceptorReactor->run();
         lk.lock();
@@ -1436,14 +1442,14 @@ void AsioTransportLayer::_runListener() noexcept {
 
 Status AsioTransportLayer::start() {
     stdx::unique_lock lk(_mutex);
-    if (_isShutdown) {
+    if (_isShutdown.load()) {
         LOGV2(6986801, "Cannot start an already shutdown TransportLayer");
         return ShutdownStatus;
     }
 
     if (_listenerOptions.isIngress()) {
         _listener.thread = stdx::thread([this] { _runListener(); });
-        _listener.cv.wait(lk, [&] { return _isShutdown || _listener.active; });
+        _listener.cv.wait(lk, [&] { return _isShutdown.load() || _listener.active; });
         return Status::OK();
     }
 
@@ -1454,7 +1460,7 @@ Status AsioTransportLayer::start() {
 void AsioTransportLayer::shutdown() {
     stdx::unique_lock lk(_mutex);
 
-    if (std::exchange(_isShutdown, true)) {
+    if (_isShutdown.swap(true)) {
         // We were already stopped
         return;
     }
@@ -1516,13 +1522,27 @@ bool isTcp(Protocol&& p) {
 }
 }  // namespace
 
+std::unique_ptr<AsioTransportLayer::TokenType>
+AsioTransportLayer::_makeParseProxyTokenIfPossible() {
+    stdx::lock_guard lk(_mutex);
+    if (_numConnectionsPendingProxyHeader >= gProxyProtocolMaximumPendingConnections.load()) {
+        return {};
+    }
+    ++_numConnectionsPendingProxyHeader;
+    return std::make_unique<TokenType>([this] {
+        stdx::lock_guard lk(_mutex);
+        --_numConnectionsPendingProxyHeader;
+    });
+}
+
 void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec,
                                       AsioSession::GenericSocket peerSocket) mutable {
         Timer timer;
         asioTransportLayerHangDuringAcceptCallback.pauseWhileSet();
 
-        if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
+        if (_isShutdown.load()) {
+            LOGV2_DEBUG(9484001, 3, "Unable to accept connection: transport layer in shutdown");
             return;
         }
 
@@ -1556,11 +1576,34 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
             if (session->isConnectedToLoadBalancerPort()) {
+                // This session is not counted towards the number of accepted connections until the
+                // server receives the proxy header and moves the session to `SessionManager`.
+                // Therefore, the server may go above the ingress connection limits if it is waiting
+                // to receive the proxy header for many accepted connections.
+                // Thus, the server limits the number of connections received on the proxy port that
+                // are yet to provide the proxy header.
+                auto token = _makeParseProxyTokenIfPossible();
+                if (MONGO_unlikely(!token)) {
+                    static logv2::SeveritySuppressor severitySuppressor{
+                        Seconds(10), logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
+                    _discardedDueToMaximumPendingOnProxyHeader.increment();
+                    LOGV2_DEBUG(
+                        11246701,
+                        severitySuppressor().toInt(),
+                        "Rejecting proxy connection due to reaching the limit on connections "
+                        "pending on proxy protocol header",
+                        "remote"_attr = session->remote(),
+                        "limit"_attr = gProxyProtocolMaximumPendingConnections.loadRelaxed(),
+                        "rejected"_attr = _discardedDueToMaximumPendingOnProxyHeader.get());
+                    _acceptConnection(acceptor);
+                    return;
+                }
                 session->parseProxyProtocolHeader(_acceptorReactor)
-                    .getAsync([this, session = std::move(session)](Status s) {
+                    .getAsync([this, session = std::move(session), t = std::move(token)](Status s) {
                         if (s.isOK()) {
                             _sep->startSession(std::move(session));
                         }
+                        // We will release the token (i.e. `t`) as we leave this function.
                     });
             } else {
                 _sep->startSession(std::move(session));

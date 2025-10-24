@@ -29,6 +29,7 @@
 global:
   cpp_namespace: "mongo::transport"
   cpp_includes:
+      - "mongo/db/server_options.h"
       - "mongo/transport/transport_options.h"
 
 imports:
@@ -133,3 +134,38 @@ server_parameters:
     default: 0
     validator: {gte: 0}
     redact: false
+
+  proxyProtocolMaximumWaitBackoffMillis:
+    description: >-
+        The listener thread exponentially increases the wait between checking for the proxy header
+        on an accepted socket. This value decided the maximum wait time (in milliseconds).
+    set_at: [startup, runtime]
+    cpp_varname: gProxyProtocolMaximumWaitBackoffMillis
+    cpp_vartype: AtomicWord<int32_t>
+    default: 200
+    validator: {gte: 0}
+    redact: false
+
+  proxyProtocolTimeoutSecs:
+    description: >-
+       The maximum wait time (in seconds) before expiring accepted sockets from the proxy port,
+       unless the proxy protocol header is presented to the server before that.
+    set_at: [startup, runtime]
+    cpp_varname: gProxyProtocolTimeoutSecs
+    cpp_vartype: AtomicWord<int32_t>
+    default: 120
+    validator: {gte: 0}
+    redact: false
+
+  proxyProtocolMaximumPendingConnections:
+    description: >-
+        Decides the maximum number of connections accepted from the proxy port that are yet to 
+        provide the proxy protocol header. Once the server reaches this threshold, it will 
+        reject new connections accepted from the proxy port.
+    set_at: [startup, runtime]
+    cpp_varname: gProxyProtocolMaximumPendingConnections
+    cpp_vartype: AtomicWord<int32_t>
+    default: {expr: "static_cast<int32_t>(DEFAULT_MAX_CONN)"}
+    validator: {gte: 0}
+    redact: false
+
