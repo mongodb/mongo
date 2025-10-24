@@ -552,6 +552,7 @@ MongoDSessionCatalog::MongoDSessionCatalog(
     : _ti(std::move(ti)) {}
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
+    LOGV2(11148203, "Starting MongoDSessionCatalog::onStepUp.");
     // Invalidate sessions that could have a retryable write on it, so that we can refresh from disk
     // in case the in-memory state was out of sync.
     const auto catalog = SessionCatalog::get(opCtx);

@@ -1772,6 +1772,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
         // be interrupted on replication state change, or finish while being primary. If this
         // results in a wait, it means the thread which started in the previous stepUp did not yet
         // exit. It should eventually exit.
+        LOGV2(11148206, "Waiting for previous step up thread to exit.");
         _stepUpThread.join();
     }
 
