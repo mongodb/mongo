@@ -147,6 +147,7 @@ clang_tidy_checks:
   meta:
     slack: server-programmability
     jira: Server Programmability
+    fully_marked: true
   files:
     - src/mongo/tools/mongo_tidy_checks/
 
