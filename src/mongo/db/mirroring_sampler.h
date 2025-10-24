@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"

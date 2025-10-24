@@ -37,6 +37,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -52,7 +53,7 @@ struct OpMsgRequest;
  *
  * All public functions are thread-safe.
  */
-class MirrorMaestro {
+class MONGO_MOD_PUBLIC MirrorMaestro {
 public:
     /**
      * Initialize the MirrorMaestro for serviceContext

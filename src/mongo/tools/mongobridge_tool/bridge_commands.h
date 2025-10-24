@@ -35,6 +35,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

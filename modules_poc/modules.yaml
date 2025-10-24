@@ -741,6 +741,7 @@ networking.mirrored_reads:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/mirror*
 
@@ -748,6 +749,7 @@ networking.mongo_bridge:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/tools/mongobridge_tool/
 
