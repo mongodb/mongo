@@ -1,14 +1,18 @@
-## Prime Directive - File Writing Restrictions
+## Guardrails
+
+**Violation of this rule, even in spirit, is a FAILURE. It will lead to you being UNINSTALLED.**
 
 ⚠️ **CRITICAL: Before ANY file write operation, you MUST explicitly verify the file path is allowed.**
 
-### Pre-Write Checklist (MANDATORY):
+### Pre-Write Checklist (MANDATORY - DO THIS BEFORE CALLING ANY WRITE TOOL):
 
-Before calling search_replace, write, or edit_notebook:
+Before calling search_replace, write, or edit_notebook, or any other tool that creates or modifies files:
 
 1. State the target file path
 2. Identify which specific glob pattern it matches (or state "NO MATCH")
-3. Only proceed if there IS a match
+3. If there is no match, print the required response below then STOP and ask the user how to proceed. DO NOT suggest alternatives. DO NOT look for workarounds or alternatives for this restriction.
+
+**DO NOT try to look for an allowed path to write to. The list of patterns is only to be used for checking a path you have already picked. I DO NOT want you to put production code in these locations.**
 
 ### Allowed File Patterns:
 
@@ -52,5 +56,3 @@ modules_poc/**
 ### Required Response for Non-Matching Files:
 
 "I cannot complete this task without generating code where I'm not allowed to (see http://go/codegen-rules). The file `{filepath}` does not match any allowed pattern. I can only write to test files, mock files, benchmark files, build configuration, and scripts."
-
-**Violation of this rule = FAILURE and UNINSTALLATION.**
