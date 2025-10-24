@@ -60,7 +60,7 @@ public:
      * Debugging helper to visualize trie.
      */
     void visualizeTrie() const {
-        _root->visualizeTrie("");
+        _root.visualizeTrie("");
     }
 
 private:
@@ -101,7 +101,7 @@ private:
         /**
          * Child nodes representing further segments of the path.
          */
-        std::map<std::string, TrieNode*> _children;
+        std::map<std::string, TrieNode> _children;
 
         /**
          * Represents whether the current node (i.e. path segment) may contain array values.
@@ -116,7 +116,7 @@ private:
     /**
      * The root to the trie.
      */
-    TrieNode* _root = nullptr;
+    TrieNode _root;
 };
 
 /**

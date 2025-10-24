@@ -34,10 +34,7 @@ using namespace mongo::multikey_paths;
 namespace mongo {
 
 void PathArrayness::addPath(FieldPath path, MultikeyComponents multikeyPath) {
-    if (!_root) {
-        _root = new TrieNode();
-    }
-    _root->insertPath(path, multikeyPath, 0);
+    _root.insertPath(path, multikeyPath, 0);
 }
 
 bool PathArrayness::isPathArray(FieldPath path) const {
@@ -53,7 +50,7 @@ void PathArrayness::TrieNode::visualizeTrie(std::string fieldName, int depth) co
 
     // Recursively print children
     for (auto it = _children.begin(); it != _children.end(); ++it) {
-        it->second->visualizeTrie(it->first, depth + 1);
+        it->second.visualizeTrie(it->first, depth + 1);
     }
 }
 
@@ -67,11 +64,11 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
     // Insert the top level field.
     std::string fieldNameToInsert = std::string(path.getFieldName(depth));
     if (!_children.contains(fieldNameToInsert)) {
-        _children.insert({fieldNameToInsert, new TrieNode(multikeyPath.count(depth))});
+        _children.insert({fieldNameToInsert, TrieNode(multikeyPath.count(depth))});
     }
 
     // Recursively invoke the remaining path.
-    _children.at(fieldNameToInsert)->insertPath(path, multikeyPath, ++depth);
+    _children.at(fieldNameToInsert).insertPath(path, multikeyPath, ++depth);
 }
 
 PathArrayness build(std::vector<IndexEntry> entries) {
