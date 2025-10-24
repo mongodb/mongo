@@ -38,10 +38,18 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 
+#include <algorithm>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::join_ordering {
 namespace {
+bool anySecondaryNamespacesDontExist(const MultipleCollectionAccessor& mca) {
+    auto colls = mca.getSecondaryCollectionAcquisitions();
+    return std::any_of(
+        colls.begin(), colls.end(), [](auto&& it) { return !it.second.collectionExists(); });
+}
+
 bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
                                     const Pipeline& pipeline) {
     if (!pipeline.getContext()->getQueryKnobConfiguration().isJoinOrderingEnabled()) {
@@ -58,7 +66,7 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
         return false;
     }
 
-    if (mca.isAnySecondaryNamespaceAViewOrNotFullyLocal()) {
+    if (mca.isAnySecondaryNamespaceAViewOrNotFullyLocal() || anySecondaryNamespacesDontExist(mca)) {
         // TODO SERVER-112239: Enable support for views, as the above check will prevent views from
         // being used for join ordering.
         return false;
