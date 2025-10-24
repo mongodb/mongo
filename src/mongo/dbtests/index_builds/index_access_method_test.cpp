@@ -266,17 +266,23 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
     int64_t numInserted;
 
     // Checks duplicates and returns the error code when constraints are enforced.
+    const auto initDuplicateKeyErrors =
+        SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto status = indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
     ASSERT_EQ(numInserted, 0);
+    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+              initDuplicateKeyErrors + 1);
 
     // Skips the check on duplicates when constraints are not enforced.
     opCtx->setEnforceConstraints(false);
     ASSERT_OK(indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted));
     ASSERT_EQ(numInserted, 2);
+    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+              initDuplicateKeyErrors + 1);
 }
 
 TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
@@ -304,11 +310,15 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
     int64_t numInserted;
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
+    const auto initDuplicateKeyErrors =
+        SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest();
     // Disallows new duplicates in a regular index and rejects the insert.
     auto status = indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
     ASSERT_EQ(numInserted, 0);
+    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+              initDuplicateKeyErrors + 1);
 }
 
 TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
@@ -342,6 +352,8 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
     int64_t numDeleted;
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
+    const auto initDuplicateKeyErrors =
+        SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest();
     // Inserts two keys.
     ASSERT_OK(indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexDescriptor->getEntry(), key1, options, {}, &numInserted));
@@ -349,6 +361,7 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
     ASSERT_OK(indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexDescriptor->getEntry(), key2_old, options, {}, &numInserted));
     ASSERT_EQ(numInserted, 1);
+    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(), initDuplicateKeyErrors);
 
     // Disallows new duplicates in a regular index and rejects the update.
     auto status = indexAccessMethod->doUpdate(
@@ -356,6 +369,8 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
     ASSERT_EQ(numInserted, 0);
     ASSERT_EQ(numDeleted, 0);
+    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+              initDuplicateKeyErrors + 1);
 }
 
 }  // namespace

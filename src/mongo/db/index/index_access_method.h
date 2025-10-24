@@ -637,6 +637,8 @@ public:
                                               const DatabaseName& dbName,
                                               const IndexBuildMethodEnum& method) final;
 
+    static long long getDuplicateKeyErrors_forTest();
+
 protected:
     /**
      * Perform some initial validation on the document to ensure it can be indexed before calling
