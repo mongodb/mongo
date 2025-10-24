@@ -33,6 +33,9 @@ load(
 )
 load("@local_host_values//:local_host_values_set.bzl", "NUM_CPUS")
 load("@evergreen_variables//:evergreen_variables.bzl", "UNSAFE_COMPILE_VARIANT", "UNSAFE_VERSION_ID")
+load("//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl", "MIN_VER_MAP")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 
 # These will throw an error if the following condition is not met:
 # (libunwind == on && os == linux) || libunwind == off || libunwind == auto
@@ -1116,27 +1119,6 @@ idl_generator_rule = rule(
     fragments = ["py"],
 )
 
-def write_target_impl(ctx):
-    out = ctx.actions.declare_file(ctx.label.name + ".gen_source_list")
-    ctx.actions.write(
-        out,
-        "//" + ctx.label.package + ":" + ctx.attr.target_name,
-    )
-    return [
-        DefaultInfo(
-            files = depset([out]),
-        ),
-    ]
-
-write_target = rule(
-    write_target_impl,
-    attrs = {
-        "target_name": attr.string(
-            doc = "the name of the target to record",
-        ),
-    },
-)
-
 def idl_generator(name, tags = [], **kwargs):
     idl_generator_rule(
         name = name,
@@ -1464,4 +1446,156 @@ def mongo_cc_fuzzer_test(
         features = features,
         exec_properties = exec_properties,
         **kwargs
+    )
+
+def _compute_win_defines(ver):
+    if ver not in MIN_VER_MAP:
+        fail("Unsupported windows_version_minimal=%r; supported: %r" %
+             (ver, sorted(MIN_VER_MAP.keys())))
+    m = MIN_VER_MAP[ver]
+    return [
+        "_WIN32_WINNT=%s" % m["win"],
+        "BOOST_USE_WINAPI_VERSION=%s" % m["win"],
+        "NTDDI_VERSION=%s" % m["ddi"],
+    ]
+
+def _rc_impl(ctx):
+    # No-op on non-Windows
+    if not ctx.target_platform_has_constraint(
+        ctx.attr._os_windows[platform_common.ConstraintValueInfo],
+    ):
+        li = cc_common.create_linker_input(
+            owner = ctx.label,
+            user_link_flags = [],
+            additional_inputs = depset(),  # and declare it as a link input
+        )
+        new_cc_shared_info = CcSharedLibraryInfo(
+            dynamic_deps = depset(),
+            exports = [],
+            linker_input = li,
+            link_once_static_libs = {},
+        )
+
+        return [DefaultInfo(files = depset([])), CcInfo(), new_cc_shared_info]
+
+    new_cc_shared_info = CcSharedLibraryInfo(
+        dynamic_deps = depset(),
+        exports = [],
+        linker_input = None,
+        link_once_static_libs = {},
+    )
+
+    # On Windows we need an rc executable
+    if ctx.executable.rc == None:
+        fail("windows_rc: 'rc' tool not provided. Pass rc = '@mongo_windows_toolchain//:rc' (or your wrapper).")
+
+    out = ctx.actions.declare_file(ctx.label.name + ".res")
+
+    defines = []
+    if ctx.attr.windows_version_minimal:
+        ver = ctx.attr.windows_version_minimal[BuildSettingInfo].value
+        defines += _compute_win_defines(ver)
+    defines += ctx.attr.defines
+
+    include_dirs = ["src", ctx.file.src.dirname]
+
+    # Add $(GENDIR)/src (use backslashes for rc.exe friendliness)
+    gen_src = ctx.var["GENDIR"] + "\\src"
+    include_dirs.append(gen_src)
+
+    args = ctx.actions.args()
+    args.add("/nologo")
+    for inc in include_dirs:
+        args.add("/I", inc)
+    for d in defines:
+        args.add("/d", d)
+    args.add("/fo" + out.path)  # /fo must be joined
+    args.add(ctx.file.src.path)
+
+    ctx.actions.run(
+        executable = ctx.executable.rc,  # your wrapper
+        arguments = [args],
+        inputs = [ctx.file.src] + ctx.files.resources,
+        outputs = [out],
+        mnemonic = "WindowsRC",
+    )
+
+    li = cc_common.create_linker_input(
+        owner = ctx.label,
+        user_link_flags = [out.path],  # put .res on the link line
+        additional_inputs = depset([out]),  # and declare it as a link input
+    )
+    lc = cc_common.create_linking_context(linker_inputs = depset([li]))
+    new_cc_shared_info = CcSharedLibraryInfo(
+        dynamic_deps = depset(),
+        exports = [],
+        linker_input = li,
+        link_once_static_libs = {},
+    )
+
+    return [DefaultInfo(files = depset([out])), CcInfo(linking_context = lc), new_cc_shared_info]
+
+windows_rc_rule = rule(
+    implementation = _rc_impl,
+    attrs = {
+        "src": attr.label(mandatory = True, allow_single_file = [".rc"]),
+        "resources": attr.label_list(allow_files = True),
+        "defines": attr.string_list(),
+        "rc": attr.label(executable = True, cfg = "exec", allow_files = True),
+        "windows_version_minimal": attr.label(),
+        "_os_windows": attr.label(
+            default = Label("@platforms//os:windows"),
+            providers = [platform_common.ConstraintValueInfo],
+        ),
+    },
+    provides = [CcInfo],
+    fragments = ["cpp"],
+)
+
+def windows_rc(name, src, manifest_in = None, icon = None):
+    if manifest_in:
+        # Turn "foo.manifest.in" into "foo.manifest"
+        out_manifest = manifest_in[:-3] if manifest_in.endswith(".in") else manifest_in
+
+        generate_config_header(
+            name = name + "_manifest_gen",
+            checks = "//src/mongo/util:version_constants_gen.py",
+            cpp_defines = [],
+            cpp_linkflags = [],
+            cpp_opts = [],
+            extra_definitions = {
+                "MONGO_DISTMOD": "$(MONGO_DISTMOD)",
+                "MONGO_VERSION": "$(MONGO_VERSION)",
+                "GIT_COMMIT_HASH": "$(GIT_COMMIT_HASH)",
+            } | select({
+                "//bazel/config:js_engine_mozjs": {"js_engine_ver": "mozjs"},
+                "//conditions:default": {"js_engine_ver": "none"},
+            }) | select({
+                "//bazel/config:tcmalloc_google_enabled": {"MONGO_ALLOCATOR": "tcmalloc-google"},
+                "//bazel/config:tcmalloc_gperf_enabled": {"MONGO_ALLOCATOR": "tcmalloc-gperf"},
+                "//conditions:default": {"MONGO_ALLOCATOR": "system"},
+            }) | select({
+                "//bazel/config:build_enterprise_enabled": {"build_enterprise_enabled": "1"},
+                "//conditions:default": {},
+            }),
+            logfile = name + "_manifest_gen.log",
+            output = out_manifest,
+            template = manifest_in,
+        )
+
+    resources = ["//src/mongo/util:rc_constants_gen"]
+    if manifest_in:
+        resources.append(name + "_manifest_gen")
+    if icon:
+        resources.append(icon)
+
+    windows_rc_rule(
+        name = name,
+        src = src,
+        resources = resources,
+        rc = select({
+            "@platforms//os:windows": "@mongo_windows_toolchain//:rc",
+            "//conditions:default": None,
+        }),
+        windows_version_minimal = "//bazel/config:win_min_version",
     )

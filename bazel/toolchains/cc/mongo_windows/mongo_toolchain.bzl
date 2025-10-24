@@ -11,6 +11,41 @@ load(
     "setup_vc_env_vars",
 )
 
+def _compute_rc_path(ctx, env_vars):
+    # Allow an explicit override from CI/dev
+    rc_path = ctx.os.environ.get("RC_PATH")
+    if rc_path and ctx.path(rc_path).exists:
+        return rc_path.replace("\\", "/")
+
+    winsdkdir = (env_vars.get("WINDOWSSDKDIR") or "").rstrip("\\/")
+    sdkver = (env_vars.get("WindowsSDKVersion") or "").strip("\\/")
+
+    # Typical locations in recent SDKs
+    candidates = []
+    if winsdkdir:
+        if sdkver:
+            candidates += [
+                "%s\\bin\\%s\\x64\\rc.exe" % (winsdkdir, sdkver),
+                "%s\\bin\\%s\\x86\\rc.exe" % (winsdkdir, sdkver),
+            ]
+        candidates += [
+            "%s\\bin\\x64\\rc.exe" % winsdkdir,
+            "%s\\bin\\x86\\rc.exe" % winsdkdir,
+        ]
+
+    # Fallback to LLVM if present
+    llvm = ctx.os.environ.get("BAZEL_LLVM")
+    if llvm:
+        candidates += [
+            "%s\\bin\\llvm-rc.exe" % llvm,
+            "%s\\bin\\rc.exe" % llvm,  # some layouts
+        ]
+
+    for c in candidates:
+        if ctx.path(c).exists:
+            return c.replace("\\", "/")
+    return None
+
 def _impl_gen_windows_toolchain_build_file(ctx):
     if "windows" not in ctx.os.name:
         ctx.file(
@@ -84,6 +119,21 @@ def _impl_gen_windows_toolchain_build_file(ctx):
     # Save all the information to the file in bazel out to be used for debugging
     # purpose.
     ctx.file("windows_toolchain_config.json", json.encode(substitutions), executable = False)
+
+    # --- expose rc.exe/llvm-rc.exe as a stable label in this repo ---
+    # Ask VS env for SDK location/version (setup_vc_env_vars already did that).
+    # Add WindowsSDKVersion to your setup_vc_env_vars() if not already included.
+    rc_path = _compute_rc_path(ctx, vars)
+    if not rc_path:
+        auto_configure_fail(
+            "Could not locate rc.exe (or llvm-rc.exe). Set RC_PATH or ensure Windows SDK is installed and WindowsSDKVersion is exported.",
+        )
+
+    ctx.file(
+        "rc_wrapper.cmd",
+        "@echo off\r\nsetlocal\r\nset \"INCLUDE=%s\"\r\nset \"PATH=%s\"\r\n\"%s\" %%*\r\n" % (vars["INCLUDE"], vars["PATH"], rc_path),
+        executable = True,
+    )
 
     ctx.report_progress("Generating toolchain build file")
     ctx.template(

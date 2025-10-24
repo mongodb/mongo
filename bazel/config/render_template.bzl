@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "write_target")
+load("//bazel:utils.bzl", "write_target")
 
 def render_template_impl(ctx):
     python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime

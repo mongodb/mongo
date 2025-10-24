@@ -1,5 +1,5 @@
 load("@poetry//:dependencies.bzl", "dependency")
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library", "windows_rc")
 load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -396,6 +396,13 @@ mongo_cc_library(
     }),
 )
 
+windows_rc(
+    name = "mongo_res",
+    src = "mongo.rc",
+    icon = "mongo.ico",
+    manifest_in = "mongo.manifest.in",
+)
+
 mongo_cc_binary(
     name = "mongo",
     srcs = [
@@ -416,7 +423,6 @@ mongo_cc_binary(
         "dist_test",
         "jstestshell",
     ],
-    #+ env.WindowsResourceFile("mongo.rc"),
     deps = [
         # NOTE: Do not add new deps here unless required by the linker to
         # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
@@ -424,6 +430,7 @@ mongo_cc_binary(
         # dep of mongos_initializers.
         "mongo_main",
         "//src/mongo/db:server_base",
+        "mongo_res",
     ],
 )
 

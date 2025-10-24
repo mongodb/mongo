@@ -351,7 +351,7 @@ def setup_vc_env_vars(repository_ctx, vc_path, envvars = [], allow_empty = False
         dictionary of the envvars
     """
     if not envvars:
-        envvars = ["PATH", "INCLUDE", "LIB", "WINDOWSSDKDIR"]
+        envvars = ["PATH", "INCLUDE", "LIB", "WINDOWSSDKDIR", "WindowsSDKVersion"]
 
     vcvars_script = _find_vcvars_bat_script(repository_ctx, vc_path)
     if not vcvars_script:
