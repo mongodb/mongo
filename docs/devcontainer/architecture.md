@@ -451,7 +451,7 @@ After the container starts, several commands run to finalize setup:
   "reportDockerServerPlatform": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_platform=$(docker version --format '\"{{.Server.Platform.Name}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
   "reportDockerServerVersion": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_version=$(docker version --format '\"{{.Server.Version}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
   "reportArch": "echo \"\ncommon --bes_keywords=devcontainer:arch=$(uname -i)\" >> ${containerEnv:HOME}/.bazelrc",
-  "fetchTags": "git fetch --tags || true"
+  "fetchTags": "if [ -f .git/shallow ]; then git fetch --unshallow --tags; else git fetch --tags; fi || true"
 }
 ```
 
