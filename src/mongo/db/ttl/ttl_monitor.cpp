@@ -113,6 +113,9 @@ MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 auto& ttlPasses = *MetricBuilder<Counter64>{"ttl.passes"};
 auto& ttlSubPasses = *MetricBuilder<Counter64>{"ttl.subPasses"};
 
+// Tracks the total amount of time spent deleting documents in TTL passes.
+auto& ttlDurationMicros = *MetricBuilder<Counter64>{"ttl.durationMicros"};
+
 // Tracks the number of deleted documents, as well as the number of deleted keys from indexes.
 auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
 auto& ttlDeletedKeys = *MetricBuilder<Counter64>{"ttl.deletedKeys"};
@@ -615,16 +618,17 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
         ttlDeletedDocuments.increment(numDeletedDocs);
         ttlDeletedKeys.increment(numDeletedKeys);
 
-        const auto duration = Milliseconds(timer.millis());
+        const auto duration = timer.elapsed();
         PlanSummaryStats summaryStats;
         const auto& explainer = exec->getPlanExplainer();
         explainer.getSummaryStats(&summaryStats);
         ttlExaminedDocuments.increment(summaryStats.totalDocsExamined);
         ttlExaminedKeys.increment(summaryStats.totalKeysExamined);
+        ttlDurationMicros.increment(durationCount<Microseconds>(duration));
 
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
-                                        duration,
+                                        duration_cast<Milliseconds>(duration),
                                         Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
             LOGV2(5479200,
@@ -635,7 +639,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                   "numKeysDeleted"_attr = numDeletedKeys,
                   "numKeysExamined"_attr = summaryStats.totalKeysExamined,
                   "numDocsExamined"_attr = summaryStats.totalDocsExamined,
-                  "duration"_attr = duration);
+                  "duration"_attr = duration_cast<Milliseconds>(duration));
         }
 
         if (batchingEnabled) {
@@ -767,16 +771,17 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
         ttlDeletedDocuments.increment(numDeletedDocs);
         ttlDeletedKeys.increment(numDeletedKeys);
 
-        const auto duration = Milliseconds(timer.millis());
+        const auto duration = timer.elapsed();
         PlanSummaryStats summaryStats;
         const auto& explainer = exec->getPlanExplainer();
         explainer.getSummaryStats(&summaryStats);
         ttlExaminedDocuments.increment(summaryStats.totalDocsExamined);
         ttlExaminedKeys.increment(summaryStats.totalKeysExamined);
+        ttlDurationMicros.increment(durationCount<Microseconds>(duration));
 
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
-                                        duration,
+                                        duration_cast<Milliseconds>(duration),
                                         Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
             LOGV2(5400702,
@@ -786,7 +791,7 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
                   "numKeysDeleted"_attr = numDeletedKeys,
                   "numKeysExamined"_attr = summaryStats.totalKeysExamined,
                   "numDocsExamined"_attr = summaryStats.totalDocsExamined,
-                  "duration"_attr = duration,
+                  "duration"_attr = duration_cast<Milliseconds>(duration),
                   "extendedRange"_attr =
                       collection.getCollectionPtr()->getRequiresTimeseriesExtendedRangeSupport());
         }
@@ -825,6 +830,10 @@ long long TTLMonitor::getTTLPasses_forTest() {
 
 long long TTLMonitor::getTTLSubPasses_forTest() {
     return ttlSubPasses.get();
+}
+
+long long TTLMonitor::getTTLDurationMicros_forTest() {
+    return ttlDurationMicros.get();
 }
 
 long long TTLMonitor::getTTLDeletedDocuments_forTest() {

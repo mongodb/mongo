@@ -124,6 +124,11 @@ protected:
         return ttlMonitor->getTTLSubPasses_forTest();
     }
 
+    long long getTTLDurationMicros() {
+        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
+        return ttlMonitor->getTTLDurationMicros_forTest();
+    }
+
     long long getTTLDeletedDocuments() {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
         return ttlMonitor->getTTLDeletedDocuments_forTest();
@@ -330,6 +335,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLSubPasses = getTTLSubPasses();
+    auto initTTLDurationMicros = getTTLDurationMicros();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
     auto initTTLDeletedKeys = getTTLDeletedKeys();
     auto initTTLExaminedDocuments = getTTLExaminedDocuments();
@@ -341,6 +347,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     ASSERT_EQ(client.count(nss), 100);
     ASSERT_EQ(getTTLPasses(), initTTLPasses);
     ASSERT_EQ(getTTLSubPasses(), initTTLSubPasses);
+    ASSERT_EQ(getTTLDurationMicros(), initTTLDurationMicros);
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 
@@ -576,6 +583,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
 
     auto initTTLPasses = getTTLPasses();
     doTTLPassForTest(now);
+
     ASSERT_GTE(client.count(nss), documents - maxSpanSeconds + options.expireAfterSeconds.value());
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
@@ -611,6 +619,7 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedPrior1970Delete) {
 
     auto initTTLPasses = getTTLPasses();
     doTTLPassForTest(now);
+
     // We should delete two documents, the one prior to 1970 and the other eligible doc.
     ASSERT_EQ(client.count(nss), 1);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
@@ -646,6 +655,7 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedAfter2038Delete) {
 
     const auto initTTLPasses = getTTLPasses();
     doTTLPassForTest(now);
+
     // The document with time 1940 should remain.
     ASSERT_EQ(client.count(nss), 1);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
@@ -729,12 +739,11 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss0), 0);
     ASSERT_EQ(client.count(nss1), 0);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
     ASSERT_EQ(getTTLDeletedDocuments(),
               xExpiredDocsNss0 + xExpiredDocsNss1 + yExpiredDocsNss1 + initTTLDeletedDocuments);
     ASSERT_EQ(getTTLDeletedKeys(),
               xExpiredDocsNss0 + ((xExpiredDocsNss1 + yExpiredDocsNss1) * 2) + initTTLDeletedKeys);
-
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
 // Demonstrate sub-pass behavior when all expired documents are drained before the sub-pass reaches
@@ -1044,6 +1053,7 @@ TEST_F(TTLTest, TTLRunMonitorThread) {
 
     // Let the monitor run a pass.
     auto initTTLPasses = getTTLPasses();
+    auto initTTLDurationMicros = getTTLDurationMicros();
     TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
     ttlMonitor->go();
     ASSERT_OK(ttlMonitor->onUpdateTTLMonitorSleepSeconds(0));
@@ -1058,6 +1068,7 @@ TEST_F(TTLTest, TTLRunMonitorThread) {
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_GT(getTTLPasses(), initTTLPasses);  // More than one may have been run
+    ASSERT_GT(getTTLDurationMicros(), initTTLDurationMicros);
 }
 
 // Values smaller than int32_t::max() are valid for secondary TTL indexes.
