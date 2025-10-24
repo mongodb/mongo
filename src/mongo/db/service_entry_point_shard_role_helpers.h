@@ -305,34 +305,11 @@ inline void appendReplyMetadata(OperationContext* opCtx,
     }
 }
 
-inline Status refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) {
-    return FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
-        opCtx, se.getDb(), se.getVersionReceived());
-}
-
-inline Status refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) {
-    return FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-        opCtx, se.getNss(), se.getVersionReceived().placementVersion());
-}
-
-inline Status refreshCatalogCache(OperationContext* opCtx,
-                                  const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) {
-    return Grid::get(opCtx)
-        ->catalogCache()
-        ->getCollectionRoutingInfo(opCtx, refreshInfo.getNss())
-        .getStatus();
-}
-
-inline void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
-                                                   const StaleConfigInfo& se) {
-    resharding_metrics::onCriticalSectionError(opCtx, se);
-}
-
-// The refreshDatabase, refreshCollection, and refreshCatalogCache methods may have modified the
-// locker state, in particular the flags which say if the operation took a write lock or shared
-// lock.  This will cause mongod to perhaps erroneously check for write concern when no writes
-// were done, or unnecessarily kill a read operation.  If we re-use the opCtx to retry command
-// execution, we must reset the locker state.
+// When handling possible retryable errors, we may have modified the locker state, in particular the
+// flags which say if the operation took a write lock or shared lock. This will cause mongod to
+// perhaps erroneously check for write concern when no writes were done, or unnecessarily kill a
+// read operation. If we re-use the opCtx to retry command execution, we must reset the locker
+// state.
 inline void resetLockerState(OperationContext* opCtx) {
     // It is necessary to lock the client to change the Locker on the OperationContext.
     ClientLock lk(opCtx->getClient());

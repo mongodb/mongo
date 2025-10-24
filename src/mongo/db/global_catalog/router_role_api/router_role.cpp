@@ -36,7 +36,6 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
@@ -44,7 +43,6 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
 
-#include <memory>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -55,7 +53,7 @@ namespace mongo {
 namespace sharding {
 namespace router {
 
-RouterBase::RouterBase(ServiceContext* service) : _service(service) {}
+RouterBase::RouterBase(CatalogCache* catalogCache) : _catalogCache(catalogCache) {}
 
 void RouterBase::_initTxnRouterIfNeeded(OperationContext* opCtx) {
     bool activeTxnParticipantAddParticipants =
@@ -71,7 +69,7 @@ void RouterBase::_initTxnRouterIfNeeded(OperationContext* opCtx) {
 }
 
 DBPrimaryRouter::DBPrimaryRouter(ServiceContext* service, const DatabaseName& db)
-    : RouterBase(service), _dbName(db) {}
+    : RouterBase(Grid::get(service)->catalogCache()), _dbName(db) {}
 
 void DBPrimaryRouter::appendDDLRoutingTokenToCommand(const DatabaseType& dbt,
                                                      BSONObjBuilder* builder) {
@@ -93,13 +91,10 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
 }
 
 CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {
-    auto catalogCache = Grid::get(_service)->catalogCache();
-    return uassertStatusOK(catalogCache->getDatabase(opCtx, _dbName));
+    return uassertStatusOK(_catalogCache->getDatabase(opCtx, _dbName));
 }
 
 void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s) {
-    auto catalogCache = Grid::get(_service)->catalogCache();
-
     if (s == ErrorCodes::StaleDbVersion) {
         auto si = s.extraInfo<StaleDbRoutingVersion>();
         tassert(6375900, "StaleDbVersion must have extraInfo", si);
@@ -109,16 +104,7 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* re
                               << si->getDb().toStringForErrorMsg(),
                 si->getDb() == _dbName);
 
-        catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-    } else if (s == ErrorCodes::StaleConfig) {
-        // For some operations, like create, we need to check the ShardVersion to serialize with the
-        // critical section. Hence, the shard may throw a StaleConfig even when the router didn't
-        // attach a shardVersion. This StaleConfig must be handled by the shard itself, however the
-        // retryable attemps on the shard side are just 1, so that error may bubble up until here.
-        // TODO (SERVER-77402) Remove the StaleConfig retry for the DBPrimaryRouter once the
-        // ShardRole loop increases the retryable attempts.
-        auto si = s.extraInfo<StaleConfigInfo>();
-        tassert(10370601, "StaleConfig must have extraInfo", si);
+        _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
     } else {
         uassertStatusOK(s);
     }
@@ -145,18 +131,12 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* re
 }
 
 CollectionRouterCommon::CollectionRouterCommon(
-    ServiceContext* service,
-    const std::vector<NamespaceString>& targetedNamespaces,
-    bool retryOnStaleShard)
-    : RouterBase(service),
-      _targetedNamespaces(targetedNamespaces),
-      _retryOnStaleShard(retryOnStaleShard) {}
+    CatalogCache* catalogCache, const std::vector<NamespaceString>& targetedNamespaces)
+    : RouterBase(catalogCache), _targetedNamespaces(targetedNamespaces) {}
 
 void CollectionRouterCommon::_onException(OperationContext* opCtx,
                                           RoutingRetryInfo* retryInfo,
                                           Status s) {
-    auto catalogCache = Grid::get(_service)->catalogCache();
-
     const auto isNssInvolvedInRouting = [&](const NamespaceString& nss) {
         if (nss.isTimeseriesBucketsCollection() &&
             std::find(_targetedNamespaces.begin(),
@@ -172,61 +152,22 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
     if (s == ErrorCodes::StaleDbVersion) {
         auto si = s.extraInfo<StaleDbRoutingVersion>();
         tassert(6375903, "StaleDbVersion must have extraInfo", si);
-
-        const bool isShardStale =
-            !si->getVersionWanted() || *si->getVersionWanted() < si->getVersionReceived();
-        if (isShardStale && !_retryOnStaleShard) {
-            uassertStatusOK(s);
-        }
-
-        catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
+        _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
     } else if (s == ErrorCodes::StaleConfig) {
         auto si = s.extraInfo<StaleConfigInfo>();
         tassert(6375904, "StaleConfig must have extraInfo", si);
-
-
-        const bool isShardStale = [&]() {
-            if (!si->getVersionWanted()) {
-                return true;
-            }
-
-            const auto& wanted = si->getVersionWanted()->placementVersion();
-            const auto& received = si->getVersionReceived().placementVersion();
-
-            // If placement versions can't be reliably compared (e.g., when the shard has no
-            // chunks/{0,0}, or the received version is ChunkVersion::UNSHARDED()), we
-            // conservatively assume the router is stale.
-            auto compareResult = wanted <=> received;
-            if (compareResult == std::partial_ordering::unordered) {
-                return false;
-            }
-            return compareResult == std::partial_ordering::less;
-        }();
-        if (isShardStale && !_retryOnStaleShard) {
-            uassertStatusOK(s);
-        }
-
         const auto staleNs = si->getNss();
 
-        // When the shard is stale, the StaleConfig thrown by the shard should be handled by the
-        // shard itself. However, the num of retryable attemps on the shard side is just 1, so that
-        // error may bubble up until here if there is any concurrent metadata flush. In addition,
-        // the StaleConfig thrown by the shard may not be related to the targeted collection. For
-        // example, a lookup may throw a StaleConfig for the foreign collection.
-        // TODO (SERVER-77402) Only allow StaleConfig errors for the involved namespaces once the
-        // ShardRole loop increases the retryable attempts
-        if (!isShardStale) {
-            if (!isNssInvolvedInRouting(staleNs)) {
-                uassertStatusOK(s);
-            }
+        if (!isNssInvolvedInRouting(staleNs)) {
+            uassertStatusOK(s);
         }
 
         // Refresh the view namespace if the stale namespace is a buckets timeseries collection.
         if (staleNs.isTimeseriesBucketsCollection()) {
             // A timeseries might've been created, so we need to invalidate the original namespace
             // version.
-            catalogCache->onStaleCollectionVersion(staleNs.getTimeseriesViewNamespace(),
-                                                   boost::none);
+            _catalogCache->onStaleCollectionVersion(staleNs.getTimeseriesViewNamespace(),
+                                                    boost::none);
         }
 
         // Refresh the timeseries buckets nss when the command targets the buckets collection but
@@ -235,22 +176,21 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
             _targetedNamespaces.begin(), _targetedNamespaces.end(), [&](const auto& targetedNss) {
                 if (targetedNss.isTimeseriesBucketsCollection() &&
                     targetedNss.getTimeseriesViewNamespace() == staleNs) {
-                    catalogCache->onStaleCollectionVersion(targetedNss, boost::none);
+                    _catalogCache->onStaleCollectionVersion(targetedNss, boost::none);
                 }
             });
 
-        catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
-
+        _catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
     } else if (s == ErrorCodes::StaleEpoch) {
         if (auto si = s.extraInfo<StaleEpochInfo>()) {
             if (!isNssInvolvedInRouting(si->getNss())) {
                 uassertStatusOK(s);
             }
 
-            catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
+            _catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
         } else {
             for (const auto& nss : _targetedNamespaces) {
-                catalogCache->onStaleCollectionVersion(nss, boost::none);
+                _catalogCache->onStaleCollectionVersion(nss, boost::none);
             }
         }
     } else if (s == ErrorCodes::TransactionParticipantFailedUnyield) {
@@ -266,19 +206,19 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
         if (*originalStatus == ErrorCodes::StaleConfig) {
             auto si = originalStatus->extraInfo<StaleConfigInfo>();
             tassert(9690301, "StaleConfig must have extraInfo", si);
-            catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
+            _catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
         } else if (*originalStatus == ErrorCodes::StaleDbVersion) {
             auto si = originalStatus->extraInfo<StaleDbRoutingVersion>();
             tassert(9690302, "StaleDbVersion must have extraInfo", si);
-            catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
+            _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
         }
 
         uassertStatusOK(s);
     } else if (s == ErrorCodes::ShardNotFound) {
         // Shard has been removed. Attempting to route again.
         for (const auto& nss : _targetedNamespaces) {
-            catalogCache->onStaleCollectionVersion(nss, boost::none);
-            catalogCache->onStaleDatabaseVersion(nss.dbName(), boost::none);
+            _catalogCache->onStaleCollectionVersion(nss, boost::none);
+            _catalogCache->onStaleDatabaseVersion(nss.dbName(), boost::none);
         }
     } else if (s == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
         // The shard is stale but it was not allowed to retry from the ServiceEntryPoint. For
@@ -312,7 +252,6 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
 
 CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* opCtx,
                                                               const NamespaceString& nss) {
-    auto catalogCache = Grid::get(opCtx->getServiceContext())->catalogCache();
     // When in a multi-document transaction, allow getting routing info from the CatalogCache even
     // though locks may be held. The CatalogCache will throw CannotRefreshDueToLocksHeld if the
     // entry is not already cached.
@@ -330,10 +269,10 @@ CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* 
     }
 
     if (maybeAtClusterTime) {
-        return uassertStatusOK(catalogCache->getCollectionRoutingInfoAt(
+        return uassertStatusOK(_catalogCache->getCollectionRoutingInfoAt(
             opCtx, nss, maybeAtClusterTime->asTimestamp(), allowLocks));
     }
-    return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks));
+    return uassertStatusOK(_catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks));
 }
 
 void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
@@ -350,15 +289,15 @@ void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shar
     appendShardVersion(*builder, cri.getShardVersion(shardId));
 }
 
-CollectionRouter::CollectionRouter(ServiceContext* service,
-                                   NamespaceString nss,
-                                   bool retryOnStaleShard)
-    : CollectionRouterCommon(service, {std::move(nss)}, retryOnStaleShard) {}
+CollectionRouter::CollectionRouter(ServiceContext* service, NamespaceString nss)
+    : CollectionRouterCommon(Grid::get(service)->catalogCache(), {std::move(nss)}) {}
+
+CollectionRouter::CollectionRouter(CatalogCache* catalogCache, NamespaceString nss)
+    : CollectionRouterCommon(catalogCache, {std::move(nss)}) {}
 
 MultiCollectionRouter::MultiCollectionRouter(ServiceContext* service,
-                                             const std::vector<NamespaceString>& nssList,
-                                             bool retryOnStaleShard)
-    : CollectionRouterCommon(service, nssList, retryOnStaleShard) {}
+                                             const std::vector<NamespaceString>& nssList)
+    : CollectionRouterCommon(Grid::get(service)->catalogCache(), nssList) {}
 
 bool MultiCollectionRouter::isAnyCollectionNotLocal(
     OperationContext* opCtx,

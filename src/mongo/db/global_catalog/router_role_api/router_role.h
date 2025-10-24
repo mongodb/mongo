@@ -51,7 +51,7 @@ namespace router {
 
 class RouterBase {
 protected:
-    RouterBase(ServiceContext* service);
+    RouterBase(CatalogCache* catalogCache);
 
     struct RoutingRetryInfo {
         const std::string comment;
@@ -60,7 +60,7 @@ protected:
 
     void _initTxnRouterIfNeeded(OperationContext* opCtx);
 
-    ServiceContext* const _service;
+    CatalogCache* const _catalogCache;
 };
 
 // Both the router classes below declare the scope in which their 'route' method is executed as a
@@ -108,9 +108,8 @@ private:
  */
 class CollectionRouterCommon : public RouterBase {
 protected:
-    CollectionRouterCommon(ServiceContext* service,
-                           const std::vector<NamespaceString>& routingNamespaces,
-                           bool retryOnStaleShard);
+    CollectionRouterCommon(CatalogCache* catalogCache,
+                           const std::vector<NamespaceString>& routingNamespaces);
 
     static void appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                 const CollectionRoutingInfo& cri,
@@ -120,17 +119,6 @@ protected:
     CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx, const NamespaceString& nss);
 
     const std::vector<NamespaceString> _targetedNamespaces;
-
-    // TODO: SERVER-77402: Remove this.
-    // Controls whether this loop will retry when a StaleDatabaseVersion/StaleShardVersion
-    // indicates that the shard (rather than the router) was stale. When 'true', RouterLoop will
-    // retry; when 'false', the exception will be rethrown verbatim.
-    // It only makes sense to retry when the enclosed RouterRole operation results in a shardRole
-    // invocation that ensures that the shard will refresh its metadata in case it was stale. This
-    // is the case for remote command execution, where the shard's ServiceEntryPoint ensures that.
-    // This flag must be set to false for operations that re-enter into the ShardRole without a
-    // ShardRole refresh loop.
-    const bool _retryOnStaleShard{true};
 };
 
 /**
@@ -139,7 +127,10 @@ protected:
  */
 class CollectionRouter : public CollectionRouterCommon {
 public:
-    CollectionRouter(ServiceContext* service, NamespaceString nss, bool retryOnStaleShard = true);
+    CollectionRouter(ServiceContext* service, NamespaceString nss);
+
+    // TODO SERVER-95927: Remove this constructor.
+    CollectionRouter(CatalogCache* catalogCache, NamespaceString nss);
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
@@ -182,9 +173,7 @@ private:
 
 class MultiCollectionRouter : public CollectionRouterCommon {
 public:
-    MultiCollectionRouter(ServiceContext* service,
-                          const std::vector<NamespaceString>& nssList,
-                          bool retryOnStaleShard = true);
+    MultiCollectionRouter(ServiceContext* service, const std::vector<NamespaceString>& nssList);
 
     /**
      * Member function which discerns whether any of the namespaces in 'routingNamespaces' are not

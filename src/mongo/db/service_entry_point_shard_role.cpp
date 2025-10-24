@@ -67,11 +67,11 @@
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/logical_time.h"
@@ -104,7 +104,6 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization_waiter.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/stats/api_version_metrics.h"
@@ -119,10 +118,8 @@
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/validate_api_parameters.h"
 #include "mongo/db/vector_clock/vector_clock.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -643,11 +640,6 @@ private:
     // Executes the parsed command against the database.
     void _commandExec();
 
-    // Takes a command execution error (or write error), attempts to perform metadata refresh and
-    // return true in case the refresh was executed, false in case no refresh was executed and an
-    // error status if the refresh failed.
-    StatusWith<bool> _refreshIfNeeded(const Status& execError);
-
     // Takes a command execution error (or write error), checks if the problem was that sharding is
     // not yet initialized, and waits for initialization if so. Returns true in the case that we
     // waited for sharding initialization and false otherwise.
@@ -681,9 +673,6 @@ private:
     boost::optional<RunCommandOpTimes> _runCommandOpTimes;
     boost::optional<rpc::ImpersonatedClientSessionGuard> _clientSessionGuard;
     boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
-    bool _refreshedDatabase = false;
-    bool _refreshedCollection = false;
-    int _refreshedCatalogCacheAttempts = 0;
     bool _awaitedShardingInitialization = false;
     bool _cannotRetry = false;
 
@@ -1889,162 +1878,74 @@ void ExecCommandDatabase::_commandExec() {
         service_entry_point_shard_role_helpers::waitForReadConcern(
             opCtx, getInvocation(), _execContext.getRequest());
     }
-    service_entry_point_shard_role_helpers::setPrepareConflictBehaviorForReadConcern(
-        opCtx, getInvocation());
 
-    _extraFieldsBuilder.resetToEmpty();
-    _execContext.getReplyBuilder()->reset();
+    shard_role_loop::RetryContext shardRetryCtx;
+    while (true) {
+        service_entry_point_shard_role_helpers::setPrepareConflictBehaviorForReadConcern(
+            opCtx, getInvocation());
 
-    try {
-        // TODO (SERVER-90204) Replace with a more accurate check of whether the command is coming
-        // from a router.
-        if (OperationShardingState::isComingFromRouter(opCtx)) {
-            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        _extraFieldsBuilder.resetToEmpty();
+        _execContext.getReplyBuilder()->reset();
+
+        try {
+            // TODO (SERVER-90204) Replace with a more accurate check of whether the command is
+            // coming from a router.
+            if (OperationShardingState::isComingFromRouter(opCtx)) {
+                ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+            }
+            _runCommandOpTimes.emplace(opCtx);
+            if (getInvocation()->supportsWriteConcern() ||
+                getInvocation()->definition()->getLogicalOp() == LogicalOp::opGetMore) {
+                // getMore operations inherit a WriteConcern from their originating cursor. For
+                // example, if the originating command was an aggregate with a $out and batchSize:0.
+                // Note that if the command only performed reads then we will not need to wait at
+                // all.
+                RunCommandAndWaitForWriteConcern runner(this);
+                runner.run();
+            } else {
+                RunCommandImpl runner(this);
+                runner.run();
+            }
+        } catch (DBException& ex) {
+            // If the command has failed, there is no need to look for write errors at the oss.
+            OperationShardingState::get(opCtx).resetShardingOperationFailedStatus();
+
+            const auto staleExceptionIsRetryable =
+                shard_role_loop::handleStaleError(opCtx, ex.toStatus(), shardRetryCtx);
+
+            if (staleExceptionIsRetryable ==
+                shard_role_loop::CanRetry::NO_BECAUSE_EXHAUSTED_RETRIES) {
+                ex.addContext("Exhausted maximum number of shard metadata recovery attempts");
+            }
+
+            const bool waitedForInitialized = _awaitShardingInitializedIfNeeded(ex.toStatus());
+
+            const bool errorMayBeRetried =
+                staleExceptionIsRetryable == shard_role_loop::CanRetry::YES || waitedForInitialized;
+
+            if (errorMayBeRetried && canRetryCommand(ex.toStatus())) {
+                _resetLockerStateAfterShardingUpdate(opCtx);
+                continue;  // Retry
+            }
+
+            // Cannot retry. Fail the command.
+            throw;
         }
-        _runCommandOpTimes.emplace(opCtx);
-        if (getInvocation()->supportsWriteConcern() ||
-            getInvocation()->definition()->getLogicalOp() == LogicalOp::opGetMore) {
-            // getMore operations inherit a WriteConcern from their originating cursor. For example,
-            // if the originating command was an aggregate with a $out and batchSize: 0. Note that
-            // if the command only performed reads then we will not need to wait at all.
-            RunCommandAndWaitForWriteConcern runner(this);
-            runner.run();
-        } else {
-            RunCommandImpl runner(this);
-            runner.run();
-        }
-    } catch (const DBException& ex) {
-        // If the command has failed, there is no need to look for write errors at the oss.
-        OperationShardingState::get(opCtx).resetShardingOperationFailedStatus();
-
-        const auto metadataRefreshStatus = _refreshIfNeeded(ex.toStatus());
-        const auto refreshed = uassertStatusOK(metadataRefreshStatus);
-
-        const auto waitedForInitialized = _awaitShardingInitializedIfNeeded(ex.toStatus());
-
-        if ((refreshed || waitedForInitialized) && canRetryCommand(ex.toStatus())) {
-            _resetLockerStateAfterShardingUpdate(opCtx);
-            _commandExec();
-            return;
-        }
-
-        throw;
+        break;
     }
 
     // Regardless if the command has succeeded, it needs to check if the operation sharding state
     // has some stale config errors to be handled before returning to the router.
     if (auto writeError = OperationShardingState::get(opCtx).resetShardingOperationFailedStatus()) {
-        const auto metadataRefreshStatus = _refreshIfNeeded(*writeError);
-        if (!metadataRefreshStatus.isOK() &&
-            ErrorCodes::isInterruption(metadataRefreshStatus.getStatus())) {
-            uassertStatusOK(metadataRefreshStatus);
+        try {
+            shard_role_loop::handleStaleError(opCtx, *writeError, shardRetryCtx);
+        } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
+            ex.addContext("interruption while recovering sharding metadata upon write error");
+            throw;
+        } catch (const DBException&) {
+            // Ignore other exceptions. We don't want to destroy the top-level command status.
         }
     }
-}
-
-StatusWith<bool> ExecCommandDatabase::_refreshIfNeeded(const Status& execError) {
-    auto opCtx = _execContext.getOpCtx();
-
-    tassert(8462308, "Expected to find an error in the status of the command", !execError.isOK());
-
-    if (execError == ErrorCodes::StaleConfig) {
-        ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
-    }
-
-    if (opCtx->getClient()->isInDirectClient()) {
-        return false;
-    }
-
-    if (execError == ErrorCodes::StaleDbVersion && !_refreshedDatabase) {
-        const auto staleInfo = execError.extraInfo<StaleDbRoutingVersion>();
-        tassert(8462303, "StaleDbVersion must have extraInfo", staleInfo);
-        const auto stableLocalVersion =
-            !staleInfo->getCriticalSectionSignal() && staleInfo->getVersionWanted();
-
-        if (stableLocalVersion && staleInfo->getVersionReceived() < staleInfo->getVersionWanted()) {
-            // The shard is recovered and the router is staler than the shard, so we cannot retry
-            // locally.
-            return false;
-        }
-
-        const auto refreshStatus =
-            service_entry_point_shard_role_helpers::refreshDatabase(opCtx, *staleInfo);
-        if (refreshStatus.isOK()) {
-            _refreshedDatabase = true;
-            return true;
-        } else {
-            LOGV2_WARNING(
-                8462300,
-                "Failed to refresh database metadata cache while handling StaleDbVersion exception",
-                "error"_attr = redact(refreshStatus));
-            return refreshStatus;
-        }
-    } else if (execError == ErrorCodes::StaleConfig && !_refreshedCollection) {
-        const auto staleInfo = execError.extraInfo<StaleConfigInfo>();
-        tassert(8462304, "StaleConfig must have extraInfo", staleInfo);
-        const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
-        const auto stableLocalVersion = !inCriticalSection && staleInfo->getVersionWanted();
-
-        if (stableLocalVersion &&
-            ShardVersion::isPlacementVersionIgnored(staleInfo->getVersionReceived())) {
-            // Shard is recovered, but the router didn't sent a shard version, therefore we just
-            // need to tell the router how much it needs to advance to (getVersionWanted).
-            return false;
-        }
-
-        if (stableLocalVersion &&
-            (staleInfo->getVersionReceived().placementVersion() <=>
-             staleInfo->getVersionWanted()->placementVersion()) == std::partial_ordering::less) {
-            // Shard is recovered and the router is staler than the shard.
-            return false;
-        }
-
-        if (inCriticalSection) {
-            service_entry_point_shard_role_helpers::handleReshardingCriticalSectionMetrics(
-                opCtx, *staleInfo);
-        }
-
-        const auto refreshStatus =
-            service_entry_point_shard_role_helpers::refreshCollection(opCtx, *staleInfo);
-
-        // Fail the direct shard operation so that a RetryableWriteError label can be returned and
-        // the write can be retried by the driver.
-        const auto fromRouter = OperationShardingState::isComingFromRouter(opCtx);
-        if (opCtx->isRetryableWrite() && !fromRouter) {
-            return false;
-        }
-
-        if (refreshStatus.isOK()) {
-            _refreshedCollection = true;
-            return true;
-        } else {
-            LOGV2_WARNING(
-                8462301,
-                "Failed to refresh collection metadata cache while handling StaleConfig exception",
-                "error"_attr = redact(refreshStatus));
-            return refreshStatus;
-        }
-    } else if (execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld &&
-               _refreshedCatalogCacheAttempts < 10) {
-        const auto refreshInfo = execError.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-        tassert(8462305, "ShardCannotRefreshDueToLocksHeld must have extraInfo", refreshInfo);
-        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-
-        const auto refreshStatus =
-            service_entry_point_shard_role_helpers::refreshCatalogCache(opCtx, *refreshInfo);
-        _refreshedCatalogCacheAttempts++;
-        if (refreshStatus.isOK()) {
-            return true;
-        } else {
-            LOGV2_WARNING(8462302,
-                          "Failed to refresh catalog cache while handling "
-                          "ShardCannotRefreshDueToLocksHeld exception",
-                          "error"_attr = redact(refreshStatus));
-            return refreshStatus;
-        }
-    }
-
-    return false;
 }
 
 bool ExecCommandDatabase::_awaitShardingInitializedIfNeeded(const Status& status) {
@@ -2079,14 +1980,6 @@ bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
         return false;
     }
 
-    if (execError == ErrorCodes::StaleDbVersion) {
-        const auto staleInfo = execError.extraInfo<StaleDbRoutingVersion>();
-        tassert(8462306, "StaleDbVersion must have extraInfo", staleInfo);
-        const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
-
-        return !inCriticalSection;
-    }
-
     if (execError == ErrorCodes::ShardingStateNotInitialized) {
         // We can retry commands with attached shard versions because we know that the check for
         // sharding initialization happened before anything else. For other commands (ie. those
@@ -2097,17 +1990,9 @@ bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
         return OperationShardingState::isComingFromRouter(opCtx);
     }
 
-    const auto canRetryCmd = _invocation->canRetryOnStaleConfigOrShardCannotRefreshDueToLocksHeld(
-        _execContext.getRequest());
-
-    if (execError == ErrorCodes::StaleConfig) {
-        const auto staleInfo = execError.extraInfo<StaleConfigInfo>();
-        tassert(8462307, "StaleConfig must have extraInfo", staleInfo);
-        const auto inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
-
-        return !inCriticalSection && canRetryCmd;
-    } else if (execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
-        return canRetryCmd;
+    if (execError == ErrorCodes::StaleDbVersion || execError == ErrorCodes::StaleConfig ||
+        execError == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+        return _invocation->canRetryOnStaleShardMetadataError(_execContext.getRequest());
     }
 
     return false;

@@ -63,8 +63,15 @@ CanRetry handleStaleDbVersionError(OperationContext* opCtx,
         // Recover ShardRole metadata and retry
         const auto& staleExceptionHandler =
             DatabaseShardingState::getStaleShardExceptionHandler(opCtx);
-        staleExceptionHandler.handleStaleDatabaseVersionException(opCtx, staleDbError);
-        return anyRefreshAttemptRemaining ? CanRetry::YES : CanRetry::NO_BECAUSE_EXHAUSTED_RETRIES;
+        const auto dbVersionAfterRecovery =
+            staleExceptionHandler.handleStaleDatabaseVersionException(opCtx, staleDbError);
+        if (!anyRefreshAttemptRemaining) {
+            return CanRetry::NO_BECAUSE_EXHAUSTED_RETRIES;
+        }
+        return dbVersionAfterRecovery &&
+                (dbVersionAfterRecovery == staleDbError.getVersionReceived())
+            ? CanRetry::YES
+            : CanRetry::NO;
     } else {
         // The router is stale. Do not retry at the Shard level. Let the exception propagate up to
         // the router instead.

@@ -70,7 +70,8 @@ withRetryOnTransientTxnError(() => {
     let res = assert.commandFailedWithCode(testDB.runCommand(command), ErrorCodes.StaleConfig);
     assert.contains("TransientTransactionError", res.errorLabels);
 
-    // A retryable write that fails with StaleConfig should fail with the RetryableWriteError label.
+    // A retryable write that fails with StaleConfig can be retried internally by the shard and
+    // succeed.
     command = {
         insert: "test" + (base + 2),
         documents: [{x: 2}],
@@ -78,8 +79,7 @@ withRetryOnTransientTxnError(() => {
         lsid: sessionId,
         txnNumber: NumberLong(1),
     };
-    res = assert.commandFailedWithCode(testDB.runCommand(command), ErrorCodes.StaleConfig);
-    assert.contains("RetryableWriteError", res.errorLabels);
+    res = assert.commandWorked(testDB.runCommand(command));
 
     // A non-retryable write that fails with StaleConfig should have a StaleConfig writeError and no
     // error labels.

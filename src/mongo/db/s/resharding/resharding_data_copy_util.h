@@ -34,11 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/collection_options.h"
-#include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -47,10 +43,6 @@
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
@@ -183,41 +175,5 @@ void updateSessionRecord(OperationContext* opCtx,
  */
 std::vector<ReshardingRecipientResumeData> getRecipientResumeData(OperationContext* opCtx,
                                                                   const UUID& reshardingUUID);
-
-/**
- * Calls and returns the value from the supplied lambda function.
- *
- * If a StaleConfig error is thrown during its execution, then this function will attempt to refresh
- * the collection and invoke the supplied lambda function a second time.
- *
- * TODO SERVER-77402: Replace this function with the new ShardRole retry loop utility
- */
-template <typename Callable>
-auto staleConfigShardLoop(OperationContext* opCtx, Callable&& callable) {
-    try {
-        return callable();
-    } catch (const ExceptionFor<ErrorCategory::StaleShardVersionError>& ex) {
-        if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
-
-            if (sce->getVersionWanted() &&
-                (sce->getVersionReceived().placementVersion() <=>
-                 sce->getVersionWanted()->placementVersion()) == std::partial_ordering::less) {
-                // The shard is recovered and the router is staler than the shard, so we cannot
-                // retry locally.
-                throw;
-            }
-
-            // Recover the sharding metadata if there was no wanted version in the staleConfigInfo
-            // or it was older than the received version.
-            uassertStatusOK(
-                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    opCtx, sce->getNss(), sce->getVersionReceived().placementVersion()));
-
-            return callable();
-        }
-        throw;
-    }
-}
-
 }  // namespace resharding::data_copy
 }  // namespace mongo

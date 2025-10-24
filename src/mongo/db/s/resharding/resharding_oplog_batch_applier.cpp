@@ -32,7 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/intent_guard.h"
@@ -43,9 +43,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
@@ -113,7 +111,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                continue;
                            }
 
-                           resharding::data_copy::staleConfigShardLoop(opCtx.get(), [&] {
+                           shard_role_loop::withStaleShardRetry(opCtx.get(), [&]() {
                                // ReshardingOpObserver depends on the collection metadata being
                                // known when processing writes to the temporary resharding
                                // collection. We attach placement version IGNORED to the write

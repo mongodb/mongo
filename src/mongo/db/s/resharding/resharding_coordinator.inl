@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/ddl/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_utils.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer/balance_stats.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
@@ -1166,28 +1167,40 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
                            routerRelaxCollectionUUIDConsistencyCheckBlock(
                                boost::in_place_init_if, _coordinatorDoc.getRelaxed(), opCtx.get());
 
-                       std::map<ShardId, ShardVersion> donorShardVersions;
-                       {
-                           auto cri =
-                               uassertStatusOK(RoutingInformationCache::get(opCtx.get())
-                                                   ->getCollectionRoutingInfoAt(
-                                                       opCtx.get(),
-                                                       _coordinatorDoc.getSourceNss(),
-                                                       _coordinatorDoc.getCloneTimestamp().get()));
-                           for (const auto& donorShard : _coordinatorDoc.getDonorShards()) {
-                               donorShardVersions.emplace(donorShard.getId(),
-                                                          cri.getShardVersion(donorShard.getId()));
-                           }
-                       }
-
-                       return _reshardingCoordinatorExternalState->getDocumentsToCopyFromDonors(
+                       // Use a CollectionRouter because we'll target shards according to a cached
+                       // routing table and send shard-versioned commands to them.
+                       const auto routingInformationCache =
+                           RoutingInformationCache::get(opCtx.get());
+                       sharding::router::CollectionRouter cr(routingInformationCache,
+                                                             _coordinatorDoc.getSourceNss());
+                       return cr.route(
                            opCtx.get(),
-                           **executor,
-                           _ctHolder->getAbortToken(),
-                           _coordinatorDoc.getReshardingUUID(),
-                           _coordinatorDoc.getSourceNss(),
-                           _coordinatorDoc.getCloneTimestamp().get(),
-                           donorShardVersions);
+                           "Resharding: Fetching the number of documents to copy from each shard",
+                           [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
+                               std::map<ShardId, ShardVersion> donorShardVersions;
+                               {
+                                   auto cri = uassertStatusOK(
+                                       routingInformationCache->getCollectionRoutingInfoAt(
+                                           opCtx,
+                                           _coordinatorDoc.getSourceNss(),
+                                           _coordinatorDoc.getCloneTimestamp().get()));
+                                   for (const auto& donorShard : _coordinatorDoc.getDonorShards()) {
+                                       donorShardVersions.emplace(
+                                           donorShard.getId(),
+                                           cri.getShardVersion(donorShard.getId()));
+                                   }
+                               }
+
+                               return _reshardingCoordinatorExternalState
+                                   ->getDocumentsToCopyFromDonors(
+                                       opCtx,
+                                       **executor,
+                                       _ctHolder->getAbortToken(),
+                                       _coordinatorDoc.getReshardingUUID(),
+                                       _coordinatorDoc.getSourceNss(),
+                                       _coordinatorDoc.getCloneTimestamp().get(),
+                                       donorShardVersions);
+                           });
                    })
                    .then([this](std::map<ShardId, int64_t> documentsToCopy) {
                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());

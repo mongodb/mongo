@@ -396,8 +396,7 @@ public:
             return _cmd.getGenericArguments();
         }
 
-        bool canRetryOnStaleConfigOrShardCannotRefreshDueToLocksHeld(
-            const OpMsgRequest& request) const override {
+        bool canRetryOnStaleShardMetadataError(const OpMsgRequest& request) const override {
             // Can not rerun the command when executing a GetMore command as the cursor may already
             // be lost.
             return false;

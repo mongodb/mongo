@@ -51,7 +51,7 @@ public:
      * Handles a StaleDbVersion error by recovering the sharding metadata for the specified
      * database.
      */
-    virtual void handleStaleDatabaseVersionException(
+    virtual boost::optional<DatabaseVersion> handleStaleDatabaseVersionException(
         OperationContext* opCtx, const StaleDbRoutingVersion& staleDbException) const = 0;
 };
 

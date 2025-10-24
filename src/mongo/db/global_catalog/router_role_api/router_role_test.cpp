@@ -417,53 +417,6 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
-
-    // The CollectionRouter should not retry on StaleConfig error if a shard is stale in
-    // StaleConfigInfo.
-    tries = 0;
-    sharding::router::CollectionRouter routerNotRetry(getServiceContext(), _nss, false);
-    ASSERT_THROWS_CODE(
-        routerNotRetry.route(operationContext(),
-                             "test",
-                             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                                 ASSERT_TRUE(cri.hasRoutingTable());
-                                 tries++;
-                                 uasserted(StaleConfigInfo(_nss,
-                                                           ShardVersionFactory::make(ChunkVersion(
-                                                               {epoch, timestamp}, {2, 0})),
-                                                           boost::none,
-                                                           ShardId{"0"}),
-                                           "StaleConfig error");
-                             }),
-        DBException,
-        ErrorCodes::StaleConfig);
-    ASSERT_EQ(1, tries);
-
-    tries = 0;
-    sharding::router::CollectionRouter routerNotRetry2(getServiceContext(), _nss, false);
-    ASSERT_THROWS_CODE(routerNotRetry2.route(
-                           operationContext(),
-                           "test",
-                           [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                               ASSERT_TRUE(cri.hasRoutingTable());
-                               tries++;
-                               // Create versions where router has newer version than shard (shard
-                               // stale condition)
-                               const OID staleEpoch{OID::gen()};
-                               const Timestamp staleTimestamp{1, 0};
-                               auto shardVersion =
-                                   ChunkVersion({staleEpoch, staleTimestamp}, {1, 0});
-                               auto routerVersion =
-                                   ChunkVersion({staleEpoch, staleTimestamp}, {2, 0});
-                               uasserted(StaleConfigInfo(_nss,
-                                                         ShardVersionFactory::make(routerVersion),
-                                                         ShardVersionFactory::make(shardVersion),
-                                                         ShardId{"0"}),
-                                         "StaleConfig error");
-                           }),
-                       DBException,
-                       ErrorCodes::StaleConfig);
-    ASSERT_EQ(1, tries);
 }
 
 TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleDbVersionWithoutTxn) {
@@ -487,51 +440,6 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleDbVersionWithoutTxn) {
             });
     });
     future.default_timed_get();
-
-    ASSERT_EQ(tries, 2);
-
-    // The CollectionRouter should not retry on StaleDbVersion error if the shard is stale in
-    // StaleDbRoutingVersion.
-    tries = 0;
-    sharding::router::CollectionRouter routerNotRetry(getServiceContext(), _nss, false);
-    ASSERT_THROWS_CODE(
-        routerNotRetry.route(operationContext(),
-                             "test",
-                             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                                 ASSERT_TRUE(cri.hasRoutingTable());
-                                 tries++;
-                                 uasserted(StaleDbRoutingVersion(
-                                               _nss.dbName(),
-                                               DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
-                                               boost::none),
-                                           "staleDbVersion");
-                             }),
-        DBException,
-        ErrorCodes::StaleDbVersion);
-
-    ASSERT_EQ(1, tries);
-
-    tries = 0;
-    sharding::router::CollectionRouter routerNotRetry2(getServiceContext(), _nss, false);
-    ASSERT_THROWS_CODE(
-        routerNotRetry2.route(operationContext(),
-                              "test",
-                              [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                                  ASSERT_TRUE(cri.hasRoutingTable());
-                                  tries++;
-                                  // Create versions where router has newer version than shard
-                                  // (shard stale condition)
-                                  const UUID staleEpoch{UUID::gen()};
-                                  uasserted(StaleDbRoutingVersion(
-                                                _nss.dbName(),
-                                                DatabaseVersion(staleEpoch, Timestamp(2, 0)),
-                                                DatabaseVersion(staleEpoch, Timestamp(1, 0))),
-                                            "staleDbVersion");
-                              }),
-        DBException,
-        ErrorCodes::StaleDbVersion);
-
-    ASSERT_EQ(1, tries);
 }
 
 TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleEpochWithoutTxn) {

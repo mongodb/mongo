@@ -57,6 +57,7 @@
 #include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/local_catalog/shard_role_api/resource_yielders.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/logical_time.h"
@@ -852,14 +853,9 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
         // transition into the router role for it.
         const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedViewNss};
 
-        sharding::router::CollectionRouter router(opCtx->getServiceContext(),
-                                                  resolvedViewNss,
-                                                  false  // retryOnStaleShard=false
-        );
+        sharding::router::CollectionRouter router(opCtx->getServiceContext(), resolvedViewNss);
         status = router.routeWithRoutingContext(
             opCtx, "runAggregateOnView", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-                // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
-                // CollectionRouter's retryOnStaleShard=false.
                 const auto& cri = routingCtx.getCollectionRoutingInfo(resolvedViewNss);
 
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
@@ -880,17 +876,20 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
                     // Before throwing the kick-back exception, validate the routing table
                     // we are basing this decision on. We do so by briefly entering into
                     // the shard-role by acquiring the underlying collection.
-                    const auto underlyingColl = acquireCollectionMaybeLockFree(
-                        opCtx,
-                        CollectionAcquisitionRequest::fromOpCtx(
+                    shard_role_loop::withStaleShardRetry(opCtx, [&]() {
+                        const auto underlyingColl = acquireCollectionMaybeLockFree(
                             opCtx,
-                            resolvedView.getNamespace(),
-                            AcquisitionPrerequisites::OperationType::kRead));
+                            CollectionAcquisitionRequest::fromOpCtx(
+                                opCtx,
+                                resolvedView.getNamespace(),
+                                AcquisitionPrerequisites::OperationType::kRead));
 
-                    // Throw the kick-back exception.
-                    uasserted(std::move(resolvedView),
-                              "Resolved views on collections that do not exclusively live on the "
-                              "db-primary shard must be executed by mongos");
+                        // Throw the kick-back exception.
+                        uasserted(
+                            std::move(resolvedView),
+                            "Resolved views on collections that do not exclusively live on the "
+                            "db-primary shard must be executed by mongos");
+                    });
                 }
 
                 // Run the resolved aggregation locally.

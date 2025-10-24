@@ -311,10 +311,11 @@ assertAggResultAndRouting(
     {comment: "unionWith_foreign_does_not_exist"},
     {
         toplevelExec: [true, false],
-        // The node executing the $unionWith believes it has stale information about the foreign
-        // collection and needs to target shards to properly resolve it.
-        subPipelineLocal: [false, false],
-        subPipelineRemote: [true, false],
+        // The node executing the $unionWith is the db primary shard. Since the foreign collection
+        // does not exist, it is considered to be untracked (unsharded) and to reside on the
+        // db-primary shard. Therefore, we expect a local read on that shard.
+        subPipelineLocal: [true, false],
+        subPipelineRemote: [false, false],
     },
 );
 
@@ -579,7 +580,7 @@ if (!isAuthoritativeShardEnabled) {
             // collection is unsharded.
             toplevelExec: [true, false],
             subPipelineLocal: [true, false],
-            subPipelineRemote: [true, false],
+            subPipelineRemote: [false, false],
         },
     );
 }

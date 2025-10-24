@@ -67,7 +67,7 @@ filters:
   - "check_metadata*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
-  - "direct_shard*":
+  - "*direct_shard*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
   - "start_shard_draining*":

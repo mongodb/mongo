@@ -30,6 +30,7 @@
 #include "stale_shard_exception_handler.h"
 
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
+#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_runtime.h"
 #include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -38,11 +39,17 @@
 
 namespace mongo {
 
-void StaleShardDatabaseMetadataHandlerImpl::handleStaleDatabaseVersionException(
+boost::optional<DatabaseVersion>
+StaleShardDatabaseMetadataHandlerImpl::handleStaleDatabaseVersionException(
     OperationContext* opCtx, const StaleDbRoutingVersion& staleDbException) const {
     // Recover or refresh the shard metadata.
     uassertStatusOK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
         opCtx, staleDbException.getDb(), staleDbException.getVersionReceived()));
+
+    BypassDatabaseMetadataAccess bypassDbMetadataAccess(
+        opCtx, BypassDatabaseMetadataAccess::Type::kReadOnly);  // NOLINT
+    auto scopedDss = DatabaseShardingRuntime::acquireShared(opCtx, staleDbException.getDb());
+    return scopedDss->getDbVersion(opCtx);
 }
 
 boost::optional<ChunkVersion>

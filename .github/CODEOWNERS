@@ -1534,7 +1534,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/create_unsplittable_collection.js @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/sharding/**/list_cluster_catalog* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/sharding/**/check_metadata* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
-/jstests/sharding/**/direct_shard* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/jstests/sharding/**/*direct_shard* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /jstests/sharding/**/start_shard_draining* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/shard_draining_status_test.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/replica_set_to_csrs_promotion.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot

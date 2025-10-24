@@ -42,7 +42,6 @@
 #include "mongo/db/exec/classic/batched_delete_stage.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
@@ -53,9 +52,9 @@
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
-#include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_debug.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -79,7 +78,6 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -492,41 +490,26 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                 opCtx, at, ttlCollectionCache, coll, info.getIndexName());
         }
     } catch (const ExceptionFor<ErrorCategory::StaleShardVersionError>& ex) {
-        // The TTL index tried to delete some information from a sharded collection
-        // through a direct operation against the shard but the filtering metadata was
-        // not available or the index version in the cache was stale.
+        // The TTL index tried to delete some information from a sharded collection through a direct
+        // operation against the shard but the filtering metadata was not available.
         //
         // The current TTL task cannot be completed. However, if the critical section is
         // not held the code below will fire an asynchronous refresh, hoping that the
         // next time this task is re-executed the filtering information is already
-        // present. It will also invalidate the cache, causing the index information to be refreshed
-        // on the next attempt.
+        // present.
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
             staleInfo && !staleInfo->getCriticalSectionSignal()) {
             auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
             ExecutorFuture<void>(executor)
-                .then([serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
-                    ThreadClient tc("TTLShardVersionRecovery",
-                                    serviceContext->getService(ClusterRole::ShardServer));
-                    auto uniqueOpCtx = tc->makeOperationContext();
-                    auto opCtx = uniqueOpCtx.get();
-
-                    // Updates version in cache in case index version is stale.
-                    if (staleInfo->getVersionWanted()) {
-                        Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
-                            *nss, staleInfo->getVersionWanted());
-                    }
-
-                    FilteringMetadataCache::get(opCtx)
-                        ->onCollectionPlacementVersionMismatch(
-                            opCtx,
-                            *nss,
-                            staleInfo->getVersionWanted()
-                                ? boost::make_optional(
-                                      staleInfo->getVersionWanted()->placementVersion())
-                                : boost::none)
-                        .ignore();
-                })
+                .then(
+                    [serviceContext = opCtx->getServiceContext(), nss, staleError = ex.toStatus()] {
+                        ThreadClient tc("TTLShardVersionRecovery",
+                                        serviceContext->getService(ClusterRole::ShardServer));
+                        auto uniqueOpCtx = tc->makeOperationContext();
+                        auto opCtx = uniqueOpCtx.get();
+                        shard_role_loop::RetryContext shardRoleRetryCtx;
+                        shard_role_loop::handleStaleError(opCtx, staleError, shardRoleRetryCtx);
+                    })
                 .getAsync([](auto) {});
         }
         LOGV2_WARNING(6353000,

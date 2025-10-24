@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/global_catalog/router_role_api/router_role.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -98,19 +99,13 @@ bool initializeAutoGet(OperationContext* opCtx,
             }
         }
 
-        sharding::router::MultiCollectionRouter multiCollectionRouter(
-            opCtx->getServiceContext(),
-            secondaryExecNssListJustNss,
-            false  // retryOnStaleShard=false
-        );
+        sharding::router::MultiCollectionRouter multiCollectionRouter(opCtx->getServiceContext(),
+                                                                      secondaryExecNssListJustNss);
         multiCollectionRouter.route(
             opCtx,
             "initializeAutoGet",
             [&](OperationContext* opCtx,
                 const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap) {
-                // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
-                // CollectionRouter's retryOnStaleShard=false.
-
                 // Figure out if all of 'secondaryExecNssListJustNss' are local. This is useful
                 // because we can pushdown $lookup to SBE if:
                 // - All secondary collections are tracked and local to this shard.
@@ -120,9 +115,12 @@ bool initializeAutoGet(OperationContext* opCtx,
                 // read remotely, which would inhibit the pushdown of $lookup to SBE.
                 isAnySecondaryCollectionNotLocal =
                     multiCollectionRouter.isAnyCollectionNotLocal(opCtx, criMap);
-                auto scopedShardRoles =
-                    createScopedShardRoles(opCtx, criMap, secondaryExecNssListJustNss);
-                initAutoGetFn();
+
+                shard_role_loop::withStaleShardRetry(opCtx, [&]() {
+                    auto scopedShardRoles =
+                        createScopedShardRoles(opCtx, criMap, secondaryExecNssListJustNss);
+                    initAutoGetFn();
+                });
             });
     } else {
         initAutoGetFn();

@@ -84,10 +84,12 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
             optMetadata);
 
     auto metadata = *optMetadata;
+    const auto placementVersion = metadata.getShardPlacementVersion();
+    const auto shardVersion = ShardVersionFactory::make(metadata);
 
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
-                            ShardVersion::UNSHARDED() /* wantedVersion */,
+                            shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
             metadata.isSharded());
@@ -96,8 +98,6 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
             "The collection was not found locally even though it is marked as sharded.",
             collection);
 
-    const auto placementVersion = metadata.getShardPlacementVersion();
-    const auto shardVersion = ShardVersionFactory::make(metadata);
 
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,

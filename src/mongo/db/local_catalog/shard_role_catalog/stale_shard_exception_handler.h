@@ -44,7 +44,7 @@ public:
 
 class StaleShardDatabaseMetadataHandlerImpl : public StaleShardDatabaseMetadataHandler {
 public:
-    void handleStaleDatabaseVersionException(
+    boost::optional<DatabaseVersion> handleStaleDatabaseVersionException(
         OperationContext* opCtx, const StaleDbRoutingVersion& staleDbException) const override;
 };
 

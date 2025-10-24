@@ -575,12 +575,6 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
         // entering the shard role for a local read.
         routingCtx.onRequestSentForNss(nss);
 
-        // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
-        // catching exceptions. attachCursorSourceToPipelineForLocalRead enters the
-        // shard role but does not refresh the shard if the shard has stale metadata.
-        // Proceeding to do normal shard targeting, which will go through the
-        // service_entry_point and refresh the shard if needed.
-
         // Pass in the 'preFinalizedPipeline', since 'finalizeAndAttachCursorToPipelineForLocalRead'
         // will acquire new collection acquisition and perform 'finalizePipeline' on the new
         // collection metadata.
@@ -603,12 +597,6 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
                     "comment"_attr = expCtx->getOperationContext()->getComment());
 
         return pipelineWithCursor;
-    } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
-        // The current node has stale information about this collection, proceed with
-        // shard targeting, which has logic to handle refreshing that may be needed.
-    } catch (ExceptionFor<ErrorCategory::StaleShardVersionError>&) {
-        // The current node has stale information about this collection, proceed with
-        // shard targeting, which has logic to handle refreshing that may be needed.
     } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
         // The current node may be trying to run a pipeline on a namespace which is an
         // unresolved view, proceed with shard targeting,

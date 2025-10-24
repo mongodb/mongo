@@ -62,15 +62,31 @@ class StaleShardExceptionHandlerMock : public StaleShardCollectionMetadataHandle
 public:
     virtual ~StaleShardExceptionHandlerMock() = default;
 
-    void handleStaleDatabaseVersionException(
+    boost::optional<DatabaseVersion> handleStaleDatabaseVersionException(
         OperationContext* opCtx, const StaleDbRoutingVersion& staleDbException) const override {
         ++_numDbVersionCalls;
+        return std::visit(
+            OverloadedVisitor{
+                [&](const ReturnReceivedVersion&) {
+                    return boost::optional<DatabaseVersion>(staleDbException.getVersionReceived());
+                },
+                [&](const boost::optional<DatabaseVersion>& dbVersion) { return dbVersion; },
+            },
+            _handleStaleDatabaseVersionExceptionRet);
     }
 
     boost::optional<ChunkVersion> handleStaleShardVersionException(
         OperationContext* opCtx, const StaleConfigInfo& sci) const override {
         ++_numShardVersionCalls;
-        return _handleStaleShardVersionExceptionRet;
+        return std::visit(
+            OverloadedVisitor{
+                [&](const ReturnReceivedVersion&) {
+                    return boost::optional<ChunkVersion>(
+                        sci.getVersionReceived().placementVersion());
+                },
+                [&](const boost::optional<ChunkVersion>& chunkVersion) { return chunkVersion; },
+            },
+            _handleStaleShardVersionExceptionRet);
     }
 
     void clear() {
@@ -80,7 +96,12 @@ public:
 
     mutable int _numDbVersionCalls{0};
     mutable int _numShardVersionCalls{0};
-    mutable boost::optional<ChunkVersion> _handleStaleShardVersionExceptionRet;
+
+    class ReturnReceivedVersion {};
+    mutable std::variant<ReturnReceivedVersion, boost::optional<DatabaseVersion>>
+        _handleStaleDatabaseVersionExceptionRet = ReturnReceivedVersion{};
+    mutable std::variant<ReturnReceivedVersion, boost::optional<ChunkVersion>>
+        _handleStaleShardVersionExceptionRet = ReturnReceivedVersion{};
 };
 
 class CollectionShardingStateFactoryMock : public CollectionShardingStateFactory {
@@ -223,6 +244,14 @@ TEST_F(ShardRoleLoopTest, handleStaleDbException) {
     retryCtx = shard_role_loop::RetryContext{};
     ASSERT_EQ(CanRetry::NO, handleStaleError(_opCtx, staleDbStaleRouterStatus, retryCtx));
     ASSERT_EQ(0, _staleShardExceptionHandlerMock->_numDbVersionCalls);
+    ASSERT_EQ(0, _staleShardExceptionHandlerMock->_numShardVersionCalls);
+    _staleShardExceptionHandlerMock->clear();
+
+    // The router was stale, but the database does not exist anymore. The shard shall not retry.
+    _staleShardExceptionHandlerMock->_handleStaleDatabaseVersionExceptionRet = boost::none;
+    retryCtx = shard_role_loop::RetryContext{};
+    ASSERT_EQ(CanRetry::NO, handleStaleError(_opCtx, staleDbUnknownShardMetadataStatus, retryCtx));
+    ASSERT_EQ(1, _staleShardExceptionHandlerMock->_numDbVersionCalls);
     ASSERT_EQ(0, _staleShardExceptionHandlerMock->_numShardVersionCalls);
     _staleShardExceptionHandlerMock->clear();
 }

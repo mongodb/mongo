@@ -47,6 +47,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -396,7 +397,7 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
                                                ShardId donorShard,
                                                HostAndPort donorHost,
                                                BSONObj resumeToken) {
-    resharding::data_copy::staleConfigShardLoop(opCtx, [&] {
+    shard_role_loop::withStaleShardRetry(opCtx, [&] {
         // ReshardingOpObserver depends on the collection metadata being known when processing
         // writes to the temporary resharding collection. We attach placement version IGNORED to the
         // write operations to retry on a StaleConfig error and allow the collection metadata to be
