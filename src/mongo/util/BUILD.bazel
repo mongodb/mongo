@@ -559,6 +559,10 @@ mongo_cc_library(
         "//src/mongo/util:heap_profiler.cpp",
         "//src/mongo/util:tcmalloc_server_status_section.cpp",
     ],
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
@@ -573,6 +577,10 @@ mongo_cc_unit_test(
     srcs = [
         "//src/mongo/util:tcmalloc_set_parameter_test.cpp",
     ],
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
     tags = [
         "convert_target",
         "mongo_unittest_third_group",
