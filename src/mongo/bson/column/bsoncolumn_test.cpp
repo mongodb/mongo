@@ -1093,8 +1093,7 @@ public:
         appendEOO(expected);
 
         BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
-        ASSERT_THROWS_CODE(
-            std::distance(col.begin(), col.end()), DBException, ErrorCodes::InvalidBSONColumn);
+        ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 6785500);
     }
 
     const boost::optional<uint64_t> kDeltaForBinaryEqualValues = Simple8bTypeUtil::encodeInt64(0);
@@ -3880,7 +3879,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
         std::vector<BSONElement> collection;
         ASSERT_THROWS_CODE(colBlockBased.decompress<BSONElementMaterializer>(collection, allocator),
                            DBException,
-                           ErrorCodes::InvalidBSONColumn);
+                           8690000);
     }
 
     // Verify block-based path decompression throws an error.
@@ -3895,7 +3894,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
         ASSERT_THROWS_CODE(
             colBlockBased.decompress<BSONElementMaterializer>(allocator, std::span(testPaths)),
             DBException,
-            ErrorCodes::InvalidBSONColumn);
+            8609800);
     }
 
     // Build a similar BSONColumn that has the delta block not in interleaved mode.
@@ -3913,8 +3912,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
 
     // Verify the iterative implementation throws an error.
     BSONColumn col{scalarBinary.buf(), static_cast<size_t>(scalarBinary.len())};
-    ASSERT_THROWS_CODE(
-        std::distance(col.begin(), col.end()), DBException, ErrorCodes::InvalidBSONColumn);
+    ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 8412601);
 
     // Verify non-interleaved block-based decompression throws an error.
     {
@@ -3924,7 +3922,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
         std::vector<BSONElement> collection;
         ASSERT_THROWS_CODE(colBlockBased.decompress<BSONElementMaterializer>(collection, allocator),
                            DBException,
-                           ErrorCodes::InvalidBSONColumn);
+                           8609800);
     }
 }
 
@@ -8220,15 +8218,14 @@ TEST_F(BSONColumnTest, InterleavedEmptySequence) {
         {TestPath{{"x"}}, collection}};
     ASSERT_THROWS_CODE(colBlockBased.decompress<BSONElementMaterializer>(collection, allocator),
                        DBException,
-                       ErrorCodes::InvalidBSONColumn);
+                       8625732);
     ASSERT_THROWS_CODE(
         colBlockBased.decompress<BSONElementMaterializer>(allocator, std::span(testPaths)),
         DBException,
-        ErrorCodes::InvalidBSONColumn);
+        8625730);
 
     BSONColumn col(createBSONColumn(interleavedBinary.buf(), interleavedBinary.len()));
-    ASSERT_THROWS_CODE(
-        std::distance(col.begin(), col.end()), DBException, ErrorCodes::InvalidBSONColumn);
+    ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 9232700);
 }
 
 
@@ -8545,8 +8542,7 @@ TEST_F(BSONColumnTest, InvalidDeltaAfterInterleaved) {
         appendEOO(expected);
 
         BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
-        ASSERT_THROWS_CODE(
-            std::distance(col.begin(), col.end()), DBException, ErrorCodes::InvalidBSONColumn);
+        ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 6785500);
     };
 
     test(appendInterleavedStartLegacy);
@@ -8562,8 +8558,7 @@ TEST_F(BSONColumnTest, InvalidDeltaAfterInterleaved) {
     appendEOO(expected);
 
     BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
-    ASSERT_THROWS_CODE(
-        std::distance(col.begin(), col.end()), DBException, ErrorCodes::InvalidBSONColumn);
+    ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 6785500);
 }
 
 TEST_F(BSONColumnTest, InvalidDelta) {
@@ -9464,7 +9459,7 @@ TEST_F(BSONColumnTest, LegacyInterleavedPaths) {
     // 'Request for unknown element'
     ASSERT_THROWS_CODE(column.decompress<BSONElementMaterializer>(allocator, std::span(paths)),
                        DBException,
-                       ErrorCodes::InvalidBSONColumn);
+                       9071200);
 
     // Try again with a path that we can support.
     for (auto&& elem : elems) {

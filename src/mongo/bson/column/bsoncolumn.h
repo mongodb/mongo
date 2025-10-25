@@ -615,9 +615,8 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
     while (ptr < end) {
         control = *ptr;
         if (control == stdx::to_underlying(BSONType::eoo)) {
-            uassert(ErrorCodes::InvalidBSONColumn,
-                    "BSONColumn data ended without reaching end of buffer",
-                    ptr + 1 == end);
+            uassert(
+                8517800, "BSONColumn data ended without reaching end of buffer", ptr + 1 == end);
             break;
         } else if (isUncompressedLiteralControlByte(control)) {
             // The BSONColumn encoding guarantees that the field name is just a single null byte.
@@ -680,7 +679,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
                 ptr = newPtr;
             }
         } else {
-            uasserted(ErrorCodes::InvalidBSONColumn, "Unexpected control byte value");
+            uasserted(8517801, "Unexpected control byte value");
         }
     }
 }

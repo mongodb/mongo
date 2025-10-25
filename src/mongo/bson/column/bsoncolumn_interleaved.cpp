@@ -77,9 +77,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::writeToElement
                 .write<LittleEndian<double>>(Simple8bTypeUtil::decodeDouble(value, scaleIndex));
         } break;
         default:
-            uassert(ErrorCodes::InvalidBSONColumn,
-                    "attempt to materialize unsupported 64-bit type",
-                    false);
+            uassert(8784700, "attempt to materialize unsupported type", false);
     }
 }
 
@@ -121,15 +119,13 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElemen
             // The first 5 bytes in binData is a count and subType, copy them from
             // previous
             memcpy(esElem.value(), lastLiteral.value(), 5);
-            uassert(ErrorCodes::InvalidBSONColumn,
+            uassert(8690003,
                     "BinData length should not exceed 16 in a delta encoding",
                     lastLiteral.valuestrsize() <= 16);
             Simple8bTypeUtil::decodeBinary(value, esElem.value() + 5, lastLiteral.valuestrsize());
         } break;
         default:
-            uassert(ErrorCodes::InvalidBSONColumn,
-                    "attempt to materialize unsupported 128-bit type",
-                    false);
+            uassert(8784701, "attempt to materialize unsupported type", false);
     }
 }
 
@@ -237,8 +233,8 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage
               [&](DecodingState::Decoder64& d64) {
                   // Simple-8b delta block, load its scale factor and validate for sanity
                   uint8_t newScaleIndex = bsoncolumn::scaleIndexForControlByte(control);
-                  uassert(ErrorCodes::InvalidBSONColumn,
-                          "Invalid control byte in BSON Column in interleaved decoding",
+                  uassert(8690002,
+                          "Invalid control byte in BSON Column",
                           newScaleIndex != bsoncolumn::kInvalidScaleIndex);
 
                   // If Double, scale last value according to this scale factor
@@ -250,13 +246,11 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage
                           : _lastLiteral.Double();
 
                       auto encoded = Simple8bTypeUtil::encodeDouble(val, newScaleIndex);
-                      uassert(ErrorCodes::InvalidBSONColumn,
-                              "Invalid double encoding in BSON Column in interleaved decoding",
-                              encoded);
+                      uassert(8690001, "Invalid double encoding in BSON Column", encoded);
                       d64.lastEncodedValue = *encoded;
                   } else {
-                      uassert(ErrorCodes::InvalidBSONColumn,
-                              "Unexpected control for type in BSONColumn in interleaved decoding",
+                      uassert(8915500,
+                              "Unexpected control for type in BSONColumn",
                               newScaleIndex == Simple8bTypeUtil::kMemoryAsInteger);
                   }
 
@@ -272,8 +266,8 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage
               [&](DecodingState::Decoder128& d128) {
                   // We can read the last known value from the decoder iterator even as it has
                   // reached end.
-                  uassert(ErrorCodes::InvalidBSONColumn,
-                          "Invalid control byte in BSON Column in interleaved decoding",
+                  uassert(8915501,
+                          "Invalid control byte in BSON Column",
                           bsoncolumn::scaleIndexForControlByte(control) ==
                               Simple8bTypeUtil::kMemoryAsInteger);
 
@@ -310,7 +304,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(BSONElementStorage& 
         return _lastLiteral;
     }
 
-    uassert(ErrorCodes::InvalidBSONColumn,
+    uassert(8625729,
             "attempt to expand delta for type that does not have encoded representation",
             d64.lastEncodedValue);
 
@@ -347,7 +341,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(BSONElementStorage& 
     }
 
     // 'String' and 'Code' can have unencodable values that are followed by non-zero deltas.
-    uassert(ErrorCodes::InvalidBSONColumn,
+    uassert(8690000,
             "attempt to expand delta for type that does not have encoded representation",
             d128.lastEncodedValue || _lastLiteral.type() == BSONType::string ||
                 _lastLiteral.type() == BSONType::code);

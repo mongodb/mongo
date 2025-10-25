@@ -978,9 +978,6 @@ error_codes:
       categories: [Interruption, RetriableError],
     }
 
-  # Bad BSON column format found during decompression
-  - {code: 472, name: InvalidBSONColumn, categories: [ValidationError]}
-
   # Error codes 4000-8999 are reserved.
 
   # Non-sequential error codes for compatibility only)
