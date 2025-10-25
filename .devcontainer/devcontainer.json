@@ -1,5 +1,8 @@
 {
   "name": "MongoDB Development Container",
+  "runArgs": [
+    "--name=mongo-dev-${containerWorkspaceFolderBasename}-${devcontainerId}"
+  ],
   "build": {
     "dockerfile": "./Dockerfile",
     "context": "..",
