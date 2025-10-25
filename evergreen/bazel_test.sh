@@ -29,13 +29,13 @@ LOCAL_ARG="$(bazel_evergreen_shutils::compute_local_arg test)"
 # build on the waterfall, then we don't need the --release
 # flag. Otherwise, this is potentially a build that "leaves
 # the building", so we do want that flag.
-LOCAL_ARG="$(bazel_evergreen_shutils::maybe_release_flag "$LOCAL_ARG")"
+RELEASE_FLAG="$(bazel_evergreen_shutils::maybe_release_flag)"
 
 # Possibly scale test timeout and append to bazel_args
 bazel_evergreen_shutils::maybe_scale_test_timeout_and_append
 
 # Build the shared flags and persist the --config subset
-ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} ${patch_compile_flags:-}"
+ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} $RELEASE_FLAG ${patch_compile_flags:-}"
 echo "${ALL_FLAGS}" > .bazel_build_flags
 
 # to capture exit codes

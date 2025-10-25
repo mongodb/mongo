@@ -115,11 +115,10 @@ bazel_evergreen_shutils::extract_config_flags() {
 
 # Adds --config=public-release if this is a release-ish build.
 bazel_evergreen_shutils::maybe_release_flag() {
-  local local_arg="$1"
   if [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
-    echo "$local_arg" # non-release
+    echo "" # non-release
   else
-    echo "$local_arg --config=public-release"
+    echo "--config=public-release"
   fi
 }
 

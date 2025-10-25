@@ -142,13 +142,13 @@ LOCAL_ARG="$(bazel_evergreen_shutils::compute_local_arg build)"
 # build on the waterfall, then we don't need the --release
 # flag. Otherwise, this is potentially a build that "leaves
 # the building", so we do want that flag.
-LOCAL_ARG="$(bazel_evergreen_shutils::maybe_release_flag "$LOCAL_ARG")"
+RELEASE_FLAG="$(bazel_evergreen_shutils::maybe_release_flag)"
 
 # Ensure server is up and print PID
 bazel_evergreen_shutils::ensure_server_and_print_pid "$BAZEL_BINARY"
 
 # Build flags line
-ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} ${patch_compile_flags:-}"
+ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} $RELEASE_FLAG ${patch_compile_flags:-}"
 echo "${ALL_FLAGS}" > .bazel_build_flags
 
 set +o errexit
