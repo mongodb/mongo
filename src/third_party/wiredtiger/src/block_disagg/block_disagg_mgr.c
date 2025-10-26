@@ -152,7 +152,7 @@ __bmd_get_page_ids(
 
     if (block_disagg->plhandle->plh_get_page_ids == NULL) {
         __wt_verbose_warning(
-          session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "plh_discard is not implemented");
+          session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "plh_get_page_ids is not implemented");
         return (0);
     }
 

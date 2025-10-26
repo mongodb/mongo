@@ -678,7 +678,7 @@ config_cache(void)
 
     /* Check if both min and max cache sizes have been specified and if they're consistent. */
     if (config_explicit(NULL, "cache")) {
-        if (GV(CACHE) < 4086) {
+        if (GV(CACHE) < 2048) {
             config_off(NULL, "preserve_prepared");
             config_off(NULL, "precise_checkpoint");
         }
@@ -737,16 +737,16 @@ config_cache(void)
      * is solved.
      */
     if (GV(PRECISE_CHECKPOINT))
-        cache *= 6;
+        cache *= 2;
 
     if (GV(CACHE) < cache)
         GV(CACHE) = (uint32_t)cache;
 
-    if (GV(PRECISE_CHECKPOINT) && GV(CACHE) < 4086)
-        GV(CACHE) = 4086;
+    if (GV(PRECISE_CHECKPOINT) && GV(CACHE) < 2048)
+        GV(CACHE) = 2048;
 
     if (cache_maximum_explicit && GV(CACHE) > GV(CACHE_MAXIMUM)) {
-        if (GV(PRECISE_CHECKPOINT) && GV(CACHE_MAXIMUM) < 4086)
+        if (GV(PRECISE_CHECKPOINT) && GV(CACHE_MAXIMUM) < 2048)
             config_off(NULL, "cache.maximum");
         else
             GV(CACHE) = GV(CACHE_MAXIMUM);
@@ -779,9 +779,9 @@ dirty_eviction_config:
         config_single(NULL, "cache.eviction_updates_trigger=95", false);
     }
 
-    if (GV(PRECISE_CHECKPOINT) && GV(CACHE) < 4086) {
-        WARN("%s", "Setting cache to minimum of 4086MB due to precise_checkpoint");
-        config_single(NULL, "cache=4086", false);
+    if (GV(PRECISE_CHECKPOINT) && GV(CACHE) < 2048) {
+        WARN("%s", "Setting cache to minimum of 2048MB due to precise_checkpoint");
+        config_single(NULL, "cache=2048", false);
     }
 }
 

@@ -174,3 +174,15 @@ class WiredTigerStat:
     def __exit__(self, exception_type, exception_value, exception_traceback):
         # Close the statistics cursor
         self.stat_cursor.close()
+
+class WiredTigerCursor:
+    def __init__(self, session, uri = 'statistics:', *args, **kwargs):
+        self.cursor = session.open_cursor(uri, *args, **kwargs)
+
+    def __enter__(self):
+        # Get the opened cursor
+        return self.cursor
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        # Close the cursor
+        self.cursor.close()

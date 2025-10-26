@@ -427,7 +427,7 @@ __wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_TXN_OP *op, 
         __txn_apply_prepare_state_page_del(session, page_del, commit);
 
     if (WT_DELTA_INT_ENABLED(op->btree, S2C(session)))
-        __wt_atomic_add_uint8_v(&ref->ref_changes, 1);
+        __wt_atomic_store_uint8_v_release(&ref->rec_state, WT_REF_REC_DIRTY);
 
     WT_REF_UNLOCK(ref, previous_state);
 }
@@ -552,7 +552,7 @@ __wt_txn_op_delete_commit(
         __txn_op_delete_commit_apply_page_del_timestamp(session, op);
 
     if (WT_DELTA_INT_ENABLED(op->btree, S2C(session)))
-        __wt_atomic_add_uint8_v(&ref->ref_changes, 1);
+        __wt_atomic_store_uint8_v_release(&ref->rec_state, WT_REF_REC_DIRTY);
 
 err:
     WT_REF_UNLOCK(ref, previous_state);

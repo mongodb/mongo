@@ -358,7 +358,7 @@ __rec_hs_cursor_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint32_t btr
  *     A helper function to insert the record into the history store including stop time point.
  */
 static int
-__rec_hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
+__rec_hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree, WT_REF *ref,
   const WT_ITEM *key, const uint8_t type, const WT_ITEM *hs_value, WT_TIME_WINDOW *tw,
   bool error_on_ts_ordering)
 {
@@ -390,6 +390,9 @@ __rec_hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *bt
     WT_ASSERT(session,
       F_ISSET(session, WT_SESSION_INTERNAL) ||
         F_ISSET(cursor, WT_CURSTD_HS_READ_ALL | WT_CURSTD_HS_READ_COMMITTED));
+
+    __wt_verbose_debug1(session, WT_VERB_RECONCILE,
+      "start inserting an update to the history store for %p", (void *)ref);
 
     /*
      * Keep track if the caller had set WT_CURSTD_HS_READ_ALL flag on the history store cursor. We
@@ -543,6 +546,9 @@ __rec_hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *bt
       cursor, tw, tw->durable_stop_ts, tw->durable_start_ts, (uint64_t)type, hs_value);
     WT_ERR(cursor->insert(cursor));
 
+    __wt_verbose_debug1(session, WT_VERB_RECONCILE,
+      "finished inserting an update to the history store for %p", (void *)ref);
+
 err:
     if (!hs_read_all_flag)
         F_CLR(cursor, WT_CURSTD_HS_READ_ALL);
@@ -647,6 +653,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
 #define MAX_REVERSE_MODIFY_NUM 16
     WT_MODIFY entries[MAX_REVERSE_MODIFY_NUM];
     WT_UPDATE_VECTOR updates;
+    WT_REF *ref;
     WT_SAVE_UPD *list;
     WT_UPDATE *newest_hs, *newest_hs_tombstone, *no_ts_upd, *oldest_upd, *prev_upd, *ref_upd,
       *tombstone, *upd;
@@ -663,6 +670,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
     hs_flag_set = false;
     r->cache_write_hs = false;
     btree = S2BT(session);
+    ref = r->ref;
     prev_upd = NULL;
     WT_TIME_WINDOW_INIT(&tw);
     insert_cnt = 0;
@@ -916,6 +924,10 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             }
         }
 
+        __wt_verbose_debug1(session, WT_VERB_RECONCILE,
+          "moving %" WT_SIZET_FMT " updates to the history store in saved update list %u of ref %p",
+          updates.size, i, (void *)ref);
+
         if (updates.size > 0) {
             __wt_update_vector_peek(&updates, &oldest_upd);
 
@@ -1093,15 +1105,15 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
               __wt_calc_modify(session, prev_full_value, full_value, prev_full_value->size / 10,
                 entries, &nentries) == 0) {
                 WT_ERR(__wt_modify_pack(hs_cursor, entries, nentries, &modify_value));
-                WT_ERR(__rec_hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_MODIFY,
+                WT_ERR(__rec_hs_insert_record(session, hs_cursor, btree, ref, key, WT_UPDATE_MODIFY,
                   modify_value, &tw, error_on_ts_ordering));
                 ++cache_hs_insert_reverse_modify;
                 __wt_scr_free(session, &modify_value);
                 ++modify_cnt;
             } else {
                 modify_cnt = 0;
-                WT_ERR(__rec_hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_STANDARD,
-                  full_value, &tw, error_on_ts_ordering));
+                WT_ERR(__rec_hs_insert_record(session, hs_cursor, btree, ref, key,
+                  WT_UPDATE_STANDARD, full_value, &tw, error_on_ts_ordering));
                 ++cache_hs_insert_full_update;
             }
 

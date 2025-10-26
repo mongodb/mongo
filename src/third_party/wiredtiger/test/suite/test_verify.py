@@ -29,6 +29,7 @@
 import os, re, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from helper import WiredTigerCursor
 
 # test_verify.py
 #    Utilities: wt verify
@@ -384,6 +385,42 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # The test may output the following error message while opening a file that
         # does not exist. Ignore that.
         self.ignoreStderrPatternIfExists('No such file or directory')
+
+    def test_verify_redacted(self):
+        """
+        Test verify in a 'wt' process on a table with redacted.
+        """
+        self.skip_disagg_wt_verify_test()
+        if not wiredtiger.diagnostic_build():
+            self.skipTest('requires a diagnostic build as the test uses verify -d dump_pages')
+
+        params = 'key_format=S,value_format=S'
+        self.session.create('table:' + self.tablename, params)
+        self.populate(self.tablename)
+        """
+        Insert some secret entries into the table
+        """
+        with WiredTigerCursor(self.session, 'table:' + self.tablename, None, None) as cursor:
+            cursor['secret_key'] = "#hidden#"
+
+        # stabilize the table with a checkpoint
+        self.session.checkpoint()
+
+        # Check the redacted output
+        self.runWt(["-p", "verify", '-d', 'dump_pages', f"file:{self.tablename}.wt"],
+            outfilename='verify_redacted.out', errfilename="verify_redacted.err", failure=False)
+
+        self.check_empty_file('verify_redacted.err')
+        self.check_file_not_contains('verify_redacted.out', 'secret_key')
+        self.check_file_not_contains('verify_redacted.out', '#hidden#')
+
+        # Check the unredacted output
+        self.runWt(["-p", "verify", '-d', 'dump_pages', '-u', f"file:{self.tablename}.wt"],
+            outfilename='verify_redacted.out', errfilename="verify_redacted.err", failure=False)
+
+        self.check_empty_file('verify_redacted.err')
+        self.check_file_contains('verify_redacted.out', 'secret_key')
+        self.check_file_contains('verify_redacted.out', '#hidden#')
 
     def test_verify_all(self):
         """

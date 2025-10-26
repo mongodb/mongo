@@ -37,6 +37,10 @@ import wttest
 # Used as a 'mixin' class along with a WiredTigerTestCase class
 class suite_subprocess:
     subproc = None
+    """
+    Check the first 1GB content from a file.
+    """
+    maxbytes = 1 * 1024 ** 3
 
     def has_error_in_file(self, filename):
         """
@@ -97,12 +101,8 @@ class suite_subprocess:
     # Check contents of the file against a provided checklist. Expected is used as a bool to either
     # ensure checklist is included or ensure the checklist is not included in the file.
     def check_file_contains_one_of(self, filename, checklist, expected):
-        """
-        Check that the file contains the expected string in the first 100K bytes
-        """
-        maxbytes = 1024*100
         with open(filename, 'r') as f:
-            got = f.read(maxbytes)
+            got = f.read(self.maxbytes)
             found = False
             for expect in checklist:
                 pat = self.convert_to_pattern(expect)
@@ -127,8 +127,8 @@ class suite_subprocess:
                     expect = str(checklist)
                 gotstr = '\'' + \
                     (got if len(got) < 1000 else (got[0:1000] + '...')) + '\''
-                if len(got) >= maxbytes:
-                    self.fail(filename + ': does not contain expected ' + expect + ', or output is too large, got ' + gotstr)
+                if len(got) >= self.maxbytes:
+                    self.fail(filename + ': does not contain expected ' + expect + ', or output is larger than ' + str(self.maxbytes) + ' Bytes')
                 else:
                     self.fail(filename + ': does not contain expected ' + expect + ', got ' + gotstr)
 
@@ -172,11 +172,10 @@ class suite_subprocess:
               'output files follow:'
         WiredTigerTestCase.prout(out)
         for filename in filenames:
-            maxbytes = 1024*100
             with open(filename, 'r') as f:
-                contents = f.read(maxbytes)
+                contents = f.read(self.maxbytes)
                 if len(contents) > 0:
-                    if len(contents) >= maxbytes:
+                    if len(contents) >= self.maxbytes:
                         contents += '...\n'
                     sepline = '*' * 50 + '\n'
                     out = sepline + filename + '\n' + sepline + contents

@@ -2338,7 +2338,10 @@ static WT_INLINE void __wt_cache_decr_check_size(
 static WT_INLINE void __wt_cache_decr_check_uint64(
   WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v, const char *fld);
 static WT_INLINE void __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page);
-static WT_INLINE void __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page);
+static WT_INLINE void __wt_cache_dirty_decr_size(
+  WT_SESSION_IMPL *session, size_t size, bool is_internal);
+static WT_INLINE void __wt_cache_dirty_incr_size(
+  WT_SESSION_IMPL *session, size_t size, bool is_internal);
 static WT_INLINE void __wt_cache_page_byte_dirty_decr(
   WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static WT_INLINE void __wt_cache_page_byte_updates_decr(

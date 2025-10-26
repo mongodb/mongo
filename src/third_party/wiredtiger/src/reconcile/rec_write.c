@@ -39,7 +39,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
     btree = S2BT(session);
     page = ref->page;
 
-    __wt_verbose(session, WT_VERB_RECONCILE, "%p reconcile %s (%s%s)", (void *)ref,
+    __wt_verbose_debug1(session, WT_VERB_RECONCILE, "%p reconcile %s (%s%s)", (void *)ref,
       __wt_page_type_string(page->type), LF_ISSET(WT_REC_EVICT) ? "evict" : "checkpoint",
       LF_ISSET(WT_REC_HS) ? ", history store" : "");
 
@@ -379,6 +379,9 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
          */
         return (ret);
     }
+
+    __wt_verbose_debug1(
+      session, WT_VERB_RECONCILE, "finished building disk image for %p", (void *)ref);
 
     /* Wrap up the page reconciliation. Panic on failure. */
     WT_ERR(__rec_write_wrapup(session, r));
@@ -3149,8 +3152,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     __rec_page_modify_ta_safe_free(session, &mod->stop_ta);
     WT_TIME_AGGREGATE_INIT_MERGE(&stop_ta);
 
-    __wt_verbose(session, WT_VERB_RECONCILE, "%p reconciled into %" PRIu32 " pages", (void *)ref,
-      r->multi_next);
+    __wt_verbose_debug1(session, WT_VERB_RECONCILE, "%p reconciled into %" PRIu32 " pages",
+      (void *)ref, r->multi_next);
 
     switch (r->multi_next) {
     case 0: /* Page delete */
@@ -3262,7 +3265,7 @@ split:
     }
 
     if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
-        __wt_atomic_add_uint8_v(&ref->ref_changes, 1);
+        __wt_atomic_store_uint8_v_release(&ref->rec_state, WT_REF_REC_DIRTY);
 
     /*
      * If the page has post-instantiation delete information, we don't need it any more. Note: this
@@ -3378,6 +3381,9 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 
     btree = S2BT(session);
 
+    __wt_verbose_debug1(session, WT_VERB_RECONCILE,
+      "start moving updates to the history store for %p", (void *)r->ref);
+
     /* Set a flag in the session to track that we're in HS wrapup */
     F_SET(session, WT_SESSION_HS_WRAPUP);
     session->reconcile_stats.hs_wrapup_next_prev_calls = 0;
@@ -3409,6 +3415,9 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 
     WT_STAT_CONN_INCRV(
       session, rec_hs_wrapup_next_prev_calls, session->reconcile_stats.hs_wrapup_next_prev_calls);
+
+    __wt_verbose_debug1(session, WT_VERB_RECONCILE,
+      "finished moving updates to the history store for %p", (void *)r->ref);
 err:
     F_CLR(session, WT_SESSION_HS_WRAPUP);
     return (ret);

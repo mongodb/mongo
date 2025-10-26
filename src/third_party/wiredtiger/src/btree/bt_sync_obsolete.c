@@ -331,7 +331,7 @@ __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
          * ref's state. There's nothing to do for in-memory pages as we don't change those.
          */
         if (WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)) && previous_state != new_state)
-            __wt_atomic_add_uint8_v(&ref->ref_changes, 1);
+            __wt_atomic_store_uint8_v_release(&ref->rec_state, WT_REF_REC_DIRTY);
         WT_REF_UNLOCK(ref, new_state);
         WT_RET(ret);
     } else

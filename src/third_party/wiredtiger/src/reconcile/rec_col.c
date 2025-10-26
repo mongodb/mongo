@@ -219,7 +219,6 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
     WTI_REC_KV *val;
     WT_REF *ref;
     WT_TIME_AGGREGATE ft_ta, ta;
-    uint8_t prev_ref_changes;
 
     btree = S2BT(session);
     page = pageref->page;
@@ -235,7 +234,7 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
-        prev_ref_changes = __wt_atomic_load_uint8_v_acquire(&ref->ref_changes);
+        __wt_atomic_cas_uint8_v(&ref->rec_state, WT_REF_REC_DIRTY, WT_REF_REC_CLEAN);
 
         /* Update the starting record number in case we split. */
         r->recno = ref->ref_recno;
@@ -327,13 +326,6 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
         if (page_del != NULL)
             WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
         WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
-
-        /*
-         * Set the ref_changes state to zero if there were no concurrent changes while reconciling
-         * the internal page.
-         */
-        if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
-            __wt_atomic_cas_uint8_v(&ref->ref_changes, prev_ref_changes, 0);
     }
     WT_INTL_FOREACH_END;
 

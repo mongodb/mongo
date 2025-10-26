@@ -83,7 +83,7 @@ functions:
             ${additional_env_vars}
 
             echo "Dump Environment"
-            printenv
+            printenv | sort
         # The expansion is used for any task that requires the mongodbtoolchain binaries.
         - key: PREPARE_PATH
           value: |
@@ -92,6 +92,12 @@ functions:
             else
               export PATH=/opt/mongodbtoolchain/v5/bin:$PATH
             fi
+
+            ${additional_env_vars}
+
+            echo "Dump Environment"
+            printenv | sort
+
   # Since Bazel (currently used in SCons) uses EngFlow's remote execution system instead of icecream,
   # additional credentials need to be setup to maintain efficient compilation speed.
   "get engflow creds": &get_engflow_creds
@@ -1452,12 +1458,20 @@ variables:
       num_jobs: $(echo $(sysctl -n hw.logicalcpu) / 2 | bc)
       cmake_generator: "Unix Makefiles"
       additional_env_vars: |
+        export HOMEBREW_PREFIX="$(brew --prefix)"
+        export LLVM_PREFIX="$HOMEBREW_PREFIX/opt/llvm"
+        export PATH="$LLVM_PREFIX/bin:$PATH"
+        export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+        export CXXFLAGS="--sysroot=$SDKROOT"
+        export CFLAGS="--sysroot=$SDKROOT"
+        export CPPFLAGS="-isystem $LLVM_PREFIX/include"
+        export LDFLAGS="-L$LLVM_PREFIX/lib -L$LLVM_PREFIX/lib/c++ -L$LLVM_PREFIX/lib/unwind -lunwind"
+        export CC="clang"
+        export CXX="clang++"
         export LD_LIBRARY_PATH=""
         export DYLD_LIBRARY_PATH=$WT_BUILDDIR
       # Must disable TCMALLOC as it may be picked up locally and its not on all hosts.
       ENABLE_TCMALLOC: 0
-      # FIXME-WT-15777 Use PALM for unit tests for now until we can build PALite on macos-14.
-      unit_test_variant_args: "page_log=palm"
     tasks:
       - name: compile
         # This is a special case and should *only* be used for the macOS buildvariant.
@@ -2336,8 +2350,6 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "get project"
-      - func: "compile wiredtiger"
       - func: "python config check"
       - func: "unit test"
 
