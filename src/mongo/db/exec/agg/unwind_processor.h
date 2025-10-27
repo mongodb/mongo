@@ -31,14 +31,17 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
 namespace mongo::exec::agg {
 
-// This class is used by the aggregation framework and streams enterprise module
-// to perform the document processing needed for $unwind.
-class UnwindProcessor {
+/**
+ * This class is used by the aggregation framework and streams enterprise module to perform the
+ * document processing needed for $unwind.
+ */
+class MONGO_MOD_PUBLIC UnwindProcessor {
 public:
     UnwindProcessor(const FieldPath& unwindPath,
                     bool preserveNullAndEmptyArrays,

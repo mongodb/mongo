@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/util/modules.h"
 
 #include <boost/intrusive_ptr.hpp>
 
@@ -70,13 +71,23 @@ using DocumentSourceToStageFn =
  *
  * DO NOT call this function directly. Instead, use the REGISTER_AGG_STAGE_MAPPING
  * macro defined in this file.
+ *
+ * TODO SERVER-112775: Remove 'server_backup_restore' dependency on the 'REGISTER_AGG_STAGE_MAPPING'
+ * macro that references this function.
+ * TODO SERVER-112776: Remove 'data_movement' dependency on the 'REGISTER_AGG_STAGE_MAPPING' macro
+ * that references this function.
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on the 'REGISTER_AGG_STAGE_MAPPING' macro
+ * that references this function.
  */
-void registerDocumentSourceToStageFn(DocumentSource::Id dsid, DocumentSourceToStageFn fn);
+MONGO_MOD_NEEDS_REPLACEMENT void registerDocumentSourceToStageFn(DocumentSource::Id dsid,
+                                                                 DocumentSourceToStageFn fn);
 
 /**
  * Create the corresponding 'Stage' object for the given instance of 'DocumentSource'.
+ * TODO SERVER-112775: Remove 'server_backup_restore' dependency on this function.
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on this function.
  */
-StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds);
+MONGO_MOD_NEEDS_REPLACEMENT StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds);
 
 /**
  * Create the corresponding 'Stage' object for the given instance of 'DocumentSource'. Attach the

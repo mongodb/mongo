@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -41,7 +42,12 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
-class Pipeline {
+/**
+ * TODO SERVER-112775: Remove 'server_backup_restore' dependency on this class.
+ * TODO SERVER-112776: Remove 'data_movement' dependency on this class.
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on this class.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT Pipeline {
 public:
     using StageContainer = std::vector<StagePtr>;
 

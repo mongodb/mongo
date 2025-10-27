@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/merge_processor.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
@@ -49,8 +50,11 @@ namespace mongo::exec::agg {
  * This class handles the execution part of the single document transformation aggregation stage
  * and is part of the execution pipeline. Its construction is based on
  * DocumentSourceSingleDocumentTransformation, which handles the optimization part.
+ *
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on reference to 'BatchObject' type.
  */
-class MergeStage final : public WriterStage<MongoProcessInterface::BatchObject> {
+class MONGO_MOD_NEEDS_REPLACEMENT MergeStage final
+    : public WriterStage<MongoProcessInterface::BatchObject> {
 public:
     MergeStage(StringData stageName,
                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

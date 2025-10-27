@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/sequential_document_cache.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -56,8 +57,9 @@ namespace mongo::exec::agg {
  * This class handles the execution part of the lookup aggregation stage and is part of the
  * execution pipeline. Its construction is based on DocumentSourceLookUp, which handles the
  * optimization part.
+ * TODO SERVER-112777: Remove the reference to LookUpStage in the 'atlas_streams' module.
  */
-class LookUpStage final : public Stage {
+class MONGO_MOD_NEEDS_REPLACEMENT LookUpStage final : public Stage {
 public:
     LookUpStage(StringData stageName,
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -102,16 +104,22 @@ public:
     /**
      * Builds the $lookup pipeline for the streams engine, and should not be used in classic
      * $lookup.
+     *
+     * TODO SERVER-112777: Remove the need for this function in order to resolve 'atlas_streams'
+     * dependency on 'LookUpStage'.
      */
-    std::unique_ptr<mongo::Pipeline> buildStreamsPipeline(
+    MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<mongo::Pipeline> buildStreamsPipeline(
         const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
 
     /**
      * Reinitialize the cache with a new max size. May only be called if this DSLookup was created
      * with pipeline syntax only, the cache has not been frozen or abandoned, and no data has been
      * added to it.
+     *
+     * TODO SERVER-109932: Delete 'MONGO_MOD_PRIVATE' once 'document_source_lookup_test.cpp' is
+     * split into two files.
      */
-    void reInitializeCache_forTest(size_t maxCacheSizeBytes);
+    MONGO_MOD_PRIVATE void reInitializeCache_forTest(size_t maxCacheSizeBytes);
 
 private:
     GetNextResult doGetNext() final;

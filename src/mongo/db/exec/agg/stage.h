@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace exec {
@@ -44,8 +45,12 @@ namespace agg {
  * This is what is returned from the main 'Stage' API: getNext(). It is essentially a
  * (ReturnStatus, Document) pair, with the first entry being used to communicate information
  * about the execution of the 'Stage', such as whether or not it has been exhausted.
+ *
+ * TODO SERVER-112775: Remove 'server_backup_restore' dependency on this class.
+ * TODO SERVER-112776: Remove 'data_movement' dependency on this class.
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on this class.
  */
-class GetNextResult {
+class MONGO_MOD_NEEDS_REPLACEMENT GetNextResult {
 public:
     enum class ReturnStatus {
         // There is a result to be processed.
@@ -142,8 +147,13 @@ private:
     Document _result;
 };
 
-// TODO SPM-4106: Remove inheritance once the refactoring is done.
-class Stage : public virtual RefCountable {
+/**
+ * TODO SPM-4106: Remove inheritance once the refactoring is done.
+ * TODO SERVER-112775: Resolve 'server_backup_restore' dependency on this class.
+ * TODO SERVER-112776: Resolve 'data_movement' dependency on this class.
+ * TODO SERVER-112777: Resolve 'atlas_streams' dependency on this class.
+ */
+class MONGO_MOD_OPEN Stage : public virtual RefCountable {
 public:
     Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     ~Stage() override {}
