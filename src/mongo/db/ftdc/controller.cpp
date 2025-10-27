@@ -401,12 +401,6 @@ void FTDCController::doLoop(Service* service) try {
                     client, std::get<0>(collectSample), std::get<1>(collectSample));
                 iassert(s);
 
-                for (const auto& entry : sectionSizes) {
-                    LOGV2_INFO(10630201,
-                               "FTDC Entry",
-                               "name"_attr = entry.first,
-                               "size"_attr = entry.second);
-                }
             } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
                 for (const auto& entry : sectionSizes) {
                     LOGV2_INFO(10630202,
