@@ -193,9 +193,11 @@ def validate_database(
             "skipValidationOnInvalidViewDefinitions", False
         )
         skipValidationOnNamespaceNotFound = test_data.get("skipValidationOnNamespaceNotFound", True)
+        # TODO (SERVER-112502): Remove this and always set "full" to true.
+        doesNotSupportWTVerify = test_data.get("doesNotSupportWTVerify", False)
 
         validate_opts = {
-            "full": True,
+            "full": not doesNotSupportWTVerify,
             # TODO (SERVER-24266): Always enforce fast counts, once they are always accurate
             "enforceFastCount": not skipEnforceFastCountOnValidate,
         }
