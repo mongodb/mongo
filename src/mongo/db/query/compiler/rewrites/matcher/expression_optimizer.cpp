@@ -45,6 +45,7 @@
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_simplifier.h"
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/util/string_map.h"
 
 #include <absl/container/flat_hash_map.h>
 
@@ -291,8 +292,7 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
     if (matchType == MatchExpression::OR && children.size() > 1) {
         // This groups the children which have equalities to scalars, arrays, and regexes
         // against the same path.
-        stdx::unordered_map<std::string, std::vector<std::unique_ptr<MatchExpression>>>
-            pathToExprsMap;
+        StringMap<std::vector<std::unique_ptr<MatchExpression>>> pathToExprsMap;
 
         // The children which we know cannot be part of this optimization.
         std::vector<std::unique_ptr<MatchExpression>> nonEligibleForIn;
@@ -344,13 +344,13 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
                 }
             }
 
-            auto key = std::string{childExpression->path()};
-            if (!pathToExprsMap.contains(key)) {
+            StringData key = childExpression->path();
+            if (auto it = pathToExprsMap.find(key); it == pathToExprsMap.end()) {
                 std::vector<std::unique_ptr<MatchExpression>> exprs;
                 exprs.push_back(std::move(childExpression));
-                pathToExprsMap.insert({key, std::move(exprs)});
+                pathToExprsMap.insert({std::string{key}, std::move(exprs)});
             } else {
-                auto& childrenIndexList = pathToExprsMap.find(key)->second;
+                auto& childrenIndexList = it->second;
                 childrenIndexList.push_back(std::move(childExpression));
             }
         }
@@ -380,9 +380,6 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
 
         // Create the $in expressions.
         if (!pathToExprsMap.empty()) {
-            std::vector<std::unique_ptr<MatchExpression>> nonEquivOrChildren;
-            nonEquivOrChildren.reserve(nonEligibleForIn.size());
-
             std::vector<std::unique_ptr<InMatchExpression>> ins;
             ins.reserve(pathToExprsMap.size());
 
@@ -427,7 +424,7 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
                         auto status = inExpression->addRegex(std::move(regexExpressionPtr));
                         tassert(3401203,  // TODO SERVER-53380 convert to tassertStatusOK.
                                 "Conversion from OR to IN should always succeed",
-                                status == Status::OK());
+                                status.isOK());
                     } else {
                         tasserted(8619402,
                                   "Expecting that the predicate against " + path +
@@ -455,20 +452,15 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
                 auto status = inExpression->setEqualitiesArray(std::move(inEqualities));
                 tassert(3401206,  // TODO SERVER-53380 convert to tassertStatusOK.
                         "Conversion from OR to IN should always succeed",
-                        status == Status::OK());
+                        status.isOK());
 
                 ins.push_back(std::move(inExpression));
             }
 
             // Once we know if there will be at least one $in expression we can generate, gather
             // all of the children which are not going to be part of a new $in.
-            for (size_t i = 0; i < nonEligibleForIn.size(); i++) {
-                nonEquivOrChildren.push_back(std::move(nonEligibleForIn.at(i)));
-            }
-
-            tassert(3401204,
-                    "Incorrect number of non-equivalent expressions",
-                    nonEquivOrChildren.size() == nonEligibleForIn.size());
+            std::vector<std::unique_ptr<MatchExpression>> nonEquivOrChildren =
+                std::move(nonEligibleForIn);
 
             children.clear();
 
@@ -504,10 +496,7 @@ std::unique_ptr<MatchExpression> listOfOptimizer(std::unique_ptr<MatchExpression
         } else {
             // If the map is empty, there are no $in expressions to create. We should put all
             // the children back that we deemed ineligible.
-            children.clear();
-            for (size_t i = 0; i < nonEligibleForIn.size(); i++) {
-                children.push_back(std::move(nonEligibleForIn.at(i)));
-            }
+            children = std::move(nonEligibleForIn);
         }
     }
     return expression;
@@ -653,6 +642,7 @@ std::unique_ptr<MatchExpression> exprOptimizer(std::unique_ptr<MatchExpression> 
         // children. The rewritten expression might not be equivalent to the original one so we
         // still have to keep the latter for correctness.
         auto andMatch = std::make_unique<AndMatchExpression>();
+        andMatch->reserve(2);
         andMatch->add(exprMatchExpr.getRewriteResult()->releaseMatchExpression());
         andMatch->add(std::move(expression));
         // Re-optimize the new AND in order to make sure that any AND children are absorbed.

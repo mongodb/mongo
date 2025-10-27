@@ -54,7 +54,6 @@
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/util/assert_util.h"
 
-#include <algorithm>
 #include <cmath>
 #include <compare>
 #include <cstddef>
@@ -62,12 +61,9 @@
 #include <set>
 #include <type_traits>
 
-#include <s2cellid.h>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -369,6 +365,7 @@ unique_ptr<MatchExpression> createAndOfNodes(std::vector<unique_ptr<MatchExpress
     }
 
     unique_ptr<AndMatchExpression> splitAnd = std::make_unique<AndMatchExpression>();
+    splitAnd->reserve(children->size());
     for (auto&& expr : *children)
         splitAnd->add(std::move(expr));
 
@@ -384,6 +381,7 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
     }
 
     unique_ptr<NorMatchExpression> splitNor = std::make_unique<NorMatchExpression>();
+    splitNor->reserve(children->size());
     for (auto&& expr : *children)
         splitNor->add(std::move(expr));
 
@@ -717,7 +715,7 @@ bool hasPredicateOnPathsHelper(const MatchExpression& expr,
     boost::optional<StringData> fullPath;
     if (expr.fieldRef()) {
         if (parentPath) {
-            ownedPath = std::string{*parentPath} + "." + expr.fieldRef()->dottedField();
+            ownedPath = fmt::format("{}.{}", *parentPath, expr.fieldRef()->dottedField());
             fullPath = ownedPath;
         } else {
             fullPath = expr.fieldRef()->dottedField();
