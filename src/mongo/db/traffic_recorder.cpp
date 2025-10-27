@@ -125,10 +125,10 @@ void TrafficRecorder::Recording::start() {
                                                 std::ios_base::app | std::ios_base::out);
 
         // The calculator calculates the checksum of each recording for integrity check.
-        absl::crc32c_t checksum;
+        absl::crc32c_t checksum{0};
         auto writeChecksum = [&checksumOut, &checksum](const std::string& recordingFile) {
             fmt::print(checksumOut, "{}\t{:x}\n", recordingFile, static_cast<uint32_t>(checksum));
-            checksum = {};
+            checksum = absl::crc32c_t{0};
         };
 
         // This function guarantees to open a new recording file. Force the thread to sleep for
