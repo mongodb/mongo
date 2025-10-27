@@ -58,7 +58,7 @@ const st = new ShardingTest({
 });
 
 // Add one shard since the last shard cannot be removed.
-const normalShard = new ReplSetTest({name: "addshard2-1", nodes: 1, nodeOptions: {shardsvr: ""}});
+const normalShard = new ReplSetTest({name: "add_shard_2-1", nodes: 1, nodeOptions: {shardsvr: ""}});
 normalShard.startSet();
 normalShard.initiate();
 
