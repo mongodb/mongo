@@ -1468,17 +1468,6 @@ TEST_F(ReplCoordTest,
 
 class StepDownTest : public ReplCoordTest {
 protected:
-    struct SharedClientAndOperation {
-        static SharedClientAndOperation make(ServiceContext* serviceContext) {
-            SharedClientAndOperation result;
-            result.client = serviceContext->getService()->makeClient("StepDownThread");
-            result.opCtx = result.client->makeOperationContext();
-            return result;
-        }
-        std::shared_ptr<Client> client;
-        std::shared_ptr<OperationContext> opCtx;
-    };
-
     virtual void initAndStart() {
         init("mySet/test1:1234,test2:1234,test3:1234");
         assertStartSuccess(BSON("_id" << "mySet"
@@ -1493,28 +1482,32 @@ protected:
         ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     }
 
-    std::pair<SharedClientAndOperation, stdx::future<boost::optional<Status>>> stepDown_nonBlocking(
-        bool force, Milliseconds waitTime, Milliseconds stepDownTime) {
-        using PromisedClientAndOperation = stdx::promise<SharedClientAndOperation>;
-        auto task = stdx::packaged_task<boost::optional<Status>(PromisedClientAndOperation)>(
-            [=, this](PromisedClientAndOperation operationPromise) -> boost::optional<Status> {
-                auto result = SharedClientAndOperation::make(getServiceContext());
-                operationPromise.set_value(result);
+    stdx::future<boost::optional<Status>> stepDown_nonBlocking(bool force,
+                                                               Milliseconds waitTime,
+                                                               Milliseconds stepDownTime) {
+        auto task =
+            stdx::packaged_task<boost::optional<Status>()>([=, this]() -> boost::optional<Status> {
+                _stepDownClient = getServiceContext()->getService()->makeClient("StepDownThread");
+                _stepDownOpCtx = _stepDownClient->makeOperationContext();
+                // Temporarily attach the client to the current thread so that calls to cc()
+                // performed by the ReplicationCoordinator resolve as expected.
+                Client::setCurrent(std::move(_stepDownClient));
+                // (The fixture regains later ownership of the client to ensure a clean teardown).
+                ScopeGuard onExit([&] { _stepDownClient = Client::releaseCurrent(); });
+
                 try {
-                    getReplCoord()->stepDown(result.opCtx.get(), force, waitTime, stepDownTime);
+                    getReplCoord()->stepDown(_stepDownOpCtx.get(), force, waitTime, stepDownTime);
                     return Status::OK();
                 } catch (const DBException& e) {
                     return e.toStatus();
                 }
             });
         auto result = task.get_future();
-        PromisedClientAndOperation operationPromise;
-        auto operationFuture = operationPromise.get_future();
-        stdx::thread(std::move(task), std::move(operationPromise)).detach();
+        stdx::thread(std::move(task)).detach();
 
         getReplCoord()->waitForStepDownAttempt_forTest();
 
-        return std::make_pair(operationFuture.get(), std::move(result));
+        return result;
     }
 
     // Makes it so enough secondaries are caught up that a stepdown command can succeed.
@@ -1558,6 +1551,10 @@ protected:
         exitNetwork();
     }
 
+    OperationContext* getStepDownOpCtx() {
+        return _stepDownOpCtx.get();
+    }
+
     OID rid2;
     OID rid3;
 
@@ -1566,6 +1563,9 @@ private:
         ReplCoordTest::setUp();
         initAndStart();
     }
+
+    ServiceContext::UniqueClient _stepDownClient;
+    std::shared_ptr<OperationContext> _stepDownOpCtx;
 };
 
 
@@ -1934,7 +1934,7 @@ TEST_F(StepDownTest, StepDownCanCompleteBasedOnReplSetUpdatePositionAlone) {
     ASSERT_OK(repl->processReplSetUpdatePosition(updatePositionArgs));
 
     // Verify that stepDown completes successfully.
-    ASSERT_OK(*result.second.get());
+    ASSERT_OK(*result.get());
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -1967,12 +1967,12 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 
     // Interrupt the ongoing stepdown command so that the stepdown attempt will fail.
     {
-        stdx::lock_guard<Client> lk(*result.first.client.get());
-        result.first.opCtx->markKilled(ErrorCodes::Interrupted);
+        stdx::lock_guard<Client> lk(cc());
+        getStepDownOpCtx()->markKilled(ErrorCodes::Interrupted);
     }
 
     // Ensure that the stepdown command failed.
-    auto stepDownStatus = *result.second.get();
+    auto stepDownStatus = *result.get();
     ASSERT_NOT_OK(stepDownStatus);
     // Which code is returned is racy.
     ASSERT(stepDownStatus == ErrorCodes::PrimarySteppedDown ||
@@ -2145,7 +2145,7 @@ TEST_F(StepDownTestWithUnelectableNode,
     ASSERT_OK(repl->processReplSetUpdatePosition(catchupOtherSecondary));
 
     // Verify that stepDown completes successfully.
-    ASSERT_OK(*result.second.get());
+    ASSERT_OK(*result.get());
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -2680,7 +2680,7 @@ TEST_F(StepDownTest,
 
     catchUpSecondaries(optime2, Date_t() + Seconds(optime2.getSecs()));
 
-    ASSERT_OK(*result.second.get());
+    ASSERT_OK(*result.get());
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -2729,7 +2729,7 @@ TEST_F(StepDownTest,
 
     catchUpSecondaries(optime2);
 
-    ASSERT_OK(*result.second.get());
+    ASSERT_OK(*result.get());
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -2748,8 +2748,8 @@ TEST_F(StepDownTest, NodeReturnsInterruptedWhenInterruptedDuringStepDown) {
 
     // stepDown where the secondary actually has to catch up before the stepDown can succeed.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
-    killOperation(result.first.opCtx.get());
-    ASSERT_EQUALS(ErrorCodes::Interrupted, *result.second.get());
+    killOperation(getStepDownOpCtx());
+    ASSERT_EQUALS(ErrorCodes::Interrupted, *result.get());
     ASSERT_TRUE(repl->getMemberState().primary());
 }
 
@@ -2783,7 +2783,7 @@ TEST_F(StepDownTest, OnlyOneStepDownCmdIsAllowedAtATime) {
     // Now ensure that the original stepdown command can still succeed.
     catchUpSecondaries(optime2);
 
-    ASSERT_OK(*result.second.get());
+    ASSERT_OK(*result.get());
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -2816,7 +2816,7 @@ TEST_F(StepDownTest, UnconditionalStepDownFailsStepDownCommand) {
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     // Ensure that the stepdown command failed.
-    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, *result.second.get());
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, *result.get());
 }
 
 // Test that if a stepdown command is blocked waiting for secondaries to catch up when an
@@ -2849,12 +2849,12 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
 
     // Interrupt the ongoing stepdown command.
     {
-        stdx::lock_guard<Client> lk(*result.first.client.get());
-        result.first.opCtx->markKilled(ErrorCodes::Interrupted);
+        stdx::lock_guard<Client> lk(cc());
+        getStepDownOpCtx()->markKilled(ErrorCodes::Interrupted);
     }
 
     // Ensure that the stepdown command failed.
-    ASSERT_EQUALS(*result.second.get(), ErrorCodes::Interrupted);
+    ASSERT_EQUALS(*result.get(), ErrorCodes::Interrupted);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // We should now report that we are a writable primary.
@@ -2900,8 +2900,8 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
 
     // Interrupt the ongoing stepdown command.
     {
-        stdx::lock_guard<Client> lk(*result.first.client.get());
-        result.first.opCtx->markKilled(ErrorCodes::Interrupted);
+        stdx::lock_guard<Client> lk(cc());
+        getStepDownOpCtx()->markKilled(ErrorCodes::Interrupted);
     }
 
     // Now while the first stepdown request is waiting for secondaries to catch up, force an
@@ -2910,7 +2910,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     // Ensure that the stepdown command failed.
-    auto stepDownStatus = *result.second.get();
+    auto stepDownStatus = *result.get();
     ASSERT_NOT_OK(stepDownStatus);
     // Which code is returned is racy.
     ASSERT(stepDownStatus == ErrorCodes::PrimarySteppedDown ||

@@ -57,7 +57,10 @@
 #include "mongo/db/global_catalog/catalog_cache/routing_information_cache.h"
 #include "mongo/db/global_catalog/catalog_cache/shard_server_catalog_cache_loader.h"
 #include "mongo/db/global_catalog/catalog_cache/shard_server_catalog_cache_loader_impl.h"
+#include "mongo/db/global_catalog/ddl/drop_agg_temp_collections.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/index_on_config.h"
+#include "mongo/db/global_catalog/metadata_consistency_validation/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_impl.h"
 #include "mongo/db/keys_collection_client.h"
@@ -82,11 +85,16 @@
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/client/shard_factory.h"
 #include "mongo/db/sharding_environment/client/shard_remote.h"
 #include "mongo/db/sharding_environment/client/sharding_connection_hook.h"
+#include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/router_uptime_reporter.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -99,6 +107,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -519,6 +528,17 @@ void _initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
     Grid::get(opCtx)->setShardingInitialized();
 }
 
+void _setClusterTimeSigningEnabled(OperationContext* opCtx, bool enabled) {
+    const auto signingAllowedOnNode = [] {
+        const auto& clusterNode = serverGlobalParams.clusterRole;
+        // Only config servers and single replica sets are allowed to sign cluster times.
+        return clusterNode.has(ClusterRole::ConfigServer) || clusterNode.has(ClusterRole::None);
+    }();
+    if (auto validator = LogicalTimeValidator::get(opCtx); signingAllowedOnNode && validator) {
+        validator->enableKeyGenerator(opCtx, enabled);
+    }
+}
+
 }  // namespace
 
 ShardingInitializationMongoD::ShardingInitializationMongoD()
@@ -670,7 +690,168 @@ void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long l
     }
 }
 
+void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, long long term) {
+    auto* svcCtx = opCtx->getServiceContext();
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        Status status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
+        if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
+            // If the node is shutting down or it lost quorum just as it was becoming primary,
+            // don't run the sharding onStepUp machinery. The onStepDown counterpart to these
+            // methods is already idempotent, so the machinery will remain in the stepped down
+            // state.
+            if (ErrorCodes::isShutdownError(status.code()) ||
+                ErrorCodes::isNotPrimaryError(status.code())) {
+                return;
+            }
+            fassertFailedWithStatus(
+                40184,
+                status.withContext("Failed to initialize config database on config server's "
+                                   "first transition to primary"));
+        }
+
+        if (status.isOK()) {
+            // Load the clusterId into memory. Use local readConcern, since we can't use
+            // majority/snapshot readConcern in drain mode because the global lock prevents
+            // replication. This is safe, since if the clusterId write is rolled back, any writes
+            // that depend on it will also be rolled back.
+            //
+            // Since we *just* wrote the cluster ID to the config.version document (via the call
+            // to ShardingCatalogManager::initializeConfigDatabaseIfNeeded above), this read can
+            // only meaningfully fail if the node is shutting down.
+            status = ClusterIdentityLoader::get(opCtx)->loadClusterId(
+                opCtx,
+                ShardingCatalogManager::get(opCtx)->localCatalogClient(),
+                repl::ReadConcernLevel::kLocalReadConcern);
+
+            if (ErrorCodes::isShutdownError(status.code())) {
+                return;
+            }
+            fassert(40217, status);
+        }
+
+        if (auto validator = LogicalTimeValidator::get(svcCtx)) {
+            validator->enableKeyGenerator(opCtx, true);
+        }
+
+        PeriodicShardedIndexConsistencyChecker::get(svcCtx).onStepUp(svcCtx);
+        TransactionCoordinatorService::get(svcCtx)->initializeIfNeeded(opCtx, term);
+
+        FilteringMetadataCache::get(svcCtx)->onStepUp();
+
+        ShardingCatalogManager::get(opCtx)->scheduleAsyncUnblockDDLCoordinators(opCtx);
+    }
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        if (ShardingState::get(opCtx)->enabled()) {
+            VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
+
+            if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                // Called earlier for config servers.
+                TransactionCoordinatorService::get(svcCtx)->initializeIfNeeded(opCtx, term);
+                FilteringMetadataCache::get(opCtx)->onStepUp();
+            }
+
+            const auto configsvrConnStr =
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
+            ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
+                opCtx, configsvrConnStr);
+
+            // Note, these must be done after the configTime is recovered via
+            // VectorClockMutable::recoverDirect above, because they may trigger filtering metadata
+            // refreshes which should use the recovered configTime.
+            migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
+            migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
+
+            const bool scheduleAsyncRefresh = true;
+            resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+
+            // Schedule a drop of the temporary collections used by aggregations ($out
+            // specifically).
+            dropAggTempCollections(opCtx);
+        }
+
+        // The code above will only be executed after a stepdown happens, however the code below
+        // needs to be executed also on startup, and the enabled check might fail in shards during
+        // startup. Create uuid index on config.rangeDeletions if needed
+        const auto minKeyFieldName =
+            RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName;
+        const auto maxKeyFieldName =
+            RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName;
+        Status indexStatus = createIndexOnConfigCollection(
+            opCtx,
+            NamespaceString::kRangeDeletionNamespace,
+            BSON(RangeDeletionTask::kCollectionUuidFieldName << 1 << minKeyFieldName << 1
+                                                             << maxKeyFieldName << 1),
+            false);
+        if (!indexStatus.isOK()) {
+            // If the node is shutting down or it lost quorum just as it was becoming primary,
+            // don't run the sharding onStepUp machinery. The onStepDown counterpart to these
+            // methods is already idempotent, so the machinery will remain in the stepped down
+            // state.
+            if (ErrorCodes::isShutdownError(indexStatus.code()) ||
+                ErrorCodes::isNotPrimaryError(indexStatus.code())) {
+                return;
+            }
+            fassertFailedWithStatus(
+                64285,
+                indexStatus.withContext("Failed to create index on config.rangeDeletions on "
+                                        "shard's first transition to primary"));
+        }
+    }
+
+    _setClusterTimeSigningEnabled(opCtx, true);
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+        !ShardingState::get(opCtx)->enabled()) {
+        // Note this must be called after the config server has created the cluster ID and also
+        // after the onStepUp logic for the shard role because this triggers sharding state
+        // initialization which will transition some components into the "primary" state, like
+        // the TransactionCoordinatorService, and they would fail if the onStepUp logic
+        // attempted the same transition.
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        // TODO: SERVER-82965 Remove condition after v8.0 becomes last-lts.
+        if (!serverGlobalParams.doAutoBootstrapSharding ||
+            gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),
+                                                       fcvSnapshot)) {
+            // We only want to install the shard identity if we don't have one yet. Otherwise the
+            // field in the shard identity representing the replicaSetConfigShardMaintenanceMode
+            // might differ from the actual startup value, and we try to install a shard identity
+            // that differs from the existing one, which is prohibited. Since that field is
+            // responsible for the deferred sharding initialization, we should trust the persisted
+            // field instead of the startup flag (which will be reset by transforming to a sharded
+            // cluster).
+            if (!ShardingInitializationMongoD::getShardIdentityDoc(opCtx)) {
+                ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(
+                    opCtx, serverGlobalParams.replicaSetConfigShardMaintenanceMode);
+            }
+        }
+
+        if (gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),
+                                                       fcvSnapshot)) {
+            ShardingReady::get(opCtx)->scheduleTransitionToConfigShard(opCtx);
+        }
+    }
+}
+
 void ShardingInitializationMongoD::onStepDown() {
+    auto opCtx = cc().getOperationContext();
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        PeriodicShardedIndexConsistencyChecker::get(opCtx).onStepDown();
+        TransactionCoordinatorService::get(opCtx)->interrupt();
+    }
+
+    if (ShardingState::get(opCtx)->enabled()) {
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            // Called earlier for config servers.
+            TransactionCoordinatorService::get(opCtx)->interrupt();
+        }
+
+        FilteringMetadataCache::get(opCtx)->onStepDown();
+    }
+
+    _setClusterTimeSigningEnabled(opCtx, false);
+
     _isPrimary.store(false);
 }
 

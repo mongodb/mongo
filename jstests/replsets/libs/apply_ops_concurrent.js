@@ -19,7 +19,6 @@
  *     Fully qualified namespace of second set of CRUD operations. This may be the same namespace as
  *     ns1. As with ns1, only insert operations will be used.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export var ApplyOpsConcurrentTest = function (options) {
@@ -126,16 +125,10 @@ export var ApplyOpsConcurrentTest = function (options) {
     }
 
     /**
-     * Returns number of insert operations reported by serverStatus.
-     * Depending on the server version, applyOps may increment either 'opcounters' or
-     * 'opcountersRepl':
-     *     since 3.6: 'opcounters.insert'
-     *     3.4 and older: 'opcountersRepl.insert'
+     * Returns number of insert operations recorded on the oplog for the targeted collections.
      */
-    function getInsertOpCount(serverStatus) {
-        return serverStatus.version.substr(0, 3) === "3.4"
-            ? serverStatus.opcountersRepl.insert
-            : serverStatus.opcounters.insert;
+    function getInsertOpCount(primary, targetedCollections) {
+        return primary.getCollection("local.oplog.rs").countDocuments({op: "i", "ns": {$in: targetedCollections}});
     }
 
     /**
@@ -183,16 +176,13 @@ export var ApplyOpsConcurrentTest = function (options) {
         // holding the global lock, the insert opcounter will eventually be incremented to 2.
         try {
             let insertOpCount = 0;
-            // Expecting two HMAC inserts and two applyOps in-progress.
-            let expectedFinalOpCount = 4;
-            // We end up with 3 HMAC inserts due to timing changes without the RSTL.
-            if (FeatureFlagUtil.isPresentAndEnabled(adminDb, "IntentRegistration")) {
-                expectedFinalOpCount = 5;
-            }
+            // Expecting two applyOps in-progress.
+            let expectedFinalOpCount = 2;
+
             assert.soon(
                 function () {
                     const serverStatus = adminDb.serverStatus();
-                    insertOpCount = getInsertOpCount(serverStatus);
+                    insertOpCount = getInsertOpCount(primary, [coll1.getFullName(), coll2.getFullName()]);
                     // This assertion may fail if the fail point is not implemented correctly within
                     // applyOps. This allows us to fail fast instead of waiting for the
                     // assert.soon() function to time out.
@@ -229,14 +219,11 @@ export var ApplyOpsConcurrentTest = function (options) {
         primary.setLogLevel(previousLogLevel, "replication");
 
         const serverStatus = adminDb.serverStatus();
-        let expectedOpCount = 202;
-        if (FeatureFlagUtil.isPresentAndEnabled(adminDb, "IntentRegistration")) {
-            expectedOpCount = 203;
-        }
-        // insert opCount will include insertions of two HMAC signing keys generated at RS initiate.
+        let expectedOpCount = 2 * numOps;
+
         assert.eq(
             expectedOpCount,
-            getInsertOpCount(serverStatus),
+            getInsertOpCount(primary, [coll1.getFullName(), coll2.getFullName()]),
             "incorrect number of insert operations in server status after applyOps: " + tojson(serverStatus),
         );
 

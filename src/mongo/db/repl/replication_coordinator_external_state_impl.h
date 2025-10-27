@@ -164,27 +164,12 @@ private:
     void _stopDataReplication(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock);
 
     /**
-     * Called when the instance transitions to primary in order to notify a potentially sharded host
-     * to perform respective state changes, such as starting the balancer, etc.
-     *
-     * Throws on errors.
-     */
-    void _shardingOnTransitionToPrimaryHook(OperationContext* opCtx, long long term);
-
-    /**
      * Drops all temporary collections on all databases except "local".
      *
      * The implementation may assume that the caller has acquired the global exclusive lock
      * for "opCtx".
      */
     void _dropAllTempCollections(OperationContext* opCtx);
-
-    /**
-     * Resets any active sharding metadata on this server and stops any sharding-related threads
-     * (such as the balancer). It is called after stepDown to ensure that if the node becomes
-     * primary again in the future it will recover its state from a clean slate.
-     */
-    void _shardingOnStepDownHook();
 
     /**
      * Stops asynchronous updates to and then clears the oplogTruncateAfterPoint.

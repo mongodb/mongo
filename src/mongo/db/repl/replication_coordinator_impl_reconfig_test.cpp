@@ -2711,10 +2711,15 @@ TEST_F(ReplCoordReconfigTest, FindOwnHostForCommandReconfigQuickUnelectableButFo
     unittest::LogCaptureGuard logs;
 
     Status status(ErrorCodes::InternalError, "Not Set");
-    const auto opCtx = makeOperationContext();
-    auto reconfigThread = stdx::thread(
-        [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
-
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    auto reconfigThread = stdx::thread([&] {
+        auto client = getGlobalServiceContext()->getService()->makeClient("replSetInitiate");
+        client->setService(getGlobalServiceContext()->getService());
+        auto opCtxHolder = client->makeOperationContext();
+        // This ensures that calls to cc() performed by the ReplicationCoordinator work as expected.
+        Client::setCurrent(std::move(client));
+        status = getReplCoord()->processReplSetReconfig(opCtxHolder.get(), args, &result);
+    });
     // Satisfy the quorum check.
     enterNetwork();
     respondToHeartbeat();
