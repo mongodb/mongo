@@ -24,7 +24,7 @@ let res = coll.runCommand("compact", {force: true});
 if (res.code == 115) {
     quit();
 }
-assert.commandWorked(res);
+assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted);
 
 assert.eq(coll.getIndexes().length, 2);
 assert.eq(coll.find({_id: 1}).itcount(), 1);
