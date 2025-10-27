@@ -133,3 +133,6 @@ filters:
   - "safe_secondary_reads_causal_consistency.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "reporting_compound_wildcard_index_prefixed_by_shard_key.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl

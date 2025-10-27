@@ -97,6 +97,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
         countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes.loadRelaxed());
     builder->append("countFlushReshardingStateChangeFailedShardingMetadataRefreshes",
                     countFlushReshardingStateChangeFailedShardingMetadataRefreshes.loadRelaxed());
+    builder->append("countHitsOfCompoundWildcardIndexesWithShardKeyPrefix",
+                    countHitsOfCompoundWildcardIndexesWithShardKeyPrefix.loadRelaxed());
 }
 
 }  // namespace mongo

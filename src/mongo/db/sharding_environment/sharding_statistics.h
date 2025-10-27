@@ -152,6 +152,13 @@ struct ShardingStatistics {
     AtomicWord<long long> countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes{0};
     AtomicWord<long long> countFlushReshardingStateChangeFailedShardingMetadataRefreshes{0};
 
+    // Total number of times a compound wildcard index prefixed by shard key has been detected
+    // during a moveChunk, range deleter or any other operation which needs to fetch a valid shard
+    // key index. This will help estimate the impact of SERVER-103774.
+    //
+    // TODO (SERVER-112793) Remove once v9.0 branches out.
+    AtomicWord<long long> countHitsOfCompoundWildcardIndexesWithShardKeyPrefix{0};
+
     /**
      * Obtains the per-process instance of the sharding statistics object.
      */

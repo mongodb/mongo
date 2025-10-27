@@ -85,3 +85,14 @@ server_parameters:
             gte: 1
         default: 10
         redact: false
+
+    # TODO (SERVER-112793) Remove once v9.0 branches out
+    enableCompoundWildcardIndexLog:
+        description: >-
+            Enable logging whether a compound wildcard index prefixed by the shard key exists
+            when a shard key index is fetched for a sharded collection.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableCompoundWildcardIndexLog
+        default: true
+        redact: false
