@@ -10,7 +10,15 @@ ARG USER_GID=$USER_UID
 # Create the user
 RUN groupadd $USERNAME && useradd -s /bin/bash --gid $USER_GID -m $USERNAME
 
-RUN apt-get update && apt-get install -y sudo curl ca-certificates
+RUN apt-get update && apt-get install -y sudo curl ca-certificates xdg-utils
+
+# Install xdg-open wrapper for browser integration
+COPY .devcontainer/xdg-open-wrapper.sh /usr/local/bin/xdg-open-wrapper.sh
+RUN chmod +x /usr/local/bin/xdg-open-wrapper.sh && \
+  if [ -f /usr/bin/xdg-open ]; then \
+    mv /usr/bin/xdg-open /usr/bin/xdg-open.real; \
+  fi && \
+  ln -s /usr/local/bin/xdg-open-wrapper.sh /usr/bin/xdg-open
 
 # Give user sudo access
 RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/devcontaineruser && chmod 0440 /etc/sudoers.d/devcontaineruser
