@@ -367,8 +367,11 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
     for (size_t i = 0; i < _holders.size(); ++i) {
         const auto priority = static_cast<AdmissionContext::Priority>(i);
 
-        if (priority == AdmissionContext::Priority::kExempt) {
-            // Do not report statistics for kExempt as they are included in the normal priority pool
+        if (priority == AdmissionContext::Priority::kExempt ||
+            (priority == AdmissionContext::Priority::kLow && !usesPrioritization())) {
+            // Do not report statistics for kExempt as they are included in the normal priority
+            // pool. Also, low priority statistics should only be reported when prioritization is
+            // enabled.
             continue;
         }
 
@@ -385,7 +388,9 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
                 readStats.emplace();
             }
             BSONObjBuilder bb(readStats->subobjStart(fieldName));
-            rw.read->appendTicketStats(bb);
+            if (usesPrioritization()) {
+                rw.read->appendTicketStats(bb);
+            }
             rw.read->appendHolderStats(bb);
             bb.done();
             if (priority == AdmissionContext::Priority::kNormal) {
@@ -402,7 +407,9 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
                 writeStats.emplace();
             }
             BSONObjBuilder bb(writeStats->subobjStart(fieldName));
-            rw.write->appendTicketStats(bb);
+            if (usesPrioritization()) {
+                rw.write->appendTicketStats(bb);
+            }
             rw.write->appendHolderStats(bb);
             bb.done();
             if (priority == AdmissionContext::Priority::kNormal) {
