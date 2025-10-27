@@ -6214,6 +6214,36 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "eseRotateActiveKEK",
+            command: {eseRotateActiveKEK: 1},
+            skipTest: () => {
+                return !getBuildInfo().modules.includes("atlas");
+            },
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [{resource: {cluster: true}, actions: ["eseRotateActiveKEK"]}],
+                    expectFail: true,
+                },
+            ],
+        },
+        {
+            testname: "getESERotateActiveKEKStatus",
+            command: {getESERotateActiveKEKStatus: 1},
+            skipTest: () => {
+                return !getBuildInfo().modules.includes("atlas");
+            },
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [{resource: {cluster: true}, actions: ["getESERotateActiveKEKStatus"]}],
+                    expectFail: true,
+                },
+            ],
+        },
+        {
             testname: "oidcListKeys",
             command: {oidcListKeys: 1},
             // Only enterprise knows of this command.

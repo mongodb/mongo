@@ -609,6 +609,7 @@ const allCommands = {
         skip: requiresMongoS,
     },
     endSessions: {skip: "tested in startSession"},
+    eseRotateActiveKEK: {skip: "requires additional setup"},
     explain: {
         setUp: function (mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({create: collName}));
@@ -692,6 +693,7 @@ const allCommands = {
         command: {getDiagnosticData: 1},
         shouldFail: false,
     },
+    getESERotateActiveKEKStatus: {skip: "requires additional setup"},
     getLog: {
         isAdminCommand: true,
         command: {getLog: "global"},

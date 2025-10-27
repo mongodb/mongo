@@ -273,6 +273,7 @@ const allCommands = {
     dropUser: {skip: isPrimaryOnly},
     echo: {skip: isNotAUserDataRead},
     endSessions: {skip: isNotAUserDataRead},
+    eseRotateActiveKEK: {skip: isNotAUserDataRead},
     explain: {
         command: {count: collName},
         expectFailure: true,
@@ -296,6 +297,7 @@ const allCommands = {
     getDatabaseVersion: {skip: isNotAUserDataRead},
     getDefaultRWConcern: {skip: isNotAUserDataRead},
     getDiagnosticData: {skip: isNotAUserDataRead},
+    getESERotateActiveKEKStatus: {skip: isNotAUserDataRead},
     getLog: {skip: isNotAUserDataRead},
     getMore: {
         command: {getMore: NumberLong(123), collection: collName},

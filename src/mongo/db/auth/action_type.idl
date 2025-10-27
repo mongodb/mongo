@@ -101,6 +101,7 @@ enums:
             emptycapped: "emptycapped" # Deprecated (backwards compatibility)
             enableProfiler: "enableProfiler"
             enableSharding: "enableSharding"
+            eseRotateActiveKEK: "eseRotateActiveKEK"
             exportCollection: "exportCollection"
             find: "find"
             flushRouterConfig: "flushRouterConfig"
@@ -108,9 +109,10 @@ enums:
             fsync: "fsync"
             fsyncUnlock: "fsyncUnlock" # Deprecated in favor of unlock (refer to:SERVER-89642)
             getClusterParameter: "getClusterParameter"
+            getCmdLineOpts: "getCmdLineOpts"
             getDatabaseVersion: "getDatabaseVersion"
             getDefaultRWConcern: "getDefaultRWConcern"
-            getCmdLineOpts: "getCmdLineOpts"
+            getESERotateActiveKEKStatus: "getESERotateActiveKEKStatus"
             getLog: "getLog"
             getParameter: "getParameter"
             getShardMap: "getShardMap"

@@ -414,6 +414,7 @@ let viewsCommandTests = {
     emptycapped: {skip: "removed"}, // TODO (SERVER-92950): Remove this case.
     enableSharding: {skip: "Tested as part of shardCollection"},
     endSessions: {skip: isUnrelated},
+    eseRotateActiveKEK: {skip: isUnrelated},
     explain: {command: {explain: {count: "view"}}},
     features: {skip: isUnrelated},
     filemd5: {skip: isUnrelated},
@@ -432,6 +433,7 @@ let viewsCommandTests = {
     getDatabaseVersion: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
     getDiagnosticData: {skip: isUnrelated},
+    getESERotateActiveKEKStatus: {skip: isUnrelated},
     getLog: {skip: isUnrelated},
     getMore: {
         setup: function (conn) {
