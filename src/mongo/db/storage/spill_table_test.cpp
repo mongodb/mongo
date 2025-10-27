@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -194,6 +195,48 @@ TEST_F(SpillTableTest, SpillTableDroppedOnDestruction) {
     spillTable.reset();
 
     ASSERT_FALSE(spillIdentExists(opCtx.get(), ident));
+}
+
+TEST_F(StorageEngineTest, TestSpillTableDropRetries) {
+    auto opCtx = makeOperationContext();
+    auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::Long, 1024 * 1024 * 100);
+
+    const auto initialStatus = _storageEngine->getStatus(opCtx.get());
+    ASSERT_EQ(0, initialStatus.getField("dropSpillTableRetries").Long());
+
+    // Start a thread that tries to drop the spill table and use a barrier to synchronize the
+    // thread, it needs to clean up after the cursors to avoid a deadlock
+    auto pf = mongo::makePromiseFuture<void>();
+    unittest::JoinThread dropper([&] {
+        pf.future.get();
+        spillTable.reset();
+    });
+
+    // Open a cursor to block dropping the spill table
+    // auto cursor = spillTable->getCursor(opCtx.get());
+    RecordStore* rs = spillTable->getRecordStore_forTest();
+    auto ru = _storageEngine->getSpillEngine()->newRecoveryUnit();
+    auto cursor = rs->getCursor(opCtx.get(), *ru);
+
+    using sc = std::chrono::steady_clock;
+    using namespace std::chrono_literals;
+    static constexpr auto timeout{2s};
+    static constexpr auto interval{100ms};
+    const auto start = sc::now();
+
+    int retries{0};
+    pf.promise.emplaceValue();
+    while (sc::now() - start < timeout) {
+        retries = _storageEngine->getStatus(opCtx.get()).getField("dropSpillTableRetries").Long();
+        if (retries > 0) {
+            break;
+        }
+        std::this_thread::sleep_for(interval);
+    }
+
+    cursor->detachFromOperationContext();
+
+    ASSERT_GT(retries, 0);
 }
 
 }  // namespace

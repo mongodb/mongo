@@ -54,27 +54,8 @@ public:
         return true;
     }
 
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        auto svcCtx = opCtx->getClient()->getServiceContext();
-        auto engine = svcCtx->getStorageEngine();
-        auto oldestRequiredTimestampForCrashRecovery = engine->getOplogNeededForCrashRecovery();
-        auto backupCursorHooks = BackupCursorHooks::get(svcCtx);
-
-        BSONObjBuilder bob;
-        bob.append("name", storageGlobalParams.engine);
-        bob.append("supportsCommittedReads", true);
-        bob.append("oldestRequiredTimestampForCrashRecovery",
-                   oldestRequiredTimestampForCrashRecovery
-                       ? *oldestRequiredTimestampForCrashRecovery
-                       : Timestamp());
-        bob.append("dropPendingIdents", static_cast<long long>(engine->getNumDropPendingIdents()));
-        bob.append("supportsSnapshotReadConcern", engine->supportsReadConcernSnapshot());
-        bob.append("readOnly", !opCtx->getServiceContext()->userWritesAllowed());
-        bob.append("persistent", !engine->isEphemeral());
-        bob.append("backupCursorOpen", backupCursorHooks->isBackupCursorOpen());
-
-        return bob.obj();
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
+        return opCtx->getServiceContext()->getStorageEngine()->getStatus(opCtx);
     }
 };
 auto& storageSSS = *ServerStatusSectionBuilder<StorageSSS>("storageEngine").forShard();

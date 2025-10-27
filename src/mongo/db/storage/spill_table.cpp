@@ -329,6 +329,10 @@ std::unique_ptr<StorageStats> SpillTable::computeOperationStatisticsSinceLastCal
     return _ru->computeOperationStatisticsSinceLastCall();
 }
 
+RecordStore* SpillTable::getRecordStore_forTest() {
+    return _rs.get();
+}
+
 Status SpillTable::_checkDiskSpace() const {
     return _diskState && _diskState->full()
         ? Status(ErrorCodes::OutOfDiskSpace,

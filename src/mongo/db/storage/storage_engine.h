@@ -306,6 +306,11 @@ public:
     virtual Timestamp getBackupCheckpointTimestamp() = 0;
 
     /**
+     * Return the storage engine status
+     */
+    [[nodiscard]] virtual BSONObj getStatus(OperationContext* opCtx) const = 0;
+
+    /**
      * Represents the options that the storage engine can use during full and incremental backups.
      *
      * When performing a full backup where incrementalBackup=false, the values of 'blockSizeMB',

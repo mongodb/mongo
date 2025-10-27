@@ -65,6 +65,9 @@ public:
     Timestamp getBackupCheckpointTimestamp() override {
         return Timestamp(0, 0);
     }
+    BSONObj getStatus(OperationContext* opCtx) const override {
+        return {};
+    }
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
         const StorageEngine::BackupOptions& options) final {
         return Status(ErrorCodes::CommandNotSupported,
