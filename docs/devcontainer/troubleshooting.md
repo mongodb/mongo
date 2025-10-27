@@ -54,8 +54,37 @@ Error: failed to solve: write /var/lib/docker/...: no space left on device
 
 2. **Increase Docker disk allocation:**
 
-   - **Docker Desktop/Rancher Desktop**: Settings → Resources → Disk
-   - Increase to at least 60 GB for comfortable MongoDB development
+   **Rancher Desktop:**
+
+   Rancher Desktop does not have a UI for increasing disk size. To increase it:
+
+   **On macOS or Linux:**
+
+   1. Stop Rancher Desktop completely
+   2. Create or edit the VM configuration file:
+      - **macOS**: `~/Library/Application Support/rancher-desktop/lima/_config/override.yaml`
+      - **Linux**: `~/.config/rancher-desktop/lima/_config/override.yaml`
+   3. Add or modify the disk size setting:
+      ```yaml
+      disk: 100GB
+      ```
+   4. Start Rancher Desktop
+   5. If Rancher Desktop was previously initialized, you may need to perform a factory reset (Preferences → Troubleshooting → Reset Kubernetes) for the disk size change to take effect.
+
+   **On Windows (WSL2):**
+
+   The disk is managed by WSL2:
+
+   1. Stop Rancher Desktop
+   2. Run: `wsl --shutdown`
+   3. Follow Microsoft's guide to increase WSL2 disk size: https://learn.microsoft.com/en-us/windows/wsl/disk-space
+
+   **Docker Desktop:**
+
+   1. Open Docker Desktop
+   2. Go to Settings → Resources → Disk image size
+   3. Increase to at least 60 GB (100+ GB recommended for MongoDB development)
+   4. Click "Apply & Restart"
 
 3. **Remove old dev containers:**
 

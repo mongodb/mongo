@@ -26,7 +26,8 @@ After installation, increase resources for better build performance:
 1. Open Rancher Desktop → Preferences → Virtual Machine
 2. **Memory**: Allocate as much as your system allows (leave ~4-8 GB for your host OS)
 3. **CPUs**: Allocate as many cores as possible (leave 1-2 for your host OS)
-4. Apply changes and restart Rancher Desktop
+4. **Disk**: Rancher Desktop doesn't have a UI for disk size. To increase it, see [Troubleshooting - Increase Docker disk allocation](./troubleshooting.md#build-fails-with-no-space-left-on-device) for instructions.
+5. Apply changes and restart Rancher Desktop
 
 > **Tip:** More resources = faster builds. MongoDB builds benefit significantly from additional CPU cores and memory.
 
