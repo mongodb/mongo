@@ -128,7 +128,7 @@ public:
      * Returns a const pointer to the canonical query. Requires that hasParsedQuery() is true.
      */
     const CanonicalQuery* getParsedQuery() const {
-        invariant(_canonicalQuery);
+        tassert(11052008, "Expected CanonicalQuery to exist", _canonicalQuery);
         return _canonicalQuery.get();
     }
 

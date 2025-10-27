@@ -79,7 +79,7 @@ DeleteResult deleteObject(OperationContext* opCtx,
     }
 
     // This method doesn't support multi-deletes when returning pre-images.
-    invariant(!request.getMulti());
+    tassert(11052000, "Expected single delete", !request.getMulti());
 
     BSONObj image;
     if (exec->getNext(&image, nullptr) == PlanExecutor::IS_EOF) {

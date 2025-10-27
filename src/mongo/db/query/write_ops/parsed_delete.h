@@ -125,7 +125,7 @@ public:
      * Always guaranteed to return a valid expression context.
      */
     boost::intrusive_ptr<ExpressionContext> expCtx() {
-        invariant(_expCtx.get());
+        tassert(11052004, "Expected ExpressionContext to exist", _expCtx.get());
         return _expCtx;
     }
 

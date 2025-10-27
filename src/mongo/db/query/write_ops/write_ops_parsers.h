@@ -159,32 +159,32 @@ public:
     Type type() const;
 
     BSONObj getUpdateReplacement() const {
-        invariant(type() == Type::kReplacement);
+        tassert(11052018, "Unexpected type", type() == Type::kReplacement);
         return get<ReplacementUpdate>(_update).bson;
     }
 
     BSONObj getUpdateModifier() const {
-        invariant(type() == Type::kModifier);
+        tassert(11052019, "Unexpected type", type() == Type::kModifier);
         return get<ModifierUpdate>(_update).bson;
     }
 
     const std::vector<BSONObj>& getUpdatePipeline() const {
-        invariant(type() == Type::kPipeline);
+        tassert(11052020, "Unexpected type", type() == Type::kPipeline);
         return get<PipelineUpdate>(_update);
     }
 
     doc_diff::Diff getDiff() const {
-        invariant(type() == Type::kDelta);
+        tassert(11052021, "Unexpected type", type() == Type::kDelta);
         return get<DeltaUpdate>(_update).diff;
     }
 
     const TransformFunc& getTransform() const {
-        invariant(type() == Type::kTransform);
+        tassert(11052022, "Unexpected type", type() == Type::kTransform);
         return get<TransformUpdate>(_update).transform;
     }
 
     bool mustCheckExistenceForInsertOperations() const {
-        invariant(type() == Type::kDelta);
+        tassert(11052023, "Unexpected type", type() == Type::kDelta);
         return get<DeltaUpdate>(_update).options.mustCheckExistenceForInsertOperations;
     }
 

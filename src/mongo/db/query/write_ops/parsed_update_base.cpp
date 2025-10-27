@@ -182,9 +182,10 @@ void ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
 }
 
 Status ParsedUpdateBase::parseRequest() {
-    // It is invalid to request that the UpdateStage return the prior or newly-updated version
-    // of a document during a multi-update.
-    invariant(!(_request->shouldReturnAnyDocs() && _request->isMulti()));
+    tassert(11052005,
+            "Cannot request UpdateStage to return the prior or newly-updated version of a document "
+            "during a multi-update",
+            !(_request->shouldReturnAnyDocs() && _request->isMulti()));
 
     // It is invalid to specify 'upsertSupplied:true' for a non-upsert operation, or if no upsert
     // document was supplied with the request.
@@ -202,9 +203,10 @@ Status ParsedUpdateBase::parseRequest() {
                 constants && (*constants)["new"_sd].type() == BSONType::object);
     }
 
-    // It is invalid to request that a ProjectionStage be applied to the UpdateStage if the
-    // UpdateStage would not return any document.
-    invariant(_request->getProj().isEmpty() || _request->shouldReturnAnyDocs());
+    tassert(
+        11052006,
+        "Cannot apply projection to UpdateStage if the UpdateStage would not return any document",
+        _request->getProj().isEmpty() || _request->shouldReturnAnyDocs());
 
     auto [collatorToUse, collationMatchesDefault] =
         resolveCollator(_opCtx, _request->getCollation(), _collection);
@@ -305,7 +307,9 @@ bool ParsedUpdateBase::hasParsedQuery() const {
 }
 
 std::unique_ptr<CanonicalQuery> ParsedUpdateBase::releaseParsedQuery() {
-    invariant(_canonicalQuery.get() != nullptr);
+    tassert(11052007,
+            "Expected ParsedUpdateBase to own a CanonicalQuery",
+            _canonicalQuery.get() != nullptr);
     return std::move(_canonicalQuery);
 }
 

@@ -128,8 +128,9 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
  * oplog.
  */
 BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& oplog) {
-    invariant(oplog.getPreImageOpTime() || oplog.getPostImageOpTime() ||
-              oplog.getNeedsRetryImage());
+    tassert(11052024,
+            "Expected OplogEntry with pre or post image",
+            oplog.getPreImageOpTime() || oplog.getPostImageOpTime() || oplog.getNeedsRetryImage());
     DBDirectClient client(opCtx);
     if (oplog.getNeedsRetryImage()) {
         // Extract image from side collection.

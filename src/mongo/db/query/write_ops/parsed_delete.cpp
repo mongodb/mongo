@@ -73,13 +73,14 @@ ParsedDelete::ParsedDelete(OperationContext* opCtx,
 
 Status ParsedDelete::parseRequest() {
     dassert(!_canonicalQuery.get());
-    // It is invalid to request that the DeleteStage return the deleted document during a
-    // multi-remove.
-    invariant(!(_request->getReturnDeleted() && _request->getMulti()));
+    tassert(11052001,
+            "Cannot request DeleteStage to return the deleted document during a multi-delete",
+            !(_request->getReturnDeleted() && _request->getMulti()));
 
-    // It is invalid to request that a ProjectionStage be applied to the DeleteStage if the
-    // DeleteStage would not return the deleted document.
-    invariant(_request->getProj().isEmpty() || _request->getReturnDeleted());
+    tassert(11052002,
+            "Cannot apply projection to DeleteStage if the DeleteStage would not return the "
+            "deleted document",
+            _request->getProj().isEmpty() || _request->getReturnDeleted());
 
     auto [collatorToUse, collationMatchesDefault] =
         resolveCollator(_opCtx, _request->getCollation(), _collection);
@@ -170,7 +171,9 @@ bool ParsedDelete::hasParsedQuery() const {
 }
 
 std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
-    invariant(_canonicalQuery.get() != nullptr);
+    tassert(11052003,
+            "Expected ParsedDelete to own a CanonicalQuery",
+            _canonicalQuery.get() != nullptr);
     return std::move(_canonicalQuery);
 }
 
