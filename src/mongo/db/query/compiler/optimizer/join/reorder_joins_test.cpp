@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
@@ -42,16 +43,30 @@ unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join
 
 class ReorderGraphTest : public CatalogTestFixture {
 protected:
-    std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss) {
+    std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss,
+                                                       BSONObj filter = BSONObj::kEmptyObject) {
         auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
+        if (!filter.isEmpty()) {
+            auto swFindCmd = ParsedFindCommand::withExistingFilter(
+                expCtx,
+                nullptr,
+                std::move(MatchExpressionParser::parse(filter, expCtx).getValue()),
+                std::make_unique<FindCommandRequest>(nss),
+                ProjectionPolicies::aggregateProjectionPolicies());
+            ASSERT_OK(swFindCmd.getStatus());
+            return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+                .expCtx = expCtx, .parsedFind = std::move(swFindCmd.getValue())});
+        }
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
-    std::unique_ptr<QuerySolution> makeCollScanPlan(NamespaceString nss) {
+    std::unique_ptr<QuerySolution> makeCollScanPlan(
+        NamespaceString nss, std::unique_ptr<MatchExpression> filter = nullptr) {
         auto scan = std::make_unique<CollectionScanNode>();
         scan->nss = nss;
+        scan->filter = std::move(filter);
         auto soln = std::make_unique<QuerySolution>();
         soln->setRoot(std::move(scan));
         return soln;
@@ -310,6 +325,51 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
     goldenCtx.outStream() << soln->toString() << std::endl;
     goldenCtx.outStream() << "Solution with seed 1:" << std::endl;
     goldenCtx.outStream() << soln2->toString() << std::endl;
+}
+
+TEST_F(ReorderGraphTest, INLJResidualPred) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+
+    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
+    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
+    createCollection(nss1);
+    createCollection(nss2);
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(), nss2, {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}));
+
+    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
+
+    JoinGraph graph;
+    QuerySolutionMap solnsPerQuery;
+
+    auto cq1 = makeCanonicalQuery(nss1);
+    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
+    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
+
+    BSONObj filter = fromjson("{b: {$gt: 5}}");
+    auto cq2 = makeCanonicalQuery(nss2, filter);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
+    auto me = std::move(MatchExpressionParser::parse(filter, expCtx).getValue());
+    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2, std::move(me))});
+
+    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
+
+    std::vector<ResolvedPath> resolvedPaths{
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+    };
+
+    graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
+
+    auto soln =
+        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
+    ASSERT(soln);
+
+    // TODO: invoke proper graph serialization
+    goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
+    goldenCtx.outStream() << soln->toString() << std::endl;
 }
 
 }  // namespace mongo::join_ordering
