@@ -128,7 +128,6 @@ public:
         std::vector{std::string{ErrorLabel::kStreamProcessorUserError}};
 
     static constexpr std::int32_t kMaxNumberOfRetries = 64;
-    static constexpr std::int32_t kKnownSeed = 12345;
 
     static constexpr DefaultRetryStrategy::RetryParameters kBackoffParameters{
         .maxRetryAttempts = kMaxNumberOfRetries,
@@ -229,12 +228,21 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyCallbackNoRetry) {
 TEST_F(RetryStrategyTest, DefaultRetryStrategyHasDelay) {
     auto strategy = makeDefaultRetryStrategy();
 
-    BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownSeed);
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
 
+    auto lastBackoff = Milliseconds{0};
     for (std::int32_t i = 0; i < kMaxNumberOfRetries; ++i) {
         ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
             statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
-        ASSERT_GT(strategy.getNextRetryDelay(), Milliseconds{0});
+
+        const auto backoff = strategy.getNextRetryDelay();
+
+        if (backoff < Milliseconds{kDefaultClientMaxBackoffMillisDefault}) {
+            ASSERT_GT(backoff, lastBackoff);
+        } else {
+            ASSERT_EQ(backoff, Milliseconds{kDefaultClientMaxBackoffMillisDefault});
+        }
+        lastBackoff = backoff;
     }
 }
 
@@ -310,13 +318,12 @@ TEST_F(RetryStrategyTest, DefaultRetryStrategyTargetingMetadataRetryExhausted) {
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyNonZeroRetryDelay) {
     auto strategy = makeAdaptiveRetryStrategy();
-
-    BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownSeed);
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
 
     ASSERT(strategy.recordFailureAndEvaluateShouldRetry(
         statusRetriableErrorCategory, target1, errorLabelsSystemOverloaded));
 
-    ASSERT_GT(strategy.getNextRetryDelay(), Milliseconds{0});
+    ASSERT_EQ(strategy.getNextRetryDelay(), Milliseconds{200});
 }
 
 TEST_F(RetryStrategyTest, AdaptiveRetryStrategyCallbackCalled) {

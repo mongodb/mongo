@@ -31,6 +31,7 @@
 
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 
 #include <cmath>
 #include <cstdint>
@@ -40,74 +41,48 @@ namespace {
 
 class BackoffWithJitterTest : public unittest::Test {
 public:
-    void setUp() override {
-        backoffWithJitter.initRandomEngineWithSeed_forTest(kKnownSeed);
-    }
-
-    std::int64_t exp2i(std::int64_t n) {
-        return static_cast<std::int64_t>(std::exp2(n));
-    }
-
     static constexpr Milliseconds kBaseBackoff{100};
     static constexpr Milliseconds kMaxBackoff{4000};
-    static constexpr std::int32_t kKnownSeed = 12345;
-    static constexpr std::int32_t kConfidence = 32;
 
     BackoffWithJitter backoffWithJitter{kBaseBackoff, kMaxBackoff};
 };
 
 TEST_F(BackoffWithJitterTest, BackoffWithJitterIncrementTest) {
-    constexpr std::int32_t maxAttempt = 8;
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
 
-    // Basic test that validate that the backoff with jitter is always within bounds.
-    // It should never exceed base * 2^nthAttempt and it should also never exceed maxBackoff.
-    for (int nthAttempt = 0; nthAttempt < maxAttempt; ++nthAttempt) {
-        const auto maxBackoffAtNthAttempt = kBaseBackoff * exp2i(nthAttempt);
+    // This array contains the expected values for backoff with jitter disabled.
+    // The exponential backoff is bound by the max backoff so the last values are expected to be
+    // exactly the max backoff.
+    constexpr auto expectedValues = std::array{
+        Milliseconds{0},
+        Milliseconds{200},
+        Milliseconds{400},
+        Milliseconds{800},
+        Milliseconds{1600},
+        Milliseconds{3200},
+        kMaxBackoff,
+        kMaxBackoff,
+        kMaxBackoff,
+    };
 
-        // Validate that even when calling getBackoffDelay multiple times, we're always within
-        // bounds.
-        for (int confidence = 0; confidence < kConfidence; ++confidence) {
-            ASSERT_LTE(backoffWithJitter.getBackoffDelay(), kMaxBackoff);
-            ASSERT_LTE(backoffWithJitter.getBackoffDelay(), maxBackoffAtNthAttempt);
-        }
-
+    for (const auto expectedValue : expectedValues) {
         const auto backoff = backoffWithJitter.getBackoffDelayAndIncrementAttemptCount();
-
-        if (nthAttempt == 0) {
-            ASSERT_EQ(backoff, Milliseconds{0});
-            continue;
-        }
-
-        // For this known seed, we're always jittering above 0
-        ASSERT_GT(backoff, Milliseconds{0});
+        ASSERT_EQ(backoff, expectedValue);
     }
 }
 
-// TODO: SERVER-109201 Make this test verify specific values instead of relying on random
-// distributions with fixed seed.
-TEST_F(BackoffWithJitterTest, BackoffWithJitterExponentialGrowth) {
-    constexpr std::int32_t maxAttempt = 8;
+TEST_F(BackoffWithJitterTest, BackoffWithJitterDoesJitter) {
+    backoffWithJitter.setAttemptCount_forTest(4);
 
-    // Test that verifies that the exponential growth does happen by jittering enough time to find
-    // a backoff higher than the mean backoff for the nth attempt.
-    for (int nthAttempt = 0; nthAttempt < maxAttempt; ++nthAttempt) {
-        backoffWithJitter.incrementAttemptCount();
-        const auto meanBackoffAtAttempt =
-            std::min(kBaseBackoff * exp2i(nthAttempt - 1), kMaxBackoff / 2);
+    constexpr std::uint32_t kKnownSeed = 0xc0ffee;
+    backoffWithJitter.initRandomEngineWithSeed_forTest(kKnownSeed);
 
-        // This is still deterministic, but the backoff delay does return waits that are
-        // implementation defined due to std::uniform_int_distribution. Since we use a known
-        // seed, it will always yield the same result, but the amount of attempt is unknown at
-        // compile time. 8 was found to always jitter above the mean at least once.
-        std::int32_t jitteredAboveMean = 0;
-        for (std::int32_t i = 0; i < kConfidence; ++i) {
-            const auto backoff = backoffWithJitter.getBackoffDelay();
-            if (backoff > meanBackoffAtAttempt) {
-                ++jitteredAboveMean;
-                break;
-            }
-        }
-        ASSERT_GT(jitteredAboveMean, 0);
+    constexpr std::size_t kNumAttempts = 4;
+    std::set<Milliseconds> delays;
+    for (std::size_t i = 0; i < kNumAttempts; ++i) {
+        const auto delay = backoffWithJitter.getBackoffDelay();
+        ASSERT_FALSE(delays.contains(delay));
+        delays.insert(delay);
     }
 }
 

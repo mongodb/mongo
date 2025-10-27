@@ -107,7 +107,6 @@ protected:
 
     void runDummyCommandOnShard(ShardId shardId,
                                 Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kNoRetry) {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
         auto result = uassertStatusOK(
             shard->runCommand(operationContext(),
@@ -122,7 +121,6 @@ protected:
         ShardId shardId,
         Milliseconds maxTimeMS,
         Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kNoRetry) {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
         auto result = uassertStatusOK(
             shard->runCommand(operationContext(),
@@ -152,6 +150,7 @@ protected:
     static constexpr std::uint32_t kKnownGoodSeed = 0xc0ffee;
 
     inline static auto kConfigShard = ShardId("config");
+    FailPointEnableBlock _{"returnMaxBackoffDelay"};
 };
 
 class ShardRetryabilityTest : public ShardRemoteTest {
@@ -304,7 +303,6 @@ TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloadedWithDeadline) {
 
 TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetry) {
     auto future = launchAsync([&] {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard =
             unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
         auto result = uassertStatusOK(shard->runExhaustiveCursorCommand(
@@ -324,7 +322,6 @@ TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetry) {
 
 TEST_F(ShardRemoteTest, RunAggregationWithResultErrorOverloadedRetry) {
     auto future = launchAsync([&] {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard =
             unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
         auto result = uassertStatusOK(shard->runAggregationWithResult(
@@ -348,7 +345,6 @@ TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetryTimeLimite
                                           ErrorCodes::ExceededTimeLimit};
 
     auto future = launchAsync([&] {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard =
             unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
         auto result = uassertStatusOK(shard->runExhaustiveCursorCommand(
@@ -370,7 +366,6 @@ TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetryTimeLimite
 
 TEST_F(ShardRemoteTest, RunCommandResponseIndefiniteErrorOverloaded) {
     auto future = launchAsync([&] {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard =
             unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
         auto result = uassertStatusOK(shard->runCommandWithIndefiniteRetries(

@@ -94,6 +94,7 @@ struct ShardingCatalogClientTest : ShardingTestFixture {
     static constexpr int kMaxCommandExecutions = kDefaultClientMaxRetryAttemptsDefault + 1;
     inline static const NamespaceString kNamespace =
         NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    FailPointEnableBlock _{"returnMaxBackoffDelay"};
 };
 
 TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
@@ -1214,7 +1215,6 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandSystemOverloadedAtMaxRetry) 
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         ASSERT_THROWS_CODE(catalogClient()->getDatabase(
                                operationContext(),
                                DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"),
@@ -1243,7 +1243,6 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandSystemOverloadedWithDeadline
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         ASSERT_THROWS_CODE(catalogClient()->getDatabase(
                                operationContext(),
                                DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"),
@@ -1273,7 +1272,6 @@ TEST_F(ShardingCatalogClientTest, RetryOnUserManagementReadCommandSystemOverload
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
 
-        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         bool ok = catalogClient()->runUserManagementReadCommand(
             operationContext(),
             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
