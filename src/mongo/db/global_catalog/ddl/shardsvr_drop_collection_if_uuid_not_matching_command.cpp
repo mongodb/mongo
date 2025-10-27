@@ -103,7 +103,7 @@ public:
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::dropCollection));
+                            ActionType::internal));
         }
     };
 };

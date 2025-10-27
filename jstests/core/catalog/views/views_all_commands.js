@@ -165,7 +165,7 @@ let viewsCommandTests = {
     _shardsvrConvertToCapped: {skip: isAnInternalCommand},
     _shardsvrCoordinateMultiUpdate: {skip: isAnInternalCommand},
     _shardsvrDropCollection: {skip: isAnInternalCommand},
-    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isUnrelated},
+    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isAnInternalCommand},
     _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrDropIndexes: {skip: isAnInternalCommand},
     _shardsvrDropIndexesParticipant: {skip: isAnInternalCommand},

@@ -103,7 +103,7 @@ const allCommands = {
     _shardsvrConvertToCapped: {skip: isPrimaryOnly},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
     _shardsvrCreateCollection: {skip: isPrimaryOnly},
-    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isNotAUserDataRead},
+    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isAnInternalCommand},
     _shardsvrDropCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrDropIndexes: {skip: isAnInternalCommand},
     _shardsvrDropIndexesParticipant: {skip: isAnInternalCommand},
