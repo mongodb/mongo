@@ -144,6 +144,23 @@ Span Span::start(OperationContext* opCtx, const std::string& name, bool keepSpan
     return start(telemetryCtx, name, keepSpan);
 }
 
+Span Span::startIfExistingTraceParent(OperationContext* opCtx,
+                                      const std::string& name,
+                                      bool keepSpan) {
+    if (opCtx == nullptr) {
+        return Span{};
+    }
+
+    auto& telemetryCtxHolder = TelemetryContextHolder::get(opCtx);
+    auto telemetryCtx = telemetryCtxHolder.get();
+
+    if (!telemetryCtx) {
+        return Span{};
+    }
+
+    return start(telemetryCtx, name, keepSpan);
+}
+
 Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                  const std::string& name,
                  bool keepSpan) {
