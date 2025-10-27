@@ -567,12 +567,6 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
      */
 
     /*
-     * WiredTiger will reload the dir store's checkpoint when opening a cursor: Opening a file
-     * cursor triggers __wt_btree_open (even if the file has been opened before).
-     */
-    WT_STAT_CONN_DSRC_INCR(session, layered_table_manager_checkpoints_refreshed);
-
-    /*
      * Update the checkpoint metadata LSN. This doesn't require further synchronization, because the
      * updates are protected by the checkpoint lock.
      */

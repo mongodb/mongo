@@ -953,7 +953,6 @@ struct __wt_connection_stats {
     int64_t layered_curs_upgrade_ingest;
     int64_t layered_curs_upgrade_stable;
     int64_t layered_table_manager_checkpoints;
-    int64_t layered_table_manager_checkpoints_refreshed;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_failed;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_succeed;
     int64_t layered_table_manager_logops_applied;
@@ -1641,7 +1640,6 @@ struct __wt_dsrc_stats {
     int64_t layered_curs_upgrade_ingest;
     int64_t layered_curs_upgrade_stable;
     int64_t layered_table_manager_checkpoints;
-    int64_t layered_table_manager_checkpoints_refreshed;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_failed;
     int64_t layered_table_manager_checkpoints_disagg_pick_up_succeed;
     int64_t layered_table_manager_logops_applied;

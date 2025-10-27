@@ -56,9 +56,11 @@ class test_layered22(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
+            self.session.begin_transaction()
             cursor["Hello " + str(i)] = "World"
             cursor["Hi " + str(i)] = "There"
             cursor["OK " + str(i)] = "Go"
+            self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -84,7 +86,9 @@ class test_layered22(wttest.WiredTigerTestCase):
         value2 = "abaa"
 
         for i in range(self.nitems):
+            self.session.begin_transaction()
             cursor[str(i)] = value1
+            self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         for i in range(self.nitems):
             if i % 10 == 0:
@@ -92,7 +96,7 @@ class test_layered22(wttest.WiredTigerTestCase):
                 cursor.set_key(str(i))
                 mods = [wiredtiger.Modify('b', 1, 1)]
                 self.assertEqual(cursor.modify(mods), 0)
-                self.session.commit_transaction()
+                self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(20)}")
 
         cursor.close()
 
@@ -113,7 +117,9 @@ class test_layered22(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         self.assertEqual(cursor.search_near(), wiredtiger.WT_NOTFOUND)
 
+        self.session.begin_transaction()
         cursor["found"] = "yes"
+        self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
         cursor.set_key("found")
         self.assertEqual(cursor.search(), 0)
         self.assertEqual(cursor.search_near(), 0)
@@ -123,9 +129,11 @@ class test_layered22(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
+            self.session.begin_transaction()
             cursor["Hello " + str(i)] = "World"
             cursor["Hi " + str(i)] = "There"
             cursor["OK " + str(i)] = "Go"
+            self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -137,7 +145,9 @@ class test_layered22(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
+            self.session.begin_transaction()
             cursor["Hello " + str(i)] = "World"
+            self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
         cursor.close()
 
         random_cursor = self.session.open_cursor(self.uri, None, "next_random=true")

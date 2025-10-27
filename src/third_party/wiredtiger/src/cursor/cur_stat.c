@@ -414,11 +414,9 @@ __curstat_layered_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT
     WT_DATA_HANDLE *dhandle;
     WT_DECL_ITEM(stable_uri_buf);
     WT_DECL_RET;
-    WT_LAYERED_TABLE *layered;
-    const char *checkpoint_name;
-    const char *stable_uri;
-
-    layered = NULL;
+    WT_LAYERED_TABLE *layered = NULL;
+    const char *checkpoint_name = NULL;
+    const char *stable_uri = NULL;
 
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, 0));
     dhandle = session->dhandle;
@@ -436,7 +434,6 @@ __curstat_layered_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT
     /* Now do the stable table. */
     if (!S2C(session)->layered_table_manager.leader) {
         /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
-        checkpoint_name = NULL;
         WT_ERR_NOTFOUND_OK(
           __wt_meta_checkpoint_last_name(session, stable_uri, &checkpoint_name, NULL, NULL), true);
 
@@ -464,6 +461,7 @@ done:
     __wt_curstat_dsrc_final(cst);
 
 err:
+    __wt_free(session, checkpoint_name);
     __wt_scr_free(session, &stable_uri_buf);
     /* The constituent table dhandles have been released. Release the layered dhandle. */
     if (session->dhandle == NULL)

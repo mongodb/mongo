@@ -97,7 +97,8 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
         stat_cursor.close()
 
-        self.conn.close()
+        session2.close()
+        cursor.close()
 
     def test_delete(self):
         self.session.create(self.uri, self.session_create_config())
@@ -151,6 +152,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
+        session2.close()
         session2 = self.conn.open_session()
         # Do an uncommitted update
         session2.begin_transaction()
@@ -164,7 +166,8 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
-        self.conn.close()
+        session2.close()
+        cursor.close()
 
     def test_prepare_update(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
@@ -230,7 +233,9 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
-        self.conn.close()
+        session3.close()
+        session2.close()
+        cursor.close()
 
     def test_prepare_delete(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
@@ -297,7 +302,9 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
-        self.conn.close()
+        session3.close()
+        session2.close()
+        cursor.close()
 
     def test_prepare_update_delete(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
@@ -365,4 +372,6 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
-        self.conn.close()
+        session3.close()
+        session2.close()
+        cursor.close()

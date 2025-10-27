@@ -1773,20 +1773,27 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool *instantiate_updp
             ++rip;
             continue;
         case WT_CELL_VALUE:
+            /* Checkpoints use a different visibility model, so avoid clearing the timestamps. */
+            if (WT_READING_CHECKPOINT(session))
+                break;
+
+            /*
+             * We need the original timestamps of the ingest tables for the step-up even when they
+             * are globally visible.
+             */
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                break;
+
             /*
              * Simple values without compression can be directly referenced on the page to avoid
              * repeatedly unpacking their cells.
              *
              * The visibility information is not referenced on the page so we need to ensure that
              * the value is globally visible at the point in time where we read the page into cache.
-             * Pages from checkpoint-related files that have been pushed onto the pre-fetch queue
-             * will be comprised of data that is globally visible, and so the reader thread which
-             * attempts to read the page into cache can skip the visible all check.
              */
-            if (!(WT_READING_CHECKPOINT(session) && F_ISSET(session, WT_SESSION_PREFETCH_THREAD)) &&
-              (WT_TIME_WINDOW_IS_EMPTY(&unpack.tw) ||
-                (!WT_TIME_WINDOW_HAS_STOP(&unpack.tw) &&
-                  __wt_txn_tw_start_visible_all(session, &unpack.tw))))
+            if (WT_TIME_WINDOW_IS_EMPTY(&unpack.tw) ||
+              (!WT_TIME_WINDOW_HAS_STOP(&unpack.tw) &&
+                __wt_txn_tw_start_visible_all(session, &unpack.tw)))
                 __wt_row_leaf_value_set(rip - 1, &unpack);
             break;
         case WT_CELL_VALUE_OVFL:

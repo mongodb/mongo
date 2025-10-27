@@ -595,8 +595,12 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         while cur.next() == 0:
             uri = cur.get_key()
             if uri.startswith('layered:'):
-                self.verifyUntilSuccess(sess, uri)
-        cur.close()
+                try:
+                    self.verifyUntilSuccess(sess, uri)
+                except wiredtiger.WiredTigerError as e:
+                    raise Exception(f'Layered verification failed for {uri}: {str(e)}')
+
+        sess.close()
 
     def tearDown(self, dueToRetry=False):
         dumped_error_log = False
@@ -621,10 +625,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         passed = not (self.failed() or teardown_failed)
 
         if passed and self.__module__.startswith("test_layered"):
-            # FIXME-WT-15786: Handle the transient state where a follower that has not yet picked up
-            # its first checkpoint may fail with ENOENT due to missing its stable table.
-            if not re.match("test_layered(57|41|21|22|17)", str(self)):
-                self.verifyLayered()
+            self.verifyLayered()
 
         try:
             self.platform_api.tearDown(self)

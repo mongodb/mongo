@@ -164,3 +164,6 @@ class test_layered17(wttest.WiredTigerTestCase):
 
         session_follow.close()
         conn_follow.close()
+
+        # Advance the stable timestamp to include all the committed data.
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(timestamp3)}')

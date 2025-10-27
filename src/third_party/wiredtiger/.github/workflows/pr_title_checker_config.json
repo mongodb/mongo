@@ -1,0 +1,11 @@
+{
+  "CHECKS": {
+    "regexp": "^(Revert \")?WT-[0-9]+ ",
+    "alwaysPassCI": false
+  },
+  "MESSAGES": {
+    "success": "All OK",
+    "failure": "PR title does not match the regex: \"^(Revert \")?WT-[0-9]+ \"",
+    "notice": ""
+  }
+}

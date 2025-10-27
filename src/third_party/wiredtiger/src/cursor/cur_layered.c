@@ -255,6 +255,7 @@ __clayered_open_stable(WT_CURSOR_LAYERED *clayered, bool leader)
     session = CUR2S(clayered);
     layered = (WT_LAYERED_TABLE *)clayered->dhandle;
     stable_uri = layered->stable_uri;
+    checkpoint_name = NULL;
 
     WT_RET(__wt_scr_alloc(session, 0, &random_config));
     /* Get the configuration for random cursors, if any. */
@@ -273,7 +274,6 @@ __clayered_open_stable(WT_CURSOR_LAYERED *clayered, bool leader)
          */
 
         /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
-        checkpoint_name = NULL;
         WT_ERR_NOTFOUND_OK(
           __wt_meta_checkpoint_last_name(session, stable_uri, &checkpoint_name, NULL, NULL), true);
 
@@ -320,6 +320,7 @@ __clayered_open_stable(WT_CURSOR_LAYERED *clayered, bool leader)
 err:
     __wt_scr_free(session, &random_config);
     __wt_scr_free(session, &stable_uri_buf);
+    __wt_free(session, checkpoint_name);
 
     return (ret);
 }
