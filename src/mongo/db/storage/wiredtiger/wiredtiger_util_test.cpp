@@ -665,6 +665,65 @@ TEST_F(WiredTigerUtilTest, ExportTableToBSONFilter) {
     ASSERT_EQ(bob4.obj().nFields(), totalNumFields);
 }
 
+TEST_F(WiredTigerUtilTest, ConcatTwoConfigs) {
+    WT_CONFIG_ITEM key;
+    WT_CONFIG_ITEM value;
+
+    // Nothing to parse.
+    const auto emptyConfig = WiredTigerUtil::concatConfigs("", "");
+    WiredTigerConfigParser emptyParser(emptyConfig);
+    ASSERT_EQUALS(emptyParser.next(&key, &value), WT_NOTFOUND);
+
+    // Validates the 'key' and 'value' populated by the 'WiredTigerConfigParser' contain the
+    // expected values.
+    auto assertKVConfig = [&](const std::string& keyData, int valData) {
+        ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+        ASSERT_EQUALS(StringData(key.str, key.len), keyData);
+        ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+        ASSERT_EQUALS(value.val, valData);
+    };
+
+    const auto emptyLHSConfig = WiredTigerUtil::concatConfigs("", "a=123");
+    WiredTigerConfigParser emptyLHSParser(emptyLHSConfig);
+    ASSERT_EQUALS(emptyLHSParser.next(&key, &value), 0);
+    assertKVConfig("a", 123);
+
+    const auto emptyRHSConfig = WiredTigerUtil::concatConfigs("b=456", "");
+    WiredTigerConfigParser emptyRHSParser(emptyRHSConfig);
+    ASSERT_EQUALS(emptyRHSParser.next(&key, &value), 0);
+    assertKVConfig("b", 456);
+
+    const auto basicConfig = WiredTigerUtil::concatConfigs("a=123", "b=456");
+    WiredTigerConfigParser basicParser(basicConfig);
+    ASSERT_EQUALS(basicParser.next(&key, &value), 0);
+    assertKVConfig("a", 123);
+    ASSERT_EQUALS(basicParser.next(&key, &value), 0);
+    assertKVConfig("b", 456);
+
+    const auto compoundConfig = WiredTigerUtil::concatConfigs("c=789", "d=10,e=11");
+    WiredTigerConfigParser compoundParser(compoundConfig);
+    ASSERT_EQUALS(compoundParser.next(&key, &value), 0);
+    assertKVConfig("c", 789);
+    ASSERT_EQUALS(compoundParser.next(&key, &value), 0);
+    assertKVConfig("d", 10);
+    ASSERT_EQUALS(compoundParser.next(&key, &value), 0);
+    assertKVConfig("e", 11);
+
+    // Test can retrieve value by key.
+    ASSERT_EQUALS(compoundParser.get("d", &value), 0);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+    ASSERT_EQUALS(value.val, 10);
+
+    // Test concatenation is compatible with parsing nested structs from one of the configs.
+    const auto logEnabledConfig =
+        WiredTigerUtil::concatConfigs("a=123,log=(enabled=true),b=436", "c=789");
+    WiredTigerConfigParser logEnabledParser(logEnabledConfig);
+
+    auto enabled = logEnabledParser.isTableLoggingEnabled();
+    ASSERT(enabled);
+    ASSERT(*enabled);
+}
+
 TEST(WiredTigerConfigParserTest, IterationAndKeyLookup) {
     // Configuration string containing a mix of value types, including a repeated key.
     WiredTigerConfigParser parser(

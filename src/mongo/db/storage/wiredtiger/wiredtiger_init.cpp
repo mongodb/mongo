@@ -162,8 +162,13 @@ public:
             isReplSet,
             shouldRecoverFromOplogAsStandalone,
             inStandaloneMode);
-        kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
-        kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
+        std::string extraRecordStoreOptions = WiredTigerUtil::concatConfigs(
+            wiredTigerGlobalOptions.collectionConfig, provider.getMainWiredTigerTableSettings());
+        kv->setRecordStoreExtraOptions(std::move(extraRecordStoreOptions));
+
+        std::string extraIndexOptions = WiredTigerUtil::concatConfigs(
+            wiredTigerGlobalOptions.indexConfig, provider.getMainWiredTigerTableSettings());
+        kv->setSortedDataInterfaceExtraOptions(std::move(extraIndexOptions));
 
         boost::system::error_code ec;
         boost::filesystem::remove_all(params.getSpillDbPath(), ec);

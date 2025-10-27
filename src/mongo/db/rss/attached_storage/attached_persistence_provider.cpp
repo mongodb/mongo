@@ -57,6 +57,10 @@ std::string AttachedPersistenceProvider::getWiredTigerConfig(int) const {
     return "";
 }
 
+std::string AttachedPersistenceProvider::getMainWiredTigerTableSettings() const {
+    return "";
+}
+
 bool AttachedPersistenceProvider::shouldUseReplicatedCatalogIdentifiers() const {
     return false;
 }

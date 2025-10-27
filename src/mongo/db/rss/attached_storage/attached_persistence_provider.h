@@ -48,6 +48,12 @@ public:
     std::string getWiredTigerConfig(int) const override;
 
     /**
+     * No additional settings required by the provider for tables from the main WiredTiger storage
+     * engine instance.
+     */
+    std::string getMainWiredTigerTableSettings() const override;
+
+    /**
      * Replicated catalog identifiers aren't compatible with attached storage as of right now, as a
      * node may create a local collection whose catalog identifier collides with that of a
      * replicated collection created on another node.

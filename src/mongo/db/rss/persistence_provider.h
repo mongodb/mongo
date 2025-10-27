@@ -71,6 +71,13 @@ public:
     virtual std::string getWiredTigerConfig(int flattenLeafPageDelta) const = 0;
 
     /**
+     * Additional configuration that should be added to the WiredTiger config string for creating a
+     * new table. Only applies to the 'main' WiredTiger instance - excluding 'spill' WiredTiger
+     * instances.
+     */
+    virtual std::string getMainWiredTigerTableSettings() const = 0;
+
+    /**
      * If true, the provider expects that all catalog identifiers will be replicated and identical
      * between nodes.
      */

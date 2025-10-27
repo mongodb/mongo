@@ -404,6 +404,16 @@ public:
     };
 
     /**
+     * Given two configuration strings, concatenates them together with a ','. It's the callers
+     * responsibility to ensure both input configs are valid.
+     * Example:
+     *      - configA = "exclusive=true"
+     *      - configB = "key_format=q"
+     *      - returns "exclusive=true,key_format=q"
+     */
+    static std::string concatConfigs(const std::string& configA, const std::string& configB);
+
+    /**
      * Helper for handling WT eviction events. Returns non-zero to indicate that WT should not take
      * part in optional eviction on this session, and zero otherwise
      */

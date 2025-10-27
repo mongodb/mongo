@@ -1418,6 +1418,10 @@ uint64_t WiredTigerUtil::genTableId() {
     return nextTableId.fetchAndAdd(1);
 }
 
+std::string WiredTigerUtil::concatConfigs(const std::string& configA, const std::string& configB) {
+    return str::stream() << configA << "," << configB;
+}
+
 boost::optional<bool> WiredTigerConfigParser::isTableLoggingEnabled() const {
     WT_CONFIG_ITEM value;
     if (auto retCode = get(kLogKeyName.data(), &value); retCode != 0) {
