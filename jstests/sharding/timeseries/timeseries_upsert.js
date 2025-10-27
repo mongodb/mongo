@@ -17,6 +17,8 @@ import {
 
 setUpShardedCluster();
 
+const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
+
 const collName = "sharded_timeseries_upsert";
 const dateTime = new ISODate();
 
@@ -284,19 +286,22 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, updateShardKey =
     });
 })();
 
-(function testSingleUpdateReplacementDocWouldChangeOwningShard() {
-    runTest({
-        collConfig: metaShardKey,
-        updateOp: {
-            q: {[metaFieldName]: -1},
-            u: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
-            multi: false,
-            upsert: true,
-        },
-        upsertedDoc: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
-        updateShardKey: true,
-    });
-})();
+// TODO SERVER-104122: Handle WCOS error in UWE.
+if (!uweEnabled) {
+    (function testSingleUpdateReplacementDocWouldChangeOwningShard() {
+        runTest({
+            collConfig: metaShardKey,
+            updateOp: {
+                q: {[metaFieldName]: -1},
+                u: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
+                multi: false,
+                upsert: true,
+            },
+            upsertedDoc: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
+            updateShardKey: true,
+        });
+    })();
+}
 
 (function testSingleUpdateReplacementDocWithNoShardKey() {
     runTest({

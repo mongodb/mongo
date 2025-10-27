@@ -29,7 +29,6 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
-#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/write_op_helper.h"
@@ -38,6 +37,24 @@
 
 namespace mongo {
 namespace unified_write_executor {
+
+
+void WriteOpAnalyzerImpl::recordTargetingStats(OperationContext* opCtx,
+                                               const CollectionRoutingInfoTargeter& targeter,
+                                               const NSTargeter::TargetingResult& tr,
+                                               const WriteOp& op) {
+    // FindAndModify command does not record the following metrics.
+    if (op.isFindAndModify()) {
+        return;
+    }
+
+    size_t nsIdx = BulkWriteCRUDOp(op.getBulkWriteOp()).getNsInfoIdx();
+    _stats.recordTargetingStats(tr.endpoints,
+                                nsIdx,
+                                targeter.isTargetedCollectionSharded(),
+                                targeter.getAproxNShardsOwningChunks(),
+                                op.getType());
+}
 
 StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                                                   RoutingContext& routingCtx,
@@ -65,18 +82,9 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         } break;
     }
 
-    if (!op.isFindAndModify()) {
-        size_t nsIdx = BulkWriteCRUDOp(op.getBulkWriteOp()).getNsInfoIdx();
-        _stats.recordTargetingStats(tr.endpoints,
-                                    nsIdx,
-                                    targeter.isTargetedCollectionSharded(),
-                                    targeter.getAproxNShardsOwningChunks(),
-                                    op.getType());
-    }
-
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
     const auto& cm = cri.getChunkManager();
-    const bool isShardedTimeseries = cm.isSharded() && cm.isTimeseriesCollection();
+    const bool isShardedTimeseries = targeter.isTrackedTimeSeriesNamespace();
     const bool isUpdate = op.getType() == WriteType::kUpdate;
     const bool isRetryableWrite = opCtx->isRetryableWrite();
     const bool inTxn = static_cast<bool>(TransactionRouter::get(opCtx));
@@ -96,6 +104,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
 
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
+        recordTargetingStats(opCtx, targeter, tr, op);
         return Analysis{
             BatchType::kNonTargetedWrite, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else if (isMultiWriteBlockingMigrations) {
@@ -115,9 +124,11 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         return Analysis{
             BatchType::kInternalTransaction, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else if (tr.endpoints.size() == 1) {
+        recordTargetingStats(opCtx, targeter, tr, op);
         return Analysis{
             BatchType::kSingleShard, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else {
+        recordTargetingStats(opCtx, targeter, tr, op);
         // For updates/upserts/deletes running outside of a transaction that need to target more
         // than one endpoint, all shards are targeted -AND- 'shardVersion' is set to IGNORED on all
         // endpoints. The exception to this is when 'onlyTargetDataOwningShardsForMultiWrites' is

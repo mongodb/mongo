@@ -86,9 +86,30 @@ public:
                                const WriteBatch& batch);
 
 private:
-    enum class ShouldAppendLsidAndTxnNumber : bool {};
-    enum class ShouldAppendReadWriteConcern : bool {};
-    enum class FilterGenericArguments : bool {};
+    struct IsEmbeddedCommand {
+        enum Value : bool { No = false, Yes = true };
+        Value value;
+        constexpr IsEmbeddedCommand(Value v) : value(v) {}
+        constexpr explicit operator bool() const {
+            return static_cast<bool>(value);
+        }
+    };
+    struct ShouldAppendLsidAndTxnNumber {
+        enum Value : bool { No = false, Yes = true };
+        Value value;
+        constexpr ShouldAppendLsidAndTxnNumber(Value v) : value(v) {}
+        constexpr explicit operator bool() const {
+            return static_cast<bool>(value);
+        }
+    };
+    struct ShouldAppendReadWriteConcern {
+        enum Value : bool { No = false, Yes = true };
+        Value value;
+        constexpr ShouldAppendReadWriteConcern(Value v) : value(v) {}
+        constexpr explicit operator bool() const {
+            return static_cast<bool>(value);
+        }
+    };
 
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
@@ -116,7 +137,7 @@ private:
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-        FilterGenericArguments filterGenericArguments) const;
+        IsEmbeddedCommand isEmbeddedCommand) const;
 
     BSONObj buildBulkWriteRequest(
         OperationContext* opCtx,
@@ -124,7 +145,7 @@ private:
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-        FilterGenericArguments filterGenericArguments,
+        IsEmbeddedCommand isEmbeddedCommand,
         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
         ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
 
@@ -134,6 +155,7 @@ private:
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+        IsEmbeddedCommand isEmbeddedCommand,
         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
         ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
 
@@ -142,7 +164,7 @@ private:
                          const std::map<NamespaceString, ShardEndpoint>& versionByNss,
                          const std::map<WriteOpId, UUID>& sampleIds,
                          boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                         FilterGenericArguments filterGenericArguments,
+                         IsEmbeddedCommand isEmbeddedCommand,
                          ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
                          ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
 

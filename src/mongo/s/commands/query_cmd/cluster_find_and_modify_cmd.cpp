@@ -843,9 +843,20 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     _updateMetrics->collectMetrics(originalCmdObj);
 
     if (unified_write_executor::isEnabled(opCtx)) {
+        auto cmdObjForShard = CommandHelpers::filterCommandRequestForPassthrough(originalCmdObj);
+
         // Evaluate let parameters once before forwarding to the shards for non-deterministic
         // operators like $rand.
-        auto cmdObjForShard = expandLetParams(opCtx, originalNss, originalCmdObj);
+        cmdObjForShard = expandLetParams(opCtx, originalNss, cmdObjForShard);
+
+        // Manually appending the required "$db" field name so that we can pass the parsed command
+        // request to further processing.
+        {
+            BSONObjBuilder bob(cmdObjForShard);
+            bob.append(write_ops::FindAndModifyCommandRequest::kDbNameFieldName,
+                       DatabaseNameUtil::serialize(originalNss.dbName(), SerializationContext{}));
+            cmdObjForShard = bob.obj();
+        }
 
         auto request = write_ops::FindAndModifyCommandRequest::parse(
             cmdObjForShard, IDLParserContext("ClusterFindAndModify"));

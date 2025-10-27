@@ -145,10 +145,10 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
                     "Cluster write op executing in internal transaction failed with error",
                     "error"_attr = redact(swRes.getStatus()));
 
+        handleTransientTxnError(opCtx, swRes.getStatus());
+
         // Process the local or top-level error for the batch.
         processErrorForBatch(opCtx, std::vector{op}, swRes.getStatus(), boost::none);
-
-        handleTransientTxnError(opCtx, swRes.getStatus());
 
         if (inTransaction) {
             LOGV2_DEBUG(10413100,
@@ -295,10 +295,19 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
                     "shardId"_attr = shardId.toString(),
                     "host"_attr = (hostAndPort ? hostAndPort->toString() : std::string("(none)")));
 
+        handleTransientTxnError(opCtx, status);
+
+        if (write_op_helpers::isRetryErrCode(status.code())) {
+            Result result;
+            for (auto& op : ops) {
+                auto retryResult = handleRetryableError(opCtx, routingCtx, op, status);
+                result.combine(std::move(retryResult));
+            }
+            return result;
+        }
+
         // Process the local error for the batch.
         processErrorForBatch(opCtx, ops, status, shardId);
-
-        handleTransientTxnError(opCtx, status);
 
         if (inTransaction) {
             LOGV2_DEBUG(10896502,
@@ -341,10 +350,19 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
                     "error"_attr = redact(status),
                     "host"_attr = shardResponse.target);
 
+        handleTransientTxnError(opCtx, status, shardResponse.data, shardResponse.target);
+
+        if (write_op_helpers::isRetryErrCode(status.code())) {
+            Result result;
+            for (auto& op : ops) {
+                auto retryResult = handleRetryableError(opCtx, routingCtx, op, status);
+                result.combine(std::move(retryResult));
+            }
+            return result;
+        }
+
         // Process the top-level error for the batch.
         processErrorForBatch(opCtx, ops, status, shardId);
-
-        handleTransientTxnError(opCtx, status, shardResponse.data, shardResponse.target);
 
         if (inTransaction) {
             LOGV2_DEBUG(10413101,

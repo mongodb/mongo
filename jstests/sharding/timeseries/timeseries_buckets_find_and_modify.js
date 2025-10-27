@@ -111,7 +111,12 @@ const testBucketMetaUpdateToOwningShardChange = function (queryField) {
     assert.eq(orgBucketDocs.length, newBucketDocs.length, `Wrong number of buckets left: ${tojson(newBucketDocs)}`);
     assert(!newBucketDocs.find((e) => e === orgBucketDocs[bucketDocIdx]), tojson(newBucketDocs));
 };
-testBucketMetaUpdateToOwningShardChange("_id");
-testBucketMetaUpdateToOwningShardChange("meta");
+
+// TODO SERVER-104122: Handle WCOS error in UWE.
+const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
+if (!uweEnabled) {
+    testBucketMetaUpdateToOwningShardChange("_id");
+    testBucketMetaUpdateToOwningShardChange("meta");
+}
 
 tearDownShardedCluster();

@@ -19,8 +19,7 @@ selector:
     # - jstests/sharding/database_versioning_all_commands.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
-    # TODO SERVER-111710: enable viewful timeseries
-    # - jstests/sharding/timeseries/**/*.js
+    - jstests/sharding/timeseries/**/*.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
     - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
@@ -31,7 +30,6 @@ selector:
     # - jstests/sharding/query/update/update_shard_key_bulk_write.js
     # - jstests/sharding/query/update_delete_many_metrics.js
     # - jstests/sharding/read_write_concern_defaults_application.js
-    # - jstests/sharding/timeseries/timeseries_writes_without_shard_key_single_shard_data_placement_change.js
     - jstests/sharding/updateOne_without_shard_key/deleteOne_without_shard_key_basic.js
     - jstests/sharding/updateOne_without_shard_key/dropping_collection_during_clusterQueryWithoutShardKey_errors.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
@@ -47,18 +45,15 @@ selector:
     - jstests/sharding/query/find_and_modify/*.js
 
     # No passthrough tests.
-    # TODO SERVER-111710: enable viewful timeseries
-    # - jstests/noPassthrough/timeseries/**/*.js
+    - jstests/noPassthrough/timeseries/**/*.js
     # - jstests/noPassthrough/crud/bulk_write_currentop.js
     - jstests/noPassthrough/crud/bulk_write_metrics.js
-    # TODO SERVER-111710: enable viewful timeseries
-    # - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
+    - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
     - jstests/noPassthrough/crud/bulk_write_currentop.js
 
     # - jstests/noPassthrough/query/command_diagnostics_sharded.js
     # - jstests/noPassthrough/query/profile/profile_planning_time_stats.js
     # - jstests/noPassthrough/server_parameters/cluster_commands_require_cluster_node.js
-    # - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_insert_ordered_true.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_bulkwrite_metrics.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit_bulk_write.js
@@ -77,6 +72,7 @@ selector:
   exclude_files:
     # TODO SERVER-104122: Handle WCOS error in UWE.
     - jstests/noPassthrough/txns_retryable_writes_sessions/router_transactions_metrics.js
+    - jstests/sharding/timeseries/timeseries_shardkey_update.js
 
 executor:
   archive:

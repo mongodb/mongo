@@ -14,9 +14,6 @@ selector:
     - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_update_shard_key.js
     - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_update_shard_key_kill_sessions.js
 
-    # TODO SERVER-111710: enable viewful timeseries
-    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
-
   exclude_with_any_tags:
     - requires_standalone
     - requires_replication

@@ -248,6 +248,10 @@ BatchWriteCommandRefImpl::getEncryptionInformation(int index) const {
     return getRequest().getWriteCommandRequestBase().getEncryptionInformation();
 }
 
+const OptionalBool& BatchWriteCommandRefImpl::getRawData() const {
+    return getRequest().getGenericArguments().getRawData();
+}
+
 BSONObj BatchWriteCommandRefImpl::toBSON(int index) const {
     return visitOpData(index,
                        OverloadedVisitor{[&](const BSONObj& insertDoc) { return insertDoc; },
@@ -397,6 +401,10 @@ BulkWriteCommandRefImpl::getEncryptionInformation(int index) const {
     return getRequest().getNsInfo()[nsInfoIdx].getEncryptionInformation();
 }
 
+const OptionalBool& BulkWriteCommandRefImpl::getRawData() const {
+    return getRequest().getRawData();
+}
+
 BSONObj BulkWriteCommandRefImpl::toBSON(int index) const {
     return visitOpData(index, [&](const auto& op) { return op.toBSON(); });
 }
@@ -512,6 +520,10 @@ bool FindAndModifyCommandRefImpl::getUpsert(int index) const {
 const boost::optional<mongo::EncryptionInformation>&
 FindAndModifyCommandRefImpl::getEncryptionInformation(int index) const {
     return getRequest().getEncryptionInformation();
+}
+
+const OptionalBool& FindAndModifyCommandRefImpl::getRawData() const {
+    return getRequest().getRawData();
 }
 
 BSONObj FindAndModifyCommandRefImpl::toBSON(int index) const {

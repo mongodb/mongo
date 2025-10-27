@@ -310,6 +310,11 @@ public:
     const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
 
     /**
+     * Returns whether the command operates on the timeseries bucket raw data.
+     */
+    const OptionalBool& getRawData() const;
+
+    /**
      * Returns a BSON representation of the specified write op. Note that this representation
      * may be specific to BatchedCommandRequest and may differ from the representation used by
      * other types of write commands.
@@ -586,6 +591,11 @@ public:
     const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
 
     /**
+     * Returns whether the command operates on the timeseries bucket raw data.
+     */
+    const OptionalBool& getRawData() const;
+
+    /**
      * Returns a BSON representation of the specified write op. Note that this representation may
      * be specific to BulkWriteCommandRequest and may differ from the representation used by other
      * write commands.
@@ -834,6 +844,11 @@ public:
     const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
 
     /**
+     * Returns whether the command operates on the timeseries bucket raw data.
+     */
+    const OptionalBool& getRawData() const;
+
+    /**
      * Returns a BSON representation of the specified write op. Note that this representation may
      * be specific to BulkWriteCommandRequest and may differ from the representation used by other
      * write commands.
@@ -1003,6 +1018,9 @@ public:
     }
     decltype(auto) getStmtIds() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getStmtIds(); });
+    }
+    decltype(auto) getRawData() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getRawData(); });
     }
 
     /**
