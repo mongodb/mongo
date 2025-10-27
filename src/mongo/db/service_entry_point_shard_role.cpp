@@ -1242,6 +1242,8 @@ void RunCommandImpl::_epilogue() {
         auto response = body.asTempObj();
         if (auto wcErrElement = response["writeConcernError"]; !wcErrElement.eoo()) {
             wcCode = ErrorCodes::Error(wcErrElement["code"].numberInt());
+            CurOp::get(opCtx)->debug().writeConcernError.emplace(
+                response.getObjectField("writeConcernError").getOwned());
         }
         appendErrorLabelsAndTopologyVersion(opCtx,
                                             &body,
@@ -2020,6 +2022,8 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     boost::optional<ErrorCodes::Error> wcCode;
     if (response.hasField("writeConcernError")) {
         wcCode = ErrorCodes::Error(response["writeConcernError"]["code"].numberInt());
+        CurOp::get(opCtx)->debug().writeConcernError.emplace(
+            response.getObjectField("writeConcernError").getOwned());
     }
     appendErrorLabelsAndTopologyVersion(opCtx,
                                         &_extraFieldsBuilder,

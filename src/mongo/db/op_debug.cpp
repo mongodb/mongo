@@ -425,6 +425,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("writeConcern", writeConcern->toBSON());
     }
 
+    if (writeConcernError) {
+        pAttrs->add("writeConcernError", *writeConcernError);
+    }
+
     if (waitForWriteConcernDurationMillis > Milliseconds::zero()) {
         pAttrs->add("waitForWriteConcernDuration", waitForWriteConcernDurationMillis);
     }
@@ -683,6 +687,10 @@ void OpDebug::append(OperationContext* opCtx,
 
     if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
         b.append("writeConcern", writeConcern->toBSON());
+    }
+
+    if (writeConcernError) {
+        b.append("writeConcernError", *writeConcernError);
     }
 
     if (waitForWriteConcernDurationMillis > Milliseconds::zero()) {
