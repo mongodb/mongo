@@ -46,6 +46,9 @@ public:
         serverGlobalParams.slowMS.store(kDefaultSlowms);
         serverGlobalParams.sampleRate.store(kDefaultSampleRate);
 
+        DatabaseProfileSettings::get(opCtx->getServiceContext())
+            .setDefaultSlowOpInProgressThreshold(Milliseconds(kDefaultSlowInProgMS));
+
         // Generate a unique database name for each test so that we start a blank slate.
         dbName = DatabaseName::createDatabaseName_forTest(
             boost::none, str::stream() << "profileCmdTestDb" << PseudoRandom(0).nextInt64());
@@ -115,6 +118,7 @@ TEST_F(ProfileCmdTest, SetAllParameters) {
     ProfileCmdTestArgs args{.level = 1,
                             .sampleRate = 0.5,
                             .slowms = -1,
+                            .slowinprogms = -2,
                             .filter = ObjectOrUnset{BSON("nreturned" << BSON("$eq" << 1))}};
 
     auto resp = runCommand(buildCmdRequest(args));

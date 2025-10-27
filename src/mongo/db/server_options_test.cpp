@@ -714,6 +714,80 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
     ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
+TEST(SetupOptions, SlowInProgMsCommandLineParamParsesSuccessfully) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--defaultSlowInProgMS");
+    argv.push_back("300");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::mongo::storeServerOptions(environment));
+
+    ASSERT_EQ(::mongo::serverGlobalParams.defaultSlowInProgMS.load(), 300);
+}
+
+TEST(SetupOptions, SlowInProgMsParamInitializedSuccessfullyFromINIConfigFile) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.ini");
+
+    parser.setConfig("config.ini", "defaultSlowInProgMS=300");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::mongo::storeServerOptions(environment));
+
+    ASSERT_EQ(::mongo::serverGlobalParams.defaultSlowInProgMS.load(), 300);
+}
+
+TEST(SetupOptions, SlowInProgMsParamInitializedSuccessfullyFromYAMLConfigFile) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.yaml");
+
+    parser.setConfig("config.yaml",
+                     "operationProfiling:\n"
+                     "    slowOpInProgressThresholdMs: 300\n");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::mongo::storeServerOptions(environment));
+
+    ASSERT_EQ(::mongo::serverGlobalParams.defaultSlowInProgMS.load(), 300);
+}
+
 TEST(SetupOptions, NonNumericSlowMsCommandLineOptionFailsToParse) {
     OptionsParserTester parser;
     moe::Environment environment;

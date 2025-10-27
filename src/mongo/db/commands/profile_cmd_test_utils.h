@@ -37,6 +37,7 @@
 namespace mongo {
 
 static const int kDefaultSlowms = 200;
+static const int kDefaultSlowInProgMS = 1000;
 static const double kDefaultSampleRate = 1.0;
 
 /**
@@ -46,6 +47,7 @@ struct ProfileCmdTestArgs {
     int64_t level = 0;
     boost::optional<double> sampleRate = boost::none;
     boost::optional<int64_t> slowms = boost::none;
+    boost::optional<int64_t> slowinprogms = boost::none;
     boost::optional<ObjectOrUnset> filter = boost::none;
 };
 

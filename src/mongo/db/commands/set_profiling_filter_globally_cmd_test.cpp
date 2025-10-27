@@ -86,7 +86,7 @@ public:
                                                   ExpressionContextBuilder{}.opCtx(opCtx).build())
             : std::shared_ptr<ProfileFilterImpl>(nullptr);
         DatabaseProfileSettings::get(opCtx->getServiceContext())
-            .setDatabaseProfileSettings(dbName, {0, std::move(profileFilter)});
+            .setDatabaseProfileSettings(dbName, {0, std::move(profileFilter), Milliseconds(0)});
     }
 
     std::vector<DatabaseName> databases;

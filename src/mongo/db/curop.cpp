@@ -727,7 +727,9 @@ void CurOp::_updateExecutionTimers() {
 }
 
 CurOp::ShouldProfileQuery CurOp::_shouldProfileAtLevel1AndLogSlowQuery(
-    const logv2::LogOptions& logOptions, std::shared_ptr<const ProfileFilter> filter) {
+    const logv2::LogOptions& logOptions,
+    Milliseconds slowms,
+    std::shared_ptr<const ProfileFilter> filter) {
     if (filter) {
         // Calculate this operation's CPU time before deciding whether logging/profiling is
         // necessary only if it is needed for filtering.
@@ -740,11 +742,8 @@ CurOp::ShouldProfileQuery CurOp::_shouldProfileAtLevel1AndLogSlowQuery(
     } else {
         // Log the operation if it is eligible according to the current slowMS and sampleRate
         // settings.
-        const auto [shouldLogSlowOp, shouldSample] =
-            shouldLogSlowOpWithSampling(opCtx(),
-                                        logOptions.component(),
-                                        _debug.workingTimeMillis,
-                                        Milliseconds(serverGlobalParams.slowMS.load()));
+        const auto [shouldLogSlowOp, shouldSample] = shouldLogSlowOpWithSampling(
+            opCtx(), logOptions.component(), _debug.workingTimeMillis, slowms);
 
         return ShouldProfileQuery{.shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample,
                                   .shouldLogSlowQuery = shouldLogSlowOp};
@@ -826,8 +825,10 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         oplogGetMoreStats.recordMillis(
             durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime));
     }
-    const auto [shouldProfileAtLevel1, shouldLogSlowOp] =
-        _shouldProfileAtLevel1AndLogSlowQuery(logOptions, std::move(filter));
+    const auto [shouldProfileAtLevel1, shouldLogSlowOp] = _shouldProfileAtLevel1AndLogSlowQuery(
+        logOptions,
+        Milliseconds(slowMsOverride.value_or(serverGlobalParams.slowMS.load())),
+        std::move(filter));
 
     // Defer calculating the CPU time until we know that we actually are going to write it to
     // the logs or profiler. The CPU time may have been determined earlier if it was a
@@ -852,12 +853,10 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 }
 
 void CurOp::logLongRunningOperationIfNeeded() {
-    static constexpr int kSlowInProgressLogDebugLevel = 1;
     static const logv2::LogOptions kLogOptions{logv2::LogComponent::kCommandSlowInProg};
 
     if (!_eligibleForLongRunningQueryLogging ||
-        !logv2::shouldLog(kLogOptions.component(),
-                          logv2::LogSeverity::Debug(kSlowInProgressLogDebugLevel))) {
+        !logv2::shouldLog(kLogOptions.component(), logv2::LogSeverity::Log())) {
         return;
     }
     if (shouldCurOpStackOmitDiagnosticInformation(this)) {
@@ -868,20 +867,19 @@ void CurOp::logLongRunningOperationIfNeeded() {
 
     _updateExecutionTimers();
 
-    std::shared_ptr<const ProfileFilter> filter =
-        DatabaseProfileSettings::get(opCtx()->getServiceContext())
-            .getDatabaseProfileSettings(getNSS().dbName())
-            .filter;
+    auto profileSettings = DatabaseProfileSettings::get(opCtx()->getServiceContext())
+                               .getDatabaseProfileSettings(getNSS().dbName());
     const bool shouldLogSlowOp =
-        _shouldProfileAtLevel1AndLogSlowQuery(kLogOptions, std::move(filter)).shouldLogSlowQuery;
+        _shouldProfileAtLevel1AndLogSlowQuery(
+            kLogOptions, profileSettings.slowOpInProgressThreshold, profileSettings.filter)
+            .shouldLogSlowQuery;
     if (!shouldLogSlowOp) {
         return;
     }
 
     calculateCpuTime();
     logv2::DynamicAttributes attr = _reportDebugAndStats(kLogOptions, false);
-    LOGV2_DEBUG_OPTIONS(
-        1794200, kSlowInProgressLogDebugLevel, kLogOptions, "Slow in-progress query", attr);
+    LOGV2_OPTIONS(1794200, kLogOptions, "Slow in-progress query", attr);
     _eligibleForLongRunningQueryLogging = false;
 }
 

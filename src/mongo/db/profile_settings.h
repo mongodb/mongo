@@ -43,11 +43,16 @@ namespace mongo {
 class ServiceContext;
 
 struct MONGO_MOD_PUB ProfileSettings {
-    int level;
+    int level{0};
     std::shared_ptr<const ProfileFilter> filter;  // nullable
+    Milliseconds slowOpInProgressThreshold{0};
 
-    ProfileSettings(int level, std::shared_ptr<ProfileFilter> filter)
-        : level(level), filter(filter) {
+    ProfileSettings(int level,
+                    std::shared_ptr<ProfileFilter> filter,
+                    Milliseconds slowOpInProgressThreshold)
+        : level(level),
+          filter(std::move(filter)),
+          slowOpInProgressThreshold(slowOpInProgressThreshold) {
         // ProfileSettings represents a state, not a request to change the state.
         // -1 is not a valid profiling level: it is only used in requests, to represent
         // leaving the state unchanged.
@@ -56,9 +61,7 @@ struct MONGO_MOD_PUB ProfileSettings {
 
     ProfileSettings() = default;
 
-    bool operator==(const ProfileSettings& other) const {
-        return level == other.level && filter == other.filter;
-    }
+    bool operator==(const ProfileSettings& other) const = default;
 };
 
 /**
@@ -83,6 +86,11 @@ public:
      * Set the global 'ProfileFilter' default.
      */
     void setDefaultFilter(std::shared_ptr<ProfileFilter> filter);
+
+    /**
+     * Set the global 'ProfileFilter' default.
+     */
+    void setDefaultSlowOpInProgressThreshold(Milliseconds slowOpInProgressThreshold);
 
     /**
      * Return the global 'ProfileFilter' default.
@@ -139,6 +147,7 @@ private:
     // on a database.
     std::shared_ptr<ProfileFilter> _defaultProfileFilter;
     int _defaultLevel = 0;
+    Milliseconds _defaultSlowOpInProgressThreshold{5000};
 };
 
 

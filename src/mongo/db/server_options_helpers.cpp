@@ -448,6 +448,11 @@ Status storeBaseOptions(const moe::Environment& params) {
     if (params.count("operationProfiling.slowOpThresholdMs")) {
         serverGlobalParams.slowMS.store(params["operationProfiling.slowOpThresholdMs"].as<int>());
     }
+    if (params.count("operationProfiling.slowOpInProgressThresholdMs")) {
+        serverGlobalParams.defaultSlowInProgMS.store(
+            params["operationProfiling.slowOpInProgressThresholdMs"].as<int>());
+    }
+
 
     if (params.count("operationProfiling.slowOpSampleRate")) {
         serverGlobalParams.sampleRate.store(

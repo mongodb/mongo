@@ -72,15 +72,22 @@ protected:
 
         auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
         auto oldSettings = dbProfileSettings.getDatabaseProfileSettings(dbName);
+        auto newSettings = oldSettings;
 
         if (auto filterOrUnset = request.getFilter()) {
-            auto newSettings = oldSettings;
             if (auto filter = filterOrUnset->obj) {
                 newSettings.filter = std::make_shared<ProfileFilterImpl>(
                     *filter, ExpressionContextBuilder{}.opCtx(opCtx).build());
             } else {
                 newSettings.filter = nullptr;
             }
+        }
+
+        if (auto slowOpInProgMS = request.getSlowinprogms()) {
+            newSettings.slowOpInProgressThreshold = Milliseconds(*slowOpInProgMS);
+        }
+
+        if (oldSettings != newSettings) {
             dbProfileSettings.setDatabaseProfileSettings(dbName, newSettings);
         }
 

@@ -34,7 +34,7 @@
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_format.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -89,7 +89,7 @@ struct MONGO_MOD_PUB ServerGlobalParams {
 
     boost::optional<int> listenBacklog;  // --listenBacklog
 
-    AtomicWord<bool> quiet{false};  // --quiet
+    Atomic<bool> quiet{false};  // --quiet
 
     ClusterRole clusterRole = ClusterRole::None;       // --configsvr/--shardsvr
     MaintenanceMode maintenanceMode;                   // --maintenanceMode
@@ -110,11 +110,13 @@ struct MONGO_MOD_PUB ServerGlobalParams {
 
     int defaultProfile = 0;  // --profile
     boost::optional<BSONObj> defaultProfileFilter;
-    AtomicWord<int> slowMS{100};           // --time in ms that is "slow"
-    AtomicWord<double> sampleRate{1.0};    // --samplerate rate at which to sample slow queries
+    Atomic<int> slowMS{100};  // --time in ms that is "slow"
+    Atomic<int> defaultSlowInProgMS{
+        5000};                       // --time in ms that is "slow" to log a query in-progress.
+    Atomic<double> sampleRate{1.0};  // --samplerate rate at which to sample slow queries
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
 
-    AtomicWord<int> slowTaskExecutorWaitTimeProfilingMs{
+    Atomic<int> slowTaskExecutorWaitTimeProfilingMs{
         50};                    // --time in ms that is "slow" for a task to begin execution
     bool noUnixSocket = false;  // --nounixsocket
     bool doFork = false;        // --fork
@@ -302,7 +304,7 @@ struct MONGO_MOD_PUB ServerGlobalParams {
         }
 
     private:
-        AtomicWord<FCV> _version{FCV::kUnsetDefaultLastLTSBehavior};
+        Atomic<FCV> _version{FCV::kUnsetDefaultLastLTSBehavior};
 
     } mutableFCV;
 
@@ -313,7 +315,7 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     // primaries can accept user-initiated writes and validate based on the feature compatibility
     // version. A secondary always validates in the upgraded mode so that it can sync new features,
     // even when in the downgraded feature compatibility mode.
-    AtomicWord<bool> validateFeaturesAsPrimary{true};
+    Atomic<bool> validateFeaturesAsPrimary{true};
 
     std::vector<std::string> disabledSecureAllocatorDomains;
 

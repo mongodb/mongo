@@ -74,6 +74,13 @@ configs:
         short_name: slowms
         arg_vartype: Int
         default: 100
+    "operationProfiling.slowOpInProgressThresholdMs":
+        description: >-
+            The default amount of milliseconds after which a query should be logged while it is
+            still in-progress
+        short_name: defaultSlowInProgMS
+        arg_vartype: Int
+        default: 5000
     "taskExecutorProfiling.slowTaskWaitTimeProfilingMs":
         description: "Value of slow wait time for tasks"
         short_name: slowTaskWaitTimeProfilingMs

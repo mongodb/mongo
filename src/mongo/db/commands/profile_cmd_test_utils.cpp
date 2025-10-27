@@ -40,6 +40,7 @@ ProfileCmdRequest buildCmdRequest(const ProfileCmdTestArgs& reqArgs) {
     ProfileCmdRequest req{reqArgs.level};
     req.setSampleRate(reqArgs.sampleRate);
     req.setSlowms(reqArgs.slowms);
+    req.setSlowinprogms(reqArgs.slowinprogms);
     req.setFilter(reqArgs.filter);
     return req;
 }
@@ -47,6 +48,9 @@ ProfileCmdRequest buildCmdRequest(const ProfileCmdTestArgs& reqArgs) {
 void validateCmdResponse(BSONObj resp, const ProfileCmdTestArgs& prevSettings) {
     ASSERT_EQ(resp["was"].Number(), prevSettings.level) << resp;
     ASSERT_EQ(resp["slowms"].Number(), prevSettings.slowms.value_or(kDefaultSlowms)) << resp;
+    ASSERT_EQ(resp["slowinprogms"].Number(),
+              prevSettings.slowinprogms.value_or(kDefaultSlowInProgMS))
+        << resp;
     ASSERT_EQ(resp["sampleRate"].Number(), prevSettings.sampleRate.value_or(kDefaultSampleRate))
         << resp;
 
@@ -66,6 +70,8 @@ void validateProfileSettings(const ProfileCmdTestArgs& req, const ProfileSetting
     ASSERT_EQ(serverGlobalParams.sampleRate.load(), req.sampleRate.value_or(kDefaultSampleRate));
 
     ASSERT_EQ(settings.level, req.level);
+    ASSERT_EQ(settings.slowOpInProgressThreshold,
+              Milliseconds(req.slowinprogms.value_or(kDefaultSlowInProgMS)));
 
     if (req.filter && req.filter->obj) {
         ASSERT_NE(settings.filter, nullptr);

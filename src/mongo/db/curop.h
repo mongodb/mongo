@@ -790,7 +790,9 @@ private:
         bool shouldLogSlowQuery;
     };
     ShouldProfileQuery _shouldProfileAtLevel1AndLogSlowQuery(
-        const logv2::LogOptions& logOptions, std::shared_ptr<const ProfileFilter> filter);
+        const logv2::LogOptions& logOptions,
+        Milliseconds slowms,
+        std::shared_ptr<const ProfileFilter> filter);
 
     logv2::DynamicAttributes _reportDebugAndStats(const logv2::LogOptions& logOptions,
                                                   bool isFinalStorageStatsUpdate);

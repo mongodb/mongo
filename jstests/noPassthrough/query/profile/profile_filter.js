@@ -22,6 +22,7 @@ function runTest(conn) {
     assert.eq(response.filter, {$and: [{millis: {$gt: 100}}, {millis: {$lt: 300}}]});
     // But, slowms / sampleRate still appears in getProfilingLevel.
     assert.eq(response.slowms, oldResponse.slowms);
+    assert.eq(response.slowinprogms, oldResponse.slowinprogms);
     assert.eq(response.sampleRate, oldResponse.sampleRate);
     // Since this may be confusing, a note also appears.
     assert.eq(
@@ -129,7 +130,7 @@ function runTest(conn) {
     assert.throws(() => db.setProfilingLevel(isMongos ? 0 : 1, {filter: {no_such_field: 23}}));
     assert.eq(0, db.getProfilingLevel());
     const response3 = db.setProfilingLevel(0);
-    let expectedFields = ["was", "slowms", "sampleRate", "ok"];
+    let expectedFields = ["was", "slowms", "slowinprogms", "sampleRate", "ok"];
     if (isMongos) {
         expectedFields = [...expectedFields, "$clusterTime", "operationTime"];
     }

@@ -77,11 +77,12 @@ TEST_F(ProfileSettingsTest, DefaultProfileLevel) {
     ASSERT_EQ(dbProfileSettings.getDatabaseProfileSettings(testDBNameFirst).level, 1);
 
     // Setting the default profile level should have not changed the result.
-    dbProfileSettings.setDatabaseProfileSettings(testDBNameFirst, {1, nullptr});
+    dbProfileSettings.setDatabaseProfileSettings(testDBNameFirst, {1, nullptr, Milliseconds(5000)});
     ASSERT_EQ(dbProfileSettings.getDatabaseProfileSettings(testDBNameFirst).level, 1);
 
     // Changing the profile level should make fetching it different.
-    dbProfileSettings.setDatabaseProfileSettings(testDBNameSecond, {2, nullptr});
+    dbProfileSettings.setDatabaseProfileSettings(testDBNameSecond,
+                                                 {2, nullptr, Milliseconds(5000)});
     ASSERT_EQ(dbProfileSettings.getDatabaseProfileSettings(testDBNameSecond).level, 2);
 }
 
@@ -102,13 +103,36 @@ TEST_F(ProfileSettingsTest, DefaultDatabaseFilter) {
 
     // Setting a specific filter should override the default .
     auto specificFilter = std::make_shared<ProfileFilterMock>(2);
-    dbProfileSettings.setDatabaseProfileSettings(testDBNameSecond, {1, specificFilter});
+    dbProfileSettings.setDatabaseProfileSettings(testDBNameSecond,
+                                                 {1, specificFilter, Milliseconds(5000)});
     filter = dynamic_cast<const ProfileFilterMock*>(
         dbProfileSettings.getDatabaseProfileSettings(testDBNameSecond).filter.get());
     ASSERT(filter);
     ASSERT_EQ(filter->id, specificFilter->id);
 }
 
+TEST_F(ProfileSettingsTest, DefaultSlowOpInProgressThreshold) {
+    DatabaseName testDBNameFirst =
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdbfirst");
+    DatabaseName testDBNameSecond =
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdbsecond");
+
+    auto defaultSlowOpInProgressThreshold = Milliseconds(100);
+    dbProfileSettings.setDefaultSlowOpInProgressThreshold(defaultSlowOpInProgressThreshold);
+
+    // Return the default filter when one has not been explicitly set.
+    auto slowOpInProgressThreshold =
+        dbProfileSettings.getDatabaseProfileSettings(testDBNameFirst).slowOpInProgressThreshold;
+    ASSERT_EQ(slowOpInProgressThreshold, defaultSlowOpInProgressThreshold);
+
+    // Setting a specific filter should override the default .
+    auto specificSlowOpThreshold = Milliseconds(200);
+    dbProfileSettings.setDatabaseProfileSettings(testDBNameSecond,
+                                                 {1, nullptr, specificSlowOpThreshold});
+    slowOpInProgressThreshold =
+        dbProfileSettings.getDatabaseProfileSettings(testDBNameSecond).slowOpInProgressThreshold;
+    ASSERT_EQ(slowOpInProgressThreshold, specificSlowOpThreshold);
+}
 
 TEST_F(ProfileSettingsTest, SetAll) {
     DatabaseName testDBNameFirst =
@@ -119,7 +143,8 @@ TEST_F(ProfileSettingsTest, SetAll) {
     // Set a filter on one database. This should be overridden when setting a filter on all
     // databases.
     auto specificFilter = std::make_shared<ProfileFilterMock>(2);
-    dbProfileSettings.setDatabaseProfileSettings(testDBNameSecond, {2, specificFilter});
+    dbProfileSettings.setDatabaseProfileSettings(testDBNameSecond,
+                                                 {2, specificFilter, Milliseconds(5000)});
 
     // Setting a profile filter on all databases and changing the default applies to all databases.
     auto defaultFilter = std::make_shared<ProfileFilterMock>(1);

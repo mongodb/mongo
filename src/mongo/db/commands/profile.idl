@@ -68,6 +68,10 @@ commands:
                     an alternative to slowms and sampleRate. The special value 'unset' removes
                     the filter."
                 optional: true
+            slowinprogms:
+                type: safeInt64
+                description: "The threshold, in milliseconds, at which slow ops are logged during execution."
+                optional: true
 
     setProfilingFilterGlobally:
         description: "Parser for the 'setProfilingFilterGlobally' command."

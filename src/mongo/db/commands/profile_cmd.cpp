@@ -134,6 +134,10 @@ protected:
                     newSettings.filter = nullptr;
                 }
             }
+            if (auto slowOpInProgMS = request.getSlowinprogms()) {
+                newSettings.slowOpInProgressThreshold = Milliseconds(*slowOpInProgMS);
+            }
+
             uassertStatusOK(_setProfileSettings(opCtx, db, dbName, newSettings));
         }
 

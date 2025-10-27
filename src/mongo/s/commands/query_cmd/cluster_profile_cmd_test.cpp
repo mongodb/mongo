@@ -56,6 +56,9 @@ public:
 
         serverGlobalParams.slowMS.store(kDefaultSlowms);
         serverGlobalParams.sampleRate.store(kDefaultSampleRate);
+
+        DatabaseProfileSettings::get(getServiceContext())
+            .setDefaultSlowOpInProgressThreshold(Milliseconds(kDefaultSlowInProgMS));
     }
 
     ProfileSettings getDbProfileSettings() {
@@ -107,6 +110,7 @@ TEST_F(ClusterProfileCmdTest, SetAllParameters) {
     ProfileCmdTestArgs args{.level = 0,
                             .sampleRate = 0.5,
                             .slowms = -1,
+                            .slowinprogms = -2,
                             .filter = ObjectOrUnset{BSON("nreturned" << BSON("$eq" << 1))}};
 
     auto resp = runCommand(buildCmdRequest(args));

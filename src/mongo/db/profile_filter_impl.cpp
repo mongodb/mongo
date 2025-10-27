@@ -97,7 +97,8 @@ bool ProfileFilterImpl::matches(OperationContext* opCtx,
 void ProfileFilterImpl::initializeDefaults(ServiceContext* service) {
     auto& dbProfileSettings = DatabaseProfileSettings::get(service);
     dbProfileSettings.setDefaultLevel(serverGlobalParams.defaultProfile);
-
+    dbProfileSettings.setDefaultSlowOpInProgressThreshold(
+        Milliseconds(serverGlobalParams.defaultSlowInProgMS.load()));
     try {
         if (auto expr = serverGlobalParams.defaultProfileFilter) {
             // Create a temporary operation context that will only be valid for parsing, and will
