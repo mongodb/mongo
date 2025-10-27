@@ -41,7 +41,7 @@ try {
         }
 
         // Await replication to ensure that metadata on secondary nodes is up-to-date.
-        new ReplSetTest(shard.nodes[0]).awaitSecondaryNodes();
+        new ReplSetTest(shard.nodes[0]).awaitReplication();
 
         // Skipping checking sharded collection metadata because any workload on the suite could
         // perform an operation that is known to leave incorrect metadata (such as
