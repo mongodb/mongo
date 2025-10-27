@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/logv2/ramlog.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

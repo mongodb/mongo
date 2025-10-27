@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log_truncation.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::logv2::constants {
 
@@ -40,11 +41,11 @@ constexpr size_t kNumStaticAttrs = 16;
 
 // Field names used in the JSON and BSON formatter
 constexpr StringData kTimestampFieldName = "t"_sd;
-constexpr StringData kSeverityFieldName = "s"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kSeverityFieldName = "s"_sd;
 constexpr StringData kComponentFieldName = "c"_sd;
 constexpr StringData kServiceFieldName = "svc"_sd;
 constexpr StringData kContextFieldName = "ctx"_sd;
-constexpr StringData kIdFieldName = "id"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr StringData kIdFieldName = "id"_sd;
 constexpr StringData kMessageFieldName = "msg"_sd;
 constexpr StringData kAttributesFieldName = "attr"_sd;
 constexpr StringData kTruncatedFieldName = "truncated"_sd;
@@ -57,7 +58,7 @@ constexpr StringData kTenantFieldName = "tenant"_sd;
 constexpr StringData kNullOptionalString = "(nothing)"_sd;
 
 constexpr LogTruncation kDefaultTruncation = LogTruncation::Enabled;
-constexpr int32_t kDefaultMaxAttributeOutputSizeKB = 10;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr int32_t kDefaultMaxAttributeOutputSizeKB = 10;
 
 constexpr int32_t kUserAssertWithLogID = -1;
 

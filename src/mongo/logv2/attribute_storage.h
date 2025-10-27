@@ -36,6 +36,7 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <string_view>  // NOLINT
@@ -43,7 +44,8 @@
 
 #include <boost/container/small_vector.hpp>
 
-namespace mongo::logv2 {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC logv2 {
 
 class TypeErasedAttributeStorage;
 
@@ -389,7 +391,7 @@ CustomAttributeValue mapValue(const T& val) {
 }
 
 template <typename It>
-class SequenceContainerLogger {
+class MONGO_MOD_NEEDS_REPLACEMENT SequenceContainerLogger {
 public:
     SequenceContainerLogger(It begin, It end) : _begin(begin), _end(end) {}
 
@@ -622,7 +624,7 @@ private:
 };
 
 // Named attribute, storage for a name-value attribute.
-class NamedAttribute {
+class MONGO_MOD_NEEDS_REPLACEMENT NamedAttribute {
 public:
     NamedAttribute() = default;
     NamedAttribute(const char* n, long double val) = delete;
@@ -840,4 +842,5 @@ auto mapLog(It begin, It end) {
     return detail::AssociativeContainerLogger(begin, end);
 }
 
-}  // namespace mongo::logv2
+}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace mongo

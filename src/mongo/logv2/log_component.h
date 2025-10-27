@@ -31,11 +31,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
 
-namespace mongo::logv2 {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC logv2 {
 
 // clang-format off
 /**
@@ -175,4 +177,5 @@ private:
 
 std::ostream& operator<<(std::ostream& os, LogComponent component);
 
-}  // namespace mongo::logv2
+}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace mongo

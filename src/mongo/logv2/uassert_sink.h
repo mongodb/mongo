@@ -32,6 +32,7 @@
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <boost/log/attributes/attribute_value_set.hpp>
 #include <boost/log/attributes/value_extraction.hpp>

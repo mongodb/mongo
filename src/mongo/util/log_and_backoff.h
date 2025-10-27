@@ -33,11 +33,12 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 namespace log_backoff_detail {
 void logAndBackoffImpl(size_t numAttempts);
 }  // namespace log_backoff_detail
@@ -57,4 +58,4 @@ void logAndBackoff(int32_t logId,
     log_backoff_detail::logAndBackoffImpl(numAttempts);
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -56,17 +57,17 @@ class DBException;
  *  In 'redact' mode replace all values with '###' and keep keys intact.
  *  In normal mode return objectToRedact.toString().
  */
-BSONObj redact(const BSONObj& objectToRedact);
+MONGO_MOD_PUBLIC BSONObj redact(const BSONObj& objectToRedact);
 
 /**
  *  In 'redact mode return '###'.
  *  In normal mode return stringToRedact.
  */
-StringData redact(StringData stringToRedact);
-inline StringData redact(const char* stringToRedact) {
+MONGO_MOD_PUBLIC StringData redact(StringData stringToRedact);
+MONGO_MOD_PUBLIC inline StringData redact(const char* stringToRedact) {
     return redact(StringData(stringToRedact));
 }
-inline StringData redact(const std::string& stringToRedact) {
+MONGO_MOD_PUBLIC inline StringData redact(const std::string& stringToRedact) {
     return redact(StringData(stringToRedact));
 }
 
@@ -74,12 +75,12 @@ inline StringData redact(const std::string& stringToRedact) {
  *  In 'redact' mode keep status code and replace reason with '###'.
  *  In normal mode return statusToRedact.toString().
  */
-std::string redact(const Status& statusToRedact);
+MONGO_MOD_PUBLIC std::string redact(const Status& statusToRedact);
 
 /**
  * In 'redact' mode keep exception type and replace causedBy with '###'.
  * In normal mode return exceptionToRedact.toString().
  */
-std::string redact(const DBException& exceptionToRedact);
+MONGO_MOD_PUBLIC std::string redact(const DBException& exceptionToRedact);
 
 }  // namespace mongo

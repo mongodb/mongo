@@ -39,6 +39,7 @@
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -50,7 +51,7 @@
 
 namespace mongo::logv2 {
 
-class JSONFormatter {
+class MONGO_MOD_OPEN JSONFormatter {
 public:
     JSONFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr,
                   LogTimestampFormat timestampFormat = LogTimestampFormat::kISO8601UTC)

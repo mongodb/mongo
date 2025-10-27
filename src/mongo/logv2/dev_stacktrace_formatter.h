@@ -35,6 +35,7 @@
 #include "mongo/logv2/log_format.h"
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/utility/formatting_ostream_fwd.hpp>

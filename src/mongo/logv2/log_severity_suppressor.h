@@ -40,6 +40,7 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 
@@ -61,7 +62,7 @@ namespace bmi = boost::multi_index;
  * `quiet` severity for key `k` until the suppression expires.
  */
 template <typename K, typename H = absl::Hash<K>, typename Eq = std::equal_to<K>>
-class KeyedSeveritySuppressor {
+class MONGO_MOD_PUBLIC KeyedSeveritySuppressor {
 public:
     using key_type = K;
     using hasher = H;
@@ -119,7 +120,7 @@ private:
     Suppressions _suppressions;
 };
 
-class SeveritySuppressor {
+class MONGO_MOD_PUBLIC SeveritySuppressor {
 public:
     SeveritySuppressor(ClockSource* cs, Milliseconds period, LogSeverity normal, LogSeverity quiet)
         : _stopWatch(cs ? cs : SystemClockSource::get()),

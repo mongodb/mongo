@@ -623,9 +623,11 @@ observability.logging:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/log_process_details*
     - src/mongo/logv2/
+    - src/mongo/util/log_and_backoff*
 
 observability.tracing:
   meta:

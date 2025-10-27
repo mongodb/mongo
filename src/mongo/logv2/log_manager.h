@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/logv2/log_format.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -45,7 +46,7 @@ class LogComponentSettings;
  *
  * Use this while setting up the logging system, before launching any threads.
  */
-class LogManager {
+class MONGO_MOD_PUBLIC LogManager {
 public:
     LogManager(const LogManager&) = delete;
     LogManager& operator=(const LogManager&) = delete;

@@ -30,8 +30,11 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::logv2 {
+
+namespace mongo {
+namespace MONGO_MOD_PUBLIC logv2 {
 
 /**
  * This is used for dev stacktraces which bypass structured logging. LOGV2 sinks
@@ -43,4 +46,5 @@ namespace mongo::logv2 {
  */
 void plainLogBypass(StringData message);
 
-}  // namespace mongo::logv2
+}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace mongo

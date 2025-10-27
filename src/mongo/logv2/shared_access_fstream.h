@@ -32,6 +32,7 @@
 #if defined(_WIN32) && defined(_MSC_VER)
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <fstream>  // IWYU pragma: keep
 

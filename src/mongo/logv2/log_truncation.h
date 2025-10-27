@@ -29,8 +29,12 @@
 
 #pragma once
 
-namespace mongo::logv2 {
+#include "mongo/util/modules.h"
+
+namespace mongo {
+namespace MONGO_MOD_PUBLIC logv2 {
 
 enum class LogTruncation { Enabled, Disabled };
 
-}  // namespace mongo::logv2
+}
+}  // namespace mongo

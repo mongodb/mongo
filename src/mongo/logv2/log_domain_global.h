@@ -38,6 +38,7 @@
 #include "mongo/logv2/log_format.h"
 #include "mongo/logv2/log_source.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <functional>
@@ -45,7 +46,7 @@
 #include <string>
 
 namespace mongo::logv2 {
-class LogDomainGlobal : public LogDomain::Internal {
+class MONGO_MOD_PUBLIC LogDomainGlobal : public LogDomain::Internal {
 public:
     struct ConfigurationOptions {
         enum class RotationMode { kRename, kReopen };

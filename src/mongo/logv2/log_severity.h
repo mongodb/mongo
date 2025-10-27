@@ -30,12 +30,14 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <iostream>
 #include <string>
 
-namespace mongo::logv2 {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC logv2 {
 
 /**
  * Representation of the severity / priority of a log message.
@@ -174,7 +176,7 @@ public:
      * 'enableTestCommands'.  Not synchronized. Call in single threaded
      * mode only, i.e. startup or unit tests.
      */
-    static void suppressProdOnly_forTest(bool b) {
+    MONGO_MOD_NEEDS_REPLACEMENT static void suppressProdOnly_forTest(bool b) {
         _suppressProdOnly = b;
     }
 
@@ -202,4 +204,5 @@ private:
     static inline bool _suppressProdOnly = false;
 };
 
-}  // namespace mongo::logv2
+}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace mongo

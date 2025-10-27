@@ -45,6 +45,7 @@
 #include "mongo/logv2/log_truncation.h"          // IWYU pragma: export
 #include "mongo/logv2/redaction.h"               // IWYU pragma: export
 #include "mongo/util/errno_util.h"
+#include "mongo/util/modules.h"
 
 // The logging macros below are documented in detail under docs/logging.md
 //
@@ -298,7 +299,7 @@
         ##__VA_ARGS__)
 
 namespace mongo::logv2 {
-inline bool shouldLog(LogComponent logComponent, LogSeverity severity) {
+MONGO_MOD_PUBLIC inline bool shouldLog(LogComponent logComponent, LogSeverity severity) {
     return LogManager::global().getGlobalSettings().shouldLog(logComponent, severity);
 }
 }  // namespace mongo::logv2

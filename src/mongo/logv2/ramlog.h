@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
 #include <array>
@@ -59,7 +60,7 @@ namespace mongo::logv2 {
  * 1. In the degenerate case of a single log line being above RamLog::kMaxSizeBytes, it may
  *    keep up to two log lines and exceed the size cap.
  */
-class RamLog {
+class MONGO_MOD_NEEDS_REPLACEMENT RamLog {
     RamLog(const RamLog&) = delete;
     RamLog& operator=(const RamLog&) = delete;
 
@@ -181,7 +182,7 @@ private:
  * Instances of LineIterator hold the lock for the underlying RamLog for their whole lifetime,
  * and so should not be kept around.
  */
-class RamLog::LineIterator {
+class MONGO_MOD_NEEDS_REPLACEMENT RamLog::LineIterator {
     LineIterator(const LineIterator&) = delete;
     LineIterator& operator=(const LineIterator&) = delete;
 

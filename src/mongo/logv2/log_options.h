@@ -35,8 +35,10 @@
 #include "mongo/logv2/log_service.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::logv2 {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC logv2 {
 
 class UserAssertAfterLog {
 public:
@@ -143,4 +145,5 @@ private:
     FatalMode _fatalMode = FatalMode::kAssert;
 };
 
-}  // namespace mongo::logv2
+}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace mongo

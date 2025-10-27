@@ -37,6 +37,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <boost/log/attributes/constant.hpp>

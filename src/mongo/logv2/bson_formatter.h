@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -41,7 +42,7 @@
 
 namespace mongo::logv2 {
 
-class BSONFormatter {
+class MONGO_MOD_NEEDS_REPLACEMENT BSONFormatter {
 public:
     BSONFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr) {}
 

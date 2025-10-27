@@ -32,6 +32,7 @@
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_source.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::logv2 {
 

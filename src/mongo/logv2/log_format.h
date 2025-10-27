@@ -29,9 +29,13 @@
 
 #pragma once
 
-namespace mongo::logv2 {
+#include "mongo/util/modules.h"
+
+namespace mongo {
+namespace MONGO_MOD_PUBLIC logv2 {
 
 enum class LogFormat { kDefault, kJson, kPlain };
 enum class LogTimestampFormat { kISO8601UTC, kISO8601Local };
 
-}  // namespace mongo::logv2
+}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace mongo

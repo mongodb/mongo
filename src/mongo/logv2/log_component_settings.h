@@ -33,6 +33,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::logv2 {
 
@@ -41,7 +42,7 @@ namespace mongo::logv2 {
  * kDefault always has a log severity defined but it is not necessary to
  * provide log severities for the other components (up to but not including kNumLogComponents).
  */
-class LogComponentSettings {
+class MONGO_MOD_PUBLIC LogComponentSettings {
     LogComponentSettings(const LogComponentSettings&) = delete;
     LogComponentSettings& operator=(const LogComponentSettings&) = delete;
 

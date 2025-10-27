@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <tuple>
 #include <type_traits>
 
@@ -70,7 +72,7 @@ struct isNamedArg<NamedArg<T>> : public std::true_type {};
 template <typename T>
 concept IsNamedArg = isNamedArg<T>::value;
 
-struct AttrUdl {
+struct MONGO_MOD_NEEDS_REPLACEMENT AttrUdl {
     const char* name;
 
     template <typename T>
@@ -129,7 +131,7 @@ auto ComposedAttr<Ts...>::attributes() const {
  * Combines multiple attributes to be returned in user defined logAttrs() functions
  */
 template <typename... Ts>
-auto multipleAttrs(Ts&&... attrs) {
+MONGO_MOD_PUBLIC auto multipleAttrs(Ts&&... attrs) {
     // We can capture lvalue references as reference otherwise this is a temporary object that needs
     // to be stored during the lifetime of the log statement.
     return detail::ComposedAttr<
@@ -140,7 +142,7 @@ auto multipleAttrs(Ts&&... attrs) {
 }  // namespace logv2
 
 inline namespace literals {
-constexpr logv2::detail::AttrUdl operator""_attr(const char* name, std::size_t) {
+MONGO_MOD_PUBLIC constexpr logv2::detail::AttrUdl operator""_attr(const char* name, std::size_t) {
     return {name};
 }
 }  // namespace literals

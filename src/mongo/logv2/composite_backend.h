@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex_registry.h"
 
 #include <tuple>
