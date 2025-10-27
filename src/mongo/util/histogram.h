@@ -78,11 +78,15 @@ public:
         }
     }
 
-    void increment(const T& data) {
+    void incrementN(const T& data, int64_t count) {
         auto i = std::upper_bound(_partitions.begin(), _partitions.end(), data, _comparator) -
             _partitions.begin();
 
-        ++_counts[i];
+        _counts[i] += count;
+    }
+
+    void increment(const T& data) {
+        incrementN(data, /*count=*/1);
     }
 
     const std::vector<T>& getPartitions() const {
@@ -91,7 +95,8 @@ public:
 
     std::vector<int64_t> getCounts() const {
         std::vector<int64_t> r(_counts.size());
-        std::transform(_counts.begin(), _counts.end(), r.begin(), [](auto&& x) { return x; });
+        std::transform(
+            _counts.begin(), _counts.end(), r.begin(), [](auto&& x) -> int64_t { return x; });
         return r;
     }
 
