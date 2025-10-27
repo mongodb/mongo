@@ -37,6 +37,8 @@ After installation, increase resources for better build performance:
 
 [Docker Desktop](https://www.docker.com/products/docker-desktop/) is a popular alternative.
 
+> **Note on Licensing**: Docker Desktop may require a paid license for commercial use. Please review the licensing terms to ensure compliance with your use case.
+
 **Installation:**
 
 1. Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
@@ -49,6 +51,8 @@ After installation, increase resources for better build performance:
 #### Option C: OrbStack (macOS)
 
 [OrbStack](https://orbstack.dev/) is a lightweight, fast Docker alternative for macOS.
+
+> **Note on Licensing**: OrbStack may require a paid license for commercial use. Please review the licensing terms to ensure compliance with your use case.
 
 **Installation:**
 
