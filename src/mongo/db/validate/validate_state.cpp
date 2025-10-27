@@ -85,7 +85,8 @@ ValidateState::ValidateState(OperationContext* opCtx,
                        ? rss::consensus::IntentRegistry::Intent::LocalWrite
                        : rss::consensus::IntentRegistry::Intent::Read}),
       _nss(nss),
-      _dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); }) {
+      _dataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(),
+                    [&]() { return gMaxValidateMBperSec.load(); }) {
 
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFastCount.

@@ -988,7 +988,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
     auto msg = "replication consistency check";
 
     // Disable throttling for secondaries.
-    DataThrottle dataThrottle(opCtx, []() { return 0; });
+    DataThrottle dataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(),
+                              []() { return 0; });
 
     try {
         const DbCheckAcquisition acquisition(

@@ -431,7 +431,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                               maxBatchTimeMillis,
                               _getBatchWriteConcern(opCtx, invocation.getBatchWriteConcern()),
                               secondaryIndexCheckParameters,
-                              {opCtx, [&]() {
+                              {opCtx->fastClockSource().now().toMillisSinceEpoch(), [&]() {
                                    return gMaxDbCheckMBperSec.load();
                                }}};
     auto result = std::make_unique<DbCheckRun>();
@@ -470,7 +470,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    maxBatchTimeMillis,
                                    _getBatchWriteConcern(opCtx, invocation.getBatchWriteConcern()),
                                    boost::none,
-                                   {opCtx, [&]() {
+                                   {opCtx->fastClockSource().now().toMillisSinceEpoch(), [&]() {
                                         return gMaxDbCheckMBperSec.load();
                                     }}};
         result->push_back(info);
