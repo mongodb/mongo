@@ -61,6 +61,7 @@ nodes.forEach((node) =>
 // server, the catalog change won't take effect, but the WT table being dropped will.
 coll = rst.getPrimary().getDB("indexRebuild")["coll"];
 assert.commandWorked(coll.dropIndexes());
+assert.commandWorked(rst.getPrimary().adminCommand({fsync: 1}));
 rst.awaitReplication();
 rst.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
 rst.stop(1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
