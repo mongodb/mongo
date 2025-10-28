@@ -44,6 +44,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -87,23 +88,42 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionOKTest) {
     // Set up routing table for the logical sessions collection.
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
-    auto future = launchAsync([&] {
-        auto now = Date_t::now();
-        auto thePast = now - Minutes(5);
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
+        auto future = launchAsync([&] {
+            auto now = Date_t::now();
+            auto thePast = now - Minutes(5);
 
-        auto record1 = makeRecord(thePast);
-        _collection.refreshSessions(operationContext(), {record1});
-    });
+            auto record1 = makeRecord(thePast);
+            _collection.refreshSessions(operationContext(), {record1});
+        });
 
-    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
-        response.setNModified(1);
+        onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+            if (internalQueryUnifiedWriteExecutor.load()) {
+                BulkWriteCommandReply reply(
+                    BulkWriteCommandResponseCursor(0,
+                                                   {BulkWriteReplyItem{0, Status::OK()}},
+                                                   NamespaceString::kLogicalSessionsNamespace),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+                reply.setNModified(1);
+                return reply.toBSON();
+            } else {
+                BatchedCommandResponse response;
+                response.setStatus(Status::OK());
+                response.setNModified(1);
 
-        return response.toBSON();
-    });
+                return response.toBSON();
+            }
+        });
 
-    future.default_timed_get();
+        future.default_timed_get();
+    }
 }
 
 TEST_F(SessionsCollectionShardedTest, CheckReadConcern) {
@@ -153,42 +173,85 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
     // Set up routing table for the logical sessions collection.
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
-    auto future = launchAsync([&] {
-        auto now = Date_t::now();
-        auto thePast = now - Minutes(5);
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
 
-        auto record1 = makeRecord(thePast);
-        _collection.refreshSessions(operationContext(), {record1});
-    });
+        auto future = launchAsync([&] {
+            auto now = Date_t::now();
+            auto thePast = now - Minutes(5);
 
-    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
-        response.setNModified(0);
-        response.addToErrDetails(
-            write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
-        return response.toBSON();
-    });
+            auto record1 = makeRecord(thePast);
+            _collection.refreshSessions(operationContext(), {record1});
+        });
 
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
+        onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+            if (internalQueryUnifiedWriteExecutor.load()) {
+                BulkWriteCommandReply reply(
+                    BulkWriteCommandResponseCursor(
+                        0,
+                        {BulkWriteReplyItem{0, {ErrorCodes::NotWritablePrimary, "not primary"}}},
+                        NamespaceString::kLogicalSessionsNamespace),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+                reply.setNModified(0);
+                return reply.toBSON();
+            } else {
+                BatchedCommandResponse response;
+                response.setStatus(Status::OK());
+                response.setNModified(0);
+                response.addToErrDetails(
+                    write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
+                return response.toBSON();
+            }
+        });
+
+        ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
+    }
 }
 
 TEST_F(SessionsCollectionShardedTest, RemoveOneSessionOKTest) {
     // Set up routing table for the logical sessions collection.
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
-    auto future = launchAsync(
-        [&] { _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()}); });
 
-    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
-        response.setNModified(0);
-        response.setNModified(1);
-        return response.toBSON();
-    });
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
 
-    future.default_timed_get();
+        auto future = launchAsync([&] {
+            _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()});
+        });
+
+        onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+            // TODO lol
+            if (internalQueryUnifiedWriteExecutor.load()) {
+                BulkWriteCommandReply reply(
+                    BulkWriteCommandResponseCursor(0,
+                                                   {BulkWriteReplyItem{0, Status::OK()}},
+                                                   NamespaceString::kLogicalSessionsNamespace),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+                reply.setNModified(1);
+                return reply.toBSON();
+            } else {
+                BatchedCommandResponse response;
+                response.setStatus(Status::OK());
+                response.setNModified(1);
+                return response.toBSON();
+            }
+        });
+
+        future.default_timed_get();
+    }
 }
 
 TEST_F(SessionsCollectionShardedTest, RemoveOneSessionStatusErrTest) {
@@ -209,19 +272,43 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionWriteErrTest) {
     // Set up routing table for the logical sessions collection.
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
-    auto future = launchAsync(
-        [&] { _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()}); });
 
-    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
-        response.setNModified(0);
-        response.addToErrDetails(
-            write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
-        return response.toBSON();
-    });
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
 
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
+        auto future = launchAsync([&] {
+            _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()});
+        });
+
+        onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+            // TODO
+            if (internalQueryUnifiedWriteExecutor.load()) {
+                BulkWriteCommandReply reply(
+                    BulkWriteCommandResponseCursor(
+                        0,
+                        {BulkWriteReplyItem{0, {ErrorCodes::NotWritablePrimary, "not primary"}}},
+                        NamespaceString::kLogicalSessionsNamespace),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+                reply.setNModified(0);
+                return reply.toBSON();
+            } else {
+                BatchedCommandResponse response;
+                response.setStatus(Status::OK());
+                response.setNModified(0);
+                response.addToErrDetails(
+                    write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
+                return response.toBSON();
+            }
+        });
+
+        ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
+    }
 }
 
 }  // namespace

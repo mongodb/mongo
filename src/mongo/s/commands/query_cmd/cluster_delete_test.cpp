@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 #include <functional>
@@ -58,30 +59,64 @@ protected:
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
-            cb(request);
+            if (internalQueryUnifiedWriteExecutor.load()) {
+                cb(request);
+                BulkWriteCommandReply reply(
+                    BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, kNss),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+                reply.setNInserted(1);
+                BSONObjBuilder bob(reply.toBSON().addFields(BSON("ok" << 1)));
+                appendTxnResponseMetadata(bob);
+                return bob.obj();
+            } else {
+                ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
+                cb(request);
 
-            BSONObjBuilder bob;
-            bob.append("n", 1);
-            appendTxnResponseMetadata(bob);
-            return bob.obj();
+                BSONObjBuilder bob;
+                bob.append("n", 1);
+                appendTxnResponseMetadata(bob);
+                return bob.obj();
+            }
         });
     }
 
     void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
-
-            BSONObjBuilder bob;
-            bob.append("n", 1);
-            appendTxnResponseMetadata(bob);
-            return bob.obj();
+            if (internalQueryUnifiedWriteExecutor.load()) {
+                BulkWriteCommandReply reply(
+                    BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, kNss),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+                reply.setNDeleted(1);
+                BSONObjBuilder bob(reply.toBSON().addFields(BSON("ok" << 1)));
+                appendTxnResponseMetadata(bob);
+                return bob.obj();
+            } else {
+                ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
+                BSONObjBuilder bob;
+                bob.append("n", 1);
+                appendTxnResponseMetadata(bob);
+                return bob.obj();
+            }
         });
     }
 };
 
 TEST_F(ClusterDeleteTest, NoErrors) {
-    testNoErrors(kDeleteCmdTargeted, kDeleteCmdScatterGather);
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
+        testNoErrors(kDeleteCmdTargeted, kDeleteCmdScatterGather);
+    }
 }
 
 TEST_F(ClusterDeleteTest, AttachesAtClusterTimeForSnapshotReadConcern) {
@@ -100,8 +135,12 @@ TEST_F(ClusterDeleteTest, CorrectMetrics) {
     b.append("delete", 1);
     b.append("getmore", 0);
     b.append("command", 0);
-
-    testOpcountersAreCorrect(kDeleteCmdTargeted, /* expectedValue */ b.obj());
+    const BSONObj obj = b.obj();
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
+        testOpcountersAreCorrect(kDeleteCmdTargeted, /* expectedValue */ obj);
+    }
 }
 
 TEST_F(ClusterDeleteTest, RejectsCmdAggregateNamespace) {

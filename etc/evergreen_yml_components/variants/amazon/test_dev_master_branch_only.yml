@@ -592,6 +592,7 @@ buildvariants:
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
       has_packages: false
+      evergreen_remote_exec: on
       target_resmoke_time: 30
       max_sub_suites: 3
       idle_timeout_factor: 1.5
@@ -603,6 +604,14 @@ buildvariants:
         --mongosSetParameters="{internalQueryUnifiedWriteExecutor: true}"
     # For now just unified write executor suites but tasks will be added as development continues.
     tasks:
+      # TODO SERVER-104147: Both 'DocumentSequenceLargeDocumentMultiInsertWorks' and
+      # 'DocumentSequenceMaxWriteBatchWorks' currently fails in the UWE because we do not check our
+      # batches for sizing, nor do we check that a batch is under the BSON size limit. Enable this
+      # task and verify that this passes once we have support for this.
+      # - name: integration_tests_sharded
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023-arm64-latest-large
       - name: unified_write_executor
       - name: unified_write_executor_sharding
       - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen

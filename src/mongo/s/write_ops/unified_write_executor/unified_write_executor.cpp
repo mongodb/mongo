@@ -142,15 +142,9 @@ FindAndModifyCommandResponse findAndModify(OperationContext* opCtx,
         executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
 }
 
+// TODO SERVER-106306: Convert the knob below to an IFR flag.
 bool isEnabled(OperationContext* opCtx) {
-    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    // (Generic FCV reference): isUpgradingOrDowngrading() must be false since during upgrades the
-    // viewless featureflag could be on but there are still viewful collections being converted and
-    // UWE doesn't support viewful collections.
-    return internalQueryUnifiedWriteExecutor.load() &&
-        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot) &&
-        !fcvSnapshot.isUpgradingOrDowngrading();
+    return internalQueryUnifiedWriteExecutor.load();
 }
 
 }  // namespace unified_write_executor

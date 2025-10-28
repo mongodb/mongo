@@ -73,8 +73,7 @@ FindAndModifyCommandResponse findAndModify(OperationContext* opCtx,
                                            BSONObj originalCommand = BSONObj());
 
 /**
- * Unified write executor feature flag check. Also ensures we only have viewless timeseries
- * collections.
+ * Unified write executor query knob check.
  */
 bool isEnabled(OperationContext* opCtx);
 
