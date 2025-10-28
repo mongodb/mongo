@@ -61,6 +61,7 @@ ReadThroughCacheBase::CancelToken::CancelToken(CancelToken&&) = default;
 ReadThroughCacheBase::CancelToken::~CancelToken() = default;
 
 void ReadThroughCacheBase::CancelToken::tryCancel() {
+    // Taking mutex in order to be mutually exclusive with _asyncWork's _threadPool.schedule lambda
     stdx::lock_guard lg(_info->cancelTokenMutex);
     _info->cancelStatus =
         Status(ErrorCodes::ReadThroughCacheLookupCanceled, "Internal only: task canceled");
@@ -87,16 +88,23 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
             auto opCtxHolder = tc->makeOperationContext();
 
             cancelStatusAtTaskBegin = [&] {
+                // Taking mutex in order to be mutually exclusive with
+                // any callers of `::tryCance()`
                 stdx::lock_guard lg(taskInfo->cancelTokenMutex);
                 taskInfo->opCtxToCancel = opCtxHolder.get();
                 return taskInfo->cancelStatus;
             }();
 
             ON_BLOCK_EXIT([&] {
+                // Taking mutex in order to be mutually exclusive with
+                // any callers of `::tryCancel()`
                 stdx::lock_guard lg(taskInfo->cancelTokenMutex);
                 taskInfo->opCtxToCancel = nullptr;
             });
 
+            // There is no need to take the taskInfo->cancelTokenMutex here, as we are not writing
+            // the taskInfo->opCtxToCancel in the work function and the only writers to the taskInfo
+            // structure are in this function.
             work(taskInfo->opCtxToCancel, cancelStatusAtTaskBegin);
         });
 
