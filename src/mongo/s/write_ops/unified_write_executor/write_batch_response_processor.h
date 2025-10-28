@@ -40,6 +40,47 @@
 namespace mongo::unified_write_executor {
 
 /**
+ * A struct representing data to be returned to the higher level of control flow.
+ */
+struct ProcessorResult {
+    using CollectionsToCreate =
+        stdx::unordered_map<NamespaceString,
+                            std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
+
+    std::vector<WriteOp> opsToRetry;    // Ops to be retried due to recoverable errors
+    CollectionsToCreate collsToCreate;  // Collections to be explicitly created
+    std::map<WriteOpId, std::set<ShardId>>
+        successfulShardSet{};  // Shards where each op succeeded. This is used to track the
+                               // shards that we don't need to retry on because of
+                               // retryable(staleness/collection doesn't exist errors) because
+                               // the operation was already executed.
+
+    void combine(const ProcessorResult other) {
+        opsToRetry.insert(opsToRetry.end(),
+                          std::make_move_iterator(other.opsToRetry.begin()),
+                          std::make_move_iterator(other.opsToRetry.end()));
+
+
+        for (auto& [nss, info] : other.collsToCreate) {
+            if (auto it = collsToCreate.find(nss); it == collsToCreate.cend()) {
+                collsToCreate.emplace(nss, std::move(info));
+            }
+        }
+
+        for (auto& [opId, otherSuccessfulShards] : other.successfulShardSet) {
+            auto it = successfulShardSet.find(opId);
+            if (it == successfulShardSet.cend()) {
+                successfulShardSet.emplace(opId, std::move(otherSuccessfulShards));
+            } else {
+                std::move(otherSuccessfulShards.begin(),
+                          otherSuccessfulShards.end(),
+                          std::inserter(it->second, it->second.end()));
+            }
+        }
+    }
+};
+
+/**
  * Handles responses from shards and interactions with the catalog necessary to retry certain
  * errors.
  * Intended workflow:
@@ -58,47 +99,7 @@ namespace mongo::unified_write_executor {
  */
 class WriteBatchResponseProcessor {
 public:
-    using CollectionsToCreate =
-        stdx::unordered_map<NamespaceString,
-                            std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
-
-    /**
-     * A struct representing data to be returned to the higher level of control flow.
-     */
-    struct Result {
-        std::vector<WriteOp> opsToRetry;    // Ops to be retried due to recoverable errors
-        CollectionsToCreate collsToCreate;  // Collections to be explicitly created
-        std::map<WriteOpId, std::set<ShardId>>
-            successfulShardSet{};  // Shards where each op succeeded. This is used to track the
-                                   // shards that we don't need to retry on because of
-                                   // retryable(staleness/collection doesn't exist errors) because
-                                   // the operation was already executed.
-
-        void combine(const Result other) {
-
-            opsToRetry.insert(opsToRetry.end(),
-                              std::make_move_iterator(other.opsToRetry.begin()),
-                              std::make_move_iterator(other.opsToRetry.end()));
-
-
-            for (auto& [nss, info] : other.collsToCreate) {
-                if (auto it = collsToCreate.find(nss); it == collsToCreate.cend()) {
-                    collsToCreate.emplace(nss, std::move(info));
-                }
-            }
-
-            for (auto& [opId, otherSuccessfulShards] : other.successfulShardSet) {
-                auto it = successfulShardSet.find(opId);
-                if (it == successfulShardSet.cend()) {
-                    successfulShardSet.emplace(opId, std::move(otherSuccessfulShards));
-                } else {
-                    std::move(otherSuccessfulShards.begin(),
-                              otherSuccessfulShards.end(),
-                              std::inserter(it->second, it->second.end()));
-                }
-            }
-        }
-    };
+    using CollectionsToCreate = ProcessorResult::CollectionsToCreate;
 
     using ReplyItemsByShard = std::map<ShardId, BulkWriteReplyItem>;
     struct WriteOpResults {
@@ -139,9 +140,9 @@ public:
      * If 'response' is a type that can stale errors (such as SimpleWriteBatchResponse), then
      * 'routingCtx' must be an initialized RoutingContext.
      */
-    Result onWriteBatchResponse(OperationContext* opCtx,
-                                RoutingContext& routingCtx,
-                                const WriteBatchResponse& response);
+    ProcessorResult onWriteBatchResponse(OperationContext* opCtx,
+                                         RoutingContext& routingCtx,
+                                         const WriteBatchResponse& response);
 
     /**
      * Turns gathered statistics into a command reply for the client. Consumes any pending reply
@@ -156,10 +157,10 @@ public:
     FindAndModifyCommandResponse generateClientResponseForFindAndModifyCommand();
 
     /**
-     * This method is called by the scheduler to record a target error that occurred during batch
+     * This method is called by the scheduler to record target errors that occurred during batch
      * creation.
      */
-    void recordTargetError(OperationContext* opCtx, const WriteOp& op, const Status& status);
+    void recordTargetErrors(OperationContext* opCtx, const BatcherResult& batcherResult);
 
     /**
      * This method is called by the scheduler to record errors for the remaining ops that don't have
@@ -190,32 +191,38 @@ public:
     bool checkBulkWriteReplyMaxSize();
 
 private:
-    Result _onWriteBatchResponse(OperationContext* opCtx,
-                                 RoutingContext& routingCtx,
-                                 const EmptyBatchResponse& response);
-    Result _onWriteBatchResponse(OperationContext* opCtx,
-                                 RoutingContext& routingCtx,
-                                 const SimpleWriteBatchResponse& response);
-    Result _onWriteBatchResponse(OperationContext* opCtx,
-                                 RoutingContext& routingCtx,
-                                 const NoRetryWriteBatchResponse& response);
+    ProcessorResult _onWriteBatchResponse(OperationContext* opCtx,
+                                          RoutingContext& routingCtx,
+                                          const EmptyBatchResponse& response);
+    ProcessorResult _onWriteBatchResponse(OperationContext* opCtx,
+                                          RoutingContext& routingCtx,
+                                          const SimpleWriteBatchResponse& response);
+    ProcessorResult _onWriteBatchResponse(OperationContext* opCtx,
+                                          RoutingContext& routingCtx,
+                                          const NoRetryWriteBatchResponse& response);
 
     /**
      * Process a response from a shard, handle errors, and collect statistics. Returns an array
      * containing ops that did not complete successfully that need to be resent.
      */
-    Result onShardResponse(OperationContext* opCtx,
-                           RoutingContext& routingCtx,
-                           const ShardId& shardId,
-                           const ShardResponse& response);
+    ProcessorResult onShardResponse(OperationContext* opCtx,
+                                    RoutingContext& routingCtx,
+                                    const ShardId& shardId,
+                                    const ShardResponse& response);
 
     /**
-     * Process findAndModify command reply, handle retryable errors and save the reply.
+     * Process a FindAndModifyCommandReply attributed to 'op', adding it to _results and updating
+     * _numOkResponses.
      */
-    Result processFindAndModifyReply(OperationContext* opCtx,
-                                     RoutingContext& routingCtx,
-                                     BSONObj replyObj,
-                                     boost::optional<ShardId> shardId = boost::none);
+    void processFindAndModifyReply(OperationContext* opCtx,
+                                   const WriteOp& op,
+                                   write_ops::FindAndModifyCommandReply reply);
+
+    /**
+     * Process the counters and the list of retried stmtIds from the BulkWriteCommandReply. Note
+     * that this method does _not_ update '_numOkResponses' or '_nErrors'.
+     */
+    void processCountersAndRetriedStmtIds(const BulkWriteCommandReply& parsedReply);
 
     /**
      * Adds all of the reply items in a shard response to '_results' and handles retryable errors.
@@ -223,11 +230,11 @@ private:
      * be retried on specific shards only. Further processing of the replies is done in
      * 'finalizeRepliesForOps' which aggregates the responses from all of the shards for each op.
      */
-    Result processOpsInReplyItems(OperationContext* opCtx,
-                                  RoutingContext& routingCtx,
-                                  ShardId shardId,
-                                  const std::vector<WriteOp>& ops,
-                                  const std::vector<BulkWriteReplyItem>&);
+    ProcessorResult processOpsInReplyItems(OperationContext* opCtx,
+                                           RoutingContext& routingCtx,
+                                           ShardId shardId,
+                                           const std::vector<WriteOp>& ops,
+                                           const std::vector<BulkWriteReplyItem>&);
 
     /**
      * If an op was not in the ReplyItems, this function processes it and decides if a retry is
@@ -251,7 +258,7 @@ private:
     /**
      * Remove ops that already have non-retryable errors from ops to retry.
      **/
-    void removeFailedOpsFromOpsToRetry(Result& result);
+    void removeFailedOpsFromOpsToRetry(ProcessorResult& result);
 
     /**
      * Adds a single reply item to '_results'.
@@ -289,10 +296,15 @@ private:
     /**
      * Handle retryable error marking if we need to retry or create a collection.
      */
-    Result handleRetryableError(OperationContext* opCtx,
-                                RoutingContext& routingCtx,
-                                WriteOp op,
-                                const Status& status);
+    ProcessorResult handleRetryableError(OperationContext* opCtx,
+                                         RoutingContext& routingCtx,
+                                         boost::optional<WriteOp> op,
+                                         const Status& status);
+
+    ProcessorResult handleRetryableErrorForBatch(OperationContext* opCtx,
+                                                 RoutingContext& routingCtx,
+                                                 const std::vector<WriteOp>& ops,
+                                                 const Status& status);
 
     /**
      * Returns the retriedStmtIds to set them in the client response.

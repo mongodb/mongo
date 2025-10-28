@@ -56,6 +56,14 @@ public:
     const UUID uuid1 = UUID::gen();
     const UUID uuid2 = UUID::gen();
 
+    const BSONObj emptyBulkWriteCommandReplyObj =
+        BSON("cursor" << BSON("firstBatch" << BSONArray() << "id" << 0LL << "ns" << "foo")
+                      << "nErrors" << 0 << "nDeleted" << 0 << "nInserted" << 0 << "nMatched" << 0
+                      << "nModified" << 0 << "nUpserted" << 0);
+
+    const BSONObj emptyFindAndModifyCommandReplyObj =
+        BSON("lastErrorObject" << BSON("n" << 0) << "value" << BSONNULL);
+
     void setUp() override {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(HostAndPort("config", 12345));
@@ -235,8 +243,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
         ASSERT_EQ(2, responses.size());
         for (auto& [shardId, response] : responses) {
             ASSERT(expectedShardIds.contains(shardId));
-            ASSERT(response.swResponse.getStatus().isOK());
-            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+            ASSERT(response.isOK());
         }
     });
 
@@ -256,7 +263,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
             lsid,
             txnNumber,
             operationContext()->getWriteConcern());
-        return BSON("ok" << 1);
+        return emptyBulkWriteCommandReplyObj;
     });
 
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
@@ -272,7 +279,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
             lsid,
             txnNumber,
             operationContext()->getWriteConcern());
-        return BSON("ok" << 1);
+        return emptyBulkWriteCommandReplyObj;
     });
 
     future.default_timed_get();
@@ -325,8 +332,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
         ASSERT_EQ(1, responses.size());
         for (auto& [shardId, response] : responses) {
             ASSERT(expectedShardIds.contains(shardId));
-            ASSERT(response.swResponse.getStatus().isOK());
-            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+            ASSERT(response.isOK());
         }
     });
 
@@ -349,7 +355,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
                                bulkRequest.getLet(),
                                bulkRequest.getComment(),
                                bulkRequest.getMaxTimeMS());
-        return BSON("ok" << 1);
+        return emptyBulkWriteCommandReplyObj;
     });
 
     future.default_timed_get();
@@ -396,8 +402,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
         ASSERT_EQ(1, responses.size());
         for (auto& [shardId, response] : responses) {
             ASSERT(expectedShardIds.contains(shardId));
-            ASSERT(response.swResponse.getStatus().isOK());
-            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+            ASSERT(response.isOK());
         }
     });
 
@@ -419,7 +424,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
             lsid,
             txnNumber,
             operationContext()->getWriteConcern());
-        return BSON("ok" << 1);
+        return emptyBulkWriteCommandReplyObj;
     });
 
     future.default_timed_get();
@@ -461,8 +466,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
         ASSERT_EQ(1, responses.size());
         for (auto& [shardId, response] : responses) {
             ASSERT(expectedShardIds.contains(shardId));
-            ASSERT(response.swResponse.getStatus().isOK());
-            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+            ASSERT(response.isOK());
         }
     });
 
@@ -488,7 +492,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
             boost::none,
             boost::none,
             std::vector<StmtId>{0, 1});
-        return BSON("ok" << 1);
+        return emptyBulkWriteCommandReplyObj;
     });
 
     future.default_timed_get();
@@ -552,8 +556,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) 
         ASSERT_EQ(1, responses.size());
         for (auto& [shardId, response] : responses) {
             ASSERT(expectedShardIds.contains(shardId));
-            ASSERT(response.swResponse.getStatus().isOK());
-            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+            ASSERT(response.isOK());
         }
     });
 
@@ -574,7 +577,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) 
                                  << shardVersionBson << "readConcern" << BSONObj() << "writeConcern"
                                  << operationContext()->getWriteConcern().toBSON()),
             request.cmdObj);
-        return BSON("ok" << 1);
+
+        return emptyFindAndModifyCommandReplyObj;
     });
 
     future.default_timed_get();

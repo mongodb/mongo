@@ -29,6 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 
+#include "mongo/db/error_labels.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/transaction_router.h"
 
@@ -205,8 +206,8 @@ void WriteOpBatcher::markBatchReprocess(WriteBatch batch) {
     markOpReprocess(batch.getWriteOps());
 }
 
-WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
-                                                           RoutingContext& routingCtx) {
+BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
+                                                  RoutingContext& routingCtx) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     std::vector<std::pair<WriteOp, Status>> opsWithErrors;
@@ -226,15 +227,14 @@ WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
             // If the write command is running in a transaction, then discard the current batch,
             // consume the op, record the error, and return an empty batch.
             if (inTransaction) {
-                opsWithErrors.emplace_back(*writeOp, swAnalysis.getStatus());
+                const auto& status = swAnalysis.getStatus();
+                opsWithErrors.emplace_back(*writeOp, status);
                 _producer.advance();
 
-                LOGV2_DEBUG(10896514,
-                            2,
-                            "Aborting write command due to error in transaction",
-                            "error"_attr = redact(swAnalysis.getStatus()));
+                const bool transientTxnError = isTransientTransactionError(
+                    status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false);
 
-                return {WriteBatch{}, std::move(opsWithErrors)};
+                return {WriteBatch{}, std::move(opsWithErrors), transientTxnError};
             }
             // If the write command is not in a transaction and '_retryOnTargetError' is true, then
             // discard the current batch, refresh the catalog cache, set '_retryOnTargetError' to
@@ -247,7 +247,7 @@ WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
                             "error"_attr = redact(swAnalysis.getStatus()));
 
                 for (const auto& nss : routingCtx.getNssList()) {
-                    routingCtx.onStaleShardVersionError(nss, boost::none /*wantedVersion*/);
+                    routingCtx.onStaleShardVersionError(nss, /*wantedVersion*/ boost::none);
                 }
 
                 _retryOnTargetError = false;
@@ -332,8 +332,8 @@ WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
     return {builder.done(), std::move(opsWithErrors)};
 }
 
-WriteOpBatcher::Result UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
-                                                             RoutingContext& routingCtx) {
+BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
+                                                    RoutingContext& routingCtx) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     // When this method returns (or when an exception is thrown), mark the ops in 'opsToReprocess'
@@ -393,7 +393,7 @@ WriteOpBatcher::Result UnorderedWriteOpBatcher::getNextBatch(OperationContext* o
                             "error"_attr = redact(swAnalysis.getStatus()));
 
                 for (const auto& nss : routingCtx.getNssList()) {
-                    routingCtx.onStaleShardVersionError(nss, boost::none /*wantedVersion*/);
+                    routingCtx.onStaleShardVersionError(nss, /*wantedVersion*/ boost::none);
                 }
 
                 _retryOnTargetError = false;

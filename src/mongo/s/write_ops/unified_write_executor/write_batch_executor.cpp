@@ -29,6 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
+#include "mongo/db/error_labels.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
 #include "mongo/db/raw_data_operation.h"
@@ -48,6 +49,55 @@ namespace mongo {
 namespace unified_write_executor {
 
 namespace {
+BulkWriteCommandReply parseBulkWriteCommandReply(const BSONObj& responseData) {
+    return BulkWriteCommandReply::parse(responseData,
+                                        IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
+}
+
+BulkWriteCommandReply parseBulkWriteCommandReplySingleOp(const BSONObj& responseData,
+                                                         const WriteOp& op) {
+    // If we're parsing a BulkWriteCommandReply for a single op and 'responseData' is empty, that
+    // means the two-phase write completed successfully without updating or deleting anything
+    // (because nothing matched the filter).
+    //
+    // In this case, we create a BulkWriteCommandReply containing a single response item with an
+    // OK status and with n=0 (and with nModified=0 if 'writeOp' is an update).
+    if (responseData.isEmpty()) {
+        BulkWriteReplyItem replyItem(0, Status::OK());
+        replyItem.setN(0);
+        if (op.getType() == WriteType::kUpdate) {
+            replyItem.setNModified(0);
+        }
+
+        auto cursor =
+            BulkWriteCommandResponseCursor(/*cursorId*/ 0,
+                                           std::vector<BulkWriteReplyItem>{std::move(replyItem)},
+                                           NamespaceString::makeBulkWriteNSS(boost::none));
+        return BulkWriteCommandReply(std::move(cursor), 0, 0, 0, 0, 0, 0);
+    }
+
+    return parseBulkWriteCommandReply(responseData);
+}
+
+write_ops::FindAndModifyCommandReply parseFindAndModifyCommandReply(const BSONObj& responseData) {
+    // If we're parsing a FindAndModifyCommandReply and 'responseData' is empty, that means the
+    // two-phase write completed successfully without updating or deleting anything (because nothing
+    // matched the filter).
+    //
+    // In this case, we create a FindAndModifyCommandReply with an OK status and n=0.
+    if (responseData.isEmpty()) {
+        write_ops::FindAndModifyLastError lastError(/*n*/ 0);
+        lastError.setUpdatedExisting(false);
+
+        write_ops::FindAndModifyCommandReply reply;
+        reply.setLastErrorObject(std::move(lastError));
+        return reply;
+    }
+
+    return write_ops::FindAndModifyCommandReply::parse(
+        responseData, IDLParserContext("FindAndModifyCommandReply_UnifiedWriteExec"));
+}
+
 void appendWriteConcern(OperationContext* opCtx, BSONObjBuilder& builder) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     auto writeConcern = getWriteConcernForShardRequest(opCtx);
@@ -69,6 +119,40 @@ DatabaseName getExecutionDatabase(const WriteBatch& batch) {
     return DatabaseName::kAdmin;
 }
 
+bool isTransientTxnError(bool inTransaction,
+                         const Status& status,
+                         boost::optional<const BSONObj&> responseData = boost::none) {
+    if (inTransaction) {
+        if (responseData) {
+            return hasTransientTransactionErrorLabel(
+                ErrorReply::parse(*responseData, IDLParserContext("ErrorReply_UnifiedWriteExec")));
+        } else {
+            return isTransientTransactionError(
+                status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false);
+        }
+    }
+    return false;
+}
+
+NoRetryWriteBatchResponse makeNoRetryWriteBatchResponse(
+    const StatusWith<BSONObj>& swResponse,
+    const WriteOp& op,
+    boost::optional<WriteConcernErrorDetail> wce,
+    bool inTransaction) {
+    if (swResponse.getStatus().isOK()) {
+        auto parsedReply = op.isFindAndModify()
+            ? CommandReplyVariant{parseFindAndModifyCommandReply(swResponse.getValue())}
+            : CommandReplyVariant{parseBulkWriteCommandReplySingleOp(swResponse.getValue(), op)};
+
+        return NoRetryWriteBatchResponse{std::move(parsedReply), std::move(wce), op};
+    } else {
+        const auto& status = swResponse.getStatus();
+        const bool transientTxnError = isTransientTxnError(inTransaction, status);
+
+        return NoRetryWriteBatchResponse{status, std::move(wce), op, transientTxnError};
+    }
+}
+
 template <typename T>
 void filterGenericArgumentsForEmbeddedCommand(OperationContext* opCtx, T& request) {
     // When the command is embedded, we should filter out all the generic arguments other than
@@ -77,6 +161,31 @@ void filterGenericArgumentsForEmbeddedCommand(OperationContext* opCtx, T& reques
     coordinate_multi_update_util::filterRequestGenericArguments(request.getGenericArguments());
 }
 }  // namespace
+
+const Status& ShardResponse::getStatus() const {
+    tassert(11272100, "Expected OK status or error", !isEmpty());
+    return swReply->getStatus();
+}
+
+CommandReplyVariant& ShardResponse::getReply() {
+    tassert(11272101, "Expected OK status", isOK());
+    return swReply->getValue();
+}
+
+const CommandReplyVariant& ShardResponse::getReply() const {
+    tassert(11272102, "Expected OK status", isOK());
+    return swReply->getValue();
+}
+
+CommandReplyVariant& NoRetryWriteBatchResponse::getReply() {
+    tassert(11272103, "Expected OK status", isOK());
+    return swReply.getValue();
+}
+
+const CommandReplyVariant& NoRetryWriteBatchResponse::getReply() const {
+    tassert(11272104, "Expected OK status", isOK());
+    return swReply.getValue();
+}
 
 bool WriteBatchExecutor::usesProvidedRoutingContext(const WriteBatch& batch) const {
     // For SimpleWriteBatches, the executor use the provided RoutingContext. For all other batch
@@ -138,12 +247,13 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
             nsIndexMap[nss] = nsInfos.size();
             nsInfos.push_back(nsInfo);
         }
+
         auto nsIndex = nsIndexMap[nss];
         visit([&](auto& value) { return value.setNsInfoIdx(nsIndex); }, bulkOp);
 
         if (op.getType() == WriteType::kUpdate &&
             allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
-            get_if<BulkWriteUpdateOp>(&bulkOp)->setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+            get<BulkWriteUpdateOp>(bulkOp).setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
                 *allowShardKeyUpdatesWithoutFullShardKeyInQuery);
         }
 
@@ -259,7 +369,7 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
     auto cmdObj = request.toBSON();
 
     if (shouldAppendReadWriteConcern) {
-        cmdObj = applyReadWriteConcern(opCtx, true /* appendRC */, true /* appendWC */, cmdObj);
+        cmdObj = applyReadWriteConcern(opCtx, /*appendRC*/ true, /*appendWC*/ true, cmdObj);
     }
 
     BSONObjBuilder builder(cmdObj);
@@ -324,9 +434,110 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     return EmptyBatchResponse{};
 }
 
+ShardResponse WriteBatchExecutor::makeShardResponse(
+    StatusWith<executor::RemoteCommandResponse> swResponse,
+    std::vector<WriteOp> ops,
+    bool inTransaction,
+    boost::optional<HostAndPort> hostAndPort,
+    boost::optional<const ShardId&> shardId) {
+    const bool isFindAndModifyCommand = (ops.size() == 1 && ops.front().isFindAndModify());
+
+    // If there was a local error, return a ShardResponse that reports this local error.
+    if (!swResponse.isOK()) {
+        // TODO SERVER-105303 Handle interruption/shutdown.
+        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
+        const Status& status = swResponse.getStatus();
+
+        LOGV2_DEBUG(10896501,
+                    4,
+                    "Local error occurred when receiving write results from shard",
+                    "error"_attr = redact(status),
+                    "shardId"_attr = shardId,
+                    "host"_attr = hostAndPort);
+
+        const bool transientTxnError = isTransientTxnError(inTransaction, status);
+
+        return ShardResponse{.swReply = StatusWith<CommandReplyVariant>{status},
+                             .ops = std::move(ops),
+                             .transientTxnError = transientTxnError,
+                             .hostAndPort = std::move(hostAndPort)};
+    }
+
+    const auto& response = swResponse.getValue();
+    auto status = getStatusFromCommandResult(response.data);
+    boost::optional<WriteConcernErrorDetail> wce;
+
+    // If this is a findAndModify command, populate 'wce' now.
+    if (isFindAndModifyCommand) {
+        if (auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
+            !wcStatus.isOK()) {
+            wce = WriteConcernErrorDetail{std::move(wcStatus)};
+        }
+    }
+
+    // If there was a top-level error, return a ShardResponse that reports this top-level error.
+    if (!status.isOK()) {
+        if (!isFindAndModifyCommand) {
+            status = status.withContext(str::stream() << "cluster write results unavailable from "
+                                                      << response.target);
+        }
+
+        LOGV2_DEBUG(10347001,
+                    4,
+                    "Remote error reported from shard when receiving cluster write results",
+                    "error"_attr = redact(status),
+                    "shardId"_attr = shardId,
+                    "host"_attr = response.target);
+
+        const bool transientTxnError = isTransientTxnError(inTransaction, status, response.data);
+
+        return ShardResponse{.swReply = StatusWith<CommandReplyVariant>{std::move(status)},
+                             .wce = std::move(wce),
+                             .ops = std::move(ops),
+                             .transientTxnError = transientTxnError,
+                             .hostAndPort = response.target};
+    }
+
+    // If there were no local errors or top-level errors, parse the reply, and then return a
+    // ShardResponse that contains the parsed reply.
+    LOGV2_DEBUG(10347003,
+                4,
+                "Parsing cluster write shard response",
+                "response"_attr = response.data,
+                "host"_attr = response.target);
+
+    auto swReply = [&]() -> StatusWith<CommandReplyVariant> {
+        if (isFindAndModifyCommand) {
+            return parseFindAndModifyCommandReply(
+                CommandHelpers::filterCommandReplyForPassthrough(response.data));
+        } else {
+            auto parsedReply = parseBulkWriteCommandReply(response.data);
+
+            // If this is not a findAndModify command, then we populate 'wce' here.
+            if (auto wcError = parsedReply.getWriteConcernError()) {
+                wce = WriteConcernErrorDetail{
+                    Status(ErrorCodes::Error(wcError->getCode()), wcError->getErrmsg())};
+            }
+
+            return std::move(parsedReply);
+        }
+    }();
+
+    return ShardResponse{.swReply = std::move(swReply),
+                         .wce = std::move(wce),
+                         .ops = std::move(ops),
+                         .hostAndPort = response.target};
+}
+
+ShardResponse WriteBatchExecutor::makeEmptyShardResponse(std::vector<WriteOp> ops) {
+    return ShardResponse{.ops = std::move(ops)};
+}
+
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const SimpleWriteBatch& batch) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     std::vector<AsyncRequestsSender::Request> requestsToSend;
     for (auto& [shardId, shardRequest] : batch.requestByShardId) {
         auto requestObj =
@@ -365,13 +576,62 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     }
 
     SimpleWriteBatchResponse shardResponses;
+    bool stopParsingResponses = false;
 
-    while (!sender.done()) {
+    while (!stopParsingResponses && !sender.done()) {
         auto arsResponse = sender.next();
-        ShardResponse shardResponse{std::move(arsResponse.swResponse),
-                                    batch.requestByShardId.at(arsResponse.shardId).ops,
-                                    std::move(arsResponse.shardHostAndPort)};
-        shardResponses.emplace(std::move(arsResponse.shardId), std::move(shardResponse));
+
+        ShardResponse shardResponse =
+            makeShardResponse(std::move(arsResponse.swResponse),
+                              batch.requestByShardId.at(arsResponse.shardId).ops,
+                              inTransaction,
+                              std::move(arsResponse.shardHostAndPort),
+                              arsResponse.shardId);
+
+        const bool hasTransientTxnError = shardResponse.hasTransientTxnError();
+        const bool hasTopLevelErrorThatAbortsTxn =
+            (inTransaction && shardResponse.isError() && !hasTransientTxnError &&
+             !shardResponse.isWouldChangeOwningShardError());
+
+        const auto numItemErrors = shardResponse.isOK() &&
+                holds_alternative<BulkWriteCommandReply>(shardResponse.getReply())
+            ? get<BulkWriteCommandReply>(shardResponse.getReply()).getNErrors()
+            : 0;
+
+        const bool hasItemErrorThatAbortsTxn = inTransaction && numItemErrors > 0;
+
+        if (hasTransientTxnError || hasTopLevelErrorThatAbortsTxn || hasItemErrorThatAbortsTxn) {
+            LOGV2_DEBUG(11272105,
+                        4,
+                        "Stopped parsing of shard responses due to error in transaction",
+                        "topLevelStatus"_attr = shardResponse.getStatus(),
+                        "numItemErrors"_attr = numItemErrors,
+                        "shardId"_attr = arsResponse.shardId,
+                        "host"_attr = shardResponse.hostAndPort);
+
+            stopParsingResponses = true;
+        }
+
+        shardResponses.emplace_back(std::move(arsResponse.shardId), std::move(shardResponse));
+    }
+
+    // If we stopped parsing responses early, generate empty ShardResponses for the remaining
+    // ShardIds.
+    if (stopParsingResponses) {
+        // Make a set of the ShardIds for which we already have ShardResponses.
+        absl::flat_hash_set<ShardId> shardIdSet;
+        for (const auto& [shardId, _] : shardResponses) {
+            shardIdSet.emplace(shardId);
+        }
+
+        // For each 'shardId' that isn't in 'shardIdSet', create an empty ShardResponse and
+        // add it to 'shardResponses'.
+        for (const auto& [shardId, _] : batch.requestByShardId) {
+            if (!shardIdSet.count(shardId)) {
+                shardResponses.emplace_back(
+                    shardId, makeEmptyShardResponse(batch.requestByShardId.at(shardId).ops));
+            }
+        }
     }
 
     tassert(10346800,
@@ -384,6 +644,8 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const NonTargetedWriteBatch& batch) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     const WriteOp& writeOp = batch.op;
 
     bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
@@ -396,7 +658,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 
     auto cmdObj = buildRequest(opCtx,
                                {writeOp},
-                               {},        /* versionByNss*/
+                               {},        /* versionByNss */
                                sampleIds, /* sampleIds */
                                allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                                IsEmbeddedCommand::Yes,
@@ -410,12 +672,14 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto swResponse = swRes.isOK() ? StatusWith{swRes.getValue().getResponse().getOwned()}
                                    : StatusWith<BSONObj>{swRes.getStatus()};
 
-    return NoRetryWriteBatchResponse{std::move(swResponse), std::move(wce), writeOp};
+    return makeNoRetryWriteBatchResponse(swResponse, writeOp, std::move(wce), inTransaction);
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const InternalTransactionBatch& batch) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     const WriteOp& writeOp = batch.op;
 
     std::map<WriteOpId, UUID> sampleIds;
@@ -427,7 +691,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto singleUpdateRequest = buildBulkWriteRequestWithoutTxnInfo(
         opCtx,
         {writeOp},
-        {}, /* versionByNss*/
+        {}, /* versionByNss */
         sampleIds,
         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
         IsEmbeddedCommand::No);
@@ -435,7 +699,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder*/ nullptr, inlineExecutor);
 
     BulkWriteCommandReply bulkWriteResponse;
 
@@ -467,12 +731,15 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 
     auto swResponse = responseStatus.isOK() ? StatusWith(bulkWriteResponse.toBSON().getOwned())
                                             : StatusWith<BSONObj>(responseStatus);
-    return NoRetryWriteBatchResponse{std::move(swResponse), std::move(wce), writeOp};
+
+    return makeNoRetryWriteBatchResponse(swResponse, writeOp, std::move(wce), inTransaction);
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const MultiWriteBlockingMigrationsBatch& batch) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     const WriteOp& writeOp = batch.op;
     const auto& nss = writeOp.getNss();
 
@@ -494,7 +761,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         }
     }();
 
-    return NoRetryWriteBatchResponse{std::move(reply), boost::none, {writeOp}};
+    return makeNoRetryWriteBatchResponse(reply, writeOp, /*wce*/ boost::none, inTransaction);
 }
 
 }  // namespace unified_write_executor

@@ -39,7 +39,7 @@ namespace unified_write_executor {
 
 class WriteBatchScheduler {
 public:
-    using CollectionsToCreate = WriteBatchResponseProcessor::CollectionsToCreate;
+    using CollectionsToCreate = ProcessorResult::CollectionsToCreate;
 
     static constexpr size_t kMaxRoundsWithoutProgress = 10;
 

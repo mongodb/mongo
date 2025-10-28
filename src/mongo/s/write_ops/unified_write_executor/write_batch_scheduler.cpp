@@ -102,8 +102,7 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
     const size_t previousNumOkResponses = _processor.getNumOkResponsesProcessed();
 
     auto result = routing_context_utils::runAndValidate(
-        *swRoutingCtx.getValue(),
-        [&](RoutingContext& routingCtx) -> WriteBatchResponseProcessor::Result {
+        *swRoutingCtx.getValue(), [&](RoutingContext& routingCtx) -> ProcessorResult {
             // Call getNextBatch() and handle any target errors that occurred.
             auto batch = getNextBatchAndHandleTargetErrors(opCtx, routingCtx);
 
@@ -225,16 +224,26 @@ void WriteBatchScheduler::handleInitRoutingContextError(OperationContext* opCtx,
 
 WriteBatch WriteBatchScheduler::getNextBatchAndHandleTargetErrors(OperationContext* opCtx,
                                                                   RoutingContext& routingCtx) {
+    const bool ordered = _cmdRef.getOrdered();
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     auto result = _batcher.getNextBatch(opCtx, routingCtx);
 
     if (!result.opsWithErrors.empty()) {
-        // Record any target errors that occurred with the response processor.
-        for (const auto& [op, status] : result.opsWithErrors) {
-            _processor.recordTargetError(opCtx, op, status);
-        }
+        // Record the errors that occurred during the batch creation process.
+        _processor.recordTargetErrors(opCtx, result);
+
         // If an unrecoverable error occurred, discard the batch, call stopMakingBatches() to
         // stop any further execution of this command, and then return an empty batch.
-        if (_cmdRef.getOrdered() || TransactionRouter::get(opCtx)) {
+        if (ordered || inTransaction) {
+            if (inTransaction) {
+                const auto& status = result.opsWithErrors.front().second;
+                LOGV2_DEBUG(10896514,
+                            2,
+                            "Aborting write command due to error in transaction",
+                            "error"_attr = redact(status));
+            }
+
             _batcher.markBatchReprocess(std::move(result.batch));
             _batcher.stopMakingBatches();
             return WriteBatch{};
