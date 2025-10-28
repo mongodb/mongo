@@ -275,7 +275,7 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
                          cdb,
                          newCmdObj,
                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                         Shard::RetryPolicy::kNoRetry);
+                         Shard::RetryPolicy::kStrictlyNotIdempotent);
                      uassertStatusOKWithContext(response.swResponse,
                                                 str::stream() << "failed while running command "
                                                               << newCmdObj);
@@ -512,7 +512,7 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
                 ns,
                 cmdObj,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kNoRetry,
+                Shard::RetryPolicy::kStrictlyNotIdempotent,
                 BSONObj() /*query*/,
                 BSONObj() /*collation*/,
                 boost::none /*letParameters*/,

@@ -48,6 +48,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 
 namespace mongo {
@@ -80,6 +81,9 @@ public:
 };
 
 TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
+    // We disable any backoff to avoid dealing with network waits.
+    auto _ = FailPointEnableBlock{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 0)};
+
     setupNShards(2);
 
     const NamespaceString kOutNss =
@@ -106,6 +110,12 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
     const BSONObj listCollectionsResponse = BSON("name" << kOutNss.coll() << "type"
                                                         << "collection"
                                                         << "options" << collectionOptions);
+
+    // Mock a server overloaded response for "listCollections". We expect the process interface to
+    // proceed to retry the request.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        return createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
+    });
 
     // Mock the response to $out's "listCollections" request.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -201,6 +211,12 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
         ASSERT_EQ(tempNss.coll(), request.cmdObj["filter"]["name"].valueStringData());
         return CursorResponse(kTestAggregateNss, CursorId{0}, {listCollectionsGetUUIDResponse})
             .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // Mock a server overloaded response for what is supposed to be
+    // "internalRenameIfOptionsAndIndexesMatch". We expect the process interface to retry.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        return createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
     });
 
     // Mock the response to $out's "internalRenameIfOptionsAndIndexesMatch" request.
