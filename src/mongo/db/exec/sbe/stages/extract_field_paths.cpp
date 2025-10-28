@@ -34,33 +34,27 @@
 
 namespace mongo::sbe {
 ExtractFieldPathsStage::ExtractFieldPathsStage(std::unique_ptr<PlanStage> input,
-                                               value::SlotId inputSlotId,
-                                               std::vector<value::Path> pathReqs,
-                                               value::SlotVector outputSlotIds,
+                                               std::vector<PathSlot> inputs,
+                                               std::vector<PathSlot> outputs,
                                                PlanNodeId planNodeId,
                                                bool participateInTrialRunTracking)
     : PlanStage("extract_field_paths"_sd,
                 nullptr /* yieldPolicy */,
                 planNodeId,
                 participateInTrialRunTracking),
-      _inputSlotId(inputSlotId),
-      _pathReqs(std::move(pathReqs)),
-      _outputSlotIds(std::move(outputSlotIds)) {
-    tassert(10984201,
-            "expect pathReqs and outputSlotIds to be equal length",
-            _pathReqs.size() == _outputSlotIds.size());
+      _inputs(std::move(inputs)),
+      _outputs(std::move(outputs)) {
 
-    for (size_t i = 0; i < _outputSlotIds.size(); i++) {
-        _outputAccessorsIdxForSlotId[_outputSlotIds[i]] = i;
+    for (size_t i = 0; i < _outputs.size(); i++) {
+        _outputAccessorsIdxForSlotId[_outputs[i].second] = i;
     }
     _children.emplace_back(std::move(input));
 }
 
 std::unique_ptr<PlanStage> ExtractFieldPathsStage::clone() const {
     return std::make_unique<ExtractFieldPathsStage>(_children[0]->clone(),
-                                                    _inputSlotId,
-                                                    _pathReqs,
-                                                    _outputSlotIds,
+                                                    _inputs,
+                                                    _outputs,
                                                     _commonStats.nodeId,
                                                     participateInTrialRunTracking());
 }
@@ -68,11 +62,12 @@ std::unique_ptr<PlanStage> ExtractFieldPathsStage::clone() const {
 void ExtractFieldPathsStage::constructRoot() {
     _root = std::make_unique<value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>>();
 
-    _recorders.reserve(_pathReqs.size());
-    for (size_t i = 0; i < _pathReqs.size(); ++i) {
+    _recorders.reserve(_outputs.size());
+    for (size_t i = 0; i < _outputs.size(); ++i) {
         _recorders.emplace_back();
-        _root->add(
-            _pathReqs[i], nullptr /* filterRecorder */, &_recorders.back() /* outProjRecorder */);
+        _root->add(_outputs[i].first,
+                   nullptr /* filterRecorder */,
+                   &_recorders.back() /* outProjRecorder */);
     }
 }
 
@@ -81,8 +76,11 @@ void ExtractFieldPathsStage::prepare(CompileCtx& ctx) {
 
     constructRoot();
 
-    _outputAccessors.resize(_pathReqs.size());
-    _inputAccessor = _children[0]->getAccessor(ctx, _inputSlotId);
+    _outputAccessors.resize(_outputs.size());
+    for (const auto& [path, slotId] : _inputs) {
+        auto inputAccessor = _children[0]->getAccessor(ctx, slotId);
+        _root->addAccessorAtPath(inputAccessor, path);
+    }
 }
 
 value::SlotAccessor* ExtractFieldPathsStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -122,20 +120,36 @@ PlanState ExtractFieldPathsStage::getNext() {
         return trackPlanState(state);
     }
 
-    auto [inputTag, inputVal] = _inputAccessor->getViewOfValue();
-    value::walkObj<value::ScalarProjectionPositionInfoRecorder>(
-        _root.get(),
-        inputTag,
-        inputVal,
-        value::bitcastTo<const char*>(inputVal),
-        [](value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
-           value::TypeTags eltTag,
-           value::Value eltVal,
-           const char* bsonPtr) {
-            if (auto rec = node->projRecorder) {
-                rec->recordValue(eltTag, eltVal);
+    auto walk = [](value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
+                   value::TypeTags eltTag,
+                   value::Value eltVal,
+                   const char* bsonPtr) {
+        if (auto rec = node->projRecorder) {
+            rec->recordValue(eltTag, eltVal);
+        }
+    };
+
+    if (_root->inputAccessor) {
+        // Should only be used for unit tests.
+        auto [inputTag, inputVal] = _root->inputAccessor->getViewOfValue();
+        value::walkObj<value::ScalarProjectionPositionInfoRecorder>(
+            _root.get(), inputTag, inputVal, value::bitcastTo<const char*>(inputVal), walk);
+    } else {
+        // Important this is only for toplevel fields. For nested fields, we would need knowledge of
+        // arrayness. We would also need to check for input accessors during the tree traversal.
+        for (const auto& child : _root->getChildren) {
+            const auto& childWalkNode = child.second;
+            if (childWalkNode->inputAccessor) {
+                auto [childTag, childVal] = childWalkNode->inputAccessor->getViewOfValue();
+                value::walkField<value::ScalarProjectionPositionInfoRecorder>(
+                    childWalkNode.get(),
+                    childTag,
+                    childVal,
+                    value::bitcastTo<const char*>(childVal),
+                    walk);
             }
-        });
+        }
+    }
 
     // Consume all outputs
     for (size_t i = 0; i < _recorders.size(); ++i) {
@@ -169,16 +183,27 @@ const SpecificStats* ExtractFieldPathsStage::getSpecificStats() const {
 std::vector<DebugPrinter::Block> ExtractFieldPathsStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
-    DebugPrinter::addIdentifier(ret, _inputSlotId);
-    ret.emplace_back(DebugPrinter::Block("pathReqs[`"));
-    for (size_t idx = 0; idx < _pathReqs.size(); ++idx) {
+    ret.emplace_back(DebugPrinter::Block("inputs[`"));
+    for (size_t idx = 0; idx < _inputs.size(); ++idx) {
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
-        DebugPrinter::addIdentifier(ret, _outputSlotIds[idx]);
+        const auto& [path, slotId] = _inputs[idx];
+        DebugPrinter::addIdentifier(ret, slotId);
         ret.emplace_back("=");
+        ret.emplace_back(value::pathToString(path));
+    }
+    ret.emplace_back("`]");
 
-        ret.emplace_back(value::pathToString(_pathReqs[idx]));
+    ret.emplace_back(DebugPrinter::Block("outputs[`"));
+    for (size_t idx = 0; idx < _outputs.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+        const auto& [path, slotId] = _outputs[idx];
+        DebugPrinter::addIdentifier(ret, slotId);
+        ret.emplace_back("=");
+        ret.emplace_back(value::pathToString(path));
     }
     ret.emplace_back("`]");
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,23 +27,57 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/values/cell_interface.h"
-
-#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/path_request.h"
+
 #include "mongo/db/exec/sbe/values/value.h"
 
-#include <memory>
-
 namespace mongo::sbe::value {
-ValueBlock& MaterializedCellBlock::getValueBlock() {
-    tassert(7953701, "Value block should be non null", _deblocked);
-    return *_deblocked;
+std::string pathToString(const Path& p) {
+    std::string out;
+    size_t idx = 0;
+    for (auto& component : p) {
+        if (holds_alternative<Id>(component)) {
+            out += "Id";
+        } else if (holds_alternative<Get>(component)) {
+            out += "Get(";
+            out += get<Get>(component).field;
+            out += ')';
+        } else if (holds_alternative<Traverse>(component)) {
+            out += "Traverse";
+        }
+        ++idx;
+
+        if (idx != p.size()) {
+            out.push_back('/');
+        }
+    }
+    return out;
 }
-std::unique_ptr<CellBlock> MaterializedCellBlock::clone() const {
-    auto ret = std::make_unique<MaterializedCellBlock>();
-    ret->_deblocked = _deblocked->clone();
-    ret->_filterPosInfo = _filterPosInfo;
-    return ret;
+
+std::ostream& operator<<(std::ostream& os, const Path& path) {
+    os << pathToString(path);
+    return os;
+};
+
+std::string PathRequest::toString() const {
+    return str::stream() << (type == kFilter ? "FilterPath" : "ProjectPath") << "("
+                         << pathToString(path) << ")";
+}
+
+StringData PathRequest::getTopLevelField() const {
+    return get<Get>(path[0]).field;
+}
+
+std::string PathRequest::getFullPath() const {
+    StringBuilder sb;
+    for (const auto& component : path) {
+        if (holds_alternative<Get>(component)) {
+            if (sb.len() != 0) {
+                sb.append(".");
+            }
+            sb.append(get<Get>(component).field);
+        }
+    }
+    return sb.str();
 }
 }  // namespace mongo::sbe::value

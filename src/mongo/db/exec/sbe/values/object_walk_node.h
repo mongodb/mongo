@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
@@ -171,6 +172,13 @@ struct ObjectWalkNode {
              FilterPositionInfoRecorder* filterRecorder,
              ProjectionRecorder* outProjBlockRecorder,
              size_t pathIdx = 0);
+
+    void addAccessorAtPath(value::SlotAccessor* inputAccessor,
+                           const Path& path,
+                           size_t pathIdx = 0);
+
+    // Non-null if and only if this node has a source slot.
+    value::SlotAccessor* inputAccessor = nullptr;
 };
 
 template <class ProjectionRecorder>
@@ -210,6 +218,32 @@ void ObjectWalkNode<ProjectionRecorder>::add(const Path& path,
             projRecorder = outProjRecorder;
         }
         tassert(11089612, "Unexpected pathIdx", pathIdx == path.size() - 1);
+    }
+}
+
+template <class ProjectionRecorder>
+void ObjectWalkNode<ProjectionRecorder>::addAccessorAtPath(value::SlotAccessor* outInputAccessor,
+                                                           const Path& path,
+                                                           size_t pathIdx /*= 0*/) {
+    if (pathIdx == 0) {
+        // Check some invariants about the path.
+        tassert(11163706, "Cannot be given empty path", !path.empty());
+        tassert(11163707, "Path must end with Id", holds_alternative<Id>(path.back()));
+    }
+
+    if (holds_alternative<Get>(path[pathIdx])) {
+        auto& get = std::get<Get>(path[pathIdx]);
+        if (auto it = getChildren.find(get.field); it != getChildren.end()) {
+            it->second->addAccessorAtPath(outInputAccessor, path, pathIdx + 1);
+        }
+    } else if (holds_alternative<Traverse>(path[pathIdx])) {
+        tassert(11163703, "expected nonzero pathIdx", pathIdx != 0);
+        if (traverseChild) {
+            traverseChild->addAccessorAtPath(outInputAccessor, path, pathIdx + 1);
+        }
+    } else if (holds_alternative<Id>(path[pathIdx])) {
+        tassert(11163702, "Id must be at end of path", pathIdx == path.size() - 1);
+        inputAccessor = outInputAccessor;
     }
 }
 

@@ -117,8 +117,19 @@ public:
             auto pathReqs = makePathReqs(paths);
             value::SlotVector outputSlots = generateMultipleSlotIds(pathReqs.size());
 
+            // A single input slot that holds the entire object.
+            std::vector<PathSlot> inputs = {{{Id{}}, scanSlots[0]}};
+            std::vector<PathSlot> outputs;
+            outputs.reserve(pathReqs.size());
+            tassert(11163704,
+                    "expected an output slot for each path req",
+                    pathReqs.size() == outputSlots.size());
+            for (size_t i = 0; i < pathReqs.size(); ++i) {
+                outputs.emplace_back(std::make_pair(pathReqs[i], outputSlots[i]));
+            }
+
             auto extractFieldPathsStage = makeS<ExtractFieldPathsStage>(
-                std::move(scanStage), scanSlots[0], pathReqs, outputSlots, kEmptyPlanNodeId);
+                std::move(scanStage), inputs, outputs, kEmptyPlanNodeId);
 
             return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
         };
@@ -136,6 +147,80 @@ TEST_F(ExtractFieldPathsStageTest, SinglePathNonNestedNonArrayTest) {
     std::vector<std::string> outputs{"[1]", "[2]"};
 
     runExtractFieldPathsTest(paths, inputs, outputs);
+}
+
+TEST_F(ExtractFieldPathsStageTest, SinglePathNonNestedNonArrayToplevelFieldSlotTest) {
+    // `inputBab` is an array of subarrays. Each subarray has an element for each input slot.
+    BSONArrayBuilder inputBab;
+    inputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
+    auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
+    value::ValueGuard inputGuard{inputTag, inputVal};
+    // `outputBab` is an array of subarrays. Each subarray has an element for each output slot.
+    BSONArrayBuilder outputBab;
+    outputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
+    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto makeStageFn = [&, this](value::SlotVector scanSlots,
+                                 std::unique_ptr<PlanStage> scanStage) {
+        std::vector<FieldPath> paths{"a"};
+        auto pathReqs = makePathReqs(paths);
+        value::SlotVector outputSlots = generateMultipleSlotIds(pathReqs.size());
+        std::vector<PathSlot> inputs;
+        for (size_t i = 0; i < scanSlots.size(); ++i) {
+            // Associate each input slot with its corresponding toplevel field path.
+            tassert(11163708, "input path not toplevel", pathReqs[i].size() == 2);
+            inputs.emplace_back(pathReqs[i], scanSlots[i]);
+        }
+        std::vector<PathSlot> outputs;
+        outputs.reserve(pathReqs.size());
+        for (size_t i = 0; i < pathReqs.size(); ++i) {
+            // Associate each output slot with its corresponding path.
+            outputs.emplace_back(std::make_pair(pathReqs[i], outputSlots[i]));
+        }
+        auto extractFieldPathsStage =
+            makeS<ExtractFieldPathsStage>(std::move(scanStage), inputs, outputs, kEmptyPlanNodeId);
+        return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
+    };
+    inputGuard.reset();
+    expectedGuard.reset();
+    runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
+}
+
+TEST_F(ExtractFieldPathsStageTest, SingleToplevelFieldSlotNestedPathTest) {
+    // `inputBab` is an array of subarrays. Each subarray has an element for each input slot.
+    BSONArrayBuilder inputBab;
+    inputBab << BSON_ARRAY(BSON("b" << 1)) << BSON_ARRAY(BSON("b" << 2));
+    auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
+    value::ValueGuard inputGuard{inputTag, inputVal};
+    // `outputBab` is an array of subarrays. Each subarray has an element for each output slot.
+    BSONArrayBuilder outputBab;
+    outputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
+    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto makeStageFn = [&, this](value::SlotVector scanSlots,
+                                 std::unique_ptr<PlanStage> scanStage) {
+        std::vector<FieldPath> paths{"a.b"};
+        auto pathReqs = makePathReqs(paths);
+        value::SlotVector outputSlots = generateMultipleSlotIds(pathReqs.size());
+        std::vector<PathSlot> inputs;
+        for (size_t i = 0; i < scanSlots.size(); ++i) {
+            // Associate each input slot with its corresponding toplevel field path.
+            Path p = {pathReqs[i][0], Id{}};
+            inputs.emplace_back(p, scanSlots[i]);
+        }
+        std::vector<PathSlot> outputs;
+        outputs.reserve(pathReqs.size());
+        for (size_t i = 0; i < pathReqs.size(); ++i) {
+            // Associate each output slot with its corresponding path.
+            outputs.emplace_back(pathReqs[i], outputSlots[i]);
+        }
+        auto extractFieldPathsStage =
+            makeS<ExtractFieldPathsStage>(std::move(scanStage), inputs, outputs, kEmptyPlanNodeId);
+        return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
+    };
+    inputGuard.reset();
+    expectedGuard.reset();
+    runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
 TEST_F(ExtractFieldPathsStageTest, MultiPathNonNestedNonArrayTest) {

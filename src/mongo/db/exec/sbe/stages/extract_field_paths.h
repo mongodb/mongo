@@ -44,22 +44,29 @@
 
 
 namespace mongo::sbe {
+using PathSlot = std::pair<value::Path, value::SlotId>;
 /**
- * Given an input stage `input` with a single slot `inputSlotId` containing an object and a set of
- * requested paths `pathReqs`, populate output slots `outputSlotIds` with the value at each path.
+ * 'ExtractFieldPathsStage' takes as input:
  *
- * This stage is used to evaluate ExpressionFieldPath's in a single walk over the input object.
+ *    - A list of input (path, slotId) pairs. These represent the input slot accessors, and their
+ *      location in the path tree. There is either a single (path, slotId) pair that holds the
+ *      entire result, or otherwise there is a list of slots for toplevel fields.
  *
- * Debug string representation:
- *     extract_field_paths `inputSlotId` pathReqs[outputSlotIds[i] = pathReqs[i], ... ,
- *         outputSlotIds[N] = pathReqs[N]]
+ *    - A list of output (path, slotId) pairs. These represent the output slot accessors, and their
+ *      location in the path tree. There can be arbitrarily many outputs.
+ *
+ * The output slot(s) are populated in a single pass over the input slot(s).
+ *
+ * Example debug string representation:
+ *
+ *     extract_field_paths inputs[s4 = Get(a)/Id, s5 = Get(b)/Id] outputs[s6 =
+ *     Get(a)/Traverse/Get(c)/Id, s7 = Get(b)/Traverse/Get(d)/Id, s8 = Get(b)/Traverse/Get(e)/Id]
  */
 class ExtractFieldPathsStage final : public PlanStage {
 public:
     ExtractFieldPathsStage(std::unique_ptr<PlanStage> input,
-                           value::SlotId inputSlotId,
-                           std::vector<value::Path> pathReqs,
-                           value::SlotVector outputSlotIds,
+                           std::vector<PathSlot> inputs,
+                           std::vector<PathSlot> outputs,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking = true);
 
@@ -89,11 +96,9 @@ protected:
 private:
     void constructRoot();
 
-    const value::SlotId _inputSlotId;
-    const std::vector<value::Path> _pathReqs;
-    const value::SlotVector _outputSlotIds;
+    const std::vector<PathSlot> _inputs;
+    const std::vector<PathSlot> _outputs;
 
-    value::SlotAccessor* _inputAccessor = nullptr;
     std::unique_ptr<value::ObjectWalkNode<value::ScalarProjectionPositionInfoRecorder>> _root =
         nullptr;
     std::vector<value::OwnedValueAccessor> _outputAccessors;

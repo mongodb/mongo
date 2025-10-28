@@ -2220,6 +2220,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/values:cell_interface.cpp",
         "//src/mongo/db/exec/sbe/values:key_string_entry.cpp",
         "//src/mongo/db/exec/sbe/values:object_walk_node.cpp",
+        "//src/mongo/db/exec/sbe/values:path_request.cpp",
         "//src/mongo/db/exec/sbe/values:row.cpp",
         "//src/mongo/db/exec/sbe/values:slot_printer.cpp",
         "//src/mongo/db/exec/sbe/values:ts_block.cpp",
