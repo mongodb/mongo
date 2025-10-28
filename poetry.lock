@@ -67,6 +67,22 @@ files = [
 visualize = ["Twisted (>=16.1.1)", "graphviz (>0.5.1)"]
 
 [[package]]
+name = "avro-python3"
+version = "1.10.2"
+description = "Avro is a serialization and RPC framework."
+optional = false
+python-versions = ">=3.5"
+groups = ["testing"]
+markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
+files = [
+    {file = "avro-python3-1.10.2.tar.gz", hash = "sha256:3b63f24e6b04368c3e4a6f923f484be0230d821aad65ac36108edbff29e9aaab"},
+]
+
+[package.extras]
+snappy = ["python-snappy"]
+zstandard = ["zstandard"]
+
+[[package]]
 name = "backports-tarfile"
 version = "1.2.0"
 description = "Backport of CPython tarfile module"
@@ -1844,6 +1860,27 @@ files = [
 
 [package.dependencies]
 referencing = ">=0.31.0"
+
+[[package]]
+name = "kafka-python"
+version = "2.2.15"
+description = "Pure Python client for Apache Kafka"
+optional = false
+python-versions = "*"
+groups = ["testing"]
+markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
+files = [
+    {file = "kafka_python-2.2.15-py2.py3-none-any.whl", hash = "sha256:84c0993cd4f7f2f01e92d8104ea9bdf631aff72fc5e6ea62eb3bdf1d56528fc3"},
+    {file = "kafka_python-2.2.15.tar.gz", hash = "sha256:e0f480a45f3814cb0eb705b8b4f61069e1be61dae0d8c69d0f1f2da33eea1bd5"},
+]
+
+[package.extras]
+benchmarks = ["pyperf"]
+crc32c = ["crc32c"]
+lz4 = ["lz4"]
+snappy = ["python-snappy"]
+testing = ["mock", "pytest", "pytest-mock", "pytest-timeout"]
+zstd = ["zstandard"]
 
 [[package]]
 name = "keyring"
@@ -5771,4 +5808,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "c433563364aaf4a17f7f866bc7f48d28b7a3a318b05a6ecf569f3811a201e8f4"
+content-hash = "74748385429e064561228a7b802a7600951a292f294df6ee268bd42a7964a3b1"
