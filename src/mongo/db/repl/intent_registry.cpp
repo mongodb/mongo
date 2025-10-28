@@ -110,12 +110,14 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
                 ClientLock lock(client);
                 serviceCtx->killOperation(lock, opCtx, ErrorCodes::InterruptedAtShutdown);
             }
-            uassert(ErrorCodes::InterruptedAtShutdown,
-                    "Cannot register intent due to Shutdown.",
-                    validIntent);
+            uassert(
+                ErrorCodes::InterruptedAtShutdown,
+                fmt::format("Cannot register {} intent due to Shutdown.", intentToString(intent)),
+                validIntent);
         } else {
             uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                    "Cannot register intent due to ReplStateChange.",
+                    fmt::format("Cannot register {} intent due to ReplStateChange.",
+                                intentToString(intent)),
                     validIntent);
         }
 
