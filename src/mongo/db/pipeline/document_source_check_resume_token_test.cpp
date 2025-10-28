@@ -59,6 +59,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -443,6 +444,43 @@ protected:
     }
 
     /**
+     * Convenience method to create the class under test with a projection stage that excludes
+     * the "_id" field from documents. This is useful for testing scenarios where documents
+     * don't have "_id" fields in the stream.
+     */
+    intrusive_ptr<exec::agg::ChangeStreamEnsureResumeTokenPresentStage>
+    createEnsureResumeTokenPresentStageNoID(ResumeTokenData tokenData) {
+        DocumentSourceChangeStreamSpec spec;
+        spec.setStartAfter(ResumeToken(tokenData));
+        auto checkResumeTokenDS =
+            DocumentSourceChangeStreamEnsureResumeTokenPresent::create(getExpCtx(), spec);
+        _mock->setResumeToken(std::move(tokenData));
+
+        // Create a project stage that excludes the "_id" field
+        auto projectDS =
+            DocumentSourceProject::create(BSON("_id" << 0), getExpCtx(), "$project"_sd);
+        _projectStage = exec::agg::buildStage(projectDS);
+        _projectStage->setSource(_mock.get());
+
+        auto checkResumeTokenStage =
+            boost::dynamic_pointer_cast<exec::agg::ChangeStreamEnsureResumeTokenPresentStage>(
+                exec::agg::buildStage(checkResumeTokenDS));
+        checkResumeTokenStage->setSource(_projectStage.get());
+        return checkResumeTokenStage;
+    }
+
+    /**
+     * Convenience method to create the class under test with a given timestamp, _id string, and
+     * namespace. Also adds an exclude projection on top of the _mock source to remove the _id field
+     * before sending to the EnsureResumeTokenPresentStage.
+     */
+    intrusive_ptr<exec::agg::ChangeStreamEnsureResumeTokenPresentStage>
+    createEnsureResumeTokenPresentStageNoId(Timestamp ts, StringData id, UUID uuid = testUuid()) {
+        return createEnsureResumeTokenPresentStageNoID(
+            {ts, 0, 0, uuid, Value(Document{{"_id", id}})});
+    }
+
+    /**
      * This method is required to avoid a static initialization fiasco resulting from calling
      * UUID::gen() in file or class static scope.
      */
@@ -452,6 +490,7 @@ protected:
     }
 
     intrusive_ptr<ChangeStreamMockStage> _mock;
+    intrusive_ptr<exec::agg::Stage> _projectStage;
 };
 
 class CheckResumabilityTest : public CheckResumeTokenTest {
@@ -563,6 +602,27 @@ TEST_F(CheckResumeTokenTest, ShouldIgnoreChangeWithEarlierResumeToken) {
     // but don't throw - we haven't surpassed the token yet and still may see it in the next doc.
     addOplogEntryOnTestNS(resumeTimestamp, "0");
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
+}
+
+TEST_F(CheckResumeTokenTest, ShouldFailWhenResumeTokenNotFoundBeforeSurpassingItExcludeIDField) {
+    // This test verifies that the uassert when we surpass the ResumeToken without finding it does
+    // not error when the input does not have an "_id" field (such as when the pipeline has a
+    // $project that excludes it).
+    Timestamp resumeTimestamp(100, 5);
+
+    auto checkResumeToken = createEnsureResumeTokenPresentStageNoId(resumeTimestamp, "1");
+
+    // Add an entry with an earlier timestamp - this will be skipped.
+    addOplogEntryOnTestNS(Timestamp(100, 3), "0");
+
+    // Add an entry that surpasses the resume token without the resume token itself being present.
+    // This document has a later timestamp than the resume token.
+    addOplogEntryOnTestNS(Timestamp(100, 7), "2");
+
+    // This should throw ChangeStreamFatalError because we surpassed the resume token without
+    // finding it.
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {

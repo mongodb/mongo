@@ -100,10 +100,12 @@ GetNextResult ChangeStreamEnsureResumeTokenPresentStage::doGetNext() {
     }
 
     // Assert that before surpassing the resume token, we observed the token itself in the stream.
-    uassert(ErrorCodes::ChangeStreamFatalError,
-            str::stream() << "cannot resume stream; the resume token was not found. "
-                          << nextInput.getDocument()["_id"].getDocument().toString(),
-            _hasSeenResumeToken);
+    uassert(
+        ErrorCodes::ChangeStreamFatalError,
+        str::stream() << "cannot resume stream; the resume token was not found. "
+                      << nextInput.getDocument().metadata().getSortKey().getDocument().toString(),
+        _hasSeenResumeToken);
+
 
     // At this point, we have seen the token and swallowed it. Return the next event to the client.
     invariant(_hasSeenResumeToken && _resumeStatus == ResumeStatus::kSurpassedToken);

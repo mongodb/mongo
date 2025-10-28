@@ -75,6 +75,8 @@ last-continuous:
       ticket: SERVER-106239
     - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
       ticket: SERVER-112520
+    - test_file: jstests/change_streams/filter_excludes_resume_point.js
+      ticket: SERVER-112849
   suites: null
 last-lts:
   all:
@@ -652,4 +654,6 @@ last-lts:
       ticket: SERVER-106239
     - test_file: jstests/core/timeseries/geo/timeseries_geonear_measurements.js
       ticket: SERVER-112520
+    - test_file: jstests/change_streams/filter_excludes_resume_point.js
+      ticket: SERVER-112849
   suites: null
