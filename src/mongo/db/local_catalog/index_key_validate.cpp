@@ -30,11 +30,6 @@
 #include "mongo/db/local_catalog/index_key_validate.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -46,22 +41,17 @@
 #include "mongo/db/index/wildcard_validation.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/local_catalog/clustered_collection_options_gen.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -75,22 +65,15 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
-
-namespace mongo {
-namespace index_key_validate {
-
-std::function<void(std::map<StringData, std::set<IndexType>>&)> filterAllowedIndexFieldNames;
-
+namespace mongo::index_key_validate {
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
+const std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
     {IndexDescriptor::k2dIndexBitsFieldName, {IndexType::INDEX_2D}},
     {IndexDescriptor::k2dIndexMaxFieldName, {IndexType::INDEX_2D}},
     {IndexDescriptor::k2dIndexMinFieldName, {IndexType::INDEX_2D}},
@@ -126,8 +109,13 @@ std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
     // We need to keep allowing it until FCV upgrade is implemented to clean this up.
     {"bucketSize"_sd, {}}};
 
-// Initialised by a GlobalInitializerRegisterer.
-std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames = {};
+const std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames = [] {
+    auto nonDeprecatedAllowedFieldNames = kAllowedFieldNames;
+    for (const auto& name : kDeprecatedFieldNames) {
+        nonDeprecatedAllowedFieldNames.erase(name);
+    }
+    return nonDeprecatedAllowedFieldNames;
+}();
 
 namespace {
 // When the skipIndexCreateFieldNameValidation failpoint is enabled, validation for index field
@@ -139,7 +127,7 @@ MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 // validation for TTL index 'expireAfterSeconds' will be disabled in certain codepaths.
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexExpireAfterSecondsValidation);
 
-static const std::set<StringData> allowedIdIndexFieldNames = {
+const std::set<StringData> allowedIdIndexFieldNames = {
     IndexDescriptor::kCollationFieldName,
     IndexDescriptor::kIndexNameFieldName,
     IndexDescriptor::kIndexVersionFieldName,
@@ -149,7 +137,7 @@ static const std::set<StringData> allowedIdIndexFieldNames = {
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
 
-static const std::set<StringData> allowedClusteredIndexFieldNames = {
+const std::set<StringData> allowedClusteredIndexFieldNames = {
     ClusteredIndexSpec::kNameFieldName,
     ClusteredIndexSpec::kUniqueFieldName,
     ClusteredIndexSpec::kVFieldName,
@@ -1116,25 +1104,4 @@ BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& index
 
     return indexSpec;
 }
-
-
-GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
-    "FilterAllowedIndexFieldNames", [](InitializerContext*) {
-        if (filterAllowedIndexFieldNames)
-            filterAllowedIndexFieldNames(kAllowedFieldNames);
-    });
-
-GlobalInitializerRegisterer nonDeprecatedAllowedFieldNamesInitializer(
-    "NonDeprecatedAllowedIndexFieldNames",
-    [](InitializerContext*) {
-        kNonDeprecatedAllowedFieldNames = kAllowedFieldNames;
-
-        for (const auto& name : kDeprecatedFieldNames) {
-            kNonDeprecatedAllowedFieldNames.erase(name);
-        }
-    },
-    nullptr,
-    {"FilterAllowedIndexFieldNames"});
-
-}  // namespace index_key_validate
-}  // namespace mongo
+}  // namespace mongo::index_key_validate

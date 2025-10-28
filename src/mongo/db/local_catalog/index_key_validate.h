@@ -40,23 +40,16 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
-#include <functional>
 #include <limits>
 #include <set>
 
 #include <boost/optional.hpp>
 
-namespace mongo {
-class BSONObj;
-class CollatorInterface;
-class NamespaceString;
-class Status;
-template <typename T>
-class StatusWith;
-
-namespace index_key_validate {
+MONGO_MOD_PUBLIC;
+namespace mongo::index_key_validate {
 
 // TTL indexes with 'expireAfterSeconds' are repaired with this duration, which is chosen to be
 // the largest possible value for the 'safeInt' type that can be returned in the listIndexes
@@ -68,22 +61,16 @@ constexpr auto kExpireAfterSecondsForInactiveTTLIndex =
  * Describe which field names are considered valid options when creating an index. If the set
  * associated with the field name is empty, the option is always valid, otherwise it will be allowed
  * only when creating the set of index types listed in the set.
- *
- * Although the variable is not defined as const, it in practice is one. It may be modified only by
- * a GlobalInitializerRegisterer.
  */
-extern std::map<StringData, std::set<IndexType>> kAllowedFieldNames;
+extern const std::map<StringData, std::set<IndexType>> kAllowedFieldNames;
 
-const std::set<StringData> kDeprecatedFieldNames = {
+const constexpr StringData kDeprecatedFieldNames[] = {
     "_id"_sd, "bucketSize"_sd, IndexDescriptor::kNamespaceFieldName};
 
 /**
  * Like 'allowedFieldNames', but removes deprecated fields specified in kDeprecatedFieldNames.
- *
- * Although the variable is not defined as const, it in practice is one. It may be modified only by
- * a GlobalInitializerRegisterer.
  */
-extern std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames;
+extern const std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames;
 
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
@@ -185,12 +172,4 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc);
  */
 BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj);
 
-/**
- * Optional filtering function to adjust allowed index field names at startup.
- * Set it in a MONGO_INITIALIZER with 'FilterAllowedIndexFieldNames' as a dependant.
- */
-extern std::function<void(std::map<StringData, std::set<IndexType>>& allowedIndexFieldNames)>
-    filterAllowedIndexFieldNames;
-
-}  // namespace index_key_validate
-}  // namespace mongo
+}  // namespace mongo::index_key_validate
