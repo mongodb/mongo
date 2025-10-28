@@ -137,9 +137,9 @@ export function getQueryAndOptionsModel({
     allowCollation = false,
     allowedStages = [],
 } = {}) {
+    const noCollation = fc.constant({});
     return fc.record({
         "pipeline": getAggPipelineArb({allowOrs, deterministicBag, allowedStages}),
-        // TODO SERVER-111679: Make 'collation' optional if 'allowCollation' is true.
-        "options": allowCollation ? fc.record({"collation": collationArb}) : fc.constant({}),
+        "options": allowCollation ? oneof(noCollation, fc.record({"collation": collationArb})) : noCollation,
     });
 }

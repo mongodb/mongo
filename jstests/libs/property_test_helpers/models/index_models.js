@@ -3,6 +3,7 @@
  * See property_test_helpers/README.md for more detail on the design.
  */
 import {fieldArb, getScalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {getPartialFilterPredicateArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -83,15 +84,26 @@ const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: getScalarA
 /*
  * A b-tree index model.
  */
-function getSimpleIndexModel({allowPartialIndexes, allowSparse}) {
-    const options = [emptyOptionsArb];
+function getSimpleIndexModel({allowPartialIndexes, allowSparse, allowCollation}) {
+    const optionsSpec = {};
     if (allowSparse) {
-        options.push(fc.constant({sparse: true}));
+        optionsSpec.sparse = fc.boolean();
     }
     if (allowPartialIndexes) {
-        options.push(partialFilterOptionArb);
+        optionsSpec.partialFilterExpression = getPartialFilterPredicateArb({leafArb: getScalarArb()});
     }
-    return fc.record({def: simpleIndexDefArb, options: oneof(...options)});
+    if (allowCollation) {
+        optionsSpec.collation = collationArb;
+    }
+    const optionsArb = fc.record(optionsSpec, {requiredKeys: []}).filter((options) => {
+        if (options.sparse && options.partialFilterExpression) {
+            // Sparse and partial indexes are not allowed together.
+            return false;
+        }
+        return true;
+    });
+
+    return fc.record({def: simpleIndexDefArb, options: optionsArb});
 }
 
 /*
@@ -210,16 +222,16 @@ function getWildCardIndexModel(allowPartialIndexes) {
  *
  * Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
  */
-export function getIndexModel({allowPartialIndexes = false, allowSparse = true} = {}) {
+export function getIndexModel({allowPartialIndexes = false, allowSparse = true, allowCollation = true} = {}) {
     return oneof(
-        getSimpleIndexModel({allowPartialIndexes, allowSparse}),
+        getSimpleIndexModel({allowPartialIndexes, allowSparse, allowCollation}),
         getWildCardIndexModel(allowPartialIndexes),
         getHashedIndexModel(allowPartialIndexes),
     );
 }
-export function getTimeSeriesIndexModel({allowPartialIndexes = false} = {}) {
+export function getTimeSeriesIndexModel({allowPartialIndexes = false, allowCollation = true} = {}) {
     // TODO SERVER-102738 support more time-series index types.
-    const simpleIndexModel = getSimpleIndexModel({allowPartialIndexes, allowSparse: false});
+    const simpleIndexModel = getSimpleIndexModel({allowPartialIndexes, allowSparse: false, allowCollation});
     return simpleIndexModel.filter(({def, options}) => {
         // Filter out multikey indexes.
         return !isMultikey(def);

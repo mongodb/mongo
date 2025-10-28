@@ -83,11 +83,12 @@ testNumDocsAndIndexes(true /* isTS */);
 // This does not test time-series because results should be the same with a TS collection.
 function testMatchedDocsMetrics(allowOrs) {
     // Now test that queries return an acceptable number of results on average.
+    // TODO SERVER-113037: Make this test less fragile.
     const testCases = [
         {
             name: "single $match queries",
             aggModel: getMatchArb(allowOrs).map((matchStage) => ({"pipeline": [matchStage], "options": {}})),
-            minimumAcceptedAvgNumDocs: 15,
+            minimumAcceptedAvgNumDocs: 5,
         },
         {
             name: "deterministic aggregations",

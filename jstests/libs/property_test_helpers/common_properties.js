@@ -33,7 +33,9 @@ function getAllVariationsOfQueryShape(shapeIx, getQuery, testHelpers) {
 
 /*
  * Runs one of each query shape with the first parameters plugged in, comparing the experiment
- * results to the control results.
+ * results to the control results. "Control" queries are collection scans run without optimizations
+ * and without the plan cache.
+ *
  * The `statsCollectorFn`, if provided, is run on the explain of each query on the experiment
  * collection.
  */

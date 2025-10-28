@@ -16,8 +16,6 @@ import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workl
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-// Custom arbs run by this PBT
-import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {
     simpleProjectArb,
@@ -40,6 +38,9 @@ const experimentColl = db.collation_pbt_experiment;
 
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
 
+// Note that we exclude $group here on purpose. With collation, different strings will compare as
+// equal, but the output of the $group stage depends on which one is seen first. This is not
+// guaranteed to be the same across the control/experiment collections.
 const allowedStages = [
     simpleProjectArb,
     getMatchArb(),
@@ -53,7 +54,6 @@ const aggModel = getQueryAndOptionsModel({allowCollation: true, allowedStages: a
 testProperty(
     correctnessProperty,
     {controlColl, experimentColl},
-    // TODO SERVER-111679: Extend query property tester query model to support collated indexes.
     makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
     numRuns,
 );
