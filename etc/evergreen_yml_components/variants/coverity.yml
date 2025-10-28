@@ -5,7 +5,7 @@ buildvariants:
     patchable: false
     allow_for_git_tag: false
     # Run at 4 am UTC everyday
-    cron: "0 4 * * *"
+    cron: "30 4 * * *"
     run_on: ubuntu2404-xlarge
     modules:
       - devprod_coverity
