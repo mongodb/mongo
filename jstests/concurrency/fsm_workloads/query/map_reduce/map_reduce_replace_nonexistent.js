@@ -14,8 +14,6 @@
  *   requires_scripting,
  *   # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
  *   does_not_support_stepdowns,
- *   # TODO (SERVER-95170): Re-enable this test in txn suites.
- *   does_not_support_transactions,
  *   # TODO (SERVER-91002): server side javascript execution is deprecated, and the balancer is not
  *   # compatible with it, once the incompatibility is taken care off we can re-enable this test
  *   assumes_balancer_off
