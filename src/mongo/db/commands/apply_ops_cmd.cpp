@@ -48,6 +48,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -292,10 +293,16 @@ public:
                                                << repl::ApplyOps::kOplogApplicationModeFieldName));
         }
 
-        auto applyOpsStatus = CommandHelpers::appendCommandStatusNoThrow(
-            result, repl::applyOps(opCtx, dbName, cmdObj, oplogApplicationMode, &result));
+        const auto applyOpsStatus =
+            repl::applyOps(opCtx, dbName, cmdObj, oplogApplicationMode, &result);
 
-        return applyOpsStatus;
+        if (isStaleShardingMetadataError(applyOpsStatus.code())) {
+            // Set the error on the OperationShardingState so that the shard ServiceEntryPoint can
+            // react to it.
+            OperationShardingState::get(opCtx).setShardingOperationFailedStatus(applyOpsStatus);
+        }
+
+        return CommandHelpers::appendCommandStatusNoThrow(result, applyOpsStatus);
     }
 };
 MONGO_REGISTER_COMMAND(ApplyOpsCmd).forShard();

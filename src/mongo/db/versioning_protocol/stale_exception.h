@@ -179,4 +179,9 @@ private:
     boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
 };
 
+/*
+ * Returns true if 'errorCode' corresponds to an error related to stale sharding metadata.
+ */
+bool isStaleShardingMetadataError(ErrorCodes::Error errorCode);
+
 }  // namespace mongo

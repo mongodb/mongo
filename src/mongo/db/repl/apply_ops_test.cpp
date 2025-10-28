@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
@@ -53,9 +54,11 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -535,6 +538,57 @@ TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
     BSONObjBuilder resultBuilder;
     auto status = applyOps(opCtx.get(), nss.dbName(), dropDatabaseCmdObj, mode, &resultBuilder);
     ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
+}
+
+TEST_F(ApplyOpsTest, ApplyOpsCmdStaleConfigSetsShardingOperationFailedStatus) {
+    class OpObserverMockThrowsStaleConfig : public OpObserverNoop {
+    public:
+        void onInserts(OperationContext* opCtx,
+                       const CollectionPtr& coll,
+                       std::vector<InsertStatement>::const_iterator begin,
+                       std::vector<InsertStatement>::const_iterator end,
+                       const std::vector<RecordId>& recordIds,
+                       std::vector<bool> fromMigrate,
+                       bool defaultFromMigrate,
+                       OpStateAccumulator* opAccumulator = nullptr) override {
+            // Throw a staleConfig error.
+            uasserted(StaleConfigInfo(
+                          coll->ns(), ShardVersion::UNSHARDED(), boost::none, ShardId{"shardId"}),
+                      "stale shard");
+        }
+    };
+
+    // Install an opObserver that always throws a StaleConfig error on insert.
+    opObserverRegistry()->addObserver(std::make_unique<OpObserverMockThrowsStaleConfig>());
+
+    auto opCtx = cc().makeOperationContext();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto uuid = UUID::gen();
+
+    // Create a collection for us to insert documents into.
+    CollectionOptions collectionOptions;
+    collectionOptions.uuid = uuid;
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, collectionOptions));
+
+    // Run an applyOps command with an insert into the collection.
+    auto applyOpsCmd = CommandHelpers::findCommand(opCtx.get(), "applyOps");
+    ASSERT(applyOpsCmd);
+
+    const auto cmdInvocationBson =
+        BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                << "ns" << nss.ns_forTest() << "o"
+                                                << BSON("_id" << 0) << "ui" << uuid)));
+    const auto cmdInvocationRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), cmdInvocationBson);
+
+    const auto cmdInvocation = applyOpsCmd->parse(opCtx.get(), cmdInvocationRequest);
+    rpc::LegacyReplyBuilder replyBuilder;
+    cmdInvocation->run(opCtx.get(), &replyBuilder);
+
+    // Expect the sharding error to be set on the OperationShardingState.
+    const auto ossError =
+        OperationShardingState::get(opCtx.get()).resetShardingOperationFailedStatus();
+    ASSERT_EQ(ErrorCodes::StaleConfig, ossError->code());
 }
 
 }  // namespace
