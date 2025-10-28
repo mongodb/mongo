@@ -1,8 +1,8 @@
 /**
  * Tests:
- * (1) We cannot set commitQuorum when creating an primary-driven index.
+ * (1) We can set commitQuorum when creating an primary-driven index, but it's a no-op.
  * (2) The default commit quorum for a primary-driven index build is 0 (disabled).
- * (3) We cannot set the commitQuorum when the primary-driven index build is running.
+ * (3) We can set the commitQuorum when the primary-driven index build is running, but it's a no-op.
  * @tags: [
  *   requires_replication,
  * ]
@@ -30,6 +30,7 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB("test");
+const collName = "primaryDrivenIndexBuild";
 const coll = primaryDB.primaryDrivenIndexBuild;
 
 // TODO(SERVER-109349): Remove this check when the feature flag is removed.
@@ -41,28 +42,25 @@ if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds"))
 const bulk = coll.initializeUnorderedBulkOp();
 const numDocs = 1000;
 for (let i = 0; i < numDocs; i++) {
-    bulk.insert({a: i, b: i});
+    bulk.insert({a: i, x: i});
 }
 assert.commandWorked(bulk.execute());
 
-const collName = "coll";
 // This test depends on using the IndexBuildsCoordinator to build this index, which as of
 // SERVER-44405, will not occur in this test unless the collection is created beforehand.
 assert.commandWorked(primaryDB.runCommand({create: collName}));
 
+// Use createIndex(es) to build indexes and check the commit quorum default.
 jsTestLog("Create index");
-assert.commandFailedWithCode(
+let res = assert.commandWorked(
     primaryDB.runCommand({
         createIndexes: collName,
         indexes: [{name: "x_1", key: {x: 1}}],
         commitQuorum: "majority",
     }),
-    ErrorCodes.BadValue,
 );
-
-// Use createIndex(es) to build indexes and check the commit quorum default.
-let res = assert.commandWorked(primaryDB[collName].createIndex({x: 1}));
 assert.eq(0, res.commitQuorum);
+assert(checkLog.checkContainsWithCountJson(primaryDB, 11302400, undefined, 1), "Expecting to see log with id 11302400");
 
 rst.awaitReplication();
 
@@ -82,12 +80,16 @@ try {
 
     failPoint.wait();
 
-    assert.commandFailed(
+    assert.commandWorked(
         primaryDB.runCommand({
             setIndexCommitQuorum: "primaryDrivenIndexBuild",
             indexNames: ["a_1"],
             commitQuorum: "majority",
         }),
+    );
+    assert(
+        checkLog.checkContainsWithCountJson(primaryDB, 11302401, undefined, 1),
+        "Expecting to see log with id 11302401",
     );
 } finally {
     failPoint.off();
@@ -96,6 +98,6 @@ try {
 // Wait for the parallel shell to complete.
 awaitShell();
 
-IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
+IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1", "x_1"]);
 
 rst.stopSet();

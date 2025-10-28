@@ -1102,6 +1102,16 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     }
 
     auto currentCommitQuorum = invariantStatusOK(swOnDiskCommitQuorum);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+        invariant(currentCommitQuorum.numNodes == CommitQuorumOptions::kDisabled);
+        LOGV2_WARNING(11302401,
+                      "Setting commitQuorum is not supported for primary-driven index builds.");
+        return Status::OK();
+    }
+
     if (currentCommitQuorum.numNodes == CommitQuorumOptions::kDisabled ||
         newCommitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
         return Status(ErrorCodes::BadValue,

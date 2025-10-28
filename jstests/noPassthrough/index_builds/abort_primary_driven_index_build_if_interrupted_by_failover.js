@@ -64,10 +64,10 @@ let buildUUID = extractUUIDFromObject(
 jsTest.log.info(`buildUUID: ${tojson(buildUUID)}`);
 
 jsTest.log.info("6. CommitQuorum is kDisabled (0) while primary-driven");
-assert.commandFailedWithCode(
+assert.commandWorked(
     primary.getDB(dbName).runCommand({setIndexCommitQuorum: collName, indexNames: [indexName], commitQuorum: 1}),
-    ErrorCodes.BadValue,
 );
+assert(checkLog.checkContainsWithCountJson(primary, 11302401, undefined, 1), "Expecting to see log with id 11302401");
 
 jsTest.log.info("7. Simulate primary failure while build is paused");
 rst.stop(primary, undefined, {forRestart: true, skipValidation: true});

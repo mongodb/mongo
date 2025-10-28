@@ -258,7 +258,6 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
                                                              IndexBuildProtocol protocol,
                                                              const CreateIndexesCommand& cmd) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto commitQuorumEnabled = (enableIndexBuildCommitQuorum) ? true : false;
 
     // TODO(SERVER-109664): Do not use the feature-flag to disable commit quorum for
     // primary-driven index builds.
@@ -267,7 +266,17 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
         fcvSnapshot.isVersionInitialized() &&
         feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
             VersionContext::getDecoration(opCtx), fcvSnapshot);
+
+    // Commit quorum is disabled for primary-driven index builds.
     auto commitQuorum = cmd.getCommitQuorum();
+    if (isPrimaryDrivenIndexBuild) {
+        if (commitQuorum) {
+            LOGV2_WARNING(11302400,
+                          "commitQuorum is not supported for primary-driven index builds.");
+        }
+        return CommitQuorumOptions(CommitQuorumOptions::kDisabled);
+    }
+
     if (commitQuorum) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Standalones can't specify commitQuorum",
@@ -275,21 +284,13 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
         uassert(ErrorCodes::BadValue,
                 str::stream() << "commitQuorum is supported only for two phase index builds with "
                                  "commit quorum support enabled ",
-                (IndexBuildProtocol::kTwoPhase == protocol && commitQuorumEnabled));
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "commitQuorum is not supported for primary-driven index builds.",
-                !isPrimaryDrivenIndexBuild);
+                (IndexBuildProtocol::kTwoPhase == protocol && enableIndexBuildCommitQuorum));
         return commitQuorum;
-    }
-
-    // Commit quorum is disabled for primary-driven index builds.
-    if (isPrimaryDrivenIndexBuild) {
-        return CommitQuorumOptions(CommitQuorumOptions::kDisabled);
     }
 
     if (IndexBuildProtocol::kTwoPhase == protocol) {
         // Setting CommitQuorum to 0 will make the index build to opt out of voting proces.
-        return (replCoord->getSettings().isReplSet() && commitQuorumEnabled)
+        return (replCoord->getSettings().isReplSet() && enableIndexBuildCommitQuorum)
             ? CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)
             : CommitQuorumOptions(CommitQuorumOptions::kDisabled);
     }
