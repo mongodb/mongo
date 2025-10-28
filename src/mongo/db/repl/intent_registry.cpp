@@ -363,7 +363,15 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
                   "token_id"_attr = token,
                   "client"_attr = opCtx->getClient()->desc());
         }
-        LOGV2(9795404, "Timeout while waiting on intent queue to drain");
+        LOGV2_FATAL_CONTINUE(9795404,
+                             "Timeout while waiting on intent queue to drain, printing stack "
+                             "traces then calling abort() to allow the cluster to progress.");
+
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+        // Dump the stack of each thread.
+        printAllThreadStacksBlocking();
+#endif
+
         fasserted(9795401);
     } else if (!timeout.count()) {
         tokenMap.cv.wait(lock, [&tokenMap] { return tokenMap.map.empty(); });
