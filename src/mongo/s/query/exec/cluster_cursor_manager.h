@@ -55,6 +55,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -69,7 +70,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class ClockSource;
 class OperationContext;
@@ -700,4 +701,4 @@ struct ClusterCursorManager::AuthzCheckPolicy<ReleaseMemoryAuthzCheckFnInputType
     }
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

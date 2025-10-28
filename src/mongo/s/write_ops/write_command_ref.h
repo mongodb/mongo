@@ -32,6 +32,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 #include <cstddef>
@@ -866,8 +867,11 @@ private:
  *
  * Code that uses the WriteCommandRef class must ensure that a WriteCommandRef does not outlive the
  * referred-to CommandRequest object.
+ *
+ * TODO SERVER-111488: This class (and the others in this file) should be private to the query
+ * module.
  */
-class WriteCommandRef {
+class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef {
 public:
     class OpRef;
     class InsertOpRef;
@@ -1077,7 +1081,7 @@ private:
  * Because OpRef contains a WriteCommandRef that refers to a request object, code that uses the
  * OpRef class must ensure that a WriteOpRef does not outlive the referred-to request object.
  */
-class WriteCommandRef::OpRef {
+class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::OpRef {
 public:
     explicit OpRef(WriteCommandRef cmdRef, int index) : _cmdRef(std::move(cmdRef)), _index(index) {
         tassert(10778512,
@@ -1328,7 +1332,7 @@ public:
     }
 };
 
-class WriteCommandRef::UpdateOpRef : public WriteCommandRef::OpRef {
+class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::UpdateOpRef : public WriteCommandRef::OpRef {
 public:
     explicit UpdateOpRef(WriteCommandRef cmdRef, int index) : OpRef(std::move(cmdRef), index) {
         tassert(10778514, "Expected update op", _cmdRef.getOp(index).isUpdateOp());
@@ -1363,7 +1367,7 @@ public:
     }
 };
 
-class WriteCommandRef::DeleteOpRef : public WriteCommandRef::OpRef {
+class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::DeleteOpRef : public WriteCommandRef::OpRef {
 public:
     explicit DeleteOpRef(WriteCommandRef cmdRef, int index) : OpRef(std::move(cmdRef), index) {
         tassert(10778515, "Expected delete op", _cmdRef.getOp(index).isDeleteOp());
@@ -1406,12 +1410,12 @@ inline WriteCommandRef::DeleteOpRef WriteCommandRef::OpRef::getDeleteOp() const 
  */
 using WriteOpRef = WriteCommandRef::OpRef;
 using InsertOpRef = WriteCommandRef::InsertOpRef;
-using UpdateOpRef = WriteCommandRef::UpdateOpRef;
-using DeleteOpRef = WriteCommandRef::DeleteOpRef;
+using UpdateOpRef MONGO_MOD_NEEDS_REPLACEMENT = WriteCommandRef::UpdateOpRef;
+using DeleteOpRef MONGO_MOD_NEEDS_REPLACEMENT = WriteCommandRef::DeleteOpRef;
 
 /**
  * Legacy 'BatchItemRef' type alias.
  */
-using BatchItemRef = WriteOpRef;
+using BatchItemRef MONGO_MOD_NEEDS_REPLACEMENT = WriteOpRef;
 
 }  // namespace mongo

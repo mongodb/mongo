@@ -44,6 +44,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -54,7 +55,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This class represents the layout and content of a insert/update/delete runCommand,
@@ -215,4 +216,4 @@ private:
     BSONArray _arr;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -40,7 +41,7 @@ namespace mongo {
  * An RAII object which owns a ClusterClientCursor and kills the cursor if it is not explicitly
  * released.
  */
-class ClusterClientCursorGuard final {
+class MONGO_MOD_PUBLIC ClusterClientCursorGuard final {
     ClusterClientCursorGuard(const ClusterClientCursorGuard&) = delete;
     ClusterClientCursorGuard& operator=(const ClusterClientCursorGuard&) = delete;
 

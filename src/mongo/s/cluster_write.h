@@ -38,13 +38,14 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace cluster {
 
 /**
@@ -70,4 +71,4 @@ bulk_write_exec::BulkWriteReplyInfo bulkWrite(
     bulk_write_exec::BulkWriteExecStats& execStats);
 
 }  // namespace cluster
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

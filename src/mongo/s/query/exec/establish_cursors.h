@@ -40,6 +40,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -76,8 +77,10 @@ namespace mongo {
  *
  * @param designatedHostsMap: A map of hosts to be targeted for particular shards, overriding
  *                            the read preference setting.
+ *
+ * TODO SERVER-111290 Remove external dependencies on this method.
  */
-std::vector<RemoteCursor> establishCursors(
+MONGO_MOD_NEEDS_REPLACEMENT std::vector<RemoteCursor> establishCursors(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
@@ -124,6 +127,6 @@ void killRemoteCursor(OperationContext* opCtx,
 /**
  * Appends the given operation key to the given request.
  */
-void appendOpKey(const OperationKey& opKey, BSONObjBuilder* cmdBuilder);
+MONGO_MOD_NEEDS_REPLACEMENT void appendOpKey(const OperationKey& opKey, BSONObjBuilder* cmdBuilder);
 
 }  // namespace mongo

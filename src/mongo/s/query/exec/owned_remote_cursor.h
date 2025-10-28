@@ -32,8 +32,9 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/query/exec/establish_cursors.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * A RAII wrapper class for RemoteCursor which schedules a killCursors request upon destruction if
@@ -90,4 +91,4 @@ private:
     NamespaceString _nss;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

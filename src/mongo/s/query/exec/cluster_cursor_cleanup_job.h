@@ -30,11 +30,12 @@
 #pragma once
 
 #include "mongo/util/background.h"
+#include "mongo/util/modules.h"
 
 #include <atomic>
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Background job which regularly performs cleanup tasks on the ClusterCursorManager owned by the
@@ -52,4 +53,4 @@ public:
 
 extern ClusterCursorCleanupJob clusterCursorCleanupJob;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
@@ -40,8 +41,10 @@ namespace mongo {
  * Holds a single result from a mongos find command shard request and the shard the request
  * originated from. The result can either contain collection data, stored in '_resultObj'; or be
  * EOF, and isEOF() returns true.
+ *
+ * TODO SERVER-111290 Remove external dependencies on this class.
  */
-class ClusterQueryResult {
+class MONGO_MOD_NEEDS_REPLACEMENT ClusterQueryResult {
 public:
     ClusterQueryResult() = default;
 

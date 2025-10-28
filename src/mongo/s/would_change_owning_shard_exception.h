@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -43,7 +44,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+// TODO SERVER-113081 Investigate whether this can be made private to the query module.
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 /**
  * This error is thrown when an update would cause a document to be owned by a different
@@ -127,4 +129,4 @@ private:
 };
 using WouldChangeOwningShardException = ExceptionFor<ErrorCodes::WouldChangeOwningShard>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

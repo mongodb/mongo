@@ -39,6 +39,7 @@
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <boost/optional.hpp>
@@ -60,7 +61,7 @@ class StatusWith;
  *
  * Does not throw exceptions.
  */
-class ClusterClientCursor {
+class MONGO_MOD_PUBLIC ClusterClientCursor {
     ClusterClientCursor(const ClusterClientCursor&) = delete;
     ClusterClientCursor& operator=(const ClusterClientCursor&) = delete;
 

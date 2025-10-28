@@ -39,6 +39,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/exec/owned_remote_cursor.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -46,7 +47,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class BSONObj;
 class ClusterCursorManager;
@@ -126,4 +127,4 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

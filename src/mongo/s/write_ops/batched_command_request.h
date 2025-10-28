@@ -42,6 +42,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 #include <cstddef>
@@ -55,7 +56,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This class wraps the different kinds of command requests into a generically usable write command
@@ -255,4 +256,4 @@ private:
 
 BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

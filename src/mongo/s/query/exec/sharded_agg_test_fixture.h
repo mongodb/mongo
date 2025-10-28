@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -51,7 +52,10 @@ public:
     }
 };
 
-class ShardedAggTestFixture : public ShardCatalogCacheTestFixture {
+/**
+ * TODO SERVER-111290 Remove external dependencies on this class.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT ShardedAggTestFixture : public ShardCatalogCacheTestFixture {
 public:
     const NamespaceString kTestAggregateNss =
         NamespaceString::createNamespaceString_forTest("unittests", "sharded_agg_test");
