@@ -254,7 +254,8 @@ public:
     virtual Key nextWithDeferredValue() = 0;
     virtual Value getDeferredValue() = 0;
 
-    virtual const Key& current() = 0;
+    // Returns the next key without advancing the iterator.
+    virtual const Key& peek() = 0;
 
     virtual ~SortIteratorInterface() {}
 

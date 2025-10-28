@@ -117,7 +117,7 @@ public:
     IntWrapper getDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    const IntWrapper& current() override {
+    const IntWrapper& peek() override {
         MONGO_UNREACHABLE;
     }
 
@@ -141,7 +141,7 @@ public:
     IntWrapper getDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    const IntWrapper& current() override {
+    const IntWrapper& peek() override {
         MONGO_UNREACHABLE;
     }
 };
@@ -167,7 +167,7 @@ public:
     IntWrapper getDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    const IntWrapper& current() override {
+    const IntWrapper& peek() override {
         MONGO_UNREACHABLE;
     }
 

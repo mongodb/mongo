@@ -179,7 +179,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    const Key& current() override {
+    const Key& peek() override {
         return _data[_index].first;
     }
 
@@ -254,7 +254,7 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(8248303);
     }
 
-    const Key& current() override {
+    const Key& peek() override {
         return std::prev(_iterator)->first;
     }
 
@@ -320,8 +320,8 @@ public:
         return Value::deserializeForSorter(*_bufferReader, _settings.second);
     }
 
-    const Key& current() override {
-        tasserted(ErrorCodes::NotImplemented, "current() not implemented for FileIterator");
+    const Key& peek() override {
+        tasserted(ErrorCodes::NotImplemented, "peek() not implemented for FileIterator");
     }
 
     SorterRange getRange() const override {
@@ -519,7 +519,7 @@ public:
         return false;
     }
 
-    const Key& current() override {
+    const Key& peek() override {
         invariant(_remaining);
 
         if (!_positioned) {
@@ -1742,7 +1742,7 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::getState() const {
         return State::kReady;
 
     // Similarly, we can return the next element from the spilled iterator if it's < _min.
-    if (_spillIter && compare(_spillIter->current(), *_min) < 0)
+    if (_spillIter && compare(_spillIter->peek(), *_min) < 0)
         return State::kReady;
 
     // A later call to add() may improve _min. Or in the worst case, after done() is called
@@ -1771,7 +1771,7 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
     };
 
     if (!_heap.empty() && _spillIter) {
-        if (compare(_heap.top().first, _spillIter->current()) <= 0) {
+        if (compare(_heap.top().first, _spillIter->peek()) <= 0) {
             pullFromHeap();
         } else {
             pullFromSpilled();

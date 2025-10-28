@@ -274,7 +274,7 @@ PlanStage::StageState TextOrStage::returnResultsSpilled(WorkingSetID* out) {
     double score = textRecordData.score;
     bool skip = score == kRejectedDocumentScore;
 
-    while (_sorterIterator->more() && _sorterIterator->current() == recordId) {
+    while (_sorterIterator->more() && _sorterIterator->peek() == recordId) {
         double currentScore = _sorterIterator->next().second.score;
         score += currentScore;
         skip |= currentScore == kRejectedDocumentScore;

@@ -94,7 +94,7 @@ TEST_F(InMemIterTest, DoesNoReorderGivenInput) {
         IntWrapper getDeferredValue() override {
             MONGO_UNREACHABLE;
         }
-        const IntWrapper& current() override {
+        const IntWrapper& peek() override {
             MONGO_UNREACHABLE;
         }
         size_t _pos;
