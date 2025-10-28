@@ -32,29 +32,56 @@
 #include <cstring>
 #include <sstream>
 
+/**
+ * Deprecated MD5 functions. MD-5 is considered cryptographically broken and unsuitable for further
+ * use. For non-cryptographic purposes, consider using a modern hash function like XXHash or
+ * CityHash.
+ *
+ * These functions are retained only for compatibility with existing data and applications.
+ */
 namespace mongo {
 
-void md5_init_state(md5_state_t* pms) {
+[[deprecated(
+    "This API is deprecated. Use SHA-256 instead of MD-5 for all new cryptographic applications. "
+    "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
+    "CityHash.")]]
+void md5_init_state_deprecated(md5_state_t* pms) {
     md5_init(pms);
 }
 
-void md5_append(md5_state_t* pms, const md5_byte_t* data, int nbytes) {
+[[deprecated(
+    "This API is deprecated. Use SHA-256 instead of MD-5 for all new cryptographic applications. "
+    "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
+    "CityHash.")]]
+void md5_append_deprecated(md5_state_t* pms, const md5_byte_t* data, int nbytes) {
     md5_process(pms, data, nbytes);
 }
 
-void md5_finish(md5_state_t* pms, md5_byte_t digest[16]) {
+[[deprecated(
+    "This API is deprecated. Use SHA-256 instead of MD-5 for all new cryptographic applications. "
+    "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
+    "CityHash.")]]
+void md5_finish_deprecated(md5_state_t* pms, md5_byte_t digest[16]) {
     md5_done(pms, digest);
 }
 
-void md5(const void* buf, int nbytes, md5digest digest) {
+[[deprecated(
+    "This API is deprecated. Use SHA-256 instead of MD-5 for all new cryptographic applications. "
+    "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
+    "CityHash.")]]
+void md5_deprecated(const void* buf, int nbytes, md5digest digest) {
     md5_state_t st;
-    md5_init_state(&st);
-    md5_append(&st, (const md5_byte_t*)buf, nbytes);
-    md5_finish(&st, digest);
+    md5_init_state_deprecated(&st);
+    md5_append_deprecated(&st, (const md5_byte_t*)buf, nbytes);
+    md5_finish_deprecated(&st, digest);
 }
 
-void md5(const char* str, md5digest digest) {
-    md5(str, strlen(str), digest);
+[[deprecated(
+    "This API is deprecated. Use SHA-256 instead of MD-5 for all new cryptographic applications. "
+    "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
+    "CityHash.")]]
+void md5_deprecated(const char* str, md5digest digest) {
+    md5_deprecated(str, strlen(str), digest);
 }
 
 std::string digestToString(md5digest digest) {
@@ -67,14 +94,14 @@ std::string digestToString(md5digest digest) {
     return ss.str();
 }
 
-std::string md5simpledigest(const void* buf, int nbytes) {
+std::string md5simpledigest_deprecated(const void* buf, int nbytes) {
     md5digest d;
-    md5(buf, nbytes, d);
+    md5_deprecated(buf, nbytes, d);
     return digestToString(d);
 }
 
-std::string md5simpledigest(const std::string& s) {
-    return md5simpledigest(s.data(), s.size());
+std::string md5simpledigest_deprecated(const std::string& s) {
+    return md5simpledigest_deprecated(s.data(), s.size());
 }
 
 }  // namespace mongo

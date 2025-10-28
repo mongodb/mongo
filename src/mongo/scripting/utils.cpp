@@ -51,9 +51,9 @@ static BSONObj native_hex_md5(const BSONObj& args, void* data) {
 
     md5digest d;
     md5_state_t st;
-    md5_init_state(&st);
-    md5_append(&st, reinterpret_cast<const md5_byte_t*>(sd.data()), sd.size());
-    md5_finish(&st, d);
+    md5_init_state_deprecated(&st);
+    md5_append_deprecated(&st, reinterpret_cast<const md5_byte_t*>(sd.data()), sd.size());
+    md5_finish_deprecated(&st, d);
 
     return BSON("" << digestToString(d));
 }

@@ -218,7 +218,7 @@ void FTSIndexFormat::_appendIndexKey(KeyStringBuilder& keyString,
         if (term.size() <= termKeyPrefixLengthV3) {
             keyString.appendString(term);
         } else {
-            string keySuffix = md5simpledigest(term);
+            string keySuffix = md5simpledigest_deprecated(term);
             invariant(termKeySuffixLengthV3 == keySuffix.size());
             keyString.appendString(term.substr(0, termKeyPrefixLengthV3) + keySuffix);
         }

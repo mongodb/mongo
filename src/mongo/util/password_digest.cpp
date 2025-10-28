@@ -37,11 +37,12 @@ std::string createPasswordDigest(StringData username, StringData clearTextPasswo
     md5digest d;
     {
         md5_state_t st;
-        md5_init_state(&st);
-        md5_append(&st, (const md5_byte_t*)username.data(), username.size());
-        md5_append(&st, (const md5_byte_t*)":mongo:", 7);
-        md5_append(&st, (const md5_byte_t*)clearTextPassword.data(), clearTextPassword.size());
-        md5_finish(&st, d);
+        md5_init_state_deprecated(&st);
+        md5_append_deprecated(&st, (const md5_byte_t*)username.data(), username.size());
+        md5_append_deprecated(&st, (const md5_byte_t*)":mongo:", 7);
+        md5_append_deprecated(
+            &st, (const md5_byte_t*)clearTextPassword.data(), clearTextPassword.size());
+        md5_finish_deprecated(&st, d);
     }
     return digestToString(d);
 }

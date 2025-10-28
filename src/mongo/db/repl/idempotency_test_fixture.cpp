@@ -324,17 +324,17 @@ std::string IdempotencyTest::computeDataHash(const CollectionAcquisition& collec
                                            InternalPlanner::IXSCAN_FETCH);
     ASSERT(nullptr != exec.get());
     md5_state_t st;
-    md5_init_state(&st);
+    md5_init_state_deprecated(&st);
 
     PlanExecutor::ExecState state;
     BSONObj obj;
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
         obj = this->canonicalizeDocumentForDataHash(obj);
-        md5_append(&st, (const md5_byte_t*)obj.objdata(), obj.objsize());
+        md5_append_deprecated(&st, (const md5_byte_t*)obj.objdata(), obj.objsize());
     }
     ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
     md5digest d;
-    md5_finish(&st, d);
+    md5_finish_deprecated(&st, d);
     return digestToString(d);
 }
 

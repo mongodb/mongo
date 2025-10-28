@@ -130,7 +130,7 @@ public:
 
         md5digest d;
         md5_state_t st;
-        md5_init_state(&st);
+        md5_init_state_deprecated(&st);
 
         int n = 0;
 
@@ -230,7 +230,7 @@ public:
                     int len;
                     const char* data = owned["data"].binDataClean(len);
                     // This is potentially an expensive operation, so do it out of the lock
-                    md5_append(&st, (const md5_byte_t*)(data), len);
+                    md5_append_deprecated(&st, (const md5_byte_t*)(data), len);
                     n++;
 
                     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -260,7 +260,7 @@ public:
                 result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
 
             // This must be *after* the capture of md5state since it mutates st
-            md5_finish(&st, d);
+            md5_finish_deprecated(&st, d);
 
             result.append("numChunks", n);
             result.append("md5", digestToString(d));

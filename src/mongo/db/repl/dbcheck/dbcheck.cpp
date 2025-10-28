@@ -363,7 +363,7 @@ DbCheckHasher::DbCheckHasher(
       _deadlineOnSecondary(deadlineOnSecondary) {
 
     // Get the MD5 hasher set up.
-    md5_init_state(&_state);
+    md5_init_state_deprecated(&_state);
 
     auto& collectionPtr = acquisition.collection().getCollectionPtr();
 
@@ -512,9 +512,9 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
 
         _bytesSeen += currKeyStringWithoutRecordId.size();
         _countKeysSeen += 1;
-        md5_append(&_state,
-                   md5Cast(currKeyStringWithoutRecordId.data()),
-                   currKeyStringWithoutRecordId.size());
+        md5_append_deprecated(&_state,
+                              md5Cast(currKeyStringWithoutRecordId.data()),
+                              currKeyStringWithoutRecordId.size());
 
         _lastKeySeen = currKeyStringBson;
 
@@ -879,7 +879,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
         _countDocsSeen += 1;
         _bytesSeen += currentObj.objsize();
 
-        md5_append(&_state, md5Cast(currentObjData), currentObjSize);
+        md5_append_deprecated(&_state, md5Cast(currentObjData), currentObjSize);
 
         _dataThrottle->awaitIfNeeded(opCtx, record.size());
         if (Date_t::now() > deadlineOnPrimary) {
@@ -915,7 +915,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
 
 std::string DbCheckHasher::total(void) {
     md5digest digest;
-    md5_finish(&_state, digest);
+    md5_finish_deprecated(&_state, digest);
 
     return digestToString(digest);
 }

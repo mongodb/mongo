@@ -84,12 +84,12 @@ private:
 };
 
 Hasher::Hasher(HashSeed seed) {
-    md5_init_state(&_md5State);
+    md5_init_state_deprecated(&_md5State);
     addSeed(seed);
 }
 
 void Hasher::addData(const void* keyData, size_t numBytes) {
-    md5_append(&_md5State, static_cast<const md5_byte_t*>(keyData), numBytes);
+    md5_append_deprecated(&_md5State, static_cast<const md5_byte_t*>(keyData), numBytes);
 }
 
 template <typename T>
@@ -99,7 +99,7 @@ void Hasher::addIntegerData(T number) {
 }
 
 void Hasher::finish(HashDigest out) {
-    md5_finish(&_md5State, out);
+    md5_finish_deprecated(&_md5State, out);
 }
 
 void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {

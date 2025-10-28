@@ -61,9 +61,9 @@ int do_md5_test(void) {
         char hex_output[16 * 2 + 1];
         int di;
 
-        md5_init_state(&state);
-        md5_append(&state, (const md5_byte_t*)test[i], strlen(test[i]));
-        md5_finish(&state, digest);
+        md5_init_state_deprecated(&state);
+        md5_append_deprecated(&state, (const md5_byte_t*)test[i], strlen(test[i]));
+        md5_finish_deprecated(&state, digest);
         for (di = 0; di < 16; ++di)
             sprintf(hex_output + di * 2, "%02x", digest[di]);
         if (strcmp(hex_output, test[i + 1]) != 0) {
