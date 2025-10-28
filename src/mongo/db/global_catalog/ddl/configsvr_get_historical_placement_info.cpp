@@ -62,7 +62,11 @@ public:
                 : nss;
 
             return ShardingCatalogManager::get(opCtx)->getHistoricalPlacement(
-                opCtx, targetedNs, request().getAt(), request().getCheckIfPointInTimeIsInFuture());
+                opCtx,
+                targetedNs,
+                request().getAt(),
+                request().getCheckIfPointInTimeIsInFuture(),
+                request().getIgnoreRemovedShards());
         }
 
     private:

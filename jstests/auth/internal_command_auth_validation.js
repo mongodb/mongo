@@ -221,6 +221,7 @@ const internalCommandsMap = {
         command: {
             _configsvrGetHistoricalPlacement: "x.y",
             at: new Timestamp(1691525961, 12),
+            ignoreRemovedShards: false,
         },
     },
     _configsvrMoveRange: {

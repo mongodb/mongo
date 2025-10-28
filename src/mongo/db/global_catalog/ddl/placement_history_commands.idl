@@ -88,3 +88,9 @@ commands:
                     "When true, verifies that the supplied 'at' cluster time is not in
                     the future relative to the current config time"
                 default: true
+            ignoreRemovedShards:
+                type: bool
+                # TODO SERVER-111106: improve this description.
+                description:
+                    "When true, returns extended placement information for the requested namespace/
+                    cluster, which takes into account the cluster's current topology"

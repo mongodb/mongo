@@ -51,7 +51,8 @@ public:
     virtual HistoricalPlacement fetch(OperationContext* opCtx,
                                       const boost::optional<NamespaceString>& nss,
                                       Timestamp atClusterTime,
-                                      bool checkIfPointInTimeIsInFuture = false) = 0;
+                                      bool checkIfPointInTimeIsInFuture,
+                                      bool ignoreRemovedShards) = 0;
 };
 
 }  // namespace mongo

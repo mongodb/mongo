@@ -30,6 +30,8 @@
 #include "mongo/s/change_streams/change_stream_db_absent_state_event_handler.h"
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/pipeline/change_stream.h"
+#include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
@@ -47,8 +49,12 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
             std::holds_alternative<DatabaseCreatedControlEvent>(event));
     Timestamp clusterTime = std::get<DatabaseCreatedControlEvent>(event).clusterTime;
 
-    auto placement = ctx.getHistoricalPlacementFetcher().fetch(
-        opCtx, readerCtx.getChangeStream().getNamespace(), clusterTime);
+    auto placement =
+        ctx.getHistoricalPlacementFetcher().fetch(opCtx,
+                                                  readerCtx.getChangeStream().getNamespace(),
+                                                  clusterTime,
+                                                  false /* checkIfPointInTimeIsInFuture */,
+                                                  false /* ignoreRemovedShards */);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;
     }

@@ -40,12 +40,15 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
     OperationContext* opCtx,
     const boost::optional<NamespaceString>& nss,
     Timestamp atClusterTime,
-    bool checkIfPointInTimeIsInFuture) {
+    bool checkIfPointInTimeIsInFuture,
+    bool ignoreRemovedShards) {
     // The config server request must always have a namespace string, even if it is the empty
     // string.
     const auto targetWholeCluster = !nss.has_value() || nss->isEmpty();
-    ConfigsvrGetHistoricalPlacement request(
-        targetWholeCluster ? NamespaceString::kEmpty : nss.value(), atClusterTime);
+    ConfigsvrGetHistoricalPlacement request(targetWholeCluster ? NamespaceString::kEmpty
+                                                               : nss.value(),
+                                            atClusterTime,
+                                            ignoreRemovedShards);
     request.setTargetWholeCluster(targetWholeCluster);
     request.setCheckIfPointInTimeIsInFuture(checkIfPointInTimeIsInFuture);
 

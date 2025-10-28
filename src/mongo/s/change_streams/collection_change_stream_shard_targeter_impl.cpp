@@ -29,7 +29,7 @@
 
 #include "mongo/s/change_streams/collection_change_stream_shard_targeter_impl.h"
 
-#include "mongo/db/pipeline/change_stream_read_mode.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
 #include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
@@ -40,8 +40,11 @@ namespace mongo {
 
 ShardTargeterDecision CollectionChangeStreamShardTargeterImpl::initialize(
     OperationContext* opCtx, Timestamp atClusterTime, ChangeStreamReaderContext& readerCtx) {
-    auto placement =
-        _fetcher->fetch(opCtx, readerCtx.getChangeStream().getNamespace(), atClusterTime);
+    auto placement = _fetcher->fetch(opCtx,
+                                     readerCtx.getChangeStream().getNamespace(),
+                                     atClusterTime,
+                                     false /* checkIfPointInTimeIsInFuture */,
+                                     false /* ignoreRemovedShards */);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;
     }

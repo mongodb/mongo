@@ -722,7 +722,8 @@ public:
     HistoricalPlacement getHistoricalPlacement(OperationContext* opCtx,
                                                const boost::optional<NamespaceString>& nss,
                                                const Timestamp& atClusterTime,
-                                               bool checkIfPointInTimeIsInFuture = true);
+                                               bool checkIfPointInTimeIsInFuture,
+                                               bool ignoreRemovedShards);
 
     /**
      * Helper function to compose a command request to insert new initialization metadata documents

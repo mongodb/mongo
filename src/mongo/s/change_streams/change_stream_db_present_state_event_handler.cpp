@@ -29,6 +29,7 @@
 
 #include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -99,8 +100,12 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     Timestamp clusterTime,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
-    auto placement = ctx.getHistoricalPlacementFetcher().fetch(
-        opCtx, readerCtx.getChangeStream().getNamespace(), clusterTime);
+    auto placement =
+        ctx.getHistoricalPlacementFetcher().fetch(opCtx,
+                                                  readerCtx.getChangeStream().getNamespace(),
+                                                  clusterTime,
+                                                  false /* checkIfPointInTimeIsInFuture */,
+                                                  false /* ignoreRemovedShards */);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;
     }

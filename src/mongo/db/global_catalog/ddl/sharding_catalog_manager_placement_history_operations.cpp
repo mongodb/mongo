@@ -43,9 +43,14 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/pcre_util.h"
+
+#include <algorithm>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -366,7 +371,8 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
     OperationContext* opCtx,
     const boost::optional<NamespaceString>& nss,
     const Timestamp& atClusterTime,
-    bool checkIfPointInTimeIsInFuture) {
+    bool checkIfPointInTimeIsInFuture,
+    bool ignoreRemovedShards) {
 
     uassert(ErrorCodes::InvalidOptions,
             "unsupported namespace for historical placement query",
@@ -797,7 +803,32 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
 
     const auto sourceField =
         isComputedPlacementAccurate ? "computedPlacement" : "placementAtInitTime";
-    return HistoricalPlacement{extractShardIds(sourceField), HistoricalPlacementStatus::OK};
+
+    std::vector<ShardId> shardIds = extractShardIds(sourceField);
+
+    // Build the result piece by piece because some response fields are only set conditionally.
+    HistoricalPlacement historicalPlacementResult;
+    historicalPlacementResult.setStatus(HistoricalPlacementStatus::OK);
+
+    if (ignoreRemovedShards) {
+        // TODO SERVER-111106: Add the remaining missing output parameters here.
+
+        // Remove all shards that were mentioned in the placement history that are not present
+        // anymore in the current version of the shard registry.
+        auto allAvailableShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        std::sort(allAvailableShardIds.begin(), allAvailableShardIds.end());
+        size_t originalNumberOfShardIds = shardIds.size();
+        std::erase_if(shardIds, [&](const ShardId& shardId) {
+            return !std::binary_search(
+                allAvailableShardIds.begin(), allAvailableShardIds.end(), shardId);
+        });
+        historicalPlacementResult.setAnyRemovedShardDetected(shardIds.size() <
+                                                             originalNumberOfShardIds);
+    }
+
+    historicalPlacementResult.setShards(std::move(shardIds));
+
+    return historicalPlacementResult;
 }
 
 void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
@@ -892,7 +923,11 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
      */
     auto allShardIds = [&] {
         const auto clusterPlacementAtEarliestClusterTime =
-            getHistoricalPlacement(opCtx, boost::none /*namespace*/, earliestClusterTime);
+            getHistoricalPlacement(opCtx,
+                                   boost::none /*namespace*/,
+                                   earliestClusterTime,
+                                   true /* checkIfPointInTimeIsInFuture */,
+                                   false /* ignoreRemovedShards */);
         return clusterPlacementAtEarliestClusterTime.getShards();
     }();
 

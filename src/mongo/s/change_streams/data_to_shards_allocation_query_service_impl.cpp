@@ -39,10 +39,13 @@ namespace mongo {
 
 AllocationToShardsStatus DataToShardsAllocationQueryServiceImpl::getAllocationToShardsStatus(
     OperationContext* opCtx, const Timestamp& clusterTime) {
-    const bool checkIfPointInTimeIsInFuture = true;
-    switch (
-        _fetcher->fetch(opCtx, NamespaceString::kEmpty, clusterTime, checkIfPointInTimeIsInFuture)
-            .getStatus()) {
+    switch (_fetcher
+                ->fetch(opCtx,
+                        NamespaceString::kEmpty,
+                        clusterTime,
+                        true /* checkIfPointInTimeIsInFuture */,
+                        false /* ignoreRemovedShards */)
+                .getStatus()) {
         case HistoricalPlacementStatus::OK:
             return AllocationToShardsStatus::kOk;
         case HistoricalPlacementStatus::FutureClusterTime:

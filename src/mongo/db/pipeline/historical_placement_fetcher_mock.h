@@ -63,7 +63,8 @@ public:
     HistoricalPlacement fetch(OperationContext* opCtx,
                               const boost::optional<NamespaceString>& nss,
                               Timestamp atClusterTime,
-                              bool checkIfPointInTimeIsInFuture = false) override {
+                              bool checkIfPointInTimeIsInFuture,
+                              bool ignoreRemovedShards) override {
         auto response = popResponse(nss, atClusterTime);
         return response.second;
     }

@@ -94,7 +94,18 @@ structs:
                 type: array<shard_id>
                 description:
                     "The set of shard IDs containing data on the requested nss/cluster at
-                    the point in time"
+                    the point in time.
+                    In 'ignoreRemovedShards' mode, all shards that are not present anymore in the
+                    current cluster topology will be removed from the result, i.e. only shard IDs of
+                    still-present shards are returned."
             status:
                 type: HistoricalPlacementStatus
                 description: "The status of historical placement information"
+            anyRemovedShardDetected:
+                type: bool
+                description:
+                    "When true, indicates that at least one shard that contained data for the
+                    requested nss/cluster existed in the past, but has been removed from the cluster
+                    topology afterwards.
+                    Only populated in 'ignoreRemovedShards' mode."
+                optional: true

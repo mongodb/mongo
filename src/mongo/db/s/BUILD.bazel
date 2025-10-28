@@ -1619,6 +1619,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/commands:cluster_server_parameter_commands_invocation",
         "//src/mongo/db/commands:set_feature_compatibility_version_idl",
+        "//src/mongo/db/global_catalog:sharding_catalog_client_mock",
         "//src/mongo/db/local_catalog:collection_mock",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/pipeline:aggregation_context_fixture",

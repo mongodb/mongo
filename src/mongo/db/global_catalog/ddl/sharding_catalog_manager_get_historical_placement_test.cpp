@@ -29,6 +29,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -36,6 +37,10 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/vector_clock/vector_clock.h"
+
+#include <algorithm>
+
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -49,16 +54,20 @@ public:
     void waitForRecovery(OperationContext*) const override {}
 };
 
-void assertSameHistoricalPlacement(HistoricalPlacement historicalPlacement,
-                                   std::vector<std::string> expectedSet) {
+void assertSameHistoricalPlacement(
+    const HistoricalPlacement& historicalPlacement,
+    std::vector<std::string> expectedSet,
+    boost::optional<bool> expectedAnyRemovedShardDetected = boost::none) {
     auto retrievedSet = historicalPlacement.getShards();
     ASSERT_EQ(retrievedSet.size(), expectedSet.size());
     std::sort(retrievedSet.begin(), retrievedSet.end());
     std::sort(expectedSet.begin(), expectedSet.end());
+
     for (size_t i = 0; i < retrievedSet.size(); i++) {
         ASSERT_EQ(retrievedSet[i], expectedSet[i]);
     }
     ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::OK);
+    ASSERT_EQ(historicalPlacement.getAnyRemovedShardDetected(), expectedAnyRemovedShardDetected);
 }
 
 class GetHistoricalPlacementTestFixture : public ConfigServerTestFixture {
@@ -166,6 +175,70 @@ public:
         return *ShardingCatalogManager::get(operationContext());
     }
 
+    /**
+     * Overrides the sharding catalog client, so that we can inject the set of shards visible to the
+     * shard registry during testing.
+     */
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
+        class StaticCatalogClient final : public ShardingCatalogClientMock {
+        public:
+            StaticCatalogClient(const std::vector<std::string>& shardIds) : _shardIds(shardIds) {}
+
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
+                OperationContext* opCtx,
+                repl::ReadConcernLevel readConcern,
+                BSONObj filter) override {
+
+                std::vector<ShardType> shards;
+                for (const auto& shardId : _shardIds) {
+                    ShardType shard;
+                    shard.setName(shardId);
+                    shard.setHost(shardId + ":12345");
+                    shards.push_back(std::move(shard));
+                }
+
+                return repl::OpTimeWith<std::vector<ShardType>>(std::move(shards));
+            }
+
+        private:
+            const std::vector<std::string>& _shardIds;
+        };
+
+        return std::make_unique<StaticCatalogClient>(GetHistoricalPlacementTestFixture::_shardIds);
+    }
+
+    /**
+     * Store the configured shard ids in the shard registry.
+     */
+    void setShardIdsInShardRegistry(OperationContext* opCtx, std::vector<std::string> shardIds) {
+        _shardIds = std::move(shardIds);
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+    }
+
+    /**
+     * Builds the expected value for the 'anyRemovedShardsDetected' field in the placement response.
+     */
+    boost::optional<bool> expectedValueForAnyRemovedShardDetected(bool ignoreRemovedShardsRequested,
+                                                                  bool anyShardAbsent) const {
+        if (ignoreRemovedShardsRequested) {
+            return anyShardAbsent;
+        }
+        return boost::none;
+    }
+
+    /**
+     * Retrieves the historical placement for the specified namespace and timestamp in
+     * 'ignoreRemovedShards' mode.
+     */
+    HistoricalPlacement getHistoricalPlacementIgnoreRemovedShards(StringData nss, Timestamp ts) {
+        return shardingCatalogManager().getHistoricalPlacement(
+            operationContext(),
+            NamespaceString::createNamespaceString_forTest(nss),
+            ts,
+            true /* checkIfPointInTimeIsInFuture */,
+            true /* ignoreRemovedShards */);
+    }
+
 private:
     /**
     * Given the desired number of shards n, generates a vector of n ShardType objects (in BSON
@@ -187,6 +260,10 @@ private:
         return configShardData;
     }
 
+    // This is used to communicate with the mock ShardingCatalogClient which shard ids should be
+    // returned by the shard registry.
+    std::vector<std::string> _shardIds;
+
     // Allows the usage of transactions.
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 
@@ -205,21 +282,41 @@ TEST_F(GetHistoricalPlacementTestFixture, queriesOnShardedCollectionReturnExpect
 
     setupConfigShard(opCtx, 4 /*nShards*/);
 
-    // 2 shards must own collection1
-    auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3", "shard4"});
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
+    for (bool ignoreRemovedShards : {true, false}) {
+        // 2 shards must own collection1
+        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            Timestamp(4, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
 
-    // 2 shards must own collection2
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(4, 0));
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1", "shard2"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+    }
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard3", "shard4"});
+    for (bool ignoreRemovedShards : {true, false}) {
+        // 2 shards must own collection2
+        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection2"),
+            Timestamp(4, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard3", "shard4"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+    }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ShardedCollectionWithPrimary) {
-    /*The primary shard associated to the parent database is already part of  the `shards` list of
+    /*The primary shard associated to the parent database is already part of the `shards` list of
      * the collection and it does not appear twice*/
     auto opCtx = operationContext();
 
@@ -231,15 +328,26 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ShardedCollecti
 
     setupConfigShard(opCtx, 4 /*nShards*/);
 
-    // 3 shards must own collection1 at timestamp 4
-    auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    for (bool ignoreRemovedShards : {true, false}) {
+        // 3 shards must own collection1 at timestamp 4
+        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            Timestamp(4, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1", "shard2", "shard3"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+    }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_UnshardedCollection) {
-    /*Quering the placementHistory must report the primary shard for unsharded or non-existing
+    /*Querying the placementHistory must report the primary shard for unsharded or non-existing
      * collections*/
     auto opCtx = operationContext();
 
@@ -250,20 +358,45 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_UnshardedCollec
 
     setupConfigShard(opCtx, 3 /*nShards*/);
 
-    auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection"), Timestamp(3, 0));
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
+    for (bool ignoreRemovedShards : {true, false}) {
+        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection"),
+            Timestamp(3, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
 
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db2.collection"), Timestamp(3, 0));
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2"});
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db2.collection"),
+            Timestamp(3, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
 
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db3.collection"), Timestamp(3, 0));
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard2"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard3"});
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db3.collection"),
+            Timestamp(3, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard3"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+    }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimestamp) {
@@ -279,30 +412,70 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimest
 
     setupConfigShard(opCtx, 4 /*nShards*/);
 
-    // no shards at timestamp 0
-    auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), kDawnOfTime);
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3", "shard4"});
 
-    assertSameHistoricalPlacement(historicalPlacement, {});
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(1, 0));
+    for (bool ignoreRemovedShards : {true, false}) {
+        // no shards at timestamp 0
+        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            kDawnOfTime,
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
 
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            Timestamp(1, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
 
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            Timestamp(2, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1", "shard2"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
 
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(5, 0));
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            Timestamp(4, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1", "shard2", "shard3"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            Timestamp(5, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1", "shard2", "shard3", "shard4"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+    }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp) {
@@ -320,17 +493,29 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp) 
     setupConfigShard(opCtx, 9 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection"), Timestamp(1, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection"),
+        Timestamp(1, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(1, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection2"),
+        Timestamp(1, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard4", "shard5"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db2.collection"), Timestamp(1, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db2.collection"),
+        Timestamp(1, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard7", "shard8", "shard9"});
 }
@@ -349,13 +534,17 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_InvertedTimesta
     setupConfigShard(opCtx, 8 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        Timestamp(4, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3", "shard4"});
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ReturnPrimaryShardWhenNoShards) {
-    /*Quering the placementHistory must report only the primary shard when an empty list of shards
+    /*Querying the placementHistory must report only the primary shard when an empty list of shards
      * is reported for the collection*/
     auto opCtx = operationContext();
 
@@ -369,13 +558,21 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ReturnPrimarySh
     setupConfigShard(opCtx, 3 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(4, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection2"),
+        Timestamp(4, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 
     // Note: at timestamp 3 the collection's shard list is not empty
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection2"), Timestamp(3, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection2"),
+        Timestamp(3, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -397,13 +594,21 @@ TEST_F(GetHistoricalPlacementTestFixture,
     setupConfigShard(opCtx, 5 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        Timestamp(2, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3", "shard4"});
 
     // Note: the primary shard is shard5 at timestamp 3
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(3, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        Timestamp(3, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3", "shard4"});
 }
@@ -439,30 +644,452 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers) {
 
     // A query that predates the earliest initialization doc produces a 'NotAvailable' result.
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), kDawnOfTime);
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        kDawnOfTime,
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
     ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
     ASSERT(historicalPlacement.getShards().empty());
 
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        Timestamp(2, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement,
                                   {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(3, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        Timestamp(3, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(6, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        Timestamp(6, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
+}
+
+// Test 'ignoreRemovedShards' mode for a non-existing database.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_RemovedShards_DatabaseDoesNotExist) {
+    auto opCtx = operationContext();
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard1"}},
+                                });
+
+    setupConfigShard(opCtx, 1 /*nShards*/);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    HistoricalPlacement historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+}
+
+// Test 'ignoreRemovedShards' mode for a non-existing collection.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_RemovedShards_CollectionDoesNotExist) {
+    auto opCtx = operationContext();
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard1"}},
+                                });
+
+    setupConfigShard(opCtx, 1 /*nShards*/);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    HistoricalPlacement historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+}
+
+// Test 'ignoreRemovedShards' mode with various sets of shards being present in the shard registry.
+TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_RemovedShards) {
+    auto opCtx = operationContext();
+
+    setupConfigPlacementHistory(
+        opCtx,
+        {
+            {Timestamp(1, 0), "db", {"shard1"}},
+            {Timestamp(2, 0), "db.collection1", {"shard1", "shard2"}},
+            {Timestamp(4, 0), "db.collection1", {"shard1", "shard2", "shard3"}},
+            {Timestamp(5, 0), "db.collection1", {"shard1", "shard2", "shard3", "shard4"}},
+            {Timestamp(6, 0), "db.collection1", {}},
+            {Timestamp(7, 0), "db", {}},
+        });
+
+    setupConfigShard(opCtx, 4 /*nShards*/);
+
+    setShardIdsInShardRegistry(opCtx, {});
+    HistoricalPlacement historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3", "shard4"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(
+        historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard4"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard4"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard3"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard3", "shard4"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3", "shard4"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard4"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard4"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard2", "shard3"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard2", "shard4"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard4"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard3"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard3", "shard4"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard3"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard3", "shard4"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+
+    setShardIdsInShardRegistry(opCtx, {"shard4"});
+    historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {"shard4"}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    historicalPlacement =
+        getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
+    assertSameHistoricalPlacement(historicalPlacement, {}, false);
 }
 
 // ######################## PlacementHistory: Query by database ############################
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SingleDatabase) {
-    /*Quering the placementHistory must report all the shards for every collection belonging to
+    /*Querying the placementHistory must report all the shards for every collection belonging to
      * the input db*/
     auto opCtx = operationContext();
 
@@ -473,15 +1100,25 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SingleDatabase)
 
     setupConfigShard(opCtx, 5 /*nShards*/);
 
-    auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
-    assertSameHistoricalPlacement(historicalPlacement,
-                                  {"shard1", "shard2", "shard3", "shard4", "shard5"});
+    for (bool ignoreRemovedShards : {true, false}) {
+        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db"),
+            Timestamp(3, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1", "shard2", "shard3", "shard4", "shard5"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+    }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_MultipleDatabases) {
-    /*Quering the placementHistory must report all the shards for every collection belonging to
+    /*Querying the placementHistory must report all the shards for every collection belonging to
      * the input db*/
     auto opCtx = operationContext();
 
@@ -495,17 +1132,29 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_MultipleDatabas
     setupConfigShard(opCtx, 7 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(5, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(5, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db2"), Timestamp(5, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db2"),
+        Timestamp(5, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard4", "shard5", "shard6"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db3"), Timestamp(5, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db3"),
+        Timestamp(5, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard7"});
 }
@@ -525,33 +1174,53 @@ TEST_F(GetHistoricalPlacementTestFixture, dbLevelSearch_DifferentTimestamp) {
 
     // no shards at timestamp 0
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), kDawnOfTime);
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        kDawnOfTime,
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(1, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(1, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(2, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(4, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(5, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(5, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp_repeated) {
-    /*Having different namespaces for the same timestamp should not influece the expected result*/
+    /*Having different namespaces for the same timestamp should not influence the expected result*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(
@@ -565,13 +1234,21 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp_r
     setupConfigShard(opCtx, 9 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(1, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(1, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement,
                                   {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db2"), Timestamp(1, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db2"),
+        Timestamp(1, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard6", "shard7", "shard8", "shard9"});
 }
@@ -590,13 +1267,17 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_InvertedTimesta
     setupConfigShard(opCtx, 8 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(4, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NoShardsForDb) {
-    /*Quering the placementHistory must report no shards if the list of shards belonging to every
+    /*Querying the placementHistory must report no shards if the list of shards belonging to every
      * collection and the db is empty*/
     auto opCtx = operationContext();
 
@@ -610,19 +1291,27 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NoShardsForDb) 
     setupConfigShard(opCtx, 3 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(4, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     // Note: at timestamp 3 the collection's shard list was not empty
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(3, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NewShardForDb) {
-    /*Quering the placementHistory must correctly identify a new primary for the db*/
+    /*Querying the placementHistory must correctly identify a new primary for the db*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(
@@ -634,13 +1323,21 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NewShardForDb) 
     setupConfigShard(opCtx, 4 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(2, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     // At timestamp 3 the db shard list was updated with a new primary
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(3, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard4", "shard1", "shard2", "shard3"});
 }
@@ -677,23 +1374,35 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers_rep
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(2, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement,
                                   {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(3, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(7, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(7, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
 
 // ######################## PlacementHistory: Query the entire cluster ##################
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_SingleDatabase) {
-    /*Quering the placementHistory must report all the shards for every collection and db*/
+    /*Querying the placementHistory must report all the shards for every collection and db*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(opCtx,
@@ -703,15 +1412,25 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Sing
 
     setupConfigShard(opCtx, 5 /*nShards*/);
 
-    auto historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(3, 0));
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
-    assertSameHistoricalPlacement(historicalPlacement,
-                                  {"shard1", "shard2", "shard3", "shard4", "shard5"});
+    for (bool ignoreRemovedShards : {true, false}) {
+        auto historicalPlacement =
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            boost::none,
+                                                            Timestamp(3, 0),
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            ignoreRemovedShards);
+
+        assertSameHistoricalPlacement(
+            historicalPlacement,
+            {"shard1", "shard2", "shard3", "shard4", "shard5"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+    }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_MultipleDatabases) {
-    /*Quering the placementHistory must report all the shards for every collection and db*/
+    /*Querying the placementHistory must report all the shards for every collection and db*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(opCtx,
@@ -724,7 +1443,11 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Mult
     setupConfigShard(opCtx, 7 /*nShards*/);
 
     auto historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(5, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(5, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(
         historicalPlacement,
@@ -746,27 +1469,47 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Diff
 
     // no shards at timestamp 0
     auto historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, kDawnOfTime);
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        kDawnOfTime,
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(1, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(1, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 
     historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(2, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(2, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
 
     historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(4, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(4, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(5, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(5, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 }
@@ -787,7 +1530,11 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Same
     setupConfigShard(opCtx, 9 /*nShards*/);
 
     auto historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(1, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(1, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(
         historicalPlacement,
@@ -809,7 +1556,11 @@ TEST_F(GetHistoricalPlacementTestFixture,
     setupConfigShard(opCtx, 8 /*nShards*/);
 
     auto historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(4, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(4, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(
         historicalPlacement,
@@ -817,7 +1568,7 @@ TEST_F(GetHistoricalPlacementTestFixture,
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_NoShards) {
-    /*Quering the placementHistory must report no shards if the list of shards belonging to
+    /*Querying the placementHistory must report no shards if the list of shards belonging to
      * every db.collection and db is empty*/
     auto opCtx = operationContext();
 
@@ -831,13 +1582,21 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_NoSh
     setupConfigShard(opCtx, 3 /*nShards*/);
 
     auto historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(4, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(4, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     // Note: at timestamp 3 the collection was still sharded
     historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(3, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(3, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -873,16 +1632,28 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_With
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade
     auto historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(2, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(2, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(3, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(3, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement =
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(5, 0));
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(5, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */);
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
 
@@ -912,26 +1683,42 @@ TEST_F(GetHistoricalPlacementTestFixture,
     setupConfigShard(opCtx, 9 /*nShards*/);
 
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(12, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        Timestamp(12, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     // no data must be returned since the namespace is not found
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("d.collection1"), Timestamp(12, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("d.collection1"),
+        Timestamp(12, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 
     // database exists
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(12, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(12, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement,
                                   {"shard1", "shard2", "shard3", "shard7", "shard8", "shard9"});
 
     // database does not exist
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("d"), Timestamp(12, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("d"),
+        Timestamp(12, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {});
 }
@@ -958,15 +1745,23 @@ TEST_F(GetHistoricalPlacementTestFixture,
 
     setupConfigShard(opCtx, 14 /*nShards*/);
 
-    // db|db , db*db  etc... must not be found when quering by database
+    // db|db , db*db  etc... must not be found when querying by database
     auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(10, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db"),
+        Timestamp(10, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
-    // db|db , db*db  etc... must not be found when quering by collection
+    // db|db , db*db  etc... must not be found when querying by collection
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.collection"), Timestamp(10, 0));
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection"),
+        Timestamp(10, 0),
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
@@ -987,7 +1782,9 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Empt
         auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
             opCtx,
             NamespaceString::createNamespaceString_forTest("db.collection1"),
-            Timestamp(4, 0));
+            Timestamp(4, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            false /* ignoreRemovedShards */);
         ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
         ASSERT(historicalPlacement.getShards().empty());
     }
@@ -995,7 +1792,11 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Empt
     // DB-level query
     {
         auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-            opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(4, 0));
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db"),
+            Timestamp(4, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            false /* ignoreRemovedShards */);
 
         ASSERT_EQ(0U, historicalPlacement.getShards().size());
 
@@ -1006,7 +1807,11 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Empt
     // Cluster-level query
     {
         auto historicalPlacement =
-            shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(4, 0));
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            boost::none,
+                                                            Timestamp(4, 0),
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            false /* ignoreRemovedShards */);
 
         ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
         ASSERT(historicalPlacement.getShards().empty());
@@ -1020,20 +1825,32 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Inva
 
     // Invalid namespaces are rejected
     ASSERT_THROWS_CODE(shardingCatalogManager().getHistoricalPlacement(
-                           opCtx, NamespaceString::createNamespaceString_forTest(""), kDawnOfTime),
+                           opCtx,
+                           NamespaceString::createNamespaceString_forTest(""),
+                           kDawnOfTime,
+                           true /* checkIfPointInTimeIsInFuture */,
+                           false /* ignoreRemovedShards */),
                        DBException,
                        ErrorCodes::InvalidOptions);
 
     // 'config', 'local' and 'admin' namespaces are not supported.
-    ASSERT_THROWS_CODE(shardingCatalogManager().getHistoricalPlacement(
-                           opCtx, NamespaceString(DatabaseName::kAdmin), kDawnOfTime),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        NamespaceString(DatabaseName::kAdmin),
+                                                        kDawnOfTime,
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */),
+        DBException,
+        ErrorCodes::InvalidOptions);
 
-    ASSERT_THROWS_CODE(shardingCatalogManager().getHistoricalPlacement(
-                           opCtx, NamespaceString(DatabaseName::kLocal), kDawnOfTime),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        NamespaceString(DatabaseName::kLocal),
+                                                        kDawnOfTime,
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */),
+        DBException,
+        ErrorCodes::InvalidOptions);
 }
 
 // ######################## PlacementHistory: Clean-up #####################
@@ -1068,27 +1885,37 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
     const std::vector<std::string> approximatedPlacement{"shard1", "shard2", "shard3", "shard4"};
 
     // db
-    assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(
-            opCtx, NamespaceString::createNamespaceString_forTest("db"), earliestClusterTime),
-        {"shard1", "shard2", "shard3", "shard4"});
-    assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(
-            opCtx, NamespaceString::createNamespaceString_forTest("db"), earliestClusterTime - 1),
-        approximatedPlacement);
+    assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
+                                      opCtx,
+                                      NamespaceString::createNamespaceString_forTest("db"),
+                                      earliestClusterTime,
+                                      true /* checkIfPointInTimeIsInFuture */,
+                                      false /* ignoreRemovedShards */),
+                                  {"shard1", "shard2", "shard3", "shard4"});
+    assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
+                                      opCtx,
+                                      NamespaceString::createNamespaceString_forTest("db"),
+                                      earliestClusterTime - 1,
+                                      true /* checkIfPointInTimeIsInFuture */,
+                                      false /* ignoreRemovedShards */),
+                                  approximatedPlacement);
 
     // db.collection1
     assertSameHistoricalPlacement(
         shardingCatalogManager().getHistoricalPlacement(
             opCtx,
             NamespaceString::createNamespaceString_forTest("db.collection1"),
-            earliestClusterTime),
+            earliestClusterTime,
+            true /* checkIfPointInTimeIsInFuture */,
+            false /* ignoreRemovedShards */),
         {"shard2", "shard3", "shard4"});
     assertSameHistoricalPlacement(
         shardingCatalogManager().getHistoricalPlacement(
             opCtx,
             NamespaceString::createNamespaceString_forTest("db.collection1"),
-            earliestClusterTime - 1),
+            earliestClusterTime - 1,
+            true /* checkIfPointInTimeIsInFuture */,
+            false /* ignoreRemovedShards */),
         approximatedPlacement);
 
     // db.collection2
@@ -1096,21 +1923,33 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
         shardingCatalogManager().getHistoricalPlacement(
             opCtx,
             NamespaceString::createNamespaceString_forTest("db.collection2"),
-            earliestClusterTime),
+            earliestClusterTime,
+            true /* checkIfPointInTimeIsInFuture */,
+            false /* ignoreRemovedShards */),
         {"shard1", "shard4"});
     assertSameHistoricalPlacement(
         shardingCatalogManager().getHistoricalPlacement(
             opCtx,
             NamespaceString::createNamespaceString_forTest("db.collection2"),
-            Timestamp(11, 0)),
+            Timestamp(11, 0),
+            true /* checkIfPointInTimeIsInFuture */,
+            false /* ignoreRemovedShards */),
         approximatedPlacement);
 
     // Whole cluster
     assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, earliestClusterTime),
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        earliestClusterTime,
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */),
         {"shard1", "shard2", "shard3", "shard4"});
     assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, Timestamp(11, 0)),
+        shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                        boost::none,
+                                                        Timestamp(11, 0),
+                                                        true /* checkIfPointInTimeIsInFuture */,
+                                                        false /* ignoreRemovedShards */),
         approximatedPlacement);
 }
 
@@ -1142,14 +1981,18 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
     auto historicalPlacement_coll1 = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
         NamespaceString::createNamespaceString_forTest("db.collection1"),
-        earliestClusterTime - 1);
+        earliestClusterTime - 1,
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     ShardingCatalogManager::get(opCtx)->cleanUpPlacementHistory(opCtx, earliestClusterTime);
 
     auto historicalPlacement_cleanup_coll1 = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
         NamespaceString::createNamespaceString_forTest("db.collection1"),
-        earliestClusterTime - 1);
+        earliestClusterTime - 1,
+        true /* checkIfPointInTimeIsInFuture */,
+        false /* ignoreRemovedShards */);
 
     // before cleanup
     assertSameHistoricalPlacement(historicalPlacement_coll1, {"shard1", "shard2"});
@@ -1159,7 +2002,7 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
 }
 
 TEST_F(GetHistoricalPlacementTestFixture,
-       Given_CurrentClusterTime_When_PlacementhHistoryRequested_Then_ReturnPlacementHistory) {
+       Given_CurrentClusterTime_When_PlacementHistoryRequested_Then_ReturnPlacementHistory) {
     auto opCtx = operationContext();
 
     // Set up config shard and placement history information.
@@ -1181,37 +2024,55 @@ TEST_F(GetHistoricalPlacementTestFixture,
         auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
         auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
         assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx, collNss, currentConfigTime, true /* checkIfPointInTimeIsInFuture */),
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            collNss,
+                                                            currentConfigTime,
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            false /* ignoreRemovedShards */),
             {"shard1", "shard2"});
-        assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx, collNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
-            {"shard1", "shard2"});
+        assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
+                                          opCtx,
+                                          collNss,
+                                          currentConfigTime,
+                                          false /* checkIfPointInTimeIsInFuture */,
+                                          false /* ignoreRemovedShards */),
+                                      {"shard1", "shard2"});
 
         assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx, dbOnlyNss, currentConfigTime, true /* checkIfPointInTimeIsInFuture */),
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            dbOnlyNss,
+                                                            currentConfigTime,
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            false /* ignoreRemovedShards */),
             {"shard1", "shard2"});
-        assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx, dbOnlyNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
-            {"shard1", "shard2"});
+        assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
+                                          opCtx,
+                                          dbOnlyNss,
+                                          currentConfigTime,
+                                          false /* checkIfPointInTimeIsInFuture */,
+                                          false /* ignoreRemovedShards */),
+                                      {"shard1", "shard2"});
 
         assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx, boost::none, currentConfigTime, true /* checkIfPointInTimeIsInFuture */),
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            boost::none,
+                                                            currentConfigTime,
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            false /* ignoreRemovedShards */),
             {"shard1", "shard2"});
-        assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx, boost::none, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
-            {"shard1", "shard2"});
+        assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
+                                          opCtx,
+                                          boost::none,
+                                          currentConfigTime,
+                                          false /* checkIfPointInTimeIsInFuture */,
+                                          false /* ignoreRemovedShards */),
+                                      {"shard1", "shard2"});
     }
 }
 
 TEST_F(
     GetHistoricalPlacementTestFixture,
-    Given_CurrentClusterTime_When_PlacementhHistoryRequestedInTheFuture_Then_ReturnPlacementHistoryStatusDependingOnTheCheckIfPointInTimeIsInFutureFlag) {
+    Given_CurrentClusterTime_When_PlacementHistoryRequestedInTheFuture_Then_ReturnPlacementHistoryStatusDependingOnTheCheckIfPointInTimeIsInFutureFlag) {
     auto opCtx = operationContext();
 
     // Set up config shard and placement history information.
@@ -1221,6 +2082,8 @@ TEST_F(
                                  {placementHistoryTs, "db.collection1", {"shard1", "shard2"}}});
     setupConfigShard(opCtx, 3 /*nShards*/);
 
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+
     const auto& vcTime = VectorClock::get(opCtx)->getTime();
     Timestamp currentConfigTime = vcTime.configTime().asTimestamp();
 
@@ -1228,49 +2091,75 @@ TEST_F(
     Timestamp timeInTheFuture = currentConfigTime + 1;
     ASSERT_GREATER_THAN(timeInTheFuture, currentConfigTime);
 
+    auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
+    auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
+
     // Ensure that fetching placement history returns HistoricalPlacementStatus::FutureClusterTime,
     // when requesting placement history from the future config time if
     // 'checkIfPointInTimeIsInFuture' is set to true.
-    {
-        auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
-        auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
-        ASSERT_EQ(shardingCatalogManager()
-                      .getHistoricalPlacement(
-                          opCtx, collNss, timeInTheFuture, true /* checkIfPointInTimeIsInFuture */)
-                      .getStatus(),
-                  HistoricalPlacementStatus::FutureClusterTime);
-        ASSERT_EQ(
-            shardingCatalogManager()
-                .getHistoricalPlacement(
-                    opCtx, dbOnlyNss, timeInTheFuture, true /* checkIfPointInTimeIsInFuture */)
-                .getStatus(),
-            HistoricalPlacementStatus::FutureClusterTime);
-        ASSERT_EQ(
-            shardingCatalogManager()
-                .getHistoricalPlacement(
-                    opCtx, boost::none, timeInTheFuture, true /* checkIfPointInTimeIsInFuture */)
-                .getStatus(),
-            HistoricalPlacementStatus::FutureClusterTime);
+    for (bool ignoreRemovedShards : {true, false}) {
+        // Collection-level query.
+        auto historicalPlacement =
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            collNss,
+                                                            timeInTheFuture,
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            ignoreRemovedShards);
+        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::FutureClusterTime);
+        ASSERT_EQ(boost::none, historicalPlacement.getAnyRemovedShardDetected());
+
+        // Database-level query.
+        historicalPlacement =
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            dbOnlyNss,
+                                                            timeInTheFuture,
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            ignoreRemovedShards);
+        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::FutureClusterTime);
+        ASSERT_EQ(boost::none, historicalPlacement.getAnyRemovedShardDetected());
+
+        // Whole-cluster query.
+        historicalPlacement =
+            shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                            boost::none,
+                                                            timeInTheFuture,
+                                                            true /* checkIfPointInTimeIsInFuture */,
+                                                            ignoreRemovedShards);
+        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::FutureClusterTime);
+        ASSERT_EQ(boost::none, historicalPlacement.getAnyRemovedShardDetected());
     }
 
     // Ensure that fetching placement history does not return
     // HistoricalPlacementStatus::FutureClusterTime, when requesting placement history from the
     // future config time if 'checkIfPointInTimeIsInFuture' is set to false.
-    {
-        auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
-        auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
+    for (bool ignoreRemovedShards : {true, false}) {
         assertSameHistoricalPlacement(
             shardingCatalogManager().getHistoricalPlacement(
-                opCtx, collNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
-            {"shard1", "shard2"});
+                opCtx,
+                collNss,
+                currentConfigTime,
+                false /* checkIfPointInTimeIsInFuture */,
+                ignoreRemovedShards),
+            {"shard1", "shard2"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
         assertSameHistoricalPlacement(
             shardingCatalogManager().getHistoricalPlacement(
-                opCtx, dbOnlyNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
-            {"shard1", "shard2"});
+                opCtx,
+                dbOnlyNss,
+                currentConfigTime,
+                false /* checkIfPointInTimeIsInFuture */,
+                ignoreRemovedShards),
+            {"shard1", "shard2"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
         assertSameHistoricalPlacement(
             shardingCatalogManager().getHistoricalPlacement(
-                opCtx, boost::none, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
-            {"shard1", "shard2"});
+                opCtx,
+                boost::none,
+                currentConfigTime,
+                false /* checkIfPointInTimeIsInFuture */,
+                ignoreRemovedShards),
+            {"shard1", "shard2"},
+            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
     }
 }
 
