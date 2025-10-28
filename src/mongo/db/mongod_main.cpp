@@ -1803,7 +1803,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         ReplicaSetMonitor::shutdown();
     }
 
-    if (ShardingState::get(serviceContext)->enabled()) {
+    if (auto state = ShardingState::get(serviceContext); state != nullptr && state->enabled()) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::shutDownTransactionCoord,
                                        &shutdownTimeElapsedBuilder);
