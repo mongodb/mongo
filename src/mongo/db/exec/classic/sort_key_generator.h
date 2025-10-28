@@ -36,6 +36,7 @@
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

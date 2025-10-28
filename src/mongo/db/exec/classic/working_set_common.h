@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

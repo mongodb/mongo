@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -94,7 +95,7 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
-    const SimpleMemoryUsageTracker& getMemoryUsageTracker_forTest() const {
+    MONGO_MOD_PRIVATE const SimpleMemoryUsageTracker& getMemoryUsageTracker_forTest() const {
         return _memoryTracker;
     }
 

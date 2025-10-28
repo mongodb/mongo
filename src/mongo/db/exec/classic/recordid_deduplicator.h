@@ -36,6 +36,7 @@
 #include "mongo/db/query/util/hash_roaring_set.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/spill_table.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

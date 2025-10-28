@@ -34,6 +34,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <queue>
@@ -49,8 +50,10 @@ class RecordId;
  * A QueuedDataStage is "programmed" by pushing return values from work() onto its internal
  * queue.  Calls to QueuedDataStage::work() pop values off that queue and return them in FIFO
  * order, annotating the working set with data when appropriate.
+ *
+ * TODO SERVER-112968: Remove uses of this stage outside of the 'query' module.
  */
-class QueuedDataStage final : public PlanStage {
+class MONGO_MOD_NEEDS_REPLACEMENT QueuedDataStage final : public PlanStage {
 public:
     QueuedDataStage(ExpressionContext* expCtx, WorkingSet* ws);
 

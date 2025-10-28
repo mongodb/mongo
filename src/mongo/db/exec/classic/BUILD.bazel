@@ -18,17 +18,6 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "histogram_server_status_metric",
-    hdrs = [
-        "histogram_server_status_metric.h",
-        "//src/mongo/util:histogram.h",
-    ],
-    deps = [
-        "//src/mongo/db/commands/server_status:server_status_metric",
-    ],
-)
-
-mongo_cc_library(
     name = "query_shard_server_test_fixture",
     srcs = [
         "query_shard_server_test_fixture.cpp",
@@ -40,17 +29,6 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/s:shard_server_test_fixture",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "db_exec_classic_test",
-    srcs = [
-        "histogram_server_status_metric_test.cpp",
-    ],
-    tags = ["mongo_unittest_sixth_group"],
-    deps = [
-        ":histogram_server_status_metric",
     ],
 )
 

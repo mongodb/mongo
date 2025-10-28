@@ -32,12 +32,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/util/histogram.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Records samples, exposing the aggregate statistics in Server Status as a
@@ -102,4 +103,4 @@ struct ServerStatusMetricPolicySelection<HistogramServerStatusMetric> {
     using type = Policy;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

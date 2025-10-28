@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

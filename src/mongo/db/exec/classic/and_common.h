@@ -31,6 +31,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/classic/histogram_server_status_metric.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 
 #include "mongo/unittest/unittest.h"
 

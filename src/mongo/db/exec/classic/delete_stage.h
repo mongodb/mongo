@@ -42,6 +42,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -54,7 +55,7 @@ class OpDebug;
 class OperationContext;
 class PlanExecutor;
 
-struct DeleteStageParams {
+struct MONGO_MOD_PUBLIC DeleteStageParams {
     using DocumentCounter = std::function<size_t(const BSONObj&)>;
 
     DeleteStageParams()

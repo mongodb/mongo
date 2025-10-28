@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

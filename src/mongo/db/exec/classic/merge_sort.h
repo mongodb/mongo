@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <memory>
@@ -81,7 +82,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
+    MONGO_MOD_PRIVATE const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
         return _memoryTracker;
     }
 

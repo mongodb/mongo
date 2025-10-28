@@ -41,6 +41,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <cstddef>
@@ -49,7 +50,7 @@
 
 namespace mongo {
 
-struct BatchedDeleteStageParams {
+struct MONGO_MOD_PUBLIC BatchedDeleteStageParams {
     BatchedDeleteStageParams()
         : targetBatchDocs(gBatchedDeletesTargetBatchDocs.load()),
           targetBatchTimeMS(Milliseconds(gBatchedDeletesTargetBatchTimeMS.load())),

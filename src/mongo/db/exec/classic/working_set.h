@@ -40,6 +40,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -54,7 +55,8 @@ namespace mongo {
 
 class WorkingSetMember;
 
-typedef size_t WorkingSetID;
+// TODO SERVER-112968: Remove uses of this typedef outside of the 'query' module.
+MONGO_MOD_NEEDS_REPLACEMENT typedef size_t WorkingSetID;
 
 /**
  * A type used to identify indexes that have been registered with the WorkingSet. A WorkingSetMember
@@ -119,8 +121,10 @@ struct IndexKeyDatum {
  * Collection scan stages return a WorkingSetMember in the RID_AND_OBJ state.
  *
  * A WorkingSetMember may have any of the data above.
+ *
+ * TODO SERVER-112968: Remove uses of this class outside of the 'query' module.
  */
-class WorkingSetMember {
+class MONGO_MOD_NEEDS_REPLACEMENT WorkingSetMember {
 public:
     enum MemberState {
         // Initial state.
@@ -319,8 +323,10 @@ private:
  * All data in use by a query.  Data is passed through the stage tree by referencing the ID of
  * an element of the working set.  Stages can add elements to the working set, delete elements
  * from the working set, or mutate elements in the working set.
+ *
+ * TODO SERVER-112968: Remove uses of this class outside of the the 'query' module.
  */
-class WorkingSet {
+class MONGO_MOD_NEEDS_REPLACEMENT WorkingSet {
     WorkingSet(const WorkingSet&) = delete;
     WorkingSet& operator=(const WorkingSet&) = delete;
 

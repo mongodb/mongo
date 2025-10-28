@@ -32,6 +32,7 @@
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

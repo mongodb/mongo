@@ -36,6 +36,7 @@
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

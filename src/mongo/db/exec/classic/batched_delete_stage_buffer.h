@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <set>

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

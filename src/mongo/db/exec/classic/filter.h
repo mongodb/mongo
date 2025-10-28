@@ -33,6 +33,7 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/matchable.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

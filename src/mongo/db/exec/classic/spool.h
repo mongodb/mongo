@@ -39,6 +39,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 #include <memory>

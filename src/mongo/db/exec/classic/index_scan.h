@@ -46,6 +46,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
