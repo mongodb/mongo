@@ -15,6 +15,6 @@ filters:
   - "test_MongoUnstructuredLogCheck.*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "test_MongoBannedAutoGetUsageCheck.*":
+  - "test_MongoBannedCatalogAccessFromQueryCodeCheck.*":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -11,7 +11,7 @@ cc_library(
     name = "mongo_tidy_checks_static",
     srcs = [
         "MongoAssertCheck.cpp",
-        "MongoBannedAutoGetUsageCheck.cpp",
+        "MongoBannedCatalogAccessFromQueryCodeCheck.cpp",
         "MongoBannedNamesCheck.cpp",
         "MongoBypassDatabaseMetadataAccessCheck.cpp",
         "MongoCctypeCheck.cpp",
@@ -36,7 +36,7 @@ cc_library(
     ],
     hdrs = [
         "MongoAssertCheck.h",
-        "MongoBannedAutoGetUsageCheck.h",
+        "MongoBannedCatalogAccessFromQueryCodeCheck.h",
         "MongoBannedNamesCheck.h",
         "MongoBypassDatabaseMetadataAccessCheck.h",
         "MongoCctypeCheck.h",

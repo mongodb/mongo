@@ -317,8 +317,11 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
-    def test_MongoBannedAutoGetUsageCheck(self):
-        self.expected_output = "AutoGetCollection is not allowed to be used from the query modules. Use ShardRole CollectionAcquisitions instead."
+    def test_MongoBannedCatalogAccessFromQueryCodeCheck(self):
+        self.expected_output = [
+            "AutoGetCollection is not allowed to be used from the query modules. Use ShardRole CollectionAcquisitions instead.",
+            "CollectionCatalog is not allowed to be used from the query modules. Use ShardRole CollectionAcquisitions instead.",
+        ]
         self.run_clang_tidy()
 
 

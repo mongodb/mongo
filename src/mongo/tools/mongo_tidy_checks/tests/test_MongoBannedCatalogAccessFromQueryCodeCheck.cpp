@@ -27,21 +27,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <memory>
 
-#include <clang-tidy/ClangTidy.h>
-#include <clang-tidy/ClangTidyCheck.h>
+namespace mongo {
 
-namespace mongo::tidy {
+class AutoGetCollection {};
 
-/**
- * A clang-tidy check that bans the usage of AutoGetCollection in certain modules.
- */
-class MongoBannedAutoGetUsageCheck : public clang::tidy::ClangTidyCheck {
+class CollectionCatalog {
 public:
-    MongoBannedAutoGetUsageCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
-    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
-    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+    static std::shared_ptr<CollectionCatalog> get() {
+        return std::make_shared<CollectionCatalog>();
+    }
+
+    void foo() {};
 };
 
-}  // namespace mongo::tidy
+int fun() {
+    AutoGetCollection agc;
+}
+
+int fun2() {
+    CollectionCatalog::get()->foo();
+}
+
+}  // namespace mongo

@@ -52,7 +52,7 @@ std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
 SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            bool failOnTsColl) {
-    auto catalog = CollectionCatalog::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);  // NOLINT TODO: SERVER-104335 Remove this.
     auto coll = catalog->lookupCollectionByNamespace(opCtx, nss);
     auto view = catalog->lookupView(opCtx, nss);
 

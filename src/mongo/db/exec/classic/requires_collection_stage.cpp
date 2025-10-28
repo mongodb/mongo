@@ -83,4 +83,8 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     doRestoreStateRequiresCollection();
 }
 
+uint64_t RequiresCollectionStage::getCatalogEpoch() const {
+    return CollectionCatalog::get(opCtx())->getEpoch();
+}
+
 }  // namespace mongo

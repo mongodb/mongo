@@ -1,0 +1,2 @@
+Checks: '-*,mongo-banned-catalog-access-from-query-code-check'
+WarningsAsErrors: '*'

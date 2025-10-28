@@ -367,8 +367,6 @@ void BM_PlanCacheClassic(benchmark::State& state) {
 
     auto collection =
         std::make_shared<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
-    auto catalog = CollectionCatalog::get(opCtx.get());
-    catalog->onCreateCollection(opCtx.get(), collection);
     // The initialization of the CollectionPtr is SAFE. The lifetime of the Mocked Collection
     // instance is managed by the test and guaranteed to be valid for the entire duration of the
     // test.

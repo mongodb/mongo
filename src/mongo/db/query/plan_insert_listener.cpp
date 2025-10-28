@@ -100,7 +100,8 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
         RecoveryUnit::kMajorityCommitted) {
         return std::make_unique<MajorityCommittedPointNotifier>();
     } else {
-        auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        auto collCatalog = CollectionCatalog::get(opCtx);  // NOLINT TODO SERVER-112937 Remove this.
+        auto collection = collCatalog->lookupCollectionByNamespace(opCtx, nss);
         invariant(collection);
 
         return std::make_unique<LocalCappedInsertNotifier>(
