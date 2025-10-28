@@ -46,6 +46,11 @@ NodeSet makeNodeSetFromIds(std::set<NodeId> ids) {
     }
     return result;
 }
+
+NodeSet makeNodeSetFromId(NodeId id) {
+    return makeNodeSetFromIds({id});
+}
+
 }  // namespace
 
 
@@ -124,6 +129,56 @@ TEST(JoinGraphTests, getJoinEdges) {
               (std::vector<EdgeId>{ab, ac, cd}));
     ASSERT_EQ(graph.getJoinEdges(NodeSet{"0001"}, NodeSet{"1000"}), std::vector<EdgeId>{});
     ASSERT_EQ(graph.getJoinEdges(NodeSet{"1001"}, NodeSet{"1000"}), std::vector<EdgeId>{});
+}
+
+TEST(JoinGraph, MultiplePredicatesSameEdge) {
+    JoinGraph graph{};
+
+    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = graph.addNode(makeNSS("b"), nullptr, boost::none);
+
+    auto ab = graph.addSimpleEqualityEdge(a, b, 0, 1);
+    auto ab2 = graph.addSimpleEqualityEdge(a, b, 2, 3);
+    // Opposite order of nodes
+    auto ab3 = graph.addSimpleEqualityEdge(b, a, 5, 4);
+
+    // Edge is deduplicated
+    ASSERT_EQ(ab, ab2);
+    ASSERT_EQ(ab2, ab3);
+
+    auto edges = graph.getJoinEdges(makeNodeSetFromId(a), makeNodeSetFromId(b));
+
+    ASSERT_EQ(1, edges.size());
+    // Edge returned when order of nodes reversed
+    ASSERT_EQ(edges, graph.getJoinEdges(makeNodeSetFromId(b), makeNodeSetFromId(a)));
+
+    auto edge = graph.getEdge(edges[0]);
+
+    ASSERT_EQ(edge.left, makeNodeSetFromId(a));
+    ASSERT_EQ(edge.right, makeNodeSetFromId(b));
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "predicates": [
+                {
+                    "op": "eq",
+                    "left": 0,
+                    "right": 1
+                },
+                {
+                    "op": "eq",
+                    "left": 2,
+                    "right": 3
+                },
+                {
+                    "op": "eq",
+                    "left": 4,
+                    "right": 5
+                }
+            ],
+            "left": "0000000000000000000000000000000000000000000000000000000000000001",
+            "right": "0000000000000000000000000000000000000000000000000000000000000010"
+        })",
+        edge.toBSON());
 }
 
 TEST(JoinGraphTests, GetNeighborsSimpleEqualityEdges) {

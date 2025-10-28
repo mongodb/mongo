@@ -129,6 +129,24 @@ EdgeId JoinGraph::addEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList p
                   "Self edges are not permitted, but both sides contain " + common.to_string());
     }
 
+    for (size_t i = 0; i < _edges.size(); ++i) {
+        auto&& edge = _edges[i];
+        if (edge.left == left && edge.right == right) {
+            edge.predicates.insert(edge.predicates.end(), predicates.begin(), predicates.end());
+            return i;
+        }
+        if (edge.right == left && edge.left == right) {
+            std::for_each(predicates.begin(), predicates.end(), [](JoinPredicate& pred) {
+                tassert(11233806,
+                        "only support swapping equality predicate",
+                        pred.op == JoinPredicate::Operator::Eq);
+                std::swap(pred.left, pred.right);
+            });
+            edge.predicates.insert(edge.predicates.end(), predicates.begin(), predicates.end());
+            return i;
+        }
+    }
+
     _edges.emplace_back(std::move(predicates), left, right);
     return static_cast<EdgeId>(_edges.size()) - 1;
 }
