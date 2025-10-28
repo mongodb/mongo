@@ -677,7 +677,7 @@ buildvariants:
           - ubuntu2404-arm64-large
       - name: test_packages_release
         distros:
-          - rhel94-arm64-large-packagetest
+          - rhel94-arm64-m8g-4xlarge-packagetest
       - name: .development_critical !.requires_large_host !.incompatible_oscrypto
       - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:
