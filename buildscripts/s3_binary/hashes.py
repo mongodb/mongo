@@ -29,5 +29,5 @@ S3_SHA256_HASHES = {
     "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_linux_x64.gz": "184065d8e70cfa3f98eae399b2444688775133733e4c4daa7a32ffdaa8602faa",
     "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_rhel8_ppc64le.gz": "ad0bc6188223abc115a653945ada288ac4f6232ec7226b975bb1efda8b898095",
     "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_rhel9_ppc64le.gz": "73805acc4786df9b414b1b28ce40680cd6c9a9a0fb58712928711ee6786c939d",
-    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_windows_x64.gz": "f138b09612d143fc67c8cc8efb8cfbae13ce50cf8049a7d802c5cd262176346a",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_windows_x64.exe.gz": "f138b09612d143fc67c8cc8efb8cfbae13ce50cf8049a7d802c5cd262176346a",
 }
