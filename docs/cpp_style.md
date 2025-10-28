@@ -1003,17 +1003,11 @@ python buildscripts/eslint.py fix # auto-fix js code
 
 All code changes must be formatted by
 [clang-format](http://clang.llvm.org/docs/ClangFormat.html) before they are
-checked in. Use `buildscripts/clang_format.py` to reformat C++ and JS code.
+checked in. Use `bazel run format` to reformat C++ and JS code.
 Clang-format is a C/C++ & JS code formatting tool that uses the config files
 located at `src/mongo/.clang-format` and `jstests/.clang-format` to control the
 format of the code. The version and configuration of clang-format is selected by
-`buildscripts/clang_format.py`.
-
-```sh
-python buildscripts/clang_format.py lint # check
-python buildscripts/clang_format.py format # format all code
-python buildscripts/clang_format.py format-my # reformat only changed files
-```
+`bazel run format`.
 
 Plugins are available for most editors that will automatically run clang-format
 on file save.

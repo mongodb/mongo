@@ -23,4 +23,11 @@ S3_SHA256_HASHES = {
     "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-linux-amd64": "9f48273b6c780a5f4f084ef30bc67d98cbd7d10c55c4605cf3a6ee29b741af87",
     "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-linux-arm64": "d0fc407937b8a8aec44f3a80b4a08219ba61dde234590358abb168b44478d493",
     "https://mdb-build-public.s3.amazonaws.com/fd-binaries/v10.3.0/fd-windows-amd64.exe": "fd3d4853da7a319a604e1cb03ede88cbf584edd12b89a0991871fb4d9cd3ba5b",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_darwin_x64.gz": "30eb3ed0ef541be6eea051a9097049f4b91bb565f5a0faf59ba317c061e3c3e6",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_linux_arm64.gz": "b047e429f6f455febc970c9f59c75a92986cb638456238d71716fe2810b9177f",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_linux_s390x.gz": "ae3c989c0a867bec6ba27d056019039be544d80cf154f4bdaa065bb9e825675c",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_linux_x64.gz": "184065d8e70cfa3f98eae399b2444688775133733e4c4daa7a32ffdaa8602faa",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_rhel8_ppc64le.gz": "ad0bc6188223abc115a653945ada288ac4f6232ec7226b975bb1efda8b898095",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_rhel9_ppc64le.gz": "73805acc4786df9b414b1b28ce40680cd6c9a9a0fb58712928711ee6786c939d",
+    "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_windows_x64.gz": "f138b09612d143fc67c8cc8efb8cfbae13ce50cf8049a7d802c5cd262176346a",
 }

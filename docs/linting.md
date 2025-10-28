@@ -2,17 +2,6 @@
 
 ## C++ Linters
 
-### `clang-format`
-
-The `buildscripts/clang_format.py` wrapper script runs the `clang-format` linter. You can see the
-usage message for the wrapper by running `buildscripts/clang_format.py --help`.
-
-Ex: `buildscripts/clang_format.py lint`
-
-| Linter         | Configuration File(s) | Help Command          | Documentation                                                                                |
-| -------------- | --------------------- | --------------------- | -------------------------------------------------------------------------------------------- |
-| `clang-format` | `.clang-format`       | `clang-format --help` | [https://clang.llvm.org/docs/ClangFormat.html](https://clang.llvm.org/docs/ClangFormat.html) |
-
 ### `clang-tidy`
 
 The `buildscripts/clang_tidy.py` shell script runs the `clang-tidy` linter. In order to run

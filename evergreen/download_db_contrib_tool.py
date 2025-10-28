@@ -5,12 +5,11 @@ import platform
 import re
 import stat
 import sys
-from urllib.request import urlretrieve
-
-import retry
 
 mongo_path = pathlib.Path(__file__).parents[1]
 sys.path.append(str(mongo_path))
+
+from buildscripts.s3_binary.download import download_s3_binary
 from buildscripts.util.expansions import get_expansion
 
 DB_CONTRIB_TOOL_VERSION = "v2.0.1"
@@ -50,16 +49,18 @@ def get_binary_name() -> str:
     return binary_name
 
 
-@retry.retry(tries=3, delay=3)
-def download_binary(url: str, path: str) -> None:
-    urlretrieve(url, path)
-
-
 def main() -> int:
+    os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
     binary_name = get_binary_name()
     gz_name = f"{binary_name}.gz"
     binary_url = f"{RELEASE_URL}{gz_name}"
-    download_binary(binary_url, gz_name)
+    if not download_s3_binary(
+        s3_path=binary_url,
+        local_path=gz_name,
+    ):
+        print("Failed to download db-contrib-tool binary")
+        return 1
     # extract the binary
     with gzip.open(gz_name, "rb") as fin:
         with open(binary_name, "wb") as fout:

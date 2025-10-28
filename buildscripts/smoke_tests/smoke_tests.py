@@ -373,16 +373,6 @@ def run_smoke_tests(
 
     formatters = [
         runner.command(
-            name="clang format",
-            args=[
-                MONGO_PYTHON_INTERPRETER,
-                ROOT.joinpath("buildscripts", "clang_format.py"),
-                "format-my",
-                upstream_branch,
-            ],
-            log_file="clang_format.log",
-        ),
-        runner.command(
             name="misc. lint",
             args=[
                 BAZEL,

@@ -1,3 +1,5 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
 package(default_visibility = ["//visibility:public"])
 
 py_binary(
@@ -562,4 +564,19 @@ py_library(
     name = "all_python_files",
     srcs = glob(["*.py"]),
     visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "download_db_contrib_tool",
+    srcs = ["download_db_contrib_tool.py"],
+    main = "download_db_contrib_tool.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        "//buildscripts/s3_binary:download",
+        "//buildscripts/util",
+    ],
 )

@@ -280,7 +280,7 @@ def main(
             print(f"Modified {len(idl_files_modified)} IDL files to add `mod_visibility: private`")
             for file_path in idl_files_modified:
                 print(f"  {file_path}")
-        print("Please run 'buildscripts/clang_format.py format-my' to clean up changes to headers")
+        print("Please run 'bazel run format' to clean up changes to headers")
     else:
         print(
             f"\nDry run complete. Would modify {len(headers_modified) + len(idl_files_modified)} files."
