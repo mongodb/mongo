@@ -125,7 +125,7 @@ private:
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                               DatabaseName::kAdmin,
                                               cmdToSend,
-                                              Shard::RetryPolicy::kNoRetry)
+                                              Shard::RetryPolicy::kStrictlyNotIdempotent)
             .getStatus()
             .ignore();
 
