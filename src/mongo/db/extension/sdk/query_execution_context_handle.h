@@ -54,9 +54,9 @@ public:
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tripwireAssert(11098300,
-                       "QueryExecutionContext' 'check_for_interrupt' is null",
-                       vtable.check_for_interrupt != nullptr);
+        sdk_tassert(11098300,
+                    "QueryExecutionContext' 'check_for_interrupt' is null",
+                    vtable.check_for_interrupt != nullptr);
     };
 };
 

@@ -54,15 +54,15 @@ public:
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
-        userAssert(11134101,
-                   "Failed to parse " + kStageName + ", expected non-empty object",
-                   !stageBson.getField(kStageName).Obj().isEmpty());
+        sdk_uassert(11134101,
+                    "Failed to parse " + kStageName + ", expected non-empty object",
+                    !stageBson.getField(kStageName).Obj().isEmpty());
 
         mongo::BSONObj bsonSpec = stageBson.getField(kStageName).Obj();
-        userAssert(11134102,
-                   kStageName + " stage missing or invalid " + kDebugLogLevelField + " field.",
-                   bsonSpec.hasElement(kDebugLogLevelField) &&
-                       bsonSpec.getField(kDebugLogLevelField).isNumber());
+        sdk_uassert(11134102,
+                    kStageName + " stage missing or invalid " + kDebugLogLevelField + " field.",
+                    bsonSpec.hasElement(kDebugLogLevelField) &&
+                        bsonSpec.getField(kDebugLogLevelField).isNumber());
 
         int level = bsonSpec.getIntField(kDebugLogLevelField);
         sdk::HostServicesHandle::getHostServices()->logDebug("Test log message", 11134100, level);

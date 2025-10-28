@@ -64,10 +64,9 @@ public:
                     stageBuilder.append("verbosity", "allPlansExecution");
                     break;
                 default:
-                    tripwireAsserted(11239405,
-                                     (str::stream()
-                                      << "unknown explain verbosity provided to "
-                                      << kExplainStageName << " stage: " << verbosity));
+                    sdk_tasserted(11239405,
+                                  (str::stream() << "unknown explain verbosity provided to "
+                                                 << kExplainStageName << " stage: " << verbosity));
             }
 
             stageBuilder.done();
@@ -135,7 +134,7 @@ public:
 
         auto arguments = stageBson[kStageName];
 
-        userAssert(
+        sdk_uassert(
             11239403,
             (str::stream() << "input to " << kStageName << " must be a string " << arguments),
             arguments["input"] && arguments["input"].type() == mongo::BSONType::string);

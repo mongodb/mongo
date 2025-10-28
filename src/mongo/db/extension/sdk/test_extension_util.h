@@ -37,13 +37,13 @@ namespace mongo::extension::sdk {
 inline void validateStageDefinition(mongo::BSONObj stageBson,
                                     const std::string& stageName,
                                     bool checkEmpty = false) {
-    userAssert(11165100,
-               "Failed to parse " + stageName + ", expected object",
-               stageBson.hasField(stageName) && stageBson.getField(stageName).isABSONObj());
+    sdk_uassert(11165100,
+                "Failed to parse " + stageName + ", expected object",
+                stageBson.hasField(stageName) && stageBson.getField(stageName).isABSONObj());
     if (checkEmpty) {
-        userAssert(11165101,
-                   stageName + " stage definition must be an empty object",
-                   stageBson.getField(stageName).Obj().isEmpty());
+        sdk_uassert(11165101,
+                    stageName + " stage definition must be an empty object",
+                    stageBson.getField(stageName).Obj().isEmpty());
     }
 }
 }  // namespace mongo::extension::sdk

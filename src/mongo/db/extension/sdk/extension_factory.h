@@ -55,9 +55,9 @@ protected:
     template <class StageDescriptor>
     void _registerStage(const HostPortalHandle& portal) {
         // Error out if StageDescriptor is already registered to this extension.
-        userAssert(10696402,
-                   (str::stream() << StageDescriptor::kStageName << " is already registered"),
-                   _stageDescriptors.find(StageDescriptor::kStageName) == _stageDescriptors.end());
+        sdk_uassert(10696402,
+                    (str::stream() << StageDescriptor::kStageName << " is already registered"),
+                    _stageDescriptors.find(StageDescriptor::kStageName) == _stageDescriptors.end());
 
         auto stageDesc =
             std::make_unique<ExtensionAggStageDescriptor>(std::make_unique<StageDescriptor>());

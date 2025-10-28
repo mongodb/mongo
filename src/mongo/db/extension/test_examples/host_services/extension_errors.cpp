@@ -71,10 +71,10 @@ public:
         auto code = obj["code"].Number();
 
         // Check if it's a uassert.
-        userAssert(code, errmsg, assertionType != "uassert");
+        sdk_uassert(code, errmsg, assertionType != "uassert");
 
         // Check if it's a tassert.
-        tripwireAssert(code, errmsg, assertionType != "tassert");
+        sdk_tassert(code, errmsg, assertionType != "tassert");
 
         return nullptr;
     }

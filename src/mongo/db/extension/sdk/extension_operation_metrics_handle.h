@@ -62,7 +62,7 @@ public:
 
         invokeCAndConvertStatusToException([&]() { return vtable().serialize(ptr, &buf); });
 
-        tripwireAssert(
+        sdk_tassert(
             11265502, "buffer returned from serialize function must not be null", buf != nullptr);
 
         // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
@@ -73,10 +73,10 @@ public:
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tripwireAssert(11265500,
-                       "ExtensionOperationMetrics' 'serialize' is null",
-                       vtable.serialize != nullptr);
-        tripwireAssert(
+        sdk_tassert(11265500,
+                    "ExtensionOperationMetrics' 'serialize' is null",
+                    vtable.serialize != nullptr);
+        sdk_tassert(
             11265501, "ExtensionOperationMetrics' 'update' is null", vtable.update != nullptr);
     };
 };

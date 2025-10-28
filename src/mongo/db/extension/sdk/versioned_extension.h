@@ -72,9 +72,9 @@ public:
 
     VersionedExtension getVersionedExtension(
         const ::MongoExtensionAPIVersionVector* hostVersions) const {
-        userAssert(10930201,
-                   "Cannot register duplicate versions of the same extension",
-                   !_hasDuplicateVersion);
+        sdk_uassert(10930201,
+                    "Cannot register duplicate versions of the same extension",
+                    !_hasDuplicateVersion);
 
         // Loop from highest version to lowest and return the first compatible extension.
         for (const auto& versionedExtension : _versionedExtensions) {
@@ -83,8 +83,8 @@ public:
             }
         }
 
-        userAsserted(10930202,
-                     "There are no registered extensions compatible with the host version");
+        sdk_uasserted(10930202,
+                      "There are no registered extensions compatible with the host version");
         return VersionedExtension{.version = MONGODB_EXTENSION_API_VERSION,
                                   .factoryFunc = ExtensionFactoryFunc()};
     }

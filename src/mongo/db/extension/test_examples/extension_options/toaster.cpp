@@ -57,15 +57,15 @@ public:
         sdk::validateStageDefinition(stageBson, kStageName);
 
         const auto obj = stageBson.getField(kStageName).Obj();
-        userAssert(11285301,
-                   "Failed to parse " + kStageName + ", expected {" + kStageName +
-                       ": {temp: <number>}}",
-                   obj.hasField("temp") && obj.getField("temp").isNumber());
+        sdk_uassert(11285301,
+                    "Failed to parse " + kStageName + ", expected {" + kStageName +
+                        ": {temp: <number>}}",
+                    obj.hasField("temp") && obj.getField("temp").isNumber());
 
-        userAssert(11285302,
-                   "Failed to parse " + kStageName + ", provided temperature is higher than max " +
-                       std::to_string(ToasterOptions::maxToasterHeat),
-                   obj.getField("temp").numberDouble() <= ToasterOptions::maxToasterHeat);
+        sdk_uassert(11285302,
+                    "Failed to parse " + kStageName + ", provided temperature is higher than max " +
+                        std::to_string(ToasterOptions::maxToasterHeat),
+                    obj.getField("temp").numberDouble() <= ToasterOptions::maxToasterHeat);
 
 
         return std::make_unique<ToastParseNode>(stageBson);
@@ -93,9 +93,9 @@ class ToasterExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         YAML::Node node = portal.getExtensionOptions();
-        userAssert(11285300,
-                   "Extension options must include both 'maxToasterHeat' and 'allowBagels'",
-                   node["maxToasterHeat"] && node["allowBagels"]);
+        sdk_uassert(11285300,
+                    "Extension options must include both 'maxToasterHeat' and 'allowBagels'",
+                    node["maxToasterHeat"] && node["allowBagels"]);
         ToasterOptions::maxToasterHeat = node["maxToasterHeat"].as<double>();
         ToasterOptions::allowBagels = node["allowBagels"].as<bool>();
 

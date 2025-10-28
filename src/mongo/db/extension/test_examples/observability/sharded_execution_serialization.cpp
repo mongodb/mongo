@@ -104,7 +104,7 @@ public:
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
 
-        userAssert(
+        sdk_uassert(
             11173701,
             "Intended assertion in sharded scenarios tripped",
             !stageBson.getField(kStageName)

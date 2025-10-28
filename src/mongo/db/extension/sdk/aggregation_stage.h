@@ -455,12 +455,12 @@ private:
                 static_cast<const ExtensionAggStageDescriptor*>(descriptor)->getImpl();
             auto parseNodePtr = impl.parse(bsonObjFromByteView(stageBson));
 
-            tripwireAssert(11217602,
-                           (str::stream()
-                            << "Descriptor and parse node stage names differ: descriptor='"
-                            << std::string(impl.getName()) << "' parseNode='"
-                            << std::string(parseNodePtr->getName()) << "'."),
-                           impl.getName() == parseNodePtr->getName());
+            sdk_tassert(11217602,
+                        (str::stream()
+                         << "Descriptor and parse node stage names differ: descriptor='"
+                         << std::string(impl.getName()) << "' parseNode='"
+                         << std::string(parseNodePtr->getName()) << "'."),
+                        impl.getName() == parseNodePtr->getName());
 
             *parseNode = new ExtensionAggStageParseNode(std::move(parseNodePtr));
         });
@@ -497,7 +497,7 @@ static void convertExtensionGetNextResultToCRepresentation(
     ::MongoExtensionGetNextResult* const apiResult, const ExtensionGetNextResult& extensionResult) {
     switch (extensionResult.code) {
         case GetNextCode::kAdvanced: {
-            tripwireAssert(
+            sdk_tassert(
                 10956801,
                 "If the ExtensionGetNextResult code is kAdvanced, then ExtensionGetNextResult "
                 "should have a result to return.",
@@ -507,34 +507,34 @@ static void convertExtensionGetNextResultToCRepresentation(
             break;
         }
         case GetNextCode::kPauseExecution: {
-            tripwireAssert(10956802,
-                           (str::stream()
-                            << "If the ExtensionGetNextResult code is kPauseExecution, then "
-                               "there are currently no results to return so "
-                               "ExtensionGetNextResult shouldn't have a result. In this case, "
-                               "the following result was returned: "
-                            << extensionResult.res.get()),
-                           !(extensionResult.res.has_value()));
+            sdk_tassert(10956802,
+                        (str::stream()
+                         << "If the ExtensionGetNextResult code is kPauseExecution, then "
+                            "there are currently no results to return so "
+                            "ExtensionGetNextResult shouldn't have a result. In this case, "
+                            "the following result was returned: "
+                         << extensionResult.res.get()),
+                        !(extensionResult.res.has_value()));
             apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
             apiResult->result = nullptr;
             break;
         }
         case GetNextCode::kEOF: {
-            tripwireAssert(10956805,
-                           (str::stream()
-                            << "If the ExtensionGetNextResult code is kEOF, then there are no "
-                               "results to return so ExtensionGetNextResult shouldn't have a "
-                               "result. In this case, the following result was returned: "
-                            << extensionResult.res.get()),
-                           !(extensionResult.res.has_value()));
+            sdk_tassert(10956805,
+                        (str::stream()
+                         << "If the ExtensionGetNextResult code is kEOF, then there are no "
+                            "results to return so ExtensionGetNextResult shouldn't have a "
+                            "result. In this case, the following result was returned: "
+                         << extensionResult.res.get()),
+                        !(extensionResult.res.has_value()));
             apiResult->code = ::MongoExtensionGetNextResultCode::kEOF;
             apiResult->result = nullptr;
             break;
         }
         default:
-            tripwireAsserted(10956804,
-                             (str::stream() << "Invalid GetNextCode: "
-                                            << static_cast<const int>(extensionResult.code)));
+            sdk_tasserted(10956804,
+                          (str::stream() << "Invalid GetNextCode: "
+                                         << static_cast<const int>(extensionResult.code)));
     }
 }
 

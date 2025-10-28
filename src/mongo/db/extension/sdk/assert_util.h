@@ -34,7 +34,7 @@
 #define MAKE_EXCEPTION_INFO(code, message) \
     BSON("message" << message << "errorCode" << static_cast<int>(code));
 
-#define userAsserted(code, message)                                                            \
+#define sdk_uasserted(code, message)                                                           \
     do {                                                                                       \
         auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                               \
         mongo::extension::invokeCAndConvertStatusToException([&]() {                           \
@@ -43,7 +43,7 @@
         });                                                                                    \
     } while (false)
 
-#define tripwireAsserted(code, message)                                                            \
+#define sdk_tasserted(code, message)                                                               \
     do {                                                                                           \
         auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                                   \
         mongo::extension::invokeCAndConvertStatusToException([&]() {                               \
@@ -52,16 +52,16 @@
         });                                                                                        \
     } while (false)
 
-#define userAssert(code, message, condition) \
-    do {                                     \
-        if (MONGO_unlikely(!(condition))) {  \
-            userAsserted(code, message);     \
-        }                                    \
+#define sdk_uassert(code, message, condition) \
+    do {                                      \
+        if (MONGO_unlikely(!(condition))) {   \
+            sdk_uasserted(code, message);     \
+        }                                     \
     } while (false)
 
-#define tripwireAssert(code, message, condition) \
-    do {                                         \
-        if (MONGO_unlikely(!(condition))) {      \
-            tripwireAsserted(code, message);     \
-        }                                        \
+#define sdk_tassert(code, message, condition) \
+    do {                                      \
+        if (MONGO_unlikely(!(condition))) {   \
+            sdk_tasserted(code, message);     \
+        }                                     \
     } while (false)

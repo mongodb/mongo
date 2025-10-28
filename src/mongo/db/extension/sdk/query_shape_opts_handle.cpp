@@ -50,7 +50,7 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
 
     invokeCAndConvertStatusToException([&]() { return apiFunc(ptr, byteView, &buf); });
 
-    tripwireAssert(
+    sdk_tassert(
         11188202, "buffer returned from serialize function must not be null", buf != nullptr);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory

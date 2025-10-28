@@ -83,7 +83,7 @@ class MyExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         YAML::Node node = portal.getExtensionOptions();
-        userAssert(10999100, "Extension options must include 'optionA'", node["optionA"]);
+        sdk_uassert(10999100, "Extension options must include 'optionA'", node["optionA"]);
         ExtensionOptions::optionA = node["optionA"].as<bool>();
 
         if (ExtensionOptions::optionA) {

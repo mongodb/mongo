@@ -63,15 +63,15 @@ public:
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tripwireAssert(11136800,
-                       "HostQueryShapeOpts' 'serializeIdentifier' is null",
-                       vtable.serialize_identifier != nullptr);
-        tripwireAssert(11173400,
-                       "HostQueryShapeOpts' 'serializeFieldPath' is null",
-                       vtable.serialize_field_path != nullptr);
-        tripwireAssert(11173500,
-                       "HostQueryShapeOpts' 'serializeLiteral' is null",
-                       vtable.serialize_literal != nullptr);
+        sdk_tassert(11136800,
+                    "HostQueryShapeOpts' 'serializeIdentifier' is null",
+                    vtable.serialize_identifier != nullptr);
+        sdk_tassert(11173400,
+                    "HostQueryShapeOpts' 'serializeFieldPath' is null",
+                    vtable.serialize_field_path != nullptr);
+        sdk_tassert(11173500,
+                    "HostQueryShapeOpts' 'serializeLiteral' is null",
+                    vtable.serialize_literal != nullptr);
     };
 
     /**

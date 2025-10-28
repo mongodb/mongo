@@ -42,18 +42,18 @@ MONGO_FAIL_POINT_DEFINE(failVariantNodeConversion);
     return wrapCXXAndConvertExceptionToStatus([&]() {
         const auto& impl = static_cast<const ExtensionAggStageParseNode*>(parseNode)->getImpl();
         const auto expandedSize = impl.getExpandedSize();
-        tripwireAssert(11113801,
-                       (str::stream()
-                        << "MongoExtensionExpandedArray.size must equal required size: "
-                        << "got " << expanded->size << ", but required " << expandedSize),
-                       expanded->size == expandedSize);
+        sdk_tassert(11113801,
+                    (str::stream()
+                     << "MongoExtensionExpandedArray.size must equal required size: "
+                     << "got " << expanded->size << ", but required " << expandedSize),
+                    expanded->size == expandedSize);
 
         auto expandedNodes = impl.expand();
-        tripwireAssert(11113802,
-                       (str::stream() << "AggStageParseNode expand() returned a different "
-                                         "number of elements than getExpandedSize(): returned "
-                                      << expandedNodes.size() << ", but required " << expandedSize),
-                       expandedNodes.size() == expandedSize);
+        sdk_tassert(11113802,
+                    (str::stream() << "AggStageParseNode expand() returned a different "
+                                      "number of elements than getExpandedSize(): returned "
+                                   << expandedNodes.size() << ", but required " << expandedSize),
+                    expandedNodes.size() == expandedSize);
 
         // If we exit early, destroy the ABI nodes and null any raw pointers written to the
         // caller's buffer.
@@ -72,8 +72,8 @@ MONGO_FAIL_POINT_DEFINE(failVariantNodeConversion);
         // Populate the caller's buffer directly with raw pointers to nodes.
         for (size_t i = 0; i < expandedSize; ++i) {
             if (MONGO_unlikely(failVariantNodeConversion.shouldFail())) {
-                userAsserted(11197200,
-                             "Injected failure in VariantNode conversion to ExpandedArrayElement");
+                sdk_uasserted(11197200,
+                              "Injected failure in VariantNode conversion to ExpandedArrayElement");
             }
             auto& dst = expanded->elements[i];
             std::visit(ConsumeVariantNodeToAbi{dst}, expandedNodes[i]);

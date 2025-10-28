@@ -77,12 +77,12 @@ public:
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tripwireAssert(10926401,
-                       "Extension 'register_stage_descriptor' is null",
-                       vtable.register_stage_descriptor != nullptr);
-        tripwireAssert(10999108,
-                       "Extension 'get_extension_options' is null",
-                       vtable.get_extension_options != nullptr);
+        sdk_tassert(10926401,
+                    "Extension 'register_stage_descriptor' is null",
+                    vtable.register_stage_descriptor != nullptr);
+        sdk_tassert(10999108,
+                    "Extension 'get_extension_options' is null",
+                    vtable.get_extension_options != nullptr);
     };
 };
 

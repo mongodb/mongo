@@ -629,7 +629,7 @@ typedef struct MongoExtensionHostServicesVTable {
      */
     MongoExtensionStatus* (*user_asserted)(MongoExtensionByteView structuredErrorMessage);
     /**
-     * Like userAssert, but with a deferred-fatality tripwire that gets checked prior to normal
+     * Like user_asserted, but with a deferred-fatality tripwire that gets checked prior to normal
      * shutdown. Used to ensure that this assertion will both fail the operation and also cause a
      * test suite failure.
      */

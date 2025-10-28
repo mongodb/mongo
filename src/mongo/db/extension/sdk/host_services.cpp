@@ -54,10 +54,10 @@ BSONObj HostServicesHandle::createExtensionDebugLogMessage(std::string message,
 }
 
 void HostServicesHandle::_assertVTableConstraints(const VTable_t& vtable) const {
-    tripwireAssert(
+    sdk_tassert(
         11097801, "Host services' 'user_asserted' is null", vtable.user_asserted != nullptr);
-    tripwireAssert(11188200, "Host services' 'log' is null", vtable.log != nullptr);
-    tripwireAssert(11188201, "Host services' 'log_debug' is null", vtable.log_debug != nullptr);
+    sdk_tassert(11188200, "Host services' 'log' is null", vtable.log != nullptr);
+    sdk_tassert(11188201, "Host services' 'log_debug' is null", vtable.log_debug != nullptr);
     // Note that we intentionally do not validate tripwire_asserted here. If it wasn't valid, the
     // tripwire assert would fire and we would dereference the nullptr anyway.
 }

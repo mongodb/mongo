@@ -89,7 +89,7 @@ TEST_F(HostServicesTest, ExtensionDebugLogIDLRoundTrip) {
     ASSERT_EQUALS(debugLog.getLevel(), logLevel);
 }
 
-TEST_F(HostServicesTest, uasserted) {
+TEST_F(HostServicesTest, userAsserted) {
     auto errmsg = "an error";
     int errorCode = 11111;
     BSONObj errInfo = BSON("message" << errmsg << "errorCode" << errorCode);
@@ -102,7 +102,7 @@ TEST_F(HostServicesTest, uasserted) {
     ASSERT_EQ(status.getReason(), "");
 }
 
-DEATH_TEST_REGEX_F(HostServicesTest, tasserted, "22222") {
+DEATH_TEST_REGEX_F(HostServicesTest, tripwireAsserted, "22222") {
     auto errmsg = "fatal error";
     int errorCode = 22222;
     BSONObj errInfo = BSON("message" << errmsg << "errorCode" << errorCode);

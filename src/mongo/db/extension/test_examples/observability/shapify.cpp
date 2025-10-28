@@ -110,25 +110,25 @@ private:
         for (const auto& elt : input) {
             const auto& fieldName = elt.fieldName();
             if (str::startsWith(fieldName, "obj_")) {
-                userAssert(11173600,
-                           (str::stream()
-                            << "obj field must be of type object, but found type " << elt.type()),
-                           elt.type() == BSONType::object);
+                sdk_uassert(11173600,
+                            (str::stream()
+                             << "obj field must be of type object, but found type " << elt.type()),
+                            elt.type() == BSONType::object);
 
                 BSONObjBuilder subobjBuilder = builder.subobjStart(fieldName);
                 buildQueryShape(ctxHandle, elt.Obj(), subobjBuilder);
             } else if (str::startsWith(fieldName, "path_")) {
-                userAssert(11173601,
-                           (str::stream()
-                            << "path field must be of type string, but found type " << elt.type()),
-                           elt.type() == BSONType::string);
+                sdk_uassert(11173601,
+                            (str::stream()
+                             << "path field must be of type string, but found type " << elt.type()),
+                            elt.type() == BSONType::string);
 
                 builder.append(fieldName, ctxHandle.serializeFieldPath(elt.String()));
             } else if (str::startsWith(fieldName, "ident_")) {
-                userAssert(11173602,
-                           (str::stream()
-                            << "ident field must be of type string, but found type " << elt.type()),
-                           elt.type() == BSONType::string);
+                sdk_uassert(11173602,
+                            (str::stream() << "ident field must be of type string, but found type "
+                                           << elt.type()),
+                            elt.type() == BSONType::string);
 
                 builder.append(fieldName, ctxHandle.serializeIdentifier(elt.String()));
             } else {
