@@ -28,14 +28,6 @@ class CollInfos {
         this.collInfosRes = this.collInfosRes.filter((info) => desiredCollNames.includes(info.name));
     }
 
-    /**
-     * Get names for the clustered collections.
-     */
-    getClusteredCollNames() {
-        const infos = this.collInfosRes.filter((info) => info.options.clusteredIndex);
-        return infos.map((info) => info.name);
-    }
-
     hostAndNS(collName) {
         return `${this.conn.host}--${this.ns(collName)}`;
     }
@@ -550,26 +542,37 @@ class DataConsistencyChecker {
             return true;
         };
 
-        // Returns true if we should skip comparing the index count between the source and the
-        // syncing node for a clustered collection. 6.1 added clustered indexes into collStat
-        // output. There will be a difference in the nindex count between versions before and
-        // after 6.1. So, skip comparing across 6.1 for clustered collections.
-        const skipIndexCountCheck = function (sourceCollInfos, syncingCollInfos, collName) {
+        // Returns true if we should skip comparing the indexes between the source and the
+        // syncing node due to both ${collName} and system.buckets.${collName} existing as regular
+        // collections due to SERVER-90862. In this situation, listIndexes targets different
+        // namespaces before and after 8.2. So, skip comparing across 8.2.
+        // TODO(SERVER-101594): Remove this workaround once only viewless timeseries exist.
+        const skipIndexesCheck = function (sourceCollInfos, syncingCollInfos, sourceCollections, collName) {
             const sourceVersion = sourceCollInfos.binVersion;
             const syncingVersion = syncingCollInfos.binVersion;
 
-            // If both versions are before 6.1 or both are 6.1 onwards, we are good.
+            // If both versions are before 8.2 or both are 8.2 onwards, we are good.
             if (
-                (MongoRunner.compareBinVersions(sourceVersion, "6.1") === -1 &&
-                    MongoRunner.compareBinVersions(syncingVersion, "6.1") === -1) ||
-                (MongoRunner.compareBinVersions(sourceVersion, "6.1") >= 0 &&
-                    MongoRunner.compareBinVersions(syncingVersion, "6.1") >= 0)
+                (MongoRunner.compareBinVersions(sourceVersion, "8.2") === -1 &&
+                    MongoRunner.compareBinVersions(syncingVersion, "8.2") === -1) ||
+                (MongoRunner.compareBinVersions(sourceVersion, "8.2") >= 0 &&
+                    MongoRunner.compareBinVersions(syncingVersion, "8.2") >= 0)
             ) {
                 return false;
             }
 
-            // Skip if this is a clustered collection
-            if (sourceCollInfos.getClusteredCollNames().includes(collName)) {
+            // Skip if both ${collName} and system.buckets.${collName} exist due to SERVER-90862.
+            const bucketsCollName = "system.buckets." + collName;
+            if (sourceCollections.includes(bucketsCollName)) {
+                prettyPrint(
+                    `Skipping comparison of indexes for collection ${dbName}.${
+                        collName
+                    } because a buckets collection exists at ${dbName}.${
+                        bucketsCollName
+                    }. Versions ${sourceCollInfos.binVersion} and ${
+                        syncingCollInfos.binVersion
+                    } are expected to differ in the index specs.`,
+                );
                 return true;
             }
 
@@ -624,16 +627,9 @@ class DataConsistencyChecker {
                     indexDiffs.indexesMissingOnSyncing.length > 0 ||
                     indexDiffs.indexesWithDifferentSpecs.length > 0;
             }
-            if (skipIndexCountCheck(sourceCollInfos, syncingCollInfos, collName)) {
-                prettyPrint(
-                    `Skipping comparison of collStats.nindex for clustered collection ${
-                        dbName
-                    }.${collName}. Versions ${sourceCollInfos.binVersion} and ${
-                        syncingCollInfos.binVersion
-                    } are expected to differ in the nindex count.`,
-                );
-            } else if (
+            if (
                 syncingHasIndexes &&
+                !skipIndexesCheck(sourceCollInfos, syncingCollInfos, sourceCollections, collName) &&
                 (sourceCollStats.nindexes !== syncingCollStats.nindexes || indexSpecsDiffer)
             ) {
                 reasons.push("indexes");

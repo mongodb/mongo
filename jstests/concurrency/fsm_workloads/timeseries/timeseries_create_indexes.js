@@ -3,8 +3,6 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   # TODO SERVER-105492 enable test in multiversion suites
- *   multiversion_incompatible,
  *   # TODO SERVER-105509 enable test in config shard suites
  *   config_shard_incompatible,
  * ]
@@ -27,6 +25,14 @@ function getRandomDb(db) {
 function getRandomCollection(db) {
     return db[collPrefix + Random.randInt(collCount)];
 }
+
+// TODO(SERVER-109819): Remove once v9.0 is last LTS
+// Since binary v8.2, index operations either take a single lock, or re-check the UUID when
+// re-acquiring the lock and return CollectionUUIDMismatch if the collection was dropped.
+// Older binaries don't do this, so they can return more error codes.
+const isPreV82Binary =
+    TestData.multiversionBinVersion &&
+    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(TestData.multiversionBinVersion), "8.2") < 0;
 
 export const $config = (function () {
     let data = {nsPrefix: "create_idx_", numCollections: 5};
@@ -98,6 +104,7 @@ export const $config = (function () {
             assert.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec), [
                 // The collection has been concurrently dropped and recreated
                 ErrorCodes.CollectionUUIDMismatch,
+                ...(isPreV82Binary ? [ErrorCodes.IllegalOperation] : []),
                 ErrorCodes.IndexBuildAborted,
                 // If the collection already exists and is a view
                 // TODO SERVER-85548 this should never happen
@@ -123,7 +130,15 @@ export const $config = (function () {
         },
         checkIndexes: function (db, collName) {
             const coll = getRandomCollection(db);
-            const indexes = coll.getIndexes();
+            let indexes;
+            try {
+                indexes = coll.getIndexes();
+            } catch (err) {
+                if (isPreV82Binary && err.code == ErrorCodes.CommandNotSupportedOnView) {
+                    return;
+                }
+                throw err;
+            }
             indexes.forEach((index) => {
                 Object.keys(index.key).forEach((indexKey) => {
                     assert(
