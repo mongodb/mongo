@@ -1,6 +1,7 @@
 /**
  * Tests that the background range deletion task on a donor shard after a chunk migration completes
- * accesses the storage engine with low priority.
+ * accesses the storage engine with low priority when enabled, and with normal priority when
+ * storageEngineDeprioritizeBackgroundTasks is disabled.
  *
  * @tags: [
  *    requires_wiredtiger,
@@ -17,6 +18,7 @@ const st = new ShardingTest({
         rsOptions: {
             setParameter: {
                 storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+                storageEngineHeuristicDeprioritizationEnabled: false,
             },
         },
     },
@@ -31,7 +33,7 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 // Insert enough documents to ensure the cleanup work is substantial.
-const bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 const numDocs = 2000;
 for (let i = 0; i < numDocs; i++) {
     // Add a payload to make the documents non-trivial in size.
@@ -48,24 +50,40 @@ const recipient = st.shard1;
 /**
  * Helper function to get the number of finished low-priority write operations on the donor.
  */
-const numLowPriorityWrites = function () {
-    const status = donor.adminCommand({serverStatus: 1});
-    return status.queues.execution.write.normalPriority.finishedProcessing;
+const numLowPriorityWrites = function (node) {
+    const status = node.adminCommand({serverStatus: 1});
+    return status.queues.execution.write.lowPriority.finishedProcessing;
 };
 
-const lowPriorityBefore = numLowPriorityWrites();
+let lowPriorityBefore = numLowPriorityWrites(donor);
 
 // Move a chunk from the donor (shard0) to the recipient (shard1) while waiting for the range
 // deletion to complete.
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: recipient.shardName, _waitForDelete: true}));
 
-const lowPriorityAfter = numLowPriorityWrites();
+let lowPriorityAfter = numLowPriorityWrites(donor);
 
 // Measure the counter again and assert that it has increased.
 assert.gt(
     lowPriorityAfter,
     lowPriorityBefore,
     "The number of low-priority writes should increase after a range deletion runs",
+);
+
+// Disable storageEngineDeprioritizeBackgroundTasks so that range deletions run with normal
+// priority. Return the chunk back to the donor and verify no low-priority writes are done there.
+assert.commandWorked(recipient.adminCommand({setParameter: 1, storageEngineDeprioritizeBackgroundTasks: false}));
+
+lowPriorityBefore = numLowPriorityWrites(recipient);
+
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: donor.shardName, _waitForDelete: true}));
+
+lowPriorityAfter = numLowPriorityWrites(recipient);
+
+assert.eq(
+    lowPriorityAfter,
+    lowPriorityBefore,
+    "Should NOT see low-priority writes when storageEngineDeprioritizeBackgroundTasks is disabled",
 );
 
 st.stop();

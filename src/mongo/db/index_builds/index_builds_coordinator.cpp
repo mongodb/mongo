@@ -47,6 +47,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
@@ -3365,8 +3366,11 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
     const boost::optional<RecordId>& resumeAfterRecordId) {
-    ScopedAdmissionPriority<ExecutionAdmissionContext> deprioritizeExecutionControl(
-        opCtx, AdmissionContext::Priority::kLow);
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
+        deprioritizeExecutionControl;
+    if (gStorageEngineDeprioritizeBackgroundTasks.load()) {
+        deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
+    }
 
     invariant(replState->getGenerateTableWrites());
 
@@ -3400,8 +3404,11 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    ScopedAdmissionPriority<ExecutionAdmissionContext> deprioritizeExecutionControl(
-        opCtx, AdmissionContext::Priority::kLow);
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
+        deprioritizeExecutionControl;
+    if (gStorageEngineDeprioritizeBackgroundTasks.load()) {
+        deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
+    }
 
     {
         tassert(7683109,

@@ -1,6 +1,7 @@
 /**
  * Tests that index builds access the storage engine with low priority on both primary and secondary
- * nodes.
+ * nodes when enabled, and with normal priority when storageEngineDeprioritizeBackgroundTasks is
+ * disabled.
  *
  * @tags: [
  *      requires_wiredtiger,
@@ -17,6 +18,7 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+            storageEngineHeuristicDeprioritizationEnabled: false,
         },
     },
 });
@@ -47,29 +49,33 @@ const numLowPriorityWrites = function (node) {
     return status.queues.execution.write.lowPriority.finishedProcessing;
 };
 
-const primaryLowPriorityBefore = numLowPriorityWrites(primary);
-const secondaryLowPriorityBefore = numLowPriorityWrites(secondary);
+/**
+ * Runs an index build and checks the low-priority write counters on both primary and secondary.
+ */
+const runIndexBuildTest = function ({coll, secondaryDB, indexSpec, expectLowPriorityWrites}) {
+    const primaryLowPriorityBefore = numLowPriorityWrites(primary);
+    const secondaryLowPriorityBefore = numLowPriorityWrites(secondary);
 
-// Build the index. This command blocks until the index is ready on the primary.
-assert.commandWorked(coll.createIndex({x: 1}));
+    // Build the index. This command blocks until the index is ready on the primary.
+    assert.commandWorked(coll.createIndex(indexSpec));
 
-// Wait for the index build to complete on the secondary.
-IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
+    // Wait for the index build to complete on the secondary.
+    IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
 
-const primaryLowPriorityAfter = numLowPriorityWrites(primary);
-const secondaryLowPriorityAfter = numLowPriorityWrites(secondary);
+    const primaryLowPriorityAfter = numLowPriorityWrites(primary);
+    const secondaryLowPriorityAfter = numLowPriorityWrites(secondary);
 
-// Measure the counters again and assert that they have increased.
-assert.gt(
-    primaryLowPriorityAfter,
-    primaryLowPriorityBefore,
-    "The number of low-priority writes should increase on the primary after an index build",
-);
+    const assertFn = expectLowPriorityWrites ? assert.gt : assert.eq;
+    assertFn(primaryLowPriorityAfter, primaryLowPriorityBefore);
+    assertFn(secondaryLowPriorityAfter, secondaryLowPriorityBefore);
+};
 
-assert.gt(
-    secondaryLowPriorityAfter,
-    secondaryLowPriorityBefore,
-    "The number of low-priority writes should increase on the secondary after an index build",
-);
+runIndexBuildTest({coll: coll, secondaryDB: secondaryDB, indexSpec: {x: 1}, expectLowPriorityWrites: true});
+
+jsTest.log.info("Disabling storageEngineDeprioritizeBackgroundTasks on primary and secondary...");
+assert.commandWorked(primary.adminCommand({setParameter: 1, storageEngineDeprioritizeBackgroundTasks: false}));
+assert.commandWorked(secondary.adminCommand({setParameter: 1, storageEngineDeprioritizeBackgroundTasks: false}));
+
+runIndexBuildTest({coll: coll, secondaryDB: secondaryDB, indexSpec: {y: 1}, expectLowPriorityWrites: false});
 
 rst.stopSet();

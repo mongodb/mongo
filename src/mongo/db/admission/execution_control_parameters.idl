@@ -189,7 +189,8 @@ server_parameters:
         description: >-
             Enables a heuristic that will evaluate long-running operations and deprioritize them to
             the low priority ticket pool. This parameter only takes effect if the storage engine's
-            admission control with prioritization is enabled.
+            admission control with prioritization is enabled. This only takes effect if
+            `storageEngineConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gStorageEngineHeuristicDeprioritizationEnabled
@@ -200,11 +201,26 @@ server_parameters:
         description: >-
             The number of global lock yields an operation must perform before it is deprioritized to
             the low-priority ticket pool. This parameter only takes effect when
-            `storageEngineHeuristicDeprioritizationEnabled` is true.
+            `storageEngineHeuristicDeprioritizationEnabled` is true and `storageEngineConcurrencyAdjustmentAlgorithm`
+            is "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
         cpp_varname: gStorageEngineHeuristicNumYieldsDeprioritizeThreshold
         default: 3
         validator:
             gte: 0
+        redact: false
+
+    storageEngineDeprioritizeBackgroundTasks:
+        description: >-
+            This controls whether background tasks (defined as index builds, range deletions, and
+            TTL deletions) are automatically deprioritized to the low-priority pool. If set to false,
+            these tasks will not be automatically deprioritized upon starting. However, they can
+            still be deprioritized later by the heuristic if the operation exceeds the yield
+            threshold. This only takes effect if `storageEngineConcurrencyAdjustmentAlgorithm` is
+            "fixedConcurrentTransactionsWithPrioritization".
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gStorageEngineDeprioritizeBackgroundTasks
+        default: true
         redact: false
