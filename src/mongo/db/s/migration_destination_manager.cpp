@@ -1694,7 +1694,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                         DatabaseName::kAdmin,
                         xferModsRequest,
-                        Shard::RetryPolicy::kNoRetry),
+                        Shard::RetryPolicy::kStrictlyNotIdempotent),
                     "_transferMods failed: ");
 
                 uassertStatusOKWithContext(
@@ -1820,7 +1820,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                         DatabaseName::kAdmin,
                         xferModsRequest,
-                        Shard::RetryPolicy::kNoRetry),
+                        Shard::RetryPolicy::kStrictlyNotIdempotent),
                     "_transferMods failed in STEADY STATE: ");
 
                 uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),

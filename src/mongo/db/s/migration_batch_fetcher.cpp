@@ -140,7 +140,7 @@ BSONObj MigrationBatchFetcher<Inserter>::_fetchBatch(OperationContext* opCtx) {
                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                        DatabaseName::kAdmin,
                                        _migrateCloneRequest,
-                                       Shard::RetryPolicy::kNoRetry),
+                                       Shard::RetryPolicy::kStrictlyNotIdempotent),
                                    "_migrateClone failed: ");
 
     uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(commandResponse),

@@ -38,6 +38,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -149,6 +150,21 @@ protected:
                              << "ok" << 1 << "objects" << createDocumentsToCloneArray());
     }
 
+    static BSONObj getErrorRetryable() {
+        BSONObjBuilder bob;
+        bob.append("ok", 0.0);
+        bob.append("code", ErrorCodes::IngressRequestRateLimitExceeded);
+        bob.append("errmsg", "retryable");
+        bob.append("codeName",
+                   ErrorCodes::errorString(ErrorCodes::IngressRequestRateLimitExceeded));
+        {
+            BSONArrayBuilder arrayBuilder = bob.subarrayStart(kErrorLabelsFieldName);
+            arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
+            arrayBuilder.append(ErrorLabel::kRetryableError);
+        }
+        return bob.obj();
+    }
+
 private:
     OperationContext* _opCtx;
     ServiceContext* _svcCtx;
@@ -221,6 +237,43 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
     // would hang forever.)
     auto fut = stdx::async(stdx::launch::async,
                            [&]() { onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj())); });
+    fetcher->fetchAndScheduleInsertion();
+}
+
+TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTestRetry) {
+    auto _ = FailPointEnableBlock{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 0)};
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "foo");
+    ShardId fromShard{"Donor"};
+    auto msid = MigrationSessionId::generate(fromShard, "Recipient");
+
+    auto outerOpCtx = operationContext();
+    auto newClient =
+        outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
+    AlternativeClientRegion acr(newClient);
+
+    auto executor =
+        Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+    auto newOpCtxPtr = CancelableOperationContext(
+        cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
+    auto opCtx = newOpCtxPtr.get();
+
+    auto fetcher = std::make_unique<MigrationBatchFetcher<MigrationBatchMockInserter>>(
+        outerOpCtx,
+        opCtx,
+        nss,
+        msid,
+        WriteConcernOptions::parse(WriteConcernOptions::Majority).getValue(),
+        fromShard,
+        ChunkRange{BSON("x" << 1), BSON("x" << 2)},
+        UUID::gen(),
+        UUID::gen(),
+        nullptr,
+        0 /* maxBytesPerThread */);
+
+    auto fut = stdx::async(stdx::launch::async, [&]() {
+        onCommand(getOnMigrateCloneCommandCb(getErrorRetryable()));
+        onCommand(getOnMigrateCloneCommandCb(getTerminalBsonObj()));
+    });
     fetcher->fetchAndScheduleInsertion();
 }
 

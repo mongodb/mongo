@@ -207,7 +207,7 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                                DatabaseName::kAdmin,
                                                buildMigrateSessionCmd(migrationSessionId),
-                                               Shard::RetryPolicy::kNoRetry);
+                                               Shard::RetryPolicy::kStrictlyNotIdempotent);
 
     uassertStatusOK(responseStatus.getStatus());
     uassertStatusOK(responseStatus.getValue().commandStatus);
