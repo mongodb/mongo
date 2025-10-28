@@ -1282,16 +1282,17 @@ TEST_F(BoundedSorterTest, CompoundSpill) {
 
 TEST_F(BoundedSorterTest, LargeSpill) {
     static const Key kKey = 1;
-    static constexpr uint64_t kMemoryLimit = 1024 * 1024;
-    static constexpr size_t kDocCount = kMemoryLimit;
+    static constexpr uint64_t kMemoryLimit = 4 * sorter::kSortedFileBufferSize;
+    static const int kPerEntryMemUsage = kKey.memUsageForSorter() + Doc{kKey}.memUsageForSorter();
+    static size_t kDocCountToCauseSpilling = (kMemoryLimit / kPerEntryMemUsage) + 1;
 
     unittest::TempDir tempDir = makeTempDir();
     auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(kMemoryLimit);
     sorter = makeAscNoBound(options);
 
     std::vector<Doc> input;
-    input.reserve(kDocCount);
-    for (size_t i = 0; i < kDocCount; ++i) {
+    input.reserve(kDocCountToCauseSpilling);
+    for (size_t i = 0; i < kDocCountToCauseSpilling; ++i) {
         input.emplace_back(Doc{kKey});
     }
 
