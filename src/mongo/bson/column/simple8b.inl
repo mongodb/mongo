@@ -848,7 +848,8 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t decodeAndVisit(uint64_t encoded
                     return decoderExtended7_9.visitAll<T>(encoded, visit, visitZero, visitMissing);
                     break;
                 default:
-                    uasserted(8806200, "Bad extended selector");
+                    uasserted(ErrorCodes::InvalidBSONColumn,
+                              "Bad extended selector during decodeAndVisit for selector 7");
                     break;
             }
             break;
@@ -900,7 +901,8 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t decodeAndVisit(uint64_t encoded
                     return decoderExtended8_13.visitAll<T>(encoded, visit, visitZero, visitMissing);
                     break;
                 default:
-                    uasserted(8806201, "Bad extended selector");
+                    uasserted(ErrorCodes::InvalidBSONColumn,
+                              "Bad extended selector during decodeAndVisit for selector 8");
                     break;
             }
             break;
@@ -943,7 +945,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t decodeAndVisit(uint64_t encoded
             break;
         }
         default:
-            uasserted(8586000, "Bad selector");
+            uasserted(ErrorCodes::InvalidBSONColumn, "Bad selector during decodeAndVisit");
             break;
     }
 }
@@ -1062,7 +1064,7 @@ T decodeAndSum(uint64_t encoded, uint64_t* prevNonRLE) {
         default:
             break;
     }
-    uasserted(8297100, "Bad selector");
+    uasserted(ErrorCodes::InvalidBSONColumn, "Bad selector during decodeAndSum");
     return 0;
 }
 
@@ -1192,7 +1194,7 @@ T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
         default:
             break;
     }
-    uasserted(8297300, "Bad selector");
+    uasserted(ErrorCodes::InvalidBSONColumn, "Bad selector during decodeAndPrefixSum");
     return 0;
 }
 

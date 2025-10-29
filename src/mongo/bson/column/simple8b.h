@@ -194,7 +194,9 @@ void Simple8b<T>::Iterator::_loadBlock() {
     _current = ConstDataView(_pos).read<LittleEndian<uint64_t>>();
 
     _selector = _current & kBaseSelectorMask;
-    uassert(8787300, "invalid selector 0", _selector);
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "invalid selector 0 while loading simple8b block",
+            _selector);
     uint8_t selectorExtension = ((_current >> kSelectorBits) & kBaseSelectorMask);
 
     // If RLE selector, just load remaining count. Keep value from previous.
@@ -212,7 +214,9 @@ void Simple8b<T>::Iterator::_loadBlock() {
     // If Selectors 7 or 8 check if we are using extended selectors
     if (_selector == 7 || _selector == 8) {
         _extensionType = kSelectorToExtension[_selector - 7][selectorExtension];
-        uassert(8787301, "invalid extended selector", _extensionType != kInvalidSelector);
+        uassert(ErrorCodes::InvalidBSONColumn,
+                "invalid extended selector while loading simple8b block",
+                _extensionType != kInvalidSelector);
         // Use the extended selector if extension is != 0
         if (_extensionType != kBaseSelector) {
             _selector = selectorExtension;
