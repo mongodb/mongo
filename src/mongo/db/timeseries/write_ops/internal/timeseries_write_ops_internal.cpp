@@ -102,6 +102,22 @@ inline void populateError(OperationContext* opCtx,
         errors->emplace_back(std::move(*error));
     }
 }
+
+/**
+ * Retrieves the opTime and electionId according to the current replication mode.
+ */
+void getOpTimeAndElectionId(OperationContext* opCtx,
+                            boost::optional<repl::OpTime>* opTime,
+                            boost::optional<OID>* electionId) {
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+    const auto isReplSet = replCoord->getSettings().isReplSet();
+
+    *opTime = isReplSet
+        ? boost::make_optional(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
+        : boost::none;
+    *electionId = isReplSet ? boost::make_optional(replCoord->getElectionId()) : boost::none;
+}
+
 TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
     write_ops_exec::WriteResult&& reply, const mongo::write_ops::InsertCommandRequest& request) {
     invariant(reply.results.size() == 1,
@@ -421,7 +437,7 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             return result;
         }
 
-        timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
+        getOpTimeAndElectionId(opCtx, opTime, electionId);
 
         for (auto& batch : batches) {
             bucket_catalog::finish(bucketCatalog, batch);
@@ -492,7 +508,7 @@ void processUnorderedCommitResult(OperationContext* opCtx,
     auto batch = batches[batchIndex];
 
     auto finishBatch = [&]() {
-        timeseries::getOpTimeAndElectionId(opCtx, &opTime, &electionId);
+        getOpTimeAndElectionId(opCtx, &opTime, &electionId);
         bucket_catalog::finish(bucketCatalog, batch);
     };
     auto addDocsToRetry = [&]() {

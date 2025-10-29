@@ -160,6 +160,9 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
             bucketsColl->getTimeseriesOptions());
 }
 
+/**
+ * Prepares the final write batches needed for performing the writes to storage.
+ */
 std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
 determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
     stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
@@ -179,18 +182,6 @@ determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
     });
 
     return batchesToCommit;
-}
-
-void getOpTimeAndElectionId(OperationContext* opCtx,
-                            boost::optional<repl::OpTime>* opTime,
-                            boost::optional<OID>* electionId) {
-    auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    const auto isReplSet = replCoord->getSettings().isReplSet();
-
-    *opTime = isReplSet
-        ? boost::make_optional(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
-        : boost::none;
-    *electionId = isReplSet ? boost::make_optional(replCoord->getElectionId()) : boost::none;
 }
 
 void performAtomicWrites(

@@ -64,19 +64,6 @@ namespace mongo::timeseries {
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl);
 
 /**
- * Retrieves the opTime and electionId according to the current replication mode.
- */
-void getOpTimeAndElectionId(OperationContext* opCtx,
-                            boost::optional<repl::OpTime>* opTime,
-                            boost::optional<OID>* electionId);
-
-/**
- * Prepares the final write batches needed for performing the writes to storage.
- */
-std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
-determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches);
-
-/**
  * Performs modifications atomically for a user command on a time-series collection.
  *
  * Replaces the bucket document for a partial bucket modification and removes the bucket for a full
