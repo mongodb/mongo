@@ -338,7 +338,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu2004-arm64
+      - ubuntu2004-arm64-m8g-xlarge
     expansions:
       additional_package_targets: >-
         archive-mongocryptd-stripped
@@ -364,32 +364,32 @@ buildvariants:
       multiversion_architecture: aarch64
       multiversion_edition: enterprise
       compile_variant: enterprise-ubuntu2004-arm64
-      large_distro_name: ubuntu2004-arm64-large
+      large_distro_name: ubuntu2004-arm64-m8g-4xlarge
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-small
+          - ubuntu2204-arm64-m8g-xlarge
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
       - name: .release_critical !.requires_large_host
       - name: .release_critical .requires_large_host
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
 
   - name: ubuntu2004-arm64
     display_name: Ubuntu 20.04 arm64
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu2004-arm64-small
+      - ubuntu2004-arm64-m8g-xlarge
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
@@ -415,32 +415,32 @@ buildvariants:
       multiversion_architecture: aarch64
       multiversion_edition: targeted
       compile_variant: ubuntu2004-arm64
-      large_distro_name: ubuntu2004-arm64-large
+      large_distro_name: ubuntu2004-arm64-m8g-4xlarge
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-small
+          - ubuntu2204-arm64-m8g-xlarge
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
       - name: .release_critical !.requires_large_host !.incompatible_community
       - name: .release_critical .requires_large_host !.incompatible_community
         distros:
-          - ubuntu2004-arm64-large
+          - ubuntu2004-arm64-m8g-4xlarge
 
   - name: enterprise-ubuntu2204-arm64
     display_name: Enterprise Ubuntu 22.04 arm64
     tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu2204-arm64-small
+      - ubuntu2204-arm64-m8g-xlarge
     expansions:
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
@@ -463,32 +463,32 @@ buildvariants:
       multiversion_architecture: aarch64
       multiversion_edition: enterprise
       compile_variant: enterprise-ubuntu2204-arm64
-      large_distro_name: ubuntu2204-arm64-large
+      large_distro_name: ubuntu2204-arm64-m8g-4xlarge
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .release_critical !.requires_large_host
       - name: .release_critical .requires_large_host
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
 
   - name: ubuntu2204-arm64
     display_name: Ubuntu 22.04 arm64
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu2204-arm64-small
+      - ubuntu2204-arm64-m8g-xlarge
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
@@ -514,25 +514,25 @@ buildvariants:
       multiversion_architecture: aarch64
       multiversion_edition: targeted
       compile_variant: ubuntu2204-arm64
-      large_distro_name: ubuntu2204-arm64-large
+      large_distro_name: ubuntu2204-arm64-m8g-4xlarge
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .release_critical !.requires_large_host !.incompatible_community
       - name: .release_critical .requires_large_host !.incompatible_community
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
 
   - name: enterprise-ubuntu2404
     display_name: Enterprise Ubuntu 24.04
@@ -592,7 +592,7 @@ buildvariants:
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu2404-arm64-small
+      - ubuntu2404-arm64-m8g-xlarge
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
@@ -618,32 +618,32 @@ buildvariants:
       multiversion_architecture: aarch64
       multiversion_edition: targeted
       compile_variant: ubuntu2404-arm64
-      large_distro_name: ubuntu2404-arm64-large
+      large_distro_name: ubuntu2404-arm64-m8g-2xlarge
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2404-arm64-xlarge
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2404-arm64-xlarge
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: test_packages
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_oscrypto
       - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_oscrypto
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_oscrypto
       - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_oscrypto
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-m8g-2xlarge
 
   - name: enterprise-ubuntu2404-arm64
     display_name: Enterprise Ubuntu 24.04 arm64
     tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - ubuntu2404-arm64-small
+      - ubuntu2404-arm64-m8g-xlarge
     expansions:
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
@@ -664,25 +664,25 @@ buildvariants:
       multiversion_architecture: aarch64
       multiversion_edition: enterprise
       compile_variant: enterprise-ubuntu2404-arm64
-      large_distro_name: ubuntu2404-arm64-large
+      large_distro_name: ubuntu2404-arm64-m8g-2xlarge
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2404-arm64-xlarge
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2404-arm64-xlarge
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: test_packages
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: test_packages_release
         distros:
           - rhel94-arm64-m8g-4xlarge-packagetest
       - name: .development_critical !.requires_large_host !.incompatible_oscrypto
       - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-m8g-2xlarge
       - name: .release_critical !.requires_large_host !.incompatible_oscrypto
       - name: .release_critical .requires_large_host !.incompatible_oscrypto
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-m8g-2xlarge
