@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/compiler/metadata/arrayness_trie.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/unittest/unittest.h"
