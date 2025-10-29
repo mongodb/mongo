@@ -159,6 +159,8 @@ StatementMacros:
 TabWidth:        4
 UseCRLF:         false
 UseTab:          Never
+InsertNewlineAtEOF: true
+KeepEmptyLinesAtEOF: true
 WhitespaceSensitiveMacros:
   - STRINGIZE
   - PP_STRINGIZE
