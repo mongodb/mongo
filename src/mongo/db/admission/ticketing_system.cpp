@@ -356,6 +356,7 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
     boost::optional<BSONObjBuilder> writeStats;
     int32_t readOut = 0, readAvailable = 0, readTotalTickets = 0;
     int32_t writeOut = 0, writeAvailable = 0, writeTotalTickets = 0;
+    _state.loadRelaxed().appendStats(b);
     b.append("totalDeprioritizations", _opsDeprioritized.loadRelaxed());
 
     for (size_t i = 0; i < _holders.size(); ++i) {
@@ -534,6 +535,10 @@ bool TicketingSystem::TicketingState::usesThroughputProbing() const {
 
 bool TicketingSystem::TicketingState::isRuntimeResizable() const {
     return !usesThroughputProbing();
+}
+
+void TicketingSystem::TicketingState::appendStats(BSONObjBuilder& b) const {
+    b.append("storageEngineConcurrencyAdjustmentAlgorithm", algorithm);
 }
 
 }  // namespace admission

@@ -193,6 +193,7 @@ private:
         bool usesPrioritization() const;
         bool usesThroughputProbing() const;
         bool isRuntimeResizable() const;
+        void appendStats(BSONObjBuilder& b) const;
     };
 
     /**
