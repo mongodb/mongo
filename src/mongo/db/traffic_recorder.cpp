@@ -436,6 +436,21 @@ void TrafficRecorder::stop(ServiceContext* svcCtx) {
     _stop(_recording.synchronize(), svcCtx);
 }
 
+StatusReply TrafficRecorder::status() const {
+    auto rec = _recording.synchronize();
+    StatusReply res;
+
+    auto recPtr = *rec;
+    if (!recPtr) {
+        res.setStatus(RecordingStateEnum::None);
+        return res;
+    }
+    res.setStatus(recPtr->isStarted() ? RecordingStateEnum::Running
+                                      : RecordingStateEnum::Scheduled);
+    res.setRecordingID(recPtr->getID());
+    return res;
+}
+
 void TrafficRecorder::sessionStarted(const transport::Session& ts) {
     auto id = ts.id();
     auto session = ts.toBSON().toString();

@@ -144,8 +144,8 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
-            // Not yet implemented
+        StatusReply typedRun(OperationContext* opCtx) {
+            return TrafficRecorder::get(opCtx->getServiceContext()).status();
         }
 
     private:

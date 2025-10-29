@@ -57,6 +57,7 @@ enums:
         description: State of a Recording instance
         type: string
         values:
+            None: "none"
             Scheduled: "scheduled"
             Running: "running"
             Failed: "failed"
@@ -90,6 +91,18 @@ structs:
             created:
                 description: "If a new recording was initialized by this request"
                 type: bool
+            status:
+                description: "The current state of the recording"
+                type: RecordingState
+    StatusReply:
+        description: "Response for getTrafficRecordingStatus"
+        strict: false
+        is_command_reply: true
+        fields:
+            recordingID:
+                description: "Unique identifier for the resulting recording"
+                type: string
+                optional: true
             status:
                 description: "The current state of the recording"
                 type: RecordingState

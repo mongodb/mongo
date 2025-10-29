@@ -96,6 +96,9 @@ public:
     StartReply start(const StartTrafficRecording& options, ServiceContext* svcCtx);
     void stop(ServiceContext* svcCtx);
 
+    StatusReply status() const;
+
+
     void sessionStarted(const transport::Session& ts);
     void sessionEnded(const transport::Session& ts);
 
