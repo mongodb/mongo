@@ -44,11 +44,13 @@ def get_conn_config(disagg_storage):
 def gen_disagg_storages(test_name='', disagg_only = False):
     # Get the string of the configured page_log, e.g. 'palm' or 'palite'.
     page_log = wttest.WiredTigerTestCase.vars().page_log
+    page_log_verbose = wttest.WiredTigerTestCase.vars().page_log_verbose
     disagg_storages = [
         (page_log, dict(is_disagg = True,
             is_local_storage = True,
             num_ops=100,
-            ds_name = page_log)),
+            ds_name = page_log,
+            disagg_verbose = int(page_log_verbose))),
         # This must be the last item as we separate the non-disagg from the disagg items later on.
         ('non_disagg', dict(is_disagg = False)),
     ]
@@ -108,8 +110,8 @@ def disagg_test_class(cls):
 
 # This mixin class provides disaggregated storage configuration methods.
 class DisaggConfigMixin:
-    palm_debug = False        # can be overridden in test class
-    palm_config = None        # a string, can be overridden in test class
+    disagg_verbose = 0        # (0 <= level <=3) can be overridden in test class
+    disagg_config = None      # a string, can be overridden in test class
     palm_cache_size_mb = -1   # this uses the default, can be overridden
 
     # Returns True if the current scenario is disaggregated.
@@ -164,14 +166,18 @@ class DisaggConfigMixin:
     def disaggregated_extension_config(self):
         extension_config = ''
         if self.ds_name == 'palm':
-            if self.palm_debug:
+            if self.disagg_verbose > 0: # PALM doesn't support fine verbose levels
                 extension_config += ',verbose=1'
             else:
                 extension_config += ',verbose=0'
             if self.palm_cache_size_mb != -1:
                 extension_config += f',cache_size_mb={self.palm_cache_size_mb}'
-            if self.palm_config:
-                extension_config += ',' + self.palm_config
+        elif self.ds_name == 'palite':
+            extension_config += f',verbose={self.disagg_verbose}'
+
+        if self.is_disagg:
+            if self.disagg_config:
+                extension_config += ',' + self.disagg_config
         return extension_config
 
     # Load disaggregated storage extension.

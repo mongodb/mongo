@@ -554,6 +554,7 @@ struct __wt_connection_stats {
     int64_t eviction_server_skip_metatdata_with_history;
     int64_t eviction_server_skip_pages_checkpoint_timestamp;
     int64_t eviction_server_skip_pages_last_running;
+    int64_t eviction_server_skip_pages_prune_timestamp;
     int64_t eviction_server_skip_pages_retry;
     int64_t eviction_server_skip_unwanted_pages;
     int64_t eviction_server_skip_unwanted_tree;

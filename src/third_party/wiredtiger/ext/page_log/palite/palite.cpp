@@ -85,7 +85,7 @@ char *
 write_ascii_chars(char *buf_ptr, std::span<const uint8_t> line_data)
 {
     for (uint8_t c : line_data) {
-        *buf_ptr++ = std::isprint(c) ? c : '.';
+        *buf_ptr++ = isascii(c) && std::isprint(c) ? c : '.';
     }
     return buf_ptr;
 }
@@ -333,7 +333,7 @@ log(Config &config, WT_VERBOSE_LEVEL level, std::format_string<Args...> fmt, Arg
           (level <= WT_VERBOSE_WARNING) ? config.extapi->err_printf : config.extapi->msg_printf;
         api_printf(config.extapi, session(), "%s", message.c_str());
     } else {
-        std::cerr << message;
+        std::cerr << message << std::endl;
     }
 }
 
@@ -363,7 +363,7 @@ log(std::source_location loc, Config &config, WT_VERBOSE_LEVEL level,
 //#define LOG_INFO(...)    LOG_AT(WT_VERBOSE_INFO,     __VA_ARGS__) // unused
 #define LOG_DEBUG(...) LOG_AT(WT_VERBOSE_DEBUG_1, __VA_ARGS__)
 #define LOG_DIAG(...) LOG_AT(WT_VERBOSE_DEBUG_2, __VA_ARGS__)
-#define LOG_TRACE(...) LOG_AT(WT_VERBOSE_DEBUG_5, __VA_ARGS__)
+#define LOG_TRACE(...) LOG_AT(WT_VERBOSE_DEBUG_3, __VA_ARGS__)
 
 #define LOG_SQL_TRACE(fmt, ...)         \
     do {                                \
@@ -1748,7 +1748,7 @@ public:
         uint32_t flags = 0;
         storage.get_pages(txn.conn, table_id, page_id, args, &flags, results_array, results_count);
         storage.commit_transaction(txn);
-        LOG_DIAG(
+        LOG_DEBUG(
           "Get page_id={} at lsn={}, returned {} entries, "
           "backlink_lsn={}, base_lsn={}, flags={:#x}",
           page_id, args->lsn, *results_count, args->backlink_lsn, args->base_lsn, flags);
@@ -1944,7 +1944,7 @@ public:
           "checkpoint_id={}, timestamp={}, lsn={}", checkpoint_id, checkpoint_timestamp, lsn);
         LOG_TRACE("checkpoint_metadata (size={}) =====\n{}",
           checkpoint_metadata ? checkpoint_metadata->size : 0,
-          palite_verbose_item(checkpoint_metadata));
+          checkpoint_metadata ? palite_verbose_item(checkpoint_metadata) : "<none>");
 
         if (lsnp) {
             *lsnp = lsn;
@@ -1963,8 +1963,6 @@ public:
             *checkpoint_id = 0;
         if (checkpoint_timestamp)
             *checkpoint_timestamp = 0;
-        if (checkpoint_metadata)
-            memset(checkpoint_metadata, 0, sizeof(WT_ITEM));
 
         uint64_t query_lsn = WT_PAGE_LOG_LSN_MAX; // most recent checkpoint
         Storage::Transaction txn = storage.begin_transaction();
@@ -1976,7 +1974,7 @@ public:
           checkpoint_timestamp ? *checkpoint_timestamp : 0);
         LOG_TRACE("checkpoint_metadata (size={}) =====\n{}",
           checkpoint_metadata ? checkpoint_metadata->size : 0,
-          palite_verbose_item(checkpoint_metadata));
+          checkpoint_metadata ? palite_verbose_item(checkpoint_metadata) : "<none>");
 
         if (checkpoint_lsn)
             *checkpoint_lsn = query_lsn;
