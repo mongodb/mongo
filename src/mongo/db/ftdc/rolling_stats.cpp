@@ -49,23 +49,14 @@ std::vector<int64_t> createPartitions(const int64_t maxValue) {
 }
 
 // Returns the numeric value we will use as the value of a point in a Histogram defined by
-// partitions with bucket ending at partitionIt, where partitions.end() represents the final bucket.
-int64_t currentPartitionValue(auto partitionIt, const std::vector<int64_t>& partitions) {
-    if (partitionIt == partitions.begin()) {
+// partitions with bucket ending at partitionIndex, where partitions.size() represents the final
+// bucket.
+int64_t currentPartitionValue(size_t partitionIndex, const std::vector<int64_t>& partitions) {
+    if (partitionIndex == 0) {
         return 0;
     }
-    return *(partitionIt - 1);
-}
-
-// Returns a numeric value that can be inserted into a Histogram defined by partitions into a bucket
-// ending at partitionIt, where partitions.end() represents the final bucket.
-int64_t examplePartitionValue(auto partitionIt, const std::vector<int64_t>& partitions) {
-    if (partitionIt == partitions.begin()) {
-        // Just using *partitionIt will put it in the 2nd bucket, so subtract one to ensure it goes
-        // to the previous bucket.
-        return *partitionIt - 1;
-    }
-    return *(partitionIt - 1);
+    invariant(partitionIndex <= partitions.size());
+    return partitions[partitionIndex - 1];
 }
 
 // Returns the values for the given percentiles from the given histogram and the total count of
@@ -81,22 +72,22 @@ std::vector<int64_t> getPercentileValues(const Histogram<int64_t>& histogram,
     std::vector<int64_t> values;
     values.reserve(percentiles.size());
     auto percentilesIt = percentiles.begin();
-    auto partitionIt = partitions.begin();
-    std::vector<int64_t> counts = histogram.getCounts();
     int64_t running_count = 0;
     int64_t percentileIndex = *percentilesIt * totalCount / 100;
 
-    for (auto countIt = counts.begin(); countIt != counts.end(); ++countIt) {
+    std::vector<int64_t> counts = histogram.getCounts();
+    for (auto [countIt, partitionIndex] = std::pair{counts.begin(), size_t{0}};
+         countIt < counts.end() && partitionIndex <= partitions.size();
+         ++countIt, ++partitionIndex) {
         running_count += *countIt;
         while (running_count >= percentileIndex) {
-            values.push_back(currentPartitionValue(partitionIt, partitions));
+            values.push_back(currentPartitionValue(partitionIndex, partitions));
             ++percentilesIt;
             if (percentilesIt == percentiles.end()) {
                 return values;
             }
             percentileIndex = *percentilesIt * totalCount / 100;
         }
-        ++partitionIt;
     }
 
     invariant(!"Never found percentiles.");
@@ -144,15 +135,16 @@ RollingStats::WindowData RollingStats::_readWindowData() const {
                 continue;
             }
 
-            auto partitionIt = _valuePartitions.begin();
-            for (int64_t count : histogram.getCounts()) {
-                data.count += count;
-                data.max = std::max(data.max, max);
-                int64_t value = currentPartitionValue(partitionIt, _valuePartitions);
-                data.histogram.incrementN(examplePartitionValue(partitionIt, _valuePartitions),
-                                          count);
-                data.sum += value * count;
-                ++partitionIt;
+            data.max = std::max(data.max, max);
+
+            std::vector<int64_t> counts = histogram.getCounts();
+            for (auto [countIt, partitionIndex] = std::pair{counts.begin(), size_t{0}};
+                 countIt < counts.end() && partitionIndex <= _valuePartitions.size();
+                 ++countIt, ++partitionIndex) {
+                data.count += *countIt;
+                int64_t value = currentPartitionValue(partitionIndex, _valuePartitions);
+                data.histogram.incrementN(value, *countIt);
+                data.sum += value * *countIt;
             }
         }
     }
