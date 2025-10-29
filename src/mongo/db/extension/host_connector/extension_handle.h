@@ -28,8 +28,7 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host/host_portal.h"
-#include "mongo/db/extension/host/host_services.h"
+#include "mongo/db/extension/host_connector/host_portal_adapter.h"
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -60,7 +59,7 @@ public:
      * hand, will go out of scope immediately after the call to initialize() so it is passed by
      * reference.
      */
-    void initialize(const extension::host::HostPortal& portal,
+    void initialize(const extension::host_connector::HostPortalAdapter& portal,
                     const extension::host_connector::HostServicesAdapter* hostServices) const {
         invokeCAndConvertStatusToException([&] {
             assertValid();

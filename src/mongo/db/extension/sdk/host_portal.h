@@ -56,7 +56,7 @@ public:
         invokeCAndConvertStatusToException([&] {
             assertValid();
             return vtable().register_stage_descriptor(
-                reinterpret_cast<const ::MongoExtensionAggStageDescriptor*>(stageDesc));
+                get(), reinterpret_cast<const ::MongoExtensionAggStageDescriptor*>(stageDesc));
         });
     }
 

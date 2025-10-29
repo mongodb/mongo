@@ -14,12 +14,14 @@ mongo_cc_library(
     name = "extensions_host_connector",
     srcs = [
         "executable_agg_stage.cpp",
+        "host_portal_adapter.cpp",
         "query_execution_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
     ],
     hdrs = [
         "executable_agg_stage.h",
         "extension_handle.h",
+        "host_portal_adapter.h",
         "host_services_adapter.h",
         "query_execution_context_adapter.h",
         "query_shape_opts_adapter.h",

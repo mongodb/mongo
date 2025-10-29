@@ -26,28 +26,49 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host/host_portal.h"
+#pragma once
 
-#include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::extension::host {
+#include <memory>
+#include <string>
 
-void HostPortal::registerStageDescriptor(const ::MongoExtensionAggStageDescriptor* descriptor) {
-    tassert(
-        10596400, "Got null stage descriptor during extension registration", descriptor != nullptr);
-    DocumentSourceExtension::registerStage(AggStageDescriptorHandle(descriptor));
-}
+namespace mongo::extension::host_connector {
 
-::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(
-    const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() { return registerStageDescriptor(stageDesc); });
-}
+class HostPortalBase {
+public:
+    virtual ~HostPortalBase() = default;
+    virtual void registerStageDescriptor(const ::MongoExtensionAggStageDescriptor*) const = 0;
+};
 
-::MongoExtensionByteView HostPortal::_extGetOptions(
-    const ::MongoExtensionHostPortal* portal) noexcept {
-    return stringViewAsByteView(static_cast<const HostPortal*>(portal)->_extensionOpts);
-}
+class HostPortalAdapter final : public ::MongoExtensionHostPortal {
+public:
+    HostPortalAdapter(::MongoExtensionAPIVersion apiVersion,
+                      int maxWireVersion,
+                      std::string extensionOptions,
+                      std::unique_ptr<HostPortalBase> portal)
+        : ::MongoExtensionHostPortal{&VTABLE, apiVersion, maxWireVersion},
+          _extensionOpts(std::move(extensionOptions)),
+          _portal(std::move(portal)) {}
 
-}  // namespace mongo::extension::host
+    const HostPortalBase& getImpl() const {
+        return *_portal;
+    }
+
+private:
+    static ::MongoExtensionStatus* _extRegisterStageDescriptor(
+        const MongoExtensionHostPortal* hostPortal,
+        const MongoExtensionAggStageDescriptor* stageDesc) noexcept;
+
+    static ::MongoExtensionByteView _extGetOptions(
+        const ::MongoExtensionHostPortal* portal) noexcept;
+
+    static constexpr ::MongoExtensionHostPortalVTable VTABLE{&_extRegisterStageDescriptor,
+                                                             &_extGetOptions};
+
+    const std::string _extensionOpts;
+    std::unique_ptr<HostPortalBase> _portal;
+};
+
+}  // namespace mongo::extension::host_connector

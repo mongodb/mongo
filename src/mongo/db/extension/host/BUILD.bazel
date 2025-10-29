@@ -19,7 +19,6 @@ mongo_cc_library(
         "document_source_extension.cpp",
         "document_source_extension_optimizable.cpp",
         "extension_stage.cpp",
-        "host_portal.cpp",
     ],
     hdrs = [
         "document_source_extension.h",

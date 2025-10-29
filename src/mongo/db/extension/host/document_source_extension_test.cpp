@@ -94,8 +94,12 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
     std::vector<BSONObj> testPipeline{kValidSpec};
     ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 16436);
     // Register the extension stage and try to reparse.
-    host::HostPortal::registerStageDescriptor(
-        reinterpret_cast<const ::MongoExtensionAggStageDescriptor*>(&_noOpStaticDescriptor));
+
+    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
+    host_connector::HostPortalAdapter portal{
+        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    portal.getImpl().registerStageDescriptor(&_noOpStaticDescriptor);
+
     auto parsedPipeline = buildTestPipeline(testPipeline);
     ASSERT(parsedPipeline);
 

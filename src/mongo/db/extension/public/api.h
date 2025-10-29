@@ -584,6 +584,7 @@ typedef struct MongoExtensionHostPortalVTable {
      * Register an aggregation stage descriptor with the host.
      */
     MongoExtensionStatus* (*register_stage_descriptor)(
+        const MongoExtensionHostPortal* hostPortal,
         const MongoExtensionAggStageDescriptor* descriptor);
 
     /**

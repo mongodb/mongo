@@ -30,6 +30,7 @@
 #include "mongo/db/extension/host/load_extension.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/host/host_services.h"
 #include "mongo/db/extension/host/load_stub_parsers.h"
 #include "mongo/db/extension/host_connector/extension_handle.h"
@@ -236,7 +237,11 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
                .getIncomingInternalClient()
                .maxWireVersion);
 
-    HostPortal portal{extHandle.getVersion(), maxWireVersion, YAML::Dump(config.extOptions)};
+    std::unique_ptr<HostPortal> hostPortal = std::make_unique<HostPortal>();
+    host_connector::HostPortalAdapter portal{extHandle.getVersion(),
+                                             maxWireVersion,
+                                             YAML::Dump(config.extOptions),
+                                             std::move(hostPortal)};
     extHandle.initialize(portal, host_connector::HostServicesAdapter::get());
 }
 

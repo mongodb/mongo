@@ -26,24 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
-
-#include "mongo/db/extension/host/document_source_extension.h"
 #include "mongo/db/extension/host_connector/host_portal_adapter.h"
+
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
-#include "mongo/util/assert_util.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::host_connector {
 
-class HostPortal : public host_connector::HostPortalBase {
-public:
-    void registerStageDescriptor(
-        const ::MongoExtensionAggStageDescriptor* descriptor) const override {
-        tassert(10596400,
-                "Got null stage descriptor during extension registration",
-                descriptor != nullptr);
-        host::DocumentSourceExtension::registerStage(AggStageDescriptorHandle(descriptor));
-    };
-};
+::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageDescriptor(
+    const MongoExtensionHostPortal* hostPortal,
+    const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
+        impl.registerStageDescriptor(stageDesc);
+    });
+}
 
-}  // namespace mongo::extension::host
+::MongoExtensionByteView HostPortalAdapter::_extGetOptions(
+    const ::MongoExtensionHostPortal* portal) noexcept {
+    return stringViewAsByteView(static_cast<const HostPortalAdapter*>(portal)->_extensionOpts);
+}
+
+}  // namespace mongo::extension::host_connector
