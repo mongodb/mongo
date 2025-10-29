@@ -77,6 +77,28 @@ Status updateSettings(const std::string& op, Updater&& updater) {
     return Status::OK();
 }
 
+void warnIfDynamicAdjustmentEnabled(TicketingSystem* ticketingSystem,
+                                    const std::string& serverParameter) {
+    if (!ticketingSystem->isRuntimeResizable()) {
+        LOGV2_WARNING(11280900,
+                      "Updating {serverParameter} while a dynamic adjustment algorithm (e.g., "
+                      "throughputProbing) is active. The new value will be stored but may not take "
+                      "effect until the algorithm is changed.",
+                      "serverParameter"_attr = serverParameter);
+    }
+}
+
+void warnIfPrioritizationDisabled(TicketingSystem* ticketingSystem,
+                                  const std::string& serverParameter) {
+    if (!ticketingSystem->usesPrioritization()) {
+        LOGV2_WARNING(11280901,
+                      "Updating {serverParameter} while the storage engine concurrency adjustment "
+                      "algorithm is using a single pool without prioritization. The new value will "
+                      "be stored but will not take effect.",
+                      "serverParameter"_attr = serverParameter);
+    }
+}
+
 bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
                                          ExecutionAdmissionContext* admCtx) {
     const auto priority = admCtx->getPriority();
@@ -118,36 +140,30 @@ Status TicketingSystem::NormalPrioritySettings::updateReadMaxQueueDepth(
 
 Status TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransactions(
     const int32_t& newWriteTransactions) {
-    return updateSettings(
-        "write transactions limit", [&](Client* client, TicketingSystem* ticketingSystem) {
-            if (!ticketingSystem->isRuntimeResizable()) {
-                return Status{ErrorCodes::IllegalOperation,
-                              "Cannot modify concurrent write transactions limit when it is being "
-                              "dynamically adjusted"};
-            }
-            ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
-                                                       AdmissionContext::Priority::kNormal,
-                                                       OperationType::kWrite,
-                                                       newWriteTransactions);
-            return Status::OK();
-        });
+    const auto spName = "concurrent write transactions limit";
+    return updateSettings(spName, [&](Client* client, TicketingSystem* ticketingSystem) {
+        warnIfDynamicAdjustmentEnabled(ticketingSystem, spName);
+
+        ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
+                                                   AdmissionContext::Priority::kNormal,
+                                                   OperationType::kWrite,
+                                                   newWriteTransactions);
+        return Status::OK();
+    });
 }
 
 Status TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions(
     const int32_t& newReadTransactions) {
-    return updateSettings(
-        "read transactions limit", [&](Client* client, TicketingSystem* ticketingSystem) {
-            if (!ticketingSystem->isRuntimeResizable()) {
-                return Status{ErrorCodes::IllegalOperation,
-                              "Cannot modify concurrent read transactions limit when it is being "
-                              "dynamically adjusted"};
-            }
-            ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
-                                                       AdmissionContext::Priority::kNormal,
-                                                       OperationType::kRead,
-                                                       newReadTransactions);
-            return Status::OK();
-        });
+    const auto spName = "concurrent read transactions limit";
+    return updateSettings(spName, [&](Client* client, TicketingSystem* ticketingSystem) {
+        warnIfDynamicAdjustmentEnabled(ticketingSystem, spName);
+
+        ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
+                                                   AdmissionContext::Priority::kNormal,
+                                                   OperationType::kRead,
+                                                   newReadTransactions);
+        return Status::OK();
+    });
 }
 
 Status TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions(
@@ -170,13 +186,10 @@ Status TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactio
 
 Status TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth(
     std::int32_t newWriteMaxQueueDepth) {
-    return updateSettings("write max queue depth", [=](Client*, TicketingSystem* ticketingSystem) {
-        if (!ticketingSystem->usesPrioritization()) {
-            return Status{ErrorCodes::IllegalOperation,
-                          "Cannot modify concurrent low priority settings if the storage "
-                          "engine concurrency adjustment algorithm is using a single pool "
-                          "without prioritization"};
-        }
+    const auto spName = "low priority write max queue depth";
+    return updateSettings(spName, [=](Client*, TicketingSystem* ticketingSystem) {
+        warnIfPrioritizationDisabled(ticketingSystem, spName);
+
         ticketingSystem->setMaxQueueDepth(
             AdmissionContext::Priority::kLow, OperationType::kWrite, newWriteMaxQueueDepth);
         return Status::OK();
@@ -185,13 +198,10 @@ Status TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth(
 
 Status TicketingSystem::LowPrioritySettings::updateReadMaxQueueDepth(
     std::int32_t newReadMaxQueueDepth) {
-    return updateSettings("read max queue depth", [=](Client*, TicketingSystem* ticketingSystem) {
-        if (!ticketingSystem->usesPrioritization()) {
-            return Status{ErrorCodes::IllegalOperation,
-                          "Cannot modify concurrent low priority settings if the storage "
-                          "engine concurrency adjustment algorithm is using a single pool "
-                          "without prioritization"};
-        }
+    const auto spName = "low priority read max queue depth";
+    return updateSettings(spName, [=](Client*, TicketingSystem* ticketingSystem) {
+        warnIfPrioritizationDisabled(ticketingSystem, spName);
+
         ticketingSystem->setMaxQueueDepth(
             AdmissionContext::Priority::kLow, OperationType::kRead, newReadMaxQueueDepth);
         return Status::OK();
@@ -200,48 +210,32 @@ Status TicketingSystem::LowPrioritySettings::updateReadMaxQueueDepth(
 
 Status TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions(
     const int32_t& newWriteTransactions) {
-    return updateSettings(
-        "write transactions limit", [&](Client* client, TicketingSystem* ticketingSystem) {
-            if (!ticketingSystem->isRuntimeResizable()) {
-                return Status{ErrorCodes::IllegalOperation,
-                              "Cannot modify concurrent write transactions limit when it is being "
-                              "dynamically adjusted"};
-            }
-            if (!ticketingSystem->usesPrioritization()) {
-                return Status{ErrorCodes::IllegalOperation,
-                              "Cannot modify concurrent low priority settings if the storage "
-                              "engine concurrency adjustment algorithm is using a single pool "
-                              "without prioritization"};
-            }
-            ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
-                                                       AdmissionContext::Priority::kLow,
-                                                       OperationType::kWrite,
-                                                       newWriteTransactions);
-            return Status::OK();
-        });
+    const auto spName = "low priority concurrent write transactions limit";
+    return updateSettings(spName, [&](Client* client, TicketingSystem* ticketingSystem) {
+        warnIfDynamicAdjustmentEnabled(ticketingSystem, spName);
+        warnIfPrioritizationDisabled(ticketingSystem, spName);
+
+        ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
+                                                   AdmissionContext::Priority::kLow,
+                                                   OperationType::kWrite,
+                                                   newWriteTransactions);
+        return Status::OK();
+    });
 }
 
 Status TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions(
     const int32_t& newReadTransactions) {
-    return updateSettings(
-        "read transactions limit", [&](Client* client, TicketingSystem* ticketingSystem) {
-            if (!ticketingSystem->isRuntimeResizable()) {
-                return Status{ErrorCodes::IllegalOperation,
-                              "Cannot modify concurrent read transactions limit when it is being "
-                              "dynamically adjusted"};
-            }
-            if (!ticketingSystem->usesPrioritization()) {
-                return Status{ErrorCodes::IllegalOperation,
-                              "Cannot modify concurrent low priority settings if the storage "
-                              "engine concurrency adjustment algorithm is using a single pool "
-                              "without prioritization"};
-            }
-            ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
-                                                       AdmissionContext::Priority::kLow,
-                                                       OperationType::kRead,
-                                                       newReadTransactions);
-            return Status::OK();
-        });
+    const auto spName = "low priority concurrent read transactions limit";
+    return updateSettings(spName, [&](Client* client, TicketingSystem* ticketingSystem) {
+        warnIfDynamicAdjustmentEnabled(ticketingSystem, spName);
+        warnIfPrioritizationDisabled(ticketingSystem, spName);
+
+        ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
+                                                   AdmissionContext::Priority::kLow,
+                                                   OperationType::kRead,
+                                                   newReadTransactions);
+        return Status::OK();
+    });
 }
 
 Status TicketingSystem::updateConcurrencyAdjustmentAlgorithm(std::string algorithmName) {

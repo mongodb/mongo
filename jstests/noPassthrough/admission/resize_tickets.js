@@ -20,6 +20,10 @@ describe("Storage engine concurrency adjustment algorithm", function () {
     const kFixedWithPrio = "fixedConcurrentTransactionsWithPrioritization";
     const kThroughputProbing = "throughputProbing";
 
+    // Global counters to track expected warning counts across all test calls
+    let expectedDynamicWarnings = 0;
+    let expectedPrioritizationWarnings = 0;
+
     /**
      * Sets the concurrency adjustment algorithm at runtime and verifies the change was successful.
      */
@@ -30,40 +34,61 @@ describe("Storage engine concurrency adjustment algorithm", function () {
     }
 
     /**
-     * Asserts whether normal and low priority tickets can be resized based on the expected behavior
-     * of the currently active algorithm.
+     * Helper to check for the presence of specific warning log messages.
      */
-    function assertTicketSizing(mongod, {normalAllowed, lowPriorityAllowed}) {
-        const normalRead = {storageEngineConcurrentReadTransactions: 25};
-        const normalWrite = {storageEngineConcurrentWriteTransactions: 25};
-        const lowPrioRead = {storageEngineConcurrentReadLowPriorityTransactions: 25};
-        const lowPrioWrite = {storageEngineConcurrentWriteLowPriorityTransactions: 25};
+    function assertWarningLogs(mongod, logId, readParamName, writeParamName, expectedCount, warningType) {
+        assert.soon(
+            () => checkLog.checkContainsWithCountJson(mongod, logId, {"serverParameter": readParamName}, expectedCount),
+            `Expected ${expectedCount} ${warningType} warning(s) for ${readParamName} not found`,
+        );
+        assert.soon(
+            () =>
+                checkLog.checkContainsWithCountJson(mongod, logId, {"serverParameter": writeParamName}, expectedCount),
+            `Expected ${expectedCount} ${warningType} warning(s) for ${writeParamName} not found`,
+        );
+    }
 
-        if (normalAllowed) {
-            assert.commandWorked(mongod.adminCommand({setParameter: 1, ...normalRead}));
-            assert.commandWorked(mongod.adminCommand({setParameter: 1, ...normalWrite}));
-        } else {
-            assert.commandFailedWithCode(
-                mongod.adminCommand({setParameter: 1, ...normalRead}),
-                ErrorCodes.IllegalOperation,
-            );
-            assert.commandFailedWithCode(
-                mongod.adminCommand({setParameter: 1, ...normalWrite}),
-                ErrorCodes.IllegalOperation,
+    /**
+     * Asserts that ticket resizing commands succeed. All ticket resizing operations are allowed
+     * regardless of the algorithm, though warnings may be logged based on the current algorithm.
+     */
+    function assertTicketSizing(mongod, options = {}) {
+        const expectDynamicWarnings = options.expectDynamicAdjustmentWarnings || false;
+        const expectPrioritizationWarnings = options.expectPrioritizationWarnings || false;
+
+        const ticketParams = {
+            storageEngineConcurrentReadTransactions: 25,
+            storageEngineConcurrentWriteTransactions: 25,
+            storageEngineConcurrentReadLowPriorityTransactions: 25,
+            storageEngineConcurrentWriteLowPriorityTransactions: 25,
+        };
+        for (const [param, value] of Object.entries(ticketParams)) {
+            assert.commandWorked(mongod.adminCommand({setParameter: 1, [param]: value}));
+        }
+
+        // Check for dynamic adjustment warnings (when throughput probing is active)
+        if (expectDynamicWarnings) {
+            expectedDynamicWarnings++;
+            assertWarningLogs(
+                mongod,
+                11280900,
+                "concurrent read transactions limit",
+                "concurrent write transactions limit",
+                expectedDynamicWarnings,
+                "dynamic adjustment",
             );
         }
 
-        if (lowPriorityAllowed) {
-            assert.commandWorked(mongod.adminCommand({setParameter: 1, ...lowPrioRead}));
-            assert.commandWorked(mongod.adminCommand({setParameter: 1, ...lowPrioWrite}));
-        } else {
-            assert.commandFailedWithCode(
-                mongod.adminCommand({setParameter: 1, ...lowPrioRead}),
-                ErrorCodes.IllegalOperation,
-            );
-            assert.commandFailedWithCode(
-                mongod.adminCommand({setParameter: 1, ...lowPrioWrite}),
-                ErrorCodes.IllegalOperation,
+        // Check for prioritization warnings (when single pool without prioritization is used)
+        if (expectPrioritizationWarnings) {
+            expectedPrioritizationWarnings++;
+            assertWarningLogs(
+                mongod,
+                11280901,
+                "low priority concurrent read transactions limit",
+                "low priority concurrent write transactions limit",
+                expectedPrioritizationWarnings,
+                "prioritization",
             );
         }
     }
@@ -71,13 +96,18 @@ describe("Storage engine concurrency adjustment algorithm", function () {
     describe("Algorithm behavior at server startup", function () {
         let replTest;
 
+        beforeEach(function () {
+            expectedDynamicWarnings = 0;
+            expectedPrioritizationWarnings = 0;
+        });
+
         afterEach(function () {
             if (replTest) {
                 replTest.stopSet();
             }
         });
 
-        it("should not allow any ticket resizing when throughput probing is enabled by default", function () {
+        it("should allow ticket resizing when throughput probing is enabled by default", function () {
             replTest = new ReplSetTest({nodes: 1});
             replTest.startSet();
             replTest.initiate();
@@ -88,11 +118,11 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             ).storageEngineConcurrencyAdjustmentAlgorithm;
 
             if (algorithm === kThroughputProbing) {
-                assertTicketSizing(mongod, {normalAllowed: false, lowPriorityAllowed: false});
+                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true, expectPrioritizationWarnings: true});
             }
         });
 
-        it("should allow resizing only normal priority tickets when using the 'fixed' algorithm", function () {
+        it("should allow ticket resizing when using the 'fixed' algorithm", function () {
             replTest = new ReplSetTest({
                 nodes: 1,
                 nodeOptions: {setParameter: {storageEngineConcurrencyAdjustmentAlgorithm: kFixed}},
@@ -100,7 +130,7 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             replTest.startSet();
             replTest.initiate();
             const mongod = replTest.getPrimary();
-            assertTicketSizing(mongod, {normalAllowed: true, lowPriorityAllowed: false});
+            assertTicketSizing(mongod, {expectPrioritizationWarnings: true});
         });
 
         it("should implicitly use 'fixed' algorithm when tickets are set at startup", function () {
@@ -117,9 +147,7 @@ describe("Storage engine concurrency adjustment algorithm", function () {
                 storageEngineConcurrencyAdjustmentAlgorithm: 1,
             });
             assert.commandWorked(getParameterResult);
-            assert.eq(getParameterResult.storageEngineConcurrencyAdjustmentAlgorithm, kFixed);
-
-            assertTicketSizing(mongod, {normalAllowed: true, lowPriorityAllowed: false});
+            assert.neq(getParameterResult.storageEngineConcurrencyAdjustmentAlgorithm, kThroughputProbing);
         });
 
         it("should not override to 'fixed' algorithm when prioritization is set at startup", function () {
@@ -143,7 +171,7 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             assert.commandWorked(getParameterResult);
             assert.eq(getParameterResult.storageEngineConcurrencyAdjustmentAlgorithm, kFixedWithPrio);
 
-            assertTicketSizing(mongod, {normalAllowed: true, lowPriorityAllowed: true});
+            assertTicketSizing(mongod);
         });
 
         it(`should allow resizing all ticket types with '${kFixedWithPrio}'`, function () {
@@ -154,18 +182,23 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             replTest.startSet();
             replTest.initiate();
             const mongod = replTest.getPrimary();
-            assertTicketSizing(mongod, {normalAllowed: true, lowPriorityAllowed: true});
+            assertTicketSizing(mongod);
         });
     });
 
     describe("Algorithm parameter validation", function () {
         let replTest, mongod;
+
         beforeEach(function () {
             replTest = new ReplSetTest({nodes: 1});
             replTest.startSet();
             replTest.initiate();
             mongod = replTest.getPrimary();
+
+            expectedDynamicWarnings = 0;
+            expectedPrioritizationWarnings = 0;
         });
+
         afterEach(function () {
             replTest.stopSet();
         });
@@ -198,6 +231,9 @@ describe("Storage engine concurrency adjustment algorithm", function () {
                 this.replTest.startSet();
                 this.replTest.initiate();
                 this.mongod = this.replTest.getPrimary();
+
+                expectedDynamicWarnings = 0;
+                expectedPrioritizationWarnings = 0;
             });
 
             afterEach(function () {
@@ -205,16 +241,19 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             });
 
             it("should allow transitions to other algorithms and back", function () {
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {expectPrioritizationWarnings: true});
 
                 setAlgorithm(this.mongod, kFixedWithPrio);
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: true});
+                assertTicketSizing(this.mongod);
 
                 setAlgorithm(this.mongod, kThroughputProbing);
-                assertTicketSizing(this.mongod, {normalAllowed: false, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {
+                    expectDynamicAdjustmentWarnings: true,
+                    expectPrioritizationWarnings: true,
+                });
 
                 setAlgorithm(this.mongod, kFixed);
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {expectPrioritizationWarnings: true});
             });
         });
 
@@ -229,6 +268,9 @@ describe("Storage engine concurrency adjustment algorithm", function () {
                 this.replTest.startSet();
                 this.replTest.initiate();
                 this.mongod = this.replTest.getPrimary();
+
+                expectedDynamicWarnings = 0;
+                expectedPrioritizationWarnings = 0;
             });
 
             afterEach(function () {
@@ -236,16 +278,19 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             });
 
             it("should allow transitions to other algorithms and back", function () {
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: true});
+                assertTicketSizing(this.mongod);
 
                 setAlgorithm(this.mongod, kFixed);
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {expectPrioritizationWarnings: true});
 
                 setAlgorithm(this.mongod, kThroughputProbing);
-                assertTicketSizing(this.mongod, {normalAllowed: false, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {
+                    expectDynamicAdjustmentWarnings: true,
+                    expectPrioritizationWarnings: true,
+                });
 
                 setAlgorithm(this.mongod, kFixedWithPrio);
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: true});
+                assertTicketSizing(this.mongod);
             });
         });
 
@@ -260,6 +305,9 @@ describe("Storage engine concurrency adjustment algorithm", function () {
                 this.replTest.startSet();
                 this.replTest.initiate();
                 this.mongod = this.replTest.getPrimary();
+
+                expectedDynamicWarnings = 0;
+                expectedPrioritizationWarnings = 0;
             });
 
             afterEach(function () {
@@ -267,16 +315,22 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             });
 
             it("should allow transitions to other algorithms and back", function () {
-                assertTicketSizing(this.mongod, {normalAllowed: false, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {
+                    expectDynamicAdjustmentWarnings: true,
+                    expectPrioritizationWarnings: true,
+                });
 
                 setAlgorithm(this.mongod, kFixed);
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {expectPrioritizationWarnings: true});
 
                 setAlgorithm(this.mongod, kFixedWithPrio);
-                assertTicketSizing(this.mongod, {normalAllowed: true, lowPriorityAllowed: true});
+                assertTicketSizing(this.mongod);
 
                 setAlgorithm(this.mongod, kThroughputProbing);
-                assertTicketSizing(this.mongod, {normalAllowed: false, lowPriorityAllowed: false});
+                assertTicketSizing(this.mongod, {
+                    expectDynamicAdjustmentWarnings: true,
+                    expectPrioritizationWarnings: true,
+                });
             });
         });
     });
