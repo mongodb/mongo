@@ -113,4 +113,7 @@ bool AttachedPersistenceProvider::supportsOplogSampling() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsTableVerify() const {
+    return true;
+}
 }  // namespace mongo::rss

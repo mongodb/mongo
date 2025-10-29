@@ -824,7 +824,6 @@ int WiredTigerUtil::verifyTable(WiredTigerSession& session,
 
     const char* verifyConfig =
         configurationOverride.has_value() ? configurationOverride->c_str() : nullptr;
-    // Do the verify. Weird parens prevent treating "verify" as a macro.
     return verifySession.verify(uri.c_str(), verifyConfig);
 }
 

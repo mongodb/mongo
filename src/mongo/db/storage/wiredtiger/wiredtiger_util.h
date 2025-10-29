@@ -309,7 +309,7 @@ public:
     };
 
     /**
-     * Calls WT_SESSION::validate() on a side-session to ensure that your current transaction
+     * Calls WT_SESSION::verify() on a side-session to ensure that your current transaction
      * isn't left in an invalid state.
      *
      * If errors is non-NULL, all error messages will be appended to the array.

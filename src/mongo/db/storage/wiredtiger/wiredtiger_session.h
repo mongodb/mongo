@@ -152,8 +152,10 @@ public:
     WRAPPED_WT_SESSION_METHOD(timestamp_transaction_uint)
     WRAPPED_WT_SESSION_METHOD(transaction_pinned_range)
     WRAPPED_WT_SESSION_METHOD(truncate)
-    WRAPPED_WT_SESSION_METHOD(verify)
 #undef WRAPPED_WT_SESSION_METHOD
+
+    // TODO SERVER-113061: remove this workaround.
+    int verify(const char* name, const char* config);
 
     /**
      * Gets a cursor on the table id 'id' with optional configuration, 'config'.

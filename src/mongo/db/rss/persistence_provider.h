@@ -150,6 +150,13 @@ public:
      * If true, the provider supports starting the oplog cap maintainer thread and oplog sampling.
      */
     virtual bool supportsOplogSampling() const = 0;
+
+    /**
+     * If true, the provider supports table verify.
+     *
+     * TODO SERVER-113061: remove this workaround.
+     */
+    virtual bool supportsTableVerify() const = 0;
 };
 
 }  // namespace rss

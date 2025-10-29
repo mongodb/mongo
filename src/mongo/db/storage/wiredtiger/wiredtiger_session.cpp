@@ -29,6 +29,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
@@ -124,6 +125,18 @@ void WiredTigerSession::_openCursor(WT_SESSION* session,
                         "config"_attr = config,
                         "error"_attr = status,
                         "message"_attr = kWTRepairMsg);
+}
+
+int WiredTigerSession::verify(const char* name, const char* config) {
+    auto& provider =
+        rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
+    if (!provider.supportsTableVerify()) {
+        LOGV2_DEBUG(11271900, 2, "Verify not supported by WiredTiger, exiting");
+        return 0;
+    }
+    Timer timer(_tickSource);
+    ON_BLOCK_EXIT([&] { _storageEngineTime += timer.elapsed(); });
+    return _session->verify(_session, name, config);
 }
 
 WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& config) {
