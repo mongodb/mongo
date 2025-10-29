@@ -61,6 +61,7 @@
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -79,6 +80,7 @@
 #include <absl/crc/crc32c.h>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/none.hpp>
 #include <fmt/ostream.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kRecorder
@@ -102,12 +104,22 @@ void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
     db.getCursor().write<LittleEndian<uint32_t>>(fullSize);
 }
 
+TrafficRecorder::RecordingID generateID() {
+    return UUID::gen().toString();
+}
+
 TrafficRecorder::Recording::Recording(const StartTrafficRecording& options,
                                       std::filesystem::path globalRecordingDirectory,
                                       TickSource* tickSource)
     : _path(_getPath(globalRecordingDirectory, std::string{options.getDestination()})),
       _maxLogSize(options.getMaxFileSize()),
       _tickSource(tickSource) {
+
+    if (auto id = options.getRecordingID()) {
+        _id = RecordingID(*id);
+    } else {
+        _id = generateID();
+    }
 
     // Scheduled times can be provided to startTrafficRecording.
     auto start = options.getStartTime();
@@ -323,7 +335,7 @@ std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_makeRecording(
     return std::make_shared<Recording>(options, globalRecordingDirectory, tickSource);
 }
 
-void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
+StartReply TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
     uassert(ErrorCodes::BadValue,
             "startTime and endTime should both be provided, or neither",
             options.getStartTime().has_value() == options.getEndTime().has_value());
@@ -344,11 +356,19 @@ void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext
 
     // May throw if not in a valid state to create a new recording i.e., if a pending or running
     // recording already exists.
-    auto rec = _prepare(options, svcCtx);
+    auto [rec, created] = _prepare(options, svcCtx);
+    const auto recID = (*rec)->getID();
+    if (!created) {
+        // This request did not need to create a new recording - it is a repeated call with the same
+        // recording ID. No further action needs to be taken.
+        auto status =
+            (*rec)->isStarted() ? RecordingStateEnum::Running : RecordingStateEnum::Scheduled;
+        return {recID, false, status};
+    }
     if (!options.getStartTime().has_value()) {
         // Start immediately.
         _start(std::move(rec), svcCtx);
-        return;
+        return {recID, true, RecordingStateEnum::Running};
     }
 
     auto start = *options.getStartTime();
@@ -404,6 +424,7 @@ void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext
         }
         LOGV2_INFO(10849406, "Recording Stopped");
     });
+    return {recID, true, RecordingStateEnum::Scheduled};
 }
 
 void TrafficRecorder::stop(ServiceContext* svcCtx) {
@@ -479,7 +500,7 @@ void TrafficRecorder::_observe(Recording& recording,
 }
 
 
-TrafficRecorder::LockedRecordingHandle TrafficRecorder::_prepare(
+std::pair<TrafficRecorder::LockedRecordingHandle, bool> TrafficRecorder::_prepare(
     const StartTrafficRecording& options, ServiceContext* svcCtx) {
     auto globalRecordingDirectory = gTrafficRecordingDirectory;
     uassert(ErrorCodes::BadValue,
@@ -487,9 +508,28 @@ TrafficRecorder::LockedRecordingHandle TrafficRecorder::_prepare(
             !globalRecordingDirectory.empty());
 
     auto rec = _recording.synchronize();
-    uassert(ErrorCodes::BadValue, "Traffic recording already active", !*rec);
+    auto recPtr = *rec;
+    auto requestedID = options.getRecordingID();
+
+    if (recPtr) {
+        // A recording already exists.
+        if (requestedID.has_value()) {
+            // A recording exists, and the request provided a recording ID.
+            // If the current recording has the same ID, the start request should complete
+            // successfully without taking further action, else it should fail.
+            uassert(ErrorCodes::BadValue,
+                    "Traffic recording already active with a different recording ID",
+                    *requestedID == recPtr->getID());
+            return {std::move(rec), false};
+        } else {
+            // If no recording ID was specified, any existing recording means the current start
+            // command should fail.
+            uasserted(ErrorCodes::BadValue, "Traffic recording already active");
+        }
+    }
+
     *rec = _makeRecording(options, globalRecordingDirectory, svcCtx->getTickSource());
-    return rec;
+    return {std::move(rec), true};
 }
 
 void TrafficRecorder::_start(LockedRecordingHandle rec, ServiceContext* svcCtx) {
@@ -498,7 +538,7 @@ void TrafficRecorder::_start(LockedRecordingHandle rec, ServiceContext* svcCtx) 
     uassert(ErrorCodes::BadValue, "Non-existent traffic recording cannot be started", recording);
     uassert(ErrorCodes::BadValue,
             "Traffic recording instance cannot be started repeatedly",
-            !recording->started());
+            !recording->isStarted());
 
     recording->start();
     _shouldRecord.store(true);

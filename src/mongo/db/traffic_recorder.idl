@@ -52,6 +52,16 @@ types:
         serializer: "mongo::memory_util::MemorySize::serializeToBSON"
         is_view: false
 
+enums:
+    RecordingState:
+        description: State of a Recording instance
+        type: string
+        values:
+            Scheduled: "scheduled"
+            Running: "running"
+            Failed: "failed"
+            Finished: "finished"
+
 structs:
     TrafficRecorderStats:
         description: "A struct representing the trafficRecording server status section"
@@ -69,6 +79,20 @@ structs:
                 type: long
             currentFileSize:
                 type: long
+    StartReply:
+        description: "Response for startTrafficRecording"
+        strict: false
+        is_command_reply: true
+        fields:
+            recordingID:
+                description: "Unique identifier for the resulting recording"
+                type: string
+            created:
+                description: "If a new recording was initialized by this request"
+                type: bool
+            status:
+                description: "The current state of the recording"
+                type: RecordingState
 
 commands:
     startTrafficRecording:
@@ -100,6 +124,10 @@ commands:
                 description: "Future time to halt the recording"
                 optional: true
                 type: date
+            recordingID:
+                description: "Recording ID; a call with the same ID as the current running recording will succeed with no changes, as the specified recording is already active"
+                optional: true
+                type: string
 
     stopTrafficRecording:
         description: "stop recording Command"

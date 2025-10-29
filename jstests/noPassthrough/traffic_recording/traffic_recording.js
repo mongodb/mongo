@@ -238,6 +238,52 @@ function runTest(client, restartCommand) {
         return new Date(now.getTime() + milliseconds);
     };
 
+    // Validate start response when providing recording ID.
+    {
+        let res = assert.commandWorked(
+            db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+        );
+        assert(res.created);
+        assert.eq(res.status, "running");
+    }
+
+    {
+        // Start with the same ID is allowed, but doesn't create a new recording.
+        let res = assert.commandWorked(
+            db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+        );
+        assert(!res.created);
+        assert.eq(res.status, "running");
+    }
+
+    assert.commandWorked(db.runCommand({"stopTrafficRecording": 1}));
+
+    // Validate start response when providing recording ID and scheduling for the future.
+    {
+        let res = assert.commandWorked(
+            db.runCommand({
+                "startTrafficRecording": 1,
+                "destination": "recordings",
+                "recordingID": "foobar",
+                startTime: nowPlusDays(0.5),
+                endTime: nowPlusDays(2),
+            }),
+        );
+        assert(res.created);
+        assert.eq(res.status, "scheduled");
+    }
+
+    {
+        // Start with the same ID is allowed, but doesn't create a new recording.
+        let res = assert.commandWorked(
+            db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+        );
+        assert(!res.created);
+        assert.eq(res.status, "scheduled");
+    }
+
+    assert.commandWorked(db.runCommand({"stopTrafficRecording": 1}));
+
     // No start or end time - allowed.
     assert.commandWorked(db.runCommand({"startTrafficRecording": 1, "destination": "recordings"}));
     assert.commandWorked(db.runCommand({"stopTrafficRecording": 1}));

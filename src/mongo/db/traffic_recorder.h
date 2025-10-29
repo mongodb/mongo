@@ -84,6 +84,7 @@ void appendPacketHeader(DataBuilder& builder, const TrafficRecordingPacket& pack
  */
 class TrafficRecorder {
 public:
+    using RecordingID = std::string;
     // The Recorder may record some special events that are required by the replay client.
 
     static TrafficRecorder& get(ServiceContext* svc);
@@ -92,7 +93,7 @@ public:
 
     // Start and stop block until the associate operation has succeeded or failed
     // On failure these methods throw
-    void start(const StartTrafficRecording& options, ServiceContext* svcCtx);
+    StartReply start(const StartTrafficRecording& options, ServiceContext* svcCtx);
     void stop(ServiceContext* svcCtx);
 
     void sessionStarted(const transport::Session& ts);
@@ -124,8 +125,12 @@ protected:
         virtual void start();
         virtual Status shutdown();
 
-        bool started() const {
+        bool isStarted() const {
             return _started.loadRelaxed();
+        }
+
+        const RecordingID& getID() {
+            return _id;
         }
 
         /**
@@ -181,14 +186,16 @@ protected:
         TrafficRecorderStats _trafficStats;
         int64_t _written = 0;
         Status _result = Status::OK();
+
+        RecordingID _id;
     };
 
     using LockedRecordingHandle =
         decltype(std::declval<mongo::synchronized_value<std::shared_ptr<Recording>>>()
                      .synchronize());
 
-    [[nodiscard]] LockedRecordingHandle _prepare(const StartTrafficRecording& options,
-                                                 ServiceContext* svcCtx);
+    [[nodiscard]] std::pair<TrafficRecorder::LockedRecordingHandle, bool> _prepare(
+        const StartTrafficRecording& options, ServiceContext* svcCtx);
     void _start(LockedRecordingHandle handle, ServiceContext* svcCtx);
     void _stop(LockedRecordingHandle handle, ServiceContext* svcCtx);
     void _fail();
