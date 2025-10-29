@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/otel/telemetry_context.h"
 
 #ifdef MONGO_CONFIG_OTEL
@@ -49,6 +50,7 @@ class TelemetryContextSerializer {
 public:
     static std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson);
     static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context);
+    static BSONObj appendTelemetryContext(OperationContext* opCtx, BSONObj bson);
 };
 
 namespace detail {
@@ -70,6 +72,9 @@ public:
     }
     static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context) {
         return BSONObj();
+    }
+    static BSONObj appendTelemetryContext(OperationContext* opCtx, BSONObj bson) {
+        return bson;
     }
 };
 

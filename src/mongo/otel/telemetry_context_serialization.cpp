@@ -30,7 +30,9 @@
 #include "mongo/otel/telemetry_context_serialization.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
@@ -74,6 +76,26 @@ std::shared_ptr<TelemetryContext> TelemetryContextSerializer::fromBSON(const BSO
 BSONObj TelemetryContextSerializer::toBSON(const std::shared_ptr<TelemetryContext>& context) {
     auto propagator = getPropagator();
     return detail::toBSON(*context, propagator);
+}
+
+BSONObj TelemetryContextSerializer::appendTelemetryContext(OperationContext* opCtx, BSONObj bson) {
+    invariant(opCtx);
+    auto& telemetryCtxHolder = TelemetryContextHolder::get(opCtx);
+    if (!telemetryCtxHolder.get()) {
+        return bson;
+    }
+
+    BSONObjBuilder bob;
+    for (const auto& field : bson) {
+        if (field.fieldName() == GenericArguments::kTraceCtxFieldName) {
+            continue;
+        }
+        bob.append(field);
+    }
+    bob.append(GenericArguments::kTraceCtxFieldName,
+               TelemetryContextSerializer::toBSON(telemetryCtxHolder.get()));
+
+    return bob.obj();
 }
 
 namespace detail {

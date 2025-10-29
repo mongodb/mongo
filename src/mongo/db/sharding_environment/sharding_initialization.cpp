@@ -69,7 +69,6 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/otel/telemetry_context_metadata_hook.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/client_metadata_propagation_egress_hook.h"
@@ -181,9 +180,6 @@ std::unique_ptr<rpc::EgressMetadataHookList> makeShardingEgressHooksList(Service
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
     hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     hookList->addHook(std::make_unique<rpc::RoutingTableCacheGossipMetadataHook>(service));
-#ifdef MONGO_CONFIG_OTEL
-    hookList->addHook(std::make_unique<otel::TelemetryContextMetadataHook>(service));
-#endif
 
     return hookList;
 }

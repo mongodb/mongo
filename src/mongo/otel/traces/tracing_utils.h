@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/stdx/unordered_set.h"
 
 #include <opentelemetry/context/propagation/text_map_propagator.h>
@@ -39,6 +40,8 @@ namespace otel {
 
 using OtelStringView = opentelemetry::nostd::string_view;
 using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
+
+bool isTracingEnabled(OperationContext* opCtx);
 
 OtelStringView asOtelStringView(StringData data);
 StringData asStringData(OtelStringView view);

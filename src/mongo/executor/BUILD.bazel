@@ -22,6 +22,8 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/otel",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/otel/traces:tracing",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.
         "//src/mongo/s:mongos_server_parameters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.

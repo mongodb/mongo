@@ -34,7 +34,7 @@ mongo_cc_library(
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
         ":otel_base",
-        "//src/mongo/otel/traces:tracing_internal",
+        "//src/mongo/otel/traces:tracing",
     ],
 )
 
@@ -52,21 +52,6 @@ mongo_cc_library(
     ),
 )
 
-mongo_cc_library(
-    name = "telemetry_context_metadata_hook",
-    srcs = [
-        "//src/mongo/otel:telemetry_context_metadata_hook.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/otel:telemetry_context_metadata_hook.h",
-    ],
-    deps = [
-        ":otel",
-        "//src/mongo/otel/traces:tracing",
-        "//src/mongo/rpc:metadata",
-    ],
-)
-
 mongo_cc_unit_test(
     name = "otel_test",
     srcs = [
@@ -79,6 +64,7 @@ mongo_cc_unit_test(
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
         ":otel",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/otel/traces:tracing_test_util",
         "//src/third_party/opentelemetry-cpp/api",
     ],

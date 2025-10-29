@@ -36,18 +36,24 @@ idl_generator(
 # MONGO_CONFIG_OTEL is not defined.
 mongo_cc_library(
     name = "tracing_base",
+    srcs = [
+        "tracing.cpp",
+        ":tracing_feature_flag_gen",
+    ],
     hdrs = [
         "trace_initialization.h",
+        "tracing.h",
         "//src/mongo/otel/traces/span:span.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
     ],
 )
 
 # Library for public facing tracing API used by the larger codebase.
 mongo_cc_library(
     name = "tracing",
-    srcs = [
-        ":tracing_feature_flag_gen",
-    ],
     deps = [
         ":tracing_base",
         "//src/mongo/base:system_error",
@@ -123,7 +129,6 @@ mongo_cc_unit_test(
     srcs = [
         "bson_text_map_carrier_test.cpp",
         "trace_initialization_test.cpp",
-        "//src/mongo/otel:telemetry_context_metadata_hook_test.cpp",
         "//src/mongo/otel/traces/span:span_telemetry_context_impl_test.cpp",
         "//src/mongo/otel/traces/span:span_test.cpp",
     ],
@@ -136,9 +141,7 @@ mongo_cc_unit_test(
         ":tracing",
         ":tracing_test_util",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/otel",
-        "//src/mongo/otel:telemetry_context_metadata_hook",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )

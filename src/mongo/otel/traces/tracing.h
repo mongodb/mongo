@@ -29,25 +29,10 @@
 
 #pragma once
 
-#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/db/operation_context.h"
 
-namespace mongo {
+namespace mongo::otel::traces {
 
-class ServiceContext;
+bool isTracingEnabled(OperationContext* opCtx);
 
-namespace otel {
-
-class TelemetryContextMetadataHook : public rpc::EgressMetadataHook {
-public:
-    TelemetryContextMetadataHook(ServiceContext* service);
-
-    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override;
-
-    Status readReplyMetadata(OperationContext* opCtx, const BSONObj& metadataObj) override;
-
-private:
-    ServiceContext* _service;
-};
-
-}  // namespace otel
-}  // namespace mongo
+}

@@ -29,6 +29,8 @@
 
 #include "mongo/otel/telemetry_context_serialization.h"
 
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/otel_test_fixture.h"
 #include "mongo/otel/traces/span/span.h"
@@ -48,7 +50,10 @@ using DefaultSpan = opentelemetry::trace::DefaultSpan;
 using opentelemetry::baggage::propagation::BaggagePropagator;
 using opentelemetry::trace::propagation::HttpTraceContext;
 
-class TelemetryContextSerializationTest : public traces::OtelTestFixture {};
+class TelemetryContextSerializationTest : public traces::OtelTestFixture {
+protected:
+    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagTracing", true};
+};
 
 BSONObj serializeTraceContextOnly(const std::shared_ptr<TelemetryContext>& context) {
     HttpTraceContext propagator;
@@ -112,6 +117,40 @@ TEST_F(TelemetryContextSerializationTest, KeepSpan) {
     ASSERT_TRUE(getKeepSpan(context));
     context = performRoundTrip(context);
     ASSERT_TRUE(getKeepSpan(context));
+}
+
+TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextReturnsIfNoTelemetryContext) {
+    BSONObj originalBson = BSON("key" << "value");
+    auto opCtx = makeOperationContext();
+    BSONObj resultBson =
+        TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
+    ASSERT_BSONOBJ_EQ(originalBson, resultBson);
+}
+
+TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextAddsTelemetryContextIfExists) {
+    BSONObj originalBson = BSON("key" << "value");
+    auto opCtx = makeOperationContext();
+    auto& telemetryContextHolder = TelemetryContextHolder::get(opCtx.get());
+    auto telemetryContext = traces::Span::createTelemetryContext();
+    telemetryContextHolder.set(telemetryContext);
+    BSONObj resultBson =
+        TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
+    ASSERT_BSONOBJ_NE(originalBson, resultBson);
+    ASSERT_TRUE(resultBson.hasField(GenericArguments::kTraceCtxFieldName));
+}
+
+TEST_F(TelemetryContextSerializationTest,
+       AppendTelemetryContextAddsTelemetryContextIfExistsAndReplacesBSONFieldIfExists) {
+    BSONObj originalBson =
+        BSON("key" << "value" << GenericArguments::kTraceCtxFieldName << "old_value");
+    auto opCtx = makeOperationContext();
+    auto& telemetryContextHolder = TelemetryContextHolder::get(opCtx.get());
+    auto telemetryContext = traces::Span::createTelemetryContext();
+    telemetryContextHolder.set(telemetryContext);
+    BSONObj resultBson =
+        TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
+    ASSERT_BSONOBJ_NE(originalBson, resultBson);
+    ASSERT_TRUE(resultBson.hasField(GenericArguments::kTraceCtxFieldName));
 }
 
 }  // namespace

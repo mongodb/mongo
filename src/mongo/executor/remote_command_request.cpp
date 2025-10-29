@@ -36,6 +36,8 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/tracing.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -103,6 +105,10 @@ RemoteCommandRequest::RemoteCommandRequest(RequestId requestId_,
         BSONObjBuilder bob(std::move(cmdObj));
         APIParameters::get(opCtx).appendInfo(&bob);
         cmdObj = bob.obj();
+    }
+
+    if (otel::traces::isTracingEnabled(opCtx)) {
+        cmdObj = otel::TelemetryContextSerializer::appendTelemetryContext(opCtx, std::move(cmdObj));
     }
 
     _updateTimeoutFromOpCtxDeadline(opCtx);

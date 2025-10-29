@@ -27,49 +27,20 @@
  *    it in the license file.
  */
 
-
-#include "mongo/otel/telemetry_context_metadata_hook.h"
-
-#include "mongo/db/service_context.h"
-#include "mongo/idl/generic_argument_gen.h"
-#include "mongo/otel/telemetry_context_holder.h"
-#include "mongo/otel/telemetry_context_serialization.h"
 #include "mongo/otel/traces/tracing_feature_flag_gen.h"
 
-namespace mongo {
-namespace otel {
+namespace mongo::otel::traces {
 
-TelemetryContextMetadataHook::TelemetryContextMetadataHook(ServiceContext* service)
-    : _service(service) {}
-
-Status TelemetryContextMetadataHook::writeRequestMetadata(OperationContext* opCtx,
-                                                          BSONObjBuilder* metadataBob) {
-#ifdef MONGO_CONFIG_OTEL
+bool isTracingEnabled(OperationContext* opCtx) {
     if (!opCtx) {
-        return Status::OK();
+        return false;
     }
-
-    auto& telemetryCtxHolder = TelemetryContextHolder::get(opCtx);
-    auto telemetryCtx = telemetryCtxHolder.get();
-    if (!telemetryCtx) {
-        return Status::OK();
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (!fcv.isVersionInitialized()) {
+        return false;
     }
-
-    if (const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        (fcv.isVersionInitialized() &&
-         feature_flags::gFeatureFlagTracing.isEnabled(VersionContext::getDecoration(opCtx), fcv))) {
-        metadataBob->append(GenericArguments::kTraceCtxFieldName,
-                            TelemetryContextSerializer::toBSON(telemetryCtx));
-    }
-#endif  // MONGO_CONFIG_OTEL
-
-    return Status::OK();
+    const auto& context = VersionContext::getDecoration(opCtx);
+    return feature_flags::gFeatureFlagTracing.isEnabled(context, fcv);
 }
 
-Status TelemetryContextMetadataHook::readReplyMetadata(OperationContext* opCtx,
-                                                       const BSONObj& metadataObj) {
-    return Status::OK();
-}
-
-}  // namespace otel
-}  // namespace mongo
+}  // namespace mongo::otel::traces
