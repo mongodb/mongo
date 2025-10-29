@@ -482,7 +482,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
                 _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
                 bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
                     ex.code() == ErrorCodes::ConflictingOperationInProgress ||
-                    ex.code() == ErrorCodes::QueryPlanKilled;
+                    ex.code() == ErrorCodes::QueryPlanKilled ||
+                    ex.isA<ErrorCategory::RetriableError>();
                 if (!isCatalogCacheRetriableError) {
                     return ex.toStatus();
                 }
