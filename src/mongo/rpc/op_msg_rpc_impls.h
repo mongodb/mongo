@@ -32,9 +32,10 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
-namespace rpc {
+namespace MONGO_MOD_PUBLIC rpc {
 
 class OpMsgReply final : public rpc::ReplyInterface {
 public:
@@ -86,5 +87,5 @@ private:
     OpMsgBuilder _builder;
 };
 
-}  // namespace rpc
+}  // namespace MONGO_MOD_PUBLIC rpc
 }  // namespace mongo

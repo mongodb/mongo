@@ -40,13 +40,14 @@
 #include "mongo/client/constants.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <cstdio>
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class OperationContext;
 
@@ -461,4 +462,4 @@ struct DbResponse {
  * Helper to build an error DbResponse for OP_QUERY and OP_GET_MORE.
  */
 DbResponse makeErrorResponseToUnsupportedOpQuery(StringData errorMsg);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

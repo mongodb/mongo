@@ -40,10 +40,12 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo::transport::grpc {
+namespace mongo::transport {
+namespace MONGO_MOD_PARENT_PRIVATE grpc {
 
 class Service;
 
@@ -215,4 +217,5 @@ private:
                                                               logv2::LogSeverity::Debug(4)};
 };
 
-}  // namespace mongo::transport::grpc
+}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace mongo::transport

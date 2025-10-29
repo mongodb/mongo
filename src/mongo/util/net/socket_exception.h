@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 enum class SocketErrorKind {
     CLOSED,
     RECV_ERROR,
@@ -60,4 +61,4 @@ Status makeSocketError(SocketErrorKind kind,
 
 using NetworkException = ExceptionFor<ErrorCategory::NetworkError>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

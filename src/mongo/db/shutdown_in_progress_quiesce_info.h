@@ -33,10 +33,11 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Represents an error returned from a mongod or a mongos when it is in quiesce mode. The
@@ -61,4 +62,4 @@ private:
     long long _remainingQuiesceTimeMillis = 0;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -31,11 +31,12 @@
 
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 
 namespace mongo {
-namespace rpc {
+namespace MONGO_MOD_PUBLIC rpc {
 
 /**
  * Bit flags representing support for a particular RPC protocol. This is just an internal
@@ -75,5 +76,5 @@ inline Protocol protocolForMessage(const Message& message) {
     return protocolForOperation(message.operation());
 }
 
-}  // namespace rpc
+}  // namespace MONGO_MOD_PUBLIC rpc
 }  // namespace mongo

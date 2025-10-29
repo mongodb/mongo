@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
 #include <memory>
@@ -42,7 +43,7 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * The 'WireVersion' captures all "protocol events" the write protocol went through.  A
@@ -247,4 +248,4 @@ Status validateWireVersion(WireVersionInfo client, WireVersionInfo server);
 StatusWith<WireVersionInfo> parseWireVersionFromHelloReply(const BSONObj& helloReply);
 
 }  // namespace wire_version
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

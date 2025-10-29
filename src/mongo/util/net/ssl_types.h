@@ -32,12 +32,13 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 constexpr StringData kOID_CommonName = "2.5.4.3"_sd;
 constexpr StringData kOID_CountryName = "2.5.4.6"_sd;
@@ -186,4 +187,4 @@ private:
     ClusterAuthX509Config _clusterAuthX509Config;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

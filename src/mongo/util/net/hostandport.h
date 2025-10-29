@@ -31,6 +31,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
@@ -38,7 +39,7 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class Status;
 template <typename T>
@@ -191,7 +192,7 @@ void HostAndPort::_appendToPolymorphicFunc(F f) const {
     _appendToVisitor(visitor);
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
 
 namespace fmt {
 template <>

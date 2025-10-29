@@ -39,6 +39,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -74,7 +75,7 @@ class AsioSession;
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
  */
-class AsioTransportLayer final : public TransportLayer {
+class MONGO_MOD_NEEDS_REPLACEMENT AsioTransportLayer final : public TransportLayer {
     AsioTransportLayer(const AsioTransportLayer&) = delete;
     AsioTransportLayer& operator=(const AsioTransportLayer&) = delete;
 

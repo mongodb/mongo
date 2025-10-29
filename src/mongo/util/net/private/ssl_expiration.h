@@ -30,12 +30,13 @@
 #pragma once
 
 #include "mongo/db/client.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class CertificateExpirationMonitor {
+class MONGO_MOD_PUBLIC CertificateExpirationMonitor {
 public:
     /**
      * Get the singleton instance of the monitor.

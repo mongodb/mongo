@@ -42,6 +42,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
@@ -52,7 +53,8 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo::transport::grpc {
+namespace mongo::transport {
+namespace MONGO_MOD_PARENT_PRIVATE grpc {
 
 /**
  * Captures the common semantics for ingress and egress gRPC sessions.
@@ -520,4 +522,5 @@ private:
     boost::optional<SSLConfiguration> _sslConfig;
 };
 
-}  // namespace mongo::transport::grpc
+}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace mongo::transport

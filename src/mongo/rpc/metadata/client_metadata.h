@@ -37,13 +37,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class Client;
 class OperationContext;
@@ -377,4 +378,4 @@ private:
     Deferred<size_t (*)(const BSONObj&)> _hashWithoutMongos{simpleHash};
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

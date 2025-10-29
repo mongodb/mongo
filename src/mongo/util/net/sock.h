@@ -50,6 +50,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/sockaddr.h"
 
 #include <cstdint>
@@ -58,7 +59,7 @@
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 #ifdef MONGO_CONFIG_SSL
 class SSLManagerInterface;
@@ -247,4 +248,4 @@ private:
     bool _awaitingHandshake;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

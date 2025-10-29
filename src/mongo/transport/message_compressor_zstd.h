@@ -32,11 +32,12 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/transport/message_compressor_base.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
 namespace mongo {
-class ZstdMessageCompressor final : public MessageCompressorBase {
+class MONGO_MOD_NEEDS_REPLACEMENT ZstdMessageCompressor final : public MessageCompressorBase {
 public:
     ZstdMessageCompressor();
 

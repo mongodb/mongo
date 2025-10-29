@@ -73,6 +73,14 @@
 #define MONGO_MOD_OPEN MONGO_MOD_ATTR_(open)
 
 /**
+ * Similar to MONGO_MOD_OPEN and should only be used when inheriting from a class is only allowed
+ * within its module boundaries, but there are "unfortunately" existing extensions in other modules.
+ *
+ * For now this just serves as greppable documentation and behaves the same as OPEN.
+ */
+#define MONGO_MOD_UNFORTUNATELY_OPEN MONGO_MOD_ATTR_(open)
+
+/**
  * Marks a declaration which the module owner would prefer to be
  * private, but for which there is currently no good alternative
  * for out-of-module usage. Allows external usage like MONGO_MOD_PUBLIC,

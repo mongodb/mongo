@@ -36,6 +36,7 @@
 #include "mongo/transport/session_util.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_types.h"
@@ -45,7 +46,7 @@
 namespace mongo {
 namespace transport {
 
-class MockSessionBase : public Session {
+class MONGO_MOD_UNFORTUNATELY_OPEN MockSessionBase : public Session {
 public:
     MockSessionBase() = default;
 
@@ -88,7 +89,7 @@ public:
         return false;
     };
 
-    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override {};
+    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override {}
 
     bool bindsToOperationState() const override {
         return false;
@@ -127,7 +128,7 @@ private:
     boost::optional<SSLConfiguration> _sslConfig;
 };
 
-class MockSession : public MockSessionBase {
+class MONGO_MOD_OPEN MockSession : public MockSessionBase {
     MockSession(const MockSession&) = delete;
     MockSession& operator=(const MockSession&) = delete;
 

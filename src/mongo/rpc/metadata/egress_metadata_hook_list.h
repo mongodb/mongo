@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -47,7 +48,7 @@ namespace rpc {
 /**
  * Data structure for storing a list of EgressMetadataHook.
  */
-class EgressMetadataHookList final : public EgressMetadataHook {
+class MONGO_MOD_PUBLIC EgressMetadataHookList final : public EgressMetadataHook {
 public:
     /**
      * Adds a hook to this list. The hooks are executed in the order they were added.

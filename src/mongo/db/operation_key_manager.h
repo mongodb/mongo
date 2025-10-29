@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
@@ -51,7 +52,7 @@ namespace mongo {
  * - During a killop-like operation, it is used to find the OperationContext to kill.
  * - During OperationContext destruction, the OperationKey from the client application is removed.
  */
-class OperationKeyManager {
+class MONGO_MOD_PUBLIC OperationKeyManager {
 public:
     static OperationKeyManager& get(ServiceContext* serviceContext = getCurrentServiceContext());
     static OperationKeyManager& get(Client* client) {

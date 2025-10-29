@@ -37,6 +37,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -50,7 +51,7 @@
 namespace mongo::transport {
 class ClientTransportObserver;
 
-class TransportLayerManagerImpl final : public TransportLayerManager {
+class MONGO_MOD_NEEDS_REPLACEMENT TransportLayerManagerImpl final : public TransportLayerManager {
     TransportLayerManagerImpl(const TransportLayerManagerImpl&) = delete;
     TransportLayerManagerImpl& operator=(const TransportLayerManagerImpl&) = delete;
 

@@ -40,6 +40,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -53,7 +54,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace transport {
+namespace MONGO_MOD_PUBLIC transport {
 
 /**
  * This TransportLayerMock is a noop TransportLayer implementation.
@@ -147,5 +148,5 @@ private:
     std::shared_ptr<SessionManager> _sessionManager;
 };
 
-}  // namespace transport
+}  // namespace MONGO_MOD_PUBLIC transport
 }  // namespace mongo

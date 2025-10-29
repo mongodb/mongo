@@ -32,10 +32,11 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class ServiceContext;
 class Client;
 class ClientLock;
@@ -99,4 +100,4 @@ private:
     size_t _leaseStartBitMask = ~(kDefaultLeaseSize - 1);
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

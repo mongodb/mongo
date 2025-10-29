@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**
@@ -44,6 +45,6 @@ namespace mongo {
  * - The _isSelf/saslContinue/saslStart OP_QUERY commands are allowed for intra-cluster
  * communication in a mixed version cluster. V5.0 nodes may send those commands as OP_QUERY ones.
  */
-void checkAllowedOpQueryCommand(Client& client, StringData cmd);
+MONGO_MOD_PUBLIC void checkAllowedOpQueryCommand(Client& client, StringData cmd);
 
 }  // namespace mongo

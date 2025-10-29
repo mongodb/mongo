@@ -32,11 +32,12 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/transport/message_compressor_base.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
 namespace mongo {
-class SnappyMessageCompressor final : public MessageCompressorBase {
+class MONGO_MOD_PUBLIC SnappyMessageCompressor final : public MessageCompressorBase {
 public:
     SnappyMessageCompressor();
 

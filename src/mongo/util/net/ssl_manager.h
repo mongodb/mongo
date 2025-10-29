@@ -45,6 +45,7 @@
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl_options.h"
@@ -60,7 +61,7 @@
 #endif
 #endif  // #ifdef MONGO_CONFIG_SSL
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /*
  * @return the SSL version std::string prefixed with prefix and suffixed with suffix
@@ -76,10 +77,10 @@ Status validateOpensslCipherConfig(const std::string&, const boost::optional<Ten
  * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
  */
 Status validateDisableNonTLSConnectionLogging(const bool&, const boost::optional<TenantId>&);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
 
 #ifdef MONGO_CONFIG_SSL
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 struct SSLParams;
 class TransientSSLParams;
 
@@ -542,5 +543,5 @@ void logSSLInfo(const SSLInformationToLog& info,
 void logCert(const CertInformationToLog& cert, StringData certType, int logNum);
 void logCRL(const CRLInformationToLog& crl, int logNum);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

@@ -38,6 +38,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
@@ -45,7 +46,8 @@
 #include <functional>
 #include <memory>
 
-namespace mongo::transport {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC transport {
 
 /*
  * This is the interface for all ServiceExecutors.
@@ -204,4 +206,5 @@ public:
     AtomicWord<std::size_t> limitExempt{0};
 };
 
-}  // namespace mongo::transport
+}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace mongo

@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <cstdint>
+#include "mongo/util/modules.h"
 
+#include <cstdint>
 namespace mongo {
-namespace transport {
+namespace MONGO_MOD_PUBLIC transport {
 
 using SessionId = uint64_t;
 
-}  // namespace transport
+}  // namespace MONGO_MOD_PUBLIC transport
 }  // namespace mongo

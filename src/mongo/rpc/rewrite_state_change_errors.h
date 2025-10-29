@@ -33,13 +33,14 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::rpc {
 
-class RewriteStateChangeErrors {
+class MONGO_MOD_PUBLIC RewriteStateChangeErrors {
 public:
     /**
      * Enable/disable for an entire server.

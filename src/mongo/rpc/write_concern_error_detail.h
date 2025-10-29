@@ -34,12 +34,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This class represents the layout and content of the error that occurs while trying
@@ -98,4 +99,4 @@ std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(c
  */
 WriteConcernErrorDetail getWriteConcernErrorDetail(const BSONElement& wcErrorElem);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -33,6 +33,7 @@
 #include "mongo/transport/grpc/service.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
@@ -51,7 +52,7 @@ namespace mongo::transport::grpc {
  * completed. If egress mode is enabled, this entails waiting for all sessions to be destructed. If
  * ingress mode is enabled, this entails waiting for all RPC handlers to return.
  */
-class GRPCTransportLayer : public TransportLayer {
+class MONGO_MOD_NEEDS_REPLACEMENT GRPCTransportLayer : public TransportLayer {
 protected:
     GRPCTransportLayer() = default;
 

@@ -36,13 +36,15 @@
 #include "mongo/transport/grpc/serialization.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 
 #include <grpcpp/impl/service_type.h>
 #include <grpcpp/support/status.h>
 
-namespace mongo::transport::grpc {
+namespace mongo::transport {
+namespace MONGO_MOD_PARENT_PRIVATE grpc {
 
 /**
  * Base type for all gRPC services, allowing type-specific shutdown and stringifying logic for each
@@ -123,4 +125,5 @@ private:
     bool _acceptNewRequests = true;
     bool _shutdown = false;
 };
-}  // namespace mongo::transport::grpc
+}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace mongo::transport

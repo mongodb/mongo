@@ -31,13 +31,14 @@
 
 #include "mongo/db/client.h"
 #include "mongo/rpc/metadata/audit_client_attrs.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::rpc {
 
 /**
  * RAII class to optionally set impersonated client attributes .
  */
-class ImpersonatedClientSessionGuard {
+class MONGO_MOD_NEEDS_REPLACEMENT ImpersonatedClientSessionGuard {
 public:
     ImpersonatedClientSessionGuard(Client* client,
                                    const ImpersonatedClientMetadata& parsedClientMetadata);

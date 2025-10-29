@@ -33,6 +33,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
@@ -59,7 +60,7 @@ class ReactorTimer;
  * minimizing context switches, as well as improving the readability of stack traces by grounding
  * async execution on top of a regular client call stack.
  */
-class NetworkingBaton : public Baton {
+class MONGO_MOD_UNFORTUNATELY_OPEN NetworkingBaton : public Baton {
 public:
     /**
      * Adds a session, returning a future which activates on read/write-ability of the session.

@@ -35,6 +35,7 @@ imports:
 
 structs:
     TopologyVersion:
+        mod_visibility: public
         description:
             "Clients and servers exchange topologyVersions to determine the relative
             freshness of topology information in concurrent messages."

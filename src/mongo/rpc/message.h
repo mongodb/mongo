@@ -35,6 +35,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
 
@@ -43,7 +44,7 @@
 #include <string>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Maximum accepted message size on the wire protocol.
@@ -477,4 +478,4 @@ private:
  */
 int32_t nextMessageId();
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

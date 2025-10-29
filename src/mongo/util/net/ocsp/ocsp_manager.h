@@ -34,10 +34,11 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 enum class OCSPPurpose { kClientVerify, kStaple };
 
@@ -66,4 +67,4 @@ private:
     std::unique_ptr<ThreadPool> _pool;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

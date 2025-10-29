@@ -31,8 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Extracts the write concern error from a command response.
@@ -58,4 +59,4 @@ Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse);
  */
 Status getStatusFromWriteCommandReply(const BSONObj& cmdResponse);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/http_client.h"
 
 #include <cstdint>
 
 namespace mongo {
 
-class MockHttpClient : public HttpClient {
+class MONGO_MOD_PUBLIC MockHttpClient : public HttpClient {
 public:
     MockHttpClient() = default;
 

@@ -35,6 +35,7 @@
 #include "mongo/config.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <set>
@@ -43,7 +44,7 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 #if (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS) || \
     (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE)
@@ -233,4 +234,4 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                                 StringData name,
                                 StringData value);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

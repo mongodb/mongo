@@ -37,6 +37,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <limits>
 #include <memory>
@@ -52,7 +53,7 @@ namespace transport {
  * also provides facilities for terminating sessions and attaching handlers that are invoked during
  * different stages of the Sessions' lifecycles.
  */
-class SessionManager {
+class MONGO_MOD_PUBLIC SessionManager {
 private:
     SessionManager(const SessionManager&) = delete;
     SessionManager& operator=(const SessionManager&) = delete;

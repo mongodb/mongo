@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/transport/session_manager_common.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::transport {
 
 /**
  * ASIO specialization of SessionManagerCommon.
  */
-class AsioSessionManager : public SessionManagerCommon {
+class MONGO_MOD_NEEDS_REPLACEMENT AsioSessionManager : public SessionManagerCommon {
 public:
     using SessionManagerCommon::SessionManagerCommon;
 

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <memory>
 
 namespace mongo {
@@ -40,7 +42,7 @@ namespace transport {
 /**
  * ClientTransportObservers are notified during key events in a Client's lifecycle.
  */
-class ClientTransportObserver {
+class MONGO_MOD_OPEN ClientTransportObserver {
 public:
     virtual ~ClientTransportObserver() = default;
 

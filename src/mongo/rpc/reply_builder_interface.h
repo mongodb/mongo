@@ -39,6 +39,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -56,7 +57,7 @@ namespace rpc {
 /**
  * Constructs an RPC Reply.
  */
-class ReplyBuilderInterface {
+class MONGO_MOD_OPEN ReplyBuilderInterface {
     ReplyBuilderInterface(const ReplyBuilderInterface&) = delete;
     ReplyBuilderInterface& operator=(const ReplyBuilderInterface&) = delete;
 

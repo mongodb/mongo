@@ -34,13 +34,15 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo::transport {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC transport {
 
 /**
  * A decoration on the Session object used to capture and report the metrics around connection
@@ -131,4 +133,5 @@ public:
                     rpc::ReplyBuilderInterface* response) override;
 };
 
-}  // namespace mongo::transport
+}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace mongo

@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/wire_version.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::transport::grpc {
 
-class WireVersionProvider {
+class MONGO_MOD_PARENT_PRIVATE WireVersionProvider {
 public:
     WireVersionProvider() = default;
     virtual ~WireVersionProvider() = default;

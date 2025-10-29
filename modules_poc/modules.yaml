@@ -690,6 +690,7 @@ networking.core:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/dbmessage*
     - src/mongo/db/max_time.h

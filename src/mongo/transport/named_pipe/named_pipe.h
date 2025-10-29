@@ -36,10 +36,11 @@
 #endif
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/transport/named_pipe/input_object.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 #ifndef _WIN32
 static constexpr auto kDefaultPipePath = "/tmp/"_sd;
 #else
@@ -104,4 +105,4 @@ private:
     bool _isEof : 1;
 #endif
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

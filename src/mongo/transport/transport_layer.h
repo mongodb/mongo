@@ -43,6 +43,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -63,7 +64,7 @@ namespace mongo {
 
 class OperationContext;
 
-namespace transport {
+namespace MONGO_MOD_PUBLIC transport {
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
 enum class TransportProtocol { MongoRPC, GRPC };
@@ -353,5 +354,5 @@ protected:
 };
 
 
-}  // namespace transport
+}  // namespace MONGO_MOD_PUBLIC transport
 }  // namespace mongo

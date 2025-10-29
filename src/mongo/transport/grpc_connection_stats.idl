@@ -34,6 +34,7 @@ imports:
 
 structs:
     GRPCConnectionStats:
+        mod_visibility: public
         description:
             "A struct representing the stats reported by GRPCAsyncClientFactory, typically
             through a NetworkInterface."

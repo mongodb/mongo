@@ -33,10 +33,11 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <type_traits>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 enum class MessageCompressor : uint8_t {
     kNoop = 0,
     kSnappy = 1,
@@ -152,4 +153,4 @@ private:
     AtomicWord<long long> _decompressBytesIn;
     AtomicWord<long long> _decompressBytesOut;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

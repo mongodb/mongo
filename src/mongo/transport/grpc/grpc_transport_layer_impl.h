@@ -37,6 +37,7 @@
 #include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -44,7 +45,7 @@
 
 namespace mongo::transport::grpc {
 
-class GRPCTransportLayerImpl : public GRPCTransportLayer {
+class MONGO_MOD_NEEDS_REPLACEMENT GRPCTransportLayerImpl : public GRPCTransportLayer {
 public:
     // Note that passing `nullptr` for {sessionManager} will disallow ingress usage.
     GRPCTransportLayerImpl(ServiceContext* svcCtx,

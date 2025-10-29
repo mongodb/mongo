@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
 
@@ -49,7 +50,7 @@ class SSLManagerInterface;
 namespace transport {
 
 #ifdef MONGO_CONFIG_SSL
-struct SSLConnectionContext {
+struct MONGO_MOD_PUBLIC SSLConnectionContext {
     std::unique_ptr<asio::ssl::context> ingress;
     std::unique_ptr<asio::ssl::context> egress;
     std::shared_ptr<SSLManagerInterface> manager;

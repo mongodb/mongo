@@ -36,6 +36,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -50,7 +51,7 @@ class Message;
 
 class MessageCompressorRegistry;
 
-class MessageCompressorManager {
+class MONGO_MOD_PUBLIC MessageCompressorManager {
     MessageCompressorManager(const MessageCompressorManager&) = delete;
     MessageCompressorManager& operator=(const MessageCompressorManager&) = delete;
 

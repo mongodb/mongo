@@ -52,6 +52,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_util.h"
@@ -68,7 +69,8 @@
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/support/sync_stream.h>
 
-namespace mongo::transport::grpc {
+namespace mongo::transport {
+namespace MONGO_MOD_PARENT_PRIVATE grpc {
 
 #define ASSERT_EQ_MSG(a, b) ASSERT_EQ((a).opMsgDebugString(), (b).opMsgDebugString())
 #define ASSERT_GRPC_STUB_CONNECTED(stub) \
@@ -489,4 +491,5 @@ inline std::string makeGRPCUnixSockPath(int port, StringData label = "grpc") {
     return makeUnixSockPath(port, label);
 }
 
-}  // namespace mongo::transport::grpc
+}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace mongo::transport

@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/versioned_value.h"
 
 #include <cstdint>
@@ -57,7 +58,7 @@ namespace mongo::transport {
  *
  * - featureFlagRateLimitIngressConnectionEstablishment
  */
-class SessionEstablishmentRateLimiter {
+class MONGO_MOD_PUBLIC SessionEstablishmentRateLimiter {
 public:
     SessionEstablishmentRateLimiter();
 

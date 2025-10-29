@@ -38,9 +38,11 @@
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/producer_consumer_queue.h"
 
-namespace mongo::transport::grpc {
+namespace mongo::transport {
+namespace MONGO_MOD_PARENT_PRIVATE grpc {
 
 class MockRPC {
 public:
@@ -232,4 +234,5 @@ private:
     std::shared_ptr<MockChannel> _channel;
 };
 
-}  // namespace mongo::transport::grpc
+}  // namespace MONGO_MOD_PARENT_PRIVATE grpc
+}  // namespace mongo::transport

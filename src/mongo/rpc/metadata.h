@@ -38,6 +38,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <tuple>
@@ -51,7 +52,7 @@ class StringData;
 /**
  * Utilities for dealing with what used to be called metadata.
  */
-namespace rpc {
+namespace MONGO_MOD_PUBLIC rpc {
 class ImpersonatedClientSessionGuard;
 /**
  * Returns an empty metadata object.
@@ -101,5 +102,5 @@ using RequestMetadataWriter =
 using ReplyMetadataReader = std::function<Status(
     OperationContext* opCtx, const BSONObj& replyMetadata, StringData sourceHost)>;
 
-}  // namespace rpc
+}  // namespace MONGO_MOD_PUBLIC rpc
 }  // namespace mongo

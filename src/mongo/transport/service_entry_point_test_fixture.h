@@ -42,11 +42,12 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source_mock.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
-class ServiceEntryPointTestFixture : public ServiceContextTest {
+class MONGO_MOD_OPEN ServiceEntryPointTestFixture : public ServiceContextTest {
 public:
     ServiceEntryPointTestFixture()
         : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
@@ -349,4 +350,4 @@ public:
     }
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

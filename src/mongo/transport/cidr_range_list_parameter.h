@@ -31,6 +31,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/versioned_value.h"
 
@@ -38,7 +39,8 @@
 #include <variant>
 #include <vector>
 
-namespace mongo::transport {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC transport {
 
 /**
  * Appends a CIDR range list to a bson object. The array will be appended as a subobject using a key
@@ -56,4 +58,5 @@ Status setCIDRRangeListParameter(VersionedValue<CIDRList>& value, BSONObj obj);
 
 // TODO: SERVER-106468 Define CIDRRangeListParameter here instead of generating the code.
 
-}  // namespace mongo::transport
+}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace mongo

@@ -41,6 +41,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/shared_buffer.h"
 
@@ -56,7 +57,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * OpMsg packets are made up of the following sequence of possible fields.
@@ -308,7 +309,7 @@ public:
      * the server handles them. Is false by default, although the check only happens in debug
      * builds.
      */
-    static AtomicWord<bool> disableDupeFieldCheck_forTest;
+    MONGO_MOD_NEEDS_REPLACEMENT static AtomicWord<bool> disableDupeFieldCheck_forTest;
 
     /**
      * Similar to finish, any calls on this object after are illegal.
@@ -439,4 +440,4 @@ public:
                                const BSONObj& extraFields = {});
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

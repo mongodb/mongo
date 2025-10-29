@@ -33,6 +33,7 @@
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/baton.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
@@ -50,7 +51,7 @@ namespace mongo::transport {
  * NOTE: This functionality is currently provided by inheritance, but composition might be a
  * preferred approach after more refactoring.
  */
-class CommonAsioSession : public AsioSession {
+class MONGO_MOD_NEEDS_REPLACEMENT CommonAsioSession : public AsioSession {
 public:
     /**
      * If the socket is disconnected while any of these options are being set, this constructor

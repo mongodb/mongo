@@ -40,6 +40,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
@@ -73,7 +74,8 @@ struct SessionManagerOpCounters {
  * This type contains data needed to associate Messages with connections
  * (on the transport side) and Messages with Client objects (on the database side).
  */
-class Session : public std::enable_shared_from_this<Session>, public Decorable<Session> {
+class MONGO_MOD_PUBLIC Session : public std::enable_shared_from_this<Session>,
+                                 public Decorable<Session> {
     Session(const Session&) = delete;
     Session& operator=(const Session&) = delete;
 

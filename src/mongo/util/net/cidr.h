@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <stdexcept>
 #include <string>
@@ -43,7 +44,7 @@
 #include <sys/socket.h>
 #endif
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * CIDR (Classless Inter-Domain Routing)
@@ -165,4 +166,4 @@ StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr);
  */
 using CIDRList = std::vector<std::variant<CIDR, std::string>>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

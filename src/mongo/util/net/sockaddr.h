@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 #include <vector>
 
@@ -48,7 +50,7 @@
 
 #include "mongo/base/string_data.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class BSONObjBuilder;
 
 #if defined(_WIN32)
@@ -159,4 +161,4 @@ private:
     bool _isValid = false;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

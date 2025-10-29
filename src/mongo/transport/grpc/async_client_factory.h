@@ -43,6 +43,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::transport::grpc {
 
@@ -51,7 +52,7 @@ namespace mongo::transport::grpc {
  * This relies on the GRPCTransportLayer-global channel pool and does not own one of its own.
  * Sessions do not perform the MongoDB handshake nor are they pooled upon return.
  */
-class GRPCAsyncClientFactory : public executor::AsyncClientFactory {
+class MONGO_MOD_NEEDS_REPLACEMENT GRPCAsyncClientFactory : public executor::AsyncClientFactory {
 public:
     static constexpr auto kDiagnosticLogLevel = 4;
     static constexpr auto kDefaultStreamEstablishmentTimeout = Seconds(20);

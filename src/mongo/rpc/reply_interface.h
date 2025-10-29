@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/rpc/protocol.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class BSONObj;
@@ -40,7 +41,7 @@ namespace rpc {
 /**
  * An immutable view of an RPC Reply.
  */
-class ReplyInterface {
+class MONGO_MOD_OPEN ReplyInterface {
     ReplyInterface(const ReplyInterface&) = delete;
     ReplyInterface& operator=(const ReplyInterface&) = delete;
 

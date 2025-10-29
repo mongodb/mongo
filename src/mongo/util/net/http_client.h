@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/cidr.h"
 
 #include <cstdint>
@@ -48,7 +49,7 @@ constexpr Seconds kTotalRequestTimeout{120};
 /**
  * Interface used to upload and receive binary payloads to HTTP servers.
  */
-class HttpClient {
+class MONGO_MOD_OPEN HttpClient {
 public:
     enum class HttpMethod { kGET, kPOST, kPUT, kPATCH, kDELETE };
 
