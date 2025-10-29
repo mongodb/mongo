@@ -1,9 +1,31 @@
 root = true
 
-[*.sh]
-charset = utf-8
+[*]
 end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
+
+[*.sh]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+[*.json]
+indent_style = space
+indent_size = 4
+
+[*.yaml]
+indent_style = space
+indent_size = 2
+
+[*.{c++,cc,cpp,cxx,h,h++,hh,hpp,hxx,inl,ipp,tlh,tli}]
+charset = utf-8
+indent_style = space
+indent_size = 4
+cpp_indent_braces = false
+
+[*.{js,jsx,ts,tsx}]
+charset = utf-8
+end_of_line = lf
 indent_style = space
 indent_size = 4
