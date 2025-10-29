@@ -100,7 +100,7 @@ assert.commandFailedWithCode(
         zones: [{zone: nonExistingZoneName, min: {newKey: 5}, max: {newKey: 10}}],
         numInitialChunks: 2,
     }),
-    ErrorCodes.CannotCreateChunkDistribution,
+    ErrorCodes.ZoneNotFound,
 );
 
 jsTest.log("Fail if zone provided is invalid for storage.");

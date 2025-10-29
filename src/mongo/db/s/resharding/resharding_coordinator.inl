@@ -998,6 +998,15 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
     } else {
         if (_coordinatorDoc.getZones()) {
             zones = *_coordinatorDoc.getZones();
+
+            ShardingCatalogManager& shardingCatalogManager =
+                *ShardingCatalogManager::get(opCtx.get());
+
+            // This is a best effort check that all of the zones exist. It does not provide any
+            // guarantee that the zones will remain stable during the resharding operation.
+            for (const auto& zone : zones) {
+                shardingCatalogManager.checkZoneExists(opCtx.get(), std::string(zone.getZone()));
+            }
         } else if (_coordinatorDoc.getForceRedistribution() &&
                    *_coordinatorDoc.getForceRedistribution()) {
             // If zones are not provided by the user for same-key resharding, we should use the

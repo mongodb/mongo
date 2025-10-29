@@ -57,6 +57,7 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/topology/topology_change_helpers.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -67,6 +68,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/algorithm/string/join.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -340,6 +342,17 @@ Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
     return Status::OK();
 }
 
+void ShardingCatalogManager::checkZoneExists(OperationContext* opCtx, std::string zoneName) {
+    BSONObjBuilder queryBuilder;
+    queryBuilder.append(ShardType::tags(), zoneName);
+
+    auto zoneCount = topology_change_helpers::runCountCommandOnConfig(
+        opCtx, _localConfigShard, NamespaceString::kConfigsvrShardsNamespace, queryBuilder.obj());
+
+    uassert(ErrorCodes::ZoneNotFound,
+            str::stream() << "zone " << zoneName << " does not exist",
+            zoneCount > 0);
+}
 
 void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
                                                   const NamespaceString& nss,
@@ -350,18 +363,7 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
 
     Lock::ExclusiveLock lk(opCtx, _kZoneOpLock);
 
-    auto zoneDoc = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
-                                       opCtx,
-                                       kConfigPrimarySelector,
-                                       repl::ReadConcernLevel::kLocalReadConcern,
-                                       NamespaceString::kConfigsvrShardsNamespace,
-                                       BSON(ShardType::tags() << zoneName),
-                                       BSONObj(),
-                                       1))
-                       .docs;
-    uassert(ErrorCodes::ZoneNotFound,
-            str::stream() << "zone " << zoneName << " does not exist",
-            !zoneDoc.empty());
+    checkZoneExists(opCtx, zoneName);
 
     ChunkRange actualRange = givenRange;
     KeyPattern keyPattern;
