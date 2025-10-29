@@ -477,6 +477,7 @@ class ServerParameter(common.SourceLocation):
         self.cpp_class = None  # type: ServerParameterClass
         self.cpp_vartype = None  # type: str
         self.cpp_varname = None  # type: str
+        self.mod_visibility = None  # type: str
         self.condition = None  # type: Condition
         self.redact = False  # type: bool
         self.omit_in_ftdc = False  # type: bool
@@ -537,6 +538,7 @@ class ConfigOption(common.SourceLocation):
         self.arg_vartype = None  # type: str
         self.cpp_vartype = None  # type: str
         self.cpp_varname = None  # type: str
+        self.mod_visibility = None  # type: str
         self.condition = None  # type: Condition
 
         self.conflicts = []  # type: List[str]

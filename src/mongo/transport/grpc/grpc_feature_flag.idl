@@ -41,6 +41,7 @@ feature_flags:
         default: false
         fcv_gated: false
     featureFlagEgressGrpcForSearch:
+        mod_visibility: public
         description: "Feature flag to use egress gRPC for search communication"
         cpp_varname: gEgressGrpcForSearch
         default: true

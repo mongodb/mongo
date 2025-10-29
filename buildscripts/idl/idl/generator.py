@@ -1001,7 +1001,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-    def _gen_exported_constexpr(self, name, suffix, expr, condition):
+    def _gen_exported_constexpr(self, name, suffix, expr, condition, mod_visibility):
         # type: (str, str, ast.Expression, ast.Condition) -> None
         """Generate exports for default initializer."""
         if not (name and expr and expr.export):
@@ -1009,12 +1009,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         with self._condition(condition, preprocessor_only=True):
             self._writer.write_line(
-                "constexpr auto %s%s = %s;" % (_get_constant(name), suffix, expr.expr)
+                f"{make_mod_tag(mod_visibility)}constexpr auto {_get_constant(name)}{suffix} = {expr.expr};"
             )
 
         self.write_empty_line()
 
-    def _gen_extern_declaration(self, vartype, varname, condition):
+    def _gen_extern_declaration(self, vartype, varname, condition, mod_visibility):
         # type: (str, str, ast.Condition) -> None
         """Generate externs for storage declaration."""
         if (vartype is None) or (varname is None):
@@ -1026,7 +1026,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             for ns in idents:
                 self._writer.write_line("namespace %s {" % (ns))
 
-            self._writer.write_line("extern %s %s;" % (vartype, decl))
+            self._writer.write_line(f"{make_mod_tag(mod_visibility)}extern {vartype} {decl};")
 
             for ns in reversed(idents):
                 self._writer.write_line("}  // namespace " + ns)
@@ -1062,7 +1062,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         cls = scp.cpp_class
 
-        with self._block(f"class {cls.name} : public ServerParameter {{", "};"):
+        with self._block(
+            f"class {make_mod_tag(scp.mod_visibility)}{cls.name} : public ServerParameter {{", "};"
+        ):
             self._writer.write_unindented_line("public:")
             if scp.default is not None:
                 self._writer.write_line(
@@ -1249,6 +1251,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         for idl_enum in spec.enums:
             if idl_enum.mod_visibility:
                 return True
+        for scp in spec.server_parameters:
+            if scp.mod_visibility:
+                return True
+        if spec.configs:
+            for opt in spec.configs:
+                if opt.mod_visibility:
+                    return True
         return False
 
     def generate(self, spec):
@@ -1453,17 +1462,25 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
             for scp in spec.server_parameters:
                 if scp.cpp_class is None:
-                    self._gen_exported_constexpr(scp.name, "Default", scp.default, scp.condition)
+                    self._gen_exported_constexpr(
+                        scp.name, "Default", scp.default, scp.condition, scp.mod_visibility
+                    )
                 self._writer.write_line(
-                    f"constexpr inline auto {_get_constant(scp.name + 'Name')} = \"{scp.name}\"_sd;"
+                    f"{make_mod_tag(scp.mod_visibility)}constexpr inline auto {_get_constant(scp.name + 'Name')} = \"{scp.name}\"_sd;"
                 )
-                self._gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
+                self._gen_extern_declaration(
+                    scp.cpp_vartype, scp.cpp_varname, scp.condition, scp.mod_visibility
+                )
                 self.gen_server_parameter_class(scp)
 
             if spec.configs:
                 for opt in spec.configs:
-                    self._gen_exported_constexpr(opt.name, "Default", opt.default, opt.condition)
-                    self._gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
+                    self._gen_exported_constexpr(
+                        opt.name, "Default", opt.default, opt.condition, opt.mod_visibility
+                    )
+                    self._gen_extern_declaration(
+                        opt.cpp_vartype, opt.cpp_varname, opt.condition, opt.mod_visibility
+                    )
                 self._gen_config_function_declaration(spec)
 
             # Write a base class for each command in API Version 1.

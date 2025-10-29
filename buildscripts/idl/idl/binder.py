@@ -1553,6 +1553,7 @@ def _bind_server_parameter(ctxt, param):
     ast_param.redact = param.redact
     ast_param.test_only = param.test_only
     ast_param.deprecated_name = param.deprecated_name
+    ast_param.mod_visibility = param.mod_visibility
 
     # The omit_in_ftdc flag can only be enabled for cluster parameters.
     if param.omit_in_ftdc is not None and param.set_at != ["cluster"]:
@@ -1673,6 +1674,7 @@ def _bind_feature_flags(ctxt, param):
     ast_param = ast.ServerParameter(param.file_name, param.line, param.column)
     ast_param.name = param.name
     ast_param.description = param.description
+    ast_param.mod_visibility = param.mod_visibility
 
     # Choose the feature flag phase.
     ast_param.feature_flag_phase = _bind_feature_flag_phase(ctxt, param)
@@ -1823,6 +1825,7 @@ def _bind_config_option(ctxt, globals_spec, option):
     node.arg_vartype = option.arg_vartype
     node.cpp_vartype = option.cpp_vartype
     node.cpp_varname = option.cpp_varname
+    node.mod_visibility = option.mod_visibility
     node.condition = _bind_condition(option.condition, condition_for="config")
 
     node.requires = option.requires

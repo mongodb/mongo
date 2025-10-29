@@ -614,6 +614,8 @@ properties:
               If defined alone, a variable of this name will assume to have been declared and
               defined by the implementer, and its type will be automatically inferred at compile
               time. If cpp_varname is not defined, then cpp_class must be specified.
+          mod_visibility:
+            "$ref": "#/$defs/mod_visibility"
           cpp_class:
             description: >
               Declares a custom ServerParameter class in the generated header using the provided
@@ -796,6 +798,8 @@ properties:
             type: string
             description: >
               Name of the global variable which stores the option. Used with cpp_vartype.
+          mod_visibility:
+            "$ref": "#/$defs/mod_visibility"
           condition:
             type: object
             description: >
@@ -911,6 +915,8 @@ properties:
           cpp_varname:
             type: string
             description: Declares the underlying variable to use for the feature flag.
+          mod_visibility:
+            "$ref": "#/$defs/mod_visibility"
           default:
             type: boolean
             description: >

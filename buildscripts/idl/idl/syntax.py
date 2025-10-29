@@ -843,6 +843,7 @@ class ServerParameter(common.SourceLocation):
         self.description = None  # type: str
         self.cpp_vartype = None  # type: str
         self.cpp_varname = None  # type: str
+        self.mod_visibility = None  # type: str
         self.cpp_class = None  # type: ServerParameterClass
         self.condition = None  # type: Condition
         self.deprecated_name = []  # type: List[str]
@@ -869,6 +870,7 @@ class FeatureFlag(common.SourceLocation):
         self.name = None  # type: str
         self.description = None  # type: str
         self.cpp_varname = None  # type: str
+        self.mod_visibility = None  # type: str
         self.default = None  # type: Expression
         self.version = None  # type: str
         self.fcv_gated = None  # type: Expression
@@ -924,6 +926,7 @@ class ConfigOption(common.SourceLocation):
         self.arg_vartype = None  # type: str
         self.cpp_vartype = None  # type: str
         self.cpp_varname = None  # type: str
+        self.mod_visibility = None  # type: str
         self.condition = None  # type: Condition
 
         self.conflicts = []  # type: List[str]
