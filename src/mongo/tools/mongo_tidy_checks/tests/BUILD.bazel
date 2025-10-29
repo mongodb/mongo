@@ -19,6 +19,7 @@ tests = [
     # This list represents the test source files, which should contain a single issue which will be flagged
     # by a clang tidy check. The issue should be isolated in as minimal way as possible.
     "test_MongoHeaderBracketCheck",
+    "test_MongoHeaderIncludePathCheck",
     "test_MongoVolatileCheck",
     "test_MongoUninterruptibleLockGuardCheck",
     "test_MongoUninterruptibleLockGuardCheckForOpCtxMember",
@@ -59,6 +60,7 @@ tests = [
             "-Wno-unused-variable",
             "-Wno-return-type",
             "-Isrc/mongo/tools/mongo_tidy_checks/tests",
+            "-Isrc/mongo",  # for mongo header path test
         ] + select({
             "//bazel/config:compiler_type_gcc": ["-Wno-volatile"],
             "//bazel/config:compiler_type_clang": ["-Wno-deprecated-volatile"],

@@ -37,6 +37,7 @@
 #include "MongoCxx20StdChronoCheck.h"
 #include "MongoFCVConstantCheck.h"
 #include "MongoHeaderBracketCheck.h"
+#include "MongoHeaderIncludePathCheck.h"
 #include "MongoInvariantDDLCoordinatorCheck.h"
 #include "MongoInvariantStatusIsOKCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
@@ -64,6 +65,8 @@ public:
         CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
             "mongo-uninterruptible-lock-guard-check");
         CheckFactories.registerCheck<MongoHeaderBracketCheck>("mongo-header-bracket-check");
+        CheckFactories.registerCheck<MongoHeaderIncludePathCheck>(
+            "mongo-header-include-path-check");
         CheckFactories.registerCheck<MongoCctypeCheck>("mongo-cctype-check");
         CheckFactories.registerCheck<MongoConfigHeaderCheck>("mongo-config-header-check");
         CheckFactories.registerCheck<MongoCxx20BannedIncludesCheck>(
