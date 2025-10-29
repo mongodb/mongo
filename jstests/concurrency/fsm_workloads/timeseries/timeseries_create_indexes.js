@@ -80,6 +80,9 @@ export const $config = (function() {
                     // TODO SERVER-85548 remove after legacy timeseries
                     ErrorCodes.NamespaceNotFound,
                     ErrorCodes.NoProgressMade,
+                    // Can occur when mongos exhausts its retries on StaleConfig errors from the
+                    // shard and returns the StaleConfig error to the client.
+                    ErrorCodes.StaleConfig,
                 ]);
         },
         drop: function(db, collName) {
@@ -119,6 +122,9 @@ export const $config = (function() {
                 ErrorCodes.CannotImplicitlyCreateCollection,
                 // TODO SERVER-104712 remove the following exected error
                 10195200,
+                // Can occur when mongos exhausts its retries on StaleConfig errors from the shard
+                // and returns the StaleConfig error to the client.
+                ErrorCodes.StaleConfig,
             ]);
         },
         checkIndexes: function(db, collName) {
