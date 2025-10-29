@@ -181,6 +181,11 @@ def main() -> int:
         help="The branch to use as the fork point for changed files",
         default="origin/master",
     )
+    parser.add_argument(
+        "--file",
+        help="The file to format",
+        type=pathlib.Path,
+    )
 
     args = parser.parse_args()
     prettier_path: pathlib.Path = args.prettier.resolve()
@@ -188,7 +193,9 @@ def main() -> int:
     os.chdir(default_dir)
 
     files_to_format = "all"
-    if not args.all:
+    if args.file:
+        files_to_format = [str(args.file)]
+    elif not args.all:
         max_distance = 100
         distance = _git_distance([f"{args.origin_branch}..HEAD"])
         if distance > max_distance:
