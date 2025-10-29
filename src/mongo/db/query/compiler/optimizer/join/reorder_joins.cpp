@@ -243,6 +243,12 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
                                                                             ctx.makeJoinPreds(edge),
                                                                             boost::none,
                                                                             currentNode.embedPath);
+            } else if (internalRandomJoinReorderDefaultToHashJoin.load()) {
+                soln = std::make_unique<HashJoinEmbeddingNode>(std::move(soln),
+                                                               std::move(rhs),
+                                                               ctx.makeJoinPreds(edge),
+                                                               boost::none,
+                                                               currentNode.embedPath);
             } else {
                 soln = std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(soln),
                                                                      std::move(rhs),

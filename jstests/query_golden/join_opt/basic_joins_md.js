@@ -38,22 +38,58 @@ assert.commandWorked(
 );
 
 function runBasicJoinTest(pipeline) {
-    subSection("No join opt");
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
-    outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+    try {
+        subSection("No join opt");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const noJoinOptResults = coll.aggregate(pipeline).toArray();
 
-    subSection("With random order, seed 44");
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: 44}));
-    outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        subSection("With random order, seed 44, nested loop joins");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: 44}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const seed44NLJResults = coll.aggregate(pipeline).toArray();
 
-    subSection("With random order, seed 420");
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: 420}));
-    outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        subSection("With random order, seed 44, hash join enabled");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: true}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const seed44HJResults = coll.aggregate(pipeline).toArray();
 
-    // Reset flag.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: false}));
+
+        subSection("With random order, seed 420, nested loop joins");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: 420}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const seed420NLJResults = coll.aggregate(pipeline).toArray();
+
+        subSection("With random order, seed 420, hash join enabled");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: true}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const seed420HJResults = coll.aggregate(pipeline).toArray();
+
+        // Validate that all execution modes return the same results.
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed44NLJResults),
+            "Results differ between no join opt and seed 44 NLJ",
+        );
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed44HJResults),
+            "Results differ between no join opt and seed 44 HJ",
+        );
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed420NLJResults),
+            "Results differ between no join opt and seed 420 NLJ",
+        );
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed420HJResults),
+            "Results differ between no join opt and seed 420 HJ",
+        );
+    } finally {
+        // Reset flags.
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: false}));
+    }
 }
 
 section("Basic example with two joins");

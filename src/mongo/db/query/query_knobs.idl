@@ -520,6 +520,15 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalRandomJoinReorderDefaultToHashJoin:
+        description: "Change the default join algorithm produced from random reorderer from NestedLoopJoin to HashJoin."
+        set_at: [startup, runtime]
+        cpp_varname: "internalRandomJoinReorderDefaultToHashJoin"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
     internalQueryMaxPipelineRewrites:
         description: "Maximum number of pipeline rewrite rules to apply"
         set_at: [startup, runtime]
