@@ -17,7 +17,6 @@ const session = primary.getDB(dbName).getMongo().startSession({causalConsistency
 const primaryDB = session.getDatabase(dbName);
 
 stopReplicationOnSecondaries(rst);
-const coll = db[collName];
 
 const res = primaryDB.runCommand({
     insert: collName,
