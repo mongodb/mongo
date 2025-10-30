@@ -242,6 +242,7 @@ const skippedAuthTestingAggStages = [
     "$tumblingWindow",
     "$sessionWindow",
     "$validate",
+    "$setStreamMeta",
 
     // The following stages are stubs defined in aggregation_stage_stub_parsers.json.
     "$stubStage",

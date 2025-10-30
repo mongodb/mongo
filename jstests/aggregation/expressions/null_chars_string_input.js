@@ -458,6 +458,7 @@ const skips = new Set([
     "$searchMeta",
     "$sessionWindow",
     "$setMetadata",
+    "$setStreamMeta", // Tested in set_stream_meta_error.js
     "$setVariableFromSubPipeline",
     "$shardedDataDistribution",
     "$skip",
