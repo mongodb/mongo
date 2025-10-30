@@ -35,6 +35,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

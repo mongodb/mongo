@@ -44,6 +44,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/summation.h"
 
 #include <functional>
@@ -81,7 +82,7 @@ enum class AccumulatorDocumentsNeeded {
     kLastOutputDocument,
 };
 
-class AccumulatorState : public RefCountable {
+class MONGO_MOD_PUBLIC AccumulatorState : public RefCountable {
 public:
     using Factory = std::function<boost::intrusive_ptr<AccumulatorState>()>;
 

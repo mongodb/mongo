@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -38,9 +39,11 @@
 
 namespace mongo {
 
-// This class is used by the aggregation framework and streams enterprise module
-// to perform the document processing needed for $match.
-class MatchProcessor {
+/**
+ * This class is used by the aggregation framework and streams enterprise module to perform the
+ * document processing needed for $match.
+ */
+class MONGO_MOD_PUBLIC MatchProcessor {
 public:
     MatchProcessor(std::unique_ptr<MatchExpression> expr,
                    DepsTracker dependencies,

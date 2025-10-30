@@ -40,12 +40,13 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 // A descriptor for a merge strategy. Holds a merge strategy function and a set of actions the
 // client should be authorized to perform in order to be able to execute a merge operation using
@@ -213,4 +214,4 @@ private:
     bool _allowMergeOnNullishValues;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

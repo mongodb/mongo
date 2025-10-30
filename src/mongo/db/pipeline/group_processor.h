@@ -31,13 +31,14 @@
 
 #include "mongo/db/pipeline/group_processor_base.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This class is used by the aggregation framework and streams enterprise module to perform the
@@ -130,4 +131,4 @@ private:
     GroupProcessorBase::Accumulators _currentAccumulators;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

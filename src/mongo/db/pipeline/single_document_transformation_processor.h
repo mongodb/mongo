@@ -30,14 +30,17 @@
 #pragma once
 
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/util/modules.h"
 
 #include <type_traits>
 
 namespace mongo {
 
-// This class is used by the aggregation framework and streams enterprise module
-// to perform the document processing needed for stages that do 1:1 document transformation.
-class SingleDocumentTransformationProcessor {
+/**
+ * This class is used by the aggregation framework and streams enterprise module to perform the
+ * document processing needed for stages that do 1:1 document transformation.
+ */
+class MONGO_MOD_PUBLIC SingleDocumentTransformationProcessor {
 public:
     SingleDocumentTransformationProcessor(std::unique_ptr<TransformerInterface> parsedTransform);
 

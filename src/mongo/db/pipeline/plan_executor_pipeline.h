@@ -52,6 +52,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <queue>

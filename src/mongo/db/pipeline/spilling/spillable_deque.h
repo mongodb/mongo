@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/storage/spill_table.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <deque>

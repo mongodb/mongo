@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

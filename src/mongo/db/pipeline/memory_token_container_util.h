@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

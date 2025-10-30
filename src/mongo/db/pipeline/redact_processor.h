@@ -32,15 +32,18 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/util/modules.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 
 namespace mongo {
 
-// This class is used by the aggregation framework and streams enterprise module
-// to perform the document processing needed for $redact.
-class RedactProcessor final {
+/**
+ * This class is used by the aggregation framework and streams enterprise module to perform the
+ * document processing needed for $redact.
+ */
+class MONGO_MOD_PUBLIC RedactProcessor final {
 public:
     RedactProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                     const boost::intrusive_ptr<Expression>& expression,

@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <utility>

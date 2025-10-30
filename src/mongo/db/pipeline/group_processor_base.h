@@ -33,6 +33,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
@@ -42,7 +43,7 @@ namespace mongo {
  * Base class of all GroupProcessor implementations. This class is used by the aggregation framework
  * and streams enterprise module to perform the document processing needed for $group.
  */
-class GroupProcessorBase {
+class MONGO_MOD_OPEN GroupProcessorBase {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
