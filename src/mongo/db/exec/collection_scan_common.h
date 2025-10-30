@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -40,7 +41,7 @@ struct ResumeScanPoint {
     bool tolerateKeyNotFound = false;
 };
 
-struct CollectionScanParams {
+struct MONGO_MOD_PUBLIC CollectionScanParams {
     enum Direction {
         FORWARD = 1,
         BACKWARD = -1,

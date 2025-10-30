@@ -30,10 +30,15 @@
 #pragma once
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class IndexPathProjection {
+/**
+ * TODO SERVER-113178: Determine whether this class can be reworked to remove local catalog
+ * dependency on query module.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT IndexPathProjection {
 public:
     IndexPathProjection(std::unique_ptr<projection_executor::ProjectionExecutor> projExec)
         : _exec(std::move(projExec)), _exhaustivePaths(_exec->extractExhaustivePaths()) {

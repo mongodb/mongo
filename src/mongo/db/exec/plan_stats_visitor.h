@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace sbe {

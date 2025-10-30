@@ -39,6 +39,7 @@
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/container_size_helper.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -59,8 +60,10 @@ using PlanStageKey = const PlanStage*;
 
 /**
  * The interface all specific-to-stage stats provide.
+ *
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on this struct.
  */
-struct SpecificStats {
+struct MONGO_MOD_NEEDS_REPLACEMENT SpecificStats {
     virtual ~SpecificStats() {}
 
     /**
@@ -415,7 +418,10 @@ struct CountScanStats : public SpecificStats {
     size_t keysExamined;
 };
 
-struct DeleteStats : public SpecificStats {
+/**
+ * SERVER-112776: Remove 'data_movement' dependency on this struct.
+ */
+struct MONGO_MOD_NEEDS_REPLACEMENT DeleteStats : public SpecificStats {
     DeleteStats() = default;
 
     std::unique_ptr<SpecificStats> clone() const final {
@@ -438,7 +444,10 @@ struct DeleteStats : public SpecificStats {
     size_t bytesDeleted = 0u;
 };
 
-struct BatchedDeleteStats : public DeleteStats {
+/**
+ * SERVER-112776: Remove 'ttl' dependency on this struct.
+ */
+struct MONGO_MOD_NEEDS_REPLACEMENT BatchedDeleteStats : public DeleteStats {
     BatchedDeleteStats() = default;
 
     // Unlike a standard multi:true delete, BatchedDeleteStage can complete with PlanStage::IS_EOF
@@ -799,7 +808,10 @@ struct ProjectionStats : public SpecificStats {
     BSONObj projObj;
 };
 
-struct SortStats : public SpecificStats {
+/**
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on this struct.
+ */
+struct MONGO_MOD_NEEDS_REPLACEMENT SortStats : public SpecificStats {
     SortStats() = default;
     SortStats(uint64_t limit, uint64_t maxMemoryUsageBytes)
         : limit(limit), maxMemoryUsageBytes(maxMemoryUsageBytes) {}

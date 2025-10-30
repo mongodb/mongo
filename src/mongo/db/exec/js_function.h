@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

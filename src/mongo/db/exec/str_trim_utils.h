@@ -33,6 +33,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe::value {
 

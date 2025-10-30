@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

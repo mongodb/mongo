@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

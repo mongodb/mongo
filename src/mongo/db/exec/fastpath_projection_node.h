@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/projection_node.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

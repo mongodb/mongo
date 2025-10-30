@@ -37,6 +37,7 @@
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>

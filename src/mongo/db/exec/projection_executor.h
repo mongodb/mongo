@@ -44,6 +44,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -59,8 +60,10 @@ namespace mongo::projection_executor {
  * A ProjectionExecutor is responsible for parsing and executing a $project. It represents either an
  * inclusion or exclusion projection. This is the common interface between the two types of
  * projections.
+ *
+ * TODO SERVER-113179: Remove external dependencies on this class.
  */
-class ProjectionExecutor : public TransformerInterface {
+class MONGO_MOD_NEEDS_REPLACEMENT ProjectionExecutor : public TransformerInterface {
 public:
     /**
      * The name of an internal variable to bind a projection post image to, which is used by the

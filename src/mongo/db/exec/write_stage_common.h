@@ -43,6 +43,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -60,7 +61,7 @@ class Document;
 
 namespace write_stage_common {
 
-class PreWriteFilter {
+class MONGO_MOD_PUBLIC PreWriteFilter {
 public:
     /**
      * This class represents the different kind of actions we can take when handling a write

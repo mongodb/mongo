@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"

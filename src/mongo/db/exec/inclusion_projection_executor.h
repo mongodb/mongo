@@ -30,6 +30,8 @@
 #pragma once
 
 
+#include "mongo/util/modules.h"
+
 #include <boost/container/small_vector.hpp>
 #include <boost/smart_ptr.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"

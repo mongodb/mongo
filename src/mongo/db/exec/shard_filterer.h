@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

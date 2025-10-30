@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/shard_filterer.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

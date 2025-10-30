@@ -32,6 +32,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

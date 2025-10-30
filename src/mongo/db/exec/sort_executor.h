@@ -38,6 +38,7 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -55,9 +56,11 @@ namespace mongo {
  * The template parameter is the type of data being sorted. In DocumentSource execution, we sort
  * Document objects directly, but in the PlanStage layer we may sort WorkingSetMembers. The type of
  * the sort key, on the other hand, is always Value.
+ *
+ * TODO SERVER-112777: Remove 'atlas_streams' dependency on this class.
  */
 template <typename T>
-class SortExecutor {
+class MONGO_MOD_NEEDS_REPLACEMENT SortExecutor {
 public:
     using DocumentSorter = Sorter<Value, T>;
     class Comparator {

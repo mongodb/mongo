@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/shard_filterer.h"
+#include "mongo/util/modules.h"
 
 #include <variant>
 
@@ -46,8 +47,10 @@ namespace mongo {
  * This struct represents the policy of "do the normal thing." This will use state set up on the
  * OperationContext to determine whether to add a ShardFilterer to the execution plan. In almost all
  * cases, this is what you want to use.
+ *
+ * TODO SERVER-112777: Remove atlas_streams dependency on this struct.
  */
-struct AutomaticShardFiltering {};
+struct MONGO_MOD_NEEDS_REPLACEMENT AutomaticShardFiltering{};
 
 /**
  * This type indicates that the consumer of the PlanExecutor does not want any shard filtering to
@@ -63,6 +66,8 @@ struct ProofOfUpstreamFiltering {
     ProofOfUpstreamFiltering(const ShardFilterer& proofOfManualFilter) {}
 };
 
-using ExecShardFilterPolicy = std::variant<AutomaticShardFiltering, ProofOfUpstreamFiltering>;
+// TODO SERVER-112777: Remove atlas_streams dependency on this 'using' declaration.
+using ExecShardFilterPolicy MONGO_MOD_NEEDS_REPLACEMENT =
+    std::variant<AutomaticShardFiltering, ProofOfUpstreamFiltering>;
 
 }  // namespace mongo
