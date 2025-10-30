@@ -10,7 +10,22 @@ ARG USER_GID=$USER_UID
 # Create the user
 RUN groupadd $USERNAME && useradd -s /bin/bash --gid $USER_GID -m $USERNAME
 
-RUN apt-get update && apt-get install -y sudo curl ca-certificates xdg-utils
+RUN apt-get update && apt-get install -y \
+    sudo \
+    curl \
+    ca-certificates \
+    xdg-utils \
+    wget \
+    less \
+    jq \
+    vim-tiny \
+    procps \
+    lsof \
+    zip \
+    unzip \
+    openssh-client \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install xdg-open wrapper for browser integration
 COPY .devcontainer/xdg-open-wrapper.sh /usr/local/bin/xdg-open-wrapper.sh
@@ -20,8 +35,9 @@ RUN chmod +x /usr/local/bin/xdg-open-wrapper.sh && \
   fi && \
   ln -s /usr/local/bin/xdg-open-wrapper.sh /usr/bin/xdg-open
 
-# Give user sudo access
-RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/devcontaineruser && chmod 0440 /etc/sudoers.d/devcontaineruser
+# Give user sudo access (common-utils feature will enhance this)
+RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/devcontaineruser && \
+    chmod 0440 /etc/sudoers.d/devcontaineruser
 
 # Persistent bash history
 RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
@@ -67,7 +83,37 @@ RUN /opt/mongodbtoolchain/revisions/*/scripts/install.sh; echo "Toolchain instal
 # Add MongoDB toolchain to PATH
 ENV PATH="/opt/mongodbtoolchain/v5/bin:${PATH}"
 
+# Setup bash profile to source .bashrc
+RUN echo "" >> "$HOME/.bash_profile" && \
+  echo "# BEGIN Source .bashrc" >> "$HOME/.bash_profile" && \
+  echo "if [[ -f ~/.bashrc ]]; then" >> "$HOME/.bash_profile" && \
+  echo "    source ~/.bashrc" >> "$HOME/.bash_profile" && \
+  echo "fi" >> "$HOME/.bash_profile" && \
+  echo "# END Source .bashrc" >> "$HOME/.bash_profile"
+
+# Create MongoDB data directory
+USER root
+RUN mkdir -p /data/db && chown -R ${USERNAME}:${USERNAME} /data/db
+USER $USERNAME
+
 # Bazel telemetry
 RUN echo "common --bes_keywords=devcontainer:use=true" >> "$HOME/.bazelrc" && \
   echo "common --bes_keywords=devcontainer:image=$BASE_IMAGE" >> "$HOME/.bazelrc" && \
   echo "common --bes_keywords=devcontainer:username=$USERNAME" >> "$HOME/.bazelrc"
+
+# Install pipx (Python package manager for tools)
+ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
+RUN /opt/mongodbtoolchain/v5/bin/python3 -m venv /tmp/pipx-venv && \
+  /tmp/pipx-venv/bin/python -m pip install --upgrade "pip<20.3" && \
+  /tmp/pipx-venv/bin/python -m pip install pipx && \
+  /tmp/pipx-venv/bin/pipx install pipx --python /opt/mongodbtoolchain/v5/bin/python3 --force && \
+  /tmp/pipx-venv/bin/pipx ensurepath --force && \
+  rm -rf /tmp/pipx-venv
+
+# Install db-contrib-tool using pipx
+RUN /home/${USERNAME}/.local/bin/pipx install db-contrib-tool
+
+# Install poetry with pinned dependencies
+COPY --chown=${USERNAME}:${USERNAME} poetry_requirements.txt /tmp/poetry_requirements.txt
+RUN /home/${USERNAME}/.local/bin/pipx install poetry --pip-args="-r /tmp/poetry_requirements.txt" && \
+  rm /tmp/poetry_requirements.txt

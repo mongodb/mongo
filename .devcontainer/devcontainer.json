@@ -25,6 +25,11 @@
       "source": "mongo-bashhistory",
       "target": "/commandhistory",
       "type": "volume"
+    },
+    {
+      "source": "${containerWorkspaceFolderBasename}-python3-venv",
+      "target": "${containerWorkspaceFolder}/python3-venv",
+      "type": "volume"
     }
   ],
   "containerEnv": {
@@ -33,10 +38,11 @@
   "remoteUser": "${localEnv:USER}",
   "containerUser": "${localEnv:USER}",
   "features": {
-    "./features/workstation": {},
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers-community/features/bazel:1": {},
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
+    },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"
     },
@@ -44,16 +50,7 @@
       "username": "${localEnv:USER}"
     }
   },
-  "postCreateCommand": {
-    "fixVolumePerms": "sudo chown -R $(whoami): ${containerEnv:HOME}/.config/engflow_auth && sudo chown -R $(whoami): ${containerEnv:HOME}/.cache",
-    "venvActivation": "echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.bashrc && echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.zshrc;",
-    "createDataDir": "sudo mkdir -p /data/db && sudo chown -R $(whoami): /data/db",
-    "installNodeModules": "bazel run @pnpm//:pnpm -- --dir ${containerWorkspaceFolder} install",
-    "reportDockerServerPlatform": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_platform=$(docker version --format '\"{{.Server.Platform.Name}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
-    "reportDockerServerVersion": "echo \"\ncommon --bes_keywords=devcontainer:docker_server_version=$(docker version --format '\"{{.Server.Version}}\"')\" >> ${containerEnv:HOME}/.bazelrc",
-    "reportArch": "echo \"\ncommon --bes_keywords=devcontainer:arch=$(uname -i)\" >> ${containerEnv:HOME}/.bazelrc",
-    "fetchTags": "if [ -f .git/shallow ]; then git fetch --unshallow --tags; else git fetch --tags; fi || true"
-  },
+  "postCreateCommand": "WORKSPACE_FOLDER=${containerWorkspaceFolder} ${containerWorkspaceFolder}/.devcontainer/post-create.sh",
   "shutdownAction": "none",
   "portsAttributes": {
     "*": {
@@ -113,7 +110,7 @@
         "[starlark]": {
           "editor.defaultFormatter": "BazelBuild.vscode-bazel"
         },
-        "terminal.integrated.wordSeparators": " ()[]{}',\"`─‘’@",
+        "terminal.integrated.wordSeparators": " ()[]{}',\"`─''@",
         "yaml.schemas": {
           "./buildscripts/idl/idl_schema.yml": [
             "*.idl"
