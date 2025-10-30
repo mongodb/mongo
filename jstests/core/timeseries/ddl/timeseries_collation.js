@@ -10,6 +10,9 @@
  *   # This test uses a non-default collation which can cause bucket reopening to be sub-optimal
  *   # when moveCollection is running in the background.
  *   assumes_balancer_off,
+ *   # As this test depends on specific bucketing, avoid testing in FCV upgrade/downgrade tests
+ *   # to avoid changes in bucketing.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
