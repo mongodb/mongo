@@ -126,6 +126,7 @@ echo "bazel build ${ALL_FLAGS} ${targets}" >.bazel_build_invocation
 
 set +o errexit
 
+export RETRY_ON_FAIL=1
 bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
     build ${ALL_FLAGS} ${targets}
 RET=$?

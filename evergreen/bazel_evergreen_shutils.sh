@@ -308,18 +308,22 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             RET=$?
         fi
 
-        # Classify failure & decide on guard for next attempt.
-        [[ $RET -eq 124 ]] && echo "Bazel timed out." >&2
-
         if ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
             echo "[retry ${i}] Bazel server down (OOM/killed). Enabling OOM guard for next attempt and restarting…" >&2
             use_oom_guard=true
             "$BAZEL_BINARY" shutdown || true
             "$BAZEL_BINARY" info >/dev/null 2>&1 || true
             bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
-        else
-            echo "Bazel failed (exit=$RET); restarting server before retry…" >&2
+        elif [[ $RET -eq 124 ]]; then
+            echo "Bazel timed out." >&2
             "$BAZEL_BINARY" shutdown || true
+        else
+            if [[ ${RETRY_ON_FAIL:-0} -eq 1 ]]; then
+                echo "Bazel failed (exit=$RET); restarting server before retry..." >&2
+                "$BAZEL_BINARY" shutdown || true
+            else
+                break
+            fi
         fi
 
         sleep 60
