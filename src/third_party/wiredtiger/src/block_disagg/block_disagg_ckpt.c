@@ -46,6 +46,11 @@ __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *sessio
         WT_RET(__wt_buf_init(session, &ckpt->raw, WT_BLOCK_CHECKPOINT_BUFFER));
         endp = ckpt->raw.mem;
         __wt_page_header_byteswap((void *)root_image->data);
+        /*
+         * In disaggregated storage, checkpoint cookie is the same as address cookie of the root
+         * page, and currently we rely on this assumption to discard older checkpoint root page when
+         * the checkpoint becomes redundant.
+         */
         WT_RET(__wti_block_disagg_write_internal(
           session, block_disagg, root_image, block_meta, &size, &checksum, true, true));
         __wt_page_header_byteswap((void *)root_image->data);

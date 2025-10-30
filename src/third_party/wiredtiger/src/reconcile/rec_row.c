@@ -1232,14 +1232,16 @@ __wti_rec_row_leaf(
          * the table, and the value has become obsolete.
          */
         if (upd == NULL) {
-            if (__wt_txn_tw_stop_visible_all(session, twp))
+            if (__wt_txn_tw_stop_visible_all(session, twp)) {
                 upd = &upd_tombstone;
-            else if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
+                r->key_removed_from_disk_image = true;
+            } else if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
                 if (WT_TIME_WINDOW_HAS_STOP(twp)) {
                     if (twp->stop_txn < r->rec_start_oldest_id &&
                       r->rec_prune_timestamp != WT_TS_NONE &&
                       twp->durable_stop_ts <= r->rec_prune_timestamp) {
                         upd = &upd_tombstone;
+                        r->key_removed_from_disk_image = true;
                         WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys);
                     }
                 } else {
@@ -1247,6 +1249,7 @@ __wti_rec_row_leaf(
                       r->rec_prune_timestamp != WT_TS_NONE &&
                       twp->durable_start_ts <= r->rec_prune_timestamp) {
                         upd = &upd_tombstone;
+                        r->key_removed_from_disk_image = true;
                         WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys);
                     }
                 }
@@ -1358,6 +1361,7 @@ __wti_rec_row_leaf(
 
                 /* Not creating a key so we can't use last-key as a prefix for a subsequent key. */
                 lastkey->size = 0;
+                r->key_removed_from_disk_image = true;
                 break;
             default:
                 WT_ERR(__wt_illegal_value(session, upd->type));

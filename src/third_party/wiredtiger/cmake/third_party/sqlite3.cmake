@@ -35,7 +35,23 @@ add_library(sqlite3_lib STATIC
     ${SQLITE3_DIR}/sqlite3.c
     ${SQLITE3_DIR}/sqlite3.h
 )
+
 target_include_directories(sqlite3_lib PUBLIC ${SQLITE3_DIR})
+
+target_compile_definitions(sqlite3_lib PRIVATE
+    # Omitting the possibility of using shared cache allows many conditionals in
+    # performance-critical sections of the code to be eliminated. This can give
+    # a noticeable improvement in performance.
+    SQLITE_OMIT_SHARED_CACHE
+
+    # Omit support for interfaces marked as deprecated.
+    SQLITE_OMIT_DEPRECATED
+
+    # The alloca() memory allocator will be used in a few situations where it is
+    # appropriate. This can give a small performance improvement.
+    SQLITE_USE_ALLOCA
+)
+
 set_target_properties(sqlite3_lib PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )

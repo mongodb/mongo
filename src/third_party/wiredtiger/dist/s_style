@@ -74,7 +74,7 @@ for f in "$@"; do
     # Finding paired typos in the comments of different file types and excluding invalid edge cases.
     if [ "${fname##*.}" = "py" ]; then
         grep -E '#.*[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f > $t
-    elif [ "${fname##*.}" = "c" ] || [ "${fname##*.}" = "h" ]; then
+    elif [ "${fname##*.}" = "c" ] || [ "${fname##*.}" = "cpp" ] || [ "${fname##*.}" = "h" ]; then
         grep -E '/?\*.*[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f | grep -E -v -e "@" -e "long long" > $t
     else
         grep -E '[[:space:]]\b([a-zA-Z]+)[[:space:]]\b\1[[:space:]\.]' $f | grep -E -v -e "@" -e "^\(" > $t

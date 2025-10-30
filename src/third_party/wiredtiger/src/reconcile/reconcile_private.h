@@ -194,6 +194,12 @@ struct __wti_reconcile {
      */
     bool update_used;
 
+    /* Track if there is any update chain with its updates all aborted. */
+    bool has_upd_chain_all_aborted;
+
+    /* Track if any key is removed from the disk image due to its delete is globally visible. */
+    bool key_removed_from_disk_image;
+
     /*
      * When we can't mark the page clean after reconciliation (for example, checkpoint or eviction
      * found some uncommitted updates), there's a leave-dirty flag.
@@ -386,7 +392,6 @@ struct __wti_reconcile {
 
     bool cache_write_hs;                /* Used the history store table */
     bool cache_write_restore_invisible; /* Used update/restoration because of invisible update */
-    bool cache_upd_chain_all_aborted;   /* All updates in the chain are aborted */
 
     WT_REF_STATE tested_ref_state; /* Debugging information */
 
@@ -463,9 +468,9 @@ typedef struct {
         (r)->ref->page->modify->mod_multi_entries == 1))
 
 /* Called after building the disk image. */
-#define WT_BUILD_DELTA_LEAF(session, r)                         \
-    WT_DELTA_LEAF_ENABLED((session)) && (r)->multi_next == 1 && \
-      WT_REC_RESULT_SINGLE_PAGE((session), (r))
+#define WT_BUILD_DELTA_LEAF(session, r)                                                     \
+    WT_DELTA_LEAF_ENABLED((session)) && !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT) && \
+      (r)->multi_next == 1 && WT_REC_RESULT_SINGLE_PAGE((session), (r))
 
 /*
  * Called when building the internal page image to indicate should we start to build a delta for the

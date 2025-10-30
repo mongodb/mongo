@@ -135,8 +135,6 @@ class test_verify_disagg(wttest.WiredTigerTestCase):
 
         # The leader is still alive, verify it.
         self.verify([self.session])
-        # FIXME-WT-14700: remove ignore after freeing root pages is addressed.
-        self.ignoreStdoutPattern("Mismatch in page IDs")
 
     def test_verify_leader_no_table(self):
         # Layered table does not exist, expect ENOENT

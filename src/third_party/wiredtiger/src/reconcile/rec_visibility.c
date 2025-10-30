@@ -1331,7 +1331,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
         WT_ASSERT_ALWAYS(session, upd == NULL,
           "__wt_rec_upd_select has selected an update when none are present on the update chain");
         if (first_upd != NULL)
-            r->cache_upd_chain_all_aborted = true;
+            r->has_upd_chain_all_aborted = true;
         return (0);
     }
 

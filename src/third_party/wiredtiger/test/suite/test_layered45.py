@@ -169,6 +169,82 @@ class test_layered45(wttest.WiredTigerTestCase):
         session2.close()
         cursor.close()
 
+    def test_delete_update_restore(self):
+        self.session.create(self.uri, self.session_create_config())
+
+        cursor = self.session.open_cursor(self.uri, None, None)
+        value1 = "a"
+
+        for i in range(self.nitems):
+            self.session.begin_transaction()
+            cursor[str(i)] = value1
+            self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(5)}')
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
+
+        self.session.checkpoint()
+
+        self.session.begin_transaction()
+        cursor.set_key(str(5))
+        cursor.remove()
+        self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(10)}')
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+
+        # We should build a delta
+        self.session.checkpoint()
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
+        stat_cursor.close()
+
+        session2 = self.conn.open_session()
+        # Do an uncommitted update on the deleted key
+        session2.begin_transaction()
+        cursor2 = session2.open_cursor(self.uri, None, None)
+        cursor2[str(5)] = value1
+
+        # Evict the data and we should build an empty delta
+        session3 = self.conn.open_session("debug=(release_evict_page)")
+        evict_cursor = session3.open_cursor(self.uri, None, None)
+        session3.begin_transaction()
+        evict_cursor.set_key(str(4))
+        evict_cursor.search()
+        evict_cursor.close()
+        session3.rollback_transaction()
+        session3.close()
+
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 1)
+        stat_cursor.close()
+
+        session2.rollback_transaction()
+
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(20)},oldest_timestamp={self.timestamp_str(20)}')
+
+        # We should build a delta with delete
+        self.session.checkpoint()
+
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
+        stat_cursor.close()
+
+        session2.close()
+        session2 = self.conn.open_session()
+        # Do an uncommitted update
+        session2.begin_transaction()
+        cursor2 = session2.open_cursor(self.uri, None, None)
+        cursor2[str(2)] = value1
+
+        # We should build an empty delta
+        self.session.checkpoint()
+
+        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
+        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
+        stat_cursor.close()
+
+        session2.close()
+        cursor.close()
+
     def test_prepare_update(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.create(self.uri, self.session_create_config())

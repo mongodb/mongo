@@ -178,6 +178,20 @@ join(const Range &range, const Separator &sep)
     return ss.str();
 }
 
+// Base-2 (binary) units
+constexpr uint64_t operator""_KB(unsigned long long val)
+{
+    return val * 1024;
+}
+constexpr uint64_t operator""_MB(unsigned long long val)
+{
+    return val * 1024 * 1024;
+}
+constexpr uint64_t operator""_GB(unsigned long long val)
+{
+    return val * 1024 * 1024 * 1024;
+}
+
 // Unix epoch microseconds
 inline auto
 now_us()
@@ -191,7 +205,8 @@ struct Config {
     WT_EXTENSION_API *extapi = nullptr; // WiredTiger extension API
 
     std::filesystem::path home_dir;        // Home directory for the extension
-    uint32_t cache_size_mb = 500;          // Size of cache in megabytes (default)
+    uint32_t cache_size_mb = 8'192;        // Size of cache in megabytes (default)
+    uint32_t mmap_size_mb = 8'192;         // Size of memory map in megabytes (default)
     uint32_t delay_ms = 0;                 // Average length of delay when simulated
     uint32_t error_ms = 0;                 // Average length of sleep when simulated
     uint32_t force_delay = 0;              // Force a simulated network delay every N operations
@@ -213,6 +228,7 @@ struct Config {
 
         configure_value(parser.get(), config, "home", home_dir);
         configure_value(parser.get(), config, "cache_size_mb", cache_size_mb);
+        configure_value(parser.get(), config, "mmap_size_mb", mmap_size_mb);
         configure_value(parser.get(), config, "delay_ms", delay_ms);
         configure_value(parser.get(), config, "error_ms", error_ms);
         configure_value(parser.get(), config, "force_delay", force_delay);
@@ -302,12 +318,12 @@ template <> struct std::formatter<Config> {
     format(const Config &cfg, format_context &ctx) const
     {
         return std::format_to(ctx.out(),
-          "{{cache_size_mb={}, delay_ms={}, error_ms={}, force_delay={}, "
+          "{{cache_size_mb={:L}, mmap_size_mb={:L}, delay_ms={}, error_ms={}, force_delay={}, "
           "force_error={}, materialization_delay_ms={}, last_materialized_lsn={}, "
           "verbose={}, verbose_msg={}, sql_trace={}, verify={}}}",
-          cfg.cache_size_mb, cfg.delay_ms, cfg.error_ms, cfg.force_delay, cfg.force_error,
-          cfg.materialization_delay_ms, cfg.last_materialized_lsn, cfg.verbose, cfg.verbose_msg,
-          cfg.sql_trace, cfg.verify);
+          cfg.cache_size_mb, cfg.mmap_size_mb, cfg.delay_ms, cfg.error_ms, cfg.force_delay,
+          cfg.force_error, cfg.materialization_delay_ms, cfg.last_materialized_lsn, cfg.verbose,
+          cfg.verbose_msg, cfg.sql_trace, cfg.verify);
     }
 };
 
@@ -1046,6 +1062,7 @@ private:
     {
         std::call_once(
           db_init, [this](sqlite3 *d) { create_tables(d); }, db);
+        configure_connection(db);
     }
 
     void
@@ -1154,6 +1171,46 @@ private:
         }
 
         LOG_DEBUG("SQLite database schema initialized");
+    }
+
+    void
+    configure_connection(sqlite3 *db)
+    {
+        // The WAL journaling mode uses a write-ahead log instead of a rollback
+        // journal to implement transactions. This significantly improves performance.
+        SQL_CALL_CHECK(
+          db, sqlite3_exec, db, "PRAGMA journal_mode = WAL;", nullptr, nullptr, nullptr);
+
+        // Turn Synchronous mode OFF for better performance.
+        // We don't care about database corruption in case of OS crash or power failure.
+        SQL_CALL_CHECK(
+          db, sqlite3_exec, db, "PRAGMA synchronous = OFF;", nullptr, nullptr, nullptr);
+
+        // For temporary store use memory instead of disk.
+        SQL_CALL_CHECK(
+          db, sqlite3_exec, db, "PRAGMA temp_store = MEMORY;", nullptr, nullptr, nullptr);
+
+        // Uses memory mapping instead of read/write calls when the database
+        // is < mmap_size in bytes.
+        const uint64_t MMAP_SIZE = config.mmap_size_mb * 1_MB;
+        SQL_CALL_CHECK(db, sqlite3_exec, db,
+          std::format("PRAGMA mmap_size = {};", MMAP_SIZE).c_str(), nullptr, nullptr, nullptr);
+
+        // Increase page size to 16KB (default is 4KB). This improves performance
+        // for tables with BLOBs.
+        const uint64_t PAGE_SIZE = 16_KB;
+        SQL_CALL_CHECK(db, sqlite3_exec, db,
+          std::format("PRAGMA page_size = {};", PAGE_SIZE).c_str(), nullptr, nullptr, nullptr);
+
+        // Set cache size as configured.
+        // Cache size is specified in megabytes. Convert to number of pages.
+        const uint64_t CACHE_PAGES = (config.cache_size_mb * 1_MB) / PAGE_SIZE;
+        SQL_CALL_CHECK(db, sqlite3_exec, db,
+          std::format("PRAGMA cache_size = {};", CACHE_PAGES).c_str(), nullptr, nullptr, nullptr);
+
+        // Set busy timeout to 10 seconds.
+        SQL_CALL_CHECK(
+          db, sqlite3_exec, db, "PRAGMA busy_timeout = 10000;", nullptr, nullptr, nullptr);
     }
 
     void

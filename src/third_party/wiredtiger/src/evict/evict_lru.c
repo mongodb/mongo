@@ -1705,6 +1705,21 @@ __evict_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree)
 }
 
 /*
+ * __evict_disagg_btree_skip_count --
+ *     Count the number of skipped ingest btrees and stable btrees in disagg
+ */
+static WT_INLINE void
+__evict_disagg_btree_skip_count(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+    if (__wt_conn_is_disagg(session)) {
+        if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+            WT_STAT_CONN_INCR(session, eviction_server_skip_ingest_trees);
+        else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+            WT_STAT_CONN_INCR(session, eviction_server_skip_stable_trees);
+    }
+}
+
+/*
  * __evict_walk --
  *     Fill in the array by walking the next set of pages.
  */
@@ -1797,12 +1812,14 @@ retry:
         btree = dhandle->handle;
         if (btree->evict_disabled > 0) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_eviction_disabled);
+            __evict_disagg_btree_skip_count(session, btree);
             continue;
         }
 
         /* Skip read-only btrees if we are not looking for clean pages. */
         if (F_ISSET(btree, WT_BTREE_READONLY) && !F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_read_only);
+            __evict_disagg_btree_skip_count(session, btree);
             continue;
         }
 
@@ -1810,6 +1827,7 @@ retry:
         if (WT_BTREE_SYNCING(btree) &&
           !F_ISSET(evict, WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_UPDATES)) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_checkpointing_trees);
+            __evict_disagg_btree_skip_count(session, btree);
             continue;
         }
 
@@ -1822,6 +1840,7 @@ retry:
         if (btree->evict_priority != 0 && !__wt_evict_aggressive(session) &&
           !__evict_btree_dominating_cache(session, btree)) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_stick_in_cache);
+            __evict_disagg_btree_skip_count(session, btree);
             continue;
         }
 
@@ -1836,6 +1855,7 @@ retry:
              */
             if (btree->evict_ref == NULL && session->hazards.num_active > WTI_EVICT_MAX_TREES) {
                 WT_STAT_CONN_INCR(session, eviction_server_skip_trees_too_many_active_walks);
+                __evict_disagg_btree_skip_count(session, btree);
                 continue;
             }
         }
@@ -1859,11 +1879,14 @@ retry:
         evict_walk_period = __wt_atomic_load_uint32_relaxed(&btree->evict_walk_period);
         if (evict_walk_period != 0 && btree->evict_walk_skips++ < evict_walk_period) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_not_useful_before);
+            __evict_disagg_btree_skip_count(session, btree);
             continue;
         }
 
-        if (F_ISSET(btree, WT_BTREE_IN_MEMORY) && !F_ISSET(evict, WT_EVICT_CACHE_DIRTY))
+        if (F_ISSET(btree, WT_BTREE_IN_MEMORY) && !F_ISSET(evict, WT_EVICT_CACHE_DIRTY)) {
+            __evict_disagg_btree_skip_count(session, btree);
             continue;
+        }
 
         btree->evict_walk_skips = 0;
 

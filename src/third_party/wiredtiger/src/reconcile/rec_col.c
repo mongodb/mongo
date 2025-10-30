@@ -1347,6 +1347,7 @@ record_loop:
             if (upd == NULL && orig_stale) {
                 /* The on-disk value is stale and there was no update. Treat it as deleted. */
                 deleted = true;
+                r->key_removed_from_disk_image = true;
                 twp = &clear_tw;
             } else if (upd == NULL) {
                 update_no_copy = false; /* Maybe data copy */
@@ -1367,6 +1368,7 @@ record_loop:
                 deleted = orig_deleted;
                 if (deleted) {
                     twp = &clear_tw;
+                    r->key_removed_from_disk_image = true;
                     goto compare;
                 }
                 twp = &vpack->tw;
@@ -1469,6 +1471,7 @@ record_loop:
                 case WT_UPDATE_TOMBSTONE:
                     deleted = true;
                     twp = &clear_tw;
+                    r->key_removed_from_disk_image = true;
                     break;
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));

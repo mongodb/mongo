@@ -1655,13 +1655,11 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
              * will find we have already instantiated a prepared update (possibly with a prepared
              * tombstone) by the page in-memory code. Discard the re-instantiated prepared updates.
              *
-             * If we have instantiated a tombstone when we read the page back into memory, discard
-             * it as well. FIXME- WT-15619 and WT-15618: no need to consider the delta case after we
-             * have implemented delta consolidation
+             * If we have instantiated a tombstone when we read the page back into memory, don't
+             * discard it as it may still be needed for delta building.
              */
-            if ((F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
-                  WT_TIME_WINDOW_HAS_PREPARE(&supd->tw)) ||
-              WT_DELTA_LEAF_ENABLED(session))
+            if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+              WT_TIME_WINDOW_HAS_PREPARE(&supd->tw))
                 for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
                     ;
 
@@ -1669,9 +1667,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
             WT_ERR(__wt_row_modify(&cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
 
             if (last_upd != NULL && last_upd->next != NULL) {
-                WT_ASSERT(session,
-                  F_ISSET(last_upd->next,
-                    WT_UPDATE_PREPARE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_DS));
+                WT_ASSERT(session, F_ISSET(last_upd->next, WT_UPDATE_PREPARE_RESTORED_FROM_DS));
                 __split_free_update_list(session, last_upd, &free_size);
             }
             break;
@@ -2144,7 +2140,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
      * page is not skipped by a checkpoint.
      */
     page->modify->first_dirty_txn = WT_TXN_FIRST;
-
+    F_SET_ATOMIC_16(page, WT_PAGE_INMEM_SPLIT);
     /*
      * We modified the page above, which will have set the first dirty transaction to the last
      * transaction current running. However, the updates we installed may be older than that. Set

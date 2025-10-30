@@ -550,6 +550,7 @@ struct __wt_connection_stats {
     int64_t eviction_queue_empty;
     int64_t eviction_queue_not_empty;
     int64_t eviction_server_skip_dirty_pages_during_checkpoint;
+    int64_t eviction_server_skip_ingest_trees;
     int64_t eviction_server_skip_intl_page_with_active_child;
     int64_t eviction_server_skip_metatdata_with_history;
     int64_t eviction_server_skip_pages_checkpoint_timestamp;
@@ -557,6 +558,7 @@ struct __wt_connection_stats {
     int64_t eviction_server_skip_pages_prune_timestamp;
     int64_t eviction_server_skip_pages_retry;
     int64_t eviction_server_skip_unwanted_pages;
+    int64_t eviction_server_skip_stable_trees;
     int64_t eviction_server_skip_unwanted_tree;
     int64_t eviction_server_skip_trees_too_many_active_walks;
     int64_t eviction_server_skip_checkpointing_trees;

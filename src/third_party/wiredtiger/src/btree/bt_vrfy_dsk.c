@@ -368,7 +368,8 @@ __verify_row_key_order_check(
       __wt_buf_set_printable_format(
         vi->session, current->data, current->size, btree->key_format, false, tmp2));
 err:
-    WT_ASSERT(vi->session, ret != WT_ERROR);
+    /* Verify can return errors in salvage mode, propagate them. */
+    WT_ASSERT(vi->session, F_ISSET(btree, WT_BTREE_SALVAGE) || ret != WT_ERROR);
     __wt_scr_free(vi->session, &tmp1);
     __wt_scr_free(vi->session, &tmp2);
     return (ret);
