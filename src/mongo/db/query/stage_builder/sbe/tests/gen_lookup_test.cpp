@@ -1158,6 +1158,38 @@ TEST_F(NestedLoopJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
                             expected);
 }
 
+TEST_F(NestedLoopJoinStageBuilderTest, JoinWithArrayPredicate) {
+    // Note that this test does not need to assert on results as technically the HashJoin stage
+    // should not be built if array predicates are involved. However its possible for arrays to be
+    // introduced during execution so we must ensure that the stage at least does not crash.
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: [1]}"),
+        fromjson("{_id: 1, lkey: [0, 1]}"),
+        fromjson("{_id: 2, lkey: []}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0}"),
+        fromjson("{_id: 1, fkey: 1}"),
+        fromjson("{_id: 2, fkey: [1]}"),
+        fromjson("{_id: 3, fkey: [0]}"),
+        fromjson("{_id: 4, fkey: [0, 1]}"),
+        fromjson("{_id: 5}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, lkey: [1], embedding: {_id: 2, fkey: [1]}}"),
+        fromjson("{_id: 1, lkey: [0, 1], embedding: {_id: 4, fkey: [0, 1]}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            {},
+                            boost::make_optional<FieldPath>("embedding"),
+                            expected);
+}
+
 TEST_F(HashJoinStageBuilderTest, JoinWithSinglePredicate) {
     const std::vector<BSONObj> ldocs = {
         fromjson("{_id: 0, lkey: 1}"),
@@ -1331,6 +1363,38 @@ TEST_F(HashJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
                             FieldPath("fkey"),
                             {},
                             boost::make_optional<FieldPath>("a.b.c"),
+                            expected);
+}
+
+TEST_F(HashJoinStageBuilderTest, JoinWithArrayPredicate) {
+    // Note that this test does not need to assert on results as technically the HashJoin stage
+    // should not be built if array predicates are involved. However its possible for arrays to be
+    // introduced during execution so we must ensure that the stage at least does not crash.
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: [1]}"),
+        fromjson("{_id: 1, lkey: [0, 1]}"),
+        fromjson("{_id: 2, lkey: []}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0}"),
+        fromjson("{_id: 1, fkey: 1}"),
+        fromjson("{_id: 2, fkey: [1]}"),
+        fromjson("{_id: 3, fkey: [0]}"),
+        fromjson("{_id: 4, fkey: [0, 1]}"),
+        fromjson("{_id: 5}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, lkey: [1], embedding: {_id: 2, fkey: [1]}}"),
+        fromjson("{_id: 1, lkey: [0, 1], embedding: {_id: 4, fkey: [0, 1]}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            {},
+                            boost::make_optional<FieldPath>("embedding"),
                             expected);
 }
 }  // namespace
