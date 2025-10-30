@@ -107,7 +107,7 @@ buildvariants:
     display_name: "Amazon Linux 2 arm64"
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-arm64-latest-m8g-xlarge
     expansions:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source
@@ -130,32 +130,32 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: amazon2
       repo_edition: org
-      large_distro_name: amazon2-arm64-latest-large
+      large_distro_name: amazon2-arm64-latest-m8g-4xlarge
       compile_variant: amazon2-arm64
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: run_unit_tests_TG
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .development_critical !.incompatible_community !.requires_large_host
       - name: .development_critical !.incompatible_community .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: .release_critical !.incompatible_community !.requires_large_host
       - name: .release_critical !.incompatible_community .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
 
   - name: enterprise-amazon2-arm64
     display_name: "Enterprise Amazon Linux 2 arm64"
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-arm64-latest-m8g-xlarge
     expansions:
       additional_package_targets: >-
         archive-mongocryptd-stripped
@@ -180,8 +180,8 @@ buildvariants:
       packager_distro: amazon2
       repo_edition: enterprise
       compile_variant: enterprise-amazon2-arm64
-      core_analyzer_distro_name: amazon2-arm64-latest-large
-      large_distro_name: amazon2-arm64-latest-large
+      core_analyzer_distro_name: amazon2-arm64-latest-m8g-4xlarge
+      large_distro_name: amazon2-arm64-latest-m8g-4xlarge
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
@@ -191,15 +191,15 @@ buildvariants:
           - amazon2-arm64-latest-xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: .release_critical !.requires_large_host
       - name: .release_critical .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
 
   - name: amazon2023
     display_name: Amazon Linux 2023.3
@@ -343,7 +343,7 @@ buildvariants:
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2023.3-arm64-small
+      - amazon2023.3-arm64-m8g-xlarge
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
@@ -364,26 +364,26 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: amazon2023
       repo_edition: org
-      large_distro_name: amazon2023.3-arm64-large
+      large_distro_name: amazon2023.3-arm64-m8g-4xlarge
       compile_variant: amazon2023-arm64
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: run_unit_tests_TG
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: .release_critical !.requires_large_host !.incompatible_community
       - name: .release_critical .requires_large_host !.incompatible_community
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
 
   - &enterprise-amazon2023-arm64-template
     name: &enterprise-amazon2023-arm64 enterprise-amazon2023-arm64
@@ -391,7 +391,7 @@ buildvariants:
     tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2023.3-arm64-small
+      - amazon2023.3-arm64-m8g-xlarge
     expansions: &enterprise-amazon2023-arm64-dynamic-expansions
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
@@ -414,8 +414,8 @@ buildvariants:
       packager_distro: amazon2023
       repo_edition: enterprise
       compile_variant: *enterprise-amazon2023-arm64
-      large_distro_name: amazon2023.3-arm64-large
-      core_analyzer_distro_name: amazon2023.3-arm64-large
+      large_distro_name: amazon2023.3-arm64-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023.3-arm64-m8g-4xlarge
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
@@ -425,15 +425,15 @@ buildvariants:
           - amazon2023.3-arm64-xxlarge
       - name: test_packages
         distros:
-          - ubuntu2204-arm64-large
+          - ubuntu2204-arm64-m8g-4xlarge
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: .release_critical !.requires_large_host
       - name: .release_critical .requires_large_host
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
 
   # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
   # This variant is a special variant to test Link Time Optimization (LTO).
@@ -528,7 +528,7 @@ buildvariants:
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     modules: ["asp-js-engine"]
     run_on:
-      - amazon2023-arm64-latest-small
+      - amazon2023-arm64-latest-m8g-xlarge
     expansions:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
@@ -550,11 +550,11 @@ buildvariants:
       packager_distro: amazon2023
       repo_edition: enterprise
       compile_variant: enterprise-amazon2023-streams-arm64
-      large_distro_name: amazon2023-arm64-latest-large
+      large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2023-arm64-latest-large
+          - amazon2023-arm64-latest-m8g-4xlarge
       - name: streams_gen
       - name: streams_kafka_gen
       # TODO(SERVER-103985) - Enabling this is blocked on SRE support arm64 in the sre/gwproxy image (SRE-1481)
@@ -619,7 +619,7 @@ buildvariants:
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     modules: ["asp-js-engine"]
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-arm64-latest-m8g-xlarge
     expansions:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
@@ -641,11 +641,11 @@ buildvariants:
       packager_distro: amazon2
       repo_edition: enterprise
       compile_variant: enterprise-amazon2-streams-arm64
-      large_distro_name: amazon2-arm64-latest-large
+      large_distro_name: amazon2-arm64-latest-m8g-4xlarge
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: streams_gen
       - name: streams_kafka_gen
       # TODO(SERVER-103985) - Enabling this is blocked on SRE support arm64 in the sre/gwproxy image (SRE-1481)
