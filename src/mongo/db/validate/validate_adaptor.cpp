@@ -727,8 +727,15 @@ void computeMDHash(const BSONObj& mdField, SHA256Block& metadataHash) {
     for (const auto& field : mdField) {
         if (field.fieldNameStringData() == "indexes") {
             for (const auto& indexField : field.Obj()) {
+                // The multikey fields are not guaranteed to be consistent across different nodes.
+                // Some issues that can cause inconsistent multikey fields:
+                //  * Aborted multi-doc transaction with writes that set multikey fields.
+                //  * Initial syncing from a collection with multikey set but no longer has data
+                //    that sets multikey fields.
+                const auto& filteredIndexField =
+                    indexField.Obj().removeFields({"multikey", "multikeyPaths"});
                 metadataHash.xorInline(SHA256Block::computeHash(
-                    {ConstDataRange(indexField.value(), indexField.valuesize())}));
+                    {ConstDataRange(filteredIndexField.objdata(), filteredIndexField.objsize())}));
             }
         } else {
             metadataHash.xorInline(

@@ -108,6 +108,17 @@ assert.eq(
     `Collection1 result: ${tojson(res1_order)}\nCollection2 result: ${tojson(res2_order)}`,
 );
 
+jsTest.log.info("Testing when index catalog entries have different multikey fields");
+assert.commandWorked(coll1.insert({_id: "multikey", first: [1, 2, 3]}));
+assert.commandWorked(coll1.deleteOne({_id: "multikey"}));
+const res1_multikey = assert.commandWorked(coll1.validate({collHash: true}));
+const res2_multikey = assert.commandWorked(coll2.validate({collHash: true}));
+assert.eq(
+    res1_multikey.metadata,
+    res2_multikey.metadata,
+    `Collection1 result: ${tojson(res1_multikey)}\nCollection2 result: ${tojson(res2_multikey)}`,
+);
+
 jsTest.log.info("Testing when catalog entries diverge");
 assert.commandWorked(coll1.createIndex({b: 1}));
 const res1_div = assert.commandWorked(coll1.validate({collHash: true}));
