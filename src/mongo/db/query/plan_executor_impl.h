@@ -59,6 +59,7 @@
 #include "mongo/db/yieldable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 #include <memory>

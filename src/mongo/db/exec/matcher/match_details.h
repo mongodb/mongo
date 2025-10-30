@@ -29,13 +29,19 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <memory>
 #include <string>
 
 namespace mongo {
 
-/** Reports information about a match request. */
-class MatchDetails {
+/**
+ * Reports information about a match request.
+ *
+ * TODO SERVER-113198: Remove external dependency on this class.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT MatchDetails {
 public:
     MatchDetails();
 

@@ -63,6 +63,7 @@
 #include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/util/modules.h"
 
 #include <type_traits>
 #include <utility>

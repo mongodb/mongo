@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

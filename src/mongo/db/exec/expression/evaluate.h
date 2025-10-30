@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

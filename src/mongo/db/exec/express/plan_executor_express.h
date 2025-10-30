@@ -36,6 +36,7 @@
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

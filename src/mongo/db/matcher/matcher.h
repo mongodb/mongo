@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -50,8 +51,10 @@ class CollatorInterface;
 
 /**
  * Matcher is a simple wrapper around a BSONObj and the MatchExpression created from it.
+ *
+ * TODO SERVER-113198: Remove external dependencies on this class.
  */
-class Matcher {
+class MONGO_MOD_NEEDS_REPLACEMENT Matcher {
     Matcher(const Matcher&) = delete;
     Matcher& operator=(const Matcher&) = delete;
 

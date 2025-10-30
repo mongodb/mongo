@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -47,8 +48,10 @@
 namespace mongo {
 /**
  * Memory usage tracker for use cases where we don't need per-function memory tracking.
+ *
+ * TODO SERVER-113197: Remove streams dependency on this class.
  */
-class SimpleMemoryUsageTracker {
+class MONGO_MOD_NEEDS_REPLACEMENT SimpleMemoryUsageTracker {
 public:
     SimpleMemoryUsageTracker(const SimpleMemoryUsageTracker&) = delete;
     SimpleMemoryUsageTracker operator=(const SimpleMemoryUsageTracker&) = delete;
@@ -189,8 +192,9 @@ private:
  * base tracker of the class.
  *
  * TODO SERVER-80007: move implementation to .cpp to save on compilation time.
+ * TODO SERVER-113197: Remove streams dependency on this class.
  */
-class MemoryUsageTracker {
+class MONGO_MOD_NEEDS_REPLACEMENT MemoryUsageTracker {
 public:
     MemoryUsageTracker(const MemoryUsageTracker&) = delete;
     MemoryUsageTracker operator=(const MemoryUsageTracker&) = delete;
@@ -302,8 +306,11 @@ private:
     stdx::unordered_map<std::string, SimpleMemoryUsageTracker> _functionMemoryTracker;
 };
 
+/**
+ * TODO SERVER-113197: Remove streams dependency on this class.
+ */
 template <typename Tracker>
-class MemoryUsageTokenImpl : private boost::noncopyable {
+class MONGO_MOD_OPEN MemoryUsageTokenImpl : private boost::noncopyable {
 public:
     // Default constructor is only present to support ease of use for some containers.
     MemoryUsageTokenImpl() {}
