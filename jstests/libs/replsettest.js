@@ -2228,41 +2228,48 @@ export class ReplSetTest {
             let secondary = secondariesToCheck[index];
             let secondaryName = secondary.host;
 
-            let secondaryConfigVersion = asCluster(
-                rst,
-                secondary,
-                () => secondary.getDB("local")["system.replset"].find().readConcern("local").limit(1).next().version,
-            );
-
-            if (targetConfigVersion != secondaryConfigVersion) {
-                jsTest.log.info(
-                    "ReplSetTest awaitReplication: secondary #" +
-                        secondaryCount +
-                        ", " +
-                        secondaryName +
-                        ", has config version #" +
-                        secondaryConfigVersion +
-                        ", but expected config version #" +
-                        targetConfigVersion,
+            // TODO(SERVER-113063): Remove this skip.
+            const shouldSkipConfigVersionCheck =
+                typeof TestData !== "undefined" && TestData.skipAwaitReplicationConfigVersionCheck;
+            if (!shouldSkipConfigVersionCheck) {
+                let secondaryConfigVersion = asCluster(
+                    rst,
+                    secondary,
+                    () =>
+                        secondary.getDB("local")["system.replset"].find().readConcern("local").limit(1).next().version,
                 );
 
-                if (secondaryConfigVersion > targetConfigVersion) {
-                    target = targetNode || rst.getPrimary();
-                    targetConfigVersion = target
-                        .getDB("local")
-                        ["system.replset"].find()
-                        .readConcern("local")
-                        .limit(1)
-                        .next().version;
-                    targetName = target.host;
+                if (targetConfigVersion != secondaryConfigVersion) {
+                    jsTest.log.info(
+                        "ReplSetTest awaitReplication: secondary #" +
+                            secondaryCount +
+                            ", " +
+                            secondaryName +
+                            ", has config version #" +
+                            secondaryConfigVersion +
+                            ", but expected config version #" +
+                            targetConfigVersion,
+                    );
 
-                    jsTest.log.info("ReplSetTest awaitReplication: for target, " + targetName, {
-                        opTime: targetLatestOpTime,
-                    });
+                    if (secondaryConfigVersion > targetConfigVersion) {
+                        target = targetNode || rst.getPrimary();
+                        targetConfigVersion = target
+                            .getDB("local")
+                            ["system.replset"].find()
+                            .readConcern("local")
+                            .limit(1)
+                            .next().version;
+                        targetName = target.host;
+
+                        jsTest.log.info("ReplSetTest awaitReplication: for target, " + targetName, {
+                            opTime: targetLatestOpTime,
+                        });
+                    }
+
+                    return Progress.ConfigMismatch;
                 }
-
-                return Progress.ConfigMismatch;
             }
+
             // Skip this node if we're connected to an arbiter
             let res = asCluster(rst, secondary, () =>
                 assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1})),
