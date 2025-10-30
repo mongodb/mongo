@@ -6,11 +6,13 @@
 //   requires_pipeline_optimization,
 //   not_allowed_with_signed_security_token,
 //   uses_getmore_outside_of_transaction,
+//   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+//   # consistent, no add/remove shard operations should occur during the test.
+//   assumes_stable_shard_list,
 // ]
 
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 let local = db.local;
 let foreign = db.foreign;
@@ -25,7 +27,7 @@ function getKnob(knob) {
 }
 
 function setKnob(knob, value) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+    setParameterOnAllNonConfigNodes(db.getMongo(), knob, value);
 }
 
 const string1MB = Array(1024 * 1024).toString();

@@ -11,7 +11,7 @@ import {
     getQueryPlanners,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
-import {getParameter, setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {getParameter, setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 export class QuerySettingsUtils {
     /**
@@ -358,16 +358,19 @@ export class QuerySettingsUtils {
     withBackfillDelaySeconds(delaySeconds, fn) {
         let originalDelaySeconds = null;
         let hostList = [];
+        let conn = null;
         try {
-            const conn = this._db.getMongo();
-            hostList = DiscoverTopology.findNonConfigNodes(conn);
-            assert.gt(hostList.length, 0, "No hosts found");
+            conn = this._db.getMongo();
             originalDelaySeconds = getParameter(conn, "internalQuerySettingsBackfillDelaySeconds");
-            setParameterOnAllHosts(hostList, "internalQuerySettingsBackfillDelaySeconds", delaySeconds);
+            setParameterOnAllNonConfigNodes(conn, "internalQuerySettingsBackfillDelaySeconds", delaySeconds);
             return fn();
         } finally {
-            if (hostList.length > 0 && originalDelaySeconds !== null) {
-                setParameterOnAllHosts(hostList, "internalQuerySettingsBackfillDelaySeconds", originalDelaySeconds);
+            if (originalDelaySeconds !== null && conn !== null) {
+                setParameterOnAllNonConfigNodes(
+                    conn,
+                    "internalQuerySettingsBackfillDelaySeconds",
+                    originalDelaySeconds,
+                );
             }
         }
     }

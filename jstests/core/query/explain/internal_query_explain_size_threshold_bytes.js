@@ -10,12 +10,15 @@
  *  does_not_support_stepdowns,
  *  # Explain for the aggregate command cannot run within a multi-document transaction
  *  does_not_support_transactions,
- *  requires_fcv_82]
+ *  requires_fcv_82,
+ *  # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *  # consistent, no add/remove shard operations should occur during the test.
+ *  assumes_stable_shard_list,
+ * ]
  */
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain, getWarnings} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const leeway = 32;
 const statsTreeWarning = "stats tree exceeded BSON size limit for explain";
@@ -57,11 +60,7 @@ try {
             // Test is SBE-only.
             break;
         }
-        setParameterOnAllHosts(
-            DiscoverTopology.findNonConfigNodes(db.getMongo()),
-            "internalQueryExplainSizeThresholdBytes",
-            size,
-        );
+        setParameterOnAllNonConfigNodes(db.getMongo(), "internalQueryExplainSizeThresholdBytes", size);
         const coll = db.internal_query_explain_size_threshold_bytes;
         coll.drop();
         assert.commandWorked(coll.insert({_id: 1, a: 1}));
@@ -96,8 +95,8 @@ try {
     }
 } finally {
     // Reset parameter for other tests.
-    setParameterOnAllHosts(
-        DiscoverTopology.findNonConfigNodes(db.getMongo()),
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
         "internalQueryExplainSizeThresholdBytes",
         original.internalQueryExplainSizeThresholdBytes,
     );

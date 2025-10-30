@@ -15,12 +15,14 @@
  *   assumes_superuser_permissions,
  *   # This test relies on aggregations returning specific batch-sized responses.
  *   assumes_no_implicit_cursor_exhaustion,
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getEngine, hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
@@ -28,7 +30,7 @@ import {
     setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {runWithRetries} from "jstests/libs/run_with_retries.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Helper function to retry a test.
 // This is useful because the spilling stats are global and can be affected by spuriously
@@ -63,7 +65,7 @@ function getServerParameter(knob) {
 }
 
 function setServerParameter(knob, value) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+    setParameterOnAllNonConfigNodes(db.getMongo(), knob, value);
 }
 
 const sbeIncreasedSpillingInitialValue = getServerParameter(sbeIncreasedSpillingKnob);

@@ -6,17 +6,19 @@
  * assumes_read_concern_unchanged,
  * do_not_wrap_aggregations_in_facets,
  * not_allowed_with_signed_security_token,
+ * # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ * # consistent, no add/remove shard operations should occur during the test.
+ * assumes_stable_shard_list,
  * ]
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Doc size was found through logging the size in the SpillableDeque. Partition sizes were chosen
 // arbitrarily.
@@ -343,8 +345,8 @@ function testErrorsWhenCantSpill() {
     )["internalDocumentSourceSetWindowFieldsMaxMemoryBytes"];
     // Decrease the maximum memory limit allowed. $push uses about ~950 to store all the values in
     // the second partition.
-    setParameterOnAllHosts(
-        DiscoverTopology.findNonConfigNodes(db.getMongo()),
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
         "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
         avgDocSize * 2,
     );
@@ -364,8 +366,8 @@ function testErrorsWhenCantSpill() {
     // Assert the pipeline fails when trying to spill, but 'allowDiskUse' is set to false.
     runSingleErrorTest({spec: {percentile: percentileSpec}, errorCode: 5643011, diskUse: false});
     // Reset the memory limit for other tests.
-    setParameterOnAllHosts(
-        DiscoverTopology.findNonConfigNodes(db.getMongo()),
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
         "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
         origParamValue,
     );

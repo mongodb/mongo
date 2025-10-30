@@ -3,19 +3,21 @@
 // @tags: [
 //   not_allowed_with_signed_security_token,
 //   requires_fcv_82,
+//   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+//   # consistent, no add/remove shard operations should occur during the test.
+//   assumes_stable_shard_list,
 // ]
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getKnob(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
 }
 
 function setKnob(knob, value) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+    setParameterOnAllNonConfigNodes(db.getMongo(), knob, value);
 }
 
 let local = db.local;

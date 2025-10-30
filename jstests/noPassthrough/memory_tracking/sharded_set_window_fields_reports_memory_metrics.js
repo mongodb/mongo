@@ -4,19 +4,19 @@
  * and explain("executionStats") do not report on the merging part of a split pipeline, and
  * $setWindowFields is forced to be run on the merging node, so memory tracking statistics do not
  * appear in these channels.
+ * @tags: [
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
+ * ]
  */
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {runShardedMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const st = new ShardingTest(Object.assign({shards: 2}));
 const testDB = st.s.getDB("test");
-setParameterOnAllHosts(
-    DiscoverTopology.findNonConfigNodes(testDB.getMongo()),
-    "internalQueryFrameworkControl",
-    "forceClassicEngine",
-);
+setParameterOnAllNonConfigNodes(testDB.getMongo(), "internalQueryFrameworkControl", "forceClassicEngine");
 
 const collName = jsTestName();
 const coll = testDB[collName];
