@@ -39,3 +39,15 @@ mongo_cc_library(
         "//src/mongo/db:query_expressions",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "dependency_analysis_test",
+    srcs = [
+        "elemmatch_dependencies_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":dependency_analysis",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)

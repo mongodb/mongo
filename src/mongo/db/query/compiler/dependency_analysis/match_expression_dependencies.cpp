@@ -78,28 +78,28 @@ class PostVisitor : public SelectiveMatchExpressionVisitorBase<true> {
 public:
     using SelectiveMatchExpressionVisitorBase<true>::visit;
 
-    PostVisitor(bool& ignoreDependencies) : _ignoreDependencies(ignoreDependencies) {}
+    PostVisitor(size_t& ignoreDepsDepth) : _ignoreDepsDepth(ignoreDepsDepth) {}
 
     void visit(const ElemMatchObjectMatchExpression* expr) override {
-        _ignoreDependencies = false;
+        _ignoreDepsDepth--;
     }
 
     void visit(const ElemMatchValueMatchExpression* expr) override {
-        _ignoreDependencies = false;
+        _ignoreDepsDepth--;
     }
 
     void visit(const InternalSchemaObjectMatchExpression* expr) override {
-        _ignoreDependencies = false;
+        _ignoreDepsDepth--;
     }
 
 private:
-    bool& _ignoreDependencies;
+    size_t& _ignoreDepsDepth;
 };
 
 class DependencyVisitor : public MatchExpressionConstVisitor {
 public:
-    DependencyVisitor(DepsTracker* deps, bool& ignoreDependencies)
-        : _deps(deps), _ignoreDependencies(ignoreDependencies) {}
+    DependencyVisitor(DepsTracker* deps, size_t& ignoreDepsDepth)
+        : _deps(deps), _ignoreDepsDepth(ignoreDepsDepth) {}
 
     void visit(const AlwaysFalseMatchExpression* expr) override {}
 
@@ -125,12 +125,12 @@ public:
 
     void visit(const ElemMatchObjectMatchExpression* expr) override {
         visitPathExpression(expr);
-        _ignoreDependencies = true;
+        _ignoreDepsDepth++;
     }
 
     void visit(const ElemMatchValueMatchExpression* expr) override {
         visitPathExpression(expr);
-        _ignoreDependencies = true;
+        _ignoreDepsDepth++;
     }
 
     void visit(const EqualityMatchExpression* expr) override {
@@ -142,7 +142,7 @@ public:
     }
 
     void visit(const ExprMatchExpression* expr) override {
-        if (_ignoreDependencies) {
+        if (_ignoreDepsDepth > 0) {
             return;
         }
 
@@ -172,7 +172,7 @@ public:
     }
 
     void visit(const InternalBucketGeoWithinMatchExpression* expr) override {
-        if (_ignoreDependencies) {
+        if (_ignoreDepsDepth > 0) {
             return;
         }
         _deps->needWholeDocument = true;
@@ -207,7 +207,7 @@ public:
     }
 
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) override {
-        if (_ignoreDependencies) {
+        if (_ignoreDepsDepth > 0) {
             return;
         }
         _deps->needWholeDocument = true;
@@ -248,7 +248,7 @@ public:
     }
 
     void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) override {
-        if (_ignoreDependencies) {
+        if (_ignoreDepsDepth > 0) {
             return;
         }
         _deps->needWholeDocument = true;
@@ -263,7 +263,7 @@ public:
     }
 
     void visit(const InternalSchemaMinPropertiesMatchExpression* expr) override {
-        if (_ignoreDependencies) {
+        if (_ignoreDepsDepth > 0) {
             return;
         }
         _deps->needWholeDocument = true;
@@ -271,11 +271,11 @@ public:
 
     void visit(const InternalSchemaObjectMatchExpression* expr) override {
         visitPathExpression(expr);
-        _ignoreDependencies = true;
+        _ignoreDepsDepth++;
     }
 
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) override {
-        if (_ignoreDependencies) {
+        if (_ignoreDepsDepth > 0) {
             return;
         }
         _deps->needWholeDocument = true;
@@ -341,7 +341,7 @@ public:
 
 private:
     void visitPathExpression(const PathMatchExpression* expr) {
-        if (_ignoreDependencies) {
+        if (_ignoreDepsDepth > 0) {
             return;
         }
 
@@ -365,7 +365,7 @@ private:
     }
 
     DepsTracker* _deps;
-    bool& _ignoreDependencies;
+    size_t& _ignoreDepsDepth;
 };
 
 class VariableRefVisitor : public SelectiveMatchExpressionVisitorBase<true> {
@@ -387,9 +387,14 @@ private:
 }  // namespace
 
 void addDependencies(const MatchExpression* expr, DepsTracker* deps) {
-    bool ignoreDependencies = false;
-    PostVisitor postVisitor(ignoreDependencies);
-    DependencyVisitor visitor(deps, ignoreDependencies);
+    // We don't want to track dependencies for paths nested within, for example, $elemMatch queries.
+    // We could also have nested $elemMatches- this means we need to track depth in order to know if
+    // we've left the scope of such an expression's subtree and can resume tracking paths again.
+    // We also need to keep this context in both the pre & post visitors, which is why we share a
+    // reference to one variable here.
+    size_t ignoreDepsDepth = 0;
+    PostVisitor postVisitor(ignoreDepsDepth);
+    DependencyVisitor visitor(deps, ignoreDepsDepth);
     MatchExpressionWalker walker(
         &visitor /*preVisitor*/, nullptr /*inVisitor*/, &postVisitor /*postVisitor*/);
     tree_walker::walk<true, MatchExpression>(expr, &walker);
