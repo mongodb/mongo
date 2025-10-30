@@ -5,7 +5,7 @@ buildvariants:
   - name: &AL2023-arm64-coverage AL2023-arm64-coverage
     display_name: "~ Code Coverage AL2023.3 Arm64"
     run_on:
-      - amazon2023.3-arm64-large
+      - amazon2023.3-arm64-m8g-4xlarge
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     expansions:
@@ -19,7 +19,7 @@ buildvariants:
         --gcov=True
         --collect_code_coverage
         ${coverage_bazel_tags}
-      large_distro_name: amazon2023.3-arm64-large
+      large_distro_name: amazon2023.3-arm64-m8g-4xlarge
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout

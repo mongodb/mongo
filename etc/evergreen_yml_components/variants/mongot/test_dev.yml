@@ -77,7 +77,7 @@ buildvariants:
     cron: "0 1,5,9,13,17,21 * * *" # Run these tasks every 4 hours
     patchable: false
     run_on:
-      - amazon2023.3-arm64-small
+      - amazon2023.3-arm64-m8g-xlarge
     expansions: &amazon2023-arm64-mongot-integration-expansions
       build_mongot: true
       bazel_compile_flags: >-
@@ -99,26 +99,26 @@ buildvariants:
     tasks: &amazon2023-arm64-mongot-distro-tasks
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
       - name: .mongot_e2e_tests !.requires_large_host
       - name: .mongot_e2e_tests .requires_large_host
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: search_community
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: search_community_ssl
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: search_auth
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-m8g-4xlarge
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -132,7 +132,7 @@ buildvariants:
     tags: ["mongot_e2e"]
     patch_only: true
     run_on:
-      - amazon2023.3-arm64-small
+      - amazon2023.3-arm64-m8g-xlarge
     expansions:
       <<: *amazon2023-arm64-mongot-integration-expansions
       compile_variant: amazon2023-arm64-mongot-integration-patchable
@@ -147,7 +147,7 @@ buildvariants:
     cron: "0 1,5,9,13,17,21 * * *" # Run these tasks every 4 hours
     patchable: false
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-arm64-latest-m8g-xlarge
     stepback: true
     expansions: &amazon-linux2-arm64-mongot-integration-expansions
       build_mongot: true
@@ -162,26 +162,26 @@ buildvariants:
     tasks: &amazon-linux2-arm64-mongot-distro-tasks
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
       - name: .mongot_e2e_tests !.requires_large_host
       - name: .mongot_e2e_tests .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: search_auth
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: search_community
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: search_community_ssl
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -195,7 +195,7 @@ buildvariants:
     tags: ["mongot_e2e"]
     patch_only: true
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-arm64-latest-m8g-xlarge
     stepback: true
     expansions:
       <<: *amazon-linux2-arm64-mongot-integration-expansions

@@ -27,7 +27,7 @@ buildvariants:
           - ubuntu2404-large
       - name: check_workstation_setup_script
         distros:
-          - ubuntu2204-arm64-small
+          - ubuntu2204-arm64-m8g-xlarge
       - name: test_copybara_sync
         distros:
           - ubuntu2204-small
@@ -40,7 +40,7 @@ buildvariants:
     cron: "0 4 * * 0" # Every week starting 0400 UTC Sunday
     stepback: false
     run_on:
-      - amazon2023-arm64-latest-small
+      - amazon2023-arm64-latest-m8g-xlarge
     depends_on:
       - name: archive_dist_test
         variant: amazon-linux2023-arm64-static-compile

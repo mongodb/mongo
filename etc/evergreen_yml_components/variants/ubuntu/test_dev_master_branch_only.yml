@@ -23,7 +23,7 @@ buildvariants:
     tags: ["bazel_cache_hydration"]
     cron: "0 * * * *" # Every hour
     run_on:
-      - ubuntu2204-arm64-large
+      - ubuntu2204-arm64-m8g-4xlarge
     stepback: false
     expansions:
       compile_variant: *workstation_bazel_cache_hydration_arm64
