@@ -328,7 +328,9 @@ void processFindCommand(OperationContext* opCtx,
                         const NamespaceString& nss,
                         FindCommandRequest* findCommand,
                         GetTxnCallback getTransaction) {
-    invariant(findCommand->getEncryptionInformation());
+    tassert(11177500,
+            "findCommand must contain encryption information",
+            findCommand->getEncryptionInformation());
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *findCommand)
                       .collator(collatorFromBSON(opCtx, findCommand->getCollation()))
@@ -350,7 +352,9 @@ void processCountCommand(OperationContext* opCtx,
                          const NamespaceString& nss,
                          CountCommandRequest* countCommand,
                          GetTxnCallback getTxn) {
-    invariant(countCommand->getEncryptionInformation());
+    tassert(11177501,
+            "countCommand must contain encryption information",
+            countCommand->getEncryptionInformation());
     // Count command does not have legacy runtime constants, and does not support user variables
     // defined in a let expression.
     auto expCtx =
