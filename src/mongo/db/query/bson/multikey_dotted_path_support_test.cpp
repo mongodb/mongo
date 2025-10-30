@@ -29,6 +29,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <set>
 #include <string>
 #include <vector>
@@ -47,6 +48,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 
@@ -135,6 +137,17 @@ void assertArrayComponentsAreEqual(const MultikeyComponents& expectedArrayCompon
     }
 }
 
+std::pair<BSONObj, std::string> makeDeeplyNestedObjAndDottedPath(size_t depth) {
+    BSONObj obj = BSON("a" << 1);
+    std::string path = "a";
+    path.reserve(depth * 2 + 1);
+    for (uint32_t i = 0; i < depth; ++i) {
+        obj = BSON("a" << obj);
+        path.insert(0, "a.");
+    }
+    return std::make_pair(std::move(obj), std::move(path));
+}
+
 TEST(ExtractAllElementsAlongPath, NestedObjectWithScalarValue) {
     BSONObj obj = BSON("a" << BSON("b" << 1));
 
@@ -149,22 +162,25 @@ TEST(ExtractAllElementsAlongPath, NestedObjectWithScalarValue) {
 }
 
 TEST(ExtractAllElementsAlongPath, NestedMaxDepthObjectWithScalarValue) {
-    BSONObj obj = BSON("a" << 1);
-    std::string dotted_path = "a";
-    dotted_path.reserve(1 + BSONDepth::getMaxAllowableDepth() * 2);
-    for (uint32_t i = 0; i < BSONDepth::getMaxAllowableDepth(); ++i) {
-        obj = BSON("a" << obj);
-        dotted_path.insert(0, "a.");
-    }
-
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
     MultikeyComponents actualArrayComponents;
+    auto [obj, dottedPath] = makeDeeplyNestedObjAndDottedPath(BSONDepth::getMaxAllowableDepth());
     mdps::extractAllElementsAlongPath(
-        obj, dotted_path, actualElements, expandArrayOnTrailingField, &actualArrayComponents);
+        obj, dottedPath, actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual({BSON("" << 1)}, actualElements);
     assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
+}
+
+DEATH_TEST_REGEX(ExtractAllElementsAlongPath, ExceedsMaxDepth, "Tripwire.*11177100") {
+    BSONElementSet actualElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents actualArrayComponents;
+    auto [obj, dottedPath] =
+        makeDeeplyNestedObjAndDottedPath(std::numeric_limits<BSONDepthIndex>::max() + 1);
+    mdps::extractAllElementsAlongPath(
+        obj, dottedPath, actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 }
 
 TEST(ExtractAllElementsAlongPath, NestedObjectWithEmptyArrayValue) {
