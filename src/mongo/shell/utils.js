@@ -355,7 +355,8 @@ function jsTestOptions() {
     if (TestData) {
         // TODO (SERVER-112812): Enable OpenTelemetry tracing.
         // const isMultiversion =
-        //     TestData.useRandomBinVersionsWithinReplicaSet || TestData.mixedBinVersions || TestData.mongosBinVersion;
+        // TestData.useRandomBinVersionsWithinReplicaSet || TestData.mixedBinVersions || TestData.mongosBinVersion;
+        const enableOTELTracing = false; //TestData.enableOTELTracing ?? !isMultiversion;
 
         return Object.merge(_jsTestOptions, {
             // Test commands should be enabled by default if no enableTestCommands were present in
@@ -472,9 +473,9 @@ function jsTestOptions() {
             fuzzMongodConfigs: TestData.fuzzMongodConfigs || false,
             mozJSGCZeal: TestData.mozJSGCZeal || "",
 
-            // TODO (SERVER-112812): Enable OpenTelemetry tracing.
-            enableOTELTracing: false, // TestData.enableOTELTracing ?? !isMultiversion,
+            enableOTELTracing,
             traceCtx: TestData.traceCtx || null,
+            otelTraceDirectory: enableOTELTracing ? (TestData.otelTraceDirectory ?? null) : null,
         });
     }
     return _jsTestOptions;

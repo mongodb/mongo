@@ -1243,6 +1243,13 @@ export class ShardingTest {
                 }
 
                 startOptions = Object.merge(startOptions, otherParams.configOptions);
+
+                const clusterVersionInfo = this.getClusterVersionInfo();
+                if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
+                    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(startOptions.binVersion ?? "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
+                    startOptions.setParameter = startOptions.setParameter ?? {};
+                    startOptions.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
+                }
                 rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
 
                 let nodeOptions = [];
@@ -1316,6 +1323,12 @@ export class ShardingTest {
 
                 rsDefaults.setParameter.migrationLockAcquisitionMaxWaitMS =
                     otherParams.migrationLockAcquisitionMaxWaitMS;
+
+                const clusterVersionInfo = this.getClusterVersionInfo();
+                if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
+                    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(rsDefaults.binVersion || "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
+                    rsDefaults.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
+                }
 
                 let rsSettings = rsDefaults.settings;
                 delete rsDefaults.settings;
@@ -1622,6 +1635,12 @@ export class ShardingTest {
                 options.setParameter = options.setParameter || {};
                 options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown =
                     options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown || 0;
+
+                const clusterVersionInfo = this.getClusterVersionInfo();
+                if (jsTestOptions().otelTraceDirectory && !clusterVersionInfo.isMixedVersion &&
+                    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(options.binVersion ?? "latest"), MongoRunner.getBinVersionFor("8.3.0")) >= 0) {
+                    options.setParameter.opentelemetryTraceDirectory = jsTestOptions().otelTraceDirectory;
+                }
 
                 options.port = options.port || _allocatePortForMongos();
                 if (jsTestOptions().shellGRPC) {
