@@ -13,7 +13,9 @@ let normalClusterRunCommand = TestData.preOverrideRunCommand;
 jsTestLog("Normal Cluster: " + normalCluster);
 jsTestLog("BulkWrite Cluster: " + bulkWriteCluster);
 
-const errorsOnly = Math.random() < 0.75;
+// TODO SERVER-105762: Support for errorsOnly in UWE
+const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
+const errorsOnly = uweEnabled ? false : Math.random() < 0.75;
 
 jsTestLog("Running bulkWrite override with `errorsOnly:" + errorsOnly + "`");
 

@@ -77,3 +77,6 @@ filters:
   - "replica_sets_recordids_replicated_jscore_passthrough.yml":
     approvers:
       - 10gen/server-collection-write-path
+  - "unified_write_executor*":
+    approvers:
+      - 10gen/query-execution-router

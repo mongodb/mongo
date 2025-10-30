@@ -1832,6 +1832,41 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
+    name: unified_write_executor_bulk_write_multi_op_sharded_collections_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_sharded_multi_stmt_txn_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_bulk_write_sharded_causally_consistent_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_bulk_write_sharded_collections_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_bulk_write_sharded_multi_stmt_txn_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
     name: query_correctness_query_shape_hash_stability_generated_test_1
     tags:
       [
