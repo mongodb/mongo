@@ -42,6 +42,7 @@
 #include "mongo/db/ftdc/ftdc_mongod_gen.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/ftdc/ftdc_server.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -89,6 +90,15 @@ public:
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         std::vector<std::string> namespaces = gDiagnosticDataCollectionStatsNamespaces.get();
+
+        auto ru = shard_role_details::getRecoveryUnit(opCtx);
+        if (ru) {
+            // Set the cache max wait timeout very low as we do not want any FTDC
+            // operation to get blocked on cache eviction. 1 is a magic number that
+            // opts
+            // this thread out of all optional eviction without any waiting.
+            ru->setCacheMaxWaitTimeout(Milliseconds(1));
+        }
 
         for (const auto& nsStr : namespaces) {
 

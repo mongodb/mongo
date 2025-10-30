@@ -41,6 +41,7 @@
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/ftdc_server_gen.h"
 #include "mongo/db/ftdc/ftdc_system_stats.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -286,6 +287,15 @@ public:
         // "oplog" is included to append the earliest and latest optimes, which allow calculation of
         // the oplog window.
         // "lockContentionMetrics" is included to collect metrics on mutexes
+
+        auto ru = shard_role_details::getRecoveryUnit(opCtx);
+        if (ru) {
+            // Set the cache max wait timeout very low as we do not want any FTDC
+            // operation to get blocked on cache eviction. 1 is a magic number that
+            // opts
+            // this thread out of all optional eviction without any waiting.
+            ru->setCacheMaxWaitTimeout(Milliseconds(1));
+        }
 
         BSONObjBuilder commandBuilder;
         commandBuilder.append(kCommand, 1);
