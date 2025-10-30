@@ -387,6 +387,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kCleanup,
             [this, _ = shared_from_this(), executor](auto* opCtx) {
+                ConfigsvrCoordinatorService::getService(opCtx)->waitForAllOngoingCoordinatorsOfType(
+                    opCtx, ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode);
                 topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
                     opCtx, _getTargeter(opCtx), _executorWithoutGossip);
                 _unblockFCVChangesOnNewShard(opCtx, **executor);

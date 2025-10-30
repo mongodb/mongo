@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_parameters/set_cluster_parameter_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -64,6 +65,9 @@ public:
         auto serviceContext = getServiceContext();
         auto storageMock = std::make_unique<repl::StorageInterfaceMock>();
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
+
+        auto registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
+        registry->registerService(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
     }
 
     void tearDown() override {

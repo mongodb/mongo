@@ -153,14 +153,13 @@ void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
     BSONObj initialState,
     const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
     const auto op = extractConfigsvrCoordinatorMetadata(initialState);
-    if (op.getId().getCoordinatorType() != ConfigsvrCoordinatorTypeEnum::kSetClusterParameter) {
-        return;
-    }
 
-    const auto stateDoc = SetClusterParameterCoordinatorDocument::parse(
-        initialState, IDLParserContext("CoordinatorDocument"));
-    if (stateDoc.getCompatibleWithTopologyChange()) {
-        return;
+    if (op.getId().getCoordinatorType() == ConfigsvrCoordinatorTypeEnum::kSetClusterParameter) {
+        const auto stateDoc = SetClusterParameterCoordinatorDocument::parse(
+            initialState, IDLParserContext("CoordinatorDocument"));
+        if (stateDoc.getCompatibleWithTopologyChange()) {
+            return;
+        }
     }
 
     const auto service = ShardingDDLCoordinatorService::getService(opCtx);
@@ -169,7 +168,8 @@ void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
     }
 
     uassert(ErrorCodes::AddOrRemoveShardInProgress,
-            "Cannot start SetClusterParameterCoordinator because a topology change is in progress",
+            fmt::format("Cannot start {} because a topology change is in progress",
+                        ConfigsvrCoordinatorType_serializer(op.getId().getCoordinatorType())),
             service->areAllCoordinatorsOfTypeFinished(opCtx, DDLCoordinatorTypeEnum::kAddShard));
 }
 
