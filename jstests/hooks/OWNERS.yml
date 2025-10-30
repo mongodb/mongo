@@ -33,3 +33,6 @@ filters:
   - "run_check_shard_filtering_metadata.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "*validate_collections*.js":
+    approvers:
+      - 10gen/server-validate

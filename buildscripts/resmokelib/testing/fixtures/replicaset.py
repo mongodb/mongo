@@ -1151,6 +1151,107 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         """Convert the obj to a record to track history."""
         self.fixturelib.make_historic(obj)
 
+    def internode_validation(self):
+        """
+        Perform internode validation on this replica set using extended validate. Compares the 'all' and 'metadata' hashes of each collection.
+        """
+        self.logger.info("Waiting for all nodes to be caught up")
+        self.await_last_op_committed()
+
+        self.logger.info("Performing Internode Validation")
+
+        # Collections we exclude from the hash comparisons. This is because these collections can contain different document contents for valid reasons (i.e. implicitly replicated, TTL indexes, etc)
+        excluded_config_collections = [
+            "system.preimages",
+            "mongos",
+            "rangeDeletions",
+            "sampledQueries",
+            "sampledQueriesDiff",
+            "analyzeShardKeySplitPoints",
+            "system.sessions",
+            "actionlog",
+        ]
+
+        # the 'system.profile' collections are unreplicated and should not be compared.
+        excluded_any_db_collections = ["system.profile"]
+
+        base_hashes = {}
+        filter = {"type": "collection"}
+        for node in self.nodes:
+            client = interface.build_client(node, self.auth_options)
+            # Skip validating collections for arbiters.
+            admin_db = client.get_database("admin")
+            ret = admin_db.command("isMaster")
+            if "arbiterOnly" in ret and ret["arbiterOnly"]:
+                self.logger.info("Skipping collection validation on arbiter")
+                continue
+
+            hashes = {}
+            something_set = False
+            for db_name in client.list_database_names():
+                # the 'local' database is unreplicated and should not be compared.
+                if db_name == "local":
+                    continue
+                if db_name not in hashes:
+                    hashes[db_name] = {}
+                db = client.get_database(db_name)
+                for coll_name in db.list_collection_names(filter=filter):
+                    # Skip excluded collections which all live in the 'config' database.
+                    if db_name == "config" and coll_name in excluded_config_collections:
+                        continue
+                    if coll_name in excluded_any_db_collections:
+                        continue
+                    validate_cmd = {"validate": coll_name, "collHash": True}
+                    ret = db.command(validate_cmd, check=False)
+                    if "all" in ret and "metadata" in ret:
+                        something_set = True
+                        hashes[db_name][coll_name] = {
+                            "all": ret["all"],
+                            "metadata": ret["metadata"],
+                        }
+                    elif not self.fcv:
+                        # 'all' and 'metadata' should only not exist when in multiversion suite.
+                        raise RuntimeError(
+                            f"Missing {db_name}.{coll_name} hashes on a node outside of a multiversion suite."
+                        )
+                    elif something_set:
+                        # we have previously gotten a hash for this node, so we should continue to get hashes for it.
+                        raise RuntimeError(
+                            f"Missing {db_name}.{coll_name} hashes on a node when we previously received hashes on other namespaces."
+                        )
+
+            if not base_hashes and something_set:
+                base_hashes = hashes
+            elif something_set:
+                self.logger.info(f"Base Hashes: {base_hashes}")
+                self.logger.info(f"Comparing Hashes: {hashes}")
+                # Compare the sets of hashes
+                for db_name in base_hashes:
+                    # No collection hashes for this DB entry, skipping.
+                    if not base_hashes[db_name]:
+                        continue
+                    if db_name not in hashes:
+                        raise RuntimeError(
+                            f"Missing {db_name} hashes on a node when it was expected to exist."
+                        )
+                    for coll_name in base_hashes[db_name]:
+                        if coll_name not in hashes[db_name]:
+                            raise RuntimeError(
+                                f"Missing {db_name}.{coll_name} hashes on a node when it was expected to exist."
+                            )
+                        base_hash = base_hashes[db_name][coll_name]
+                        comp_hash = hashes[db_name][coll_name]
+                        if base_hash["all"] != comp_hash["all"]:
+                            raise RuntimeError(
+                                f"all hash difference on {db_name}.{coll_name}. {base_hash['all']} vs {comp_hash['all']}"
+                            )
+                        if base_hash["metadata"] != comp_hash["metadata"]:
+                            raise RuntimeError(
+                                f"metadata hash difference on {db_name}.{coll_name}. {base_hash['metadata']} vs {comp_hash['metadata']}"
+                            )
+
+        self.logger.info("Internode Validation Successful")
+
 
 def get_last_optime(client, fixturelib):
     """Get the latest optime.

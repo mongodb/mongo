@@ -667,6 +667,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.logger.info("Adding %s as a shard...", connection_string)
             client.admin.command({"addShard": connection_string})
 
+    def internode_validation(self):
+        for replicaset in self.shards:
+            replicaset.internode_validation()
+
 
 class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixture):
     """Fixture to interact with external sharded cluster fixture."""

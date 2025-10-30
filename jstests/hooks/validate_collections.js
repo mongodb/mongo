@@ -25,8 +25,55 @@ export class CollectionValidator {
                 return thread.returnData();
             });
 
+            // Compare hashes between nodes.
+            let hashes = {};
+            let hashesSet = false;
             returnData.forEach((res) => {
                 assert.commandWorked(res, "Collection validation failed");
+                if (!hashesSet) {
+                    if (!res.dbHashes || Object.keys(res.dbHashes).length === 0) {
+                        return;
+                    }
+                    // Skipping config server hash checks.
+                    if (res.dbHashes["config"] && res.dbHashes["config"]["mongos"]) {
+                        return;
+                    }
+                    hashes = res.dbHashes;
+                    hashesSet = true;
+                } else {
+                    let currHashes = res.dbHashes;
+                    if (!currHashes || Object.keys(currHashes).length === 0) {
+                        // No data to compare against.
+                        return;
+                    }
+                    // Skipping config server hash checks.
+                    if (currHashes.config?.mongos) {
+                        return;
+                    }
+
+                    Object.keys(hashes).forEach((db) => {
+                        Object.keys(hashes[db]).forEach((coll) => {
+                            // Skip checking the local database.
+                            if (db == "local") {
+                                return;
+                            }
+                            assert.eq(
+                                hashes[db][coll].all,
+                                currHashes[db][coll].all,
+                                "Collection hashes are different for " + db + "." + coll,
+                            );
+                            // Skip metadata for config.transactions.
+                            if (db == "config" && coll == "transactions") {
+                                return;
+                            }
+                            assert.eq(
+                                hashes[db][coll].metadata,
+                                currHashes[db][coll].metadata,
+                                "Metadata hashes are different for " + db + "." + coll,
+                            );
+                        });
+                    });
+                }
             });
         }
     }
@@ -49,7 +96,7 @@ function validateCollectionsImpl(db, obj) {
     assert(obj.hasOwnProperty("full"), "Please specify whether to use full validation");
 
     // Failed collection validation results are saved in failed_res.
-    let full_res = {ok: 1, failed_res: []};
+    let full_res = {ok: 1, failed_res: [], hashes: {}};
 
     // Don't run validate on view namespaces.
     let filter = {type: "collection"};
@@ -125,6 +172,10 @@ function validateCollectionsImpl(db, obj) {
             full_res.failed_res.push(res);
             full_res.ok = 0;
         }
+
+        if (obj.collHash && res.all && res.metadata) {
+            full_res.hashes[collDocument["name"]] = {"all": res.all, "metadata": res.metadata};
+        }
     }
 
     return full_res;
@@ -168,6 +219,8 @@ function validateCollectionsThread(newMongoWithRetry, validatorFunc, host) {
             });
         }
 
+        let dbHashes = {};
+
         const dbs = conn.getDBs().databases;
         for (let db of dbs) {
             const dbName = db.name;
@@ -183,15 +236,19 @@ function validateCollectionsThread(newMongoWithRetry, validatorFunc, host) {
                     // TODO (SERVER-24266): Always enforce fast counts, once they are always
                     // accurate.
                     enforceFastCount: !TestData.skipEnforceFastCountOnValidate && !TestData.allowUncleanShutdowns,
+                    collHash: true,
                 });
                 if (validateRes.ok !== 1) {
                     return {ok: 0, host: host, validateRes: validateRes};
+                }
+                if (validateRes.hashes && Object.keys(validateRes.hashes).length !== 0) {
+                    dbHashes[dbName] = validateRes.hashes;
                 }
             } finally {
                 conn._setSecurityToken(undefined);
             }
         }
-        return {ok: 1};
+        return {ok: 1, dbHashes};
     } catch (e) {
         print("Exception caught in scoped thread running validationCollections on server: " + host);
         return {ok: 0, error: e.toString(), stack: e.stack, host: host};
