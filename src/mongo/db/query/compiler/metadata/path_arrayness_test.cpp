@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -68,15 +69,14 @@ TEST(ArraynessTrie, InsertIntoTrie) {
                                                  multikeyPaths_ABDE,
                                                  multikeyPaths_BDE};
 
-    PathArrayness trie;
+    PathArrayness pathArrayness;
 
     for (size_t i = 0; i < fields.size(); i++) {
-        trie.addPath(fields[i], multikeyness[i]);
+        pathArrayness.addPath(fields[i], multikeyness[i]);
     }
 
-    trie.visualizeTrie();
+    pathArrayness.visualizeTrie();
 
-    ASSERT_EQ(trie.isPathArray(field_A), true);
+    ASSERT_EQ(pathArrayness.isPathArray(field_A), true);
 }
-
 }  // namespace mongo

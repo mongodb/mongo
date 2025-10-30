@@ -169,13 +169,19 @@ StrDistribution::StrDistribution(MixedDistributionDescriptor distrDescriptor,
 
 void StrDistribution::init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) {
     // Generate a set of random strings with random sizes between _minStrLen and _maxStrLen.
+    stdx::unordered_map<std::string, int> unique;
     _valSet.reserve(_ndv);
     std::uniform_int_distribution<size_t> uniformStrSizeDistr{_minStrLen, _maxStrLen};
     for (size_t i = 0; i < _ndv; ++i) {
         size_t len = uniformStrSizeDistr(gen);
         const auto randStr = genRandomString(len, gen);
-        const auto [tag, val] = value::makeNewString(randStr);
-        _valSet.emplace_back(tag, val);
+        if (unique.count(randStr) == 0) {
+            const auto [tag, val] = value::makeNewString(randStr);
+            _valSet.emplace_back(tag, val);
+            unique[randStr] = 0;
+        } else {
+            i--;
+        }
     }
 
     _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
