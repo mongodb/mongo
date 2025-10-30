@@ -574,6 +574,17 @@ void QueryPlannerParams::setTargetSbeStageBuilder(OperationContext* opCtx,
 }
 
 namespace {
+
+projection_executor::ProjectionExecutor* getWildcardProjectionExecutor(
+    const IndexDescriptor& desc, const IndexCatalogEntry& ice) {
+    if (desc.getIndexType() != IndexType::INDEX_WILDCARD) {
+        return nullptr;
+    }
+    return static_cast<const WildcardAccessMethod*>(ice.accessMethod())
+        ->getWildcardProjection()
+        ->exec();
+}
+
 std::vector<IndexEntry> getIndexEntriesForDistinct(
     const QueryPlannerParams::ArgsForDistinct& distinctArgs) {
     std::vector<IndexEntry> indices;
@@ -583,12 +594,8 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
     const auto& query = canonicalQuery.getFindCommandRequest().getFilter();
     const auto& key = canonicalQuery.getDistinct()->getKey();
     const auto& collectionPtr = distinctArgs.collections.getMainCollection();
-
-    // If the caller did not request a "strict" distinct scan then we may choose a plan which
-    // either unwinds arrays and treats each element in an array as its own key or ignores missing
-    // fields.
-    const bool mayUnwindArraysOrIgnoreMissing =
-        !(distinctArgs.plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
+    const bool strictDistinctOnly =
+        distinctArgs.plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY;
 
     auto ii =
         collectionPtr->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
@@ -601,58 +608,17 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
             continue;
         }
 
-        if (desc->keyPattern().hasField(key)) {
-            // This handles regular fields of Compound Wildcard Indexes as well.
-            if (distinctArgs.flipDistinctScanDirection && ice->isMultikey(opCtx, collectionPtr)) {
-                // This CanonicalDistinct was generated as a result of transforming a $group with
-                // $last accumulators using the GroupFromFirstTransformation. We cannot use a
-                // DISTINCT_SCAN if $last is being applied to an indexed field which is multikey,
-                // even if the 'canonicalDistinct' key does not include multikey paths. This is
-                // because changing the sort direction also changes the comparison semantics for
-                // arrays, which means that flipping the scan may not exactly flip the order that we
-                // see documents in. In the case of using DISTINCT_SCAN for $group, that would mean
-                // that $first of the flipped scan may not be the same document as $last from the
-                // user's requested sort order.
-                continue;
-            }
-
-            // If we do not want to ignore missing fields then we cannot use a sparse index.
-            if (!mayUnwindArraysOrIgnoreMissing && desc->isSparse()) {
-                continue;
-            }
-
-            if (!mayUnwindArraysOrIgnoreMissing &&
-                isAnyComponentOfPathOrProjectionMultikey(
-                    desc->keyPattern(),
-                    ice->isMultikey(opCtx, collectionPtr),
-                    ice->getMultikeyPaths(opCtx, collectionPtr),
-                    key)) {
-                // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
-                // then an index which is multikey on the distinct field may not be used. This is
-                // because when indexing an array each element gets inserted individually. Any plan
-                // which involves scanning the index will have effectively "unwound" all arrays.
-                continue;
-            }
-
+        if (isIndexSuitableForDistinct(desc->keyPattern(),
+                                       ice->isMultikey(opCtx, collectionPtr),
+                                       ice->getMultikeyPaths(opCtx, collectionPtr),
+                                       desc->isSparse(),
+                                       getWildcardProjectionExecutor(*desc, *ice),
+                                       key,
+                                       query,
+                                       distinctArgs.flipDistinctScanDirection,
+                                       strictDistinctOnly)) {
             indices.push_back(
                 indexEntryFromIndexCatalogEntry(opCtx, collectionPtr, *ice, canonicalQuery));
-        } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
-            // Check whether the $** projection captures the field over which we are distinct-ing.
-            auto* proj = static_cast<const WildcardAccessMethod*>(ice->accessMethod())
-                             ->getWildcardProjection()
-                             ->exec();
-            if (projection_executor_utils::applyProjectionToOneField(proj, key)) {
-                indices.push_back(
-                    indexEntryFromIndexCatalogEntry(opCtx, collectionPtr, *ice, canonicalQuery));
-            }
-
-            // It is not necessary to do any checks about 'mayUnwindArrays' in this case, because:
-            // 1) If there is no predicate on the distinct(), a wildcard indices may not be used.
-            // 2) distinct() _with_ a predicate may not be answered with a DISTINCT_SCAN on _any_
-            // multikey index.
-
-            // So, we will not distinct scan a wildcard index that's multikey on the distinct()
-            // field, regardless of the value of 'mayUnwindArrays'.
         }
     }
 

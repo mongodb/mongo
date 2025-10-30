@@ -42,28 +42,25 @@
 
 namespace mongo {
 
-namespace {
-
-/**
- * Check if an index is suitable for the DISTINCT_SCAN transition. The function represents the
- * extracted condition used by `getIndexEntriesForDistinct()` which generates all the suitable
- * indexes in case of not multiplanning.
- */
-bool isIndexSuitableForDistinct(const IndexEntry& index,
-                                const std::string& field,
-                                const OrderedPathSet& projectionFields,
+bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
+                                bool multikey,
+                                const MultikeyPaths& multikeyPaths,
+                                bool sparse,
+                                projection_executor::ProjectionExecutor* wildcardProj,
+                                StringData field,
                                 const BSONObj& filter,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly,
+                                const OrderedPathSet& projectionFields,
                                 bool hasSort) {
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
     // either unwinds arrays and treats each element in an array as its own key or ignores missing
     // fields.
     const bool mayUnwindArraysOrIgnoreMissing = !strictDistinctOnly;
 
-    if (index.keyPattern.hasField(field)) {
+    if (keyPattern.hasField(field)) {
         // This handles regular fields of Compound Wildcard Indexes as well.
-        if (flipDistinctScanDirection && index.multikey) {
+        if (flipDistinctScanDirection && multikey) {
             // This CanonicalDistinct was generated as a result of transforming a $group with
             // $last accumulators using the GroupFromFirstTransformation. We cannot use a
             // DISTINCT_SCAN if $last is being applied to an indexed field which is multikey,
@@ -77,17 +74,13 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
         }
 
         // If we do not want to ignore missing fields then we cannot use a sparse index.
-        if (!mayUnwindArraysOrIgnoreMissing && index.sparse) {
+        if (!mayUnwindArraysOrIgnoreMissing && sparse) {
             return false;
         }
 
         if (!mayUnwindArraysOrIgnoreMissing &&
-            isAnyComponentOfPathOrProjectionMultikey(index.keyPattern,
-                                                     index.multikey,
-                                                     index.multikeyPaths,
-                                                     field,
-                                                     projectionFields,
-                                                     hasSort)) {
+            isAnyComponentOfPathOrProjectionMultikey(
+                keyPattern, multikey, multikeyPaths, field, projectionFields, hasSort)) {
             // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
             // then an index which is multikey on the distinct field may not be used. This is
             // because when indexing an array each element gets inserted individually. Any plan
@@ -95,11 +88,9 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
             return false;
         }
         return true;
-    } else if (index.type == IndexType::INDEX_WILDCARD && !filter.isEmpty()) {
+    } else if (wildcardProj && !filter.isEmpty()) {
         // Check whether the $** projection captures the field over which we are distinct-ing.
-        if (index.indexPathProjection != nullptr &&
-            projection_executor_utils::applyProjectionToOneField(index.indexPathProjection->exec(),
-                                                                 field)) {
+        if (projection_executor_utils::applyProjectionToOneField(wildcardProj, field)) {
             return true;
         }
         // It is not necessary to do any checks about 'mayUnwindArrays' in this case, because:
@@ -111,6 +102,43 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
         // field, regardless of the value of 'mayUnwindArrays'.
     }
     return false;
+}
+
+namespace {
+
+projection_executor::ProjectionExecutor* getWildcardProjectionExecutor(const IndexEntry& index) {
+    if (index.type != IndexType::INDEX_WILDCARD) {
+        return nullptr;
+    }
+    tassert(11154100,
+            "indexPathProjection must be non-null for INDEX_WILDCARD",
+            index.indexPathProjection);
+    return index.indexPathProjection->exec();
+}
+
+/**
+ * Check if an index is suitable for the DISTINCT_SCAN transition. The function represents the
+ * extracted condition used by `getIndexEntriesForDistinct()` which generates all the suitable
+ * indexes in case of not multiplanning.
+ */
+bool isIndexSuitableForDistinct(const IndexEntry& index,
+                                const std::string& field,
+                                const OrderedPathSet& projectionFields,
+                                const BSONObj& filter,
+                                bool flipDistinctScanDirection,
+                                bool strictDistinctOnly,
+                                bool hasSort) {
+    return isIndexSuitableForDistinct(index.keyPattern,
+                                      index.multikey,
+                                      index.multikeyPaths,
+                                      index.sparse,
+                                      getWildcardProjectionExecutor(index),
+                                      field,
+                                      filter,
+                                      flipDistinctScanDirection,
+                                      strictDistinctOnly,
+                                      projectionFields,
+                                      hasSort);
 }
 
 bool isAFullIndexScanPreferable(const IndexEntry& index,
