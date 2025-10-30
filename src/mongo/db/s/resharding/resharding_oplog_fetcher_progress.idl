@@ -29,6 +29,7 @@
 # This file defines the document used for storing progress by the resharding oplog applier.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

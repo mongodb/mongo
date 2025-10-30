@@ -29,6 +29,7 @@
 # This file defines the _id format of oplog entry stored in config.localReshardingOplogBuffer.*.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

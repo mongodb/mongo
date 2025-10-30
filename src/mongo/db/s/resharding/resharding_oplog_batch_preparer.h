@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <list>

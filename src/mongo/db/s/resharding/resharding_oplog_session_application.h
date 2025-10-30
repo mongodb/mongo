@@ -34,6 +34,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>

@@ -37,6 +37,7 @@
 #include "mongo/s/query/exec/owned_remote_cursor.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 #include <memory>

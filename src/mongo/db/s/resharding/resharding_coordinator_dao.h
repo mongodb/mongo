@@ -34,6 +34,7 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

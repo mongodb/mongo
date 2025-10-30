@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

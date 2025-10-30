@@ -44,6 +44,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>

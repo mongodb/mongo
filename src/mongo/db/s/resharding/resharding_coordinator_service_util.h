@@ -36,6 +36,7 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <vector>

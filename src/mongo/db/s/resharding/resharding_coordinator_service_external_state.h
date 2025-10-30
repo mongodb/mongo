@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

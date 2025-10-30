@@ -34,6 +34,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/modules.h"
 
 #include <future>
 

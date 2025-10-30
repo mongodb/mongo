@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace resharding_test_util {

@@ -32,6 +32,7 @@
 
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/modules.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

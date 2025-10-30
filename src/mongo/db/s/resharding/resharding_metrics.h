@@ -45,6 +45,7 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -148,12 +149,13 @@ public:
 
     ~ReshardingMetrics();
 
-    static std::unique_ptr<ReshardingMetrics> makeInstance_forTest(UUID instanceId,
-                                                                   BSONObj shardKey,
-                                                                   NamespaceString nss,
-                                                                   Role role,
-                                                                   Date_t startTime,
-                                                                   ServiceContext* serviceContext);
+    MONGO_MOD_PRIVATE static std::unique_ptr<ReshardingMetrics> makeInstance_forTest(
+        UUID instanceId,
+        BSONObj shardKey,
+        NamespaceString nss,
+        Role role,
+        Date_t startTime,
+        ServiceContext* serviceContext);
 
     template <typename T>
     static auto initializeFrom(const T& document,

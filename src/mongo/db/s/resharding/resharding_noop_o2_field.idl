@@ -30,6 +30,7 @@
 # noop oplog entries.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/s/resharding/resharding_util.h"

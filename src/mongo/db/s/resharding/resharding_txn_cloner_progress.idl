@@ -30,6 +30,7 @@
 # cloner.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

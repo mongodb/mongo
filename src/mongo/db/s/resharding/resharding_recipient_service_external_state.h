@@ -43,6 +43,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/optional/optional.hpp>

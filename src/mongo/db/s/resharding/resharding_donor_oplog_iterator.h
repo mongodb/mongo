@@ -40,6 +40,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>

@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 

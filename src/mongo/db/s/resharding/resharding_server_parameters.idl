@@ -29,6 +29,7 @@
 # Server parameters for resharding.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo::resharding"
     cpp_includes:
         - "mongo/client/read_preference_validators.h"
