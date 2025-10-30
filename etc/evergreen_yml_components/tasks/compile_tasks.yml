@@ -189,6 +189,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
+    patchable: false
     commands:
       - func: "bazel compile"
         vars:
