@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -102,6 +103,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long limit = 0,
         const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle = {},
+        boost::optional<MultipleCollectionAccessor> collections = boost::none,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{},
         boost::optional<SearchQueryViewSpec> view = boost::none);
 
@@ -238,6 +240,9 @@ private:
 
     // Handle to catalog state.
     boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
+
+    // TODO SERVER-111401 This doesn't need to be optional.
+    const boost::optional<MultipleCollectionAccessor> _collections;
 
     // TODO SERVER-109825: Move to InternalSearchIdLookupStage class.
     ExecShardFilterPolicy _shardFilterPolicy = AutomaticShardFiltering{};

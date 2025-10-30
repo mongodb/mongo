@@ -696,6 +696,7 @@ void promoteStoredSourceOrAddIdLookup(
             expCtx,
             limit,
             nullptr /*catalogResourceHandle*/,
+            boost::none /*MultipleCollectionAccessor*/,
             buildExecShardFilterPolicy(shardFilterer),
             view);
         desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);

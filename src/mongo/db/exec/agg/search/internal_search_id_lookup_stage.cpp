@@ -47,6 +47,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
         documentSource->getExpCtx(),
         documentSource->_limit,
         documentSource->_catalogResourceHandle,
+        documentSource->_collections,
         documentSource->_shardFilterPolicy,
         documentSource->_searchIdLookupMetrics,
         documentSource->_viewPipeline
@@ -66,6 +67,7 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
     const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
+    const boost::optional<MultipleCollectionAccessor> collections,
     ExecShardFilterPolicy shardFilterPolicy,
     const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
     std::unique_ptr<mongo::Pipeline> viewPipeline)
@@ -73,6 +75,7 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
       _stageName(stageName),
       _limit(limit),
       _catalogResourceHandle(catalogResourceHandle),
+      _collections(collections),
       _shardFilterPolicy(shardFilterPolicy),
       _searchIdLookupMetrics(searchIdLookupMetrics),
       _viewPipeline(std::move(viewPipeline)) {}
@@ -99,13 +102,6 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
         return GetNextResult::makeEOF();
     }
 
-    // Ensure catalog resources are released if they were acquired.
-    bool catalogResourceHandleAcquired = false;
-    ON_BLOCK_EXIT([&]() {
-        if (catalogResourceHandleAcquired) {
-            _catalogResourceHandle->release();
-        }
-    });
     while (!result) {
         auto nextInput = pSource->getNext();
         if (!nextInput.isAdvanced()) {
@@ -138,16 +134,21 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
                 pipeline->appendPipeline(_viewPipeline->clone(pExpCtx));
             }
 
-            // Acquire catalog resources once per doGetNext() call before preparing the pipeline.
-            // TODO SERVER-111401 We should always have a _catalogResourceHandle.
-            if (_catalogResourceHandle && !catalogResourceHandleAcquired) {
+            // TODO SERVER-111401 Only use attachCursorSourceToPipelineForLocalReadWithCatalog()
+            // path.
+            if (_catalogResourceHandle && _collections) {
                 _catalogResourceHandle->acquire(pExpCtx->getOperationContext());
-                catalogResourceHandleAcquired = true;
+                pipeline =
+                    pExpCtx->getMongoProcessInterface()
+                        ->attachCursorSourceToPipelineForLocalReadWithCatalog(
+                            std::move(pipeline), _collections.value(), _catalogResourceHandle);
+                _catalogResourceHandle->release();
+            } else {
+                pipeline =
+                    pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
+                        std::move(pipeline), boost::none, false, _shardFilterPolicy);
             }
 
-            pipeline =
-                pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-                    std::move(pipeline), boost::none, false, _shardFilterPolicy);
             auto execPipeline = buildPipeline(pipeline->freeze());
             result = execPipeline->getNext();
             if (auto next = execPipeline->getNext()) {

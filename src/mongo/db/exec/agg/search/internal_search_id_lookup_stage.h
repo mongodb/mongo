@@ -53,6 +53,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long limit,
         const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
+        boost::optional<MultipleCollectionAccessor> collections,
         ExecShardFilterPolicy shardFilterPolicy,
         const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
         std::unique_ptr<mongo::Pipeline> viewPipeline);
@@ -72,6 +73,9 @@ private:
 
     // Handle on catalog state that can be acquired and released during doGetNext().
     boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
+
+    // TODO SERVER-111401 This should no longer be optional.
+    const boost::optional<MultipleCollectionAccessor> _collections;
 
     ExecShardFilterPolicy _shardFilterPolicy;
 

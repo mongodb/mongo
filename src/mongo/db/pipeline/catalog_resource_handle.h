@@ -32,20 +32,21 @@
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PRIVATE mongo {
+namespace mongo {
 
 /**
  * Interface for acquiring and releasing catalog resources needed for stages that need catalog
  * information (i.e. DocumentSourceCursor and DocumentSourceInternalSearchIdLookUp).
  */
-class CatalogResourceHandle : public RefCountable {
+class MONGO_MOD_PUBLIC CatalogResourceHandle : public RefCountable {
 public:
     virtual void acquire(OperationContext*) = 0;
     virtual void release() = 0;
     virtual void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) = 0;
+    virtual boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher() = 0;
 };
 
-class DSCatalogResourceHandleBase : public CatalogResourceHandle {
+class MONGO_MOD_PRIVATE DSCatalogResourceHandleBase : public CatalogResourceHandle {
 public:
     DSCatalogResourceHandleBase(
         boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher)
@@ -66,9 +67,13 @@ public:
 
     void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override = 0;
 
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher() override {
+        return _transactionResourcesStasher;
+    }
+
 private:
     boost::optional<HandleTransactionResourcesFromStasher> _resources;
     boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
         _transactionResourcesStasher;
 };
-}  // namespace MONGO_MOD_PRIVATE mongo
+}  // namespace mongo

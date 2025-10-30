@@ -42,6 +42,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/javascript_execution.h"
@@ -49,9 +50,11 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
 #include "mongo/db/query/client_cursor/generic_cursor_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/record_id.h"
@@ -128,6 +131,12 @@ public:
                                         const NamespaceString& nss) override;
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) override;
+
+    std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadWithCatalog(
+        std::unique_ptr<Pipeline> pipeline,
+        const MultipleCollectionAccessor& collections,
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) final;
+
     std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
         std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,

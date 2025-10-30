@@ -281,6 +281,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadWithCatalog(
+        std::unique_ptr<Pipeline> pipeline,
+        const MultipleCollectionAccessor& collections,
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) final {
+        MONGO_UNREACHABLE;
+    }
+
     std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<Pipeline> pipeline,

@@ -98,10 +98,12 @@ class JsExecution;
 
 class Pipeline;
 class RoutingContext;
-// TODO SERVER-110774 investigate removing 'CollectionRoutingInfo' and
-// 'CollectionOrViewAcquisition' forward declarations.
+// TODO SERVER-112970 Investigate removing 'CatalogResourceHandle' and 'MultipleCollectionAccessor'
+// information from forward declarations.
+class CatalogResourceHandle;
 class CollectionRoutingInfo;
 class CollectionOrViewAcquisition;
+class MultipleCollectionAccessor;
 class TransactionHistoryIteratorBase;
 
 /**
@@ -492,6 +494,22 @@ public:
      */
     virtual BSONObj preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
                                               ExplainOptions::Verbosity verbosity) = 0;
+
+    /**
+     * Accepts a pipeline and returns a new one which will draw input from the underlying
+     * collection _locally_. Trying to run this method on mongos is a programming error. Running
+     * this method on a shard server will only return results which match the pipeline on that
+     * shard.
+     *
+     * Accepts catalog information that will be used for the new returned pipeline.
+     *
+     * Unlike attachCursorSourceToPipelineForLocalRead(), this method does not accept additional
+     * configuration through 'aggRequest' or 'shouldUseCollectionDefaultCollator' parameters.
+     */
+    virtual std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadWithCatalog(
+        std::unique_ptr<Pipeline> pipeline,
+        const MultipleCollectionAccessor& collections,
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) = 0;
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying

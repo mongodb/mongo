@@ -61,6 +61,7 @@
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -109,6 +110,7 @@
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/namespace_string_util.h"
@@ -804,6 +806,15 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
                                                         aggRequest,
                                                         shouldUseCollectionDefaultCollator,
                                                         shardFilterPolicy);
+}
+
+// TODO SERVER-111401 Define this function.
+std::unique_ptr<Pipeline>
+CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalReadWithCatalog(
+    std::unique_ptr<Pipeline> pipeline,
+    const MultipleCollectionAccessor& collections,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
+    MONGO_UNIMPLEMENTED_TASSERT(11087000);
 }
 
 std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(

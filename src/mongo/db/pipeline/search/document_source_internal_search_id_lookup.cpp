@@ -51,11 +51,13 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
     const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
+    const boost::optional<MultipleCollectionAccessor> collections,
     ExecShardFilterPolicy shardFilterPolicy,
     boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
       _limit(limit),
       _catalogResourceHandle(catalogResourceHandle),
+      _collections(collections),
       _shardFilterPolicy(shardFilterPolicy),
       _viewPipeline(view ? Pipeline::parse(view->getEffectivePipeline(), getExpCtx()) : nullptr) {
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state sharedby the
