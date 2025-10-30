@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "stitch_support/stitch_support.h"
+#include "mongo/embedded/stitch_support/stitch_support.h"
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"

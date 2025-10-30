@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "src/mongo/db/exec/agg/internal_apply_oplog_update_stage.h"
+#include "mongo/db/exec/agg/internal_apply_oplog_update_stage.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"

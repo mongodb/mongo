@@ -29,14 +29,13 @@
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cryptd/cryptd_options.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
 
 #include <iostream>
-
-#include "cryptd_options.h"
 
 #include <boost/filesystem.hpp>
 

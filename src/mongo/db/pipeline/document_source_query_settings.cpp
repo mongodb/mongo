@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "document_source_query_settings.h"
+#include "mongo/db/pipeline/document_source_query_settings.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"

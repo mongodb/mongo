@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "audit_client_attrs.h"
+#include "mongo/rpc/metadata/audit_client_attrs.h"
 
 namespace mongo::rpc {
 namespace {

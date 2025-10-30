@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "shard_role_loop.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 
 #include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"

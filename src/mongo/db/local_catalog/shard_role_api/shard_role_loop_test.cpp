@@ -33,17 +33,16 @@
 #include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/global_catalog/catalog_cache/shard_server_catalog_cache_loader_mock.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
+#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_api_d_params_gen.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 
 #include <memory>
 #include <queue>
-
-#include "src/mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
-#include "src/mongo/db/local_catalog/shard_role_catalog/database_sharding_state.h"
-#include "src/mongo/db/service_context_test_fixture.h"
-#include "src/mongo/db/versioning_protocol/stale_exception.h"
 
 namespace mongo {
 

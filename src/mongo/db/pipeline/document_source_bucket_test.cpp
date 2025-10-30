@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -48,7 +49,6 @@
 #include <memory>
 #include <vector>
 
-#include "src/mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

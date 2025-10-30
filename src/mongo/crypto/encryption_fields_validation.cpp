@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "encryption_fields_validation.h"
+#include "mongo/crypto/encryption_fields_validation.h"
 
 #include <cmath>
 #include <cstdint>

@@ -28,7 +28,7 @@
  */
 
 
-#include "log_domain_global.h"
+#include "mongo/logv2/log_domain_global.h"
 
 #include <cstdint>
 #include <iosfwd>

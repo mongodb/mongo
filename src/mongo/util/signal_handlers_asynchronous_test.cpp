@@ -44,8 +44,6 @@
 #include <cstdlib>
 #include <string>
 
-#include "signal_handlers.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {

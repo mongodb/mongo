@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "expression_trigonometric.h"
+#include "mongo/db/pipeline/expression_trigonometric.h"
 
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression.h"

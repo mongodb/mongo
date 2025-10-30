@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "oplog_cap_maintainer_thread.h"
+#include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

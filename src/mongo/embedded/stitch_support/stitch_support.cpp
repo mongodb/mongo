@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "stitch_support/stitch_support.h"
+#include "mongo/embedded/stitch_support/stitch_support.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/initializer.h"
@@ -59,6 +59,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/embedded/api_common.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -74,8 +75,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "api_common.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

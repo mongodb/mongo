@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"

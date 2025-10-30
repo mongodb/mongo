@@ -35,6 +35,8 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "bits/types/struct_rusage.h"
+#include "mongo/util/processinfo.h"
+
 #include <algorithm>
 #include <climits>
 #include <compare>
@@ -54,8 +56,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include "processinfo.h"
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32

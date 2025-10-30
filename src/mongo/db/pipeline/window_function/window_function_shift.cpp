@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "window_function_shift.h"
+#include "mongo/db/pipeline/window_function/window_function_shift.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"

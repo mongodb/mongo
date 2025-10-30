@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "query_settings_comment.h"
+#include "mongo/db/query/query_settings/query_settings_comment.h"
 
 namespace mongo::query_settings {
 std::strong_ordering Comment::operator<=>(const Comment& other) const {

@@ -48,6 +48,7 @@
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/collection_record_store_options.h"
 #include "mongo/db/local_catalog/durable_catalog.h"
@@ -82,8 +83,6 @@
 #include <list>
 #include <mutex>
 #include <shared_mutex>
-
-#include "collection_catalog.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

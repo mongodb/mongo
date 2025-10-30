@@ -688,4 +688,4 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
 }  // namespace bsoncolumn
 }  // namespace mongo
 
-#include "bsoncolumn.inl"
+#include "mongo/bson/column/bsoncolumn.inl"

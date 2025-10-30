@@ -28,8 +28,10 @@
  */
 
 
-#include "search_task_executors.h"
+#include "mongo/db/query/search/search_task_executors.h"
 
+#include "mongo/db/query/search/mongot_options.h"
+#include "mongo/db/query/search/search_index_options.h"
 #include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -40,9 +42,6 @@
 
 #include <memory>
 #include <utility>
-
-#include "mongot_options.h"
-#include "search_index_options.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

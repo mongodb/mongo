@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "test.h"
+#include "mongo/db/query/query_tester/test.h"
 
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/query/query_tester/command_helpers.h"
 #include "mongo/db/query/util/jparse_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/shell/shell_utils.h"
@@ -39,8 +40,6 @@
 
 #include <fstream>
 #include <thread>
-
-#include "command_helpers.h"
 
 namespace mongo::query_tester {
 namespace {

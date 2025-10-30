@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "query_rewriter.h"
+#include "mongo/db/query/fle/query_rewriter.h"
 
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/pipeline/expression_walker.h"

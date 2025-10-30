@@ -59,7 +59,6 @@
 #include <tuple>
 #include <utility>
 
-#include "src/mongo/db/local_catalog/index_descriptor.h"
 #include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

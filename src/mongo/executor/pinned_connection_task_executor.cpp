@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "pinned_connection_task_executor.h"
+#include "mongo/executor/pinned_connection_task_executor.h"
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"

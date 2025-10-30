@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "range_predicate.h"
+#include "mongo/db/query/fle/range_predicate.h"
 
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"

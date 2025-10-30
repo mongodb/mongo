@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "src/mongo/executor/executor_integration_test_connection_stats.h"
+#include "mongo/executor/executor_integration_test_connection_stats.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"

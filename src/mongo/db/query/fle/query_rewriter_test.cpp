@@ -28,7 +28,7 @@
  */
 
 
-#include "query_rewriter.h"
+#include "mongo/db/query/fle/query_rewriter.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

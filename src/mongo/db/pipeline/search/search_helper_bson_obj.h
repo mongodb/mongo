@@ -39,8 +39,6 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/util/modules.h"
 
-#include "document_source_list_search_indexes.h"
-
 namespace mongo {
 
 namespace search_helper_bson_obj {

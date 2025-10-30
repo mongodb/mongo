@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "text_search_predicate.h"
+#include "mongo/db/query/fle/text_search_predicate.h"
 
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/server_feature_flags_gen.h"

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "stale_shard_exception_handler.h"
+#include "mongo/db/local_catalog/shard_role_catalog/stale_shard_exception_handler.h"
 
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 #include "mongo/db/local_catalog/shard_role_catalog/database_sharding_runtime.h"

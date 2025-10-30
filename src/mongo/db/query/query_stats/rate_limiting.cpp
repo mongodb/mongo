@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "rate_limiting.h"
+#include "mongo/db/query/query_stats/rate_limiting.h"
 
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"

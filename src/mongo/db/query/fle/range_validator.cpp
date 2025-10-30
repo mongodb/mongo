@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "range_validator.h"
+#include "mongo/db/query/fle/range_validator.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/crypto/fle_crypto.h"

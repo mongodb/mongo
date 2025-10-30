@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "src/mongo/db/commands/test_commands_enabled.h"
+        - "mongo/db/commands/test_commands_enabled.h"
 
 server_parameters:
     enableTestCommands:

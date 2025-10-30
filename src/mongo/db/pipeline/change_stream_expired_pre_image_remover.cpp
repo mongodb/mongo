@@ -29,7 +29,7 @@
 
 
 // IWYU pragma: no_include "cxxabi.h"
-#include "change_stream_expired_pre_image_remover.h"
+#include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"

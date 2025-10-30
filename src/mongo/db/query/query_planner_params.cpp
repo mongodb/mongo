@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "query_planner_params.h"
+#include "mongo/db/query/query_planner_params.h"
 
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/global_catalog/shard_key_pattern_query_util.h"

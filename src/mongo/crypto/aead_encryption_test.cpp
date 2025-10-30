@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "aead_encryption.h"
+#include "mongo/crypto/aead_encryption.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "equality_predicate.h"
+#include "mongo/db/query/fle/equality_predicate.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

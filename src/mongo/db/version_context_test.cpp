@@ -29,9 +29,9 @@
 #include "mongo/db/version_context.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
 
-#include "src/mongo/bson/bsonmisc.h"
 #include <fmt/format.h>
 
 namespace mongo {

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "summation.h"
+#include "mongo/util/summation.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"

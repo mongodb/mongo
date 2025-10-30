@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "range_validator.h"
+#include "mongo/db/query/fle/range_validator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -51,8 +52,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "encrypted_predicate_test_fixtures.h"
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>

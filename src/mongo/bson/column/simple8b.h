@@ -417,4 +417,4 @@ inline constexpr int128_t add(int128_t lhs, int128_t rhs) {
 
 }  // namespace mongo
 
-#include "simple8b.inl"
+#include "mongo/bson/column/simple8b.inl"

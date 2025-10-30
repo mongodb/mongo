@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -47,8 +48,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-
-#include "document_value/document_value_test_util.h"
 
 
 namespace mongo {

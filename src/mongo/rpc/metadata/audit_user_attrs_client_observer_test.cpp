@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "audit_user_attrs_client_observer.h"
+#include "mongo/rpc/metadata/audit_user_attrs_client_observer.h"
 
 #include "mongo/db/auth/authorization_session_test_fixture.h"
 #include "mongo/db/auth/sasl_options.h"

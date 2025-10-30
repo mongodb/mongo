@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "kms.h"
+#include "mongo/shell/kms.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonmisc.h"

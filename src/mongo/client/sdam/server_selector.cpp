@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "server_selector.h"
+#include "mongo/client/sdam/server_selector.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

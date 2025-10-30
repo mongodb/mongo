@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "command_helpers.h"
+#include "mongo/db/query/query_tester/command_helpers.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/database_name.h"

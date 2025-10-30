@@ -32,7 +32,7 @@
  * functions appear in backtraces, see unwind_test.cpp.
  */
 
-#include "stacktrace_libunwind_test_functions.h"
+#include "mongo/util/stacktrace_libunwind_test_functions.h"
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/stacktrace.h"

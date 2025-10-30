@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "src/mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 
-#include "src/mongo/db/service_context.h"
+#include "mongo/db/service_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

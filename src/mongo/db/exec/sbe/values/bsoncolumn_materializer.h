@@ -36,8 +36,6 @@
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
-#include "bson_block.h"
-
 
 namespace mongo::sbe {
 namespace bsoncolumn {

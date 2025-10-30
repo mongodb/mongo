@@ -35,6 +35,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/database_name.h"
+#include "mongo/util/serialization_context.h"
 
 #include <string>
 #include <variant>

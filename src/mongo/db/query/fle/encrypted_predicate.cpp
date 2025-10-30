@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "encrypted_predicate.h"
+#include "mongo/db/query/fle/encrypted_predicate.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"

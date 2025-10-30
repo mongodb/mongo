@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "boost_assert_shim.h"
+#include "mongo/util/boost_assert_shim.h"
 
 #if defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG)
 

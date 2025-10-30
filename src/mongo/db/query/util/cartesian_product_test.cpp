@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "cartesian_product.h"
+#include "mongo/db/query/util/cartesian_product.h"
 
 #include "mongo/unittest/unittest.h"
 

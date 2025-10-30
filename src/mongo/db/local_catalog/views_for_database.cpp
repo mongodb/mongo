@@ -28,7 +28,7 @@
  */
 
 
-#include "views_for_database.h"
+#include "mongo/db/local_catalog/views_for_database.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

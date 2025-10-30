@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "uncommitted_catalog_updates.h"
+#include "mongo/db/local_catalog/uncommitted_catalog_updates.h"
 
 #include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"

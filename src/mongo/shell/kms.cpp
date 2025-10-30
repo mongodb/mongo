@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "kms.h"
+#include "mongo/shell/kms.h"
 
 #include "mongo/idl/idl_parser.h"
 #include "mongo/shell/kms_gen.h"

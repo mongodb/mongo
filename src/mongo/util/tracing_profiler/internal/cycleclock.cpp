@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "cycleclock.h"
+#include "mongo/util/tracing_profiler/internal/cycleclock.h"
 namespace mongo::tracing_profiler::internal {
 
 SystemCycleClock& SystemCycleClock::get() {

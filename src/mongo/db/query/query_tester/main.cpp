@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/query_tester/command_helpers.h"
+#include "mongo/db/query/query_tester/mock_version_info.h"
+#include "mongo/db/query/query_tester/testfile.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/platform/random.h"
@@ -43,10 +46,6 @@
 #include <limits>
 #include <memory>
 #include <vector>
-
-#include "command_helpers.h"
-#include "mock_version_info.h"
-#include "testfile.h"
 
 namespace mongo::query_tester {
 namespace {

@@ -40,8 +40,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-
-#include "src/mongo/rpc/get_status_from_command_result_write_util.h"
+#include "mongo/rpc/get_status_from_command_result_write_util.h"
 
 namespace mongo {
 namespace {

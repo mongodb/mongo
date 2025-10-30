@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "log_domain_internal.h"
+#include "mongo/logv2/log_domain_internal.h"
 
 namespace mongo::logv2 {
 

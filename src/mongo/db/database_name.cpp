@@ -28,7 +28,7 @@
  */
 
 
-#include "database_name.h"
+#include "mongo/db/database_name.h"
 
 #include <boost/container_hash/hash.hpp>
 

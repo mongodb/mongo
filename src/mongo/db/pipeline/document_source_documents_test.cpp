@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "document_source_documents.h"
+#include "mongo/db/pipeline/document_source_documents.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"

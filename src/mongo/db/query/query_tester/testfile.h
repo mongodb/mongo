@@ -29,14 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/query/query_tester/test.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <fstream>
 #include <string>
 #include <vector>
-
-#include "test.h"
 
 namespace mongo::query_tester {
 
