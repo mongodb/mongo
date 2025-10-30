@@ -124,14 +124,9 @@ ExpressionContext::CollatorStash::~CollatorStash() {
     _expCtx->setCollator(std::move(_originalCollator));
 }
 
-void ExpressionContext::InterruptChecker::checkForInterruptSlow() {
-    _tick = kInterruptCheckPeriod;
-
-    OperationContext* opCtx = _expressionContext->getOperationContext();
-    invariant(opCtx);
-
-    opCtx->checkForInterrupt();
-    CurOp::get(opCtx)->logLongRunningOperationIfNeeded();
+void ExpressionContext::InterruptChecker::checkForInterruptVerySlow() {
+    _verySlowTick = kVerySlowInterruptCheckPeriod;
+    CurOp::get(_expressionContext->getOperationContext())->logLongRunningOperationIfNeeded();
 }
 
 std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(

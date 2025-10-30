@@ -16,10 +16,10 @@ function assertSlowInProgressQueryLogged(db, comment, expectedPlanSummary) {
     assert.eq(log.attr.planSummary, expectedPlanSummary, "Unexpected plan summary in log line: " + logLine);
 }
 
-const kDocCount = 200;
+const kDocCount = 2048;
 
 // Ensure that we yield often enough to log the "slow" in-progress query.
-const conn = MongoRunner.runMongod({setParameter: {internalQueryExecYieldIterations: kDocCount / 10}});
+const conn = MongoRunner.runMongod({setParameter: {internalQueryExecYieldIterations: kDocCount / 128}});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB("log_slow_in_progress_queries");

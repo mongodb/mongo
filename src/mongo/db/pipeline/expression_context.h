@@ -1194,12 +1194,27 @@ protected:
     private:
         // Performs the heavy work of checking whether an interrupt has occurred. For performance
         // reasons, this should only be called every now and then.
-        void checkForInterruptSlow();
+        MONGO_COMPILER_ALWAYS_INLINE void checkForInterruptSlow() {
+            _tick = kInterruptCheckPeriod;
 
-        static constexpr int kInterruptCheckPeriod = 128;
+            OperationContext* opCtx = _expressionContext->getOperationContext();
+            invariant(opCtx);
+
+            opCtx->checkForInterrupt();
+            if (--_verySlowTick == 0) {
+                checkForInterruptVerySlow();
+            }
+        }
+
+        // Performs the work around checking for interrupt that can't be inlined.
+        void checkForInterruptVerySlow();
+
+        static constexpr int32_t kInterruptCheckPeriod = 128;
+        static constexpr int32_t kVerySlowInterruptCheckPeriod = 8;  // Runs every 1024 ticks
 
         ExpressionContext* _expressionContext;
-        int _tick = kInterruptCheckPeriod;
+        int32_t _tick = kInterruptCheckPeriod;
+        int32_t _verySlowTick = kVerySlowInterruptCheckPeriod;
     };
 
 
