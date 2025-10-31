@@ -104,15 +104,10 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
         return;
     }
 
-    const auto& fieldNameToInsert = std::string(path.getFieldName(depth));
-    const auto& maybeChild = _children.find(fieldNameToInsert);
-
-    if (maybeChild == _children.end()) {
-        // This path component does not already exist so create a new TrieNode and insert it.
+    // Insert the top level field.
+    std::string fieldNameToInsert = std::string(path.getFieldName(depth));
+    if (!_children.contains(fieldNameToInsert)) {
         _children.insert({fieldNameToInsert, TrieNode(multikeyPath.count(depth))});
-    } else {
-        // This path component already exists in trie so resolve conflicts in arrayness information.
-        maybeChild->second._isArray &= multikeyPath.count(depth);
     }
 
     // Recursively invoke the remaining path.

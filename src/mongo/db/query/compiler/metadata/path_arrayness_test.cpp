@@ -52,9 +52,9 @@ TEST(ArraynessTrie, BuildAndLookupExistingFields) {
     FieldPath field_ABCJ("a.b.c.j");
     MultikeyComponents multikeyPaths_ABCJ{{0U, 2U}};
 
-    // Array: ["a", "a.b.d"]
+    // Array: ["a"]
     FieldPath field_ABDE("a.b.d.e");
-    MultikeyComponents multikeyPaths_ABDE{0U, 2U};
+    MultikeyComponents multikeyPaths_ABDE{0U};
 
     // Array: []
     FieldPath field_BDE("b.d.e");
@@ -123,60 +123,5 @@ TEST(ArraynessTrie, LookupEmptyTrie) {
     // Neither of these fields or their prefixes are in the trie, so assume arrays.
     ASSERT_EQ(pathArrayness.isPathArray(field_A), true);
     ASSERT_EQ(pathArrayness.isPathArray(field_ABCD), true);
-}
-
-TEST(ArraynessTrie, BuildAndLookupTrieWithConflictingArrayInformation) {
-    // Array: ["a.b"]
-    FieldPath field_AB("a.b");
-    MultikeyComponents multikeyPaths_AB{1U};
-
-    // Array: ["a.b.c"]. Note in this case "a.b" is not an array.
-    FieldPath field_ABC("a.b.c");
-    MultikeyComponents multikeyPaths_ABC{2U};
-    // First add field_AB to trie and then add field_ABC to trie.
-    std::vector<FieldPath> fields{field_AB, field_ABC};
-    std::vector<MultikeyComponents> multikeyness{multikeyPaths_AB, multikeyPaths_ABC};
-
-    PathArrayness pathArrayness;
-
-    pathArrayness.addPath(field_AB, multikeyPaths_AB);
-    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
-
-    ASSERT_EQ(pathArrayness.isPathArray(field_AB), false);
-
-    // Now let's flip the insertion order.
-    PathArrayness pathArrayness1;
-    pathArrayness1.addPath(field_ABC, multikeyPaths_ABC);
-    pathArrayness1.addPath(field_AB, multikeyPaths_AB);
-
-    // We should still get the same result.
-    ASSERT_EQ(pathArrayness1.isPathArray(field_AB), false);
-}
-
-TEST(ArraynessTrie, BuildAndLookupTrieWithSameArrayInformation) {
-    // Array: ["a.b"]
-    FieldPath field_AB("a.b");
-    MultikeyComponents multikeyPaths_AB{1U};
-
-    // Array: ["a.b"]. Note in this case "a.b" is not an array.
-    FieldPath field_ABC("a.b.c");
-    MultikeyComponents multikeyPaths_ABC{1U};
-
-    // Note "a" is not an array in field_AB or field_ABC examples above.
-    FieldPath field_A("a");
-
-    // First add field_AB to trie and then add field_ABC to trie.
-    std::vector<FieldPath> fields{field_AB, field_ABC};
-    std::vector<MultikeyComponents> multikeyness{multikeyPaths_AB, multikeyPaths_ABC};
-
-    PathArrayness pathArrayness;
-
-    pathArrayness.addPath(field_AB, multikeyPaths_AB);
-    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
-
-    // Path "a.b" is an array in both of the paths inserted into the trie.
-    ASSERT_EQ(pathArrayness.isPathArray(field_AB), true);
-    // Path "a" is not an array in either of the paths inserted into the trie.
-    ASSERT_EQ(pathArrayness.isPathArray(field_A), false);
 }
 }  // namespace mongo
