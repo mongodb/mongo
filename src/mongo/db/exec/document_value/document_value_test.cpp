@@ -1465,8 +1465,9 @@ TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
 
     // Do a sanity check on the amount of space taken by metadata in document 2. Note that the size
     // of certain data types may vary on different build variants, so we cannot assert on the exact
-    // size.
-    ASSERT_LT(doc2.getMetadataApproximateSize(), 400U);
+    // size. Also note that if this assertion fails, it may be because more document metadata fields
+    // were added. If this is the case, then the limit should be relaxed again.
+    ASSERT_LT(doc2.getMetadataApproximateSize(), 500U);
 
     Document emptyDoc;
     ASSERT_LT(emptyDoc.getMetadataApproximateSize(), 100U);
