@@ -113,4 +113,51 @@ std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPaths
     return pathsToInsert;
 }
 
+std::vector<std::pair<std::string, MultikeyComponents>> combineVectors(
+    const std::vector<FieldPath>& fieldPaths,
+    const std::vector<MultikeyComponents>& multikeyComponents) {
+    std::vector<std::pair<std::string, MultikeyComponents>> result;
+
+    tassert(11202200,
+            "The number of fieldpaths should be equal to the defs of multikeyness",
+            fieldPaths.size() == multikeyComponents.size());
+
+    for (size_t curPath = 0; curPath < fieldPaths.size(); curPath++) {
+        result.push_back({fieldPaths[curPath].fullPath(), multikeyComponents[curPath]});
+    }
+
+    return result;
+}
+
+stdx::unordered_map<std::string, bool> tranformVectorToMap(
+    const std::vector<std::pair<std::string, MultikeyComponents>>& vectorOfFieldPaths) {
+    stdx::unordered_map<std::string, bool> result;
+
+    for (const auto& curPair : vectorOfFieldPaths) {
+
+        std::string s = curPair.first;
+
+        std::vector<std::string> tokens;
+        std::string delimiter = ".";
+        size_t posStart = 0, posEnd;
+        size_t delimLen = delimiter.length();
+        std::string token;
+
+        while ((posEnd = s.find(delimiter, posStart)) != std::string::npos) {
+            token = s.substr(posStart, posEnd - posStart);
+            posStart = posEnd + delimLen;
+            tokens.push_back(token);
+        }
+        tokens.push_back(s.substr(posStart));  // Add the last token
+
+        std::string builder = "";
+        for (size_t i = 0; i < tokens.size(); i++) {
+            builder += (builder.empty() ? tokens[i] : "." + tokens[i]);
+            result[builder] = curPair.second.count(i);
+        }
+    }
+
+    return result;
+}
+
 }  // namespace mongo

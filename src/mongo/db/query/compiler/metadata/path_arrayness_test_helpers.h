@@ -30,10 +30,32 @@
 #pragma once
 
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {
 
+/**
+ * Test helper generating a random vector of paths along with the corresponding multikeyness
+ * information. The paths are generating according to the provided config. numberOfPaths dictates
+ * the size of the vector, maxLEngth and ndvLengths dictate the depth of the dotted paths. The
+ * random generator uses the provided seeds and uniform distribution.
+ */
 std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPathsWithArraynessInfo(
     int numberOfPaths, int maxLength, int ndvLengths, size_t seed, size_t seed2);
+
+/**
+ * A simple helper combining the two vectors into a vector of pairs. This helper is used to simplify
+ * declaring user defined tests, while using the same helpers that automatic generators use.
+ */
+std::vector<std::pair<std::string, MultikeyComponents>> combineVectors(
+    const std::vector<FieldPath>& fieldPaths,
+    const std::vector<MultikeyComponents>& multikeyComponents);
+
+/**
+ * Test helper transfofming a vector of pairs of fieldpaths and multikeyness info to a map where the
+ * key is the fieldpath and the value is whether the final component is an array.
+ */
+stdx::unordered_map<std::string, bool> tranformVectorToMap(
+    const std::vector<std::pair<std::string, MultikeyComponents>>& vectorOfFieldPaths);
 
 }  // namespace mongo

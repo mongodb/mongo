@@ -63,6 +63,12 @@ public:
         _root.visualizeTrie("");
     }
 
+    /**
+     * Export the trie data structure to a mapping of field path prefixes to a boolean that
+     * specifies whether or not that field path prefix is an array component.
+     */
+    stdx::unordered_map<std::string, bool> exportToMap();
+
 private:
     /**
      * Data structure representing the inner nodes of the trie.
@@ -101,6 +107,16 @@ private:
          * Debugging helper to visualize trie.
          */
         void visualizeTrie(std::string fieldName, int depth = 0) const;
+
+        /**
+         * Return the next components of this specific field path along with the corresponding
+         * `TrieNodes`. This is used only for debugging/testing purposes.
+         */
+        std::vector<std::pair<std::string, TrieNode>> getChildren() const {
+            std::vector<std::pair<std::string, TrieNode>> childrenVector;
+            std::copy(_children.begin(), _children.end(), std::back_inserter(childrenVector));
+            return childrenVector;
+        }
 
     private:
         /**

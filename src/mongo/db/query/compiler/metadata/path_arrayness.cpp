@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include <stack>
+
 using namespace mongo::multikey_paths;
 
 namespace mongo {
@@ -57,6 +59,29 @@ bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {
         }
     }
     return current->isArray();
+}
+
+stdx::unordered_map<std::string, bool> PathArrayness::exportToMap() {
+    stdx::unordered_map<std::string, bool> result;
+
+    std::stack<std::pair<PathArrayness::TrieNode, std::string>> myStack;
+
+    myStack.push({this->_root, ""});
+
+    while (!myStack.empty()) {
+        const auto& [currNode, currPathComponent] = myStack.top();
+        myStack.pop();
+
+        result[currPathComponent] = currNode.isArray();
+
+        for (auto&& [childNode, childPathComponent] : currNode.getChildren()) {
+            std::string pathPrefix = (currPathComponent.empty() ? "" : currPathComponent + ".");
+            pathPrefix += childNode;
+            myStack.push({childPathComponent, pathPrefix});
+        }
+    }
+
+    return result;
 }
 
 void PathArrayness::TrieNode::visualizeTrie(std::string fieldName, int depth) const {
