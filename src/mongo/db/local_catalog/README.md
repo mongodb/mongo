@@ -347,7 +347,7 @@ cache of the [durable catalog](#durable-catalog) state. It provides the followin
 
 ### Concurrency Control
 
-See [Concurrency Control](../concurrency/README.md)
+See [Concurrency Control](lock_manager/README.md)
 
 ### Synchronization
 
@@ -371,6 +371,8 @@ that enters `CollectionCatalog::write` while a catalog instance is being copied 
 write callbacks is enqueued. When the copy finishes, all enqueued write jobs are run on that catalog
 instance by the copying thread.
 
+[copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
+
 ### Collection objects
 
 Objects of the `Collection` class provide access to a collection's properties between
@@ -384,7 +386,7 @@ Notable properties of `Collection` objects are:
 
 - catalog ID - to look up or change information from the '\_mdb_catalog' (either through the
   'MDBCatalog' directly, or through the 'durable_catalog' namespace when parsing is helpful).
-- UUID - Identifier that remains for the lifetime of the underlying MongoDb collection, even across
+- UUID - Identifier that remains for the lifetime of the underlying MongoDB collection, even across
   DDL operations such as renames, and is consistent between different nodes and shards in a
   cluster.
 - NamespaceString - The current name associated with the collection.
@@ -525,7 +527,7 @@ The `CollectionCatalog` contains a mapping of `Namespace` and `UUID` to the `cat
 timestamps back to the oldest timestamp. These are used for efficient lookups into the durable
 catalog, and are resilient to create, drop and rename operations.
 
-Operations that use collection locks (in any [lock mode](../concurrency/README.md#lock-modes)) can
+Operations that use collection locks (in any [lock mode](lock_manager/README.md#lock-modes)) can
 rely on the catalog information of the collection not changing. However, when unlocking and then
 re-locking, not only should operations recheck catalog information to ensure it is still valid, they
 should also make sure to abandon the storage snapshot, so it is consistent with the in memory
@@ -633,7 +635,7 @@ to read at
 
 Operations that write to collections and indexes must take collection locks. Storage engines require
 all operations to hold at least a collection IX lock to provide document-level concurrency.
-Operations must perform writes in the scope of a [WriteUnitOfWork](../storage/README.md#writeunit).
+Operations must perform writes in the scope of a [WriteUnitOfWork](../storage/README.md#writeunitofwork).
 
 ## Collection and Index Writes
 

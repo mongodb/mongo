@@ -1,15 +1,15 @@
 # Time-Series Collections
 
-MongoDB supports a new collection type for storing time-series data with the [timeseries](../commands/create.idl)
+MongoDB supports a new collection type for storing time-series data with the [timeseries](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/commands/create.idl#L152-L156)
 collection option. A time-series collection presents a simple interface for inserting and querying
 measurements while organizing the actual data in buckets.
 
-A minimally configured time-series collection is defined by providing the [timeField](timeseries.idl)
-at creation. Optionally, a meta-data field may also be specified to help group
+A minimally configured time-series collection is defined by providing the [timeField](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L187-L196)
+at creation. Optionally, a [metaField](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L197-L207) may also be specified to help group
 measurements in the buckets. MongoDB also supports an expiration mechanism on measurements through
 the `expireAfterSeconds` option.
 
-A (viewful) time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../catalog/README.md) by a
+A (viewful) time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../local_catalog/README.md) by a
 combination of a view and a system collection:
 
 - The non-materialized view `mydb.mytscoll` is defined with the bucket collection as the source collection with
@@ -28,7 +28,7 @@ combination of a view and a system collection:
   - Besides the time range, buckets are also constrained by the total number and size of measurements.
 
 Time-series collections can also be sharded. For more information about sharding-specific implementation
-details, see [db/s/README_timeseries.md](../s/README_timeseries.md).
+details, see [db/global_catalog/README_timeseries.md](../global_catalog/README_timeseries.md).
 
 ## Bucket Collection Schema
 
@@ -129,7 +129,7 @@ The versions that a bucket can take are V1, V2, and V3.
 V1 buckets are uncompressed and their measurements are not sorted on time, V2 buckets are compressed
 and have their measurements sorted on time, and V3 buckets are compressed but do not have their
 measurements sorted on time. When we say that a bucket is compressed, we mean that for each field
-in its data, the measurements for that field are stored in a BSONColumn [(More about BSONColumn and the binary data type, BinData7)](https://github.com/mongodb/mongo/blob/4e8319347d8ee243fa96fe186abd91bd6b4bbeb8/src/mongo/db/timeseries/README.md#bucket-collection-schema).
+in its data, the measurements for that field are stored in a BSONColumn [(More about BSONColumn and the binary data type, BinData7)](#bucket-collection-schema).
 
 Starting in 8.0, newly created buckets will be V2 by default. V2 and V3 buckets in the BucketCatalog maintain
 a BSONColumnBuilder for each data field. These builders are append-only, meaning that new measurements can only
@@ -143,7 +143,7 @@ cannot rely on the fact that V3 buckets have their measurements in order by time
 New V1 buckets will no longer be created in 8.0+, but existing V1 buckets from upgrades will
 continue to be supported. Closed V1 buckets can be reopened, and will be compressed when more
 measurements are inserted into them. Specifically, the bucket will be sorted and compressed as V2 the
-[moment it is reopened](https://github.com/mongodb/mongo/blob/4ccd7e74075ac8a9685981570b575acf74efe350/src/mongo/db/timeseries/timeseries_write_util.cpp#L721), and the insert [will then operate](https://github.com/mongodb/mongo/blob/4ccd7e74075ac8a9685981570b575acf74efe350/src/mongo/db/timeseries/timeseries_write_util.cpp#L1075-L1081) on a compressed bucket.
+[moment it is reopened](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/timeseries/timeseries_write_util.cpp#L738-L745), and the insert [will then operate](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/timeseries/timeseries_write_util.cpp#L1119-L1125) on a compressed bucket.
 
 ### BSONColumnBuilder
 
@@ -215,7 +215,7 @@ parameter.
 ## Batched Inserts
 
 When a batch of inserts is processed by the write path, this typically comes from an `insertMany` command,
-the batch is [organized by meta value and sorted](https://github.com/mongodb/mongo/blob/5e5a0d995995fc4404c6e32546ed0580954b1e39/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L506-L527) in time ascending order to ensure efficient bucketing
+the batch is [organized by meta value and sorted](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L522-L543) in time ascending order to ensure efficient bucketing
 and insertion. Prior versions would perform bucket targeting for each measurement in the order the user
 specified. This could lead to poor insert performance and very sub-optimal bucketing behavior if the user's
 batch was in time descending order. This change in batching also significantly reduces the number of stripe
@@ -234,7 +234,7 @@ to the underlying buckets collection's schema.
   underlying buckets collection may be found in
   [timeseries_index_schema_conversion_functions.h](timeseries_index_schema_conversion_functions.h).
 - Newly supported index types in v6.0 and up
-  [store the original user index definition](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/timeseries/timeseries_commands_conversion_helper.cpp#L140-L147)
+  [store the original user index definition](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/timeseries/timeseries_commands_conversion_helper.cpp#L213-L220)
   on the transformed index definition. When mapping the bucket collection index to the time-series
   collection index, the original user index definition is returned.
 
@@ -281,7 +281,7 @@ Index types that are not supported on time-series collections include
 ## BucketCatalog
 
 In order to facilitate efficient bucketing, we maintain the set of open buckets in the
-`BucketCatalog` found in [bucket_catalog.h](bucket_catalog.h). A writer will attempt to insert each
+`BucketCatalog` found in [bucket_catalog.h](bucket_catalog/bucket_catalog.h). A writer will attempt to insert each
 document in its input batch to the `BucketCatalog`, which will return either a handle to a
 `BucketCatalog::WriteBatch` or information that can be used to retrieve a bucket from disk to
 reopen. A second attempt to insert the document, potentially into the reopened bucket, should return
@@ -321,7 +321,7 @@ the index does not exist, then query-based reopening will not be used.
 When we reopen compressed buckets, in order to avoid fully decompressing and then fully re-compressing
 the bucket we instantiate the bucket's BSONColumnBuilders from the existing BSONColumn binaries. Currently
 BSONColumn only supports optimized instantiation for scalar values; if an object or array type is
-[detected](https://github.com/mongodb/mongo/blob/5e5a0d995995fc4404c6e32546ed0580954b1e39/src/mongo/bson/column/bsoncolumnbuilder.cpp#L1380) in the input BSONColumn binary, the BSONColumnBuilder will fully decompress and re-create the
+[detected](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/bson/column/bsoncolumnbuilder.cpp#L1387-L1388) in the input BSONColumn binary, the BSONColumnBuilder will fully decompress and re-create the
 BSONColumn for the metric we are reopening.
 
 ### Bucket Closure and Archival
@@ -358,7 +358,7 @@ equivalently the value of its `control.min.<time field>`, will be taken from the
 inserted to the bucket and rounded down based on the `bucketRoundingSeconds`. This rounding will
 generally be accomplished by basic modulus arithmetic operating on the number of seconds since the
 epoch i.e. for an input timestamp `t` and a rounding value `r`, the rounded timestamp will be
-taken as `t - (t % r)`. See [jstests/core/timeseries/ddl/bucket_timestamp_rounding.js](https://github.com/mongodb/mongo/blob/master/jstests/core/timeseries/ddl/bucket_timestamp_rounding.js)
+taken as `t - (t % r)`. See [jstests/core/timeseries/ddl/bucket_timestamp_rounding.js](../../../../jstests/core/timeseries/ddl/bucket_timestamp_rounding.js)
 for edge cases on rounding and bucket timespans.
 
 A user may choose to set `bucketMaxSpanSeconds` and `bucketRoundingSeconds` directly when creating a
@@ -375,7 +375,7 @@ some reasonable presets of "seconds", "minutes" and "hours".
 | _Minutes_   | 3,600 (1 hour)          | 86,400 (1 day)         |
 | _Hours_     | 86,400 (1 day)          | 2,592,000 (30 days)    |
 
-Chart sources: [bucketRoundingSeconds](https://github.com/mongodb/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L368-L381) and [bucketMaxSpanSeconds](https://github.com/mongodb/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L259-L273).
+Chart sources: [bucketRoundingSeconds](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries_options.cpp#L374-L387) and [bucketMaxSpanSeconds](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries_options.cpp#L265-L279).
 
 If the user does not specify any bucketing parameters when creating a collection, the default value
 is `{granularity: "seconds"}`.
@@ -472,7 +472,7 @@ We have three phases of a time-series write. Each phase of the time-series write
 ### Calculating Memory Usage
 
 Memory usage for Buckets, the BucketCatalog, and other aspects of time-series collection internals (Stripes, BucketMetadata, etc)
-is calculated using the [Timeseries Tracking Allocator](https://github.com/mongodb/mongo/blob/f726b6db3a361122a87555dbea053d98b01685a3/src/mongo/db/timeseries/timeseries_tracking_allocator.h).
+is calculated using the [Tracking Allocator](../../util/tracking/allocator.h).
 
 ### Freezing Buckets
 
@@ -491,7 +491,7 @@ each phase described above in [Errors When Staging and Committing Measurements](
 
 <img width="1364" alt="bucket_catalog_stripe" src="https://github.com/user-attachments/assets/c6016335-34e3-4f62-b46a-0f0a970f2c05" />
 
-Recall that each bucket contains up to [timeseriesBucketMaxCount](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/timeseries.idl#L58) (1,000) measurements within a span of time, `bucketMaxSpanSeconds`. And further, the bucket
+Recall that each bucket contains up to [timeseriesBucketMaxCount](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/timeseries.idl#L58) (1,000) measurements within a span of time, `bucketMaxSpanSeconds`. And further, the bucket
 catalog maintains an invariant of at most 1 open bucket per unique meta value. This diagram shows
 how measurements map to each open bucket, which map to a specific stripe. The hashing function may not distribute the
 client's writes to stripes evenly, but on the whole there is a good chance that stripe contention won't be a bottleneck since
@@ -499,8 +499,8 @@ there are often more or the same number of stripes to cores on the database serv
 if the workload accesses many buckets (meta values) that map to the same stripe. In 8.2+, while holding the stripe lock during
 a write, only a small amount of work is done intentionally. This has lessened the impact of stripe contention.
 
-The [Stripe](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L152-L186) struct stores most of the core components of the [Bucket Catalog](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L198-L228). The structures within it generally compose
-the memory usage of the Bucket Catalog (see: [bucket_catalog::getMemoryUsage](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L203-L219)).
+The [Stripe](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L115-L149) struct stores most of the core components of the [Bucket Catalog](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L161-L191). The structures within it generally compose
+the memory usage of the Bucket Catalog (see: [bucket_catalog::getMemoryUsage](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L190-L206)).
 
 # References
 
@@ -514,7 +514,7 @@ See:
 - **active bucket**: A bucket that is either archived or open. It forms the cardinality managed by the
   BucketCatalog.
 
-- **archived bucket**: A bucket that resides on-disk with a crumb of info [still in memory](https://github.com/mongodb/mongo/blob/883a40fdd73056c88221aa668a627cd2e6c621a6/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L166-L175)
+- **archived bucket**: A bucket that resides on-disk with a crumb of info [still in memory](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L132-L137)
   to support efficient reopening without querying. Adding new measurements to this
   bucket will require materializing data from disk.
 
