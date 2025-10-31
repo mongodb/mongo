@@ -427,7 +427,19 @@ DEATH_TEST_REGEX_F(DSV2StageTest, StateMachineFailsOnStateFinal, "Tripwire asser
     getExpCtx()->setChangeStreamSpec(
         buildChangeStreamSpec(Timestamp(42, 0), ChangeStreamReadMode::kStrict));
 
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), nullptr);
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [](OperationContext* opCtx, const ChangeStream& changeStream) {
+            return std::make_unique<ChangeStreamShardTargeterMock>();
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get());
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+
     docSource->setState_forTest(V2Stage::State::kFinal, false /* validateStateTransition */);
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657532);
 }
