@@ -831,3 +831,16 @@ evg = rule(
     implementation = lambda ctx: evg_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# coverage
+# =========
+coverage_provider = provider(
+    doc = "Set to flag that this is a coverage build (this should only be set by bazelrc)",
+    fields = ["enabled"],
+)
+
+coverage = rule(
+    implementation = lambda ctx: coverage_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

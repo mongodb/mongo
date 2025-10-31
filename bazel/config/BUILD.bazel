@@ -14,6 +14,7 @@ load(
     "build_otel",
     "compiler_type",
     "compress_debug_compile",
+    "coverage",
     "create_dwp",
     "dbg",
     "dbg_level",
@@ -1766,6 +1767,10 @@ config_setting(
         "//bazel/config:lsan": "False",
         "//bazel/config:tsan": "False",
         "//bazel/config:ubsan": "False",
+
+        # dev stacktrace breaks stack trace unit tests run during code coverage and don't make much sense
+        # with code coverage in general
+        "//bazel/config:coverage": "False",
     },
 )
 
@@ -3094,5 +3099,21 @@ config_setting(
     name = "running_in_evg",
     flag_values = {
         "//bazel/config:evg": "True",
+    },
+)
+
+# ==========
+# Coverage
+# ==========
+
+coverage(
+    name = "coverage",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "coverage_enabled",
+    flag_values = {
+        "//bazel/config:coverage": "True",
     },
 )
