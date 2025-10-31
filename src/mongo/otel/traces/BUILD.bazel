@@ -38,6 +38,7 @@ mongo_cc_library(
     name = "tracing_base",
     srcs = [
         "tracing.cpp",
+        ":trace_settings_gen",
         ":tracing_feature_flag_gen",
     ],
     hdrs = [
@@ -77,7 +78,6 @@ mongo_cc_library(
     srcs = [
         "bson_text_map_carrier.cpp",
         "trace_initialization.cpp",
-        "trace_settings_gen",
         "tracer_provider_service.cpp",
         "tracing_utils.cpp",
         "//src/mongo/otel/traces/span:span.cpp",

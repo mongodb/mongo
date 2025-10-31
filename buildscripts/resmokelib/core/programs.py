@@ -8,7 +8,6 @@ import os
 import os.path
 import re
 import stat
-import sys
 from typing import Any, Optional, Tuple
 
 from opentelemetry import trace
@@ -75,10 +74,8 @@ def remove_set_parameter_if_before_version(
 
 def _should_enable_otel(test_data, bin_version):
     """Check whether OpenTelemetry is supported on the current platform."""
-    return (
-        test_data.get("enableOTELTracing", True)
-        and sys.platform.startswith("linux")
-        and version.parse(bin_version) >= version.parse("8.3.0")
+    return test_data.get("enableOTELTracing", True) and version.parse(bin_version) >= version.parse(
+        "8.3.0"
     )
 
 
