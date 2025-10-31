@@ -82,6 +82,14 @@ public:
      */
     static Span start(OperationContext* opCtx, const std::string& name, bool keepSpan = false);
 
+    /**
+     * Similar to `start`, but only starts and returns a Span if there is an existing Span in the
+     * provided `opCtx`'s TelemetryContext. If there is no existing Span, a no-op Span is returned.
+     */
+    static Span startIfExistingTraceParent(OperationContext* opCtx,
+                                           const std::string& name,
+                                           bool keepSpan = false);
+
     static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
     ~Span();
@@ -132,9 +140,17 @@ public:
         return Span{};
     }
 
+    static Span startIfExistingTraceParent(OperationContext* opCtx,
+                                           const std::string& name,
+                                           bool keepSpan = false) {
+        return Span{};
+    }
+
     static std::shared_ptr<TelemetryContext> createTelemetryContext() {
         return std::make_shared<TelemetryContext>();
     }
+
+    ~Span() {}
 
     void setAttribute(StringData, int) {}
     void setError(const Status&) {}

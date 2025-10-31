@@ -84,6 +84,7 @@
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
@@ -1090,6 +1091,11 @@ void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status
 }
 
 void ParseAndRunCommand::RunAndRetry::run() {
+    // We do not want to create a span for every incoming command, we only want a span when
+    // $traceCtx is specified on the command so we call Span::startIfExistingTraceParent instead of
+    // Span::start.
+    auto otelSpan = otel::traces::Span::startIfExistingTraceParent(
+        _parc->_rec->getOpCtx(), _parc->_rec->getCommand()->getName());
     do {
         try {
             // Try gMaxNumStaleVersionRetries times. On the last try, exceptions are
