@@ -94,10 +94,11 @@ protected:
 
         BSONObj key = fromjson(keyStr);
 
-        IndexBounds indexBounds = getIndexBoundsForQuery(key, *query.get());
-        ASSERT_EQUALS(indexBounds.size(), expectedBounds.size());
-        for (size_t i = 0; i < indexBounds.size(); i++) {
-            const OrderedIntervalList& oil = indexBounds.fields[i];
+        boost::optional<IndexBounds> indexBounds = getIndexBoundsForQuery(key, *query.get());
+        ASSERT_TRUE(indexBounds);
+        ASSERT_EQUALS(indexBounds->size(), expectedBounds.size());
+        for (size_t i = 0; i < indexBounds->size(); i++) {
+            const OrderedIntervalList& oil = indexBounds->fields[i];
             const OrderedIntervalList& expectedOil = expectedBounds.fields[i];
             ASSERT_EQUALS(oil.intervals.size(), expectedOil.intervals.size());
             for (size_t i = 0; i < oil.intervals.size(); i++) {
@@ -127,9 +128,10 @@ protected:
 
         BSONObj key = fromjson("{a: 1}");
 
-        IndexBounds indexBounds = getIndexBoundsForQuery(key, *query.get());
-        ASSERT_EQUALS(indexBounds.size(), 1U);
-        const OrderedIntervalList& oil = indexBounds.fields.front();
+        boost::optional<IndexBounds> indexBounds = getIndexBoundsForQuery(key, *query.get());
+        ASSERT_TRUE(indexBounds);
+        ASSERT_EQUALS(indexBounds->size(), 1U);
+        const OrderedIntervalList& oil = indexBounds->fields.front();
 
         if (oil.intervals.size() != expectedOil.intervals.size()) {
             LOGV2(22677,
@@ -381,9 +383,10 @@ TEST_F(CMCollapseTreeTest, BasicAllElemMatch) {
 
     BSONObj key = fromjson("{'foo.a': 1}");
 
-    IndexBounds indexBounds = getIndexBoundsForQuery(key, *query.get());
-    ASSERT_EQUALS(indexBounds.size(), 1U);
-    const OrderedIntervalList& oil = indexBounds.fields.front();
+    boost::optional<IndexBounds> indexBounds = getIndexBoundsForQuery(key, *query.get());
+    ASSERT_TRUE(indexBounds);
+    ASSERT_EQUALS(indexBounds->size(), 1U);
+    const OrderedIntervalList& oil = indexBounds->fields.front();
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     const Interval& interval = oil.intervals.front();
 
@@ -559,8 +562,16 @@ TEST_F(CMKeyBoundsTest, Basic) {
     expectedList.emplace_back(fromjson("{a: 0}"), fromjson("{a: 0}"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
-    BoundList list = flattenBounds(skeyPattern, indexBounds);
-    checkBoundList(list, expectedList);
+    boost::optional<BoundList> list = flattenBounds(skeyPattern, indexBounds);
+    ASSERT_TRUE(list);
+    checkBoundList(*list, expectedList);
+}
+
+// boost::none index bounds (trivially empty)
+TEST_F(CMKeyBoundsTest, Trivial) {
+    ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
+    boost::optional<BoundList> list = flattenBounds(skeyPattern, boost::none);
+    ASSERT_FALSE(list);
 }
 
 // Key { a: 1 }, Bounds a: [2, 3)
@@ -574,8 +585,9 @@ TEST_F(CMKeyBoundsTest, SingleInterval) {
     expectedList.emplace_back(fromjson("{a: 2}"), fromjson("{a: 3}"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
-    BoundList list = flattenBounds(skeyPattern, indexBounds);
-    checkBoundList(list, expectedList);
+    boost::optional<BoundList> list = flattenBounds(skeyPattern, indexBounds);
+    ASSERT_TRUE(list);
+    checkBoundList(*list, expectedList);
 }
 
 // Key { a: 1, b: 1, c: 1 }, Bounds a: [2, 3), b: [2, 3), c: [2: 3)
@@ -593,8 +605,9 @@ TEST_F(CMKeyBoundsTest, MultiIntervals) {
     expectedList.emplace_back(fromjson("{ a: 2, b: 2, c: 2 }"), fromjson("{ a: 3, b: 3, c: 3 }"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
-    BoundList list = flattenBounds(skeyPattern, indexBounds);
-    checkBoundList(list, expectedList);
+    boost::optional<BoundList> list = flattenBounds(skeyPattern, indexBounds);
+    ASSERT_TRUE(list);
+    checkBoundList(*list, expectedList);
 }
 
 // Key { a: 1, b: 1, c: 1 }, Bounds a: [0, 0], b: { $in: [4, 5, 6] }, c: [2: 3)
@@ -621,8 +634,9 @@ TEST_F(CMKeyBoundsTest, IntervalExpansion) {
     expectedList.emplace_back(fromjson("{ a: 0, b: 6, c: 2 }"), fromjson("{ a: 0, b: 6, c: 3 }"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
-    BoundList list = flattenBounds(skeyPattern, indexBounds);
-    checkBoundList(list, expectedList);
+    boost::optional<BoundList> list = flattenBounds(skeyPattern, indexBounds);
+    ASSERT_TRUE(list);
+    checkBoundList(*list, expectedList);
 }
 
 // Key { a: 1, b: 1, c: 1 }, Bounds a: [0, 1], b: { $in: [4, 5, 6] }, c: [2: 3)
@@ -646,8 +660,9 @@ TEST_F(CMKeyBoundsTest, NonPointIntervalExpasion) {
     expectedList.emplace_back(fromjson("{ a: 0, b: 4, c: 2 }"), fromjson("{ a: 1, b: 6, c: 3 }"));
 
     ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
-    BoundList list = flattenBounds(skeyPattern, indexBounds);
-    checkBoundList(list, expectedList);
+    boost::optional<BoundList> list = flattenBounds(skeyPattern, indexBounds);
+    ASSERT_TRUE(list);
+    checkBoundList(*list, expectedList);
 }
 
 /**

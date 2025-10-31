@@ -89,7 +89,7 @@ using shard_key_pattern_query_util::QueryTargetingInfo;
 // Maximum number of intervals produced by $in queries
 constexpr size_t kMaxFlattenedInCombinations = 4000000;
 
-IndexBounds collapseQuerySolution(const QuerySolutionNode* node) {
+boost::optional<IndexBounds> collapseQuerySolution(const QuerySolutionNode* node) {
     if (node->children.empty()) {
         tassert(7670304,
                 "Invalid node type",
@@ -104,11 +104,8 @@ IndexBounds collapseQuerySolution(const QuerySolutionNode* node) {
             const IndexScanNode* isn = static_cast<const IndexScanNode*>(node);
             return isn->direction > 0 ? isn->bounds : isn->bounds.reverse();
         }
-        // TODO: SERVER-84547 Instead of returning empty index bounds we should propagete the EOF
-        // plan to the shard targeting and avoid sending the query to any shard at all as it is most
-        // likely trivallyFalse.
         if (node->getType() == STAGE_EOF)
-            return IndexBounds();
+            return boost::none;
     }
 
     if (node->children.size() == 1) {
@@ -128,37 +125,45 @@ IndexBounds collapseQuerySolution(const QuerySolutionNode* node) {
         return IndexBounds();
     }
 
-    IndexBounds bounds;
+    boost::optional<IndexBounds> bounds;
 
     for (auto it = node->children.begin(); it != node->children.end(); it++) {
         // The first branch under OR
         if (it == node->children.begin()) {
             bounds = collapseQuerySolution(it->get());
-            if (bounds.size() == 0) {  // Got unexpected node in query solution tree
+            if (bounds && bounds->size() == 0) {  // Got unexpected node in query solution tree
                 return IndexBounds();
             }
             continue;
         }
 
         auto childBounds = collapseQuerySolution(it->get());
-        if (childBounds.size() == 0) {
+        if (childBounds && childBounds->size() == 0) {
             // Got unexpected node in query solution tree
             return IndexBounds();
         }
 
+        // If we are EOF so far, and our child
+        // is EOF, the result is EOF.
+        if (!bounds && !childBounds) {
+            continue;
+        }
+
         tassert(7670303,
                 "Node's index bounds size must match children index bounds sizes",
-                childBounds.size() == bounds.size());
+                childBounds && bounds && childBounds->size() == bounds->size());
 
-        for (size_t i = 0; i < bounds.size(); i++) {
-            bounds.fields[i].intervals.insert(bounds.fields[i].intervals.end(),
-                                              childBounds.fields[i].intervals.begin(),
-                                              childBounds.fields[i].intervals.end());
+        for (size_t i = 0; i < bounds->size(); i++) {
+            bounds->fields[i].intervals.insert(bounds->fields[i].intervals.end(),
+                                               childBounds->fields[i].intervals.begin(),
+                                               childBounds->fields[i].intervals.end());
         }
     }
 
-    for (size_t i = 0; i < bounds.size(); i++) {
-        IndexBoundsBuilder::unionize(&bounds.fields[i]);
+    if (bounds) {
+        for (size_t i = 0; i < bounds->size(); i++) {
+            IndexBoundsBuilder::unionize(&bounds->fields[i]);
+        }
     }
 
     return bounds;
@@ -276,7 +281,14 @@ BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
     return keyBuilder.obj();
 }
 
-BoundList flattenBounds(const ShardKeyPattern& shardKeyPattern, const IndexBounds& indexBounds) {
+boost::optional<BoundList> flattenBounds(const ShardKeyPattern& shardKeyPattern,
+                                         const boost::optional<IndexBounds>& maybeIndexBounds) {
+    if (!maybeIndexBounds) {
+        return boost::none;
+    }
+
+    const IndexBounds& indexBounds = *maybeIndexBounds;
+
     tassert(7670302,
             "'IndexBounds' and 'ShardKeyPattern' must have the same number of fields",
             indexBounds.fields.size() == (size_t)shardKeyPattern.toBSON().nFields());
@@ -369,7 +381,8 @@ BoundList flattenBounds(const ShardKeyPattern& shardKeyPattern, const IndexBound
     return ret;
 }
 
-IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& canonicalQuery) {
+boost::optional<IndexBounds> getIndexBoundsForQuery(const BSONObj& key,
+                                                    const CanonicalQuery& canonicalQuery) {
     // $text is not allowed in planning since we don't have text index on mongos.
     // TODO: Treat $text query as a no-op in planning on mongos. So with shard key {a: 1},
     //       the query { a: 2, $text: { ... } } will only target to {a: 2}.
@@ -443,11 +456,13 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
     if (statusWithMultiPlanSolns.getStatus().code() != ErrorCodes::NoQueryExecutionPlans) {
         auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 
-        // Pick any solution that has non-trivial IndexBounds. bounds.size() == 0 represents a
-        // trivial IndexBounds where none of the fields' values are bounded.
+        // Pick any solution that is trivially empty or has non-trivial IndexBounds.
+        // bounds being boost::none represents a trivially empty solution.
+        // bounds.size() == 0 represents a trivial IndexBounds where none of the fields' values are
+        // bounded.
         for (auto&& soln : solutions) {
             auto bounds = collapseQuerySolution(soln->root());
-            if (bounds.size() > 0) {
+            if (!bounds || bounds->size() > 0) {
                 return bounds;
             }
         }
@@ -554,27 +569,30 @@ void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
     //   Key { a : 1, b : 1 }
     //   Bounds { a : [1, 2), b : [3, 4) }
     //   => Ranges { a : 1, b : 3 } => { a : 2, b : 4 }
-    auto ranges = flattenBounds(cm.getShardKeyPattern(), bounds);
+    auto maybeRanges = flattenBounds(cm.getShardKeyPattern(), bounds);
 
-    for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        const auto& min = it->first;
-        const auto& max = it->second;
+    if (maybeRanges) {
+        auto& ranges = *maybeRanges;
+        for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
+            const auto& min = it->first;
+            const auto& max = it->second;
 
-        // 'getShardIdsForRange()' will only target the correct shards if min < max.
-        tassert(9607300,
-                "Shard targeting index bounds are not in the expected order",
-                SimpleBSONObjComparator::kInstance.evaluate(min <= max));
-        cm.getShardIdsForRange(min, max, shardIds, info ? &info->chunkRanges : nullptr);
+            // 'getShardIdsForRange()' will only target the correct shards if min < max.
+            tassert(9607300,
+                    "Shard targeting index bounds are not in the expected order",
+                    SimpleBSONObjComparator::kInstance.evaluate(min <= max));
+            cm.getShardIdsForRange(min, max, shardIds, info ? &info->chunkRanges : nullptr);
 
-        // Once we know we need to visit all shards no need to keep looping.
-        // However, this optimization does not apply when we are reading from a snapshot
-        // because _shardPlacementVersions contains shards with chunks and is built based on the
-        // last refresh. Therefore, it is possible for _shardPlacementVersions to have fewer entries
-        // if a shard no longer owns chunks when it used to at _clusterTime. Similarly, this
-        // optimization does not apply when it's necessary to fill chunkRanges, as the last chunks
-        // can be lost.
-        if (!cm.isAtPointInTime() && shardIds->size() == cm.getNShardsOwningChunks() && !info) {
-            break;
+            // Once we know we need to visit all shards no need to keep looping.
+            // However, this optimization does not apply when we are reading from a snapshot
+            // because _shardPlacementVersions contains shards with chunks and is built based on the
+            // last refresh. Therefore, it is possible for _shardPlacementVersions to have fewer
+            // entries if a shard no longer owns chunks when it used to at _clusterTime. Similarly,
+            // this optimization does not apply when it's necessary to fill chunkRanges, as the last
+            // chunks can be lost.
+            if (!cm.isAtPointInTime() && shardIds->size() == cm.getNShardsOwningChunks() && !info) {
+                break;
+            }
         }
     }
 
@@ -593,9 +611,12 @@ void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
 
     if (info) {
         info->desc = [&] {
-            if (ranges.size() == 1) {
-                auto min = ranges.begin()->first;
-                auto max = ranges.begin()->second;
+            if (!maybeRanges) {
+                // TODO: Have a separate description for trivially empty queries.
+                return QueryTargetingInfo::Description::kMultipleKeys;
+            } else if (maybeRanges->size() == 1) {
+                auto min = maybeRanges->begin()->first;
+                auto max = maybeRanges->begin()->second;
                 if (SimpleBSONObjComparator::kInstance.evaluate(min == max)) {
                     return QueryTargetingInfo::Description::kSingleKey;
                 }

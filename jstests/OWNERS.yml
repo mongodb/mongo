@@ -36,3 +36,6 @@ filters:
   - "**/*dbcheck*":
     approvers:
       - 10gen/server-dbcheck
+  - "**/*query*":
+    approvers:
+      - 10gen/query-execution

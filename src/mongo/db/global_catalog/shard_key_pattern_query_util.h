@@ -94,6 +94,8 @@ BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
  * IndexBounds. This function is used in sharding to determine where to route queries according to
  * the shard key pattern.
  *
+ * Returns boost::none if the IndexBounds is boost::none (see getIndexBoundsForQuery).
+ *
  * Examples:
  *
  * Key { a: 1 }, Bounds a: [0] => { a: 0 } -> { a: 0 }
@@ -107,7 +109,8 @@ BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
  * are unsatisfied, an empty BoundList could return.
  *
  */
-BoundList flattenBounds(const ShardKeyPattern& shardKeyPattern, const IndexBounds& indexBounds);
+boost::optional<BoundList> flattenBounds(const ShardKeyPattern& shardKeyPattern,
+                                         const boost::optional<IndexBounds>& indexBounds);
 
 /**
  * Transforms query into bounds for each field in the shard key.
@@ -116,8 +119,11 @@ BoundList flattenBounds(const ShardKeyPattern& shardKeyPattern, const IndexBound
  *   Query { a : { $gte : 1, $lt : 2 },
  *           b : { $gte : 3, $lt : 4 } }
  *   => Bounds { a : [1, 2), b : [3, 4) }
+ *
+ * For queries which are trivially empty, returns boost::none.
  */
-IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& canonicalQuery);
+boost::optional<IndexBounds> getIndexBoundsForQuery(const BSONObj& key,
+                                                    const CanonicalQuery& canonicalQuery);
 
 namespace shard_key_pattern_query_util {
 

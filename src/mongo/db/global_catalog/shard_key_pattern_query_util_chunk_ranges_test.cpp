@@ -36,6 +36,7 @@
 #include "mongo/db/global_catalog/shard_key_pattern_query_util.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
@@ -96,6 +97,7 @@ protected:
     void testGetShardIdsAndChunksDeleteWithExactId();
     void testGetShardIdsAndChunksDeleteWithHashedPrefixHashedShardKey();
     void testGetShardIdsAndChunksDeleteWithRangePrefixHashedShardKey();
+    void testGetShardIdsAndChunksAlwaysFalseMatch();
 
 private:
     std::unique_ptr<CanonicalQuery> makeCQ(const BSONObj& query,
@@ -657,6 +659,24 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithHashedPrefi
     ASSERT_EQUALS(info.chunkRanges.size(), 4);
 }
 
+void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksAlwaysFalseMatch() {
+    std::set<ShardId> shardIds;
+    shard_key_pattern_query_util::QueryTargetingInfo info;
+
+    // Create 2 chunks and 2 shards such that shardId '0' has chunk [MinKey, 0), '1' has
+    // chunk [0, MaxKey).
+    std::vector<BSONObj> splitPoints = {BSON("a.b" << 0)};
+    auto cri = prepare(BSON("a.b" << 1), splitPoints);
+
+    // Verify that an AlwaysFalseMatchExpression is routed to just one shard
+    auto filter = AlwaysFalseMatchExpression().MatchExpression::serialize();
+    auto cq = makeCQ(filter, fromjson("{}"), cri.getChunkManager());
+
+    getShardIdsAndChunksForCanonicalQuery(*cq, cri.getChunkManager(), &shardIds, &info, false);
+    ASSERT_EQUALS(shardIds.size(), 1);
+    ASSERT_EQUALS(info.chunkRanges.size(), 1);
+}
+
 TEST_F(ShardKeyPatternQueryUtilTest, GetShardIdsAndChunksUpdateWithRangePrefixHashedShardKey) {
     testGetShardIdsAndChunksUpdateWithRangePrefixHashedShardKey();
 }
@@ -679,6 +699,10 @@ TEST_F(ShardKeyPatternQueryUtilTest, GetShardIdsAndChunksDeleteWithHashedPrefixH
 
 TEST_F(ShardKeyPatternQueryUtilTest, GetShardIdsAndChunksDeleteWithRangePrefixHashedShardKey) {
     testGetShardIdsAndChunksDeleteWithRangePrefixHashedShardKey();
+}
+
+TEST_F(ShardKeyPatternQueryUtilTest, GetShardIdsAndChunksAlwaysFalseMatch) {
+    testGetShardIdsAndChunksAlwaysFalseMatch();
 }
 
 }  // namespace
