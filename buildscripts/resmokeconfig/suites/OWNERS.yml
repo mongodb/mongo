@@ -192,3 +192,6 @@ filters:
   - "sharded_collections_jscore_passthrough_with_config_shard.yml":
     approvers:
       - 10gen/server-cluster-scalability
+  - "concurrency_simultaneous_replication.yml":
+    approvers:
+      - 10gen/server-replication-reviewers

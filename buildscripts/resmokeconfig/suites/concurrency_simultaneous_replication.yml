@@ -17,6 +17,15 @@ selector:
     # This workload assumes no locks are taken outside of the workload.
     - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
 
+    # This workload reduces `TransactionLifetimeLimitSeconds`. When run concurrently with other
+    # tests, it may cause operations to fail with `TransactionExceededLifetimeLimitSeconds` because
+    # the transaction exceeded the configured `transactionLifetimeLimitSeconds`.
+    # TODO: SERVER-89663
+    - jstests/concurrency/fsm_workloads/query/agg/agg_graph_lookup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_lookup_in_txn.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_lookup.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_lookup.js
+
   exclude_with_any_tags:
     - requires_standalone
     - requires_sharding
