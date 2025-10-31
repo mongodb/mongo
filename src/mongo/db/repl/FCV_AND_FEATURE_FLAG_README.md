@@ -742,8 +742,8 @@ team in #server-featureflags and add the Replication team as a reviewer to your 
     This is because before FCVs are upgraded on master, we will temporarily have two builds that
     have the same version (the newly cut branch and master). If the two builds differ on which
     feature flags are enabled, this will lead to test failures in certain multiversion suites.
-  - Project team should run a full patch build against all the ! builders to minimize the impact
-    on the Build Baron process.
+  - Project team should run a full "required" alias patch. Double check that all tasks for all build
+    variants prefixed with "!" are selected.
   - If there are downstream teams that will break when this flag is enabled then enabling the
     feature by default will need to wait until those teams have affirmed they have adapted their
     product.
