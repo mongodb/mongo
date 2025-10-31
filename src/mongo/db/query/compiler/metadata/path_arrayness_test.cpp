@@ -35,8 +35,7 @@
 
 namespace mongo {
 
-TEST(ArraynessTrie, InsertIntoTrie) {
-
+TEST(ArraynessTrie, BuildAndLookupExistingFields) {
     // Array: ["a"]
     FieldPath field_A("a");
     MultikeyComponents multikeyPaths_A{0U};
@@ -61,13 +60,19 @@ TEST(ArraynessTrie, InsertIntoTrie) {
     FieldPath field_BDE("b.d.e");
     MultikeyComponents multikeyPaths_BDE{};
 
-    std::vector<FieldPath> fields{field_A, field_ABC, field_ABD, field_ABCJ, field_ABDE, field_BDE};
+    // Array: ["b.d.e.f"] (Only final component is array)
+    FieldPath field_BDEF("b.d.e.f");
+    MultikeyComponents multikeyPaths_BDEF{3U};
+
+    std::vector<FieldPath> fields{
+        field_A, field_ABC, field_ABD, field_ABCJ, field_ABDE, field_BDE, field_BDEF};
     std::vector<MultikeyComponents> multikeyness{multikeyPaths_A,
                                                  multikeyPaths_ABC,
                                                  multikeyPaths_ABD,
                                                  multikeyPaths_ABCJ,
                                                  multikeyPaths_ABDE,
-                                                 multikeyPaths_BDE};
+                                                 multikeyPaths_BDE,
+                                                 multikeyPaths_BDEF};
 
     PathArrayness pathArrayness;
 
@@ -75,8 +80,48 @@ TEST(ArraynessTrie, InsertIntoTrie) {
         pathArrayness.addPath(fields[i], multikeyness[i]);
     }
 
-    pathArrayness.visualizeTrie();
-
     ASSERT_EQ(pathArrayness.isPathArray(field_A), true);
+    ASSERT_EQ(pathArrayness.isPathArray(field_ABC), true);
+    ASSERT_EQ(pathArrayness.isPathArray(field_ABD), true);
+    ASSERT_EQ(pathArrayness.isPathArray(field_ABCJ), true);
+    ASSERT_EQ(pathArrayness.isPathArray(field_ABDE), true);
+    ASSERT_EQ(pathArrayness.isPathArray(field_BDE), false);
+    ASSERT_EQ(pathArrayness.isPathArray(field_BDEF), true);
+}
+
+TEST(ArraynessTrie, BuildAndLookupNonExistingFields) {
+    // Array: ["a", "a.b", "a.b.c"]
+    FieldPath field_ABC("a.b.c");
+    MultikeyComponents multikeyPaths_ABC{0U, 1U, 2U};
+
+    // We will not insert "a.b.c.d" into the trie.
+    FieldPath field_ABCD("a.b.c.d");
+
+    std::vector<FieldPath> fields{field_ABC};
+    std::vector<MultikeyComponents> multikeyness{multikeyPaths_ABC};
+
+    PathArrayness pathArrayness;
+
+    for (size_t i = 0; i < fields.size(); i++) {
+        pathArrayness.addPath(fields[i], multikeyness[i]);
+    }
+
+    ASSERT_EQ(pathArrayness.isPathArray(field_ABC), true);
+
+    // Path component "d" does not exist but it has prefix "a", "a.b" and "a.b.c" that are arrays.
+    ASSERT_EQ(pathArrayness.isPathArray(field_ABCD), true);
+}
+
+TEST(ArraynessTrie, LookupEmptyTrie) {
+    // We will not insert any fields into the trie.
+    FieldPath field_A("a");
+    FieldPath field_ABCD("a.b.c.d");
+    std::vector<FieldPath> fields{field_A, field_ABCD};
+
+    PathArrayness pathArrayness;
+
+    // Neither of these fields or their prefixes are in the trie, so assume arrays.
+    ASSERT_EQ(pathArrayness.isPathArray(field_A), true);
+    ASSERT_EQ(pathArrayness.isPathArray(field_ABCD), true);
 }
 }  // namespace mongo

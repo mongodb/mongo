@@ -33,7 +33,6 @@
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 
 namespace mongo {
-
 /**
  * Data structure representing arrayness of field paths.
  */
@@ -49,12 +48,13 @@ public:
     /**
      * Insert a path into the trie.
      */
-    void addPath(FieldPath path, MultikeyComponents multikeyPath);
+    void addPath(const FieldPath& path, const MultikeyComponents& multikeyPath);
 
     /**
-     * Given a path return whether it is an array.
+     * Given a path return whether any component of it is an array.
+     * For field paths that are not included in any index, assumes that the path has an array.
      */
-    bool isPathArray(FieldPath path) const;
+    bool isPathArray(const FieldPath& path) const;
 
     /**
      * Debugging helper to visualize trie.
@@ -91,6 +91,11 @@ private:
         bool isArray() const {
             return _isArray;
         }
+
+        /**
+         * Helper function to determine whether any component of a given path is an array.
+         */
+        bool isPathArray(const FieldPath& path) const;
 
         /**
          * Debugging helper to visualize trie.

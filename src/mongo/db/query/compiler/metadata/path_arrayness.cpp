@@ -33,12 +33,30 @@ using namespace mongo::multikey_paths;
 
 namespace mongo {
 
-void PathArrayness::addPath(FieldPath path, MultikeyComponents multikeyPath) {
+void PathArrayness::addPath(const FieldPath& path, const MultikeyComponents& multikeyPath) {
     _root.insertPath(path, multikeyPath, 0);
 }
 
-bool PathArrayness::isPathArray(FieldPath path) const {
-    return true;
+bool PathArrayness::isPathArray(const FieldPath& path) const {
+    return _root.isPathArray(path);
+}
+
+bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {
+    const TrieNode* current = this;
+    // Track the number of times we have seen an array prefix.
+    for (size_t depth = 0; depth < path.getPathLength(); ++depth) {
+        const auto pathSegment = std::string(path.getFieldName(depth));
+        const auto& next = current->_children.find(pathSegment);
+        if (next == current->_children.end()) {
+            // Missing path, conservatively assume all components from this point on are arrays.
+            return true;
+        }
+        current = &next->second;
+        if (current->isArray()) {
+            return true;
+        }
+    }
+    return current->isArray();
 }
 
 void PathArrayness::TrieNode::visualizeTrie(std::string fieldName, int depth) const {
