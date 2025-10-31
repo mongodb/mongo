@@ -353,10 +353,9 @@ let _jsTestOptions = {};
 
 function jsTestOptions() {
     if (TestData) {
-        // TODO (SERVER-112812): Enable OpenTelemetry tracing.
-        // const isMultiversion =
-        // TestData.useRandomBinVersionsWithinReplicaSet || TestData.mixedBinVersions || TestData.mongosBinVersion;
-        const enableOTELTracing = false; //TestData.enableOTELTracing ?? !isMultiversion;
+        const isMultiversion =
+            TestData.useRandomBinVersionsWithinReplicaSet || TestData.mixedBinVersions || TestData.mongosBinVersion;
+        const enableOTELTracing = TestData.enableOTELTracing ?? !isMultiversion;
 
         return Object.merge(_jsTestOptions, {
             // Test commands should be enabled by default if no enableTestCommands were present in

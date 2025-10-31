@@ -47,7 +47,7 @@ BSONTextMapCarrier::BSONTextMapCarrier(const BSONObj& bson) {
 OtelStringView BSONTextMapCarrier::Get(OtelStringView key) const noexcept {
     auto it = _values.find(key);
     if (it == _values.end()) {
-        return {};
+        return kMissingKeyReturnValue;
     }
     return it->second;
 }

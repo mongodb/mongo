@@ -63,7 +63,7 @@ TEST(BSONTextMapCarrier, GetExistingKey) {
 
 TEST(BSONTextMapCarrier, GetMissingKey) {
     BSONTextMapCarrier carrier;
-    ASSERT_EQ(carrier.Get(keyA), "");
+    ASSERT_EQ(carrier.Get(keyA), kMissingKeyReturnValue);
 }
 
 TEST(BSONTextMapCarrier, SetExistingKey) {
@@ -127,7 +127,7 @@ TEST(BSONTextMapCarrier, NonStringFieldsIgnored) {
     ASSERT_EQ(keys.size(), 1);
     ASSERT_TRUE(keys.contains(keyA));
     ASSERT_EQ(carrier.Get(keyA), valueA);
-    ASSERT_EQ(carrier.Get("uuid"), "");
+    ASSERT_EQ(carrier.Get("uuid"), kMissingKeyReturnValue);
 }
 
 }  // namespace

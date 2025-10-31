@@ -39,6 +39,9 @@ namespace mongo {
 namespace otel {
 namespace traces {
 
+// TODO SERVER-112886: Once this ticket is resolved this should be changed back to an empty string.
+constexpr OtelStringView kMissingKeyReturnValue = " ";
+
 using opentelemetry::nostd::function_ref;
 
 /**
