@@ -1814,10 +1814,6 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
 
     bool hasEncryptionInformation = false;
 
-    // TODO: SERVER-103226 Remove this.
-    BypassCheckAllShardRoleAcquisitionsVersioned bypassCheckAllShardRoleAcquisitionsAreVersioned(
-        opCtx);
-
     // Tell mongod what the shard and database versions are. This will cause writes to fail in
     // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.
@@ -1826,23 +1822,27 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         auto& databaseVersion = nsInfo.getDatabaseVersion();
 
         if (shardVersion || databaseVersion) {
-            // If a timeseries collection is sharded, only the buckets collection would be sharded.
-            // We expect all versioned commands to be sent over 'system.buckets' namespace. But it
-            // is possible that a stale mongos may send the request over a view namespace. In this
-            // case, we initialize the 'OperationShardingState' with buckets namespace. The bucket
-            // namespace is used because if the shard recognizes this is a timeseries collection,
-            // the timeseries write path will eventually execute on the bucket namespace and locks
-            // will be acquired with the bucket namespace. So we must initialize the
-            // 'OperationShardingState' with the bucket namespace to trigger the shard version
-            // checks.
+            OperationShardingState::setShardRole(
+                opCtx, nsInfo.getNs(), shardVersion, databaseVersion);
+
+            // For timeseries, a router may target the main namespace but the shard will execute on
+            // the buckets namespace. This NSS translation is only safe if both router and shard
+            // agree the collection is 'untracked'.
             //
-            // The returned namespaceForSharding will be the timeseries system bucket collection if
-            // the request is made on a timeseries collection. Otherwise, it will stay unchanged
-            // (i.e. the namespace from the client request).
+            // We enforce this by initializing the 'OperationShardingState' with the 'buckets_nss',
+            // but intentionally passing it the router's version for the main nss.
+            //
+            // This forces a check of the router's main_nss version vs. the shard's buckets_nss
+            // version. This check will only pass if both are 'untracked'. All other combinations
+            // (e.g., 'tracked' vs 'untracked', or 'tracked' vs 'tracked') will fail.
             auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
                 opCtx, nsInfo.getNs(), /*expectedUUID=*/boost::none);
-            OperationShardingState::setShardRole(
-                opCtx, preConditions.getTargetNs(nsInfo.getNs()), shardVersion, databaseVersion);
+            if (nsInfo.getNs() != preConditions.getTargetNs(nsInfo.getNs())) {
+                OperationShardingState::setShardRole(opCtx,
+                                                     preConditions.getTargetNs(nsInfo.getNs()),
+                                                     shardVersion,
+                                                     databaseVersion);
+            }
         }
 
         if (nsInfo.getEncryptionInformation().has_value()) {
