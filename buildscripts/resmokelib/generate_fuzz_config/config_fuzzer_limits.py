@@ -132,7 +132,7 @@ config_fuzzer_params = {
             "fuzz_at": ["startup"],
         },
         "maxShardStaleMetadataRetryAttempts": {
-            "min": 1,
+            "min": 10,
             "max": 100,
             "fuzz_at": ["startup"],
         },
