@@ -7,6 +7,7 @@ py_library(
         "compiledb.py",
         "engflow_check.py",
         "generate_common_bes_bazelrc.py",
+        "git_age_check.py",
         "install_modules.py",
         "lint.py",
         "plus_interface.py",
