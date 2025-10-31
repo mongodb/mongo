@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
 
 template <typename StateVariant, typename CumulativeMetricsT>

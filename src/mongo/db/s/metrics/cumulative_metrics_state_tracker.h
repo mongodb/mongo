@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

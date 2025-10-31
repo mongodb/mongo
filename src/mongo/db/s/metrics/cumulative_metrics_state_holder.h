@@ -31,6 +31,7 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 

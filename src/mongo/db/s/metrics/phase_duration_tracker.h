@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/metrics/phase_duration.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
