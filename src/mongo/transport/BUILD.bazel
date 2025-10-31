@@ -127,6 +127,7 @@ mongo_cc_library(
         "//src/mongo/db:server_options",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/ftdc:rolling_stats",
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:executor_stats",

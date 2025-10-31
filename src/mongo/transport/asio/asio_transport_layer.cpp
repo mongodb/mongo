@@ -600,8 +600,9 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     WrappedResolver resolver(*_egressReactor);
     Date_t timeBefore = Date_t::now();
     auto swEndpoints = resolver.resolve(peer, _listenerOptions.enableIPv6);
-    Date_t timeAfter = Date_t::now();
-    if (timeAfter - timeBefore > kSlowOperationThreshold) {
+    Milliseconds dnsResolveLatency = Date_t::now() - timeBefore;
+    _dnsResolveStatsMillis.record(durationCount<Milliseconds>(dnsResolveLatency));
+    if (dnsResolveLatency > kSlowOperationThreshold) {
         networkCounter.incrementNumSlowDNSOperations();
     }
 
@@ -875,16 +876,18 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
     }();
 
     std::move(resolverFuture)
-        .then([connector, timeBefore, connectionMetrics](WrappedResolver::EndpointVector results) {
+        .then([connector, timeBefore, connectionMetrics, this](
+                  WrappedResolver::EndpointVector results) {
             try {
                 connectionMetrics->onDNSResolved();
 
-                Date_t timeAfter = Date_t::now();
-                if (timeAfter - timeBefore > kSlowOperationThreshold) {
+                Milliseconds resolveLatency = Date_t::now() - timeBefore;
+                _dnsResolveStatsMillis.record(durationCount<Milliseconds>(resolveLatency));
+                if (resolveLatency > kSlowOperationThreshold) {
                     LOGV2_WARNING(23019,
                                   "DNS resolution while connecting to peer was slow",
                                   "peer"_attr = connector->peer,
-                                  "duration"_attr = timeAfter - timeBefore);
+                                  "duration"_attr = resolveLatency);
                     networkCounter.incrementNumSlowDNSOperations();
                 }
 
@@ -1177,6 +1180,15 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     bob->append("connsDiscardedDueToClientDisconnect", _discardedDueToClientDisconnect.get());
     bob->append("connsRejectedDueToMaxPendingProxyProtocolHeader",
                 _discardedDueToMaximumPendingOnProxyHeader.get());
+    BSONObjBuilder dnsStatsBuilder(bob->subobjStart("dnsResolveStatsLastMin"));
+    RollingStatsResult dnsResolveStatsMillis = _dnsResolveStatsMillis.getStats();
+    dnsStatsBuilder.append("count", dnsResolveStatsMillis.count);
+    dnsStatsBuilder.append("meanMillis", dnsResolveStatsMillis.mean);
+    dnsStatsBuilder.append("maxMillis", dnsResolveStatsMillis.max);
+    dnsStatsBuilder.append("p50Millis", dnsResolveStatsMillis.p50);
+    dnsStatsBuilder.append("p90Millis", dnsResolveStatsMillis.p90);
+    dnsStatsBuilder.append("p99Millis", dnsResolveStatsMillis.p99);
+    dnsStatsBuilder.done();
 }
 
 void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder&) const {}

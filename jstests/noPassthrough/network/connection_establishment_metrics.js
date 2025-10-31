@@ -112,6 +112,7 @@ let runTest = (connectionHealthLoggingOn) => {
     }
     let queryShell = runTestQuery(db);
 
+    let expectedTotalEgressConnectionEstablishmentTimeMillis = 0;
     if (connectionHealthLoggingOn) {
         jsTestLog("Checking the mongos log.");
 
@@ -120,28 +121,30 @@ let runTest = (connectionHealthLoggingOn) => {
             "Slow connection establishment log entry not found.",
         );
 
-        queryShell();
-        connDelayFailPoint.off();
-
-        jsTestLog("Checking the output of serverStatus.");
         let queryLogEntry = validateLogAndExtractCountAndEntry(st).entry;
-        let status = assert.commandWorked(st.s.adminCommand({serverStatus: 1}));
-        printjson(status);
-        assert.gte(
-            status.metrics.network.totalEgressConnectionEstablishmentTimeMillis,
-            queryLogEntry.attr.totalTimeMillis,
-        );
+        expectedTotalEgressConnectionEstablishmentTimeMillis = queryLogEntry.attr.totalTimeMillis;
     } else {
         assert.eq(validateLogAndExtractCountAndEntry(st).count, initialLogEntryCount);
-
-        queryShell();
-        connDelayFailPoint.off();
-
-        jsTestLog("Checking the output of serverStatus.");
-        let status = assert.commandWorked(st.s.adminCommand({serverStatus: 1}));
-        printjson(status);
-        assert.gte(status.metrics.network.totalEgressConnectionEstablishmentTimeMillis, 0);
     }
+
+    queryShell();
+    connDelayFailPoint.off();
+
+    jsTestLog("Checking the output of serverStatus.");
+    let status = assert.commandWorked(st.s.adminCommand({serverStatus: 1}));
+    printjson(status);
+    assert.gte(
+        status.metrics.network.totalEgressConnectionEstablishmentTimeMillis,
+        expectedTotalEgressConnectionEstablishmentTimeMillis,
+    );
+    assert.gt(status.network.dnsResolveStatsLastMin.count, 0);
+    // At least one resolve will need to take some time, so mean and max should be gte 0, other resolves may use cached results and be very fast, hence
+    // percentiles may be zero.
+    assert.gt(status.network.dnsResolveStatsLastMin.meanMillis, 0);
+    assert.gt(status.network.dnsResolveStatsLastMin.maxMillis, 0);
+    assert.gte(status.network.dnsResolveStatsLastMin.p50Millis, 0);
+    assert.gte(status.network.dnsResolveStatsLastMin.p90Millis, 0);
+    assert.gte(status.network.dnsResolveStatsLastMin.p99Millis, 0);
 
     st.stop();
 };

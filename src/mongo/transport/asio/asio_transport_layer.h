@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"
+#include "mongo/db/ftdc/rolling_stats.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -369,6 +370,9 @@ private:
     // Counts the aggregate number of proxy connections that were dropped due to the server reaching
     // the maximum number of proxy connections pending proxy protocol header.
     Counter64 _discardedDueToMaximumPendingOnProxyHeader;
+
+    // Statistics on dns resolution latency in milliseconds.
+    RollingStats _dnsResolveStatsMillis;
 };
 
 }  // namespace transport
