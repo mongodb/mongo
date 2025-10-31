@@ -69,6 +69,12 @@ public:
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;
     void stopAcceptingSessions() override;
 
+    static std::unique_ptr<TransportLayerManager> make(
+        ServiceContext* svcCtx,
+        bool isUseGrpc,
+        std::shared_ptr<ClientTransportObserver> observer = nullptr);
+
+
     /*
      * This initializes a TransportLayerManager with the global configuration of the server.
      *
@@ -83,6 +89,7 @@ public:
         ServiceContext* ctx,
         bool useEgressGRPC = false,
         boost::optional<int> loadBalancerPort = {},
+        boost::optional<int> maintenancePort = {},
         std::shared_ptr<ClientTransportObserver> observer = nullptr);
 
     static std::unique_ptr<TransportLayerManager> makeDefaultEgressTransportLayer();

@@ -699,6 +699,11 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
     }};
 }  // namespace
 
+auto makeTransportLayer(ServiceContext* svcCtx) {
+    return transport::TransportLayerManagerImpl::make(
+        svcCtx, globalMongotParams.useGRPC, std::make_unique<ClientTransportObserverMongos>());
+}
+
 ExitCode runMongosServer(ServiceContext* serviceContext) {
     BSONObjBuilder startupTimeElapsedBuilder;
     BSONObjBuilder startupInfoBuilder;
@@ -746,38 +751,12 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
 
     {
-        const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
-        if (loadBalancerPort && *loadBalancerPort == serverGlobalParams.port) {
-            LOGV2_ERROR(6067901,
-                        "Load balancer port must be different from the normal ingress port.",
-                        "port"_attr = serverGlobalParams.port);
-            quickExit(ExitCode::badOptions);
-        }
-
-        bool useEgressGRPC = false;
-        if (globalMongotParams.useGRPC) {
-#ifdef MONGO_CONFIG_GRPC
-            uassert(9925000,
-                    "Egress GRPC for search is not enabled",
-                    feature_flags::gEgressGrpcForSearch.isEnabled());
-            useEgressGRPC = true;
-#else
-            LOGV2_ERROR(
-                10049100,
-                "useGRPCForSearch is only supported on Linux platforms built with TLS support.");
-            quickExit(ExitCode::badOptions);
-#endif
-        }
-
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::setUpTransportLayer,
                                        &startupTimeElapsedBuilder);
-        auto tl = transport::TransportLayerManagerImpl::createWithConfig(
-            &serverGlobalParams,
-            serviceContext,
-            useEgressGRPC,
-            loadBalancerPort,
-            std::make_unique<ClientTransportObserverMongos>());
+
+        auto tl = makeTransportLayer(serviceContext);
+
         if (auto res = tl->setup(); !res.isOK()) {
             LOGV2_ERROR(22856, "Error setting up transport layer", "error"_attr = res);
             return ExitCode::netError;

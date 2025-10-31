@@ -53,6 +53,7 @@ mongo_cc_library(
         ":transport_layer",
         "//src/mongo/db:server_base",
         "//src/mongo/rpc:client_metadata",
+        "//src/mongo/s:load_balancer_support",
         "//src/third_party/asio",
     ] + select({
         "//bazel/config:build_grpc_enabled": [
@@ -436,6 +437,7 @@ mongo_cc_unit_test(
         "//src/mongo/rpc:message",
         "//src/mongo/transport/asio:asio_socket_test_util",
         "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util/concurrency:thread_pool",
         "//src/third_party/asio",
     ],

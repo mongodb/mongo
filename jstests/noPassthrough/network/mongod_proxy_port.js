@@ -7,7 +7,7 @@
  * ]
  */
 
-const kProxyPortConflictLogId = 9967800;
+const kProxyPortConflictLogId = 11236000;
 
 function startWithProxyPort(port, proxy) {
     const conn = MongoRunner.runMongod({port: port, "proxyPort": proxy});

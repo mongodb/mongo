@@ -441,6 +441,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     }
 
     try {
+        mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
         auto serviceContextHolder = ServiceContext::make();
         setGlobalServiceContext(std::move(serviceContextHolder));
         return runTestProgram(std::move(testsToRun),

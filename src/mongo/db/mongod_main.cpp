@@ -321,43 +321,12 @@ auto& startupInfoSection =
     *ServerStatusSectionBuilder<BSONObjectStatusSection>("startupInfo").forShard().forRouter();
 
 auto makeTransportLayer(ServiceContext* svcCtx) {
-    boost::optional<int> proxyPort;
-
-    // (Ignore FCV check): The proxy port needs to be open before the FCV is set.
-    if (gFeatureFlagMongodProxyProtocolSupport.isEnabledAndIgnoreFCVUnsafe()) {
-        if (serverGlobalParams.proxyPort) {
-            proxyPort = *serverGlobalParams.proxyPort;
-            if (*proxyPort == serverGlobalParams.port) {
-                LOGV2_ERROR(9967800,
-                            "The proxy port must be different from the public listening port.",
-                            "port"_attr = serverGlobalParams.port);
-                quickExit(ExitCode::badOptions);
-            }
-        }
-    }
-
     // Mongod should not bind to any ports in repair mode so only allow egress.
     if (storageGlobalParams.repair) {
         return transport::TransportLayerManagerImpl::makeDefaultEgressTransportLayer();
     }
 
-    bool useEgressGRPC = false;
-    if (globalMongotParams.useGRPC) {
-#ifdef MONGO_CONFIG_GRPC
-        uassert(9715900,
-                "Egress GRPC for search is not enabled",
-                feature_flags::gEgressGrpcForSearch.isEnabled());
-        useEgressGRPC = true;
-#else
-        LOGV2_ERROR(
-            10049101,
-            "useGRPCForSearch is only supported on Linux platforms built with TLS support.");
-        quickExit(ExitCode::badOptions);
-#endif
-    }
-
-    return transport::TransportLayerManagerImpl::createWithConfig(
-        &serverGlobalParams, svcCtx, useEgressGRPC, std::move(proxyPort));
+    return transport::TransportLayerManagerImpl::make(svcCtx, globalMongotParams.useGRPC);
 }
 
 ExitCode initializeTransportLayer(ServiceContext* serviceContext, BSONObjBuilder* timerReport) {

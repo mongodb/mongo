@@ -38,11 +38,14 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/s/load_balancer_support.h"
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/version.h"
 
 #ifdef MONGO_CONFIG_GRPC
@@ -170,6 +173,71 @@ bool shouldGRPCIngressBeEnabled() {
     return false;
 }
 
+std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
+    ServiceContext* svcCtx, bool isUseGrpc, std::shared_ptr<ClientTransportObserver> observer) {
+    boost::optional<int> proxyPort;
+    boost::optional<int> maintenancePort;
+
+    using PortMap = std::unordered_map<int, StringData>;
+    auto addUniquePort = [](PortMap& uniquePorts, int port, StringData role) {
+        auto [it, inserted] = uniquePorts.try_emplace(port, role);
+        if (!inserted) {
+            LOGV2_ERROR(11236000,
+                        "Port collision, ports must be unique.",
+                        "port"_attr = port,
+                        "role"_attr = role,
+                        "otherRole"_attr = it->second);
+            return quickExit(ExitCode::badOptions);
+        }
+    };
+
+    PortMap uniquePorts;
+    addUniquePort(uniquePorts, serverGlobalParams.port, "main"_sd);
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
+        if (loadBalancerPort) {
+            proxyPort = loadBalancerPort;
+            addUniquePort(uniquePorts, *loadBalancerPort, "loadbalancer"_sd);
+        }
+    } else {
+        // (Ignore FCV check): The proxy port needs to be open before the FCV is set.
+        if (gFeatureFlagMongodProxyProtocolSupport.isEnabledAndIgnoreFCVUnsafe() &&
+            serverGlobalParams.proxyPort) {
+            proxyPort = *serverGlobalParams.proxyPort;
+            addUniquePort(uniquePorts, *proxyPort, "proxy"_sd);
+        }
+    }
+
+    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled() &&
+        serverGlobalParams.maintenancePort) {
+        maintenancePort = serverGlobalParams.maintenancePort;
+        addUniquePort(uniquePorts, *maintenancePort, "maintenance"_sd);
+    }
+
+    bool useEgressGRPC = false;
+    if (isUseGrpc) {
+#ifdef MONGO_CONFIG_GRPC
+        uassert(9715900,
+                "Egress GRPC for search is not enabled",
+                feature_flags::gEgressGrpcForSearch.isEnabled());
+        useEgressGRPC = true;
+#else
+        LOGV2_ERROR(
+            10049101,
+            "useGRPCForSearch is only supported on Linux platforms built with TLS support.");
+        quickExit(ExitCode::badOptions);
+#endif
+    }
+
+    return transport::TransportLayerManagerImpl::createWithConfig(&serverGlobalParams,
+                                                                  svcCtx,
+                                                                  useEgressGRPC,
+                                                                  std::move(proxyPort),
+                                                                  std::move(maintenancePort),
+                                                                  std::move(observer));
+}
+
 std::unique_ptr<TransportLayerManager>
 TransportLayerManagerImpl::makeDefaultEgressTransportLayer() {
     transport::AsioTransportLayer::Options opts(&serverGlobalParams);
@@ -180,11 +248,13 @@ TransportLayerManagerImpl::makeDefaultEgressTransportLayer() {
         std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
 }
 
+// TODO: SERVER-112674 Open and listen for connections on maintenancePort
 std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConfig(
     const ServerGlobalParams* config,
     ServiceContext* svcCtx,
     bool useEgressGRPC,
     boost::optional<int> loadBalancerPort,
+    boost::optional<int> maintenancePort,
     std::shared_ptr<ClientTransportObserver> observer) {
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
