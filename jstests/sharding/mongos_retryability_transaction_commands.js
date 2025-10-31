@@ -1,9 +1,13 @@
 /**
- * Tests that mongos doesn't retry commands with startTransaction=true.
+ * Tests retryability on mongos commands within transactions.
+ *
+ * @tags: [
+ *   requires_fcv_83,
+ * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const setCommandToFail = (nodeConnection, command, namespace) => {
+const setCommandToFailOnce = (nodeConnection, command, namespace) => {
     return nodeConnection.adminCommand({
         configureFailPoint: "failCommand",
         mode: {times: 1},
@@ -49,16 +53,31 @@ assert.commandWorked(
 
 // Set the failCommand failpoint to make the next 'find' command fail once due to a failover.
 // Start a transaction & execute a find command.
-// It should fail once due to the 'failCommand' failpoint and should not be retried.
-jsTest.log(
-    "Testing that mongos doesn't retry the read command with startTransaction=true on replication set failover.",
-);
-assert.commandWorked(setCommandToFail(primaryConnection, "find", kNs));
+// It should succeed since the command will be retried.
+jsTest.log("Testing that mongos retries read commands with startTransaction=true on replication set failover.");
+assert.commandWorked(setCommandToFailOnce(primaryConnection, "find", kNs));
 
-assert.commandFailedWithCode(
+assert.commandWorked(
     mongosDB.runCommand({
         find: kCollName,
         filter: kDoc0,
+        startTransaction: true,
+        txnNumber: NumberLong(transactionNumber++),
+        stmtId: NumberInt(0),
+        autocommit: false,
+    }),
+);
+
+// Set the failCommand failpoint to make the next 'update' command fail once due to a failover.
+// Start a transaction & execute a find command.
+// It should fail once due to the 'failCommand' failpoint and should not be retried.
+jsTest.log("Testing that mongos doesn't retry writes with startTransaction=true on replication set failover.");
+assert.commandWorked(setCommandToFailOnce(primaryConnection, "update", kNs));
+
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        update: kCollName,
+        updates: [{q: kDoc0, u: {$set: {a: 1}}}],
         startTransaction: true,
         txnNumber: NumberLong(transactionNumber++),
         stmtId: NumberInt(0),
@@ -68,7 +87,7 @@ assert.commandFailedWithCode(
 );
 
 jsTest.log("Testing that mongos retries retryable writes on failover.");
-assert.commandWorked(setCommandToFail(primaryConnection, "insert", kNs));
+assert.commandWorked(setCommandToFailOnce(primaryConnection, "insert", kNs));
 
 assert.commandWorked(
     mongosDB.runCommand({insert: kCollName, documents: [kDoc1], txnNumber: NumberLong(transactionNumber++)}),
