@@ -760,34 +760,33 @@ namespace {
  * DISTINCT_SCAN plan that visits the first document in each group (SERVER-9507). If found, return
  * the stage that would replace them in the pipeline on top of DISTINCT_SCAN.
  *
- * Returns a pair of:
- * - first: the optional sort pattern of $group's $top and/or $bottom's common sort pattern.
- * - second: the stage that would replace $group in the pipeline on top of DISTINCT_SCAN.
+ * Returns RewriteOnFirstDocumentResult.
  */
-std::pair<boost::optional<SortPattern>, std::unique_ptr<GroupFromFirstDocumentTransformation>>
-tryDistinctGroupRewrite(const DocumentSourceContainer& sources) {
+RewriteOnFirstDocumentResult tryDistinctGroupRewrite(const DocumentSourceContainer& sources) {
     auto sourcesIt = sources.begin();
+    boost::optional<SortPattern> sortStagePattern{};
     if (sourcesIt != sources.end()) {
         auto sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
         if (sortStage) {
             if (!sortStage->hasLimit()) {
+                sortStagePattern = sortStage->getSortKeyPattern();
                 ++sourcesIt;
             } else {
                 // This $sort stage was previously followed by a $limit stage which disqualifies it
                 // from DISTINCT_SCAN.
-                return {boost::none, nullptr};
+                return {};
             }
         }
     }
 
     if (sourcesIt == sources.end()) {
-        return {boost::none, nullptr};
+        return {};
     }
 
     if (auto groupStage = dynamic_cast<DocumentSourceGroupBase*>(sourcesIt->get()); groupStage) {
-        return groupStage->rewriteGroupAsTransformOnFirstDocument();
+        return groupStage->rewriteGroupAsTransformOnFirstDocument(std::move(sortStagePattern));
     } else {
-        return {boost::none, nullptr};
+        return {};
     }
 }
 
@@ -1123,7 +1122,8 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
                            std::size_t plannerOpts) {
     // We want to do this before createCanonicalQuery() which does the last-minute optimization to
     // 'pipeline' and hence modifies it.
-    auto [sortPattern, rewrittenGroupStage] = tryDistinctGroupRewrite(pipeline->getSources());
+    auto [sortPattern, sortDirectionChangeIsRequired, rewrittenGroupStage] =
+        tryDistinctGroupRewrite(pipeline->getSources());
 
     const bool isDistinctMultiplanningEnabled =
         expCtx->isFeatureFlagShardFilteringDistinctScanEnabled();
@@ -1177,13 +1177,19 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
-    // If the GroupFromFirst transformation was generated for the $last or $bottom case, we will
-    // need to flip the direction of any generated DISTINCT_SCAN to preserve the semantics of
-    // the query.
+    // If the GroupFromFirst transformation was generated for the $last or $bottom case in case of
+    // the same sort directions in the stages or $first and $top in case of the opposite sort
+    // directions, we will need to flip the direction of any generated DISTINCT_SCAN to preserve the
+    // semantics of the query.
     const bool flipDistinctScanDirection = [&, groupStage = rewrittenGroupStage.get()] {
         const auto docsNeeded = groupStage->docsNeeded();
-        return docsNeeded == AccumulatorDocumentsNeeded::kLastInputDocument ||
-            docsNeeded == AccumulatorDocumentsNeeded::kLastOutputDocument;
+        if (sortDirectionChangeIsRequired) {
+            return (docsNeeded == AccumulatorDocumentsNeeded::kFirstInputDocument ||
+                    docsNeeded == AccumulatorDocumentsNeeded::kFirstOutputDocument);
+        } else {
+            return (docsNeeded == AccumulatorDocumentsNeeded::kLastInputDocument ||
+                    docsNeeded == AccumulatorDocumentsNeeded::kLastOutputDocument);
+        }
     }();
 
     cq->setDistinct(CanonicalDistinct(rewrittenGroupStage->groupId(),
