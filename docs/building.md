@@ -21,7 +21,7 @@ To build MongoDB, you will need:
   - On Amazon Linux, the xz-devel library is required. `yum install xz-devel`
 - Python 3.10
 - About 13 GB of free disk space for the core binaries (`mongod`,
-  `mongos`, and `mongo`) and about 600 GB for the install-all target.
+  `mongos`, and `mongo`).
 
 If using a newer version of a C++ compiler than listed above, it may work. However the versions listed above have been verified to work.
 
