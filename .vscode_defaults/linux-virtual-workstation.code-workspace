@@ -182,7 +182,7 @@
 						"ignoreFailures": false
 					},
 				],
-				"miDebuggerPath": "${workspaceFolder}/bazel-${workspaceFolderBasename}/external/gdb/v5/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/buildscripts/vscode_bazel_gdb.sh",
 			},
 			{
 				"name": "attach",
@@ -235,7 +235,7 @@
 						"ignoreFailures": false
 					},
 				],
-				"miDebuggerPath": "${workspaceFolder}/bazel-${workspaceFolderBasename}/external/gdb/v5/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/buildscripts/vscode_bazel_gdb.sh",
 			},
 			{
 				"name": "coredump",
@@ -245,7 +245,7 @@
 				"program": "${workspaceFolder}/${input:runTargets}",
 				"args": [],
 				"MIMode": "gdb",
-				"miDebuggerPath": "${workspaceFolder}/bazel-${workspaceFolderBasename}/external/gdb/v5/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/buildscripts/vscode_bazel_gdb.sh",
 				"preLaunchTask": "_prelaunch_task",
 				"setupCommands": [
 					{
@@ -309,7 +309,7 @@
 				"id": "runTargets",
 				"command": "shellCommand.execute",
 				"args": {
-					"command": "bazel query 'attr(tags, \"mongo_binary\", //...)' union 'attr(tags, \"mongo_unittest\", //...)' | grep mongo | grep -v \"_with_debug\" | grep -v third_party | sed 's;//;bazel-bin/;g' | sed 's;:;/;g'",
+					"command": "buildscripts/vscode_launch_targets.sh 2> /dev/null",
 					"cwd": "${workspaceFolder}",
 					"taskId": "runTargets",
 					"rememberPrevious": true,
