@@ -354,6 +354,9 @@ inline constexpr uint64_t kSingleSkip = 0xFFFFFFFFFFFFFFFE;
 // Constant for a simple8b block containing a single zero value.
 inline constexpr uint64_t kSingleZero = 0xE;
 
+// Constant for an invalid simple8b block, trying to read this will throw.
+static constexpr uint64_t kInvalidSimple8b = 0;
+
 /**
  * Visits all values in sequence with provided callbacks
  * visit - a callback for receiving all non-missing values (including 0)
@@ -383,6 +386,13 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t visitAll(const char* buffer,
  * Returns the total number of values over multiple Simple8b blocks including missing values.
  */
 inline size_t count(const char* buffer, size_t size);
+
+/**
+ * Returns the last value (can be missing) over multiple Simple8b blocks. If called with unsigned T
+ * it returns the encoded value in this slot. If called with signed T it returns the decoded value.
+ */
+template <typename T>
+boost::optional<T> last(const char* buffer, size_t size, uint64_t& prevNonRLE);
 
 /**
  * Calculates the sum for multiple simple8b blocks in a buffer. 'prevNonRLE' should be initialized
