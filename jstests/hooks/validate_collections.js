@@ -25,6 +25,21 @@ export class CollectionValidator {
                 return thread.returnData();
             });
 
+            let isMultiversion = false;
+            let version = "";
+            hostList.forEach((host) => {
+                const conn = newMongoWithRetry(host);
+                conn.setSecondaryOk();
+                jsTest.authenticate(conn);
+                let res = conn.adminCommand("buildInfo");
+                if (version === "") {
+                    version = res.version;
+                }
+                if (res.version != version) {
+                    isMultiversion = true;
+                }
+            });
+
             // Compare hashes between nodes.
             let hashes = {};
             let hashesSet = false;
@@ -57,13 +72,16 @@ export class CollectionValidator {
                             if (db == "local") {
                                 return;
                             }
+                            if (!currHashes[db][coll]) {
+                                return;
+                            }
                             assert.eq(
                                 hashes[db][coll].all,
                                 currHashes[db][coll].all,
                                 "Collection hashes are different for " + db + "." + coll,
                             );
-                            // Skip metadata for config.transactions.
-                            if (db == "config" && coll == "transactions") {
+                            // Skip metadata for config.transactions, and for multiversion tests. Multiversion tests can have different fields in their indexes due to fields removed in newer versions.
+                            if (isMultiversion || (db == "config" && coll == "transactions")) {
                                 return;
                             }
                             assert.eq(

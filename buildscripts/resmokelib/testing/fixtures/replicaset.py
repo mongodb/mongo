@@ -1156,7 +1156,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         Perform internode validation on this replica set using extended validate. Compares the 'all' and 'metadata' hashes of each collection.
         """
         self.logger.info("Waiting for all nodes to be caught up")
-        self.await_last_op_committed()
+        primary_client = interface.build_client(self.get_primary(), self.auth_options)
+        coll = primary_client["test"]["validate.hook"].with_options(
+            write_concern=pymongo.write_concern.WriteConcern(w=len(self.nodes))
+        )
+        coll.insert_one({"a": 1})
+        coll.drop()
 
         self.logger.info("Performing Internode Validation")
 
@@ -1245,7 +1250,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                             raise RuntimeError(
                                 f"all hash difference on {db_name}.{coll_name}. {base_hash['all']} vs {comp_hash['all']}"
                             )
-                        if base_hash["metadata"] != comp_hash["metadata"]:
+                        # Metadata hashes can be different on multiversion suites due to removed fields from indexes.
+                        if base_hash["metadata"] != comp_hash["metadata"] and not self.fcv:
                             raise RuntimeError(
                                 f"metadata hash difference on {db_name}.{coll_name}. {base_hash['metadata']} vs {comp_hash['metadata']}"
                             )
