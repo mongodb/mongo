@@ -32,6 +32,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/traces/mock_exporter.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/util/modules.h"
 
 #include <opentelemetry/sdk/trace/simple_processor_factory.h>
 #include <opentelemetry/sdk/trace/tracer_provider_factory.h>
@@ -45,7 +46,7 @@ namespace traces {
  * Test fixture for tests that require OpenTelemetry TracerProvider to be initialized.
  * Sets up a TracerProvider with MockExporter so tests can create and inspect spans.
  */
-class OtelTestFixture : public ServiceContextTest {
+class MONGO_MOD_OPEN OtelTestFixture : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();

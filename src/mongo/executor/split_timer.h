@@ -35,6 +35,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <array>
@@ -114,7 +115,7 @@ private:
  *  - nonstatic makeTimer to initialize Timer.
  */
 template <typename Policy>
-class SplitTimer {
+class MONGO_MOD_PUBLIC SplitTimer {
 private:
     template <typename E>
     static constexpr size_t _idx(E e) {

@@ -32,6 +32,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/otel/telemetry_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -44,7 +45,7 @@ namespace otel {
  * propagate parent / child relationships between Spans as well as hold metadata to correlate
  * various telemetry data.
  */
-class TelemetryContextHolder {
+class MONGO_MOD_PUBLIC TelemetryContextHolder {
 public:
     static TelemetryContextHolder& get(OperationContext* opCtx);
 

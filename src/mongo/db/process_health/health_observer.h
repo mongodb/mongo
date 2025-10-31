@@ -37,6 +37,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -75,7 +76,7 @@ struct HealthObserverLivenessStats {
 /**
  * Interface to conduct periodic health checks.
  */
-class HealthObserver {
+class MONGO_MOD_PUBLIC HealthObserver {
 public:
     virtual ~HealthObserver() = default;
 

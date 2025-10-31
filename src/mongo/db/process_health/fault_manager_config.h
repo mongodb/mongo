@@ -36,6 +36,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <algorithm>
@@ -75,7 +76,15 @@ std::ostream& operator<<(std::ostream& os, const FaultState& state);
 /**
  * Types of health observers available.
  */
-enum class FaultFacetType { kSystem, kMock1, kMock2, kTestObserver, kLdap, kDns, kConfigServer };
+enum class MONGO_MOD_PUBLIC FaultFacetType {
+    kSystem,
+    kMock1,
+    kMock2,
+    kTestObserver,
+    kLdap,
+    kDns,
+    kConfigServer
+};
 static const StringData FaultFacetTypeStrings[] = {
     "systemObserver", "mock1", "mock2", "testObserver", "LDAP", "DNS", "configServer"};
 
@@ -97,7 +106,7 @@ inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
     return os;
 }
 
-class FaultManagerConfig {
+class MONGO_MOD_PUBLIC FaultManagerConfig {
 public:
     /* Maximum possible jitter added to the time between health checks */
     static auto inline constexpr kPeriodicHealthCheckMaxJitter{Milliseconds{100}};

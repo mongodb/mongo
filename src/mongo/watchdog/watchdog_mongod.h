@@ -31,11 +31,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class ServiceContext;
 
@@ -50,4 +51,4 @@ void startWatchdog(ServiceContext* service);
 Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&);
 Status onUpdateWatchdogPeriodSeconds(const int& value);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

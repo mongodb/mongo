@@ -32,10 +32,12 @@
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
-namespace mongo::otel::traces {
+namespace mongo::otel {
+namespace MONGO_MOD_PUBLIC traces {
 
 #ifdef MONGO_CONFIG_OTEL
 
@@ -52,4 +54,5 @@ inline void shutdown(ServiceContext* serviceContext) {}
 
 #endif
 
-}  // namespace mongo::otel::traces
+}  // namespace MONGO_MOD_PUBLIC traces
+}  // namespace mongo::otel

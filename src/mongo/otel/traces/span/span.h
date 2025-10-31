@@ -33,12 +33,13 @@
 #include "mongo/config.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/otel/telemetry_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
 namespace mongo {
 namespace otel {
-namespace traces {
+namespace MONGO_MOD_PUBLIC traces {
 
 #ifdef MONGO_CONFIG_OTEL
 
@@ -141,6 +142,6 @@ public:
 
 #endif
 
-}  // namespace traces
+}  // namespace MONGO_MOD_PUBLIC traces
 }  // namespace otel
 }  // namespace mongo

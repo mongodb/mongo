@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/client.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class BSONObjBuilder;
 
 static const char kUpsertedFieldName[] = "upserted";
@@ -91,4 +92,4 @@ private:
     bool _hadError = false;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

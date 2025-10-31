@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/otel/traces/tracing_utils.h"
+#include "mongo/util/modules.h"
 
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 
@@ -45,7 +46,7 @@ using opentelemetry::nostd::function_ref;
  * providing interoperability between BSONObj and OpenTelemetry TextMap Propagators
  * (https://opentelemetry.io/docs/specs/otel/context/api-propagators/#textmap-propagator).
  */
-class BSONTextMapCarrier : public TextMapCarrier {
+class MONGO_MOD_PARENT_PRIVATE BSONTextMapCarrier : public TextMapCarrier {
 public:
     /**
      * Default constructor with an empty initial BSONObj. Intended to be used when using a

@@ -40,6 +40,7 @@
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <memory>
@@ -65,7 +66,7 @@ inline std::unique_ptr<FaultManagerConfig> getConfigWithDisabledPeriodicChecks()
  * Test wrapper class for FaultManager that has access to protected methods
  * for testing.
  */
-class FaultManagerTestImpl : public FaultManager {
+class MONGO_MOD_NEEDS_REPLACEMENT FaultManagerTestImpl : public FaultManager {
 public:
     FaultManagerTestImpl(ServiceContext* svcCtx,
                          std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -122,9 +123,9 @@ public:
 /**
  * Test suite for fault manager.
  */
-class FaultManagerTest : service_context_test::WithSetupTransportLayer,
-                         service_context_test::RouterRoleOverride,
-                         public ClockSourceMockServiceContextTest {
+class MONGO_MOD_PUBLIC FaultManagerTest : service_context_test::WithSetupTransportLayer,
+                                          service_context_test::RouterRoleOverride,
+                                          public ClockSourceMockServiceContextTest {
 public:
     void setUp() override {
         HealthObserverRegistration::resetObserverFactoriesForTest();

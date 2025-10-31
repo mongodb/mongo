@@ -28,7 +28,9 @@
  */
 
 #pragma once
+
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 #include "mongo/watchdog/watchdog.h"
 
 namespace mongo {
@@ -37,7 +39,7 @@ namespace mongo {
  * A mock WatchdogMonitor for use in C++ unit tests.
  *
  */
-class WatchdogMonitorMock final : public WatchdogMonitorInterface {
+class MONGO_MOD_PUBLIC WatchdogMonitorMock final : public WatchdogMonitorInterface {
 public:
     WatchdogMonitorMock() = default;
     ~WatchdogMonitorMock() override = default;

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/system_clock_source.h"
@@ -42,7 +43,7 @@ namespace mongo {
  * The registry keeps track of all registered instances of `ObservableMutex` and provides an
  * interface to collect contention stats.
  */
-class ObservableMutexRegistry {
+class MONGO_MOD_PUBLIC ObservableMutexRegistry {
 public:
     static constexpr auto kTotalAcquisitionsFieldName = "total"_sd;
     static constexpr auto kTotalContentionsFieldName = "contentions"_sd;

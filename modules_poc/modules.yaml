@@ -600,6 +600,7 @@ observability:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/connection_health_metrics_parameter.idl
     - src/mongo/db/not_primary_error_tracker*
@@ -624,6 +625,7 @@ observability.tracing:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/otel/traces/
     - src/mongo/util/tracing_support*
@@ -632,6 +634,7 @@ observability.metrics:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/otel/metrics/
 
@@ -639,6 +642,7 @@ observability.ftdc:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/ftdc/
 

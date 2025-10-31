@@ -31,6 +31,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_manager_config.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <ostream>
@@ -38,7 +39,7 @@
 namespace mongo {
 namespace process_health {
 
-enum class Severity { kOk, kFailure };
+enum class MONGO_MOD_PUBLIC Severity { kOk, kFailure };
 static const StringData SeverityStrings[] = {"kOk", "kFailure"};
 
 inline StringBuilder& operator<<(StringBuilder& s, const Severity& sev) {
@@ -51,7 +52,7 @@ inline std::ostream& operator<<(std::ostream& s, const Severity& sev) {
 /**
  * Immutable class representing current status of an ongoing fault tracked by facet.
  */
-class HealthCheckStatus {
+class MONGO_MOD_PUBLIC HealthCheckStatus {
 public:
     HealthCheckStatus(FaultFacetType type, Severity severity, StringData description)
         : _type(type), _severity(severity), _description(description) {}

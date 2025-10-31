@@ -32,14 +32,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/otel/telemetry_context.h"
+#include "mongo/util/modules.h"
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #endif
 
-
 namespace mongo {
-namespace otel {
+namespace MONGO_MOD_PUBLIC otel {
 
 #ifdef MONGO_CONFIG_OTEL
 
@@ -80,5 +80,5 @@ public:
 
 #endif
 
-}  // namespace otel
+}  // namespace MONGO_MOD_PUBLIC otel
 }  // namespace mongo

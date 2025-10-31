@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -38,11 +39,11 @@ namespace mongo::otel::metrics {
 /**
  * Initializes OpenTelemetry metrics using either the HTTP or file exporter.
  */
-Status initialize(const std::string& name);
+MONGO_MOD_PUBLIC Status initialize(const std::string& name);
 
 /**
  * Shuts down the OpenTelemetry metric export process by setting the global MeterProvider to a
  * NoopMeterProvider.
  */
-void shutdown();
+MONGO_MOD_PUBLIC void shutdown();
 }  // namespace mongo::otel::metrics
