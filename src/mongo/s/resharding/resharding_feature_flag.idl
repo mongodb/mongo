@@ -79,7 +79,8 @@ feature_flags:
             can be such a recipient shard. This flag is ignored if
             featureFlagReshardingSkipCloningAndApplyingIfApplicable is set to true."
         cpp_varname: gFeatureFlagReshardingSkipCloningIfApplicable
-        default: false
+        default: true
+        version: 8.0
         fcv_gated: true
     featureFlagReshardingStoreOplogFetcherProgress:
         description:
