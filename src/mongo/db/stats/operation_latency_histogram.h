@@ -56,6 +56,14 @@ struct HistogramData {
 };
 }  // namespace operation_latency_histogram_details
 
+struct OperationLatencyHistogramOptions {
+    /*
+     * If false, buckets with no counts will be excluded when calling `append`. This is useful when
+     * the structure of the appended latency histograms should be consistent over time.
+     */
+    bool includeEmptyBuckets = false;
+};
+
 /**
  * Stores statistics for latencies of read, write, command, and multi-document transaction
  * operations. There are two flavors to this type:
@@ -68,6 +76,9 @@ struct HistogramData {
 class OperationLatencyHistogram {
 public:
     using HistogramType = operation_latency_histogram_details::HistogramData<uint64_t>;
+    using Options = OperationLatencyHistogramOptions;
+
+    explicit OperationLatencyHistogram(const Options& options = {});
 
     /**
      * Increments the bucket of the histogram based on the operation type.
@@ -80,17 +91,22 @@ public:
     void append(bool includeHistograms, bool slowMSBucketsOnly, BSONObjBuilder* builder) const;
 
 private:
+    bool _includeEmptyBuckets;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 
 class AtomicOperationLatencyHistogram {
 public:
     using HistogramType = operation_latency_histogram_details::HistogramData<Atomic<uint64_t>>;
+    using Options = OperationLatencyHistogramOptions;
+
+    explicit AtomicOperationLatencyHistogram(const Options& options = {});
 
     void increment(uint64_t latency, Command::ReadWriteType type, bool isQueryableEncryptionOp);
     void append(bool includeHistograms, bool slowMSBucketsOnly, BSONObjBuilder* builder) const;
 
 private:
+    bool _includeEmptyBuckets;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 }  // namespace mongo

@@ -60,6 +60,8 @@ class MONGO_MOD_PUB ServiceLatencyTracker {
 public:
     static ServiceLatencyTracker& getDecoration(Service* service);
 
+    ServiceLatencyTracker();
+
     /**
      * Increments the cumulative histograms only if the operation came from a user.
      */

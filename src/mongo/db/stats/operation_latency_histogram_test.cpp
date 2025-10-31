@@ -68,6 +68,11 @@ TEST(OperationLatencyHistogram, EnsureIncrementsStored) {
     ASSERT_EQUALS(out["writes"]["ops"].Long(), kMaxBuckets);
     ASSERT_EQUALS(out["commands"]["ops"].Long(), kMaxBuckets);
     ASSERT_EQUALS(out["transactions"]["ops"].Long(), kMaxBuckets);
+    // There should be no latencies.
+    ASSERT_TRUE(out["reads"]["latencies"].eoo());
+    ASSERT_TRUE(out["writes"]["latencies"].eoo());
+    ASSERT_TRUE(out["commands"]["latencies"].eoo());
+    ASSERT_TRUE(out["transactions"]["latencies"].eoo());
 }
 
 TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {
@@ -101,6 +106,58 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {
     }
 }
 
+TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencyExcludeEmptyBuckets) {
+    OperationLatencyHistogram hist({.includeEmptyBuckets = false});
+    // Increment at the boundary for every other bucket.
+    uint64_t expectedSum = 0;
+    for (int i = 0; i < kMaxBuckets; i += 2) {
+        hist.increment(kLowerBounds[i], Command::ReadWriteType::kRead, false);
+        expectedSum += kLowerBounds[i];
+    }
+
+    BSONObjBuilder outBuilder;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
+    BSONObj out = outBuilder.done();
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+
+    // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
+    // bucket.
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<unsigned int>((kMaxBuckets + 1) / 2));
+    for (int i = 0; i < kMaxBuckets; i += 2) {
+        BSONObj bucket = readBuckets[i / 2].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
+        ASSERT_EQUALS(bucket["count"].Long(), 1);
+    }
+}
+
+TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencyIncludeEmptyBuckets) {
+    OperationLatencyHistogram hist({.includeEmptyBuckets = true});
+    // Increment at the boundary for every other bucket.
+    uint64_t expectedSum = 0;
+    for (int i = 0; i < kMaxBuckets; i += 2) {
+        hist.increment(kLowerBounds[i], Command::ReadWriteType::kRead, false);
+        expectedSum += kLowerBounds[i];
+    }
+
+    BSONObjBuilder outBuilder;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
+    BSONObj out = outBuilder.done();
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+
+    // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
+    // bucket.
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<unsigned int>(kMaxBuckets));
+    for (int i = 0; i < kMaxBuckets; i++) {
+        BSONObj bucket = readBuckets[i].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
+        ASSERT_EQUALS(bucket["count"].Long(), (i % 2 == 0) ? 1 : 0);
+    }
+}
+
 TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBuckets) {
     OperationLatencyHistogram hist;
     // Increment at the boundary, boundary+1, and boundary-1.
@@ -121,7 +178,7 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBuckets) {
     // The additional +1 because of the first boundary.
     uint64_t expectedSum = 3 * std::accumulate(kLowerBounds.begin(), kLowerBounds.end(), 0ULL) + 1;
     BSONObjBuilder outBuilder;
-    hist.append(true, true, &outBuilder);
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
     BSONObj out = outBuilder.done();
     ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
@@ -145,6 +202,92 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBuckets) {
     }
 }
 
+TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBucketsExcludeEmptyBuckets) {
+    OperationLatencyHistogram hist({.includeEmptyBuckets = false});
+    // Increment at the boundary for every other bucket.
+    uint64_t expectedSum = 0;
+    for (int i = 0; i < kMaxBuckets; i += 2) {
+        hist.increment(kLowerBounds[i], Command::ReadWriteType::kRead, false);
+        expectedSum += kLowerBounds[i];
+    }
+
+    auto orig = serverGlobalParams.slowMS.load();
+    serverGlobalParams.slowMS.store(100);
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    BSONObjBuilder outBuilder;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
+    BSONObj out = outBuilder.done();
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+
+    const size_t kMaxUnFilteredBuckets = 23;
+    // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
+    // bucket.
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    // Additional +1 because of the extra aggregate bucket.
+    ASSERT_EQUALS(readBuckets.size(), (kMaxUnFilteredBuckets + 1) / 2 + 1);
+    for (size_t i = 0; i < kMaxUnFilteredBuckets; i += 2) {
+        BSONObj bucket = readBuckets[i / 2].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
+        ASSERT_EQUALS(bucket["count"].Long(), 1);
+    }
+
+    // Handle the last bucket which is an aggregate
+    {
+        BSONObj bucket = readBuckets.back().Obj();
+        // Since kMaxUnFilteredBuckets is odd, the last bucket will actually be the one at index
+        // kMaxUnFilteredBuckets+1.
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()),
+                      kLowerBounds[kMaxUnFilteredBuckets + 1] + 1);
+        ASSERT_EQUALS(bucket["count"].Long(), 14);
+    }
+}
+
+TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBucketsIncludeEmptyBuckets) {
+    OperationLatencyHistogram hist({.includeEmptyBuckets = true});
+    // Increment at the boundary for every other bucket.
+    uint64_t expectedSum = 0;
+    for (int i = 0; i < kMaxBuckets; i += 2) {
+        hist.increment(kLowerBounds[i], Command::ReadWriteType::kRead, false);
+        expectedSum += kLowerBounds[i];
+    }
+
+    auto orig = serverGlobalParams.slowMS.load();
+    serverGlobalParams.slowMS.store(100);
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    BSONObjBuilder outBuilder;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
+    BSONObj out = outBuilder.done();
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+
+    const size_t kMaxUnFilteredBuckets = 23;
+    // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
+    // bucket.
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    // Additional +1 because of the extra aggregate bucket.
+    ASSERT_EQUALS(readBuckets.size(), kMaxUnFilteredBuckets + 1);
+    for (size_t i = 0; i < kMaxUnFilteredBuckets; i++) {
+        BSONObj bucket = readBuckets[i].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
+        ASSERT_EQUALS(bucket["count"].Long(), i % 2 == 0 ? 1 : 0);
+    }
+
+    // Handle the last bucket which is an aggregate
+    {
+        BSONObj bucket = readBuckets.back().Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()),
+                      kLowerBounds[kMaxUnFilteredBuckets] + 1);
+        ASSERT_EQUALS(bucket["count"].Long(), 14);
+    }
+}
+
 // QE
 // Verify we count QE correctly.
 TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencyQueryableEncryption) {
@@ -162,7 +305,7 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencyQueryableEncrypt
     uint64_t expectedSum = 3 * std::accumulate(kLowerBounds.begin(), kLowerBounds.end(), 0ULL) + 1;
 
     BSONObjBuilder outBuilder;
-    hist.append(true, false, &outBuilder);
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
     BSONObj out = outBuilder.done();
     ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
     ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["queryableEncryptionLatencyMicros"].Long()),

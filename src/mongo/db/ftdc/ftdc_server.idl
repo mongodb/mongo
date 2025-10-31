@@ -139,7 +139,8 @@ server_parameters:
         redact: false
 
     diagnosticDataCollectionEnableLatencyHistograms:
-        description: "Enable the capture of opLatencies: { histograms: true } } in FTDC."
+        description: "Enable the capture of opLatencies: { histograms: true } in FTDC."
+        default: true
         set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<bool>"
         cpp_varname: gDiagnosticDataCollectionEnableLatencyHistograms
