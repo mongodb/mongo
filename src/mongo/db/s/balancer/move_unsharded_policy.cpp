@@ -314,6 +314,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::SnapshotTooOld:
                 case ErrorCodes::StaleDbVersion:
                 case ErrorCodes::TemporarilyUnavailable:
+                case ErrorCodes::TransactionTooLargeForCache:
                 case ErrorCodes::UserWritesBlocked:
                     return true;
                 default:
