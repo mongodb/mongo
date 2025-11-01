@@ -970,8 +970,6 @@ TEST_F(
     ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningAndApplyIfApplicable) {
     RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", true);
-    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
-        "featureFlagReshardingSkipCloningIfApplicable", false);
 
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
@@ -985,8 +983,6 @@ TEST_F(
     ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningAndApplyIfApplicable) {
     RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
-    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
-        "featureFlagReshardingSkipCloningIfApplicable", false);
 
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
