@@ -183,35 +183,29 @@ const SpecificStats* ExtractFieldPathsStage::getSpecificStats() const {
 std::vector<DebugPrinter::Block> ExtractFieldPathsStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
-    auto addPathSlotsInAscOrderBySlotId = [&](const std::vector<PathSlot>& pathSlots,
-                                              const std::string& prefix) {
-        ret.emplace_back(DebugPrinter::Block(prefix));
-        std::vector<std::pair<value::SlotId, size_t>> slotIdxs;
-        slotIdxs.reserve(pathSlots.size());
-        for (size_t idx = 0; idx < pathSlots.size(); ++idx) {
-            const auto& [path, slotId] = pathSlots[idx];
-            slotIdxs.push_back({slotId, idx});
+    ret.emplace_back(DebugPrinter::Block("inputs[`"));
+    for (size_t idx = 0; idx < _inputs.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
         }
+        const auto& [path, slotId] = _inputs[idx];
+        DebugPrinter::addIdentifier(ret, slotId);
+        ret.emplace_back("=");
+        ret.emplace_back(value::pathToString(path));
+    }
+    ret.emplace_back("`]");
 
-        std::sort(slotIdxs.begin(), slotIdxs.end());
-
-        bool first = true;
-        for (auto& [slotId, idx] : slotIdxs) {
-            if (!first) {
-                ret.emplace_back(DebugPrinter::Block("`,"));
-            }
-            first = false;
-            const auto& [path, _] = pathSlots[idx];
-            tassert(9719400, "expected slot ids to match", slotId == _);
-            DebugPrinter::addIdentifier(ret, slotId);
-            ret.emplace_back("=");
-            ret.emplace_back(value::pathToString(path));
+    ret.emplace_back(DebugPrinter::Block("outputs[`"));
+    for (size_t idx = 0; idx < _outputs.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
         }
-        ret.emplace_back("`]");
-    };
-
-    addPathSlotsInAscOrderBySlotId(_inputs, "inputs[`");
-    addPathSlotsInAscOrderBySlotId(_outputs, "outputs[`");
+        const auto& [path, slotId] = _outputs[idx];
+        DebugPrinter::addIdentifier(ret, slotId);
+        ret.emplace_back("=");
+        ret.emplace_back(value::pathToString(path));
+    }
+    ret.emplace_back("`]");
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
