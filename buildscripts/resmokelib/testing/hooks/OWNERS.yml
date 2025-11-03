@@ -63,3 +63,7 @@ filters:
   - "fuzz_runtime_parameters.py":
     approvers:
       - 10gen/server-programmability
+  - "validate.py":
+    approvers:
+      - 10gen/server-validate
+      - 10gen/devprod-correctness

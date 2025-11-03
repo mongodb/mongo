@@ -271,14 +271,14 @@ def validate_collection(
     skipValidationOnNamespaceNotFound: bool,
     logger: logging.Logger,
 ):
+    logger.info(f"Trying to validate collection {coll_name} in database {db.name}")
+
     validate_cmd = {"validate": coll_name}
     validate_cmd.update(validate_opts)
     ret = db.command(validate_cmd, check=False)
 
     ok = "ok" in ret and ret["ok"]
     valid = "valid" in ret and ret["valid"]
-
-    logger.info(f"Trying to validate collection {coll_name} in database {db.name}")
 
     if not ok or not valid:
         if (
