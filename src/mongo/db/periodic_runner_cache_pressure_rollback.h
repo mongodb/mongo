@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <memory>
@@ -45,7 +46,7 @@ namespace mongo {
  * then will abort the oldest transaction.
  * The job will run every cachePressureQueryPeriodMilliseconds (defaults to once per second).
  */
-class PeriodicThreadToRollbackUnderCachePressure {
+class MONGO_MOD_PUBLIC PeriodicThreadToRollbackUnderCachePressure {
 public:
     static PeriodicThreadToRollbackUnderCachePressure& get(ServiceContext* serviceContext);
 
