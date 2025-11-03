@@ -68,7 +68,7 @@ private:
 
 class ShapifyAstNode : public sdk::AggStageAstNode {
 public:
-    ShapifyAstNode(BSONObj input) : _input(input) {}
+    ShapifyAstNode(BSONObj input) : sdk::AggStageAstNode(kShapifyStageName), _input(input) {}
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<ShapifyLogicalStage>(_input);

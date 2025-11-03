@@ -1604,6 +1604,7 @@ mongo_cc_unit_test(
         ],
     }) + [
         "//src/mongo/db/exec/agg:document_source_to_stage_registry_test.cpp",
+        "//src/mongo/db/extension/host:document_source_extension_expandable_test.cpp",
         "//src/mongo/db/extension/host:document_source_extension_optimizable_test.cpp",
         "//src/mongo/db/extension/host:document_source_extension_test.cpp",
         "//src/mongo/db/pipeline:document_source_coll_stats_test.cpp",

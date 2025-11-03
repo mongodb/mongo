@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host/document_source_extension_expandable.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/extension_stage.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
@@ -168,25 +169,18 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
         };
     }();
 
-    registerStage(nameAsString, id, descriptor);
-
     LiteParsedDocumentSource::registerParser(nameAsString,
                                              std::move(parser),
                                              AllowedWithApiStrict::kAlways,
                                              AllowedWithClientType::kAny);
-}
 
-// static
-void DocumentSourceExtension::registerStage(const std::string& name,
-                                            DocumentSource::Id id,
-                                            AggStageDescriptorHandle descriptor) {
     // Register the correct DocumentSource to construct the stage with.
     DocumentSource::registerParser(
-        name,
+        nameAsString,
         [descriptor](BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx)
             -> boost::intrusive_ptr<DocumentSource> {
-            return boost::intrusive_ptr(new DocumentSourceExtensionOptimizable(
-                specElem.fieldNameStringData(), expCtx, specElem.wrap(), descriptor));
+            return DocumentSourceExtensionExpandable::create(
+                specElem.fieldNameStringData(), expCtx, specElem.wrap(), descriptor);
         });
 
     // Register the correct exec::agg to execute the stage with.
@@ -201,7 +195,7 @@ void DocumentSourceExtension::registerStage(const std::string& name,
         });
 
     // Add the allocated id to the static map for lookup upon object construction.
-    stageToIdMap[name] = id;
+    stageToIdMap[nameAsString] = id;
 }
 
 void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) {
@@ -209,14 +203,10 @@ void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) 
 }
 
 DocumentSourceExtension::DocumentSourceExtension(
-    StringData name,
-    const boost::intrusive_ptr<ExpressionContext>& exprCtx,
-    BSONObj rawStage,
-    AggStageDescriptorHandle staticDescriptor)
+    StringData name, const boost::intrusive_ptr<ExpressionContext>& exprCtx)
     : DocumentSource(name, exprCtx),
       _stageName(std::string(name)),
-      _id(findStageId(std::string(name))),
-      _parseNode(staticDescriptor.parse(rawStage)) {}
+      _id(findStageId(std::string(name))) {}
 
 const char* DocumentSourceExtension::getSourceName() const {
     return _stageName.c_str();

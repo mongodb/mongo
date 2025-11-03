@@ -38,75 +38,6 @@
 
 namespace mongo::extension {
 
-static constexpr std::string_view kFirstStageNotAstName = "$firstStageNotAst";
-static constexpr std::string_view kExpandSizeTooBigName = "$expandSizeTooBig";
-class FirstStageNotAstParseNode : public sdk::AggStageParseNode {
-public:
-    static inline const std::string kStageName = std::string(kFirstStageNotAstName);
-    FirstStageNotAstParseNode() : sdk::AggStageParseNode(kStageName) {}
-
-    static constexpr size_t kExpansionSize = 1;
-    size_t getExpandedSize() const override {
-        return kExpansionSize;
-    }
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
-        expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new sdk::ExtensionAggStageParseNode(
-            std::make_unique<sdk::shared_test_stages::NoOpAggStageParseNode>()));
-        return expanded;
-    }
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-};
-class FirstStageNotAstStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(kFirstStageNotAstName);
-    FirstStageNotAstStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
-        return std::make_unique<FirstStageNotAstParseNode>();
-    }
-    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
-        return std::make_unique<FirstStageNotAstStageDescriptor>();
-    }
-};
-class ExpandSizeTooBigParseNode : public sdk::AggStageParseNode {
-public:
-    static inline const std::string kStageName = std::string(kExpandSizeTooBigName);
-    ExpandSizeTooBigParseNode() : extension::sdk::AggStageParseNode(kStageName) {}
-
-    static constexpr size_t kExpansionSize = 2;
-    size_t getExpandedSize() const override {
-        return kExpansionSize;
-    }
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
-        expanded.reserve(kExpansionSize);
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(
-            sdk::shared_test_stages::NoOpAggStageAstNode::make()));
-        expanded.emplace_back(new extension::sdk::ExtensionAggStageAstNode(
-            sdk::shared_test_stages::NoOpAggStageAstNode::make()));
-        return expanded;
-    }
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-};
-class ExpandSizeTooBigStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(kExpandSizeTooBigName);
-    ExpandSizeTooBigStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
-        return std::make_unique<ExpandSizeTooBigParseNode>();
-    }
-    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
-        return std::make_unique<ExpandSizeTooBigStageDescriptor>();
-    }
-};
-
 class DocumentSourceExtensionOptimizableTest : public AggregationContextFixture {
 public:
     DocumentSourceExtensionOptimizableTest() : DocumentSourceExtensionOptimizableTest(_nss) {}
@@ -117,57 +48,55 @@ protected:
     static inline NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
         boost::none, "document_source_extension_optimizable_test");
 
-    sdk::ExtensionAggStageDescriptor _expandSizeTooBigStageDescriptor{
-        ExpandSizeTooBigStageDescriptor::make()};
-    sdk::ExtensionAggStageDescriptor _firstStageNotAstStageDescriptor{
-        FirstStageNotAstStageDescriptor::make()};
     sdk::ExtensionAggStageDescriptor _noOpAggregationStageDescriptor{
         sdk::shared_test_stages::NoOpAggStageDescriptor::make()};
 
-    TestStageIdRegistrar _ids{ExpandSizeTooBigStageDescriptor::kStageName,
-                              FirstStageNotAstStageDescriptor::kStageName,
-                              sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName};
+    TestStageIdRegistrar _ids{sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName};
 };
 
-DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, expandedSizeNotOneFails, "11164400") {
-    [[maybe_unused]] auto extensionOptimizable = host::DocumentSourceExtensionOptimizable(
-        ExpandSizeTooBigStageDescriptor::kStageName,
-        getExpCtx(),
-        BSON(ExpandSizeTooBigStageDescriptor::kStageName << BSON("foo" << true)),
-        AggStageDescriptorHandle(&_expandSizeTooBigStageDescriptor));
-}
-
-DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, expandToParseNodeFails, "11164401") {
-    [[maybe_unused]] auto extensionOptimizable = host::DocumentSourceExtensionOptimizable(
-        FirstStageNotAstStageDescriptor::kStageName,
-        getExpCtx(),
-        BSON(FirstStageNotAstStageDescriptor::kStageName << BSON("foo" << true)),
-        AggStageDescriptorHandle(&_firstStageNotAstStageDescriptor));
-}
-
 TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
-    auto optimizable = host::DocumentSourceExtensionOptimizable(
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
         sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
         getExpCtx(),
-        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true)),
-        AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
+        std::move(astHandle));
 
-    ASSERT_EQ(std::string(optimizable.getSourceName()),
+    ASSERT_EQ(std::string(optimizable->getSourceName()),
               sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecution) {
-    auto optimizable = host::DocumentSourceExtensionOptimizable(
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
         sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
         getExpCtx(),
-        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true)),
-        AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
+        std::move(astHandle));
 
     // Test that an extension can provide its own implementation of serialize, that might change the
     // raw spec provided.
-    ASSERT_BSONOBJ_EQ(optimizable.serialize(SerializationOptions()).getDocument().toBson(),
+    ASSERT_BSONOBJ_EQ(optimizable->serialize(SerializationOptions()).getDocument().toBson(),
                       BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName
                            << "serializedForExecution"));
+}
+
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, serializeWithWrongOptsFails, "11217800") {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
+        getExpCtx(),
+        std::move(astHandle));
+
+    [[maybe_unused]] auto serialized =
+        optimizable->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
 }
 
 }  // namespace mongo::extension

@@ -81,7 +81,7 @@ private:
 
 class ExplainAstNode : public sdk::AggStageAstNode {
 public:
-    ExplainAstNode(StringData input) : _input(input) {}
+    ExplainAstNode(StringData input) : sdk::AggStageAstNode(kExplainStageName), _input(input) {}
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<ExplainLogicalStage>(_input);

@@ -13,6 +13,7 @@ mongo_cc_library(
     hdrs = ["shared_test_stages.h"],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/sdk:sdk_cpp",
     ],
 )

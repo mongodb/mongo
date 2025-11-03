@@ -226,9 +226,7 @@ private:
 
 protected:
     DocumentSourceExtension(StringData name,
-                            const boost::intrusive_ptr<ExpressionContext>& exprCtx,
-                            BSONObj rawStage,
-                            mongo::extension::AggStageDescriptorHandle descriptor);
+                            const boost::intrusive_ptr<ExpressionContext>& exprCtx);
 
     /**
      * NB : Here we keep a copy of the stage name to service getSourceName().
@@ -239,7 +237,6 @@ protected:
      **/
     const std::string _stageName;
     const Id _id;
-    const mongo::extension::AggStageParseNodeHandle _parseNode;
 
 private:
     // Do not support copy or move.

@@ -29,33 +29,41 @@
 #pragma once
 
 #include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
 
-class DocumentSourceExtensionOptimizable : public DocumentSourceExtension {
+class DocumentSourceExtensionExpandable : public DocumentSourceExtension {
 public:
-    // Construction of a source or transform stage that expanded from a desugar stage. This stage
-    // does not hold a parse node and therefore has no concept of a query shape. Its shape
-    // responsibility comes from the desugar stage it expanded from.
-    static boost::intrusive_ptr<DocumentSourceExtensionOptimizable> create(
+    static boost::intrusive_ptr<DocumentSourceExtensionExpandable> create(
         StringData name,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        AggStageAstNodeHandle astNode) {
-        return boost::intrusive_ptr<DocumentSourceExtensionOptimizable>(
-            new DocumentSourceExtensionOptimizable(name, expCtx, std::move(astNode)));
+        BSONObj rawStage,
+        AggStageDescriptorHandle staticDescriptor) {
+        return boost::intrusive_ptr<DocumentSourceExtensionExpandable>(
+            new DocumentSourceExtensionExpandable(name, expCtx, rawStage, staticDescriptor));
     }
 
     Value serialize(const SerializationOptions& opts) const override;
 
-protected:
-    const LogicalAggStageHandle _logicalStage;
+    std::list<boost::intrusive_ptr<DocumentSource>> expand() {
+        return expandImpl(getExpCtx(), _parseNode);
+    }
 
-    DocumentSourceExtensionOptimizable(StringData name,
-                                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       AggStageAstNodeHandle astNode)
-        : DocumentSourceExtension(name, expCtx), _logicalStage(astNode.bind()) {}
+private:
+    const AggStageParseNodeHandle _parseNode;
+
+    // Recursive helper for expand().
+    static std::list<boost::intrusive_ptr<DocumentSource>> expandImpl(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggStageParseNodeHandle& parseNodeHandle);
+
+    DocumentSourceExtensionExpandable(StringData name,
+                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      BSONObj rawStage,
+                                      extension::AggStageDescriptorHandle staticDescriptor)
+        : DocumentSourceExtension(name, expCtx), _parseNode(staticDescriptor.parse(rawStage)) {}
 };
 
 }  // namespace mongo::extension::host
