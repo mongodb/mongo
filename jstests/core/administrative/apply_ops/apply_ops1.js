@@ -11,10 +11,8 @@
  *   requires_replication,
  *   # Tenant migrations don't support applyOps.
  *   tenant_migration_incompatible,
- *   # As of 6.2, the 'preCondition' option is no longer supported by the applyOps command. The fact
- *   # that 'preCondition' is rejected is validated by this test, so it cannot run against nodes
- *   # older than 6.2.
- *   requires_fcv_62,
+ *   # While 8.0 supports $v: 1 oplog entries in applyOps, 7.0 does not.
+ *   requires_fcv_80,
  * ]
  */
 
