@@ -84,14 +84,14 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
                 ok = false;
                 return;
             }
-            boost::optional<Variables::Id> varId = e->getVariableId();
-            if (varId.has_value() && Variables::isBuiltin(*varId) &&
-                ((*varId) != Variables::kRootId)) {
+            if (e->getVariableId() != Variables::kRootId) {
+                // Referencing any user-defined variable ($let) or builtin variable (like $$NOW) is
+                // not supported.
                 LOGV2_DEBUG(11087203,
                             3,
                             "ExpressionFieldPath rejected for ExtractFieldPathsStage",
                             "fullPath"_attr = e->getFieldPath().fullPath(),
-                            "reason"_attr = "path access on builtin variable");
+                            "reason"_attr = "path access on non-ROOT variable");
                 ok = false;
                 return;
             }
