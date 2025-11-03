@@ -63,8 +63,7 @@ public:
 class FirstStageNotAstStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string(kFirstStageNotAstName);
-    FirstStageNotAstStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    FirstStageNotAstStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         return std::make_unique<FirstStageNotAstParseNode>();
@@ -98,8 +97,7 @@ public:
 class ExpandSizeTooBigStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string(kExpandSizeTooBigName);
-    ExpandSizeTooBigStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    ExpandSizeTooBigStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         return std::make_unique<ExpandSizeTooBigParseNode>();

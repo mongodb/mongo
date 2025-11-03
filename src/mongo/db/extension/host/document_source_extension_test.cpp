@@ -866,8 +866,7 @@ class NoOp2AggStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string(kNoOp2Name);
 
-    NoOp2AggStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    NoOp2AggStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         return std::make_unique<NoOp2AggStageParseNode>();

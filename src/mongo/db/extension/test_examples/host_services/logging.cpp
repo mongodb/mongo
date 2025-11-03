@@ -47,7 +47,7 @@ public:
     static inline const std::string kStageName = std::string(LogStageName);
     static inline const std::string kNumInfoLogLinesField = "numInfoLogLines";
 
-    LogStageDescriptor() : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    LogStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         // Log an error log and short-circuit if the spec is empty or not an object.

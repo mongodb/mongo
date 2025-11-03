@@ -42,9 +42,7 @@ class FooStageDescriptor : public mongo::extension::sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string(FooStageName);
 
-    FooStageDescriptor()
-        : mongo::extension::sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {
-    }
+    FooStageDescriptor() : mongo::extension::sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<mongo::extension::sdk::AggStageParseNode> parse(
         mongo::BSONObj stageBson) const override {
@@ -60,7 +58,7 @@ class BarStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string(BarStageName);
 
-    BarStageDescriptor() : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    BarStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);

@@ -168,18 +168,7 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
         };
     }();
 
-    // TODO SERVER-112178: Add case for DocumentSourceExtensionExpandable.
-    switch (descriptor.getType()) {
-        case MongoExtensionAggStageType::kNoOp:
-        case MongoExtensionAggStageType::kSource:
-            registerStage(nameAsString, id, descriptor);
-            break;
-        default:
-            tasserted(10596401,
-                      str::stream()
-                          << "Received unknown stage type while registering extension stage: "
-                          << descriptor.getType());
-    };
+    registerStage(nameAsString, id, descriptor);
 
     LiteParsedDocumentSource::registerParser(nameAsString,
                                              std::move(parser),

@@ -283,26 +283,6 @@ typedef enum MongoExtensionExplainVerbosity : uint32_t {
 } MongoExtensionExplainVerbosity;
 
 /**
- * Types of aggregation stages that can be implemented as an extension.
- */
-typedef enum MongoExtensionAggStageType : uint32_t {
-    /**
-     * NoOp stage.
-     */
-    kNoOp = 0,
-
-    /**
-     * Desugar stage.
-     */
-    kDesugar = 1,
-
-    /**
-     * Source stage.
-     */
-    kSource = 2,
-} MongoExtensionAggStageType;
-
-/**
  * An AggStageDescriptor describes features of a stage that are not bound to the stage
  * definition. This object functions as a factory to create logical stage through parsing.
  *
@@ -316,11 +296,6 @@ typedef struct MongoExtensionAggStageDescriptor {
  * Virtual function table for MongoExtensionAggStageDescriptor.
  */
 typedef struct MongoExtensionAggStageDescriptorVTable {
-    /**
-     * Return the type for this stage.
-     */
-    MongoExtensionAggStageType (*get_type)(const MongoExtensionAggStageDescriptor* descriptor);
-
     /**
      * Returns a MongoExtensionByteView containing the name of this aggregation stage.
      */

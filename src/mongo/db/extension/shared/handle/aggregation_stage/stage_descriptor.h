@@ -60,13 +60,6 @@ public:
     }
 
     /**
-     * Return the type for this stage.
-     */
-    MongoExtensionAggStageType getType() const {
-        return vtable().get_type(get());
-    }
-
-    /**
      * Parse the user provided stage definition for this stage descriptor.
      *
      * stageBson contains a BSON document with a single (stageName, stageDefinition) element
@@ -82,8 +75,6 @@ protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(
             10930102, "ExtensionAggStageDescriptor 'get_name' is null", vtable.get_name != nullptr);
-        tassert(
-            10930103, "ExtensionAggStageDescriptor 'get_type' is null", vtable.get_type != nullptr);
         tassert(10930104, "ExtensionAggStageDescriptor 'parse' is null", vtable.parse != nullptr);
     }
 };

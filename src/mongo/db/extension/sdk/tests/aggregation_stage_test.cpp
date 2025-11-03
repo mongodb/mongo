@@ -286,8 +286,7 @@ class NameMismatchStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string("$nameA");
 
-    NameMismatchStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kDesugar) {}
+    NameMismatchStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         return std::make_unique<NameMismatchParseNode>();
@@ -718,7 +717,6 @@ TEST_F(AggStageTest, SourceStageParseTest) {
         BSON(shared_test_stages::SourceAggStageDescriptor::kStageName << BSON("foo" << true));
     auto parseNodeHandle = handle.parse(stageBson);
     ASSERT_EQ(shared_test_stages::SourceAggStageDescriptor::kStageName, handle.getName());
-    ASSERT_EQ(::MongoExtensionAggStageType::kSource, handle.getType());
 }
 
 class FieldPathQueryShapeParseNode : public sdk::AggStageParseNode {

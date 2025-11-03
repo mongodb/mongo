@@ -394,18 +394,12 @@ public:
         return std::string_view(_name);
     }
 
-    ::MongoExtensionAggStageType getType() const {
-        return _type;
-    }
-
     virtual std::unique_ptr<class AggStageParseNode> parse(BSONObj stageBson) const = 0;
 
 protected:
-    AggStageDescriptor(std::string name, ::MongoExtensionAggStageType type)
-        : _name(std::move(name)), _type(type) {}
+    AggStageDescriptor(std::string name) : _name(std::move(name)) {}
 
     const std::string _name;
-    ::MongoExtensionAggStageType _type;
 };
 
 /**
@@ -441,11 +435,6 @@ private:
             static_cast<const ExtensionAggStageDescriptor*>(descriptor)->getImpl().getName());
     }
 
-    static ::MongoExtensionAggStageType _extGetType(
-        const ::MongoExtensionAggStageDescriptor* descriptor) noexcept {
-        return static_cast<const ExtensionAggStageDescriptor*>(descriptor)->getImpl().getType();
-    }
-
     static ::MongoExtensionStatus* _extParse(
         const ::MongoExtensionAggStageDescriptor* descriptor,
         ::MongoExtensionByteView stageBson,
@@ -466,8 +455,8 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggStageDescriptorVTable VTABLE = {
-        .get_type = &_extGetType, .get_name = &_extGetName, .parse = &_extParse};
+    static constexpr ::MongoExtensionAggStageDescriptorVTable VTABLE = {.get_name = &_extGetName,
+                                                                        .parse = &_extParse};
 
     std::unique_ptr<AggStageDescriptor> _descriptor;
 };

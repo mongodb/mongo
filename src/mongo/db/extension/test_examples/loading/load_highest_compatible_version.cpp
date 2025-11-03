@@ -43,8 +43,7 @@ namespace sdk = mongo::extension::sdk;
         static inline const std::string kStageName =                                             \
             std::string(ExtensionV##VERSION_NUM##StageName);                                     \
                                                                                                  \
-        ExtensionV##VERSION_NUM##StageDescriptor()                                               \
-            : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}          \
+        ExtensionV##VERSION_NUM##StageDescriptor() : sdk::AggStageDescriptor(kStageName) {}      \
                                                                                                  \
         std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override { \
             sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);          \

@@ -47,8 +47,7 @@ class TestFooStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string(TestFooStageName);
 
-    TestFooStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    TestFooStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         // Unlike foo.cpp, this will NOT fail to parse if the stage definition is not empty. Any/all

@@ -144,8 +144,7 @@ class ShapifyStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$shapify";
 
-    ShapifyStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    ShapifyStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);

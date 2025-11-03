@@ -126,8 +126,7 @@ class ExplainStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = "$explain";
 
-    ExplainStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    ExplainStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);

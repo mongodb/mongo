@@ -98,8 +98,7 @@ class ShardedExecutionSerializationStageDescriptor : public sdk::AggStageDescrip
 public:
     static inline const std::string kStageName = "$shardedExecutionSerialization";
 
-    ShardedExecutionSerializationStageDescriptor()
-        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+    ShardedExecutionSerializationStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
