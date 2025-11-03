@@ -5142,6 +5142,16 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
 }
 
 void ReplicationCoordinatorImpl::finishRecoveryIfEligible(OperationContext* opCtx) {
+    // It doesn't make sense to become a secondary before _initAndListen
+    // finishes. Perhaps more importantly, we need to take the Global lock
+    // several times in _initAndListen, and we don't want to reacquire (and not
+    // yield) the Global lock below if we race with taking the Global lock in
+    // _initAndListen.
+    LOGV2(
+        6295104,
+        "Starting ReplicationCoordinatorImpl::finishRecoveryIfEligible after startup completes...");
+    opCtx->getServiceContext()->waitForStartupComplete();
+    LOGV2(6295105, "Starting ReplicationCoordinatorImpl::finishRecoveryIfEligible");
     if (MONGO_unlikely(hangBeforeFinishRecovery.shouldFail())) {
         hangBeforeFinishRecovery.pauseWhileSet(opCtx);
     }

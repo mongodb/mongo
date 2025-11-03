@@ -201,6 +201,7 @@ void ReplCoordTest::init() {
     _net = dynamic_cast<NetworkInterfaceMock*>(
         dynamic_cast<executor::ThreadPoolTaskExecutor*>(_replExec)->getNetworkInterface().get());
     invariant(_net != nullptr);
+    service->notifyStorageStartupRecoveryComplete();
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {

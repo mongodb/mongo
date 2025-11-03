@@ -310,6 +310,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
 MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
+MONGO_FAIL_POINT_DEFINE(hangBeforeFinishingInitAndListen);
 MONGO_FAIL_POINT_DEFINE(hangBeforeShutdown);
 
 #ifdef _WIN32
@@ -1131,6 +1132,33 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
                                        TimedSectionId::logStartupOptions,
                                        &startupTimeElapsedBuilder);
         audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
+    }
+
+    if (MONGO_unlikely(hangBeforeFinishingInitAndListen.shouldFail())) {
+        // If something unexpectedly takes the GlobalLock and doesn't release
+        // it, then we can livelock here because reconstructing prepared
+        // transactions (as a result of replCoord->startup) takes the GlobalLock
+        // and doesn't release it. Other services initialized above may do
+        // something similar, whether now or in the future. Therefore, this
+        // block should be the last block before we reset the startupOpCtx.
+        LOGV2(6295100,
+              "Hanging before finishing initAndListen due to hangBeforeFinishingInitAndListen "
+              "failpoint");
+        // It would be better if we could
+        // hangBeforeFinishingInitAndListen.pauseWhileSet();
+        // and then release the failpoint from elsewhere (like a jstest), but
+        // we can't because the server hasn't started listening yet. Therefore,
+        // we just sleep for a fixed amount of time.
+        sleepsecs(1);
+        // Nothing should be permanently holding the global lock, so it should
+        // be quickly acquired here and released when we exit the block.
+        LOGV2(
+            6295101,
+            "Taking the GlobalWrite lock in initAndListen due to hangBeforeFinishingInitAndListen "
+            "failpoint");
+        Lock::GlobalWrite lk(startupOpCtx.get());
+        LOGV2(6295102,
+              "Finished hanging initAndListen due to hangBeforeFinishingInitAndListen failpoint");
     }
 
     // MessageServer::run will return when exit code closes its socket and we don't need the

@@ -488,9 +488,10 @@ void ServiceContext::waitForStartupComplete() {
 }
 
 void ServiceContext::notifyStorageStartupRecoveryComplete() {
-    stdx::unique_lock lk(_mutex);
-    _startupComplete = true;
-    lk.unlock();
+    {
+        stdx::lock_guard lk(_mutex);
+        _startupComplete = true;
+    }
     _startupCompleteCondVar.notify_all();
 }
 

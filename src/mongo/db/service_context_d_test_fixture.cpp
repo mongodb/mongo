@@ -192,6 +192,8 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     if (_journalListener) {
         serviceContext->getStorageEngine()->setJournalListener(_journalListener.get());
     }
+
+    serviceContext->notifyStorageStartupRecoveryComplete();
 }
 
 MongoDScopedGlobalServiceContextForTest::~MongoDScopedGlobalServiceContextForTest() {

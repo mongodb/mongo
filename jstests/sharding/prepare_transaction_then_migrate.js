@@ -17,6 +17,8 @@ import {
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
+const hangBeforeFinishingInitAndListenFpName = "hangBeforeFinishingInitAndListen";
+
 const dbName = "test";
 const collName = "user";
 
@@ -106,7 +108,16 @@ let runTest = function (testMode) {
         st.rs0.stepUp(st.rs0.getSecondary());
     } else if (testMode == TestMode.kWithRestart) {
         TestData.skipCollectionAndIndexValidation = true;
-        st.rs0.restart(st.rs0.getPrimary());
+        // TODO(SERVER-113373): We can't use the new failpoint in multiversion
+        // tests until 9.0 becomes last-lts.
+        const isMultiversion =
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+        const rsOpts = isMultiversion
+            ? null
+            : {
+                  setParameter: {["failpoint." + hangBeforeFinishingInitAndListenFpName]: "{'mode':'alwaysOn'}"},
+              };
+        st.rs0.restart(st.rs0.getPrimary(), rsOpts);
         st.rs0.waitForPrimary();
         TestData.skipCollectionAndIndexValidation = false;
 
