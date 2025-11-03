@@ -32,6 +32,7 @@
 namespace mongo::otel::traces {
 
 bool isTracingEnabled(OperationContext* opCtx) {
+#ifdef MONGO_CONFIG_OTEL
     if (!opCtx) {
         return false;
     }
@@ -41,6 +42,8 @@ bool isTracingEnabled(OperationContext* opCtx) {
     }
     const auto& context = VersionContext::getDecoration(opCtx);
     return feature_flags::gFeatureFlagTracing.isEnabled(context, fcv);
+#else
+    return false;
+#endif
 }
-
 }  // namespace mongo::otel::traces
