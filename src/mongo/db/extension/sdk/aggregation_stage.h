@@ -125,7 +125,6 @@ private:
  */
 class AggStageAstNode {
 public:
-    AggStageAstNode() = default;
     virtual ~AggStageAstNode() = default;
 
 
@@ -136,7 +135,8 @@ public:
     virtual std::unique_ptr<LogicalAggStage> bind() const = 0;
 
 protected:
-    AggStageAstNode(std::string_view name) : _name(name) {}
+    AggStageAstNode() = delete;  // No default constructor.
+    explicit AggStageAstNode(std::string_view name) : _name(name) {}
 
 private:
     const std::string_view _name;
@@ -235,7 +235,8 @@ public:
     virtual std::vector<VariantNode> expand() const = 0;
 
 protected:
-    AggStageParseNode(std::string_view name) : _name(name) {}
+    AggStageParseNode() = delete;  // No default constructor.
+    explicit AggStageParseNode(std::string_view name) : _name(name) {}
 
 private:
     const std::string_view _name;
@@ -397,7 +398,8 @@ public:
     virtual std::unique_ptr<class AggStageParseNode> parse(BSONObj stageBson) const = 0;
 
 protected:
-    AggStageDescriptor(std::string name) : _name(std::move(name)) {}
+    AggStageDescriptor() = delete;  // No default constructor.
+    explicit AggStageDescriptor(std::string name) : _name(std::move(name)) {}
 
     const std::string _name;
 };
