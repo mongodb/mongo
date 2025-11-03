@@ -31,20 +31,22 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 
 namespace mongo::feature_compatibility_version_documentation {
-constexpr inline auto kReleaseNotesRoot = "https://docs.mongodb.com/master/release-notes"_sd;
+MONGO_MOD_PUB constexpr inline auto kReleaseNotesRoot =
+    "https://docs.mongodb.com/master/release-notes"_sd;
 
-inline std::string compatibilityLink() {
+MONGO_MOD_PUB inline std::string compatibilityLink() {
     return fmt::format(                                //
         "{}/{}-compatibility/#feature-compatibility",  //
         kReleaseNotesRoot,                             //
         multiversion::toString(multiversion::GenericFCV::kLastLTS));
 }
 
-inline std::string upgradeLink() {
+MONGO_MOD_PUB inline std::string upgradeLink() {
     return fmt::format(               //
         "{}/{}/#upgrade-procedures",  //
         kReleaseNotesRoot,            //

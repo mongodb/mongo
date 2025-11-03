@@ -33,10 +33,11 @@
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/service_lifecycle.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::rss {
 
-class ReplicatedStorageService {
+class MONGO_MOD_PUB ReplicatedStorageService {
 public:
     static ReplicatedStorageService& get(ServiceContext*);
     static ReplicatedStorageService& get(OperationContext*);

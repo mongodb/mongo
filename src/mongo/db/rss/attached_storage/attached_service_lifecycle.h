@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/rss/service_lifecycle.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::rss {
 

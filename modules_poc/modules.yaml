@@ -379,6 +379,7 @@ transactions:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/cluster_command_translations.h
     - src/mongo/db/commands/*transaction*
@@ -407,6 +408,7 @@ fcv:
   meta:
     slack: server-fcv
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/feature_compatibility*
     - src/mongo/db/commands/feature_compatibility*
@@ -976,7 +978,8 @@ installer:
 replicated_storage_service:
   meta:
     slack: server-replication
-    jira: Server Replication
+    jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/rss
 
@@ -984,6 +987,7 @@ replication.hello:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/hello/
     - src/mongo/db/repl/replication_info.cpp
@@ -992,6 +996,7 @@ replication.initial_sync:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/modules/enterprise/src/fcbis/
     - src/mongo/db/repl/initial_sync/
@@ -1003,6 +1008,7 @@ replication.configs:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*repl_set_config*
     - src/mongo/db/repl/*member_config*
@@ -1018,6 +1024,7 @@ replication.oplog:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/op_observer/op_observer*
     - src/mongo/db/op_observer/operation_logger*
@@ -1046,6 +1053,7 @@ replication.server_rw_concerns:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/commands/server_status/read_write_concern_defaults_server_status.cpp
     - src/mongo/db/*read_concern*
@@ -1061,6 +1069,7 @@ replication.rs_aware_service:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*primary_only_service*
     - src/mongo/db/repl/*replica_set_aware_service*
@@ -1070,6 +1079,7 @@ replication.recovery:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*replication_recovery*
     - src/mongo/db/repl/*rollback*
@@ -1082,6 +1092,7 @@ replication.replication_coordinator:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*replication_coordinator*
     - src/mongo/db/repl/*external_state*
@@ -1107,6 +1118,7 @@ replication.utils:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*parsing_utils*
     - src/mongo/db/repl/*delayable_timeout_callback*
@@ -1127,6 +1139,7 @@ replication.repl_client_info:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*repl_client_info*
     - src/mongo/db/repl/*repl_set_member_in_standalone_mode*
@@ -1135,6 +1148,7 @@ replication.commands:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*repl_set_command*
     - src/mongo/db/repl/*repl_set_commands*
@@ -1147,6 +1161,7 @@ replication.testing:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*mock_repl_coord*
     - src/mongo/db/repl/*repl_set_test_egress*
@@ -1161,6 +1176,7 @@ replication.split_horizon:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/split_horizon/
 
@@ -1168,6 +1184,7 @@ replication.intent:
   meta:
     slack: server-replication
     jira: Replication
+    fully_marked: true
   files:
     - src/mongo/db/repl/*intent*
     - src/mongo/db/replication_state_transition_lock_guard*

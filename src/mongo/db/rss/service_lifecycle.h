@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -48,7 +49,7 @@ namespace rss {
  * capabilities/behaviors, while this class instead represents a set of setup/teardown and related
  * routines.
  */
-class ServiceLifecycle {
+class MONGO_MOD_OPEN ServiceLifecycle {
 public:
     virtual ~ServiceLifecycle() = default;
 

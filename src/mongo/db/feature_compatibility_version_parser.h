@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
@@ -42,7 +43,7 @@ namespace mongo {
  *
  * Also, act as helpers to serialize and deserialize "fcv_string" and "ofcv_string" idl types.
  */
-struct FeatureCompatibilityVersionParser {
+struct MONGO_MOD_PUB FeatureCompatibilityVersionParser {
     using GenericFCV = multiversion::GenericFCV;
     using FCV = multiversion::FeatureCompatibilityVersion;
 

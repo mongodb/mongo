@@ -54,7 +54,9 @@
 namespace mongo {
 namespace repl {
 
-class DatabaseCloner final : public InitialSyncBaseCloner {
+class DatabaseClonerTest;
+
+class MONGO_MOD_PUB DatabaseCloner final : public InitialSyncBaseCloner {
 public:
     struct Stats {
         DatabaseName dbname;

@@ -38,11 +38,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class FeatureCompatibilityVersion {
 public:
@@ -179,4 +180,4 @@ private:
     Lock::SharedLock _lk;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

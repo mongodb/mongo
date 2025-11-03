@@ -66,6 +66,8 @@
 namespace mongo {
 namespace repl {
 
+class CollectionClonerTest;
+
 inline const int kProgressMeterSecondsBetween = 60;
 inline const int kProgressMeterCheckInterval = 128;
 

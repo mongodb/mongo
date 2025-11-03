@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/rss/persistence_provider.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::rss {
 

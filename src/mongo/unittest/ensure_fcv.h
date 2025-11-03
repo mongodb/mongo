@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/server_options.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace unittest {

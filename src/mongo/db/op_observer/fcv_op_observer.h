@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
 #include <vector>
@@ -44,7 +45,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * OpObserver for Feature Compatibility Version (FCV).
@@ -107,4 +108,4 @@ private:
     static void _onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

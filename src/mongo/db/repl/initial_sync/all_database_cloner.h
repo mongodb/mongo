@@ -52,6 +52,8 @@
 namespace mongo {
 namespace repl {
 
+class AllDatabaseClonerTest;
+
 class AllDatabaseCloner final : public InitialSyncBaseCloner {
 public:
     struct Stats {
