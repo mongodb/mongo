@@ -38,4 +38,4 @@ filters:
       - 10gen/server-dbcheck
   - "**/*query*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query

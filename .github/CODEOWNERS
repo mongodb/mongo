@@ -401,7 +401,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/**/*move*primary* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/**/*refine_collection_shard_key* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/**/*dbcheck* @10gen/server-dbcheck @svc-auto-approve-bot
-/jstests/**/*query* @10gen/query-execution @svc-auto-approve-bot
+/jstests/**/*query* @10gen/query @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/aggregation/OWNERS.yml
 /jstests/aggregation/**/* @10gen/query @svc-auto-approve-bot
