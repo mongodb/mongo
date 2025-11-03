@@ -177,6 +177,11 @@ public:
 
     void setCacheMaxWaitTimeout(Milliseconds) override;
 
+    void optOutOfCacheEviction() override {
+        // 1 is a magic number in WiredTiger that opts this thread out of all optional eviction.
+        setCacheMaxWaitTimeout(Milliseconds(1));
+    }
+
     size_t getCacheDirtyBytes() override;
 
     // ---- WT STUFF

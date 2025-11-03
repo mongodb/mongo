@@ -856,6 +856,11 @@ public:
     virtual void setCacheMaxWaitTimeout(Milliseconds) {}
 
     /**
+     * Marks this recovery unit as exempt from participating in optional cache eviction.
+     */
+    virtual void optOutOfCacheEviction() {}
+
+    /**
      * Determine the amount of cache memory this recovery unit has dirtied. If this information is
      * not perfectly accurate, prefer to return a lower bound.
      */
