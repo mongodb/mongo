@@ -79,6 +79,8 @@ last-continuous:
       ticket: SERVER-112844
     - test_file: jstests/change_streams/filter_excludes_resume_point.js
       ticket: SERVER-112849
+    - test_file: jstests/aggregation/accumulators/accumulator_js_size_limits.js
+      ticket: SERVER-112267
   suites: null
 last-lts:
   all:
@@ -660,4 +662,6 @@ last-lts:
       ticket: SERVER-112844
     - test_file: jstests/change_streams/filter_excludes_resume_point.js
       ticket: SERVER-112849
+    - test_file: jstests/aggregation/accumulators/accumulator_js_size_limits.js
+      ticket: SERVER-112267
   suites: null
