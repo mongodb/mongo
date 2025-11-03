@@ -11,21 +11,22 @@
  *   requires_fcv_81,
  *   # Setting a server parameter is not allowed with a security token.
  *   not_allowed_with_signed_security_token,
- *   # TODO SERVER-103133 enable this test for viewless timeseres collection
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getUnionWithStage, getNestedProperties} from "jstests/libs/query/analyze_plan.js";
+
+const testDB = db.getSiblingDB(jsTestName());
+const timeFieldName = "time";
+const tagFieldName = "tag";
 
 TimeseriesTest.run((insert) => {
-    const testDB = db.getSiblingDB(jsTestName());
     // TODO SERVER-93961: It may be possible to remove this when the shard role API is ready.
     // In slower builds, inserts may get stuck behind resharding operations. This fix lowers the
     // chance for that to occur.
     assert.commandWorked(testDB.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}));
     assert.commandWorked(testDB.dropDatabase());
-    const timeFieldName = "time";
-    const tagFieldName = "tag";
     const collOptions = [null, {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}];
     const numHosts = 10;
     const numDocs = 200;
@@ -110,3 +111,109 @@ TimeseriesTest.run((insert) => {
         });
     });
 });
+
+const collA = testDB.getCollection("nested_a");
+const collB = testDB.getCollection("nested_b");
+const collC = testDB.getCollection("nested_c");
+
+function setUpCollections() {
+    collA.drop();
+    collB.drop();
+    collC.drop();
+    assert.commandWorked(
+        testDB.createCollection(collB.getName(), {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}),
+    );
+
+    assert.commandWorked(collA.insertMany([{hostname: "host_0"}, {hostname: "host_1"}]));
+    assert.commandWorked(
+        collB.insertMany([
+            {measurement: "cpu", time: ISODate(), tags: {hostname: "host_2"}},
+            {measurement: "cpu", time: ISODate(), tags: {hostname: "host_3"}},
+        ]),
+    );
+    assert.commandWorked(collC.insertMany([{hostname: "host_4"}, {hostname: "host_5"}]));
+}
+
+(function nestedUnionWith() {
+    setUpCollections();
+    const pipeline = [
+        {
+            $unionWith: {
+                coll: collB.getName(),
+                pipeline: [
+                    {
+                        $unionWith: {
+                            coll: collC.getName(),
+                            pipeline: [{$match: {"hostname": "host_4"}}],
+                        },
+                    },
+                    {$match: {$or: [{"tags.hostname": "host_2"}, {"hostname": "host_4"}]}},
+                ],
+            },
+        },
+        {$project: {[timeFieldName]: 0, _id: 0}},
+    ];
+    const results = collA.aggregate(pipeline).toArray();
+    const expected = [
+        {hostname: "host_0"},
+        {hostname: "host_1"},
+        {measurement: "cpu", tags: {hostname: "host_2"}},
+        {hostname: "host_4"},
+    ];
+    assertArrayEq({actual: results, expected: expected});
+})();
+
+// Ensure unionWith optimizations work when the foreign collection is timeseries.
+(function matchPushdown() {
+    // The $match stage from the top-level pipeline is pushed into the subpipeline, even if the subpipeline is empty.
+    setUpCollections();
+
+    const pipeline = [
+        {$unionWith: collB.getName()},
+        {$match: {$or: [{"tags.hostname": "host_2"}, {"hostname": "host_1"}]}},
+    ];
+
+    // Don't use 'assertArrayEq' since we do not want to add a $project stage and it's difficult to assert on the _id field.
+    const results = collA.aggregate(pipeline).toArray();
+    assert.eq(results.length, 2);
+    assert.eq(results[0].hostname, "host_1");
+    assert.eq(results[1].measurement, "cpu");
+    assert.eq(results[1].tags, {hostname: "host_2"});
+
+    // Run explain to ensure the optimization took place.
+    const unionWithStage = getUnionWithStage(collA.explain().aggregate(pipeline));
+    const parsedQuery = getNestedProperties(unionWithStage["$unionWith"]["pipeline"], "parsedQuery");
+    // If the optimization took place, the parsedQuery in the unionWith subpipeline will be non-empty and have the
+    // $match predicate inside.
+    assert(
+        parsedQuery.length > 0 && Object.keys(parsedQuery[0]).length > 0,
+        `Expected parsedQuery to contain an non-empty object, got: ${tojson(parsedQuery)}`,
+    );
+})();
+
+(function projectPushdown() {
+    // The $project stage from the top-level pipeline is pushed into the subpipeline, even if the subpipeline is empty.
+    setUpCollections();
+    const pipeline = [{$unionWith: collB.getName()}, {$project: {hostname: 1, _id: 0, tags: 1}}];
+
+    const results = collA.aggregate(pipeline).toArray();
+    const expected = [
+        {hostname: "host_0"},
+        {hostname: "host_1"},
+        {tags: {hostname: "host_2"}},
+        {tags: {hostname: "host_3"}},
+    ];
+    assertArrayEq({actual: results, expected: expected});
+
+    // Run explain to ensure the optimization took place.
+    const unionWithStage = getUnionWithStage(collA.explain().aggregate(pipeline));
+    const unpackStage = getNestedProperties(unionWithStage["$unionWith"]["pipeline"], "$_internalUnpackBucket");
+    // If the optimization happened, then the unpack stage should have internalized the projection inside its "include" field.
+    assert(unpackStage.length > 0, `Expected to find an unpack stage in the $unionWith subpipeline`);
+    const includeArray = unpackStage[0].include;
+    assertArrayEq({
+        actual: includeArray,
+        expected: ["tags", "hostname"],
+        message: "Expected the unpack stage to internalize the projection",
+    });
+})();

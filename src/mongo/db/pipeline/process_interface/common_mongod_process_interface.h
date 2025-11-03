@@ -147,9 +147,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
-        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           Pipeline* pipeline,
-                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
         bool shouldUseCollectionDefaultCollator = false,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;

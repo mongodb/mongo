@@ -760,9 +760,7 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       CollectionMetadata collData)> finalizePipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline,
     bool shouldUseCollectionDefaultCollator,
     boost::optional<const AggregateCommandRequest&> aggRequest,
     ExecShardFilterPolicy shardFilterPolicy) {
@@ -781,8 +779,8 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     // Viewless timeseries translations should have already occurred so we can get stable results
     // reading from the cache.
     if (!requiresCollectionAcquisition(*pipeline) || !attachCursorAfterOptimizing) {
-        if (finalizePipeline) {
-            finalizePipeline(expCtx, pipeline.get(), std::monostate{});
+        if (optimizePipeline) {
+            optimizePipeline(pipeline.get());
         }
         return pipeline;
     }
@@ -791,14 +789,15 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     bool isAnySecondaryCollectionNotLocal =
         acquireCollectionsForPipeline(expCtx, pipeline->serializeToBson(), allAcquisitions);
 
-    // Find the primary acquisition, so we can use it in makePipeline.
+    // Find the primary acquisition, so we can use it in 'performPreOptimizationRewrites'.
     const auto& itr = allAcquisitions.find(expCtx->getNamespaceString());
     tassert(10313201, "Must acquire the primary namespace", itr != allAcquisitions.end());
     const CollectionOrViewAcquisition& primaryAcquisition = itr->second;
+    pipeline->validateWithCollectionMetadata(primaryAcquisition);
+    pipeline->performPreOptimizationRewrites(expCtx, primaryAcquisition);
 
-    // After acquiring all of the collections, we can make and optimize the pipeline.
-    if (finalizePipeline) {
-        finalizePipeline(expCtx, pipeline.get(), primaryAcquisition);
+    if (optimizePipeline) {
+        optimizePipeline(pipeline.get());
     }
     return attachCursorSourceToPipelineForLocalReadImpl(std::move(pipeline),
                                                         allAcquisitions,

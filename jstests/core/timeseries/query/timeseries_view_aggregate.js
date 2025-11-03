@@ -1,5 +1,6 @@
 /**
- * Tests a few aggregation stages on views created from viewless timeseries collections
+ * Tests a few aggregation stages on on a view that is backed by a timeseries collection. This test
+ * validates that timeseries translations happen after view resolution.
  * @tags: [
  *   requires_timeseries,
  * ]
@@ -144,9 +145,7 @@ dataset.forEach((doc) => {
 });
 runTest(dataset, pipeline, expectedResults, viewPipeline);
 
-// TODO SERVER-103133 Add tests for pipelines with sub-pipelines, including $unionWith.
-
-// Test $lookup on a foreign collection that is a view on a timeseries collection.
+// Test aggregations with subpipelines on a foreign collection that is a view on a timeseries collection.
 {
     const normalCollName = jsTestName() + "_normal";
     const normalColl = db.getCollection(normalCollName);
@@ -224,5 +223,24 @@ runTest(dataset, pipeline, expectedResults, viewPipeline);
         actual: results,
         expected: expectedResults,
         extraErrorMsg: "Unexpected results with $graphLookup on a view on a timeseries collection",
+    });
+
+    // Validate $unionWith.
+    pipeline = [{$unionWith: viewName}, {$project: {_id: 0, name: 1, age: 1, status: 1}}];
+
+    // Expected results: all docs from normalColl (with age/status undefined), plus docs from the view.
+    expectedResults = [
+        {name: "Alice"},
+        {name: "Bob"},
+        {name: "Carol"},
+        {status: "active", age: 25},
+        {status: "inactive", age: 30},
+    ];
+
+    results = normalColl.aggregate(pipeline).toArray();
+    assertArrayEq({
+        actual: results,
+        expected: expectedResults,
+        extraErrorMsg: "Unexpected results with $unionWith on a view on a timeseries collection",
     });
 }

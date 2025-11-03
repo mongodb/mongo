@@ -126,7 +126,7 @@ GetNextResult UnionWithStage::doGetNext() {
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             // Preparation of sub pipeline failed. The pipeline will be modified to use the view
             // definition instead, and we attempt to prepare it again.
-            _sharedState->_pipeline = DocumentSourceUnionWith::buildPipelineFromViewDefinition(
+            _sharedState->_pipeline = DocumentSourceUnionWith::parsePipelineWithMaybeViewDefinition(
                 pExpCtx,
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 std::move(serializedPipeline),
@@ -173,12 +173,18 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
     // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith constructor.
     // Attach query settings to the '_pipeline->getContext()' by copying them from the
     // parent query ExpressionContext.
-    _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
-        pExpCtx->getQuerySettings());
+    const boost::intrusive_ptr<ExpressionContext>& pipelineCtx =
+        _sharedState->_pipeline->getContext();
+    pipelineCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
     logPipeline(104243, "$unionWith before pipeline prep: ", *_sharedState->_pipeline);
-    _sharedState->_pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
-        std::move(_sharedState->_pipeline));
+
+    _sharedState->_pipeline =
+        pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
+            pipelineCtx,
+            std::move(_sharedState->_pipeline),
+            true /* attachCursorAfterOptimizing */,
+            pipeline_optimization::optimizeAndValidatePipeline);
     logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
 
     _sharedState->_executionState = UnionWithSharedState::ExecutionProgress::kIteratingSubPipeline;

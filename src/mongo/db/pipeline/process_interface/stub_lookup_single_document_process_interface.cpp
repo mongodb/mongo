@@ -55,15 +55,13 @@ StubLookupSingleDocumentProcessInterface::finalizeAndAttachCursorToPipelineForLo
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline,
     bool shouldUseCollectionDefaultCollator,
     boost::optional<const AggregateCommandRequest&> aggRequest,
     ExecShardFilterPolicy shardFilterPolicy) {
 
-    if (finalizePipeline) {
-        finalizePipeline(expCtx, pipeline.get(), std::monostate{});
+    if (optimizePipeline) {
+        optimizePipeline(pipeline.get());
     }
     if (attachCursorAfterOptimizing) {
         return attachCursorSourceToPipelineForLocalRead(
@@ -88,14 +86,12 @@ StubLookupSingleDocumentProcessInterface::finalizeAndMaybePreparePipelineForExec
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       CollectionMetadata collData)> finalizePipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
     return finalizeAndAttachCursorToPipelineForLocalRead(
-        expCtx, std::move(pipeline), attachCursorAfterOptimizing, finalizePipeline);
+        expCtx, std::move(pipeline), attachCursorAfterOptimizing, optimizePipeline);
 }
 
 std::unique_ptr<Pipeline> StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(

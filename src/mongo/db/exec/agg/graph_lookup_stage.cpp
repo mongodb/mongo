@@ -549,33 +549,12 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
 
     std::unique_ptr<mongo::Pipeline> pipeline = mongo::Pipeline::parse(_fromPipeline, _fromExpCtx);
     _fromExpCtx->initializeReferencedSystemVariables();
-
-    const auto& finalizePipeline = [](const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      mongo::Pipeline* pipeline,
-                                      MongoProcessInterface::CollectionMetadata collData) {
-        tassert(10313400, "Expected pipeline to finalize", pipeline);
-        visit(OverloadedVisitor{
-                  [&](std::monostate) {},
-                  [&](std::reference_wrapper<const CollectionOrViewAcquisition> collOrView) {
-                      pipeline->validateWithCollectionMetadata(collOrView);
-                      pipeline->performPreOptimizationRewrites(expCtx, collOrView);
-                  },
-                  [&](std::reference_wrapper<const CollectionRoutingInfo> cri) {
-                      if (cri.get().hasRoutingTable()) {
-                          pipeline->validateWithCollectionMetadata(cri);
-                          pipeline->performPreOptimizationRewrites(expCtx, cri);
-                      }
-                  }},
-              collData);
-        pipeline_optimization::optimizePipeline(*pipeline);
-        pipeline->validateCommon(true /* alreadyOptimized */);
-    };
     try {
         return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             _fromExpCtx,
             std::move(pipeline),
             true /* attachCursorAfterOptimizing */,
-            finalizePipeline,
+            pipeline_optimization::optimizeAndValidatePipeline,
             shardTargetingPolicy);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         // This exception returns the information we need to resolve a sharded view. Update
@@ -618,7 +597,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
             _fromExpCtx,
             std::move(pipeline),
             true /* attachCursorAfterOptimizing */,
-            finalizePipeline,
+            pipeline_optimization::optimizeAndValidatePipeline,
             shardTargetingPolicy);
     }
 }

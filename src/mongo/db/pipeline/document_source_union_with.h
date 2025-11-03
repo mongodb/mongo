@@ -80,6 +80,9 @@ struct UnionWithSharedState {
         // There are no more results.
         kFinished
     };
+    // This pipeline will not be translated nor optimized, but the view will be resolved.
+    // Pre-optimization rewrites and optimizations will happen right before the subpipeline is
+    // executed in 'UnionWithStage::doGetNext'.
     std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     // The aggregation pipeline defined with the user request, prior to optimization and view
@@ -131,6 +134,7 @@ public:
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             std::unique_ptr<Pipeline> pipeline);
 
+    // Copy constructor used for clone().
     DocumentSourceUnionWith(const DocumentSourceUnionWith& original,
                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx);
 
@@ -226,7 +230,7 @@ public:
         return _sharedState;
     }
 
-    static std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
+    static std::unique_ptr<Pipeline> parsePipelineWithMaybeViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ResolvedNamespace& resolvedNs,
         std::vector<BSONObj> currentPipeline,
@@ -246,8 +250,6 @@ private:
         const boost::intrusive_ptr<const DocumentSource>& documentSource);
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-
-    void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
     std::shared_ptr<UnionWithSharedState> _sharedState;
 

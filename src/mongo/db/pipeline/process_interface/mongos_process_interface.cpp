@@ -146,9 +146,7 @@ std::unique_ptr<Pipeline> MongosProcessInterface::finalizeAndMaybePreparePipelin
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       CollectionMetadata collData)> finalizePipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
@@ -160,7 +158,7 @@ std::unique_ptr<Pipeline> MongosProcessInterface::finalizeAndMaybePreparePipelin
         expCtx,
         std::move(pipeline),
         attachCursorAfterOptimizing,
-        finalizePipeline,
+        optimizePipeline,
         shardTargetingPolicy,
         readConcern,
         shouldUseCollectionDefaultCollator);
@@ -199,8 +197,10 @@ std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
         std::move(readConcern));
 }
 
-BSONObj MongosProcessInterface::preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
-                                                          ExplainOptions::Verbosity verbosity) {
+BSONObj MongosProcessInterface::finalizePipelineAndExplain(
+    std::unique_ptr<Pipeline> pipeline,
+    ExplainOptions::Verbosity verbosity,
+    std::function<void(Pipeline* pipeline)> optimizePipeline) {
     auto firstStage = pipeline->peekFront();
 
     // We don't want to serialize and send a MergeCursors stage to the shards.
@@ -209,7 +209,8 @@ BSONObj MongosProcessInterface::preparePipelineAndExplain(std::unique_ptr<Pipeli
          typeid(*firstStage) == typeid(DocumentSourceMergeCursors))) {
         pipeline->popFront();
     }
-    return sharded_agg_helpers::targetShardsForExplain(std::move(pipeline));
+    return sharded_agg_helpers::finalizePipelineAndTargetShardsForExplain(std::move(pipeline),
+                                                                          optimizePipeline);
 }
 
 boost::optional<Document> MongosProcessInterface::lookupSingleDocument(

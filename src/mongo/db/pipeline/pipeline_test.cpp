@@ -144,8 +144,13 @@ BSONObj pipelineFromJsonArray(const std::string& jsonArray) {
 }
 
 class StubExplainInterface : public StubMongoProcessInterface {
-    BSONObj preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
-                                      ExplainOptions::Verbosity verbosity) override {
+    BSONObj finalizePipelineAndExplain(
+        std::unique_ptr<Pipeline> pipeline,
+        ExplainOptions::Verbosity verbosity,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr) override {
+        if (optimizePipeline) {
+            optimizePipeline(pipeline.get());
+        }
         BSONArrayBuilder bab;
         auto opts = SerializationOptions{.verbosity = boost::make_optional(verbosity)};
         auto pipelineVec = pipeline->writeExplainOps(opts);

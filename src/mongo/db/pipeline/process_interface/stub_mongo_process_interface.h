@@ -239,9 +239,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
-        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           Pipeline* pipeline,
-                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) override {
@@ -266,8 +264,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
-                                      ExplainOptions::Verbosity verbosity) override {
+    BSONObj finalizePipelineAndExplain(
+        std::unique_ptr<Pipeline> pipeline,
+        ExplainOptions::Verbosity verbosity,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr) override {
         MONGO_UNREACHABLE;
     }
 
@@ -290,9 +290,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
-        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           Pipeline* pipeline,
-                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
         bool shouldUseCollectionDefaultCollator = false,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) override {

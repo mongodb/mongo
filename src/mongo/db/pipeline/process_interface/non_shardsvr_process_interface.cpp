@@ -78,16 +78,14 @@ NonShardServerProcessInterface::finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       CollectionMetadata collData)> finalizePipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
     return finalizeAndAttachCursorToPipelineForLocalRead(expCtx,
                                                          std::move(pipeline),
                                                          attachCursorAfterOptimizing,
-                                                         finalizePipeline,
+                                                         optimizePipeline,
                                                          shouldUseCollectionDefaultCollator);
 }
 
@@ -375,8 +373,10 @@ void NonShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
     dropCollection(opCtx, nss);
 }
 
-BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
-    std::unique_ptr<Pipeline> pipeline, ExplainOptions::Verbosity verbosity) {
+BSONObj NonShardServerProcessInterface::finalizePipelineAndExplain(
+    std::unique_ptr<Pipeline> pipeline,
+    ExplainOptions::Verbosity verbosity,
+    std::function<void(Pipeline* pipeline)> optimizePipeline) {
     std::vector<Value> pipelineVec;
     auto firstStage = pipeline->peekFront();
     auto opts = SerializationOptions{.verbosity = verbosity};
@@ -391,7 +391,9 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
             pipelineVec = pipeline->writeExplainOps(opts);
         }
     } else {
-        auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
+        const boost::intrusive_ptr<ExpressionContext>& pipelineCtx = pipeline->getContext();
+        auto pipelineWithCursor = finalizeAndAttachCursorToPipelineForLocalRead(
+            pipelineCtx, std::move(pipeline), true, optimizePipeline);
         // If we need execution stats, this runs the plan in order to gather the stats.
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->freeze());

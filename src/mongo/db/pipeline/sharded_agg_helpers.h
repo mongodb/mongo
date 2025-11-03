@@ -187,7 +187,9 @@ void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
  * Targets the shards with an aggregation command built from `pipeline` and explain set to true.
  * Returns a BSONObj of the form {"pipeline": {<pipelineExplainOutput>}}.
  */
-BSONObj targetShardsForExplain(std::unique_ptr<Pipeline> pipeline);
+BSONObj finalizePipelineAndTargetShardsForExplain(
+    std::unique_ptr<Pipeline> pipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr);
 
 /**
  * Returns a set of targeted shards responsible for answering the 'shardQuery'.
@@ -245,10 +247,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
-        nullptr,
+    std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
     bool shouldUseCollectionDefaultCollator = false);

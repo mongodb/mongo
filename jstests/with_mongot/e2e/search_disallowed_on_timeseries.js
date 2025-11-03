@@ -5,6 +5,7 @@
  * @tags: [requires_fcv_83, requires_timeseries]
  */
 
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     expectCreateSearchIndexFails,
@@ -48,7 +49,14 @@ assert.commandWorked(bulk.execute());
                 },
             },
         ],
-        // TODO SERVER-103133 Add tests for $search in a $unionWith.
+        [
+            {
+                $unionWith: {
+                    coll: timeseriesCollName,
+                    pipeline: [{$search: {index: "default", text: {query: "example", path: metaFieldName}}}],
+                },
+            },
+        ],
     ];
 
     // TODO SERVER-108560 remove the legacy timeseries error codes (10623000 and 40602), once 9.0
@@ -170,31 +178,46 @@ assert.commandWorked(bulk.execute());
     coll.insert({a: 100, size: "medium", [metaFieldName]: 2});
     createSearchIndex(coll, {name: "foo-block", definition: {"mappings": {"dynamic": true}}});
 
-    const pipelines = [
-        [
-            {
-                $lookup: {
-                    from: collName,
-                    let: {lkey: `$${metaFieldName}`},
-                    pipeline: [
-                        {$search: {index: "foo-block", text: {query: "medium", path: "size"}}},
-                        {$match: {$expr: {$eq: [`$${metaFieldName}`, "$$lkey"]}}},
-                    ],
-                    as: "joined",
-                },
+    // Validate $lookup.
+    let pipeline = [
+        {
+            $lookup: {
+                from: collName,
+                let: {lkey: `$${metaFieldName}`},
+                pipeline: [
+                    {$search: {index: "foo-block", text: {query: "medium", path: "size"}}},
+                    {$match: {$expr: {$eq: [`$${metaFieldName}`, "$$lkey"]}}},
+                ],
+                as: "joined",
             },
-        ],
-        // TODO SERVER-103133 Add tests for $search in a $unionWith.
+        },
     ];
 
-    // TODO SERVER-108560 remove the legacy timeseries error codes (10623000 and 40602), once 9.0
-    // becomes last LTS.
-    pipelines.forEach((pipeline) => {
-        const results = tsColl.aggregate(pipeline).toArray();
-        // The 'joined' field should contain the same number of documents as the value of 'tags'.
-        results.forEach((doc) => {
-            assert.eq(doc.joined.length, doc.tags);
-        });
+    let results = tsColl.aggregate(pipeline).toArray();
+    // The 'joined' field should contain the same number of documents as the value of 'tags'.
+    results.forEach((doc) => {
+        assert.eq(doc.joined.length, doc.tags);
+    });
+
+    // Validate $unionWith.
+    pipeline = [
+        {
+            $unionWith: {
+                coll: collName,
+                pipeline: [{$search: {index: "foo-block", text: {query: "medium", path: "size"}}}],
+            },
+        },
+        {$project: {_id: 0, a: 1, size: 1, [metaFieldName]: 1}},
+        {$group: {_id: "$tags", maxSize: {$max: "$size"}, count: {$sum: 1}}},
+    ];
+    results = tsColl.aggregate(pipeline).toArray();
+    assertArrayEq({
+        actual: results,
+        expected: [
+            {_id: 1, maxSize: "medium", count: 6},
+            {_id: 0, maxSize: null, count: 5},
+            {_id: 2, maxSize: "medium", count: 1},
+        ],
     });
 
     dropSearchIndex(coll, {name: "foo-block"});

@@ -95,14 +95,12 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
-        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           Pipeline* pipeline,
-                           CollectionMetadata collData)> finalizePipeline,
+        std::function<void(Pipeline* pipeline)> optimizePipeline,
         ShardTargetingPolicy shardTargetingPolicy,
         boost::optional<BSONObj> readConcern,
         bool shouldUseCollectionDefaultCollator) final {
-        if (finalizePipeline) {
-            finalizePipeline(expCtx, pipeline.get(), std::monostate{});
+        if (optimizePipeline) {
+            optimizePipeline(pipeline.get());
         }
 
         if (attachCursorAfterOptimizing) {

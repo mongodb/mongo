@@ -37,6 +37,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -170,7 +171,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         if (it != resolvedNamespaces.end()) {
             resolvedUnionNs = it->second;
             _sharedState = std::make_shared<UnionWithSharedState>(
-                buildPipelineFromViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
+                parsePipelineWithMaybeViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
                 nullptr,
                 UnionWithSharedState::ExecutionProgress::kIteratingSource,
                 Variables(),
@@ -178,6 +179,8 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         } else {
             // This case only occurs in a sharded context where the database name is the same
             // as the current namespace, and will be resolved in the catch below.
+            // We do not use the result of 'makePipeline', since this is simply to raise
+            // 'CommandOnShardedViewNotSupportedOnMongod'.
             pipeline_factory::makePipeline(pipeline, expCtx, {});
         }
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
@@ -187,7 +190,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         // We set the resolvedUnionNs from the execption view defintion.
         resolvedUnionNs = ResolvedNamespace{e->getNamespace(), e->getPipeline()};
         _sharedState = std::make_shared<UnionWithSharedState>(
-            buildPipelineFromViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
+            parsePipelineWithMaybeViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
             nullptr,
             UnionWithSharedState::ExecutionProgress::kIteratingSource,
             Variables(),
@@ -427,7 +430,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             if (_resolvedNsForView.has_value()) {
                 // This takes care of the case where this code is executing on a mongod and we have
                 // the full catalog information, so we can resolve the view.
-                pipeCopy = buildPipelineFromViewDefinition(
+                pipeCopy = parsePipelineWithMaybeViewDefinition(
                     getExpCtx(),
                     ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
                     std::move(recoveredPipeline),
@@ -472,8 +475,10 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
                 getExpCtx()->getQuerySettings());
 
-            return getExpCtx()->getMongoProcessInterface()->preparePipelineAndExplain(
-                std::move(pipeline), *opts.verbosity);
+            return getExpCtx()->getMongoProcessInterface()->finalizePipelineAndExplain(
+                std::move(pipeline),
+                *opts.verbosity,
+                pipeline_optimization::optimizeAndValidatePipeline);
         };
 
         BSONObj explainLocal = [&] {
@@ -484,7 +489,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 logShardedViewFound(e, _sharedState->_pipeline->serializeToBson());
                 // This takes care of the case where this code is executing on mongos and we had to
                 // get the view pipeline from a shard.
-                auto resolvedPipeline = buildPipelineFromViewDefinition(
+                auto resolvedPipeline = parsePipelineWithMaybeViewDefinition(
                     getExpCtx(),
                     ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                     std::move(serializedPipe),
@@ -612,7 +617,7 @@ void DocumentSourceUnionWith::addInvolvedCollections(
     collectionNames->merge(_sharedState->_pipeline->getInvolvedCollections());
 }
 
-std::unique_ptr<Pipeline> DocumentSourceUnionWith::buildPipelineFromViewDefinition(
+std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ResolvedNamespace& resolvedNs,
     std::vector<BSONObj> currentPipeline,
@@ -625,16 +630,15 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::buildPipelineFromViewDefiniti
                     src->constraints().isAllowedInUnionPipeline());
         }
     };
-
     pipeline_factory::MakePipelineOptions opts;
     opts.attachCursorSource = false;
-    // Only call optimize() here if we actually have a pipeline to resolve in the view definition.
-    opts.optimize = !resolvedNs.pipeline.empty();
+    // We will call optimize() when finalizing the pipeline in 'doGetNext()'.
+    opts.optimize = false;
     opts.validator = validatorCallback;
 
-    auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
+    boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
-
+    // This will just parse the pipeline, with or without a view definition.
     return pipeline_factory::makePipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }

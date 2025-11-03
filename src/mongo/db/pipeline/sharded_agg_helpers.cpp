@@ -59,6 +59,7 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
@@ -544,10 +545,7 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     const AggregateCommandRequest& aggRequest,
     bool useCollectionDefaultCollator,
     const ShardId& localShardId,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
-        nullptr,
+    std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
     std::unique_ptr<Pipeline> preFinalizedPipeline = nullptr) {
     const auto& nss = expCtx->getNamespaceString();
     const auto& targetingCri = routingCtx.getCollectionRoutingInfo(nss);
@@ -576,14 +574,14 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
         routingCtx.onRequestSentForNss(nss);
 
         // Pass in the 'preFinalizedPipeline', since 'finalizeAndAttachCursorToPipelineForLocalRead'
-        // will acquire new collection acquisition and perform 'finalizePipeline' on the new
+        // will acquire new collection acquisition and perform 'optimizePipeline' on the new
         // collection metadata.
-        auto pipelineWithCursor = finalizePipeline
+        auto pipelineWithCursor = optimizePipeline
             ? expCtx->getMongoProcessInterface()->finalizeAndAttachCursorToPipelineForLocalRead(
                   expCtx,
                   std::move(preFinalizedPipeline),
                   true /* attachCursorAfterOptimizing */,
-                  finalizePipeline,
+                  optimizePipeline,
                   useCollectionDefaultCollator,
                   aggRequest)
             : expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
@@ -1565,7 +1563,8 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
     return Status::OK();
 }
 
-BSONObj targetShardsForExplain(std::unique_ptr<Pipeline> pipeline) {
+BSONObj finalizePipelineAndTargetShardsForExplain(
+    std::unique_ptr<Pipeline> pipeline, std::function<void(Pipeline* pipeline)> optimizePipeline) {
     auto expCtx = pipeline->getContext();
 
     // The pipeline is going to be explained on the shards, and we don't want to send a
@@ -1574,37 +1573,49 @@ BSONObj targetShardsForExplain(std::unique_ptr<Pipeline> pipeline) {
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
     invariant(expCtx->getExplain());
 
-    // Generate the command object for the targeted shards.
-    auto rawStages = [&pipeline]() {
-        auto serialization = pipeline->serialize();
-        std::vector<BSONObj> stages;
-        stages.reserve(serialization.size());
-
-        for (const auto& stageObj : serialization) {
-            invariant(stageObj.getType() == BSONType::object);
-            stages.push_back(stageObj.getDocument().toBson());
-        }
-
-        return stages;
-    }();
-    AggregateCommandRequest aggRequest(expCtx->getNamespaceString(), rawStages);
-
-    LiteParsedPipeline liteParsedPipeline(aggRequest);
-    PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
-
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),
                                               expCtx->getNamespaceString());
-    aggregation_request_helper::addQuerySettingsToRequest(aggRequest, expCtx);
     return router.routeWithRoutingContext(
         expCtx->getOperationContext(),
         "collecting explain from shards"_sd,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            // We must have a clone of the pipeline in case this loop is retried.
+            std::unique_ptr<Pipeline> pipelineToTarget = pipeline->clone();
+
+            const CollectionRoutingInfo& cri =
+                routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString());
+            pipelineToTarget->validateWithCollectionMetadata(cri);
+            pipelineToTarget->performPreOptimizationRewrites(expCtx, cri);
+
+            if (optimizePipeline) {
+                optimizePipeline(pipelineToTarget.get());
+            }
+
+            // Generate the command object for the targeted shards with the finalized pipeline.
+            auto rawStages = [&pipelineToTarget]() {
+                auto serialization = pipelineToTarget->serialize();
+                std::vector<BSONObj> stages;
+                stages.reserve(serialization.size());
+
+                for (const auto& stageObj : serialization) {
+                    invariant(stageObj.getType() == BSONType::object);
+                    stages.push_back(stageObj.getDocument().toBson());
+                }
+
+                return stages;
+            }();
+            AggregateCommandRequest aggRequest(expCtx->getNamespaceString(), rawStages);
+
+            LiteParsedPipeline liteParsedPipeline(aggRequest);
+            PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
+            aggregation_request_helper::addQuerySettingsToRequest(aggRequest, expCtx);
+
             auto shardDispatchResults =
                 dispatchShardPipeline(routingCtx,
                                       Document(aggRequest.toBSON()),
                                       pipelineDataSource,
                                       expCtx->eligibleForSampling(),
-                                      pipeline->clone(),
+                                      std::move(pipelineToTarget),
                                       expCtx->getExplain(),
                                       expCtx->getNamespaceString(),
                                       false /* requestQueryStatsFromRemotes */);
@@ -1713,10 +1724,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool useCollectionDefaultCollator,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
-        nullptr,
+    std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
     std::unique_ptr<Pipeline> preFinalizedPipeline = nullptr) {
 
     tassert(9597602,
@@ -1748,7 +1756,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
                                                   aggRequest,
                                                   useCollectionDefaultCollator,
                                                   *localShardId,
-                                                  finalizePipeline,
+                                                  optimizePipeline,
                                                   std::move(preFinalizedPipeline))) {
             return pipelineWithCursor;
         }
@@ -1861,9 +1869,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
@@ -1875,8 +1881,8 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     // a cache. Viewless timeseries translations should have already occurred so we can get stable
     // results reading from the cache.
     if (firstStageCanExecuteWithoutCursor(*pipeline) || !attachCursorAfterOptimizing) {
-        if (finalizePipeline) {
-            finalizePipeline(expCtx, pipeline.get(), std::monostate{});
+        if (optimizePipeline) {
+            optimizePipeline(pipeline.get());
         }
         return pipeline;
     }
@@ -1886,7 +1892,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                 "Only shard role operations can perform local reads.",
                 expCtx->getOperationContext()->getService()->role().has(ClusterRole::ShardServer));
         return expCtx->getMongoProcessInterface()->finalizeAndAttachCursorToPipelineForLocalRead(
-            expCtx, std::move(pipeline), attachCursorAfterOptimizing, finalizePipeline);
+            expCtx, std::move(pipeline), attachCursorAfterOptimizing, optimizePipeline);
     }
 
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),
@@ -1901,9 +1907,11 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
 
             const CollectionRoutingInfo& cri =
                 routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString());
+            pipelineToTarget->validateWithCollectionMetadata(cri);
+            pipelineToTarget->performPreOptimizationRewrites(expCtx, cri);
 
-            if (finalizePipeline) {
-                finalizePipeline(expCtx, pipelineToTarget.get(), cri);
+            if (optimizePipeline) {
+                optimizePipeline(pipelineToTarget.get());
             }
 
             LOGV2_DEBUG(11028102,
@@ -1923,7 +1931,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                 shardTargetingPolicy,
                 readConcern,
                 shouldUseCollectionDefaultCollator,
-                finalizePipeline,
+                optimizePipeline,
                 pipeline->clone());
         });
 }

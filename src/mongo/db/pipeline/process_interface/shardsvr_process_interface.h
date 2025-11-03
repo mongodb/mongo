@@ -128,8 +128,10 @@ public:
                                     bool multi,
                                     boost::optional<OID> targetEpoch) final;
 
-    BSONObj preparePipelineAndExplain(std::unique_ptr<Pipeline> pipeline,
-                                      ExplainOptions::Verbosity verbosity) final;
+    BSONObj finalizePipelineAndExplain(
+        std::unique_ptr<Pipeline> pipeline,
+        ExplainOptions::Verbosity verbosity,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr) final;
 
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
 
@@ -172,9 +174,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::unique_ptr<Pipeline> pipeline,
         bool attachCursorAfterOptimizing,
-        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           Pipeline* pipeline,
-                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final;

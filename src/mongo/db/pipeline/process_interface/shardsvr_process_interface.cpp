@@ -237,8 +237,10 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     return {{response.getN(), response.getNModified()}};
 }
 
-BSONObj ShardServerProcessInterface::preparePipelineAndExplain(
-    std::unique_ptr<Pipeline> pipeline, ExplainOptions::Verbosity verbosity) {
+BSONObj ShardServerProcessInterface::finalizePipelineAndExplain(
+    std::unique_ptr<Pipeline> pipeline,
+    ExplainOptions::Verbosity verbosity,
+    std::function<void(Pipeline* pipeline)> optimizePipeline) {
     auto firstStage = pipeline->peekFront();
     // We don't want to send an internal stage to the shards.
     if (firstStage &&
@@ -247,7 +249,8 @@ BSONObj ShardServerProcessInterface::preparePipelineAndExplain(
          typeid(*firstStage) == typeid(DocumentSourceCursor))) {
         pipeline->popFront();
     }
-    return sharded_agg_helpers::targetShardsForExplain(std::move(pipeline));
+    return sharded_agg_helpers::finalizePipelineAndTargetShardsForExplain(std::move(pipeline),
+                                                                          optimizePipeline);
 }
 
 void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
@@ -626,9 +629,7 @@ std::unique_ptr<Pipeline> ShardServerProcessInterface::finalizeAndMaybePreparePi
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline> pipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       Pipeline* pipeline,
-                       CollectionMetadata collData)> finalizePipeline,
+    std::function<void(Pipeline* pipeline)> optimizePipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
@@ -636,7 +637,7 @@ std::unique_ptr<Pipeline> ShardServerProcessInterface::finalizeAndMaybePreparePi
         expCtx,
         std::move(pipeline),
         attachCursorAfterOptimizing,
-        finalizePipeline,
+        optimizePipeline,
         shardTargetingPolicy,
         readConcern,
         shouldUseCollectionDefaultCollator);

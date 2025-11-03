@@ -143,10 +143,7 @@ private:
         const std::vector<BSONObj>& viewPipeline,
         bool attachCursorAfterOptimizing,
         ShardTargetingPolicy shardTargetingPolicy,
-        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           mongo::Pipeline* pipeline,
-                           MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
-            nullptr);
+        std::function<void(mongo::Pipeline* pipeline)> optimizePipeline = nullptr);
 
     bool hasLocalFieldForeignFieldJoin() const {
         return _localField != boost::none;

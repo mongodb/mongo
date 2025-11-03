@@ -66,5 +66,16 @@ void optimizeContainer(DocumentSourceContainer* container);
  */
 DocumentSourceContainer::iterator optimizeEndOfPipeline(DocumentSourceContainer::iterator itr,
                                                         DocumentSourceContainer* container);
+
+/*
+ * Helper to optimize and validate pipelines. This helper is used by stages that execute
+ * subpipelines (lookup, graphLookup, unionWith), and **must** be called before we execute the
+ * subpipeline.
+ */
+inline void optimizeAndValidatePipeline(Pipeline* pipeline) {
+    tassert(10313300, "Expected pipeline to optimize", pipeline);
+    optimizePipeline(*pipeline);
+    pipeline->validateCommon(true /* alreadyOptimized */);
+}
 }  // namespace pipeline_optimization
 }  // namespace mongo
