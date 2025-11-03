@@ -326,11 +326,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
                 // presence of dynamically set dbs in scripting (users will not have a createView
                 // work in some dynamic contexts and not in others, a source of possible
                 // frustration).
+                // TODO (SPM-1966): Both of these asserts that there is no involved mongos can be
+                // removed after SPM-1966
                 uassert(ErrorCodes::FailedToParse,
                         "db cannot be specified in $unionWith in a view",
                         !expCtx->getIsParsingViewDefinition());
-                // TODO (SPM-1966): This assert that there is no involved mongos can be removed
-                // after SPM-1966
                 uassert(ErrorCodes::FailedToParse,
                         "db cannot be specified in $unionWith on mongos, namespace:" +
                             expCtx->getNamespaceString().toStringForErrorMsg(),
