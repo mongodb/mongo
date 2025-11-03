@@ -429,6 +429,7 @@ def run_smoke_tests(
                 *bazel_args,
                 f"--test_tag_filters={unit_test_tag}",
                 "--test_output=summary",
+                "--dev_stacktrace=False",
                 unit_test_build_target,
             ],
             # NOTE: bazel already stores the real logs somewhere else
