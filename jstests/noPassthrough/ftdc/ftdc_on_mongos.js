@@ -10,10 +10,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let testPath1 = MongoRunner.toRealPath("ftdc_setdir1");
 let testPath2 = MongoRunner.toRealPath("ftdc_setdir2");
 let testPath3 = MongoRunner.toRealPath("ftdc_setdir3");
-// SERVER-30394: Use a directory relative to the current working directory.
-let testPath4 = "ftdc_setdir4/";
 let testLog3 = testPath3 + "mongos_ftdc.log";
-let testLog4 = testPath4 + "mongos_ftdc.log";
+// SERVER-30394: Use a directory relative to the current working directory. Make the filename unique
+// to prevent failures from the test running multiple times on the same machine.
+let testPath4 = "ftdc_setdir4/";
+let testLog4 = testPath4 + "mongos_ftdc_" + UUID().hex() + ".log";
 
 // Make the log file directory for mongos.
 mkdir(testPath3);
