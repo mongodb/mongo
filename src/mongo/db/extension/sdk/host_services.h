@@ -29,8 +29,6 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/public/extension_log_gen.h"
-#include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
@@ -52,14 +50,21 @@ public:
     HostServicesHandle(const ::MongoExtensionHostServices* services)
         : UnownedHandle<const ::MongoExtensionHostServices>(services) {}
 
-    static BSONObj createExtensionLogMessage(
-        std::string message,
-        std::int32_t code,
-        mongo::extension::MongoExtensionLogSeverityEnum severity);
+    /**
+     * Creates a MongoExtensionLogMessage struct for regular log messages.
+     * The returned struct should be passed to log() and is valid only during the call.
+     */
+    static ::MongoExtensionLogMessage createLogMessageStruct(const std::string& message,
+                                                             std::int32_t code,
+                                                             MongoExtensionLogSeverity severity);
 
-    static BSONObj createExtensionDebugLogMessage(std::string message,
-                                                  std::int32_t code,
-                                                  std::int32_t level);
+    /**
+     * Creates a MongoExtensionLogMessage struct for debug log messages.
+     * The returned struct should be passed to logDebug() and is valid only during the call.
+     */
+    static ::MongoExtensionLogMessage createDebugLogMessageStruct(const std::string& message,
+                                                                  std::int32_t code,
+                                                                  std::int32_t level);
 
     ::MongoExtensionStatus* userAsserted(::MongoExtensionByteView structuredErrorMessage) {
         assertValid();
@@ -74,21 +79,24 @@ public:
         return &_hostServices;
     }
 
-    void log(std::string message,
+    void log(const std::string& message,
              std::int32_t code,
-             mongo::extension::MongoExtensionLogSeverityEnum severity =
-                 mongo::extension::MongoExtensionLogSeverityEnum::kInfo) const {
+             MongoExtensionLogSeverity severity = MongoExtensionLogSeverity::kInfo) const {
         assertValid();
 
-        BSONObj obj = createExtensionLogMessage(std::move(message), code, severity);
-        invokeCAndConvertStatusToException([&]() { return vtable().log(objAsByteView(obj)); });
+        // TODO SERVER-111339 Add attributes.
+        ::MongoExtensionLogMessage logMessage = createLogMessageStruct(message, code, severity);
+
+        invokeCAndConvertStatusToException([&]() { return vtable().log(&logMessage); });
     }
 
-    void logDebug(std::string message, std::int32_t code, std::int32_t level = 1) const {
+    void logDebug(const std::string& message, std::int32_t code, std::int32_t level = 1) const {
         assertValid();
-        BSONObj debugLogBsonObj = createExtensionDebugLogMessage(message, code, level);
-        invokeCAndConvertStatusToException(
-            [&]() { return vtable().log_debug(objAsByteView(debugLogBsonObj)); });
+
+        // TODO SERVER-111339 Add attributes.
+        ::MongoExtensionLogMessage logMessage = createDebugLogMessageStruct(message, code, level);
+
+        invokeCAndConvertStatusToException([&]() { return vtable().log_debug(&logMessage); });
     }
 
     /**

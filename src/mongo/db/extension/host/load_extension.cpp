@@ -31,7 +31,6 @@
 
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/extension/host/host_portal.h"
-#include "mongo/db/extension/host/host_services.h"
 #include "mongo/db/extension/host/load_stub_parsers.h"
 #include "mongo/db/extension/host_connector/extension_handle.h"
 #include "mongo/db/extension/host_connector/host_services_adapter.h"

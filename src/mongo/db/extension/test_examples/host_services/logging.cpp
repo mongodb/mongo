@@ -56,7 +56,7 @@ public:
             sdk::HostServicesHandle::getHostServices()->log(
                 kStageName + " stage spec is empty or not an object.",
                 11134000,
-                mongo::extension::MongoExtensionLogSeverityEnum::kError);
+                ::MongoExtensionLogSeverity::kError);
             return std::make_unique<LogParseNode>(stageBson);
         }
 
@@ -70,7 +70,7 @@ public:
             sdk::HostServicesHandle::getHostServices()->log(
                 kStageName + " stage missing or invalid " + kNumInfoLogLinesField + " field.",
                 11134001,
-                mongo::extension::MongoExtensionLogSeverityEnum::kWarning);
+                ::MongoExtensionLogSeverity::kWarning);
         } else {
             numInfoLogLines = bsonSpec.getIntField(kNumInfoLogLinesField);
 
@@ -79,13 +79,13 @@ public:
                     kStageName + " stage must have non-negative value for " +
                         kNumInfoLogLinesField + ".",
                     11134002,
-                    mongo::extension::MongoExtensionLogSeverityEnum::kWarning);
+                    ::MongoExtensionLogSeverity::kWarning);
                 numInfoLogLines = 0;
             } else if (numInfoLogLines > 5) {
                 sdk::HostServicesHandle::getHostServices()->log(
                     kStageName + " stage will not print more than 5 log lines.",
                     11134003,
-                    mongo::extension::MongoExtensionLogSeverityEnum::kWarning);
+                    ::MongoExtensionLogSeverity::kWarning);
                 numInfoLogLines = 5;
             }
         }

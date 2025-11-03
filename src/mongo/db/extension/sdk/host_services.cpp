@@ -38,19 +38,32 @@ namespace mongo::extension::sdk {
 // at the very start of extension initialization, before any extension should attempt to access it.
 HostServicesHandle HostServicesHandle::_hostServices(nullptr);
 
-BSONObj HostServicesHandle::createExtensionLogMessage(
-    std::string message,
-    std::int32_t code,
-    mongo::extension::MongoExtensionLogSeverityEnum severity) {
-    mongo::extension::MongoExtensionLog log(std::move(message), code, severity);
-    return log.toBSON();
+::MongoExtensionLogMessage HostServicesHandle::createLogMessageStruct(
+    const std::string& message, std::int32_t code, MongoExtensionLogSeverity severity) {
+    // Convert message string to byte view.
+    auto messageBytes = stringViewAsByteView(std::string_view(message));
+
+    // TODO SERVER-111339 Handle attributes.
+    ::MongoExtensionLogMessage logMessage{
+        static_cast<uint32_t>(code), messageBytes, ::MongoExtensionLogType::kLog};
+    // Set union field for severity.
+    logMessage.severityOrLevel.severity = severity;
+
+    return logMessage;
 }
 
-BSONObj HostServicesHandle::createExtensionDebugLogMessage(std::string message,
-                                                           std::int32_t code,
-                                                           std::int32_t level) {
-    mongo::extension::MongoExtensionDebugLog debugLog(std::move(message), code, level);
-    return debugLog.toBSON();
+::MongoExtensionLogMessage HostServicesHandle::createDebugLogMessageStruct(
+    const std::string& message, std::int32_t code, std::int32_t level) {
+    // Convert message string to byte view.
+    auto messageBytes = stringViewAsByteView(std::string_view(message));
+
+    // TODO SERVER-111339 Handle attributes.
+    ::MongoExtensionLogMessage logMessage{
+        static_cast<uint32_t>(code), messageBytes, ::MongoExtensionLogType::kDebug};
+    // Set union field for level.
+    logMessage.severityOrLevel.level = level;
+
+    return logMessage;
 }
 
 void HostServicesHandle::_assertVTableConstraints(const VTable_t& vtable) const {

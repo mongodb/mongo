@@ -36,8 +36,7 @@ namespace mongo::extension::host_connector {
  * services to extensions.
  *
  * For each function in the MongoExtensionHostServicesVTable, this adapter has a corresponding
- * function that translates between the C API and the core implementation of the host services
- * provided primarily through mongo::extension::host::HostServices.
+ * function that translates between the C API and the core implementation of the host services.
  *
  * The HostServicesAdapter instance is a singleton, and is accessible via
  * HostServicesAdapter::get(). The pointer to the singleton instance is passed to extensions
@@ -54,9 +53,9 @@ public:
 private:
     static HostServicesAdapter _hostServicesAdapter;
 
-    static MongoExtensionStatus* _extLog(::MongoExtensionByteView logMessage) noexcept;
+    static MongoExtensionStatus* _extLog(const ::MongoExtensionLogMessage* logMessage) noexcept;
 
-    static MongoExtensionStatus* _extLogDebug(::MongoExtensionByteView rawLog) noexcept;
+    static MongoExtensionStatus* _extLogDebug(const ::MongoExtensionLogMessage* rawLog) noexcept;
 
     static ::MongoExtensionStatus* _extUserAsserted(
         ::MongoExtensionByteView structuredErrorMessage);

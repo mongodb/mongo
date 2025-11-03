@@ -12,7 +12,6 @@ mongo_cc_library(
     name = "extensions_api_public",
     srcs = [
         ":extension_error_types_gen",
-        ":extension_log_gen",
     ],
     hdrs = [],
     deps = [
@@ -26,14 +25,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "api",
     hdrs = ["api.h"],
-)
-
-idl_generator(
-    name = "extension_log_gen",
-    src = "extension_log.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
 )
 
 idl_generator(

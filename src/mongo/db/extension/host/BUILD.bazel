@@ -40,17 +40,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "host_services",
-    srcs = ["host_services.cpp"],
-    hdrs = ["host_services.h"],
-    deps = [
-        "//src/mongo:base",
-        # Needed for the IDL generated code.
-        "//src/mongo/db/extension/public:extensions_api_public",
-    ],
-)
-
-mongo_cc_library(
     name = "extension_loader",
     srcs = [
         "load_extension.cpp",

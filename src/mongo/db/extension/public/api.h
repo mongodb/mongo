@@ -570,6 +570,35 @@ typedef struct MongoExtensionHostPortalVTable {
 } MongoExtensionHostPortalVTable;
 
 /**
+ * Log severity levels for extension log messages.
+ */
+typedef enum MongoExtensionLogSeverity : uint32_t {
+    kError,
+    kWarning,
+    kInfo
+} MongoExtensionLogSeverity;
+
+/**
+ * Types of log messages. kLog type will always be logged, and kDebug type will be logged if the
+ * server's current log level is >= the specified debug log level.
+ */
+typedef enum MongoExtensionLogType : uint32_t { kLog, kDebug } MongoExtensionLogType;
+
+/**
+ * A structured log message from an extension.
+ */
+typedef struct MongoExtensionLogMessage {
+    uint32_t code;
+    MongoExtensionByteView message;
+    MongoExtensionLogType type;
+    // TODO SERVER-111339 Add attributes.
+    union {
+        MongoExtensionLogSeverity severity;
+        int level;
+    } severityOrLevel;
+} MongoExtensionLogMessage;
+
+/**
  * MongoExtensionHostServices exposes services provided by the host to the extension.
  *
  * Currently, the VTable struct is a placeholder for future services.
@@ -584,20 +613,14 @@ typedef struct MongoExtensionHostServices {
 typedef struct MongoExtensionHostServicesVTable {
     /**
      * Logs a message from the extension with severity INFO, WARNING, or ERROR.
-     *
-     * The rawLog parameter is expected to be a BSON document with the structure defined by
-     * the MongoExtensionLog struct in extension_log.idl.
      */
-    MongoExtensionStatus* (*log)(MongoExtensionByteView rawLog);
+    MongoExtensionStatus* (*log)(const MongoExtensionLogMessage* rawLog);
 
     /**
      * Sends a debug log message to the server, and logs it as long as the 'Extension' log component
      * in the server has a level greater or equal to the debug log's level.
-     *
-     * The rawLog parameter is expected to be a BSON document with the structure defined by
-     * the MongoExtensionDebugLog struct in extension_log.idl.
      */
-    MongoExtensionStatus* (*log_debug)(MongoExtensionByteView rawLog);
+    MongoExtensionStatus* (*log_debug)(const MongoExtensionLogMessage* rawLog);
 
     /**
      * Throws a non-fatal exception to end the current operation with an error. This should be

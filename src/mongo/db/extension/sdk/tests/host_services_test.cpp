@@ -46,47 +46,45 @@ public:
 };
 
 /**
- * Tests that the ExtensionLog created by HostServicesHandle::createExtensionLogMessage can be
- * round-tripped through MongoExtensionByteView serialization and deserialization.
+ * Tests that the MongoExtensionLogMessage created by HostServicesHandle::createLogMessageStruct
+ * has the correct fields populated.
  */
-TEST_F(HostServicesTest, ExtensionLogIDLRoundTrip) {
+TEST_F(HostServicesTest, CreateLogMessageStruct) {
     std::string logMessage = "Test log message";
     std::int32_t logCode = 12345;
-    MongoExtensionLogSeverityEnum logSeverity = MongoExtensionLogSeverityEnum::kInfo;
+    ::MongoExtensionLogSeverity logSeverity = ::MongoExtensionLogSeverity::kInfo;
 
-    BSONObj structuredLog =
-        sdk::HostServicesHandle::createExtensionLogMessage(logMessage, logCode, logSeverity);
-    ::MongoExtensionByteView byteView = objAsByteView(structuredLog);
+    ::MongoExtensionLogMessage structuredLog =
+        sdk::HostServicesHandle::createLogMessageStruct(logMessage, logCode, logSeverity);
 
-    ASSERT(byteView.data != nullptr);
-    ASSERT(byteView.len > 0);
+    ASSERT_EQUALS(structuredLog.code, static_cast<uint32_t>(logCode));
+    ASSERT_EQUALS(structuredLog.type, ::MongoExtensionLogType::kLog);
+    ASSERT_EQUALS(structuredLog.severityOrLevel.severity, logSeverity);
 
-    auto bsonObj = bsonObjFromByteView(byteView);
-    auto log = MongoExtensionLog::parse(bsonObj);
-
-    ASSERT_EQUALS(log.getMessage(), logMessage);
-    ASSERT_EQUALS(log.getCode(), logCode);
-    ASSERT_EQUALS(log.getSeverity(), logSeverity);
+    auto messageView = byteViewAsStringView(structuredLog.message);
+    ASSERT_EQUALS(std::string(messageView), logMessage);
+    // TODO SERVER-111339 Test attributes.
 }
 
-TEST_F(HostServicesTest, ExtensionDebugLogIDLRoundTrip) {
+/**
+ * Tests that the MongoExtensionLogMessage created by
+ * HostServicesHandle::createDebugLogMessageStruct has the correct fields populated.
+ */
+TEST_F(HostServicesTest, CreateDebugLogMessageStruct) {
     std::string logMessage = "Test debug log message";
     std::int32_t logCode = 12345;
     std::int32_t logLevel = 1;
 
-    BSONObj structuredDebugLog =
-        sdk::HostServicesHandle::createExtensionDebugLogMessage(logMessage, logCode, logLevel);
-    ::MongoExtensionByteView byteView = objAsByteView(structuredDebugLog);
+    ::MongoExtensionLogMessage structuredDebugLog =
+        sdk::HostServicesHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel);
 
-    ASSERT(byteView.data != nullptr);
-    ASSERT(byteView.len > 0);
+    ASSERT_EQUALS(structuredDebugLog.code, static_cast<uint32_t>(logCode));
+    ASSERT_EQUALS(structuredDebugLog.type, ::MongoExtensionLogType::kDebug);
+    ASSERT_EQUALS(structuredDebugLog.severityOrLevel.level, logLevel);
+    // TODO SERVER-111339 Test attributes.
 
-    auto bsonObj = bsonObjFromByteView(byteView);
-    auto debugLog = MongoExtensionDebugLog::parse(bsonObj);
-
-    ASSERT_EQUALS(debugLog.getMessage(), logMessage);
-    ASSERT_EQUALS(debugLog.getCode(), logCode);
-    ASSERT_EQUALS(debugLog.getLevel(), logLevel);
+    auto messageView = byteViewAsStringView(structuredDebugLog.message);
+    ASSERT_EQUALS(std::string(messageView), logMessage);
 }
 
 TEST_F(HostServicesTest, userAsserted) {

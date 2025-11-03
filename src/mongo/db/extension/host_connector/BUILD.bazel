@@ -53,7 +53,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo:core_headers_library",
-        "//src/mongo/db/extension/host:host_services",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/sdk:sdk_cpp",
