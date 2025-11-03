@@ -41,10 +41,9 @@ public:
     // Direct construction of a source or transform extension.
     DocumentSourceExtensionOptimizable(StringData name,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       Id id,
                                        BSONObj rawStage,
                                        AggStageDescriptorHandle staticDescriptor)
-        : DocumentSourceExtension(name, expCtx, id, rawStage, staticDescriptor),
+        : DocumentSourceExtension(name, expCtx, rawStage, staticDescriptor),
           _logicalStage(validateAndCreateLogicalStage()) {}
 
     Value serialize(const SerializationOptions& opts) const override;

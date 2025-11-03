@@ -33,11 +33,13 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
-
 namespace mongo::extension {
 
 class DocumentSourceExtensionTest;
+class TestStageIdRegistrar;
 
 namespace host {
 using LiteParsedList = std::list<std::unique_ptr<LiteParsedDocumentSource>>;
@@ -183,8 +185,6 @@ public:
 
     const char* getSourceName() const override;
 
-    static const Id& id;
-
     Id getId() const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override;
@@ -197,6 +197,9 @@ public:
 
     // This method is invoked by extensions to register descriptor.
     static void registerStage(AggStageDescriptorHandle descriptor);
+
+    // Asserts if the stage's Id is not found.
+    static Id findStageId(std::string stageName);
 
     // Declare DocumentSourceExtension to be pure virtual.
     ~DocumentSourceExtension() override = 0;
@@ -214,12 +217,16 @@ private:
      */
     friend class mongo::extension::DocumentSourceExtensionTest;
     friend class mongo::extension::host::LoadExtensionsTest;
+    friend class mongo::extension::TestStageIdRegistrar;
     static void unregisterParser_forTest(const std::string& name);
+
+    // Holds an Id value for each stageName string. This is necessary as two
+    // DocumentSourceExtensions are not necessarily linked to the same stage.
+    inline static stdx::unordered_map<std::string, Id> stageToIdMap{};
 
 protected:
     DocumentSourceExtension(StringData name,
                             const boost::intrusive_ptr<ExpressionContext>& exprCtx,
-                            Id id,
                             BSONObj rawStage,
                             mongo::extension::AggStageDescriptorHandle descriptor);
 

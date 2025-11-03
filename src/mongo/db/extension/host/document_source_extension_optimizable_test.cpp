@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 
+#include "mongo/db/extension/host/test_stage_id_registrar.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -124,13 +125,16 @@ protected:
         FirstStageNotAstStageDescriptor::make()};
     sdk::ExtensionAggStageDescriptor _noOpAggregationStageDescriptor{
         sdk::shared_test_stages::NoOpAggStageDescriptor::make()};
+
+    TestStageIdRegistrar _ids{ExpandSizeTooBigStageDescriptor::kStageName,
+                              FirstStageNotAstStageDescriptor::kStageName,
+                              sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName};
 };
 
 DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, expandedSizeNotOneFails, "11164400") {
     [[maybe_unused]] auto extensionOptimizable = host::DocumentSourceExtensionOptimizable(
         ExpandSizeTooBigStageDescriptor::kStageName,
         getExpCtx(),
-        DocumentSource::allocateId(ExpandSizeTooBigStageDescriptor::kStageName),
         BSON(ExpandSizeTooBigStageDescriptor::kStageName << BSON("foo" << true)),
         AggStageDescriptorHandle(&_expandSizeTooBigStageDescriptor));
 }
@@ -139,7 +143,6 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, expandToParseNodeFails, "11
     [[maybe_unused]] auto extensionOptimizable = host::DocumentSourceExtensionOptimizable(
         FirstStageNotAstStageDescriptor::kStageName,
         getExpCtx(),
-        DocumentSource::allocateId(FirstStageNotAstStageDescriptor::kStageName),
         BSON(FirstStageNotAstStageDescriptor::kStageName << BSON("foo" << true)),
         AggStageDescriptorHandle(&_firstStageNotAstStageDescriptor));
 }
@@ -148,7 +151,6 @@ TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
     auto optimizable = host::DocumentSourceExtensionOptimizable(
         sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
         getExpCtx(),
-        DocumentSource::allocateId(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName),
         BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true)),
         AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
 
@@ -160,7 +162,6 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecutio
     auto optimizable = host::DocumentSourceExtensionOptimizable(
         sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
         getExpCtx(),
-        DocumentSource::allocateId(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName),
         BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true)),
         AggStageDescriptorHandle(&_noOpAggregationStageDescriptor));
 

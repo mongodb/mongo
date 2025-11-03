@@ -27,27 +27,35 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/extension/host/document_source_extension.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/exec/agg/stage.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/util/modules.h"
+namespace mongo::extension {
 
-namespace mongo {
-namespace exec {
-namespace agg {
 /**
- * A Stage implementation for an extension aggregation stage. ExtensionStage is a facade around
- * handles to extension API objects.
+ * RAII helper used in tests to temporarily allocate Ids for stages in unit tests. This removes the
+ * need for unit tests to have to fully register stages when they only need to construct
+ * DocumentSourceExtensions instead of fully parsing from BSON.
  */
-class ExtensionStage final : public Stage {
+class TestStageIdRegistrar {
 public:
-    ExtensionStage(StringData name, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit TestStageIdRegistrar(std::initializer_list<StringData> stageNames) {
+        for (auto name : stageNames) {
+            const std::string key = std::string(name);
+            if (host::DocumentSourceExtension::stageToIdMap.find(key) ==
+                host::DocumentSourceExtension::stageToIdMap.end()) {
+                _inserted.emplace_back(key);
+                host::DocumentSourceExtension::stageToIdMap[key] = DocumentSource::allocateId(key);
+            }
+        }
+    }
+    ~TestStageIdRegistrar() {
+        for (auto& key : _inserted) {
+            host::DocumentSourceExtension::stageToIdMap.erase(key);
+        }
+    }
 
 private:
-    GetNextResult doGetNext() final;
+    std::vector<std::string> _inserted;
 };
-}  // namespace agg
-}  // namespace exec
-}  // namespace mongo
+
+}  // namespace mongo::extension

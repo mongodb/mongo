@@ -73,6 +73,7 @@ public:
     static void unregisterParsers() {
         host::DocumentSourceExtension::unregisterParser_forTest(
             sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+        host::DocumentSourceExtension::unregisterParser_forTest("$noOp2");
     }
 
 protected:
@@ -795,6 +796,121 @@ TEST_F(DocumentSourceExtensionTest, ExpandSameStageOnDifferentBranchesSucceeds) 
     // Both leaves are the NoOp leaf from NoOpAggStageParseNode.
     ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
     ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
+}
+
+DEATH_TEST_F(DocumentSourceExtensionTest, FindStageIdThrowsForUnknownStage, "11250700") {
+    [[maybe_unused]] auto stageId = host::DocumentSourceExtension::findStageId("$unknownStage");
+}
+
+TEST_F(DocumentSourceExtensionTest, FindStageIdMatchesRegisteredStage) {
+    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
+    host_connector::HostPortalAdapter portal{
+        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    portal.getImpl().registerStageDescriptor(&_noOpStaticDescriptor);
+
+    // Build a pipeline that contains the registered stage.
+    std::vector<BSONObj> testPipeline{kValidSpec};
+    auto pipeline = buildTestPipeline(testPipeline);
+    ASSERT(pipeline);
+
+    const auto* stagePtr = pipeline->peekFront();
+    ASSERT_TRUE(stagePtr != nullptr);
+
+    const auto* documentSourceExtension =
+        dynamic_cast<const host::DocumentSourceExtension*>(stagePtr);
+    ASSERT_TRUE(documentSourceExtension != nullptr);
+
+    // Compare the id returned by the constructed stage against the id resolved via findStageId().
+    auto stageId = documentSourceExtension->getId();
+    auto mapId = host::DocumentSourceExtension::findStageId(
+        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+    ASSERT_EQUALS(stageId, mapId);
+}
+
+namespace {
+static constexpr std::string_view kNoOp2Name = "$noOp2";
+
+class NoOp2AggStageAstNode : public sdk::AggStageAstNode {
+public:
+    NoOp2AggStageAstNode() : sdk::AggStageAstNode(kNoOp2Name) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+    }
+};
+
+class NoOp2AggStageParseNode : public sdk::AggStageParseNode {
+public:
+    NoOp2AggStageParseNode() : sdk::AggStageParseNode(kNoOp2Name) {}
+
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<sdk::VariantNode> expand() const override {
+        std::vector<sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(
+            new sdk::ExtensionAggStageAstNode(std::make_unique<NoOp2AggStageAstNode>()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return BSONObj();
+    }
+};
+
+class NoOp2AggStageDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string(kNoOp2Name);
+
+    NoOp2AggStageDescriptor()
+        : sdk::AggStageDescriptor(kStageName, MongoExtensionAggStageType::kNoOp) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
+        return std::make_unique<NoOp2AggStageParseNode>();
+    }
+};
+}  // namespace
+
+TEST_F(DocumentSourceExtensionTest, FindStageIdsMatchRegisteredStagesMultiple) {
+    // Register two different NoOp descriptors.
+    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
+    host_connector::HostPortalAdapter portal{
+        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    portal.getImpl().registerStageDescriptor(&_noOpStaticDescriptor);
+
+    sdk::ExtensionAggStageDescriptor noOp2StaticDescriptor{
+        std::make_unique<NoOp2AggStageDescriptor>()};
+    portal.getImpl().registerStageDescriptor(&noOp2StaticDescriptor);
+
+    // Build a pipeline with both stages.
+    BSONObj secondValidSpec = BSON(NoOp2AggStageDescriptor::kStageName << BSON("bar" << true));
+    std::vector<BSONObj> testPipeline{kValidSpec, secondValidSpec};
+    auto pipeline = buildTestPipeline(testPipeline);
+    ASSERT(pipeline);
+
+    ASSERT_EQUALS(pipeline->getSources().size(), 2U);
+
+    // First stage should match $noOp id.
+    auto firstIt = pipeline->getSources().begin();
+    const auto* firstStage = dynamic_cast<const host::DocumentSourceExtension*>(firstIt->get());
+    ASSERT_TRUE(firstStage != nullptr);
+    auto firstStageId = firstStage->getId();
+    auto firstMapId = host::DocumentSourceExtension::findStageId(
+        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+    ASSERT_EQUALS(firstStageId, firstMapId);
+
+    // Second stage should match $noOp2 id.
+    auto secondIt = std::next(firstIt);
+    const auto* secondStage = dynamic_cast<const host::DocumentSourceExtension*>(secondIt->get());
+    ASSERT_TRUE(secondStage != nullptr);
+    auto secondStageId = secondStage->getId();
+    auto secondMapId =
+        host::DocumentSourceExtension::findStageId(NoOp2AggStageDescriptor::kStageName);
+    ASSERT_EQUALS(secondStageId, secondMapId);
 }
 
 }  // namespace mongo::extension

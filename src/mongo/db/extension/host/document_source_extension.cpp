@@ -30,13 +30,13 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
+#include "mongo/db/extension/host/extension_stage.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
-
-ALLOCATE_DOCUMENT_SOURCE_ID(extension, DocumentSourceExtension::id);
 
 class DocumentSourceExtension::LiteParsedExpandable::ExpansionValidationFrame {
 public:
@@ -191,14 +191,28 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
 void DocumentSourceExtension::registerStage(const std::string& name,
                                             DocumentSource::Id id,
                                             AggStageDescriptorHandle descriptor) {
+    // Register the correct DocumentSource to construct the stage with.
     DocumentSource::registerParser(
         name,
-        [id, descriptor](BSONElement specElem,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        [descriptor](BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx)
             -> boost::intrusive_ptr<DocumentSource> {
             return boost::intrusive_ptr(new DocumentSourceExtensionOptimizable(
-                specElem.fieldNameStringData(), expCtx, id, specElem.wrap(), descriptor));
+                specElem.fieldNameStringData(), expCtx, specElem.wrap(), descriptor));
         });
+
+    // Register the correct exec::agg to execute the stage with.
+    exec::agg::registerDocumentSourceToStageFn(
+        id, [](const boost::intrusive_ptr<DocumentSource>& source) {
+            auto* documentSource = dynamic_cast<DocumentSourceExtension*>(source.get());
+
+            tassert(10980400, "expected 'DocumentSourceExtension' type", documentSource);
+
+            return make_intrusive<exec::agg::ExtensionStage>(documentSource->getSourceName(),
+                                                             documentSource->getExpCtx());
+        });
+
+    // Add the allocated id to the static map for lookup upon object construction.
+    stageToIdMap[name] = id;
 }
 
 void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) {
@@ -208,12 +222,11 @@ void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) 
 DocumentSourceExtension::DocumentSourceExtension(
     StringData name,
     const boost::intrusive_ptr<ExpressionContext>& exprCtx,
-    Id id,
     BSONObj rawStage,
     AggStageDescriptorHandle staticDescriptor)
     : DocumentSource(name, exprCtx),
       _stageName(std::string(name)),
-      _id(id),
+      _id(findStageId(std::string(name))),
       _parseNode(staticDescriptor.parse(rawStage)) {}
 
 const char* DocumentSourceExtension::getSourceName() const {
@@ -221,7 +234,7 @@ const char* DocumentSourceExtension::getSourceName() const {
 }
 
 DocumentSource::Id DocumentSourceExtension::getId() const {
-    return id;
+    return _id;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
@@ -240,6 +253,15 @@ StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeSta
                                         UnionRequirement::kNotAllowed,
                                         ChangeStreamRequirement::kDenylist);
     return constraints;
+}
+
+DocumentSourceExtension::Id DocumentSourceExtension::findStageId(std::string stageName) {
+    auto it = stageToIdMap.find(stageName);
+    tassert(11250700,
+            str::stream() << "Could not find id associated with extension stage " << stageName,
+            it != stageToIdMap.end());
+
+    return it->second;
 }
 
 DocumentSourceExtension::~DocumentSourceExtension() = default;
