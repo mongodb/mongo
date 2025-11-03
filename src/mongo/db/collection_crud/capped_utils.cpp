@@ -225,17 +225,17 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             // Go to the next document
             retries = 0;
         } catch (const StorageUnavailableException& e) {
-            retries++;  // logAndBackoff expects this to be 1 on first call.
+            retries++;
+            // logAndBackoff expects this to be 1 on first call. Can't use writeConflictRetry since
+            // we need to save/restore exec around call to abandonSnapshot.
+            exec->saveState();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             logAndRecordWriteConflictAndBackoff(opCtx,
                                                 retries,
                                                 "cloneCollectionAsCapped",
                                                 e.reason(),
                                                 NamespaceStringOrUUID(fromNss));
 
-            // Can't use writeConflictRetry since we need to save/restore exec around call to
-            // abandonSnapshot.
-            exec->saveState();
-            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             exec->restoreState(nullptr);  // Handles any WCEs internally.
         }
     }

@@ -82,10 +82,10 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
     // WriteConflictException, to avoid stalling replication longer than necessary.
     transactionTooLargeForCacheErrorsConvertedToWriteConflict.increment(1);
 
+    ru.abandonSnapshot();
     // Handle as write conflict.
     logAndRecordWriteConflictAndBackoff(
         opCtx, writeConflictAttempts, opStr, s.reason(), NamespaceStringOrUUID(nssOrUUID));
-    ru.abandonSnapshot();
 }
 }  // namespace
 
