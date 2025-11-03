@@ -448,14 +448,27 @@ void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
         const auto dropCmd = BSON("drop" << nss.coll() << "collectionUUID" << *uuid
                                          << "writeConcern" << BSON("w" << "majority"));
 
-        auto dropResponse = uassertStatusOK(
+        auto dropResponse =
             shard->runCommand(opCtx,
                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                               NamespaceString::kConfigShardCatalogDatabasesNamespace.dbName(),
                               dropCmd,
-                              Shard::RetryPolicy::kIdempotent));
+                              Shard::RetryPolicy::kIdempotent);
 
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(dropResponse));
+        auto status = Shard::CommandResponse::getEffectiveStatus(dropResponse);
+
+        if (status == ErrorCodes::CollectionUUIDMismatch) {
+            // Dropping a collection by UUID isn't idempotent. An old primary may have already
+            // dropped it, so re-running the drop can trigger a CollectionUUIDMismatch. This can be
+            // safely ignored since the collection is already gone.
+            //
+            // Another edge case: the collection might have been dropped and re-created with the
+            // same name but a different UUID (e.g., during a split-brain scenario). We also ignore
+            // this to avoid deleting valid metadata.
+            continue;
+        }
+
+        uassertStatusOK(status);
     }
 }
 
