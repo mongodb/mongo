@@ -162,7 +162,9 @@ testPerformUpgradeReplSet({
     },
     upgradeNodeOptions: {setParameter: {featureFlagRankFusionBasic: true, featureFlagRankFusionFull: true}},
     whenFullyDowngraded: assertRankFusionCompletelyRejected,
-    whenSecondariesAreLatestBinary: assertRankFusionCompletelyRejected,
+    // We can't test rejected or accepted states here because it's possible that an election will happen and
+    // we will connect to a node that now has the feature enabled.
+    whenSecondariesAreLatestBinary: assertRefactoredMQLKeepsWorking,
     whenBinariesAreLatestAndFCVIsLastLTS: assertRankFusionCompletelyAccepted,
 });
 
