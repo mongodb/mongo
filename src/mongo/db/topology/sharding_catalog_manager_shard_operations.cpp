@@ -519,7 +519,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return ex.toStatus();
     }
 
-    // TODO SERVER-80532: the sharding catalog might lose some databases.
+    // TODO (SERVER-109004): remove this caveat once the old path is no longer used.
+    // The sharding catalog might lose some databases.
     // Check that none of the existing shard candidate's dbs exist already
     auto dbNamesStatus = _getDBNamesListFromShard(opCtx, targeter);
     if (!dbNamesStatus.isOK()) {

@@ -318,7 +318,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_collection_operations.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_database_operations.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_placement_history_operations.cpp",
-        "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_shard_operations.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_zone_operations.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_ddl_util.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_ddl_util_detail.cpp",
@@ -339,6 +338,7 @@ mongo_cc_library(
         "//src/mongo/db/s/config:initial_split_policy.cpp",
         "//src/mongo/db/sharding_environment:sharding_config_server_parameters_gen",
         "//src/mongo/db/topology:periodic_replica_set_configshard_maintenance_mode_checker.cpp",
+        "//src/mongo/db/topology:sharding_catalog_manager_shard_operations.cpp",
         "//src/mongo/db/topology:topology_change_helpers.cpp",
     ],
     hdrs = [
