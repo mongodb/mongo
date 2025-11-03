@@ -111,7 +111,7 @@ tasks:
             SBOM_REPO_PATH: sbom.json
             SBOM_OUT_PATH: ${workdir}/sbom-with-vex-${branch_name}.json
             SILKBOMB_COMMAND: augment
-            SILKBOMB_ARGS: --sbom-in /workdir/src/sbom.json --sbom-out /workdir/src/sbom-with-vex-${branch_name}.json --repo ${github_repo} --branch ${branch_name} --project tarun_test
+            SILKBOMB_ARGS: --sbom-in /workdir/src/sbom.json --sbom-out /workdir/src/sbom-with-vex-${branch_name}.json --repo ${github_repo} --branch ${branch_name}
       - command: subprocess.exec
         display_name: Upload SBOM to Google Drive"
         params:
