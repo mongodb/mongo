@@ -32,11 +32,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/string_map.h"
 
 #include <utility>
 #include <vector>
 
+MONGO_MOD_PARENT_PRIVATE;
 namespace mongo::timeseries::bucket_catalog {
 
 /**

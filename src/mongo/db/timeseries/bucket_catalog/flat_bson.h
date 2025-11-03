@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/string_map.h"
 #include "mongo/util/tracking/vector.h"
 
@@ -50,7 +51,7 @@
 namespace mongo::timeseries::bucket_catalog {
 
 /**
- * Stores a BSON hierarchy in a flat contigous memory structure. Optimized for fast traversal
+ * Stores a BSON hierarchy in a flat contiguous memory structure. Optimized for fast traversal
  * in lock-step of a BSONObj with the same internal field order. It does this at the expense of
  * insert performance which should be a rare operation when adding measurements to a timeseries
  * bucket. Usually we need to traverse the FlatBSONStore structure to check if we need to update any
@@ -306,6 +307,7 @@ public:
     /**
      * Updates the stored fields provided by 'doc', ignoring the 'metaField' field.
      */
+    MONGO_MOD_PUBLIC
     UpdateStatus update(const BSONObj& doc,
                         boost::optional<StringData> metaField,
                         const StringDataComparator* stringComparator);
@@ -445,7 +447,7 @@ private:
 /**
  * Manages Min and Max values for timeseries measurements within a bucket.
  */
-class MinMax : public FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer> {
+class MONGO_MOD_PUBLIC MinMax : public FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer> {
     friend class FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>;
 
 public:
@@ -556,7 +558,7 @@ private:
 /**
  * Manages schema data for timeseries measurements within a bucket.
  */
-class Schema : public FlatBSON<Schema, SchemaElement, BSONTypeValue> {
+class MONGO_MOD_PUBLIC Schema : public FlatBSON<Schema, SchemaElement, BSONTypeValue> {
     friend class FlatBSON<Schema, SchemaElement, BSONTypeValue>;
 
 public:

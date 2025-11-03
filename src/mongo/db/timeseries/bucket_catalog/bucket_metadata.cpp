@@ -33,9 +33,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/timeseries/metadata.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 namespace mongo::timeseries::bucket_catalog {
 
 BucketMetadata::BucketMetadata(tracking::Context& trackingContext,

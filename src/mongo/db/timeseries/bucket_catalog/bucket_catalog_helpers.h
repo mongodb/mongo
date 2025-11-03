@@ -38,6 +38,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -47,6 +48,7 @@
 
 #include <boost/optional/optional.hpp>
 
+MONGO_MOD_PUBLIC;
 namespace mongo::timeseries::bucket_catalog {
 
 /**

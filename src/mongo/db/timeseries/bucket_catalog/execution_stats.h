@@ -31,8 +31,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/memory.h"
 
+MONGO_MOD_PUBLIC;
 namespace mongo::timeseries::bucket_catalog {
 
 struct ExecutionStats {

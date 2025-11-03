@@ -754,7 +754,14 @@ networking.mongo_bridge:
   files:
     - src/mongo/tools/mongobridge_tool/
 
-timeseries_bucket_catalog: # authoritative: @10gen/server-timeseries-bucket-catalog
+timeseries: # authoritative: @10gen/server-collection-write-path
+  meta:
+    slack: server-storage-execution
+    jira: Storage Execution
+  files:
+    - src/mongo/db/timeseries # excluding ./bucket_catalog
+
+timeseries.bucket_catalog: # authoritative: @10gen/server-timeseries-bucket-catalog
   meta:
     slack: server-storage-execution
     jira: Storage Execution
@@ -767,7 +774,6 @@ collection_write_path: # authoritative: @10gen/server-collection-write-path
     jira: Storage Execution
   files:
     - src/mongo/db/collection_crud
-    - src/mongo/db/timeseries # excluding ./bucket_catalog
     - src/mongo/db/commands/collection_to_capped*
 
 bsoncolumn: # authoritative: @10gen/server-bsoncolumn

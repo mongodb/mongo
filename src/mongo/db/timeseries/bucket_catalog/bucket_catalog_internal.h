@@ -36,6 +36,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
@@ -43,27 +44,18 @@
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo::timeseries::bucket_catalog {
-struct Stripe;
-class BucketCatalog;
-struct BatchedInsertContext;
-}  // namespace mongo::timeseries::bucket_catalog
-
 namespace mongo::timeseries::bucket_catalog::internal {
-
-using StripeNumber = std::uint8_t;
-using BatchedInsertTuple = std::tuple<BSONObj, Date_t, UserBatchIndex>;
 /**
  * Function that should run validation against the bucket to ensure it's a proper bucket document.
  * Typically, this should execute Collection::checkValidation.
@@ -71,7 +63,7 @@ using BatchedInsertTuple = std::tuple<BSONObj, Date_t, UserBatchIndex>;
 using BucketDocumentValidator =
     std::function<std::pair<Collection::SchemaValidationResult, Status>(const BSONObj&)>;
 
-enum class StageInsertBatchResult {
+enum class MONGO_MOD_PARENT_PRIVATE StageInsertBatchResult {
     Success,
     RolloverNeeded,
     NoMeasurementsStaged,
@@ -264,6 +256,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
  * buckets. Returns a pair of the effective value that respects the absolute bucket max and min
  * sizes and the raw value.
  */
+MONGO_MOD_PARENT_PRIVATE
 std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
                                                          int64_t workloadCardinality);
 
@@ -353,6 +346,7 @@ void resetBucketOIDCounter();
 /**
  * Allocates a new bucket and adds it to the catalog.
  */
+MONGO_MOD_PARENT_PRIVATE
 Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
@@ -367,6 +361,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
  * Will also update the bucket catalog stats incNumBucketsKeptOpenDueToLargeMeasurements as
  * appropriate.
  */
+MONGO_MOD_PARENT_PRIVATE
 RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
                                        int64_t numberOfActiveBuckets,
@@ -433,6 +428,7 @@ void closeArchivedBucket(BucketCatalog& catalog,
  * inserted into the provided bucket, returns true. Otherwise, returns false.
  * Also increments `currentPosition` to one past the index of the last measurement inserted.
  */
+MONGO_MOD_PARENT_PRIVATE
 StageInsertBatchResult stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
                                                           OperationId opId,
                                                           const StringDataComparator* comparator,

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/map.h"
 #include "mongo/util/tracking/unordered_map.h"
 #include "mongo/util/tracking/vector.h"
@@ -42,8 +43,6 @@
 #include <string>
 #include <variant>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
@@ -89,11 +88,11 @@ enum class BucketState : uint8_t {
     // Cannot accept inserts and will continue to not accept inserts.
     kFrozen,
     // Cannot accept inserts, and has an outstanding prepared commit. This
-    // state will propogate WriteConflictExceptions to all writers aside from
+    // state will propagate WriteConflictExceptions to all writers aside from
     // the writer who prepared the commit.
     kPreparedAndCleared,
     // Cannot accept inserts, and has an outstanding prepared commit. This
-    // state will propogate WriteConflictExceptions to all writers aside from
+    // state will propagate WriteConflictExceptions to all writers aside from
     // the writer who prepared the commit.
     kPreparedAndFrozen,
 };

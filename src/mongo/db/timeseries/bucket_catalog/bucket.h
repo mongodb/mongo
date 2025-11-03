@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_id.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
@@ -41,10 +40,10 @@
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/tracking/list.h"
-#include "mongo/util/tracking/set.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -52,9 +51,9 @@
 #include <memory>
 
 #include <boost/container/small_vector.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
+MONGO_MOD_PUBLIC;
 namespace mongo::timeseries::bucket_catalog {
 
 /**

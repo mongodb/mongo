@@ -31,11 +31,13 @@
 
 #include "mongo/bson/oid.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
 #include <cstdint>
 
+MONGO_MOD_PUBLIC;
 namespace mongo::timeseries::bucket_catalog {
 
 /**

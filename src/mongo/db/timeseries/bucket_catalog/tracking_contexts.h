@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/tracking/context.h"
 
+MONGO_MOD_PARENT_PRIVATE;
 namespace mongo::timeseries::bucket_catalog {
 
 /**
