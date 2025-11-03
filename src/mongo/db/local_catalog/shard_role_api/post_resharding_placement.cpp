@@ -62,9 +62,19 @@ PostReshardingCollectionPlacement::PostReshardingCollectionPlacement(
 
 const ShardId& PostReshardingCollectionPlacement::getReshardingDestinedRecipient(
     const BSONObj& fullDocument) const {
-    auto newShardKey = _reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
+    auto newShardKey = extractReshardingKeyFromDocument(fullDocument);
+    return getReshardingDestinedRecipientFromShardKey(newShardKey);
+}
+
+BSONObj PostReshardingCollectionPlacement::extractReshardingKeyFromDocument(
+    const BSONObj& fullDocument) const {
+    return _reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
+}
+
+const ShardId& PostReshardingCollectionPlacement::getReshardingDestinedRecipientFromShardKey(
+    const BSONObj& reshardingKey) const {
     return _tmpReshardingCollectionChunkManager
-        ->findIntersectingChunkWithSimpleCollation(newShardKey)
+        ->findIntersectingChunkWithSimpleCollation(reshardingKey)
         .getShardId();
 }
 }  // namespace mongo

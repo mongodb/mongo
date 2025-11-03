@@ -271,8 +271,7 @@ private:
                                              const BSONObj& newMeasurement,
                                              const BSONObj& oldMeasurement);
 
-    void _checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
-                                          const BSONObj& newBucket,
+    void _checkUpdateChangesReshardingKey(const BSONObj& newBucket,
                                           const BSONObj& oldBucket,
                                           const BSONObj& newMeasurement,
                                           const BSONObj& oldMeasurementt);

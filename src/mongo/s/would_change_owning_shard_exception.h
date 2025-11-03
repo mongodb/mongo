@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -59,18 +60,21 @@ class WouldChangeOwningShardInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::WouldChangeOwningShard;
 
-    explicit WouldChangeOwningShardInfo(const BSONObj& preImage,
-                                        const BSONObj& postImage,
-                                        const bool shouldUpsert,
-                                        boost::optional<NamespaceString> ns,
-                                        boost::optional<UUID> uuid,
-                                        boost::optional<BSONObj> userPostImage = boost::none)
+    explicit WouldChangeOwningShardInfo(
+        const BSONObj& preImage,
+        const BSONObj& postImage,
+        const bool shouldUpsert,
+        boost::optional<NamespaceString> ns,
+        boost::optional<UUID> uuid,
+        boost::optional<BSONObj> userPostImage = boost::none,
+        boost::optional<ShardId> preImageReshardingDestinedShard = boost::none)
         : _preImage(preImage.getOwned()),
           _postImage(postImage.getOwned()),
           _shouldUpsert(shouldUpsert),
           _ns(ns),
           _uuid(uuid),
-          _userPostImage(userPostImage) {}
+          _userPostImage(userPostImage),
+          _preImageReshardingDestinedShard(preImageReshardingDestinedShard) {}
 
     const auto& getPreImage() const {
         return _preImage;
@@ -102,6 +106,10 @@ public:
         return bob.obj();
     }
 
+    boost::optional<ShardId> getPreImageReshardingDestinedShard() const {
+        return _preImageReshardingDestinedShard;
+    }
+
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
     static WouldChangeOwningShardInfo parseFromCommandError(const BSONObj& commandError);
@@ -126,6 +134,12 @@ private:
 
     // The user-level post image for shard key update on a sharded timeseries collection.
     boost::optional<BSONObj> _userPostImage;
+
+    // The destined shard in case the update affects the post-resharding distribution. Only
+    // present in case the collection is subject to resharding. Does not get serialized into the
+    // BSONObj for this error as it's only useful to forward information on the same shard
+    // stack.
+    boost::optional<ShardId> _preImageReshardingDestinedShard;
 };
 using WouldChangeOwningShardException = ExceptionFor<ErrorCodes::WouldChangeOwningShard>;
 

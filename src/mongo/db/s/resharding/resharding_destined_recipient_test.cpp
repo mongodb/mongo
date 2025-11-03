@@ -89,6 +89,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -588,6 +589,30 @@ TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
                                                  env);
                                    }),
                   ExceptionFor<ErrorCodes::WouldChangeOwningShard>);
+}
+
+TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardReturnsCorrectDestinedShard) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
+
+    auto env = setupReshardingEnv(opCtx, true, true);
+
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
+    try {
+        runInTransaction(opCtx, [&]() {
+            updateDoc(
+                opCtx, kNss, BSON("_id" << 0 << "x" << 2), BSON("$set" << BSON("y" << 50)), env);
+        });
+        ASSERT_TRUE(false);
+    } catch (const ExceptionFor<ErrorCodes::WouldChangeOwningShard>& ex) {
+        auto wouldChangeOwningShardInfo = ex.extraInfo<WouldChangeOwningShardInfo>();
+        ASSERT_TRUE(wouldChangeOwningShardInfo);
+        ASSERT_TRUE(wouldChangeOwningShardInfo->getPreImageReshardingDestinedShard());
+        ASSERT_EQ(*wouldChangeOwningShardInfo->getPreImageReshardingDestinedShard(),
+                  kShardList[0].getName());
+    }
 }
 
 TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {

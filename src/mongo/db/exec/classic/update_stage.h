@@ -144,7 +144,6 @@ private:
                                             const Snapshotted<BSONObj>& oldObj);
 
     void checkUpdateChangesReshardingKey(OperationContext* opCtx,
-                                         const ShardingWriteRouter& shardingWriteRouter,
                                          const BSONObj& newObj,
                                          const Snapshotted<BSONObj>& oldObj);
 

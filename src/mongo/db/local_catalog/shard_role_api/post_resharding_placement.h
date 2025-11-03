@@ -54,6 +54,13 @@ public:
     // Returns the post-resharding placement for the document
     const ShardId& getReshardingDestinedRecipient(const BSONObj& fullDocument) const;
 
+    // Extract the resharding key from the input document
+    BSONObj extractReshardingKeyFromDocument(const BSONObj& fullDocument) const;
+
+    // Returns the post-resharding placement given the extracted shard key.
+    const ShardId& getReshardingDestinedRecipientFromShardKey(const BSONObj& reshardingKey) const;
+
+
 private:
     boost::optional<ShardKeyPattern> _reshardingKeyPattern;
     boost::optional<ChunkManager> _tmpReshardingCollectionChunkManager;

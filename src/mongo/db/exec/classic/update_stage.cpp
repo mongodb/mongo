@@ -733,35 +733,37 @@ void ShardingChecksForUpdate::_checkRestrictionsOnUpdatingShardKeyAreNotViolated
     }
 }
 
-void ShardingChecksForUpdate::checkUpdateChangesReshardingKey(
-    OperationContext* opCtx,
-    const ShardingWriteRouter& shardingWriteRouter,
-    const BSONObj& newObj,
-    const Snapshotted<BSONObj>& oldObj) {
+void ShardingChecksForUpdate::checkUpdateChangesReshardingKey(OperationContext* opCtx,
+                                                              const BSONObj& newObj,
+                                                              const Snapshotted<BSONObj>& oldObj) {
 
-    const auto& collDesc = _collAcq.getShardingDescription();
-    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
-    if (!reshardingKeyPattern)
+    auto& reshardingPlacement = _collAcq.getPostReshardingPlacement();
+    if (!reshardingPlacement)
         return;
-
-    auto oldShardKey = reshardingKeyPattern->extractShardKeyFromDoc(oldObj.value());
-    auto newShardKey = reshardingKeyPattern->extractShardKeyFromDoc(newObj);
+    auto oldShardKey = reshardingPlacement->extractReshardingKeyFromDocument(oldObj.value());
+    auto newShardKey = reshardingPlacement->extractReshardingKeyFromDocument(newObj);
 
     if (newShardKey.binaryEqual(oldShardKey))
         return;
 
+    const auto& collDesc = _collAcq.getShardingDescription();
     FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
     _checkRestrictionsOnUpdatingShardKeyAreNotViolated(opCtx, collDesc, shardKeyPaths);
 
-    auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldObj.value());
-    auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newObj);
+    auto oldRecipShard =
+        reshardingPlacement->getReshardingDestinedRecipientFromShardKey(oldShardKey);
+    auto newRecipShard =
+        reshardingPlacement->getReshardingDestinedRecipientFromShardKey(newShardKey);
 
-    auto& collectionPtr = _collAcq.getCollectionPtr();
-    uassert(
-        WouldChangeOwningShardInfo(
-            oldObj.value(), newObj, false /* upsert */, collectionPtr->ns(), collectionPtr->uuid()),
-        "This update would cause the doc to change owning shards under the new shard key",
-        oldRecipShard == newRecipShard);
+    uassert(WouldChangeOwningShardInfo(oldObj.value(),
+                                       newObj,
+                                       false /* upsert */,
+                                       _collAcq.nss(),
+                                       _collAcq.uuid(),
+                                       boost::none,
+                                       oldRecipShard),
+            "This update would cause the doc to change owning shards under the new shard key",
+            oldRecipShard == newRecipShard);
 }
 
 void ShardingChecksForUpdate::checkUpdateChangesShardKeyFields(
@@ -781,8 +783,7 @@ void ShardingChecksForUpdate::checkUpdateChangesShardKeyFields(
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
     checkUpdateChangesExistingShardKey(opCtx, newDoc, newObj, oldObj);
-    ShardingWriteRouter shardingWriteRouter(opCtx, _collAcq.getCollectionPtr()->ns());
-    checkUpdateChangesReshardingKey(opCtx, shardingWriteRouter, newObj, oldObj);
+    checkUpdateChangesReshardingKey(opCtx, newObj, oldObj);
 }
 
 void ShardingChecksForUpdate::checkUpdateChangesExistingShardKey(

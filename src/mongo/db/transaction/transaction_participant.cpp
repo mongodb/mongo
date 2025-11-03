@@ -3763,10 +3763,10 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
         invariant(wouldChangeOwningShardInfo->getUuid());
         operation.setNss(*wouldChangeOwningShardInfo->getNs());
         operation.setUuid(*wouldChangeOwningShardInfo->getUuid());
-        ShardingWriteRouter shardingWriteRouter(opCtx, *wouldChangeOwningShardInfo->getNs());
-        operation.setDestinedRecipient(shardingWriteRouter.getReshardingDestinedRecipient(
-            wouldChangeOwningShardInfo->getPreImage()));
-
+        if (wouldChangeOwningShardInfo->getPreImageReshardingDestinedShard()) {
+            operation.setDestinedRecipient(
+                wouldChangeOwningShardInfo->getPreImageReshardingDestinedShard());
+        }
         // Required by chunk migration.
         invariant(wouldChangeOwningShardInfo->getNs());
         operation.setNss(*wouldChangeOwningShardInfo->getNs());
