@@ -123,6 +123,10 @@ public:
     void visit(const ExpressionSize*) override {}
     void visit(const ExpressionReverseArray*) override {}
     void visit(const ExpressionSortArray*) override {}
+    void visit(const ExpressionTopN*) override {}
+    void visit(const ExpressionTop*) override {}
+    void visit(const ExpressionBottomN*) override {}
+    void visit(const ExpressionBottom*) override {}
     void visit(const ExpressionSlice*) override {}
     void visit(const ExpressionIsArray*) override {}
     void visit(const ExpressionRound*) override {}

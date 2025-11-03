@@ -173,6 +173,422 @@ TEST(ExpressionSortArrayTest, ReturnsNullWithUndefinedInput) {
     ASSERT_VALUE_EQ(val, Value(BSONNULL));
 }
 
+/* ------------------------ ExpressionTopN -------------------- */
+
+TEST(ExpressionTopNTest, ReturnsTopNElementsForwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: 2, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1 << 2)));
+}
+
+TEST(ExpressionTopNTest, ReturnsTopNElementsBackwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: 2, input: [ 2, 1, 3 ], sortBy: -1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(3 << 2)));
+}
+
+TEST(ExpressionTopNTest, ReturnsAllElementsWhenNGreaterThanArraySize) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: 10, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1 << 2 << 3)));
+}
+
+TEST(ExpressionTopNTest, ReturnsEmptyArrayWhenNIsZero) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: 0, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(std::vector<Value>()));
+}
+
+TEST(ExpressionTopNTest, ThrowsWhenNIsNegative) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: -1, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    ASSERT_THROWS(
+        [&] {
+            auto expressionTopN =
+                ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+            expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+        }(),
+        AssertionException);
+}
+
+TEST(ExpressionTopNTest, ReturnsNullWithNullInput) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: 2, input: null, sortBy: 1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionTopNTest, ReturnsNullWithNullN) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: null, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionTopNTest, ReturnsMixedTypesWithNumericSort) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $topN: { n: 5, input: [ \"string\", null, 3, {a: 1}, [1, 2] ], "
+        "sortBy: 1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    // BSON type ordering: null < numbers < strings < objects < arrays
+    ASSERT_VALUE_EQ(
+        val,
+        Value(BSON_ARRAY(BSONNULL << 3 << "string"_sd << BSON("a" << 1) << BSON_ARRAY(1 << 2))));
+}
+
+TEST(ExpressionTopNTest, ReturnsTopNWithNestedArrayElements) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $topN: { n: 2, input: [ [3, 1], [1, 2], [2, 0] ], sortBy: 1 } }");
+
+    auto expressionTopN =
+        ExpressionTopN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTopN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(2 << 0))));
+}
+
+/* ------------------------ ExpressionTop -------------------- */
+
+TEST(ExpressionTopTest, ReturnsTopElementForwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $top: { input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(1));
+}
+
+TEST(ExpressionTopTest, ReturnsTopElementBackwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $top: { input: [ 2, 1, 3 ], sortBy: -1 } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(3));
+}
+
+TEST(ExpressionTopTest, ReturnsNullWithEmptyArray) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $top: { input: [], sortBy: 1 } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionTopTest, ReturnsNullWithNullInput) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $top: { input: null, sortBy: 1 } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionTopTest, ReturnsNullWithUndefinedInput) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $top: { input: undefined, sortBy: 1 } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionTopTest, ReturnsTopWithComplexSortBy) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $top: { input: [ {a: 2, b: 1}, {a: 1, b: 2}, {a: 3, b: 0} ], "
+        "sortBy: {a: 1, b: -1} } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(fromjson("{a: 1, b: 2}")));
+}
+
+TEST(ExpressionTopTest, ReturnsTopWithMixedTypesWithNumericSort) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr =
+        fromjson("{ $top: { input: [ 1, \"string\", 2, 3, {a: 1}, [1, 2] ], sortBy: 1 } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    // BSON type ordering: null < numbers < strings < objects < arrays
+    ASSERT_VALUE_EQ(val, Value(1));
+}
+
+TEST(ExpressionTopTest, ReturnsTopWithNestedArrayElements) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $top: { input: [ [3, 1], [1, 2], [2, 0] ], sortBy: 1 } }");
+
+    auto expressionTop =
+        ExpressionTop::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionTop->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1 << 2)));
+}
+
+/* ------------------------ ExpressionBottomN -------------------- */
+
+TEST(ExpressionBottomNTest, ReturnsBottomNElementsForwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: 2, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(2 << 3)));
+}
+
+TEST(ExpressionBottomNTest, ReturnsBottomNElementsBackwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: 2, input: [ 2, 1, 3 ], sortBy: -1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(2 << 1)));
+}
+
+TEST(ExpressionBottomNTest, ReturnsAllElementsWhenNGreaterThanArraySize) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: 10, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1 << 2 << 3)));
+}
+
+TEST(ExpressionBottomNTest, ReturnsEmptyArrayWhenNIsZero) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: 0, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(std::vector<Value>()));
+}
+
+TEST(ExpressionBottomNTest, ThrowsWhenNIsNegative) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: -1, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    ASSERT_THROWS(
+        [&] {
+            auto expressionBottomN =
+                ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+            expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+        }(),
+        AssertionException);
+}
+
+TEST(ExpressionBottomNTest, ReturnsNullWithNullInput) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: 2, input: null, sortBy: 1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionBottomNTest, ReturnsNullWithNullN) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: null, input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionBottomNTest, ReturnsMixedTypesWithNumericSort) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $bottomN: { n: 5, input: [ \"string\", null, 3, {a: 1}, [1, 2] ], "
+        "sortBy: 1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    // BSON type ordering: null < numbers < strings < objects < arrays
+    ASSERT_VALUE_EQ(
+        val,
+        Value(BSON_ARRAY(BSONNULL << 3 << "string"_sd << BSON("a" << 1) << BSON_ARRAY(1 << 2))));
+}
+
+TEST(ExpressionBottomNTest, ReturnsBottomNWithNestedArrayElements) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottomN: { n: 2, input: [ [3, 1], [1, 2], [2, 0] ], sortBy: 1 } }");
+
+    auto expressionBottomN =
+        ExpressionBottomN::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottomN->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(BSON_ARRAY(2 << 0) << BSON_ARRAY(3 << 1))));
+}
+
+/* ------------------------ ExpressionBottom -------------------- */
+
+TEST(ExpressionBottomTest, ReturnsBottomElementForwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottom: { input: [ 2, 1, 3 ], sortBy: 1 } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(3));
+}
+
+TEST(ExpressionBottomTest, ReturnsBottomElementBackwards) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottom: { input: [ 2, 1, 3 ], sortBy: -1 } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(1));
+}
+
+TEST(ExpressionBottomTest, ReturnsNullWithEmptyArray) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottom: { input: [], sortBy: 1 } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionBottomTest, ReturnsNullWithNullInput) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottom: { input: null, sortBy: 1 } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionBottomTest, ReturnsNullWithUndefinedInput) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottom: { input: undefined, sortBy: 1 } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionBottomTest, ReturnsBottomWithComplexSortBy) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson(
+        "{ $bottom: { input: [ {a: 2, b: 1}, {a: 1, b: 2}, {a: 3, b: 0} ], "
+        "sortBy: {a: 1, b: -1} } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(fromjson("{a: 3, b: 0}")));
+}
+
+TEST(ExpressionBottomTest, ReturnsBottomWithMixedTypesWithNumericSort) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr =
+        fromjson("{ $bottom: { input: [ 1, \"string\", 2, 3, {a: 1}, [1, 2] ], sortBy: 1 } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    // BSON type ordering: null < numbers < strings < objects < arrays
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1 << 2)));
+}
+
+TEST(ExpressionBottomTest, ReturnsBottomWithNestedArrayElements) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $bottom: { input: [ [3, 1], [1, 2], [2, 0] ], sortBy: 1 } }");
+
+    auto expressionBottom =
+        ExpressionBottom::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionBottom->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(3 << 1)));
+}
+
 namespace set {
 Value sortSet(Value set) {
     if (set.nullish()) {

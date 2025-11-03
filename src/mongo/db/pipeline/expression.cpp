@@ -3088,6 +3088,262 @@ Value ExpressionSortArray::serialize(const SerializationOptions& options) const 
                                     {"sortBy", _sortBy.getOriginalElement()}}}});
 }
 
+/* ----------------------- ExpressionTopN ------------------------ */
+
+intrusive_ptr<Expression> ExpressionTopN::parse(ExpressionContext* const expCtx,
+                                                BSONElement expr,
+                                                const VariablesParseState& vps) {
+    uassert(721218,
+            str::stream() << "$topN requires an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == BSONType::object);
+
+    boost::intrusive_ptr<Expression> n;
+    boost::intrusive_ptr<Expression> input;
+    boost::optional<PatternValueCmp> sortBy;
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "n") {
+            n = parseOperand(expCtx, elem, vps);
+        } else if (field == "input") {
+            input = parseOperand(expCtx, elem, vps);
+        } else if (field == "sortBy") {
+            sortBy = PatternValueCmp(createSortSpecObject(elem), elem, expCtx->getCollator());
+        } else {
+            uasserted(721219, str::stream() << "$topN found an unknown argument: " << field);
+        }
+    }
+
+    uassert(7212110, "$topN requires 'n' to be specified", n);
+    uassert(7212111, "$topN requires 'input' to be specified", input);
+
+    // If sortBy is not specified, default to ascending sort on the whole value
+    if (!sortBy) {
+        BSONObj defaultSortSpec = BSON("" << 1);
+        sortBy =
+            PatternValueCmp(defaultSortSpec, defaultSortSpec.firstElement(), expCtx->getCollator());
+    }
+
+    return new ExpressionTopN(expCtx, std::move(n), std::move(input), *sortBy);
+}
+
+Value ExpressionTopN::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(topN,
+                                      ExpressionTopN::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagTopNBottomNExpressions);
+
+const char* ExpressionTopN::getOpName() const {
+    return kName.data();
+}
+
+intrusive_ptr<Expression> ExpressionTopN::optimize() {
+    _children[_kN] = _children[_kN]->optimize();
+    _children[_kInput] = _children[_kInput]->optimize();
+    return this;
+}
+
+Value ExpressionTopN::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kName,
+                           Document{{"n", _children[_kN]->serialize(options)},
+                                    {"input", _children[_kInput]->serialize(options)},
+                                    {"sortBy", _sortBy.getOriginalElement()}}}});
+}
+
+/* ----------------------- ExpressionTop ------------------------ */
+
+intrusive_ptr<Expression> ExpressionTop::parse(ExpressionContext* const expCtx,
+                                               BSONElement expr,
+                                               const VariablesParseState& vps) {
+    uassert(7212113,
+            str::stream() << "$top requires an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == BSONType::object);
+
+    boost::intrusive_ptr<Expression> input;
+    boost::optional<PatternValueCmp> sortBy;
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "input") {
+            input = parseOperand(expCtx, elem, vps);
+        } else if (field == "sortBy") {
+            sortBy = PatternValueCmp(createSortSpecObject(elem), elem, expCtx->getCollator());
+        } else {
+            uasserted(7212114, str::stream() << "$top found an unknown argument: " << field);
+        }
+    }
+
+    uassert(7212115, "$top requires 'input' to be specified", input);
+
+    // If sortBy is not specified, default to ascending sort on the whole value
+    if (!sortBy) {
+        BSONObj defaultSortSpec = BSON("" << 1);
+        sortBy =
+            PatternValueCmp(defaultSortSpec, defaultSortSpec.firstElement(), expCtx->getCollator());
+    }
+
+    return new ExpressionTop(expCtx, std::move(input), *sortBy);
+}
+
+Value ExpressionTop::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(top,
+                                      ExpressionTop::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagTopNBottomNExpressions);
+
+const char* ExpressionTop::getOpName() const {
+    return kName.data();
+}
+
+intrusive_ptr<Expression> ExpressionTop::optimize() {
+    _children[_kInput] = _children[_kInput]->optimize();
+    return this;
+}
+
+Value ExpressionTop::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kName,
+                           Document{{"input", _children[_kInput]->serialize(options)},
+                                    {"sortBy", _sortBy.getOriginalElement()}}}});
+}
+
+/* ----------------------- ExpressionBottomN ------------------------ */
+
+intrusive_ptr<Expression> ExpressionBottomN::parse(ExpressionContext* const expCtx,
+                                                   BSONElement expr,
+                                                   const VariablesParseState& vps) {
+    uassert(7212117,
+            str::stream() << "$bottomN requires an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == BSONType::object);
+
+    boost::intrusive_ptr<Expression> n;
+    boost::intrusive_ptr<Expression> input;
+    boost::optional<PatternValueCmp> sortBy;
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "n") {
+            n = parseOperand(expCtx, elem, vps);
+        } else if (field == "input") {
+            input = parseOperand(expCtx, elem, vps);
+        } else if (field == "sortBy") {
+            sortBy = PatternValueCmp(createSortSpecObject(elem), elem, expCtx->getCollator());
+        } else {
+            uasserted(7212118, str::stream() << "$bottomN found an unknown argument: " << field);
+        }
+    }
+
+    uassert(7212119, "$bottomN requires 'n' to be specified", n);
+    uassert(7212120, "$bottomN requires 'input' to be specified", input);
+
+    // If sortBy is not specified, default to ascending sort on the whole value
+    if (!sortBy) {
+        BSONObj defaultSortSpec = BSON("" << 1);
+        sortBy =
+            PatternValueCmp(defaultSortSpec, defaultSortSpec.firstElement(), expCtx->getCollator());
+    }
+
+    return new ExpressionBottomN(expCtx, std::move(n), std::move(input), *sortBy);
+}
+
+Value ExpressionBottomN::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bottomN,
+                                      ExpressionBottomN::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagTopNBottomNExpressions);
+
+const char* ExpressionBottomN::getOpName() const {
+    return kName.data();
+}
+
+intrusive_ptr<Expression> ExpressionBottomN::optimize() {
+    _children[_kN] = _children[_kN]->optimize();
+    _children[_kInput] = _children[_kInput]->optimize();
+    return this;
+}
+
+Value ExpressionBottomN::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kName,
+                           Document{{"n", _children[_kN]->serialize(options)},
+                                    {"input", _children[_kInput]->serialize(options)},
+                                    {"sortBy", _sortBy.getOriginalElement()}}}});
+}
+
+/* ----------------------- ExpressionBottom ------------------------ */
+
+intrusive_ptr<Expression> ExpressionBottom::parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps) {
+    uassert(7212122,
+            str::stream() << "$bottom requires an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == BSONType::object);
+
+    boost::intrusive_ptr<Expression> input;
+    boost::optional<PatternValueCmp> sortBy;
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "input") {
+            input = parseOperand(expCtx, elem, vps);
+        } else if (field == "sortBy") {
+            sortBy = PatternValueCmp(createSortSpecObject(elem), elem, expCtx->getCollator());
+        } else {
+            uasserted(7212123, str::stream() << "$bottom found an unknown argument: " << field);
+        }
+    }
+
+    uassert(7212124, "$bottom requires 'input' to be specified", input);
+
+    // If sortBy is not specified, default to ascending sort on the whole value
+    if (!sortBy) {
+        BSONObj defaultSortSpec = BSON("" << 1);
+        sortBy =
+            PatternValueCmp(defaultSortSpec, defaultSortSpec.firstElement(), expCtx->getCollator());
+    }
+
+    return new ExpressionBottom(expCtx, std::move(input), *sortBy);
+}
+
+Value ExpressionBottom::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bottom,
+                                      ExpressionBottom::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagTopNBottomNExpressions);
+
+const char* ExpressionBottom::getOpName() const {
+    return kName.data();
+}
+
+intrusive_ptr<Expression> ExpressionBottom::optimize() {
+    _children[_kInput] = _children[_kInput]->optimize();
+    return this;
+}
+
+Value ExpressionBottom::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kName,
+                           Document{{"input", _children[_kInput]->serialize(options)},
+                                    {"sortBy", _sortBy.getOriginalElement()}}}});
+}
+
 /* ----------------------- ExpressionSetDifference ---------------------------- */
 
 Value ExpressionSetDifference::evaluate(const Document& root, Variables* variables) const {

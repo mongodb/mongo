@@ -245,6 +245,13 @@ feature_flags:
         default: false
         fcv_gated: true
 
+    featureFlagTopNBottomNExpressions:
+        description: "Feature flag to enable $topN, $top, $bottomN and $bottom expressions"
+        cpp_varname: gFeatureFlagTopNBottomNExpressions
+        default: true
+        version: 8.3
+        fcv_gated: true
+
     featureFlagPQSBackfill:
         description: "Enables PQS representative query backfilling"
         cpp_varname: gFeatureFlagPQSBackfill

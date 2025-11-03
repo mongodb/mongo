@@ -107,6 +107,10 @@ class ExpressionSimilarityEuclidean;
 class ExpressionSize;
 class ExpressionReverseArray;
 class ExpressionSortArray;
+class ExpressionTopN;
+class ExpressionTop;
+class ExpressionBottomN;
+class ExpressionBottom;
 class ExpressionSlice;
 class ExpressionIsArray;
 class ExpressionInternalFindAllValuesAtPath;
@@ -306,6 +310,10 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSize>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionReverseArray>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSortArray>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTopN>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTop>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBottomN>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBottom>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSlice>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsArray>) = 0;
     virtual void visit(
@@ -517,6 +525,10 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionSize*) override {}
     void visit(const ExpressionReverseArray*) override {}
     void visit(const ExpressionSortArray*) override {}
+    void visit(const ExpressionTopN*) override {}
+    void visit(const ExpressionTop*) override {}
+    void visit(const ExpressionBottomN*) override {}
+    void visit(const ExpressionBottom*) override {}
     void visit(const ExpressionSlice*) override {}
     void visit(const ExpressionIsArray*) override {}
     void visit(const ExpressionInternalFindAllValuesAtPath*) override {}

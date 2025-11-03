@@ -119,6 +119,10 @@ public:
         kSize,
         kReverseArray,
         kSortArray,
+        kTopN,
+        kTop,
+        kBottomN,
+        kBottom,
         kSlice,
         kIsArray,
         kInternalFindAllValuesAtPath,
@@ -528,6 +532,22 @@ public:
 
     void visit(const ExpressionSortArray* expr) final {
         combine(OpType::kSortArray);
+    }
+
+    void visit(const ExpressionTopN* expr) final {
+        combine(OpType::kTopN);
+    }
+
+    void visit(const ExpressionTop* expr) final {
+        combine(OpType::kTop);
+    }
+
+    void visit(const ExpressionBottomN* expr) final {
+        combine(OpType::kBottomN);
+    }
+
+    void visit(const ExpressionBottom* expr) final {
+        combine(OpType::kBottom);
     }
 
     void visit(const ExpressionSlice* expr) final {

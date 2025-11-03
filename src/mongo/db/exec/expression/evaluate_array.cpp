@@ -425,6 +425,137 @@ Value evaluate(const ExpressionSortArray& expr, const Document& root, Variables*
     return Value(std::move(array));
 }
 
+Value evaluate(const ExpressionTopN& expr, const Document& root, Variables* variables) {
+    Value nVal(expr.getN()->evaluate(root, variables));
+    Value input(expr.getInput()->evaluate(root, variables));
+
+    if (nVal.nullish() || input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(721210,
+            str::stream() << "The 'n' argument to $topN must be an integer, but was of type: "
+                          << typeName(nVal.getType()),
+            nVal.integral64Bit());
+
+    uassert(721211,
+            str::stream() << "The input argument to $topN must be an array, but was of type: "
+                          << typeName(input.getType()),
+            input.isArray());
+
+    int64_t n = nVal.coerceToLong();
+    uassert(721212, "$topN requires 'n' to be non-negative", n >= 0);
+
+    std::vector<Value> array = input.getArray();
+
+    // Sort the first n elements
+    // Partial Sort uses a heap and sorts in N*log(n) time
+    std::partial_sort(array.begin(),
+                      array.begin() + std::min(static_cast<size_t>(n), array.size()),
+                      array.end(),
+                      expr.getSortBy());
+
+    // If n is greater than or equal to array size, return the entire sorted array
+    if (static_cast<size_t>(n) >= array.size()) {
+        return Value(std::move(array));
+    }
+
+    // Take top n elements
+    array.resize(n);
+    return Value(std::move(array));
+}
+
+Value evaluate(const ExpressionTop& expr, const Document& root, Variables* variables) {
+    Value input(expr.getInput()->evaluate(root, variables));
+
+    if (input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(721213,
+            str::stream() << "The input argument to $top must be an array, but was of type: "
+                          << typeName(input.getType()),
+            input.isArray());
+
+    const auto& array = input.getArray();
+
+    if (array.empty()) {
+        return Value(BSONNULL);
+    }
+
+    // Find the first element under the sort comparator (consistent with $topN)
+    auto minIt = std::min_element(array.begin(), array.end(), expr.getSortBy());
+    return *minIt;
+}
+
+Value evaluate(const ExpressionBottomN& expr, const Document& root, Variables* variables) {
+    Value nVal(expr.getN()->evaluate(root, variables));
+    Value input(expr.getInput()->evaluate(root, variables));
+
+    if (nVal.nullish() || input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(721214,
+            str::stream() << "The 'n' argument to $bottomN must be an integer, but was of type: "
+                          << typeName(nVal.getType()),
+            nVal.integral64Bit());
+
+    uassert(721215,
+            str::stream() << "The input argument to $bottomN must be an array, but was of type: "
+                          << typeName(input.getType()),
+            input.isArray());
+
+    int64_t n = nVal.coerceToLong();
+    uassert(721216, "$bottomN requires 'n' to be non-negative", n >= 0);
+
+    std::vector<Value> array = input.getArray();
+
+    auto inverse = [](const PatternValueCmp& cmp) {
+        return [cmp](const Value& lhs, const Value& rhs) {
+            return cmp(rhs, lhs);
+        };
+    };
+
+    std::partial_sort(array.rbegin(),
+                      array.rbegin() + std::min(static_cast<size_t>(n), array.size()),
+                      array.rend(),
+                      inverse(expr.getSortBy()));
+
+    // If n is greater than or equal to array size, return the entire sorted array
+    if (static_cast<size_t>(n) >= array.size()) {
+        return Value(std::move(array));
+    }
+
+    // Take bottom n elements
+    array.erase(array.begin(), array.end() - n);
+
+    return Value(std::move(array));
+}
+
+Value evaluate(const ExpressionBottom& expr, const Document& root, Variables* variables) {
+    Value input(expr.getInput()->evaluate(root, variables));
+
+    if (input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(721217,
+            str::stream() << "The input argument to $bottom must be an array, but was of type: "
+                          << typeName(input.getType()),
+            input.isArray());
+
+    const auto& array = input.getArray();
+
+    if (array.empty()) {
+        return Value(BSONNULL);
+    }
+
+    // Find the last element under the sort comparator (consistent with $bottomN)
+    auto maxIt = std::max_element(array.begin(), array.end(), expr.getSortBy());
+    return *maxIt;
+}
+
 namespace {
 
 ValueSet arrayToSet(const Value& val, const ValueComparator& valueComparator) {

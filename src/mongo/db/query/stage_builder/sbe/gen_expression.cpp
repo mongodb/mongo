@@ -328,6 +328,10 @@ public:
     void visit(const ExpressionSize* expr) final {}
     void visit(const ExpressionReverseArray* expr) final {}
     void visit(const ExpressionSortArray* expr) final {}
+    void visit(const ExpressionTopN* expr) final {}
+    void visit(const ExpressionTop* expr) final {}
+    void visit(const ExpressionBottomN* expr) final {}
+    void visit(const ExpressionBottom* expr) final {}
     void visit(const ExpressionSlice* expr) final {}
     void visit(const ExpressionIsArray* expr) final {}
     void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {}
@@ -518,6 +522,10 @@ public:
     void visit(const ExpressionSize* expr) final {}
     void visit(const ExpressionReverseArray* expr) final {}
     void visit(const ExpressionSortArray* expr) final {}
+    void visit(const ExpressionTopN* expr) final {}
+    void visit(const ExpressionTop* expr) final {}
+    void visit(const ExpressionBottomN* expr) final {}
+    void visit(const ExpressionBottom* expr) final {}
     void visit(const ExpressionSlice* expr) final {}
     void visit(const ExpressionIsArray* expr) final {}
     void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {}
@@ -2682,6 +2690,22 @@ public:
             _b.makeFunction("sortArray", std::move(functionArgs)));
 
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(exprSortArr)));
+    }
+
+    void visit(const ExpressionTopN* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(const ExpressionTop* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(const ExpressionBottomN* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(const ExpressionBottom* expr) final {
+        unsupportedExpression(expr->getOpName());
     }
 
     void visit(const ExpressionSlice* expr) final {

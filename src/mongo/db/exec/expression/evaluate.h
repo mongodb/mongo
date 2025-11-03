@@ -144,6 +144,10 @@ Value evaluate(const ExpressionIndexOfArray& expr, const Document& root, Variabl
 Value evaluate(const ExpressionIsArray& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionReverseArray& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionSortArray& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionTopN& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionTop& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionBottomN& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionBottom& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionSetDifference& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionSetEquals& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionSetIntersection& expr, const Document& root, Variables* variables);
