@@ -107,8 +107,8 @@ TimeseriesOptions generateTimeseriesOptions(
     return options;
 }
 
-std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
-                                                      const NamespaceString& nss) {
+std::pair<const std::shared_ptr<const CollectionCatalog>, std::vector<CollectionPtr>>
+getLocalCatalog(OperationContext* opCtx, const NamespaceString& nss) {
     std::vector<CollectionPtr> localCatalogCollections;
     auto collCatalogSnapshot = [&] {
         AutoGetCollection coll(opCtx,
@@ -124,7 +124,7 @@ std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
         // it's controlled by the test. The initialization is therefore safe.
         localCatalogCollections.emplace_back(CollectionPtr::CollectionPtr_UNSAFE(coll));
     }
-    return localCatalogCollections;
+    return {collCatalogSnapshot, std::move(localCatalogCollections)};
 }
 
 class MetadataConsistencyTest : public ShardServerTestFixture {
@@ -388,7 +388,7 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
     cmd.getCreateCollectionRequest().setSize(100);
     createTestCollection(opCtx, _nss, cmd.toBSON());
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     // Create a CollectionType for a non-unsplittable collection to mock the collection info
@@ -401,6 +401,7 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/);
     assertCollectionOptionsMismatchInconsistencyFound(
@@ -436,7 +437,7 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
         }
         createTestCollection(opCtx, nss, cmd.toBSON());
 
-        const auto localCatalogCollections = getLocalCatalogCollections(opCtx, nss);
+        const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, nss);
         ASSERT_EQ(1, localCatalogCollections.size());
 
         // Create a CollectionType to mock the collection metadata fetched from the config server.
@@ -451,6 +452,7 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
             _shardId,
             _shardId,
             {configColl},
+            localCatalogSnapshot,
             localCatalogCollections,
             false /*checkRangeDeletionIndexes*/);
 
@@ -517,7 +519,8 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
 
             const auto& actualNss = (localTimeseries ? nss.makeTimeseriesBucketsNamespace() : nss);
 
-            const auto localCatalogCollections = getLocalCatalogCollections(opCtx, actualNss);
+            const auto [localCatalogSnapshot, localCatalogCollections] =
+                getLocalCatalog(opCtx, actualNss);
             ASSERT_EQ(1, localCatalogCollections.size());
 
             // Create a CollectionType to mock the collection metadata fetched from the config
@@ -537,6 +540,7 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                     _shardId,
                     _shardId,
                     {configColl},
+                    localCatalogSnapshot,
                     localCatalogCollections,
                     false /*checkRangeDeletionIndexes*/);
 
@@ -775,7 +779,7 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
 
     createTestCollection(opCtx, _nss);
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     auto configColl = generateCollectionType(_nss, localCatalogCollections[0]->uuid());
@@ -785,6 +789,7 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/);
     assertOneInconsistencyFound(
@@ -804,6 +809,7 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
         _shardId,
         _shardId,
         {configColl},
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/);
     ASSERT_EQ(0, inconsistencies.size());
@@ -814,7 +820,7 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
 
     createTestCollection(opCtx, _nss);
 
-    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
 
     {
@@ -852,7 +858,8 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
         opCtx,
         _shardId,
         _shardId,
-        {},
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/);
     assertOneInconsistencyFound(
@@ -871,7 +878,8 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
         opCtx,
         _shardId,
         _shardId,
-        {},
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
         localCatalogCollections,
         false /*checkRangeDeletionIndexes*/);
     ASSERT_EQ(0, inconsistencies.size());

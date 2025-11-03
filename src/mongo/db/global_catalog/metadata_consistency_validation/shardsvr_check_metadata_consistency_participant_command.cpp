@@ -345,6 +345,7 @@ public:
                 shardId,
                 primaryShardId,
                 shardingCatalogCollections,
+                collCatalogSnapshot,
                 localCatalogCollections,
                 checkRangeDeletionIndexes);
         }

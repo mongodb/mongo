@@ -156,6 +156,7 @@ void logMetadataInconsistency(const MetadataInconsistencyItem& inconsistencyItem
 void _checkBucketCollectionInconsistencies(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const CollectionPtr& localColl,
     const bool checkView,
     std::vector<MetadataInconsistencyItem>& inconsistencies) {
@@ -187,13 +188,8 @@ void _checkBucketCollectionInconsistencies(
     // format. Check if there is a valid view, otherwise return current view/collection options (if
     // present).
     const auto [hasValidView, invalidOptions] = [&] {
-        AutoGetCollection ac(opCtx,
-                             nss.getTimeseriesViewNamespace(),
-                             MODE_IS,
-                             auto_get_collection::Options{}.viewMode(
-                                 auto_get_collection::ViewMode::kViewsPermitted));
-
-        if (auto view = ac.getView()) {
+        if (const auto& view =
+                localCatalogSnapshot->lookupView(opCtx, nss.getTimeseriesViewNamespace())) {
             if (view->viewOn() == nss && view->pipeline().size() == 1) {
                 const auto expectedViewPipeline = timeseries::generateViewPipeline(
                     *localColl->getTimeseriesOptions(), false /* asArray */);
@@ -215,23 +211,26 @@ void _checkBucketCollectionInconsistencies(
                         return std::make_pair(true, BSONObj());
                     }
                 }
-
-                // The view is not in the expected format, return the current options for debugging
-                BSONArrayBuilder pipelineArray;
-                const auto& pipeline = view->pipeline();
-                for (const auto& stage : pipeline) {
-                    pipelineArray.append(stage);
-                }
-
-                const BSONObj currentViewOptions =
-                    BSON("viewOn" << toStringForLogging(view->viewOn()) << "pipeline"
-                                  << pipelineArray.arr());
-
-                return std::make_pair(false, currentViewOptions);
             }
-        } else if (*ac) {
+
+            // The view is not in the expected format, return the current options for debugging
+            BSONArrayBuilder pipelineArray;
+            const auto& pipeline = view->pipeline();
+            for (const auto& stage : pipeline) {
+                pipelineArray.append(stage);
+            }
+
+            const BSONObj currentViewOptions = BSON("viewOn" << toStringForLogging(view->viewOn())
+                                                             << "pipeline" << pipelineArray.arr());
+
+            return std::make_pair(false, currentViewOptions);
+        }
+
+        const auto& coll = localCatalogSnapshot->lookupCollectionByNamespace(
+            opCtx, nss.getTimeseriesViewNamespace());
+        if (coll) {
             // A collection is present rather than a view, return the current options for debugging
-            return std::make_pair(false, ac->getCollectionOptions().toBSON());
+            return std::make_pair(false, coll->getCollectionOptions().toBSON());
         }
 
         return std::make_pair(false, BSONObj());
@@ -496,11 +495,13 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     return inconsistencies;
 }
 
-std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(OperationContext* opCtx,
-                                                                  const NamespaceString& nss,
-                                                                  const ShardId& currentShard,
-                                                                  const ShardId& primaryShard,
-                                                                  const CollectionPtr& localColl) {
+std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& currentShard,
+    const ShardId& primaryShard,
+    const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
+    const CollectionPtr& localColl) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
     if (currentShard != primaryShard) {
@@ -514,7 +515,7 @@ std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(OperationConte
     }
 
     _checkBucketCollectionInconsistencies(
-        opCtx, nss, localColl, currentShard == primaryShard, inconsistencies);
+        opCtx, nss, localCatalogSnapshot, localColl, currentShard == primaryShard, inconsistencies);
 
     return inconsistencies;
 }
@@ -880,6 +881,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& shardingCatalogCollections,
+    const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
     const bool checkRangeDeletionIndexes) {
 
@@ -925,6 +927,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
 
             _checkBucketCollectionInconsistencies(opCtx,
                                                   localNss,
+                                                  localCatalogSnapshot,
                                                   localColl,
                                                   primaryShardId == shardId /* isPrimaryShard */,
                                                   inconsistencies);
@@ -933,8 +936,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
             const auto& nss = localNss;
 
             if (!localNss.isShardLocalNamespace()) {
-                auto localInconsistencies =
-                    _checkLocalInconsistencies(opCtx, nss, shardId, primaryShardId, localColl);
+                auto localInconsistencies = _checkLocalInconsistencies(
+                    opCtx, nss, shardId, primaryShardId, localCatalogSnapshot, localColl);
                 inconsistencies.insert(inconsistencies.end(),
                                        std::make_move_iterator(localInconsistencies.begin()),
                                        std::make_move_iterator(localInconsistencies.end()));
@@ -948,8 +951,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
         const auto& localNss = localColl->ns();
 
         if (!localNss.isShardLocalNamespace()) {
-            auto localInconsistencies =
-                _checkLocalInconsistencies(opCtx, localNss, shardId, primaryShardId, localColl);
+            auto localInconsistencies = _checkLocalInconsistencies(
+                opCtx, localNss, shardId, primaryShardId, localCatalogSnapshot, localColl);
             inconsistencies.insert(inconsistencies.end(),
                                    std::make_move_iterator(localInconsistencies.begin()),
                                    std::make_move_iterator(localInconsistencies.end()));
