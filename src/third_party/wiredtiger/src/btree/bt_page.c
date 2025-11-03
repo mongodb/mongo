@@ -22,6 +22,79 @@ WT_STAT_USECS_HIST_INCR_FUNC(internal_reconstruct, perf_hist_internal_reconstruc
 WT_STAT_USECS_HIST_INCR_FUNC(leaf_reconstruct, perf_hist_leaf_reconstruct_latency)
 
 /*
+ * __page_find_min_delta --
+ *     Identify the smallest key across all active delta streams and return the corresponding delta
+ *     entry and its stream index (min_d).
+ *
+ * This function iterates backward through the delta streams (from latest to earliest) to naturally
+ *     enforce the "latest update wins" rule. When duplicate keys exist in multiple deltas, the
+ *     later (higher-indexed) delta is automatically preferred, and older duplicates are skipped by
+ *     advancing their stream indices. This ensures only the newest visible version of a key is
+ *     emitted in subsequent merge operations.
+ *
+ * Returns 0 on success or a WT_ERR code on failure.
+ */
+static inline int
+__page_find_min_delta(WT_SESSION_IMPL *session, WT_CELL_UNPACK_DELTA_INT **unpacked_deltas,
+  size_t *delta_size_each, size_t *delta_idx, size_t delta_count,
+  WT_CELL_UNPACK_DELTA_INT **min_delta, uint32_t *min_d)
+{
+    WT_ITEM delta_key, min_delta_key;
+    ssize_t d;
+    int cmp;
+
+    /* Initialize output pointers to NULL/UINT32_MAX. */
+    *min_delta = NULL;
+    *min_d = UINT32_MAX;
+
+    /*
+     * Iterate backward from the latest delta stream (highest index) to the earliest (lowest index).
+     * This ensures that when we encounter a duplicate key, the one we already have is the LATEST.
+     */
+    for (d = (ssize_t)delta_count - 1; d >= 0; --d) {
+        /* Skip exhausted delta streams. */
+        if (delta_idx[d] >= delta_size_each[d])
+            continue;
+
+        WT_ASSERT(session, unpacked_deltas[d] != NULL);
+
+        /* Get the key for the current delta entry in stream 'd'. */
+        delta_key.data = unpacked_deltas[d][delta_idx[d]].key.data;
+        delta_key.size = unpacked_deltas[d][delta_idx[d]].key.size;
+
+        /* If no minimum has been established yet, set the first valid one. */
+        if (*min_delta == NULL) {
+            *min_delta = &unpacked_deltas[d][delta_idx[d]];
+            *min_d = (uint32_t)d;
+            continue;
+        }
+
+        /* Get the key for the current minimum delta entry. */
+        min_delta_key.data = (*min_delta)->key.data;
+        min_delta_key.size = (*min_delta)->key.size;
+
+        /* Compare the current key against the current minimum. */
+        WT_RET(__wt_compare(session, S2BT(session)->collator, &delta_key, &min_delta_key, &cmp));
+
+        if (cmp < 0) {
+            /* Found a smaller key --> update minimum. */
+            *min_delta = &unpacked_deltas[d][delta_idx[d]];
+            *min_d = (uint32_t)d;
+        } else if (cmp == 0) {
+            /*
+             * Keys are equal. Because we iterate from latest --> earliest, the current minimum
+             * (from a higher-indexed delta) is the latest. Skip this older duplicate.
+             */
+            delta_idx[d]++;
+            WT_ASSERT(session, delta_idx[d] <= delta_size_each[d]);
+        }
+        /* If cmp > 0, keep the current minimum. */
+    }
+
+    return (0);
+}
+
+/*
  * __page_build_ref --
  *     Create a ref from a base image or a delta.
  */
@@ -120,249 +193,446 @@ err:
 }
 
 /*
- * __page_merge_internal_delta_with_base_image --
- *     Merge the consolidated delta array with the base image.
+ * __page_unpack_deltas_internal --
+ *     Internal helper: allocate and unpack all delta images into arrays.
  */
 static int
-__page_merge_internal_delta_with_base_image(WT_SESSION_IMPL *session, WT_REF *ref,
-  WT_CELL_UNPACK_DELTA_INT **delta, size_t delta_entries, WT_REF ***refsp, size_t *ref_entriesp,
-  size_t *incr)
+__page_unpack_deltas_internal(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ITEM *deltas,
+  size_t delta_size, WT_CELL_UNPACK_DELTA_INT ***unpacked_deltasp, size_t **delta_size_eachp)
 {
-    WT_CELL_UNPACK_ADDR *base, *base_key, *base_val;
+    WT_CELL_UNPACK_DELTA_INT **unpacked_deltas;
     WT_DECL_RET;
+    size_t *delta_size_each;
+    size_t idx;
+    uint32_t d;
+
+    unpacked_deltas = NULL;
+    delta_size_each = NULL;
+
+    /* Allocate space to track delta sizes and unpacked deltas. */
+    WT_RET(__wt_calloc_def(session, delta_size, &delta_size_each));
+    WT_ERR(__wt_calloc_def(session, delta_size, &unpacked_deltas));
+
+    /* Unpack all delta images (do not merge them yet). */
+    for (d = 0; d < (uint32_t)delta_size; ++d) {
+        WT_PAGE_HEADER *header = (WT_PAGE_HEADER *)deltas[d].data;
+        size_t entries = header->u.entries / 2; /* key/value pairs */
+        delta_size_each[d] = entries;
+        WT_ERR(__wt_calloc_def(session, entries, &unpacked_deltas[d]));
+
+        idx = 0;
+        WT_CELL_FOREACH_DELTA_INT(session, page->dsk, header, unpacked_deltas[d][idx])
+        {
+            idx++;
+        }
+        WT_CELL_FOREACH_END;
+    }
+
+    *unpacked_deltasp = unpacked_deltas;
+    *delta_size_eachp = delta_size_each;
+    return (0);
+
+err:
+    if (unpacked_deltas != NULL) {
+        for (d = 0; d < (uint32_t)delta_size; ++d)
+            __wt_free(session, unpacked_deltas[d]);
+        __wt_free(session, unpacked_deltas);
+    }
+    __wt_free(session, delta_size_each);
+    return (ret);
+}
+
+/*
+ * __page_unpack_deltas_common --
+ *     Unpack all delta images into individual arrays (generic wrapper for reuse).
+ */
+static int
+__page_unpack_deltas_common(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ITEM *deltas,
+  size_t delta_size, WT_CELL_UNPACK_DELTA_INT ***unpacked_deltasp, size_t **delta_size_eachp)
+{
+    switch (page->type) {
+    case WT_PAGE_ROW_LEAF:
+        /* Implement unpacking for row leaf pages. */
+        break;
+    case WT_PAGE_ROW_INT:
+        /* Implement unpacking for row internal pages. */
+        WT_RET(__page_unpack_deltas_internal(
+          session, page, deltas, delta_size, unpacked_deltasp, delta_size_eachp));
+        break;
+    default:
+        return (__wt_illegal_value(session, page->type));
+    }
+
+    return (0);
+}
+
+/*
+ * __page_merge_deltas_common_merge_loop --
+ *     Merge base and multiple delta arrays into a single set of WT_REFs. Always prefers the latest
+ *     version (delta) when keys are equal.
+ */
+static int
+__page_merge_deltas_common_merge_loop(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR *base,
+  size_t base_entries, WT_CELL_UNPACK_DELTA_INT **unpacked_deltas, size_t *delta_size_each,
+  size_t *delta_idx, size_t delta_size, WT_REF *ref, WT_REF ***refsp, size_t *ref_entriesp,
+  size_t *incr, WT_ITEM *new_image, bool build_disk)
+{
+    WT_CELL_UNPACK_ADDR *base_key, *base_val;
+    WT_CELL_UNPACK_DELTA_INT *min_delta;
     WT_ITEM base_key_buf, delta_key_buf;
-    WT_PAGE *page;
     WT_REF **refs;
-    size_t base_entries, estimated_entries, final_entries, i, j, k;
+    size_t i = 0, final_entries = 0;
+    uint32_t min_d;
     int cmp;
+    WT_PAGE *page = ref->page;
 
-    final_entries = i = j = k = 0;
-    page = ref->page;
-    base_entries = (size_t)page->dsk->u.entries;
+    WT_ASSERT(session, base != NULL);
+    WT_ASSERT(session, base_entries != 0);
+    WT_ASSERT(session, refsp != NULL);
 
-    WT_ASSERT(session, base_entries != 0 && delta_entries != 0);
+    refs = *refsp;
+    min_d = 0;
+    min_delta = NULL;
 
-    /* Unpack all entries from the base image into an array. */
+    WT_UNUSED(new_image);
+    /*
+     * !!!
+     * WT_PAGE_HEADER *hdr = NULL;
+     * uint8_t *p = NULL;
+     */
+    bool row_leaf_page = false, internal_page = false;
+
+    if (build_disk) {
+        WT_ASSERT(session, new_image != NULL);
+        /*
+         * hdr = (WT_PAGE_HEADER *)new_image->data; p = (uint8_t *)hdr + sizeof(WT_PAGE_HEADER);
+         */
+
+        switch (page->type) {
+        case WT_PAGE_ROW_LEAF:
+            row_leaf_page = true;
+            break;
+        case WT_PAGE_ROW_INT:
+            internal_page = true;
+            break;
+        default:
+            return (__wt_illegal_value(session, page->type));
+        }
+    } else {
+        /*
+         * Encode the first key always from the base image. The btrees using customized collator
+         * cannot handle the truncated first key.
+         */
+        base_key = &base[i++];
+        base_val = &base[i++];
+        WT_RET(__page_build_ref(
+          session, ref, base_key, base_val, NULL, true, &refs[final_entries++], incr));
+    }
+
+    /*
+     * !!!
+     * Example: Demonstration of how the merge logic works with base and multiple delta arrays.
+     *
+     * Suppose we have a base array and three delta arrays (D1 = oldest, D3 = latest):
+     *
+     *   Base:  [1, 3, 5, 7]
+     *   D1:    [2, 3, 6]
+     *   D2:    [3, 4, 6, 8]
+     *   D3:    [3, 5, 9]
+     *
+     * Processing steps:
+     *   1. __page_find_min_delta() scans D3  D2  D1 (latest  oldest) to find the smallest key
+     *      among the current delta heads. When duplicates are found, newer deltas (higher index)
+     *      take precedence.
+     *
+     *   2. Initially:
+     *        - Base points to 1
+     *        - D3 points to 3, D2  3, D1  2
+     *      Minimum key = 1 (from Base)  emit Base(1)
+     *
+     *   3. Next smallest across deltas = 2 (from D1)  emit D1(2)
+     *
+     *   4. Keys 3 appear in D3, D2, and D1. Because D3 is the latest, its version of key 3 wins.
+     *      Older duplicates in D2 and D1 are skipped by advancing their indices.
+     *
+     *   5. Continue merging in ascending order:
+     *        Emit D3(3), Base(5 skipped since D3 overrides it), D2(4), D3(5), D1(6), D2(8), D3(9)
+     *
+     * Final merged output:
+     *   [1(base), 2(D1), 3(D3), 4(D2), 5(D3), 6(D1), 8(D2), 9(D3)]
+     *
+     */
+    for (;;) {
+
+        /* Only find next delta when needed */
+        if (min_delta == NULL)
+            WT_RET(__page_find_min_delta(session, unpacked_deltas, delta_size_each, delta_idx,
+              delta_size, &min_delta, &min_d));
+
+        /* Check if both base and all deltas are exhausted. */
+        if (i >= base_entries && min_delta == NULL)
+            break;
+
+        /* Diagnostics: detect early exhaustion of base keys or deltas. */
+        if (i >= base_entries && min_delta != NULL)
+            __wt_verbose_debug2(session, WT_VERB_PAGE_DELTA,
+              "__page_merge_deltas_common_merge_loop: ran out of base keys before deltas "
+              "(base_entries=%" PRIu64 ", delta=%" PRIu64 "/%" PRIu64 ")",
+              (uint64_t)base_entries, (uint64_t)min_d, (uint64_t)delta_size);
+
+        if (i < base_entries && min_delta == NULL)
+            __wt_verbose_debug2(session, WT_VERB_PAGE_DELTA,
+              "__page_merge_deltas_common_merge_loop: ran out of deltas before base keys "
+              "(base_entries=%" PRIu64 ", i=%" PRIu64 ")",
+              (uint64_t)base_entries, (uint64_t)i);
+
+        if (i >= base_entries)
+            cmp = 1;
+        else if (min_delta == NULL)
+            cmp = -1;
+        else {
+            base_key_buf.data = base[i].data;
+            base_key_buf.size = base[i].size;
+            delta_key_buf.data = min_delta->key.data;
+            delta_key_buf.size = min_delta->key.size;
+            WT_RET(
+              __wt_compare(session, S2BT(session)->collator, &base_key_buf, &delta_key_buf, &cmp));
+        }
+        /* Old implementation: build WT_REFs */
+        if (!build_disk) {
+            if (cmp < 0) {
+                /* Base key < Delta key -> emit base */
+                base_key = &base[i++];
+                base_val = &base[i++];
+                WT_RET(__page_build_ref(
+                  session, ref, base_key, base_val, NULL, true, &refs[final_entries++], incr));
+            } else {
+                /* Either delta < base or delta == base --> emit delta (prefer latest) */
+                if (!__wt_delta_cell_type_visible_all(min_delta))
+                    WT_RET(__page_build_ref(
+                      session, ref, NULL, NULL, min_delta, false, &refs[final_entries++], incr));
+                delta_idx[min_d]++;
+                if (cmp == 0)
+                    i += 2; /* skip base key/value if keys equal */
+                /* We consumed this delta, so recompute next round */
+                min_delta = NULL;
+            }
+        } else {
+            /* New implementation: build disk image */
+            if (cmp < 0) {
+                /*
+                 * !!! NOTE: The following commented code is a placeholder for the actual
+                 * implementation of base_key = &base[i++]; base_val = &base[i++];
+                 */
+                if (row_leaf_page) {
+                    /* Pack row-leaf base key/value. */
+                } else if (internal_page) {
+                    /* Pack internal base key/value. */
+                }
+                /*
+                 * !!! NOTE: The following commented code is a placeholder for the actual
+                 * implementation of
+                 * __wti_rec_kv_copy(session, p, base_key);
+                 * p += base_key->len;
+                 * __wti_rec_kv_copy(session, p, base_val);
+                 * p += base_val->len;
+                 */
+                i++;
+            } else {
+                if (row_leaf_page) {
+                    /* Pack row-leaf delta entry. */
+                } else if (internal_page && !__wt_delta_cell_type_visible_all(min_delta)) {
+                    /* Pack internal delta entry. */
+                }
+                /*
+                 * !!! NOTE: The following commented code is a placeholder for the actual
+                 * implementation of
+                 * __wti_rec_kv_copy(session, p, min_delta->key);
+                 * p += min_delta->key.len;
+                 * __wti_rec_kv_copy(session, p, min_delta->value);
+                 * p += min_delta->value.len;
+                 */
+                if (cmp == 0)
+                    i += 2;
+                delta_idx[min_d]++;
+                /* We consumed this delta, so recompute next round */
+                min_delta = NULL;
+            }
+
+            final_entries++;
+        }
+    }
+
+    *ref_entriesp = final_entries;
+    *refsp = refs;
+
+    return (0);
+}
+
+/*
+ * __page_merge_deltas_with_base_image_old --
+ *     Merge deltas with base image and build WT_REF array.
+ */
+static int
+__page_merge_deltas_with_base_image_old(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *deltas,
+  size_t delta_size, WT_REF ***refsp, size_t *ref_entriesp, size_t *incr)
+{
+    WT_CELL_UNPACK_ADDR *base = NULL;
+    WT_CELL_UNPACK_DELTA_INT **unpacked_deltas = NULL;
+    WT_DECL_RET;
+    WT_PAGE *page = ref->page;
+    WT_REF **refs = NULL;
+    size_t *delta_size_each = NULL, *delta_idx = NULL;
+    size_t base_entries, estimated_entries, k;
+    uint32_t d;
+
+    WT_RET(__page_unpack_deltas_common(
+      session, page, deltas, delta_size, &unpacked_deltas, &delta_size_each));
+
+    k = 0;
+    base_entries = page->dsk->u.entries;
     WT_ERR(__wt_calloc_def(session, base_entries, &base));
     WT_CELL_FOREACH_ADDR (session, page->dsk, base[k]) {
         k++;
     }
     WT_CELL_FOREACH_END;
 
-    /*
-     * Creates a new refs array containing the finalized refs. The maximum number of entries is the
-     * sum of half the base entries (since entries in the base image is the total of both keys and
-     * values) and the delta entries.
-     */
-    estimated_entries = (base_entries / 2) + delta_entries + 1;
-    WT_ERR(__wt_calloc_def(session, estimated_entries, refsp));
-    refs = *refsp;
+    estimated_entries = (base_entries / 2) + 1;
+    for (d = 0; d < delta_size; ++d)
+        estimated_entries += delta_size_each[d];
+    WT_ERR(__wt_calloc_def(session, estimated_entries, &refs));
+    WT_ERR(__wt_calloc_def(session, delta_size, &delta_idx));
 
-    /*
-     * Encode the first key always from the base image. The btrees using customized collator cannot
-     * handle the truncated first key.
-     */
-    base_key = &base[i++];
-    base_val = &base[i++];
-    WT_ERR(
-      __page_build_ref(session, ref, base_key, base_val, NULL, true, &refs[final_entries++], incr));
+    /* Common merge logic */
+    WT_ERR(__page_merge_deltas_common_merge_loop(session, base, base_entries, unpacked_deltas,
+      delta_size_each, delta_idx, delta_size, ref, &refs, ref_entriesp, incr, NULL, false));
 
-    /* Perform a merge sort between the base array and the delta array. */
-    while (i < base_entries && j < delta_entries) {
-        /* Compare the keys of the base entry and the delta entry. */
-        base_key_buf.data = base[i].data;
-        base_key_buf.size = base[i].size;
-        delta_key_buf.data = delta[j]->key.data;
-        delta_key_buf.size = delta[j]->key.size;
-        WT_ERR(__wt_compare(session, S2BT(session)->collator, &base_key_buf, &delta_key_buf, &cmp));
-
-        if (cmp < 0) {
-            base_key = &base[i++];
-            base_val = &base[i++];
-            WT_ERR(__page_build_ref(
-              session, ref, base_key, base_val, NULL, true, &refs[final_entries++], incr));
-        } else if (cmp >= 0) {
-            if (!__wt_delta_cell_type_visible_all(delta[j]))
-                WT_ERR(__page_build_ref(
-                  session, ref, NULL, NULL, delta[j], false, &refs[final_entries++], incr));
-            if (cmp == 0)
-                i += 2; /* Skip the current key and value. */
-            j++;
-        }
-    }
-    /* Copy the remaining entries from the base array or the delta array. */
-    for (; i < base_entries;) {
-        base_key = &base[i++];
-        base_val = &base[i++];
-        WT_ERR(__page_build_ref(
-          session, ref, base_key, base_val, NULL, true, &refs[final_entries++], incr));
-    }
-    for (; j < delta_entries; j++)
-        if (!__wt_delta_cell_type_visible_all(delta[j]))
-            WT_ERR(__page_build_ref(
-              session, ref, NULL, NULL, delta[j], false, &refs[final_entries++], incr));
-
-    WT_ASSERT(session, i == base_entries && j == delta_entries);
-    WT_ASSERT(session, final_entries != 0);
-    WT_ASSERT(session, final_entries < estimated_entries && refs[final_entries] == NULL);
+    *refsp = refs;
 
 err:
-    *ref_entriesp = final_entries;
+    /* Cleanup */
+    for (d = 0; d < delta_size; ++d)
+        __wt_free(session, unpacked_deltas[d]);
+    __wt_free(session, unpacked_deltas);
+    __wt_free(session, delta_size_each);
+    __wt_free(session, delta_idx);
     __wt_free(session, base);
     return (ret);
 }
 
 /*
- * __page_unpacked_delta_key_cmp --
- *     Compare two unpacked deltas
+ * __page_merge_deltas_with_base_image_new --
+ *     Merge deltas with base image into disk image in a single pass.
  */
 static int
-__page_unpacked_delta_key_cmp(
-  WT_SESSION_IMPL *session, const WT_CELL_UNPACK_DELTA_INT *a, const WT_CELL_UNPACK_DELTA_INT *b)
+__page_merge_deltas_with_base_image_new(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *deltas,
+  size_t delta_size, WT_REF ***refsp, size_t *ref_entriesp, size_t *incr, WT_ITEM *new_image)
 {
+    WT_BTREE *btree;
+    WT_CELL_UNPACK_ADDR *base = NULL;
+    WT_CELL_UNPACK_DELTA_INT **unpacked_deltas = NULL;
     WT_DECL_RET;
-    WT_ITEM key_a, key_b;
-    int cmp;
+    WT_PAGE *page = ref->page;
+    WT_REF **refs = NULL;
+    size_t *delta_size_each = NULL, *delta_idx = NULL;
+    size_t base_entries, estimated_entries, k, new_image_buf_size;
+    uint32_t d, split_size;
 
-    key_a.data = a->key.data;
-    key_a.size = a->key.size;
-    key_b.data = b->key.data;
-    key_b.size = b->key.size;
+    btree = S2BT(session);
+    WT_RET(__page_unpack_deltas_common(
+      session, page, deltas, delta_size, &unpacked_deltas, &delta_size_each));
 
-    if ((ret = __wt_compare(session, S2BT(session)->collator, &key_a, &key_b, &cmp)) != 0)
-        WT_IGNORE_RET(__wt_panic(session, ret, "failed to compare keys"));
-
-    return (cmp);
-}
-
-/*
- * __page_merge_internal_deltas --
- *     Perform a k-way merge sort on the delta arrays to create a single consolidated delta array.
- */
-static int
-__page_merge_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_DELTA_INT **unpacked_deltas,
-  uint32_t start, uint32_t end, size_t *sizes, WT_CELL_UNPACK_DELTA_INT ***deltas_merged,
-  size_t *size)
-{
-    WT_CELL_UNPACK_DELTA_INT **left, **merged, **right;
-    size_t left_size, right_size;
-    uint32_t i, mid;
-
-    WT_ASSERT(session, start <= end);
-    left = right = merged = NULL;
-
-    if (start == end) {
-        *size = sizes[start];
-        WT_RET(__wt_calloc_def(session, *size, &merged));
-        for (i = 0; i < (uint32_t)sizes[start]; ++i)
-            merged[i] = &unpacked_deltas[start][i];
-        *deltas_merged = merged;
-        return (0);
+    k = 0;
+    base_entries = page->dsk->u.entries;
+    WT_ERR(__wt_calloc_def(session, base_entries, &base));
+    WT_CELL_FOREACH_ADDR (session, page->dsk, base[k]) {
+        k++;
     }
+    WT_CELL_FOREACH_END;
 
-    mid = (start + end) / 2;
+    estimated_entries = (base_entries / 2) + 1;
+    for (d = 0; d < delta_size; ++d)
+        estimated_entries += delta_size_each[d];
+    WT_ERR(__wt_calloc_def(session, estimated_entries, &refs));
+    WT_ERR(__wt_calloc_def(session, delta_size, &delta_idx));
 
-    WT_RET(
-      __page_merge_internal_deltas(session, unpacked_deltas, start, mid, sizes, &left, &left_size));
-    WT_RET(__page_merge_internal_deltas(
-      session, unpacked_deltas, mid + 1, end, sizes, &right, &right_size));
+    /* Allocate enough size for the new image, similar to __rec_split_chunk_init. */
+    split_size = __wt_split_page_size(btree->split_pct, btree->maxleafpage, btree->allocsize);
+    new_image_buf_size = 2 * WT_ALIGN(WT_MAX(btree->maxleafpage, split_size), btree->allocsize);
+    WT_ERR(__wt_buf_init(session, new_image, new_image_buf_size));
+    /*
+     * !!!
+     * WT_PAGE_HEADER *hdr = (WT_PAGE_HEADER *)new_image->data;
+     * memset(hdr, 0, sizeof(WT_PAGE_HEADER));
+     * hdr->type = page->type;
+     */
 
-    WT_RET(__wt_calloc_def(session, left_size + right_size, &merged));
+    /* Common merge logic (disk mode) */
+    WT_ERR(__page_merge_deltas_common_merge_loop(session, base, base_entries, unpacked_deltas,
+      delta_size_each, delta_idx, delta_size, ref, &refs, ref_entriesp, incr, new_image, true));
 
-    WT_MERGE_SORT(session, left, left_size, right, right_size, __page_unpacked_delta_key_cmp, true,
-      merged, *size);
-    *deltas_merged = merged;
-
-    __wt_free(session, left);
-    __wt_free(session, right);
+    *refsp = refs;
     return (0);
+
+err:
+    for (d = 0; d < delta_size; ++d)
+        __wt_free(session, unpacked_deltas[d]);
+    __wt_free(session, unpacked_deltas);
+    __wt_free(session, delta_size_each);
+    __wt_free(session, delta_idx);
+    __wt_free(session, base);
+    __wt_free(session, refs);
+    return (ret);
 }
 
 /*
  * __page_reconstruct_internal_deltas --
- *     Reconstructs the internal page using `delta_size` delta images.
+ *     Reconstructs the internal page using delta images in a single pass.
  */
 static int
 __page_reconstruct_internal_deltas(
   WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *deltas, size_t delta_size)
 {
-    WT_CELL_UNPACK_DELTA_INT **unpacked_deltas, **unpacked_deltas_merged;
     WT_DECL_RET;
-    WT_PAGE_HEADER *header;
     WT_PAGE_INDEX *pindex;
     WT_REF **refs;
-    size_t *delta_size_each, incr, pindex_size, refs_entries, unpacked_deltas_merged_size;
-    uint32_t i, j;
+    size_t pindex_size;
+    size_t refs_entries, incr;
+    uint32_t i;
 
-    unpacked_deltas = unpacked_deltas_merged = NULL;
     refs = NULL;
-    pindex = NULL;
-    unpacked_deltas_merged_size = refs_entries = incr = 0;
+    refs_entries = 0;
+    incr = 0;
 
-    /*
-     * !!!
-     * Unpack all delta images into a 2D array where entry is WT_CELL_UNPACK_DELTA_INT:
-     *     unpacked_deltas[0] -> [ entry_0_0, entry_0_1, entry_0_2, ... ]
-     *     unpacked_deltas[1] -> [ entry_1_0, entry_1_1, entry_1_2, ... ]
-     *     unpacked_deltas[2] -> [ entry_2_0, entry_2_1, entry_2_2, ... ]
-     *                           ...
-     *     unpacked_deltas[N] -> [ entry_N_0, entry_N_1, entry_N_2, ... ]
-     */
-    WT_RET(__wt_calloc_def(session, delta_size, &delta_size_each));
-    WT_ERR(__wt_calloc_def(session, delta_size, &unpacked_deltas));
-    for (i = 0, j = 0; i < (uint32_t)delta_size; ++i, j = 0) {
-        header = (WT_PAGE_HEADER *)deltas[i].data;
-        WT_ASSERT(session, header->u.entries != 0);
-        WT_ASSERT(session, header->u.entries % 2 == 0);
+    /* Merge deltas directly with the base image to build refs in a single pass. */
+    WT_RET(__page_merge_deltas_with_base_image_old(
+      session, ref, deltas, delta_size, &refs, &refs_entries, &incr));
 
-        delta_size_each[i] = (size_t)header->u.entries / 2; /* Each entry has a key and a value. */
-        WT_ERR(__wt_calloc_def(session, header->u.entries, &unpacked_deltas[i]));
-        WT_CELL_FOREACH_DELTA_INT(session, ref->page->dsk, header, unpacked_deltas[i][j])
-        {
-            j++;
-        }
-        WT_CELL_FOREACH_END;
-    }
-
-    WT_ERR(__page_merge_internal_deltas(session, unpacked_deltas, 0, (uint32_t)delta_size - 1,
-      delta_size_each, &unpacked_deltas_merged, &unpacked_deltas_merged_size));
-
-    WT_ERR(__page_merge_internal_delta_with_base_image(session, ref, unpacked_deltas_merged,
-      unpacked_deltas_merged_size, &refs, &refs_entries, &incr));
-
-    /*
-     * Constructs a new `p-index` using the merged `refs` list and allocate refs to the new
-     * `p-index`.
-     */
+    /* Allocate a new page index and assign refs to it. */
     pindex_size = sizeof(WT_PAGE_INDEX) + refs_entries * sizeof(WT_REF *);
     WT_ERR(__wt_calloc(session, 1, pindex_size, &pindex));
     incr += pindex_size;
+
     pindex->index = (WT_REF **)(pindex + 1);
     pindex->entries = (uint32_t)refs_entries;
+
     for (i = 0; i < pindex->entries; ++i) {
         refs[i]->pindex_hint = i;
         pindex->index[i] = refs[i];
     }
 
-    /* Initialize the reconstructed `p-index` into the internal page */
+    /* Install the reconstructed page index into the internal page. */
     WT_INTL_INDEX_SET(ref->page, pindex);
     __wt_cache_page_inmem_incr(session, ref->page, incr, false);
 
-    if (0) {
-err:
-        if (refs != NULL)
-            for (i = 0; i < (uint32_t)refs_entries; ++i)
-                __wt_free(session, refs[i]);
-    }
-    __wt_free(session, refs);
-    __wt_free(session, unpacked_deltas_merged);
-    if (unpacked_deltas != NULL) {
-        for (i = 0; i < (uint32_t)delta_size; ++i)
-            __wt_free(session, unpacked_deltas[i]);
-        __wt_free(session, unpacked_deltas);
-    }
-    __wt_free(session, delta_size_each);
+    return (0);
 
+err:
+    if (refs != NULL)
+        for (i = 0; i < (uint32_t)refs_entries; ++i)
+            __wt_free(session, refs[i]);
+
+    __wt_free(session, refs);
     return (ret);
 }
 
@@ -511,6 +781,28 @@ err:
     __wt_scr_free(session, &lastkey);
     WT_TRET(__wt_btcur_close(&cbt, true));
     return (ret);
+}
+
+/*
+ * __wti_build_full_disk_image_on_read --
+ *     Build a full disk image of the page after reading from disk.
+ */
+int
+__wti_build_full_disk_image_on_read(
+  WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *deltas, size_t delta_size, WT_ITEM *new_image)
+{
+    WT_REF **refs;
+    size_t refs_entries, incr;
+
+    refs = NULL;
+    refs_entries = 0;
+    incr = 0;
+
+    /* Merge deltas directly with the base image to build refs in a single pass. */
+    WT_RET(__page_merge_deltas_with_base_image_new(
+      session, ref, deltas, delta_size, &refs, &refs_entries, &incr, new_image));
+
+    return (0);
 }
 
 /*

@@ -118,11 +118,11 @@ struct __wt_background_compact {
 struct __wt_layered_table_manager_entry {
     uint32_t ingest_id;
     uint32_t stable_id;
+
+    /* FIXME-WT-15865: Check whether all the strings contain duplicated content. */
+    const char *layered_uri;
     const char *ingest_uri;
     const char *stable_uri;
-    WT_LAYERED_TABLE *layered_table;
-
-    uint64_t checkpoint_txn_id;
 };
 
 /*

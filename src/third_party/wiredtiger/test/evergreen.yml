@@ -56,6 +56,7 @@ functions:
             COMMON_SAN_OPTIONS="abort_on_error=1:disable_coredump=0"
             if [[ "${CMAKE_BUILD_TYPE|}" =~ ASan ]]; then
               export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(dirname $(/opt/mongodbtoolchain/v5/bin/clang -print-file-name=libclang_rt.asan.so))"
               export TESTUTIL_BYPASS_ASAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ MSan ]]; then
               export MSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
@@ -2994,6 +2995,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -3008,6 +3010,7 @@ tasks:
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/"
+          shell: bash
           script: |
             set -o errexit
             set -o verbose
@@ -6458,6 +6461,7 @@ buildvariants:
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
+    unit_test_variant_args: --asan
     ctest_extra_args: -E "wt12015_backup_corruption"
   tags: ["pull_request", "sanitizer"]
   tasks:
@@ -6470,6 +6474,8 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: live-restore-long
     - name: ".stress-test-asan"
+    - name: ".unit_test"
+    - name: ".unit_test_long"
 
 - name: ubuntu2004-tsan
   display_name: "! Ubuntu 20.04 TSAN"
@@ -7317,6 +7323,7 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
     ctest_extra_args: -E "wt12015_backup_corruption"
+    unit_test_variant_args: --asan
   tasks:
     - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
@@ -7327,6 +7334,8 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: live-restore-long
     - name: ".stress-test-asan"
+    - name: ".unit_test"
+    - name: ".unit_test_long"
 
 - name: amazon2023-armv9-tsan
   display_name: "(ARMV9) Amazon Linux 2023 TSAN"

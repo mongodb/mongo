@@ -69,8 +69,6 @@ err:
 /*
  * __schema_layered_worker_verify --
  *     Run a schema worker operation (which is verification) on the layered table.
- *
- * FIXME-WT-15047: Implement ingest table verification on followers.
  */
 static int
 __schema_layered_worker_verify(WT_SESSION_IMPL *session, const char *uri,
@@ -95,10 +93,8 @@ __schema_layered_worker_verify(WT_SESSION_IMPL *session, const char *uri,
     WT_ASSERT(session, file_func == __wt_verify);
 
     /*
-     * Verifying stable tables of layered tables uses the existing verify logic.
-     * Ingest tables, however, require special handling:
-     * - On leader: ingest must always be empty/no-op.
-     * - On followers: FIXME-WT-15047 ingest tables are not checkpointed.
+     * Verifying stable tables of layered tables uses the existing verify logic. The same applies to
+     * ingest tables of leaders. However, on followers ingest tables must be empty.
      */
 
     /* Verify the stable table of the layered table. */
@@ -118,8 +114,7 @@ __schema_layered_worker_verify(WT_SESSION_IMPL *session, const char *uri,
           stable_uri);
 
     /*
-     * Verify the ingest table of the layered table. FIXME-WT-15047: Implement ingest table
-     * verification on followers.
+     * Verify the ingest table of the layered table on leader.
      */
     if (conn->layered_table_manager.leader) {
         /*

@@ -1,3 +1,7 @@
 # TCMalloc intentionally leaks newed objects. More information can be found in
 # https://github.com/gperftools/gperftools/issues/758.
 leak:InitModule
+# ARM64 python leaks memory from an unclear source. This suppresses that one leak.
+leak:PyObject_Malloc
+# FIXME-WT-15898: Unsuppress this function after resolution.
+leak:__debug_item_key

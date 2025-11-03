@@ -148,18 +148,19 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     WT_ADDR_COPY addr;
     WT_DECL_RET;
     WT_ITEM *deltas;
+    WT_ITEM *new_image;
     WT_ITEM *tmp;
     WT_PAGE *page;
     WT_PAGE_BLOCK_META block_meta;
     WT_REF_STATE previous_state;
     size_t count, i;
     uint32_t page_flags;
-    bool instantiate_upd, disk_image_freed;
+    bool instantiate_upd, disk_image_freed, page_change;
 
     WT_CLEAR(block_meta);
     tmp = NULL;
     count = 0;
-    disk_image_freed = false;
+    disk_image_freed = page_change = false;
     page = NULL;
 
     /* Lock the WT_REF. */
@@ -246,6 +247,14 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     else
         deltas = NULL;
 
+    /* Build a full disk image of the page after reading from disk. */
+    if (/* DISABLES CODE */ (0) && count > 1) {
+        ret = __wti_build_full_disk_image_on_read(session, ref, deltas, count - 1, new_image);
+        for (i = 0; i < count - 1; ++i)
+            __wt_buf_free(session, &deltas[i]);
+        __wt_buf_free(session, new_image);
+        WT_ERR(ret);
+    }
     /*
      * Build the in-memory version of the page. Clear our local reference to the allocated copy of
      * the disk image on return, the in-memory object steals it.
@@ -277,11 +286,16 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         for (i = 0; i < count - 1; ++i)
             __wt_buf_free(session, &deltas[i]);
         WT_ERR(ret);
+        /* The page may be changed if we consolidate the deltas to a new page. */
+        if (page != ref->page) {
+            page = ref->page;
+            page_change = true;
+        }
     }
 
     __wt_free(session, tmp);
 
-    if (instantiate_upd && !WT_IS_HS(session->dhandle))
+    if (!page_change && instantiate_upd && !WT_IS_HS(session->dhandle))
         WT_ERR(__wti_page_inmem_updates(session, ref));
 
     /*
@@ -614,7 +628,7 @@ skip_evict:
         }
         __wt_spin_backoff(&yield_cnt, &sleep_usecs);
         ++sleep_count;
-        if (sleep_count > 10 * WT_THOUSAND && sleep_count % 10 * WT_THOUSAND == 0)
+        if (sleep_count > 10 * WT_THOUSAND && sleep_count % (10 * WT_THOUSAND) == 0)
             __wt_verbose_warning(session, WT_VERB_READ,
               "sleep to wait the page %p for %" WT_SIZET_FMT " times", (void *)ref, sleep_count);
         WT_STAT_CONN_INCRV(session, page_sleep, sleep_usecs);

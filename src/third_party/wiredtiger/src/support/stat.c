@@ -92,6 +92,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: history store cursor not cached during eviction",
   "cache: history store table insert calls",
   "cache: history store table insert calls that returned restart",
+  "cache: history store table key to be processed",
   "cache: history store table reads",
   "cache: history store table reads missed",
   "cache: history store table reads requiring squashed modifies",
@@ -110,6 +111,7 @@ static const char *const __stats_dsrc_desc[] = {
   "non-dryrun mode",
   "cache: history store table truncations to remove an update that would have happened in "
   "non-dryrun mode",
+  "cache: history store table update to be processed",
   "cache: history store table updates without timestamps fixed up by reinserting with the fixed "
   "timestamp",
   "cache: history store table writes requiring squashed modifies",
@@ -533,6 +535,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_eviction_hs_cursor_not_cached = 0;
     stats->cache_hs_insert = 0;
     stats->cache_hs_insert_restart = 0;
+    stats->cache_hs_key_processed = 0;
     stats->cache_hs_read = 0;
     stats->cache_hs_read_miss = 0;
     stats->cache_hs_read_squash = 0;
@@ -546,6 +549,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_hs_btree_truncate_dryrun = 0;
     stats->cache_hs_key_truncate_rts_unstable_dryrun = 0;
     stats->cache_hs_key_truncate_rts_dryrun = 0;
+    stats->cache_hs_update_processed = 0;
     stats->cache_hs_order_reinsert = 0;
     stats->cache_hs_write_squash = 0;
     stats->cache_inmem_splittable = 0;
@@ -951,6 +955,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_eviction_hs_cursor_not_cached += from->cache_eviction_hs_cursor_not_cached;
     to->cache_hs_insert += from->cache_hs_insert;
     to->cache_hs_insert_restart += from->cache_hs_insert_restart;
+    to->cache_hs_key_processed += from->cache_hs_key_processed;
     to->cache_hs_read += from->cache_hs_read;
     to->cache_hs_read_miss += from->cache_hs_read_miss;
     to->cache_hs_read_squash += from->cache_hs_read_squash;
@@ -965,6 +970,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_hs_key_truncate_rts_unstable_dryrun +=
       from->cache_hs_key_truncate_rts_unstable_dryrun;
     to->cache_hs_key_truncate_rts_dryrun += from->cache_hs_key_truncate_rts_dryrun;
+    to->cache_hs_update_processed += from->cache_hs_update_processed;
     to->cache_hs_order_reinsert += from->cache_hs_order_reinsert;
     to->cache_hs_write_squash += from->cache_hs_write_squash;
     to->cache_inmem_splittable += from->cache_inmem_splittable;
@@ -1392,6 +1398,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_DSRC_READ(from, cache_eviction_hs_cursor_not_cached);
     to->cache_hs_insert += WT_STAT_DSRC_READ(from, cache_hs_insert);
     to->cache_hs_insert_restart += WT_STAT_DSRC_READ(from, cache_hs_insert_restart);
+    to->cache_hs_key_processed += WT_STAT_DSRC_READ(from, cache_hs_key_processed);
     to->cache_hs_read += WT_STAT_DSRC_READ(from, cache_hs_read);
     to->cache_hs_read_miss += WT_STAT_DSRC_READ(from, cache_hs_read_miss);
     to->cache_hs_read_squash += WT_STAT_DSRC_READ(from, cache_hs_read_squash);
@@ -1410,6 +1417,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_DSRC_READ(from, cache_hs_key_truncate_rts_unstable_dryrun);
     to->cache_hs_key_truncate_rts_dryrun +=
       WT_STAT_DSRC_READ(from, cache_hs_key_truncate_rts_dryrun);
+    to->cache_hs_update_processed += WT_STAT_DSRC_READ(from, cache_hs_update_processed);
     to->cache_hs_order_reinsert += WT_STAT_DSRC_READ(from, cache_hs_order_reinsert);
     to->cache_hs_write_squash += WT_STAT_DSRC_READ(from, cache_hs_write_squash);
     to->cache_inmem_splittable += WT_STAT_DSRC_READ(from, cache_inmem_splittable);
@@ -1975,6 +1983,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: history store cursor not cached during eviction",
   "cache: history store table insert calls",
   "cache: history store table insert calls that returned restart",
+  "cache: history store table key to be processed",
   "cache: history store table max on-disk size",
   "cache: history store table on-disk size",
   "cache: history store table reads",
@@ -1995,6 +2004,7 @@ static const char *const __stats_connection_desc[] = {
   "non-dryrun mode",
   "cache: history store table truncations to remove an update that would have happened in "
   "non-dryrun mode",
+  "cache: history store table update to be processed",
   "cache: history store table updates without timestamps fixed up by reinserting with the fixed "
   "timestamp",
   "cache: history store table writes requiring squashed modifies",
@@ -2966,6 +2976,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_hs_cursor_not_cached = 0;
     stats->cache_hs_insert = 0;
     stats->cache_hs_insert_restart = 0;
+    stats->cache_hs_key_processed = 0;
     /* not clearing cache_hs_ondisk_max */
     /* not clearing cache_hs_ondisk */
     stats->cache_hs_read = 0;
@@ -2981,6 +2992,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_hs_btree_truncate_dryrun = 0;
     stats->cache_hs_key_truncate_rts_unstable_dryrun = 0;
     stats->cache_hs_key_truncate_rts_dryrun = 0;
+    stats->cache_hs_update_processed = 0;
     stats->cache_hs_order_reinsert = 0;
     stats->cache_hs_write_squash = 0;
     stats->cache_inmem_splittable = 0;
@@ -3975,6 +3987,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, cache_eviction_hs_cursor_not_cached);
     to->cache_hs_insert += WT_STAT_CONN_READ(from, cache_hs_insert);
     to->cache_hs_insert_restart += WT_STAT_CONN_READ(from, cache_hs_insert_restart);
+    to->cache_hs_key_processed += WT_STAT_CONN_READ(from, cache_hs_key_processed);
     to->cache_hs_ondisk_max += WT_STAT_CONN_READ(from, cache_hs_ondisk_max);
     to->cache_hs_ondisk += WT_STAT_CONN_READ(from, cache_hs_ondisk);
     to->cache_hs_read += WT_STAT_CONN_READ(from, cache_hs_read);
@@ -3995,6 +4008,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, cache_hs_key_truncate_rts_unstable_dryrun);
     to->cache_hs_key_truncate_rts_dryrun +=
       WT_STAT_CONN_READ(from, cache_hs_key_truncate_rts_dryrun);
+    to->cache_hs_update_processed += WT_STAT_CONN_READ(from, cache_hs_update_processed);
     to->cache_hs_order_reinsert += WT_STAT_CONN_READ(from, cache_hs_order_reinsert);
     to->cache_hs_write_squash += WT_STAT_CONN_READ(from, cache_hs_write_squash);
     to->cache_inmem_splittable += WT_STAT_CONN_READ(from, cache_inmem_splittable);

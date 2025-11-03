@@ -279,33 +279,6 @@ FLD_AREALLSET(uint64_t field, uint64_t mask)
     qsort(base, nmemb, size, compar)
 
 /*
- * Merge two sorted arrays into a single sorted array. With `prefer_latest` true, if duplicate keys
- * are found, the element from the later array (arr2) is preferred.
- */
-#define WT_MERGE_SORT(                                                                        \
-  session, arr1, arr1_size, arr2, arr2_size, cmp, prefer_latest, merged_arr, merged_arr_size) \
-    do {                                                                                      \
-        uint32_t __i, __j, __k;                                                               \
-        int __compar;                                                                         \
-        __i = __j = __k = 0;                                                                  \
-        while (__i < (arr1_size) && __j < (arr2_size)) {                                      \
-            __compar = (cmp)((session), (arr1)[__i], (arr2)[__j]);                            \
-            if (__compar < 0)                                                                 \
-                (merged_arr)[__k++] = (arr1)[__i++];                                          \
-            else {                                                                            \
-                (merged_arr)[__k++] = (arr2)[__j++];                                          \
-                if ((prefer_latest) && __compar == 0)                                         \
-                    __i++; /* Skip corresponding element from arr1 */                         \
-            }                                                                                 \
-        }                                                                                     \
-        while (__j < (arr2_size))                                                             \
-            (merged_arr)[__k++] = (arr2)[__j++];                                              \
-        while (__i < (arr1_size))                                                             \
-            (merged_arr)[__k++] = (arr1)[__i++];                                              \
-        (merged_arr_size) = __k;                                                              \
-    } while (0)
-
-/*
  * Binary search for an integer key.
  */
 #define WT_BINARY_SEARCH(key, arrayp, n, found)                        \

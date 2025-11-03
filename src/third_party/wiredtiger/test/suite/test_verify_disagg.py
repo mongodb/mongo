@@ -33,9 +33,6 @@ from wtscenario import make_scenarios
 # test_verify_disagg.py
 #    SESSION::verify() testing for disagg storage
 
-# FIXME-WT-15047: Implement tests for populated ingest tables verification
-#    (we already have an OpLog imitation in some tests for layered tables)
-
 @disagg_test_class
 class test_verify_disagg(wttest.WiredTigerTestCase):
     hs = [

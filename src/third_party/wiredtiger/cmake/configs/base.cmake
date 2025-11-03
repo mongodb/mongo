@@ -368,7 +368,7 @@ config_string(
     SQLITE3_REQUIRED_VERSION
     "SQLite3 version to use when building PALite extension. \
     Expected format of version string: major[.minor[.patch]]"
-    DEFAULT "3.31.0"   # Minimum version for generated columns (used in PALite)
+    DEFAULT "3.35.0"   # Minimum version for RETURNING syntax (used in PALite).
 )
 
 config_bool(

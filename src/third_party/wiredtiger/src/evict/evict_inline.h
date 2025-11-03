@@ -556,11 +556,11 @@ __wt_evict_needed(
           (!conn->layered_table_manager.leader || F_ISSET(conn, WT_CONN_RECONFIGURING_STEP_UP))) {
             double cache_full = (evict->eviction_target + evict->eviction_trigger) / 2;
             if (pct_updates > cache_full)
-                __wt_verbose_warning(
+                __wt_verbose_debug1(
                   session, WT_VERB_EVICTION, "cache is full of updates: %f percent", pct_updates);
 
             if (pct_dirty > cache_full)
-                __wt_verbose_warning(
+                __wt_verbose_debug1(
                   session, WT_VERB_EVICTION, "cache is full of dirty pages: %f percent", pct_dirty);
 
             if (dirty_needed || updates_needed)

@@ -660,8 +660,6 @@ template <> struct std::formatter<PageInfo> {
     }
 };
 
-enum class GlobalKey : uint64_t { LSN = 0, CHECKPOINT_COMPLETED = 1, CHECKPOINT_STARTED = 2 };
-
 class Storage {
     enum Statement {
         BEGIN,
@@ -670,8 +668,8 @@ class Storage {
         PUT_CHECKPOINT,
         GET_CHECKPOINT,
         DELETE_CHECKPOINTS,
-        PUT_GLOBAL,
-        GET_GLOBAL,
+        GET_NEXT_LSN,
+        GET_LAST_LSN,
         PUT_PAGE,
         GET_PAGE_IDS,
         GET_FULL_PAGE_LSN,
@@ -782,11 +780,19 @@ class Storage {
                 a[DELETE_CHECKPOINTS] = R"(
                     DELETE FROM checkpoints
                     WHERE lsn > ?;)";
-                a[PUT_GLOBAL] = R"(
-                    INSERT OR REPLACE INTO globals (key, val)
-                    VALUES (?, ?);)";
-                a[GET_GLOBAL] = R"(
-                    SELECT val FROM globals WHERE key = ?;)";
+
+                /* Increment LSN and get the value. */
+                a[GET_NEXT_LSN] = R"(
+                    UPDATE lsn
+                    SET lsn = lsn + 1
+                    WHERE id = 0
+                    RETURNING lsn;)";
+
+                /* Get the last LSN. */
+                a[GET_LAST_LSN] = R"(
+                    SELECT lsn
+                    FROM lsn
+                    WHERE id = 0;)";
 
                 /* !!! Insert new pages or replace write failures.
 
@@ -1142,29 +1148,21 @@ private:
              ON pages (table_id, page_id, backlink_lsn)
              WHERE delta = 1 AND discarded = 0;)",
 
-          R"(CREATE TABLE IF NOT EXISTS globals (
-                key INTEGER NOT NULL,
-                val INTEGER NOT NULL,
-                PRIMARY KEY (key)
+          /* LSN counter table. */
+          R"(CREATE TABLE IF NOT EXISTS lsn (
+                id INTEGER PRIMARY KEY DEFAULT 0 CHECK (id = 0),
+                lsn INTEGER NOT NULL
             );)",
+
+          /* Init LSN counter, if the table is empty; do nothing otherwise. */
+          R"(INSERT OR IGNORE INTO lsn(id, lsn) VALUES (0, 0);)"
 
           R"(CREATE TABLE IF NOT EXISTS checkpoints (
                 lsn INTEGER NOT NULL,
                 timestamp INTEGER NOT NULL,
                 checkpoint_metadata BLOB,
                 PRIMARY KEY (lsn, timestamp)
-            );)",
-
-          // These keys correspond to the GlobalKey enumeration.
-          // Key 0: LSN, 1 will be used next
-          "INSERT OR IGNORE INTO globals(key, val) VALUES (0, 1);",
-
-          // TODO: remove if not needed
-          // Key 1: Checkpoint completed
-          "INSERT OR IGNORE INTO globals(key, val) VALUES (1, 0);",
-
-          // Key 2: Checkpoint started
-          "INSERT OR IGNORE INTO globals(key, val) VALUES (2, 0);"};
+            );)"};
 
         for (const char *sql : create_statements) {
             SQL_CALL_CHECK(db, sqlite3_exec, db, sql, nullptr, nullptr, nullptr);
@@ -1357,21 +1355,23 @@ public:
     }
 
     uint64_t
-    get_global(Connection &conn, GlobalKey key)
+    get_lsn(Connection &conn, Statement stmt_type)
     {
-        StatementPtr stmt = conn.db_statement(Statement::GET_GLOBAL);
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(key));
+        StatementPtr stmt = conn.db_statement(stmt_type);
         SQ_CHECK(sqlite3_step, stmt.get());
         return sqlite3_column_int64(stmt.get(), 0);
     }
 
-    void
-    put_global(Connection &conn, GlobalKey key, uint64_t val)
+    uint64_t
+    get_next_lsn(Connection &conn)
     {
-        StatementPtr stmt = conn.db_statement(Statement::PUT_GLOBAL);
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(key));
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 2, static_cast<sqlite3_int64>(val));
-        SQ_CHECK(sqlite3_step, stmt.get());
+        return get_lsn(conn, Statement::GET_NEXT_LSN);
+    }
+
+    uint64_t
+    get_last_lsn(Connection &conn)
+    {
+        return get_lsn(conn, Statement::GET_LAST_LSN);
     }
 
     void
@@ -1779,10 +1779,9 @@ public:
         // TODO: handle dek encryption
 
         Storage::Transaction txn = storage.begin_transaction();
-        uint64_t lsn = storage.get_global(txn.conn, GlobalKey::LSN);
+        uint64_t lsn = storage.get_next_lsn(txn.conn);
         storage.put_page(txn.conn, table_id, page_id, lsn, args, buf);
         storage.verify_page_chain(txn.conn, table_id, page_id, lsn);
-        storage.put_global(txn.conn, GlobalKey::LSN, lsn + 1);
         storage.commit_transaction(txn);
         args->lsn = lsn;
 
@@ -1831,10 +1830,9 @@ public:
     {
         storage.simulate_unstable_network();
         Storage::Transaction txn = storage.begin_transaction();
-        uint64_t lsn = storage.get_global(txn.conn, GlobalKey::LSN);
+        uint64_t lsn = storage.get_next_lsn(txn.conn);
         storage.discard_page(txn.conn, table_id, page_id, lsn, args);
         storage.verify_page_chain(txn.conn, table_id, page_id, lsn);
-        storage.put_global(txn.conn, GlobalKey::LSN, lsn + 1);
         storage.commit_transaction(txn);
         args->lsn = lsn;
         LOG_DEBUG("Discard page_id={} at lsn={}, backlink_lsn={}, base_lsn={}", page_id, lsn,
@@ -1992,9 +1990,8 @@ public:
       const WT_ITEM *checkpoint_metadata, uint64_t *lsnp)
     {
         Storage::Transaction txn = storage.begin_transaction();
-        uint64_t lsn = storage.get_global(txn.conn, GlobalKey::LSN);
+        uint64_t lsn = storage.get_next_lsn(txn.conn);
         storage.put_checkpoint(txn.conn, lsn, checkpoint_timestamp, checkpoint_metadata);
-        storage.put_global(txn.conn, GlobalKey::LSN, lsn + 1);
         storage.commit_transaction(txn);
 
         LOG_DEBUG(
@@ -2048,7 +2045,7 @@ public:
         }
 
         Storage::Transaction txn = storage.begin_transaction();
-        *lsn = storage.get_global(txn.conn, GlobalKey::LSN);
+        *lsn = storage.get_last_lsn(txn.conn);
         storage.commit_transaction(txn);
         LOG_TRACE("last_lsn={}", *lsn);
 

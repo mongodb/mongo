@@ -81,4 +81,4 @@ class test_ovfl01(wttest.WiredTigerTestCase):
         # Verify on disk contents.
         self.session.verify(self.uri)
 
-        self.ignoreStdoutPattern('bulk insert failed during page split')
+        self.ignoreStdoutPatternIfExists('bulk insert failed during page split')
