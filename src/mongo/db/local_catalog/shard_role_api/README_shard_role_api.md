@@ -192,3 +192,32 @@ while (...) {
 
 // ~HandleTransactionResourcesFromCursor will re-stash the TransactionResources to 'cursorPin'
 ```
+
+## Shard Role Loop - Handling Stale Metadata Errors
+
+The Shard Role Loop helper provides automatic retry logic for shard role operations that encounter stale shard metadata errors (i.e., when the shard does not know its current sharding metadata and needs to recover it from the authoritative store).
+
+### Usage
+
+Use `withStaleShardRetry` to automatically handle stale metadata errors:
+
+```cpp
+#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
+
+auto result = shard_role_loop::withStaleShardRetry(opCtx, [&]() {
+    CollectionAcquisition coll = acquireCollection(opCtx, request, MODE_IS);
+    return performSomeOperation(coll);
+});
+```
+
+### How it Works
+
+The system automatically handles three types of stale errors:
+
+- **StaleDbVersion**: Database version mismatches - refreshes database metadata
+- **StaleConfig**: Shard version mismatches - refreshes collection sharding metadata
+- **ShardCannotRefreshDueToLocksHeld**: Lock conflicts during refresh - retries after refresh
+
+If the metadata refresh succeeds, the enclosed function will be retried.
+
+Retry attempts are limited per namespace/database to prevent infinite loops. The maximum number is controlled by the `maxShardStaleMetadataRetryAttempts` server parameter, with limits applied on a per-{namespace, staleErrorType} basis. Operations cannot retry if locks are held or when running in a DBDirectClient connection.

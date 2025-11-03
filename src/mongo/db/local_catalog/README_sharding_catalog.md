@@ -68,4 +68,4 @@ When a piece of code is running in a router loop, it is also said that it is exe
 
 ### Shard role
 
-For a piece of code to be executing in the shard role, it must be holding some kind of synchronisation which guarantees the stability of the catalog for that scope. See [here](https://github.com/mongodb/mongo/blob/master/src/mongo/db/README_shard_role_api.md) for details about the Shard Role API.
+For a piece of code to be executing in the shard role, it must be holding some kind of synchronisation which guarantees the stability of the catalog for that scope. See [here](/src/mongo/db/local_catalog/shard_role_api/README_shard_role_api.md) for details about the Shard Role API.
