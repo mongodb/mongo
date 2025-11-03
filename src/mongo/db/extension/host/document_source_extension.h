@@ -205,10 +205,6 @@ public:
     ~DocumentSourceExtension() override = 0;
 
 private:
-    static void registerStage(const std::string& name,
-                              DocumentSource::Id id,
-                              AggStageDescriptorHandle descriptor);
-
     /**
      * Give access to DocumentSourceExtensionTest/LoadExtensionsTest to unregister parser.
      * unregisterParser_forTest is only meant to be used in the context of unit

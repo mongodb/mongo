@@ -68,9 +68,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandabl
                 // Case 2: AST node handle. Construct a DocumentSourceExtensionOptimizable and
                 // release the AST node handle.
                 else if constexpr (std::is_same_v<H, AggStageAstNodeHandle>) {
-                    StringData stageName = handle.getName();
-                    outExpanded.emplace_back(DocumentSourceExtensionOptimizable::create(
-                        stageName, expCtx, std::move(handle)));
+                    outExpanded.emplace_back(
+                        DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle)));
                 }
             },
             variantNodeHandle);

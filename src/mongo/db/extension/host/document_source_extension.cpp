@@ -33,7 +33,6 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_expandable.h"
-#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/extension_stage.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
@@ -155,7 +154,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
 void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor.getName();
     auto id = DocumentSource::allocateId(nameStringData);
-    auto nameAsString = std::string(nameStringData);
+    auto stageName = std::string(nameStringData);
 
     using LiteParseFn = std::function<std::unique_ptr<LiteParsedDocumentSource>(
         const NamespaceString&, const BSONElement&, const LiteParserOptions&)>;
@@ -169,18 +168,12 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
         };
     }();
 
-    LiteParsedDocumentSource::registerParser(nameAsString,
-                                             std::move(parser),
-                                             AllowedWithApiStrict::kAlways,
-                                             AllowedWithClientType::kAny);
-
     // Register the correct DocumentSource to construct the stage with.
     DocumentSource::registerParser(
-        nameAsString,
+        stageName,
         [descriptor](BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx)
             -> boost::intrusive_ptr<DocumentSource> {
-            return DocumentSourceExtensionExpandable::create(
-                specElem.fieldNameStringData(), expCtx, specElem.wrap(), descriptor);
+            return DocumentSourceExtensionExpandable::create(expCtx, specElem.wrap(), descriptor);
         });
 
     // Register the correct exec::agg to execute the stage with.
@@ -194,8 +187,11 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
                                                              documentSource->getExpCtx());
         });
 
+    LiteParsedDocumentSource::registerParser(
+        stageName, std::move(parser), AllowedWithApiStrict::kAlways, AllowedWithClientType::kAny);
+
     // Add the allocated id to the static map for lookup upon object construction.
-    stageToIdMap[nameAsString] = id;
+    stageToIdMap[stageName] = id;
 }
 
 void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) {

@@ -82,10 +82,7 @@ TEST_F(DocumentSourceExtensionExpandableTest, ExpandToExtAst) {
         BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
 
     auto expandable = host::DocumentSourceExtensionExpandable::create(
-        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
-        getExpCtx(),
-        rawStage,
-        AggStageDescriptorHandle(&_noOpStageDescriptor));
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_noOpStageDescriptor));
 
     auto expanded = expandable->expand();
 
@@ -100,10 +97,7 @@ TEST_F(DocumentSourceExtensionExpandableTest, ExpandToExtAst) {
 TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandToHostParse) {
     auto rawStage = BSON(std::string(sdk::shared_test_stages::kExpandToHostParseName) << BSONObj());
     auto expandable = host::DocumentSourceExtensionExpandable::create(
-        std::string(sdk::shared_test_stages::kExpandToHostParseName),
-        getExpCtx(),
-        rawStage,
-        AggStageDescriptorHandle(&_expandToHostParseDescriptor));
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_expandToHostParseDescriptor));
 
     auto expanded = expandable->expand();
     ASSERT_EQ(expanded.size(), 1UL);
@@ -114,10 +108,7 @@ TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandToHostParse) {
 TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandToMixed) {
     auto rawStage = BSON(std::string(sdk::shared_test_stages::kExpandToMixedName) << BSONObj());
     auto expandable = host::DocumentSourceExtensionExpandable::create(
-        std::string(sdk::shared_test_stages::kExpandToMixedName),
-        getExpCtx(),
-        rawStage,
-        AggStageDescriptorHandle(&_expandToMixedDescriptor));
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_expandToMixedDescriptor));
 
     auto expanded = expandable->expand();
     ASSERT_EQ(expanded.size(), 3UL);
@@ -142,10 +133,7 @@ TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandToMixed) {
 TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandRecursesMultipleLevels) {
     auto rawStage = BSON(std::string(sdk::shared_test_stages::kTopName) << BSONObj());
     auto expandable = host::DocumentSourceExtensionExpandable::create(
-        std::string(sdk::shared_test_stages::kTopName),
-        getExpCtx(),
-        rawStage,
-        AggStageDescriptorHandle(&_topDescriptor));
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_topDescriptor));
 
     auto expanded = expandable->expand();
     ASSERT_EQ(expanded.size(), 4UL);

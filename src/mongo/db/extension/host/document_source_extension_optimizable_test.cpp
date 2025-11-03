@@ -59,10 +59,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
-    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
-        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
-        getExpCtx(),
-        std::move(astHandle));
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
 
     ASSERT_EQ(std::string(optimizable->getSourceName()),
               sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
@@ -73,13 +71,11 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecutio
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
-    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
-        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
-        getExpCtx(),
-        std::move(astHandle));
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
 
-    // Test that an extension can provide its own implementation of serialize, that might change the
-    // raw spec provided.
+    // Test that an extension can provide its own implementation of serialize, that might change
+    // the raw spec provided.
     ASSERT_BSONOBJ_EQ(optimizable->serialize(SerializationOptions()).getDocument().toBson(),
                       BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName
                            << "serializedForExecution"));
@@ -90,10 +86,8 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, serializeWithWrongOptsFails
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
-    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
-        sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
-        getExpCtx(),
-        std::move(astHandle));
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
 
     [[maybe_unused]] auto serialized =
         optimizable->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
