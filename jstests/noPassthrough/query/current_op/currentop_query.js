@@ -7,9 +7,8 @@
  *    requires_scripting,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
@@ -30,6 +29,7 @@ const mongosConn = st.s;
 
 const mongosDB = mongosConn.getDB("currentop_query");
 const mongosColl = mongosDB.currentop_query;
+const mongosColl2 = mongosDB.currentop_query_2;
 
 // Enable sharding on the the test database and ensure that the primary is on shard0.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: rsConn.name}));
@@ -49,6 +49,7 @@ function commandOrOriginatingCommand(cmdObj, isRemoteShardCurOp) {
 // Drops and re-creates the sharded test collection.
 function dropAndRecreateTestCollection() {
     assert(mongosColl.drop());
+    assert(mongosColl2.drop());
     assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: "hashed"}}));
     // The insert via direct connection will fail with stale config if the metadata is unknown, so
     // we forcefully refresh it.
@@ -70,16 +71,19 @@ function dropAndRecreateTestCollection() {
 function runTests({conn, currentOp, truncatedOps, localOps}) {
     const testDB = conn.getDB("currentop_query");
     const coll = testDB.currentop_query;
+    const coll2 = testDB.currentop_query_2;
     dropAndRecreateTestCollection();
 
     for (let i = 0; i < 5; ++i) {
         assert.commandWorked(coll.insert({_id: i, a: i}));
     }
+    assert.commandWorked(coll2.insert({_id: 0, a: 0}));
 
     const isLocalMongosCurOp = FixtureHelpers.isMongos(testDB) && localOps;
     const isRemoteShardCurOp = FixtureHelpers.isMongos(testDB) && !localOps;
 
     const sbeEnabled = checkSbeFullyEnabled(testDB);
+    const sbeRestrictedOrEnabled = checkSbeRestrictedOrFullyEnabled(testDB);
 
     // If 'truncatedOps' is true, run only the subset of tests designed to validate the
     // truncation behaviour. Otherwise, run the standard set of tests which assume that
@@ -203,156 +207,192 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
      */
     function runStandardTests() {
         //
-        // Confirm currentOp content for commands defined in 'testList'.
+        // Confirm currentOp content for commands.
         //
-        let testList = [
-            {
-                test: function (db) {
-                    assert.eq(
-                        db.currentop_query
-                            .aggregate([{$match: {a: 1}}], {
-                                collation: {locale: "fr"},
-                                hint: {_id: 1},
-                                comment: "currentop_query",
-                            })
-                            .itcount(),
-                        1,
-                    );
-                },
-                planSummary: "IXSCAN { _id: 1 }",
-                queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: commandOrOriginatingCommand(
-                    {
-                        "aggregate": {$exists: true},
-                        "comment": "currentop_query",
-                        "collation.locale": "fr",
-                        "hint": {_id: 1},
-                    },
-                    isRemoteShardCurOp,
-                ),
-            },
-            {
-                test: function (db) {
-                    assert.eq(
-                        db.currentop_query
-                            .find({_id: {$lte: 1}})
-                            .hint({_id: 1})
-                            .comment("currentop_query_id_hint")
-                            .itcount(),
-                        2,
-                    );
-                },
-                planSummary: "IXSCAN { _id: 1 }",
-                queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.comment": "currentop_query_id_hint"},
-            },
-            {
-                test: function (db) {
-                    assert.eq(
-                        db.currentop_query.count({a: 1}, {comment: "currentop_query", collation: {locale: "fr"}}),
-                        1,
-                    );
-                },
-                command: "count",
-                planSummary: "COLLSCAN",
-                currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
-            },
-            {
-                test: function (db) {
-                    assert.eq(db.currentop_query.distinct("a", {a: 1}, {collation: {locale: "fr"}}), [1]);
-                },
-                command: "distinct",
-                planSummary: "COLLSCAN",
-                queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.collation.locale": "fr"},
-            },
-            {
-                test: function (db) {
-                    assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(), 1);
-                },
-                command: "find",
-                planSummary: "COLLSCAN",
-                queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.comment": "currentop_query"},
-            },
-            {
-                test: function (db) {
-                    assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(), 1);
-                },
-                command: "find",
-                // Yields only take place on a mongod. Since this test depends on checking that the
-                // currentOp's reported 'numYields' has advanced beyond zero, this test is not
-                // expected to work when running against a mongos with localOps=true.
-                skipMongosLocalOps: true,
-                planSummary: "COLLSCAN",
-                queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.comment": "currentop_query", numYields: {$gt: 0}},
-            },
-            {
-                test: function (db) {
-                    assert.eq(
-                        db.currentop_query.findAndModify({
-                            query: {_id: 1, a: 1},
-                            update: {$inc: {b: 1}},
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(
+                    db.currentop_query
+                        .aggregate([{$match: {a: 1}}], {
                             collation: {locale: "fr"},
+                            hint: {_id: 1},
                             comment: "currentop_query",
-                        }),
-                        {"_id": 1, "a": 1},
-                    );
-                },
-                command: "findandmodify",
-                planSummary: "IXSCAN { _id: 1 }",
-                currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
+                        })
+                        .itcount(),
+                    1,
+                );
             },
-            {
-                test: function (db) {
-                    assert.commandWorked(
-                        db.currentop_query.mapReduce(
-                            () => {},
-                            (a, b) => {},
-                            {query: {a: 1}, out: {inline: 1}, comment: "currentop_query_mr"},
-                        ),
-                    );
+            planSummary: "IXSCAN { _id: 1 }",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
+            currentOpFilter: commandOrOriginatingCommand(
+                {
+                    "aggregate": {$exists: true},
+                    "comment": "currentop_query",
+                    "collation.locale": "fr",
+                    "hint": {_id: 1},
                 },
-                planSummary: "COLLSCAN",
-                queryFramework: "classic",
-                // A mapReduce which gets sent to the shards is internally translated to an
-                // aggregation.
-                currentOpFilter: isRemoteShardCurOp
-                    ? {
-                          "cursor.originatingCommand.aggregate": "currentop_query",
-                          "cursor.originatingCommand.comment": "currentop_query_mr",
-                      }
-                    : {
-                          "command.comment": "currentop_query_mr",
-                          "ns": /^currentop_query.*currentop_query/,
-                      },
-            },
-            {
-                test: function (db) {
-                    assert.commandWorked(db.currentop_query.remove({a: 2}, {collation: {locale: "fr"}}));
-                },
-                operation: "remove",
-                planSummary: "COLLSCAN",
-                currentOpFilter: isLocalMongosCurOp
-                    ? {"command.delete": coll.getName(), "command.ordered": true}
-                    : {"command.collation.locale": "fr"},
-            },
-            {
-                test: function (db) {
-                    assert.commandWorked(
-                        db.currentop_query.update({a: 1}, {$inc: {b: 1}}, {collation: {locale: "fr"}, multi: true}),
-                    );
-                },
-                operation: "update",
-                planSummary: "COLLSCAN",
-                currentOpFilter: isLocalMongosCurOp
-                    ? {"command.update": coll.getName(), "command.ordered": true}
-                    : {"command.collation.locale": "fr"},
-            },
-        ];
+                isRemoteShardCurOp,
+            ),
+        });
 
-        testList.forEach(confirmCurrentOpContents);
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(
+                    db.currentop_query
+                        .aggregate(
+                            [
+                                {$group: {_id: null, count: {$sum: 1}}},
+                                {
+                                    $lookup: {
+                                        from: "currentop_query_2",
+                                        pipeline: [],
+                                        as: "output",
+                                    },
+                                },
+                            ],
+                            {
+                                comment: "currentop_query_group_lookup",
+                            },
+                        )
+                        .itcount(),
+                    1,
+                );
+            },
+            planSummary: "COLLSCAN",
+            queryFramework: sbeRestrictedOrEnabled ? "sbe" : "classic",
+            currentOpFilter: commandOrOriginatingCommand(
+                {
+                    "aggregate": {$exists: true},
+                    "comment": "currentop_query_group_lookup",
+                },
+                isRemoteShardCurOp,
+            ),
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(
+                    db.currentop_query
+                        .find({_id: {$lte: 1}})
+                        .hint({_id: 1})
+                        .comment("currentop_query_id_hint")
+                        .itcount(),
+                    2,
+                );
+            },
+            planSummary: "IXSCAN { _id: 1 }",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
+            currentOpFilter: {"command.comment": "currentop_query_id_hint"},
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(db.currentop_query.count({a: 1}, {comment: "currentop_query", collation: {locale: "fr"}}), 1);
+            },
+            command: "count",
+            planSummary: "COLLSCAN",
+            currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(db.currentop_query.distinct("a", {a: 1}, {collation: {locale: "fr"}}), [1]);
+            },
+            command: "distinct",
+            planSummary: "COLLSCAN",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
+            currentOpFilter: {"command.collation.locale": "fr"},
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(), 1);
+            },
+            command: "find",
+            planSummary: "COLLSCAN",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
+            currentOpFilter: {"command.comment": "currentop_query"},
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(), 1);
+            },
+            command: "find",
+            // Yields only take place on a mongod. Since this test depends on checking that the
+            // currentOp's reported 'numYields' has advanced beyond zero, this test is not
+            // expected to work when running against a mongos with localOps=true.
+            skipMongosLocalOps: true,
+            planSummary: "COLLSCAN",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
+            currentOpFilter: {"command.comment": "currentop_query", numYields: {$gt: 0}},
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.eq(
+                    db.currentop_query.findAndModify({
+                        query: {_id: 1, a: 1},
+                        update: {$inc: {b: 1}},
+                        collation: {locale: "fr"},
+                        comment: "currentop_query",
+                    }),
+                    {"_id": 1, "a": 1},
+                );
+            },
+            command: "findandmodify",
+            planSummary: "IXSCAN { _id: 1 }",
+            currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.commandWorked(
+                    db.currentop_query.mapReduce(
+                        () => {},
+                        (a, b) => {},
+                        {query: {a: 1}, out: {inline: 1}, comment: "currentop_query_mr"},
+                    ),
+                );
+            },
+            planSummary: "COLLSCAN",
+            queryFramework: "classic",
+            // A mapReduce which gets sent to the shards is internally translated to an
+            // aggregation.
+            currentOpFilter: isRemoteShardCurOp
+                ? {
+                      "cursor.originatingCommand.aggregate": "currentop_query",
+                      "cursor.originatingCommand.comment": "currentop_query_mr",
+                  }
+                : {
+                      "command.comment": "currentop_query_mr",
+                      "ns": /^currentop_query.*currentop_query/,
+                  },
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.commandWorked(db.currentop_query.remove({a: 2}, {collation: {locale: "fr"}}));
+            },
+            operation: "remove",
+            planSummary: "COLLSCAN",
+            currentOpFilter: isLocalMongosCurOp
+                ? {"command.delete": coll.getName(), "command.ordered": true}
+                : {"command.collation.locale": "fr"},
+        });
+
+        confirmCurrentOpContents({
+            test: function (db) {
+                assert.commandWorked(
+                    db.currentop_query.update({a: 1}, {$inc: {b: 1}}, {collation: {locale: "fr"}, multi: true}),
+                );
+            },
+            operation: "update",
+            planSummary: "COLLSCAN",
+            currentOpFilter: isLocalMongosCurOp
+                ? {"command.update": coll.getName(), "command.ordered": true}
+                : {"command.collation.locale": "fr"},
+        });
 
         //
         // Confirm currentOp contains collation for find command.

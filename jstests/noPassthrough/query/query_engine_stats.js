@@ -1,16 +1,14 @@
 /**
  * Tests that the query engine used is recorded correctly in the logs, system.profile, and
  * serverStatus.
- *
- * @tags: [featureFlagSbeFull]
  */
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
-let conn = MongoRunner.runMongod({});
+const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
-let db = conn.getDB(jsTestName());
+const db = conn.getDB(jsTestName());
 
 function initializeTestCollection() {
     assert.commandWorked(db.dropDatabase());
@@ -32,6 +30,13 @@ function initializeTestCollection() {
     );
 
     return coll;
+}
+
+function initializeSecondaryTestCollection() {
+    let coll2 = db.coll2;
+    coll2.drop();
+    assert.commandWorked(coll2.insertOne({_id: 0, x: 10}));
+    return coll2;
 }
 
 const framework = {
@@ -103,7 +108,8 @@ function compareQueryEngineCounters(expectedCounters) {
     assert.docEq(expectedCounters, counters);
 }
 
-let coll = initializeTestCollection();
+const coll = initializeTestCollection();
+const coll2 = initializeSecondaryTestCollection();
 
 // Start with SBE off.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
@@ -209,6 +215,21 @@ verifyProfiler(queryComment, framework.find.sbe);
 queryComment = "aggSBEGetMore";
 cursor = coll.aggregate(
     [{$_internalInhibitOptimization: {}}, {$group: {_id: "$a", acc: {$sum: "$b"}}}, {$match: {acc: {$gt: 0}}}],
+    {comment: queryComment, batchSize: 1},
+);
+cursor.next(); // initial query
+verifyProfiler(queryComment, framework.find.sbe);
+cursor.next(); // getMore performed
+verifyProfiler(queryComment, framework.find.sbe);
+
+// SBE aggregation prefix with getMore.
+queryComment = "aggSBEPrefixGetMore";
+cursor = coll.aggregate(
+    [
+        {$group: {_id: "$a", acc: {$sum: "$b"}}},
+        {$lookup: {from: coll2.getName(), pipeline: [], as: "result"}},
+        {$match: {acc: {$gt: 0}}},
+    ],
     {comment: queryComment, batchSize: 1},
 );
 cursor.next(); // initial query

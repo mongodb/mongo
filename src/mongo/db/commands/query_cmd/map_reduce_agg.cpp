@@ -191,6 +191,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curop->setPlanSummary(lk, explainer.getPlanSummary());
+        curop->debug().queryFramework = exec->getQueryFramework();
     }
 
     try {

@@ -871,6 +871,7 @@ public:
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
+                CurOp::get(opCtx)->debug().queryFramework = exec->getQueryFramework();
             }
 
             if (!collection.exists()) {

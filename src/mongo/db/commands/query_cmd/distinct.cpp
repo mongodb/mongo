@@ -622,6 +622,7 @@ public:
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setPlanSummary(lk, executor->getPlanExplainer().getPlanSummary());
+            CurOp::get(opCtx)->debug().queryFramework = executor->getQueryFramework();
         }
 
         const auto key = cmdObj.getStringField(CanonicalDistinct::kKeyField);
