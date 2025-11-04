@@ -506,11 +506,11 @@ buildvariants:
       packager_distro: amazon2023
       repo_edition: enterprise
       compile_variant: enterprise-amazon2023-streams
-      large_distro_name: amazon2023-latest-large
+      large_distro_name: amazon2023.3-c5-24xlarge
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2023-latest-large
+          - amazon2023.3-c5-24xlarge
       - name: aggregation
       - name: streams_gen
       - name: streams_kafka_gen
@@ -551,11 +551,11 @@ buildvariants:
       packager_distro: amazon2023
       repo_edition: enterprise
       compile_variant: enterprise-amazon2023-streams-arm64
-      large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      large_distro_name: amazon2023.3-arm64-xxxlarge
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
-          - amazon2023-arm64-latest-m8g-4xlarge
+          - amazon2023.3-arm64-xxxlarge
       - name: streams_gen
       - name: streams_kafka_gen
       # TODO(SERVER-103985) - Enabling this is blocked on SRE support arm64 in the sre/gwproxy image (SRE-1481)
