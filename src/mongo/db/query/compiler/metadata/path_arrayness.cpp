@@ -61,7 +61,7 @@ bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {
     return current->isArray();
 }
 
-stdx::unordered_map<std::string, bool> PathArrayness::exportToMap_forTest() {
+stdx::unordered_map<std::string, bool> PathArrayness::exportToMap() {
     stdx::unordered_map<std::string, bool> result;
 
     std::stack<std::pair<PathArrayness::TrieNode, std::string>> myStack;
@@ -69,13 +69,10 @@ stdx::unordered_map<std::string, bool> PathArrayness::exportToMap_forTest() {
     myStack.push({this->_root, ""});
 
     while (!myStack.empty()) {
-        const auto [currNode, currPathComponent] = myStack.top();
+        const auto& [currNode, currPathComponent] = myStack.top();
         myStack.pop();
 
-        // Do not insert the root (which is the only record with an empty fieldname)
-        if (!currPathComponent.empty()) {
-            result[currPathComponent] = currNode.isArray();
-        }
+        result[currPathComponent] = currNode.isArray();
 
         for (auto&& [childNode, childPathComponent] : currNode.getChildren()) {
             std::string pathPrefix = (currPathComponent.empty() ? "" : currPathComponent + ".");
@@ -87,7 +84,7 @@ stdx::unordered_map<std::string, bool> PathArrayness::exportToMap_forTest() {
     return result;
 }
 
-void PathArrayness::TrieNode::visualizeTrie_forTest(std::string fieldName, int depth) const {
+void PathArrayness::TrieNode::visualizeTrie(std::string fieldName, int depth) const {
     for (int i = 0; i < depth; ++i) {
         std::cout << "  ";
     }
@@ -96,7 +93,7 @@ void PathArrayness::TrieNode::visualizeTrie_forTest(std::string fieldName, int d
 
     // Recursively print children
     for (auto it = _children.begin(); it != _children.end(); ++it) {
-        it->second.visualizeTrie_forTest(it->first, depth + 1);
+        it->second.visualizeTrie(it->first, depth + 1);
     }
 }
 

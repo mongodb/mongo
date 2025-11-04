@@ -59,15 +59,15 @@ public:
     /**
      * Debugging helper to visualize trie.
      */
-    void visualizeTrie_forTest() const {
-        _root.visualizeTrie_forTest("");
+    void visualizeTrie() const {
+        _root.visualizeTrie("");
     }
 
     /**
      * Export the trie data structure to a mapping of field path prefixes to a boolean that
      * specifies whether or not that field path prefix is an array component.
      */
-    stdx::unordered_map<std::string, bool> exportToMap_forTest();
+    stdx::unordered_map<std::string, bool> exportToMap();
 
 private:
     /**
@@ -106,7 +106,7 @@ private:
         /**
          * Debugging helper to visualize trie.
          */
-        void visualizeTrie_forTest(std::string fieldName, int depth = 0) const;
+        void visualizeTrie(std::string fieldName, int depth = 0) const;
 
         /**
          * Return the next components of this specific field path along with the corresponding

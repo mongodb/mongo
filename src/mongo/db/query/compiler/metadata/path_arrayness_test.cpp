@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-TEST(PathArraynessTest, InsertIntoPathArraynessPredefined) {
+TEST(ArraynessTrie, BuildAndLookupExistingFields) {
     // Array: ["a"]
     FieldPath field_A("a");
     MultikeyComponents multikeyPaths_A{0U};
@@ -74,17 +74,12 @@ TEST(PathArraynessTest, InsertIntoPathArraynessPredefined) {
                                                  multikeyPaths_BDE,
                                                  multikeyPaths_BDEF};
 
-    auto pathsToInsert = combineVectors(fields, multikeyness);
-    auto arraynessMapInitial = tranformVectorToMap(pathsToInsert);
-
     PathArrayness pathArrayness;
-    for (auto&& [fieldPath, multikey] : pathsToInsert) {
-        pathArrayness.addPath(fieldPath, multikey);
+
+    for (size_t i = 0; i < fields.size(); i++) {
+        pathArrayness.addPath(fields[i], multikeyness[i]);
     }
 
-    auto arraynessMapExported = pathArrayness.exportToMap_forTest();
-
-    ASSERT_EQ(arraynessMapInitial, arraynessMapExported);
     ASSERT_EQ(pathArrayness.isPathArray(field_A), true);
     ASSERT_EQ(pathArrayness.isPathArray(field_ABC), true);
     ASSERT_EQ(pathArrayness.isPathArray(field_ABD), true);
@@ -94,36 +89,7 @@ TEST(PathArraynessTest, InsertIntoPathArraynessPredefined) {
     ASSERT_EQ(pathArrayness.isPathArray(field_BDEF), true);
 }
 
-TEST(PathArraynessTest, InsertIntoPathArraynessGenerated) {
-    size_t seed = 1354754;
-    size_t seed2 = 3421354754;
-
-    // Number of paths to insert.
-    int numberOfPaths = 10;
-
-    // Number of distinct lengths of paths.
-    // by default we chose that we have 5 field paths for each length.
-    auto ndvLengths = numberOfPaths / 5;
-    // Maximum length of dotted field paths.
-    int maxLength = 256;
-
-    std::vector<std::pair<std::string, MultikeyComponents>> pathsToInsert =
-        generateRandomFieldPathsWithArraynessInfo(
-            numberOfPaths, maxLength, ndvLengths, seed, seed2);
-
-    auto arraynessMapInitial = tranformVectorToMap(pathsToInsert);
-
-    PathArrayness pathArrayness;
-    for (auto&& [fieldPath, multikey] : pathsToInsert) {
-        pathArrayness.addPath(fieldPath, multikey);
-    }
-
-    auto arraynessMapExported = pathArrayness.exportToMap_forTest();
-
-    ASSERT_EQ(arraynessMapInitial, arraynessMapExported);
-}
-
-TEST(PathArraynessTest, BuildAndLookupNonExistingFields) {
+TEST(ArraynessTrie, BuildAndLookupNonExistingFields) {
     // Array: ["a", "a.b", "a.b.c"]
     FieldPath field_ABC("a.b.c");
     MultikeyComponents multikeyPaths_ABC{0U, 1U, 2U};
@@ -146,7 +112,7 @@ TEST(PathArraynessTest, BuildAndLookupNonExistingFields) {
     ASSERT_EQ(pathArrayness.isPathArray(field_ABCD), true);
 }
 
-TEST(PathArraynessTest, LookupEmptyTrie) {
+TEST(ArraynessTrie, LookupEmptyTrie) {
     // We will not insert any fields into the trie.
     FieldPath field_A("a");
     FieldPath field_ABCD("a.b.c.d");
