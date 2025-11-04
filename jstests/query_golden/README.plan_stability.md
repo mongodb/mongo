@@ -54,12 +54,15 @@ This provides the plan that changed, the pipeline it belonged to, and the execut
 
 ## Using the summarization scripts
 
-The `feature-extractor` internal repository contains a summarization script that
-can be used to obtain a summary of the failed test as well as information on
-the individual regressions that should be looked into. Please see `scripts/cbr/README.md`
-in that repository for more information.
+The `feature-extractor` internal repository contains a summarization script that can be used to obtain a summary of the failed test as well as information on the individual regressions that should be looked into. Please see `scripts/cbr/README.md` in that repository for more information.
 
 # Debugging failures
+
+## Which pipeline is the problematic one?
+
+In Evergreen, the diff will most likely show a pipeline **below** the counters. This is however the following pipeline in the test, not the one you are looking for. The problematic pipeline is the one that comes **before** it in the `expected_output` file.
+
+In local execution, if your environment is configured as described above, the diff will show the actual pipeline of interest, **above** the counters.
 
 ## Running the offending pipelines manually
 
@@ -94,14 +97,42 @@ db.plan_stability.aggregate(pipeline).explain().queryPlanner.winningPlan;
 db.plan_stability.aggregate(pipeline).explain().queryPlanner.rejectedPlans.sort((a,b) => b.costEstimate - a.costEstimate)[0]
 ```
 
+## Converting the pipeline to JavaScript
+
+The pipelines in the diff are **EJSON**-ish, while the mongosh shell expects **JavaScript**. EJSON-ish and JavaScript are identical when it comes to basic types, such as strings and integers, but if the pipeline contains timestamps and decimals, the JSON needs to be converted to JavaScript using `EJSON.parse()`:
+
+```js
+> pipelineStr = '[{"$match":{"field20_Timestamp_idx":{"$gt":{"$timestamp":{"t":1760551205,"i":0}}}},"field12_Decimal128_idx":{"$lte":{"$numberDecimal":"35.1"}}}]';
+
+> pipeline = EJSON.parse(pipelineStr);
+[
+  {
+    '$match': {
+      field20_Timestamp_idx: { '$gt': Timestamp({ t: 1760551205, i: 0 }) }
+    },
+    field12_Decimal128_idx: { '$lte': Decimal128('35.1') }
+  }
+]
+db.plan_stability2.aggregate(pipeline);
+```
+
+Note that **ISO Timestamps** need to be handled separately. JSON will store those as strings, resulting in loss of typing information that `EJSON.parse()` can not recover. This will result in a semantic change in the query unless manually converted to an `ISODate` object:
+
+```js
+// Manually convert
+// [{"$match":{"field19_datetime_idx":{"$gte":"2024-01-27T00:00:00.000Z"}}}]
+// to the correct JavaScript
+
+pipeline = [
+  {$match: {field19_datetime_idx: {$gte: ISODate("2024-01-27T00:00:00.000Z")}}},
+];
+```
+
 ## Is the new plan better or worse?
 
-For the majority of the plans, it will be obvious if the new plan is better or worse because all the
-execution counters would have moved in the same direction without any ambiguity.
+For the majority of the plans, it will be obvious if the new plan is better or worse because all the execution counters would have moved in the same direction without any ambiguity.
 
-Some plans, such as those involving $sort or $limit will sometimes change in a way that makes some
-counters better while others become worse. For those queries, consider running them manually multiple times
-to compare their wallclock execution times:
+Some plans, such as those involving `$sort` or `$limit` will sometimes change in a way that makes some counters better while others become worse. For those queries, consider running them manually multiple times to compare their wallclock execution times:
 
 ```javascript
 pipeline = [...];
