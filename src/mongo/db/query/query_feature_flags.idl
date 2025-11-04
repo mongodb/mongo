@@ -310,5 +310,5 @@ feature_flags:
         description: "Feature flag to enable extract_field_paths SBE stage."
         cpp_varname: gFeatureFlagExtractFieldPathsSbeStage
         fcv_gated: false
-        default: false
-        incremental_rollout_phase: in_development
+        default: true
+        incremental_rollout_phase: rollout
