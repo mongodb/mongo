@@ -589,6 +589,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_list_cluster_catalog.cpp",
         "//src/mongo/db/pipeline:document_source_sharded_data_distribution.cpp",
         "//src/mongo/db/pipeline/optimization:optimize.cpp",
+        "//src/mongo/db/pipeline/optimization:rule_based_rewriter.cpp",
+        "//src/mongo/db/pipeline/optimization:rules_to_move.cpp",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.cpp",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.cpp",
         "//src/mongo/db/pipeline/search:document_source_list_search_indexes.cpp",
@@ -597,6 +599,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/search:document_source_vector_search.cpp",
         "//src/mongo/db/pipeline/search:search_helper.cpp",
         "//src/mongo/db/pipeline/search:vector_search_helper.cpp",
+        "//src/mongo/db/pipeline/visitors:document_source_walker.cpp",
         "//src/mongo/db/pipeline/window_function:partition_iterator.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec_derivative.cpp",
@@ -765,8 +768,14 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_list_catalog.h",
         "//src/mongo/db/pipeline:document_source_list_cluster_catalog.h",
         "//src/mongo/db/pipeline:document_source_sharded_data_distribution.h",
+        "//src/mongo/db/pipeline:document_source_cursor.h",
+        "//src/mongo/db/pipeline:document_source_geo_near_cursor.h",
+        "//src/mongo/db/pipeline/visitors:document_source_visitor_registry.h",
+        "//src/mongo/db/pipeline/visitors:document_source_visitor_registry_mongod.h",
+        "//src/mongo/db/pipeline/visitors:document_source_walker.h",
         # TODO(SERVER-112281): Move to its own target.
         "//src/mongo/db/pipeline/optimization:optimize.h",
+        "//src/mongo/db/pipeline/optimization:rule_based_rewriter.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
         "//src/mongo/db/pipeline/search:document_source_list_search_indexes.h",
@@ -797,6 +806,12 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats:agg_key.h",
         "//src/mongo/db/query/search:search_index_view_validation.h",
         "//src/mongo/db/query/timeseries:timeseries_translation.h",
+        "//src/mongo/db/s:analyze_shard_key_util.h",
+        "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution.h",
+        "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution_gen",
+        "//src/mongo/db/s/resharding:document_source_resharding_add_resume_id.h",
+        "//src/mongo/db/s/resharding:document_source_resharding_iterate_transaction.h",
+        "//src/mongo/db/s/resharding:document_source_resharding_ownership_match.h",
         "//src/mongo/s:transaction_router_resource_yielder.h",
         "//src/mongo/s/query/exec:async_results_merger.h",
         "//src/mongo/s/query/exec:blocking_results_merger.h",
@@ -848,6 +863,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/physical_model/query_solution",
+        "//src/mongo/db/query/compiler/rewrites:rule_based_rewriter",
         "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
         "//src/mongo/db/query/compiler/stats",
         "//src/mongo/db/query/compiler/stats:stats_gen",
@@ -943,6 +959,7 @@ mongo_cc_library(
     srcs = [
         "document_source_internal_apply_oplog_update.cpp",
         "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.cpp",
+        "//src/mongo/db/pipeline/optimization:oplog_update_rules.cpp",
     ],
     hdrs = [
         "document_source_internal_apply_oplog_update.h",
@@ -1298,6 +1315,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:change_stream_split_large_event_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_transform_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_unwind_transaction_stage.cpp",
+        "//src/mongo/db/pipeline/optimization:change_stream_rules.cpp",
     ],
     hdrs = [
         "change_stream_document_diff_parser.h",
@@ -1375,30 +1393,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "pipeline_visitor",
-    srcs = [
-        "//src/mongo/db/pipeline/visitors:document_source_walker.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/pipeline:document_source_cursor.h",
-        "//src/mongo/db/pipeline:document_source_geo_near_cursor.h",
-        "//src/mongo/db/pipeline/visitors:document_source_visitor_registry.h",
-        "//src/mongo/db/pipeline/visitors:document_source_visitor_registry_mongod.h",
-        "//src/mongo/db/pipeline/visitors:document_source_walker.h",
-        "//src/mongo/db/s:analyze_shard_key_util.h",
-        "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution.h",
-        "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution_gen",
-        "//src/mongo/db/s/resharding:document_source_resharding_add_resume_id.h",
-        "//src/mongo/db/s/resharding:document_source_resharding_iterate_transaction.h",
-        "//src/mongo/db/s/resharding:document_source_resharding_ownership_match.h",
-    ],
-    deps = [
-        ":pipeline",
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
     name = "docs_needed_bounds_visitor",
     srcs = [
         "//src/mongo/db/pipeline/visitors:document_source_visitor_docs_needed_bounds.cpp",
@@ -1411,7 +1405,6 @@ mongo_cc_library(
         ":docs_needed_bounds",
         ":document_source_internal_apply_oplog_update",
         ":pipeline",
-        ":pipeline_visitor",
     ],
 )
 
@@ -1696,7 +1689,6 @@ mongo_cc_unit_test(
         ":field_path",
         ":granularity_rounder",
         ":pipeline",
-        ":pipeline_visitor",
         ":sharded_agg_helpers",
         "//src/mongo:base",
         "//src/mongo/db:change_stream_options",

@@ -4519,10 +4519,7 @@ TEST_F(PipelineOptimizationTest, UnionWithViewsSampleUseCase) {
         "]");
 }
 
-std::unique_ptr<Pipeline> getOptimizedPipeline(const BSONObj inputBson) {
-    QueryTestServiceContext testServiceContext;
-    auto opCtx = testServiceContext.makeOperationContext();
-
+std::unique_ptr<Pipeline> getOptimizedPipeline(const BSONObj inputBson, OperationContext* opCtx) {
     ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
     std::vector<BSONObj> rawPipeline;
     for (auto&& stageElem : inputBson["pipeline"].Array()) {
@@ -4531,7 +4528,7 @@ std::unique_ptr<Pipeline> getOptimizedPipeline(const BSONObj inputBson) {
     }
     AggregateCommandRequest request(kTestNss, rawPipeline);
     boost::intrusive_ptr<ExpressionContextForTest> ctx =
-        new ExpressionContextForTest(opCtx.get(), request);
+        new ExpressionContextForTest(opCtx, request);
     ctx->setMongoProcessInterface(std::make_shared<StubExplainInterface>());
     unittest::TempDir tempDir("PipelineTest");
     ctx->setTempDir(tempDir.path());
@@ -4548,8 +4545,10 @@ void assertTwoPipelinesOptimizeAndMergeTo(const std::string& inputPipe1,
     const BSONObj input2Bson = pipelineFromJsonArray(inputPipe2);
     const BSONObj outputBson = pipelineFromJsonArray(outputPipe);
 
-    auto pipeline1 = getOptimizedPipeline(input1Bson);
-    auto pipeline2 = getOptimizedPipeline(input2Bson);
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    auto pipeline1 = getOptimizedPipeline(input1Bson, opCtx.get());
+    auto pipeline2 = getOptimizedPipeline(input2Bson, opCtx.get());
 
     // Merge the pipelines
     for (const auto& source : pipeline2->getSources()) {

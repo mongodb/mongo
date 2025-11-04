@@ -205,7 +205,7 @@ DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOptimi
         return itr;
     }
 
-    itr = pipeline_optimization::optimizeEndOfPipeline(std::prev(itr), container);
+    itr = pipeline_optimization::optimizeEndOfPipeline(*getExpCtx(), std::prev(itr), container);
     _optimizedEndOfPipeline = true;
 
     if (itr == container->end()) {

@@ -285,15 +285,6 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
     return newGroup;
 }
 
-// Optimize the section of the pipeline before the $_internalUnpackBucket stage.
-void optimizePrefix(DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    auto prefix = DocumentSourceContainer(container->begin(), itr);
-    pipeline_optimization::optimizeContainer(&prefix);
-    pipeline_optimization::optimizeEachStage(&prefix);
-    container->erase(container->begin(), itr);
-    container->splice(itr, prefix);
-}
-
 boost::intrusive_ptr<Expression> handleDateTruncRewrite(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     boost::intrusive_ptr<Expression> expr,
@@ -1871,7 +1862,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
             }
             // We want to optimize the rest of the pipeline to ensure the stages are in their
             // optimal position and expressions have been optimized to allow for certain rewrites.
-            pipeline_optimization::optimizeEndOfPipeline(itr, container);
+            pipeline_optimization::optimizeEndOfPipeline(*getExpCtx(), itr, container);
         }
 
         if (std::next(itr) == container->end()) {

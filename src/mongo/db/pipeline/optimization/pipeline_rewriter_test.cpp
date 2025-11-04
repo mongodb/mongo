@@ -41,11 +41,15 @@ namespace {
 
 using PipelineRewriteEngineTest = AggregationContextFixture;
 
+// Need a different registry for the made up rules we register in this test.
+const auto getDocumentSourceVisitorRegistryForTest =
+    ServiceContext::declareDecoration<DocumentSourceVisitorRegistry>();
+
 #define REGISTER_TEST_RULES(DS, ...)                                                             \
     {                                                                                            \
         auto* service = getExpCtx()->getOperationContext()->getServiceContext();                 \
         registration_detail::enforceUniqueRuleNames(service, {__VA_ARGS__});                     \
-        getDocumentSourceVisitorRegistry(service)                                                \
+        getDocumentSourceVisitorRegistryForTest(service)                                         \
             .registerVisitorFunc<registration_detail::RuleRegisteringVisitorCtx, DS>(            \
                 [](DocumentSourceVisitorContextBase* ctx, const DocumentSource&) {               \
                     static_cast<registration_detail::RuleRegisteringVisitorCtx*>(ctx)->addRules( \
@@ -65,8 +69,10 @@ void runTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     };
 
     auto pipeline = makePipeline(input);
-    PipelineRewriteEngine engine{{*pipeline},
-                                 static_cast<size_t>(internalQueryMaxPipelineRewrites.load())};
+    PipelineRewriteEngine engine({getDocumentSourceVisitorRegistryForTest(
+                                      expCtx->getOperationContext()->getServiceContext()),
+                                  pipeline->getSources()},
+                                 static_cast<size_t>(internalQueryMaxPipelineRewrites.load()));
 
     engine.applyRules();
 

@@ -29,9 +29,26 @@
 
 #include "mongo/db/pipeline/optimization/optimize.h"
 
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
+
 namespace mongo::pipeline_optimization {
+namespace rbr = rule_based_rewrites::pipeline;
 
 MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
+
+namespace {
+void applyRuleBasedRewrites(rbr::PipelineRewriteContext rewriteContext) {
+    rbr::PipelineRewriteEngine engine(std::move(rewriteContext),
+                                      internalQueryMaxPipelineRewrites.load());
+
+    try {
+        engine.applyRules();
+    } catch (DBException& ex) {
+        ex.addContext("Failed to optimize pipeline");
+        throw;
+    }
+}
+}  // namespace
 
 /**
  * Modifies the pipeline, optimizing it by combining and swapping stages.
@@ -44,7 +61,8 @@ void optimizePipeline(Pipeline& pipeline) {
     if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
         return;
     }
-    optimizeContainer(&pipeline.getSources());
+    applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline));
+    // Not converted to rules yet.
     optimizeEachStage(&pipeline.getSources());
 }
 
@@ -71,17 +89,8 @@ void optimizeEachStage(DocumentSourceContainer* container) {
  * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting
  * stages.
  */
-void optimizeContainer(DocumentSourceContainer* container) {
-    DocumentSourceContainer::iterator itr = container->begin();
-    try {
-        while (itr != container->end()) {
-            invariant((*itr).get());
-            itr = (*itr).get()->optimizeAt(itr, container);
-        }
-    } catch (DBException& ex) {
-        ex.addContext("Failed to optimize pipeline");
-        throw;
-    }
+void optimizeContainer(const ExpressionContext& expCtx, DocumentSourceContainer* container) {
+    applyRuleBasedRewrites(rbr::PipelineRewriteContext(expCtx, *container));
 }
 
 /**
@@ -90,12 +99,13 @@ void optimizeContainer(DocumentSourceContainer* container) {
  * Returns a valid iterator that points to the new "end of the pipeline": i.e., the stage that
  * comes after 'itr' in the newly optimized pipeline.
  */
-DocumentSourceContainer::iterator optimizeEndOfPipeline(DocumentSourceContainer::iterator itr,
+DocumentSourceContainer::iterator optimizeEndOfPipeline(const ExpressionContext& expCtx,
+                                                        DocumentSourceContainer::iterator itr,
                                                         DocumentSourceContainer* container) {
     // We must create a new DocumentSourceContainer representing the subsection of the pipeline we
     // wish to optimize, since otherwise calls to optimizeAt() will overrun these limits.
     auto endOfPipeline = DocumentSourceContainer(std::next(itr), container->end());
-    optimizeContainer(&endOfPipeline);
+    optimizeContainer(expCtx, &endOfPipeline);
     optimizeEachStage(&endOfPipeline);
     container->erase(std::next(itr), container->end());
     container->splice(std::next(itr), endOfPipeline);

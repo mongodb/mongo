@@ -48,7 +48,7 @@ namespace mongo::rule_based_rewrites::pipeline {
  *                {"SOME_OTHER_RULE", precondition, transform, 1.0});
  */
 #define REGISTER_RULES(DS, ...)                                                                  \
-    const ServiceContext::ConstructorActionRegisterer documentSourcePrereqsRegisterer_##DS{      \
+    const ServiceContext::ConstructorActionRegisterer documentSourcePrereqsRegisterer_##DS {     \
         "PipelineOptimizationContext" #DS, [](ServiceContext* service) {                         \
             registration_detail::enforceUniqueRuleNames(service, {__VA_ARGS__});                 \
             auto& registry = getDocumentSourceVisitorRegistry(service);                          \
@@ -57,7 +57,24 @@ namespace mongo::rule_based_rewrites::pipeline {
                     static_cast<registration_detail::RuleRegisteringVisitorCtx*>(ctx)->addRules( \
                         {__VA_ARGS__});                                                          \
                 });                                                                              \
-        }};
+        }                                                                                        \
+    }
+
+/**
+ * Helper for defining a rule that calls doOptimizeAt() for a given document source.
+ */
+#define OPTIMIZE_AT_RULE(DS)                  \
+    {"OPTIMIZE_AT_" #DS,                      \
+     alwaysTrue,                              \
+     CommonTransforms::optimizeAtWrapper<DS>, \
+     kDefaultOptimizeAtPriority}
+
+// For high priority rules that e.g. attempt to push a $match as early as possible.
+constexpr double kDefaultPushdownPriority = 100.0;
+// For rules that e.g. attempt to swap with or absorb an adjacent stage.
+constexpr double kDefaultOptimizeAtPriority = 10.0;
+// For rules that optimize a stage in place.
+constexpr double kDefaultOptimizeInPlacePriority = 1.0;
 
 /**
  * Provides methods for walking and modifying a pipeline. Treats the pipeline as a linked list. Uses
@@ -66,12 +83,20 @@ namespace mongo::rule_based_rewrites::pipeline {
 class PipelineRewriteContext : public RewriteContext<PipelineRewriteContext, DocumentSource> {
 public:
     PipelineRewriteContext(Pipeline& pipeline)
-        : _container(pipeline.getSources()),
+        : PipelineRewriteContext(*pipeline.getContext(), pipeline.getSources()) {}
+
+    PipelineRewriteContext(const ExpressionContext& expCtx, DocumentSourceContainer& container)
+        : PipelineRewriteContext(
+              getDocumentSourceVisitorRegistry(expCtx.getOperationContext()->getServiceContext()),
+              container) {}
+
+    PipelineRewriteContext(const DocumentSourceVisitorRegistry& registry,
+                           DocumentSourceContainer& container)
+        : _container(container),
           _itr(_container.begin()),
           _oldItr(_itr),
           _oldDocSource(_itr->get()),
-          _registry(getDocumentSourceVisitorRegistry(
-              pipeline.getContext()->getOperationContext()->getServiceContext())) {}
+          _registry(registry) {}
 
     bool hasMore() const final {
         return _itr != _container.end();
@@ -161,6 +186,36 @@ struct CommonTransforms {
      */
     static inline bool noop(PipelineRewriteContext&) {
         return false;
+    }
+
+    template <typename DS>
+    static bool optimizeAtWrapper(PipelineRewriteContext& ctx) {
+        const auto getAdjacentStages = [&](DocumentSourceContainer::iterator itr) {
+            auto prev = itr == ctx._container.begin() ? nullptr : *std::prev(itr);
+            auto curr = itr == ctx._container.end() ? nullptr : *itr;
+            auto next = !curr || std::next(itr) == ctx._container.end() ? nullptr : *std::next(itr);
+            return std::make_tuple(std::move(prev), std::move(curr), std::move(next));
+        };
+
+        auto stagesBefore = getAdjacentStages(ctx._itr);
+        auto resultItr = ctx.current().optimizeAt(ctx._itr, &ctx._container);
+        // If nothing changed, resultItr points to the next position.
+        auto stagesAfter = getAdjacentStages(
+            resultItr == ctx._container.begin() ? resultItr : std::prev(resultItr));
+
+        // Try to detect if optimizeAt() did anything. Normally, std::next() indicates that no
+        // optimizations were performed. However, it's also possible that the current (or some
+        // other) stage was completely erased, which means comparisons involving the erased
+        // iterators would be undefined behavior.
+        if (stagesBefore == stagesAfter &&
+            (resultItr == ctx._container.end() || resultItr == std::next(ctx._itr))) {
+            // Current position may have been erased and re-inserted by optimizeAt().
+            ctx._itr = std::prev(resultItr);
+            return false;
+        }
+
+        ctx._itr = resultItr;
+        return true;
     }
 };
 

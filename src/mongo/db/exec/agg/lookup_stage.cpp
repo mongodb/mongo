@@ -88,7 +88,7 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
 
     auto& container = pipeline.getSources();
 
-    pipeline_optimization::optimizeContainer(&container);
+    pipeline_optimization::optimizeContainer(*pipeline.getContext(), &container);
 
     // We want to ensure the cache has been optimized prior to any calls to optimize().
     auto itr = (&container)->begin();
