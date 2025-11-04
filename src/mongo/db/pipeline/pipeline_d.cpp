@@ -1873,8 +1873,8 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
     // $geoNear can only run over the main collection.
     const auto& collection = collections.getMainCollection();
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "$geoNear requires a geo index to run, but "
-                          << nss.toStringForErrorMsg() << " does not exist",
+            str::stream() << "$geoNear needs a collection to run, but " << nss.toStringForErrorMsg()
+                          << " does not exist",
             collection);
 
     auto expCtx = pipeline->getContext();
