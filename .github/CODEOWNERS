@@ -946,6 +946,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/replicated_ident_utils.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /jstests/libs/**/replicated_record_ids_utils.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /jstests/libs/**/host_ipaddr.js @10gen/server-networking-and-observability @svc-auto-approve-bot
+/jstests/libs/**/feature_compatibility_version.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/libs/**/*.pem @10gen/server-security @svc-auto-approve-bot
 /jstests/libs/**/*.sha1 @10gen/server-security @svc-auto-approve-bot
 /jstests/libs/**/*.sha256 @10gen/server-security @svc-auto-approve-bot
@@ -3077,7 +3078,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/shell/**/encrypted* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/keyvault.js @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/named_pipe_test_helper* @10gen/query-integration-features @svc-auto-approve-bot
-/src/mongo/shell/**/feature_compatibility_version.js @10gen/server-fcv @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/stdx/OWNERS.yml
 /src/mongo/stdx/**/* @10gen/server-programmability @svc-auto-approve-bot
