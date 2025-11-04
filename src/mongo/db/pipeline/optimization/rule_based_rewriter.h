@@ -95,7 +95,7 @@ public:
         : _container(container),
           _itr(_container.begin()),
           _oldItr(_itr),
-          _oldDocSource(_itr->get()),
+          _oldDocSource(_itr == _container.end() ? nullptr : _itr->get()),
           _registry(registry) {}
 
     bool hasMore() const final {
