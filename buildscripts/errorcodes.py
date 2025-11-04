@@ -24,6 +24,8 @@ except ImportError:
     import re  # type: ignore
 
 MAXIMUM_CODE = 99999999  # JIRA Ticket + XX
+MIN_EXTENSION_RESERVED_CODE = 65000
+MAX_EXTENSION_RESERVED_CODE = 71000
 
 codes = []  # type: ignore
 
@@ -162,6 +164,7 @@ def read_error_codes(src_root="src/mongo"):
     dups = defaultdict(list)
     skips = []
     malformed = []  # type: ignore
+    reserved = []
 
     # define validation callbacks
     def check_dups(assert_loc):
@@ -181,10 +184,13 @@ def read_error_codes(src_root="src/mongo"):
             errors.append(assert_loc)
 
     def validate_code(assert_loc):
-        """Check for malformed codes."""
+        """Check for malformed codes or pre-reserved codes."""
         code = int(assert_loc.code)
         if code > MAXIMUM_CODE:
             malformed.append(assert_loc)
+            errors.append(assert_loc)
+        elif code >= MIN_EXTENSION_RESERVED_CODE and code < MAX_EXTENSION_RESERVED_CODE:
+            reserved.append(assert_loc)
             errors.append(assert_loc)
 
     def callback(assert_loc):
@@ -215,6 +221,11 @@ def read_error_codes(src_root="src/mongo"):
     for loc in malformed:
         line, col = get_line_and_column_for_position(loc)
         print("MALFORMED ID: %s" % loc.code)
+        print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
+
+    for loc in reserved:
+        line, col = get_line_and_column_for_position(loc)
+        print("USE OF ALREADY RESERVED ID: %s" % loc.code)
         print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
 
     return (codes, errors, seen)

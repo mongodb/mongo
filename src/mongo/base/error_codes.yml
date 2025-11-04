@@ -1053,6 +1053,7 @@ error_codes:
     }
   - {code: 56846, name: ConfigServerUnreachable}
   - {code: 57986, name: RetryableInternalTransactionNotSupported}
+  # Codes 65000-70999 are reserved for extension-developed logs and errors. Do not use these unless they are used for writing an extension.
   - {code: 640570, name: IllegalChangeToExpectedShardVersion}
   - {code: 640571, name: IllegalChangeToExpectedDatabaseVersion}
   - {
