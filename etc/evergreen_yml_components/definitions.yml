@@ -3484,3 +3484,29 @@ functions:
       add_expansions_to_env: true # needed to get the AWS secrets from ec2.assume_role
       args:
         - "./src/evergreen/build_and_push_module_images.sh"
+
+  "tar tracing data": &tar_tracing_data
+    command: archive.targz_pack
+    params:
+      target: "tracing-data.tgz"
+      source_dir: "${workdir}/build/OTelTraces"
+      include:
+        - "*trace.jsonl"
+
+  "archive tracing data": &archive_tracing_data
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: tracing-data.tgz
+      remote_file: ${project}/${build_variant}/${revision}/tracingdata/mongo-tracing-data-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: private
+      visibility: signed
+      content_type: application/gzip
+      display_name: Tracing Data - Execution ${execution}
+      optional: true
+
+  "save tracing data":
+    - *tar_tracing_data
+    - *archive_tracing_data
