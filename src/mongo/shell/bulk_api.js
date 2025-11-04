@@ -166,17 +166,15 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
         }
 
         if (this.getWriteError() != null) {
-            result.writeError = {};
-            result.writeError.code = this.getWriteError().code;
-            result.writeError.errmsg = this.getWriteError().errmsg;
-            let errInfo = this.getWriteError().errInfo;
+            const {code, errmsg, errInfo} = this.getWriteError();
+            result.writeErrors = {code, errmsg};
             if (errInfo) {
-                result.writeError.errInfo = errInfo;
+                result.writeErrors.errInfo = errInfo;
             }
         }
 
         if (this.getWriteConcernError() != null) {
-            result.writeConcernError = this.getWriteConcernError();
+            result.writeConcernErrors = this.getWriteConcernError();
         }
 
         return tojson(result, indent, nolint);

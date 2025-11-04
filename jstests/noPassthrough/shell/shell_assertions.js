@@ -1237,6 +1237,17 @@ tests.push(function assertWriteErrorJsonFormat() {
     );
 });
 
+tests.push(function assertWriteErrorToJsonHasCorrectFields() {
+    // Verify that the json obj has the correct name for the writeErrors field ('writeErrors' instead of 'writeError').
+    const writeError = {code: ErrorCodes.NetworkTimeout, errmsg: "Timeout!"};
+    const res = new WriteResult({nRemoved: 0, writeErrors: [writeError], upserted: []}, 3, {w: "majority"});
+    const jsonRes = JSON.parse(tojson(res));
+
+    assert(jsonRes.hasOwnProperty("writeErrors"));
+    assert.eq(jsonRes.writeErrors, writeError);
+    assert.eq(jsonRes.writeError, null);
+});
+
 tests.push(function assertWriteErrorWithCodeJsonFormat() {
     const writeError = {code: ErrorCodes.NetworkTimeout, errmsg: "Timeout!"};
     assertThrowsErrorWithJson(
