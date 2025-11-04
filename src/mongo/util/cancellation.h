@@ -35,6 +35,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
 #include <new>
@@ -44,7 +45,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 namespace detail {
 
@@ -286,4 +287,4 @@ private:
         make_intrusive<detail::CancellationStateHolder>()};
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

@@ -44,11 +44,11 @@ SyntheticSourceLocation makeLoc(char const* function, char const* file, long lin
 auto installBoostAssertCallbacks = [] {
     auto&& funcs = BoostAssertFuncs::global();
     funcs.assertFunc = [](char const* expr, char const* function, char const* file, long line) {
-        invariantFailed(expr, makeLoc(function, file, line));
+        error_details::invariantFailed(expr, makeLoc(function, file, line));
     };
     funcs.assertMsgFunc =
         [](char const* expr, char const* msg, char const* function, char const* file, long line) {
-            invariantFailedWithMsg(expr, msg, makeLoc(function, file, line));
+            error_details::invariantFailedWithMsg(expr, msg, makeLoc(function, file, line));
         };
     return 0;
 }();

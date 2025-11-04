@@ -836,6 +836,7 @@ filegroup(
         "//src/mongo/util:lazily_initialized.h",
         "//src/mongo/util:lru_cache.h",
         "//src/mongo/util:make_array_type.h",
+        "//src/mongo/util:modules.h",
         "//src/mongo/util:pcre.h",
         "//src/mongo/util:periodic_runner.h",
         "//src/mongo/util:read_through_cache.h",

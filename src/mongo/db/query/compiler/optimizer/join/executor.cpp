@@ -155,17 +155,16 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
 
     // We actually have several canonical queries, so we don't try to pass one in.
-    auto exec =
-        uassertStatusOKWithLocation(plan_executor_factory::make(opCtx,
-                                                                nullptr /* cq */,
-                                                                std::move(qsn),
-                                                                std::move(planStagesAndData),
-                                                                mca,
-                                                                plannerOptions,
-                                                                mca.getMainCollection()->ns(),
-                                                                std::move(sbeYieldPolicy),
-                                                                false /* isFromPlanCache */,
-                                                                false /* cachedPlanHash */));
+    auto exec = uassertStatusOK(plan_executor_factory::make(opCtx,
+                                                            nullptr /* cq */,
+                                                            std::move(qsn),
+                                                            std::move(planStagesAndData),
+                                                            mca,
+                                                            plannerOptions,
+                                                            mca.getMainCollection()->ns(),
+                                                            std::move(sbeYieldPolicy),
+                                                            false /* isFromPlanCache */,
+                                                            false /* cachedPlanHash */));
 
     return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
 }

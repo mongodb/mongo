@@ -62,18 +62,15 @@ public:
     ThrowingQueryAnalysisCoordinator() = default;
 
     void onSamplerInsert(const MongosType& doc) override {
-        throw ExceptionFor<ErrorCodes::InternalError>(
-            Status(ErrorCodes::InternalError, "Mocked error"));
+        uasserted(ErrorCodes::InternalError, "Mocked error");
     }
 
     void onSamplerUpdate(const MongosType& doc) override {
-        throw ExceptionFor<ErrorCodes::InternalError>(
-            Status(ErrorCodes::InternalError, "Mocked error"));
+        uasserted(ErrorCodes::InternalError, "Mocked error");
     }
 
     void onSamplerDelete(const MongosType& doc) override {
-        throw ExceptionFor<ErrorCodes::InternalError>(
-            Status(ErrorCodes::InternalError, "Mocked error"));
+        uasserted(ErrorCodes::InternalError, "Mocked error");
     }
 };
 

@@ -33,19 +33,20 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/alarm.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /*
  * This is a runner for alarm schedulers that waits for and processes alarms in a single
  * background thread.
  */
-class AlarmRunnerBackgroundThread {
+class MONGO_MOD_NEEDS_REPLACEMENT AlarmRunnerBackgroundThread {
 public:
     using AlarmSchedulerHandle = std::shared_ptr<AlarmScheduler>;
     // Construct an alarm runner from a vector of shared_ptr<AlarmScheduler>'s.
@@ -77,4 +78,4 @@ private:
     stdx::thread _thread;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

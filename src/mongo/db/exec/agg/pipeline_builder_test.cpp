@@ -98,8 +98,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(documentSourceMock2, DocumentSourceMock2::id);
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceMock2ToThrowsStageMappingFn(
     const boost::intrusive_ptr<DocumentSource>& ds) {
-    throw ExceptionFor<ErrorCodes::InternalError>(
-        Status(ErrorCodes::InternalError, "Mocked error"));
+    uasserted(ErrorCodes::InternalError, "Mocked error");
 }
 
 REGISTER_AGG_STAGE_MAPPING(ThrowsStage,

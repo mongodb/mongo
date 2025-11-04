@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Wrapper around std::malloc().
@@ -49,4 +50,4 @@ namespace mongo {
 [[nodiscard]] MONGO_COMPILER_RETURNS_NONNULL MONGO_COMPILER_ALLOC_SIZE(2) void* mongoRealloc(
     void* ptr, size_t size);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

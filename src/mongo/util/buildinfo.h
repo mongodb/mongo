@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/util/buildinfo_gen.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Populate standard buildInfo content.
@@ -44,4 +45,4 @@ BuildInfo getBuildInfo();
  */
 BuildInfo getBuildInfoVersionOnly();
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

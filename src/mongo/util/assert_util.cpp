@@ -64,7 +64,7 @@ void logScopedDebugInfo() {
     if (!shouldLogScopedDebugInfoInAssertUtil.load()) {
         return;
     }
-    auto diagStack = scopedDebugInfoStack().getAll();
+    auto diagStack = error_details::scopedDebugInfoStack().getAll();
     if (diagStack.empty())
         return;
     LOGV2_FATAL_OPTIONS(
@@ -142,6 +142,7 @@ MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr,
 }
 }  // namespace
 
+namespace error_details {
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
 MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
                                              WrappedStdSourceLocation loc) noexcept {
@@ -219,6 +220,7 @@ MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
     LOGV2_FATAL_CONTINUE(23088, "\n\n***aborting after invariant() failure\n\n");
     callAbort();
 }
+}  // namespace error_details
 
 namespace fassert_detail {
 
@@ -263,6 +265,7 @@ MONGO_COMPILER_NORETURN void failedNoTrace(MsgId msgid,
 
 }  // namespace fassert_detail
 
+namespace error_details {
 MONGO_COMPILER_NOINLINE void uassertedWithLocation(const Status& status, SourceLocation loc) {
     assertionCount.condrollover(assertionCount.user.addAndFetch(1));
     LOGV2_DEBUG(23074, 1, "User assertion", "error"_attr = redact(status), "location"_attr = loc);
@@ -288,6 +291,8 @@ void tassertFailed(const Status& status, SourceLocation loc) {
     breakpoint();
     error_details::throwExceptionForStatus(status);
 }
+
+}  // namespace error_details
 
 bool haveTripwireAssertionsOccurred() {
     return assertionCount.tripwire.load() != 0;
@@ -348,6 +353,7 @@ Status exceptionToStatus() {
     }
 }
 
+namespace error_details {
 std::vector<std::string> ScopedDebugInfoStack::getAll() {
     if (_loggingDepth > 0) {
         return {};  // Re-entry detected.
@@ -373,6 +379,7 @@ std::vector<std::string> ScopedDebugInfoStack::getAll() {
 
     return r;
 }
+}  // namespace error_details
 
 void reportFailedDestructor(SourceLocation loc) {
     try {

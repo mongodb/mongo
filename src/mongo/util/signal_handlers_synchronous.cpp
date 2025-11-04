@@ -213,7 +213,7 @@ void dumpScopedDebugInfo(std::ostream& os) {
     if (!shouldLogScopedDebugInfoInSignalHandlers.load()) {
         return;
     }
-    auto diagStack = scopedDebugInfoStack().getAll();
+    auto diagStack = error_details::scopedDebugInfoStack().getAll();
     if (diagStack.empty())
         return;
     os << "ScopedDebugInfo: [";

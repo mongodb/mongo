@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  *  Background thread dispatching.
@@ -171,4 +171,4 @@ public:
 };
 
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

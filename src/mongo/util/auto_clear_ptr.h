@@ -29,17 +29,18 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 template <class Container>
-class ClearDeleter {
-public:
-    void operator()(Container* container) {
-        container->clear();
-    }
-};
+class MONGO_MOD_FILE_PRIVATE
+ClearDeleter{public : void operator()(Container* container){container->clear();
+}
+}
+;
 
 /**
  * A RAII style move-only pointer that calls clear() when going out of scope
@@ -55,4 +56,4 @@ auto makeAutoClearPtr(Container* container) {
     return AutoClearPtr<Container>{container, ClearDeleter<Container>{}};
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

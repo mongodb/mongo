@@ -547,7 +547,7 @@ DEATH_TEST(DassertTerminationTest,
 
 TEST(ScopedDebugInfo, Stack) {
     using namespace unittest::match;
-    ScopedDebugInfoStack infoStack{};  // Avoiding the tls instance for now.
+    error_details::ScopedDebugInfoStack infoStack{};  // Avoiding the tls instance for now.
     std::vector<std::string> expected;
     ASSERT_THAT(infoStack.getAll(), Eq(expected));
     {
@@ -587,7 +587,7 @@ DEATH_TEST(ScopedDebugInfo, PrintedOnSignal, "mission: ATestInjectedString") {
 
 TEST(ScopedDebugInfo, FormattingCanBeCalledMoreThanOnce) {
     using namespace unittest::match;
-    ScopedDebugInfoStack infoStack{};
+    error_details::ScopedDebugInfoStack infoStack{};
 
     ScopedDebugInfo guard("greeting", "hello", &infoStack);
     // A second call to `getAll` returns correct results.
@@ -601,7 +601,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
                  CorrectScopedDebugInfosOnStackAfterIncorrectOne,
                  "(?s)tasserting in mock printer.*BACKTRACE"
                  ".*ScopedDebugInfo failed.*test.*9513401") {
-    ScopedDebugInfoStack infoStack{};
+    error_details::ScopedDebugInfoStack infoStack{};
     ScopedDebugInfo greetingGuard("greeting", "hello", &infoStack);
     ScopedDebugInfo guardTasserts("test", PrinterMockTassert(), &infoStack);
     ScopedDebugInfo anotherGreetingGuard("greeting", "hey there", &infoStack);
@@ -635,7 +635,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 DEATH_TEST_REGEX(ScopedDebugInfo,
                  InvariantAndTassertDuringLogging,
                  "(?s)ouch.*abruptQuit"
-                 ".*tasserting in mock printer.*mongo::tassertFailed"
+                 ".*tasserting in mock printer.*mongo::error_details::tassertFailed"
                  ".*ScopedDebugInfo failed.*test.*9513401") {
     ScopedDebugInfo guardTasserts("test", PrinterMockTassert());
     someRiskyBusiness();

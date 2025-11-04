@@ -32,12 +32,13 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Mock clock source that returns a fixed time until explicitly advanced.
@@ -109,4 +110,4 @@ private:
     const std::shared_ptr<ClockSource> _source;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

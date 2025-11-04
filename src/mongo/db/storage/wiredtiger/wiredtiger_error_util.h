@@ -110,25 +110,26 @@ inline void uassertWTOK(int ret, WT_SESSION* session) {
     uassertStatusOK(wtRCToStatus(ret, session));
 }
 
-#define MONGO_invariantWTOK_2(expression, session)                                 \
-    do {                                                                           \
-        int _invariantWTOK_retCode = expression;                                   \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                         \
-            invariantOKFailed(#expression,                                         \
-                              wtRCToStatus_error(_invariantWTOK_retCode, session), \
-                              MONGO_SOURCE_LOCATION());                            \
-        }                                                                          \
+#define MONGO_invariantWTOK_2(expression, session)                                                \
+    do {                                                                                          \
+        int _invariantWTOK_retCode = expression;                                                  \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                                        \
+            error_details::invariantOKFailed(#expression,                                         \
+                                             wtRCToStatus_error(_invariantWTOK_retCode, session), \
+                                             MONGO_SOURCE_LOCATION());                            \
+        }                                                                                         \
     } while (false)
 
-#define MONGO_invariantWTOK_3(expression, session, contextExpr)                           \
-    do {                                                                                  \
-        int _invariantWTOK_retCode = expression;                                          \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                                \
-            invariantOKFailedWithMsg(#expression,                                         \
-                                     wtRCToStatus_error(_invariantWTOK_retCode, session), \
-                                     contextExpr,                                         \
-                                     MONGO_SOURCE_LOCATION());                            \
-        }                                                                                 \
+#define MONGO_invariantWTOK_3(expression, session, contextExpr)      \
+    do {                                                             \
+        int _invariantWTOK_retCode = expression;                     \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {           \
+            error_details::invariantOKFailedWithMsg(                 \
+                #expression,                                         \
+                wtRCToStatus_error(_invariantWTOK_retCode, session), \
+                contextExpr,                                         \
+                MONGO_SOURCE_LOCATION());                            \
+        }                                                            \
     } while (false)
 
 #define MONGO_invariantWTOK_EXPAND(x) x /**< MSVC workaround */

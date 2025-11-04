@@ -48,10 +48,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
-#include "mongo/db/traffic_recorder_session_utils.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/decorable.h"
@@ -87,6 +88,22 @@
 
 
 namespace mongo {
+
+static std::vector<std::pair<transport::SessionId, std::string>> getActiveSessions(
+    ServiceContext* svcCtx) {
+    transport::TransportLayerManager* tlManager = svcCtx->getTransportLayerManager();
+    std::vector<std::pair<transport::SessionId, std::string>> openSessions;
+    if (tlManager) {
+        tlManager->forEach([&openSessions](transport::TransportLayer* tl) {
+            auto sessionManager = tl->getSessionManager();
+            if (sessionManager) {
+                auto sessionIds = sessionManager->getOpenSessionIDs();
+                openSessions.insert(openSessions.end(), sessionIds.begin(), sessionIds.end());
+            }
+        });
+    }
+    return openSessions;
+}
 
 void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
     db.clear();

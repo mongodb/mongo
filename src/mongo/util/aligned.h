@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/stdx/new.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -38,7 +39,7 @@
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace aligned_detail {
 template <size_t step>
@@ -207,4 +208,4 @@ using CacheCombinedExclusive = Aligned<T,
                                        stdx::hardware_destructive_interference_size,
                                        stdx::hardware_constructive_interference_size>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

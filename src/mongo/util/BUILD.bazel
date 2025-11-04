@@ -106,6 +106,8 @@ mongo_cc_library(
     ],
     hdrs = [
         "boost_assert_shim.h",
+        "modules.h",
+        "//src/mongo/platform:compiler.h",
     ],
     copts = [
         "-Isrc/third_party/boost",

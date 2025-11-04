@@ -35,6 +35,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -48,7 +49,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /*
  * An alarm scheduler will fill a Future<void> at some time in the future and allow the caller to
@@ -203,4 +204,4 @@ private:
     AlarmMap _alarms;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

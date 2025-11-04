@@ -30,6 +30,8 @@
 #pragma once
 
 #if defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG)
+#include "mongo/util/modules.h"
+
 #include <functional>
 
 namespace mongo {

@@ -34,6 +34,7 @@
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/scoped_unlock.h"
 
 #include <limits>

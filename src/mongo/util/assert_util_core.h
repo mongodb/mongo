@@ -32,6 +32,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -58,43 +59,53 @@
 // IWYU pragma: friend "mongo/base/string_data.h"
 // IWYU pragma: friend "mongo/util/intrusive_counter.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
+namespace error_details {
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
-MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
-                                             WrappedStdSourceLocation loc) noexcept;
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailed(
+    const char* expr, WrappedStdSourceLocation loc) noexcept;
 #endif
 
-MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
-                                             SyntheticSourceLocation loc) noexcept;
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailed(
+    const char* expr, SyntheticSourceLocation loc) noexcept;
 
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
-MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
-                                                    const std::string& msg,
-                                                    WrappedStdSourceLocation loc) noexcept;
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
+    const char* expr, const std::string& msg, WrappedStdSourceLocation loc) noexcept;
 #endif
-MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
-                                                    const std::string& msg,
-                                                    SyntheticSourceLocation loc) noexcept;
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
+    const char* expr, const std::string& msg, SyntheticSourceLocation loc) noexcept;
 
-// This overload is our legacy invariant, which just takes a condition to test.
+template <typename T>
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithLocation(
+    const T& testOK, const char* expr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    if (MONGO_unlikely(!testOK)) {
+        ::mongo::error_details::invariantFailed(expr, loc);
+    }
+}
+
+template <typename T, typename ContextExpr>
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithContextAndLocation(
+    const T& testOK,
+    const char* expr,
+    ContextExpr&& contextExpr,
+    SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    if (MONGO_unlikely(!testOK)) {
+        ::mongo::error_details::invariantFailedWithMsg(expr, contextExpr(), loc);
+    }
+}
+}  // namespace error_details
+
+// This overload is our simple invariant, which just takes a condition to test.
 //
 // ex)   invariant(!condition);
 //
 //       Invariant failure !condition some/file.cpp 528
 //
-#define MONGO_invariant_1(Expression) \
-    ::mongo::invariantWithLocation((Expression), #Expression, MONGO_SOURCE_LOCATION())
-
-template <typename T>
-constexpr void invariantWithLocation(const T& testOK,
-                                     const char* expr,
-                                     SourceLocation loc = MONGO_SOURCE_LOCATION()) {
-    if (MONGO_unlikely(!testOK)) {
-        ::mongo::invariantFailed(expr, loc);
-    }
-}
-
+#define MONGO_invariant_1(Expression)              \
+    ::mongo::error_details::invariantWithLocation( \
+        (Expression), #Expression, MONGO_SOURCE_LOCATION())
 
 // This invariant overload accepts a condition and a message, to be logged if the condition is
 // false.
@@ -103,21 +114,12 @@ constexpr void invariantWithLocation(const T& testOK,
 //
 //       Invariant failure !condition "hello!" some/file.cpp 528
 //
-#define MONGO_invariant_2(Expression, contextExpr)                                     \
-    ::mongo::invariantWithContextAndLocation((Expression),                             \
-                                             #Expression,                              \
-                                             [&] { return std::string{contextExpr}; }, \
-                                             MONGO_SOURCE_LOCATION())
-
-template <typename T, typename ContextExpr>
-constexpr void invariantWithContextAndLocation(const T& testOK,
-                                               const char* expr,
-                                               ContextExpr&& contextExpr,
-                                               SourceLocation loc = MONGO_SOURCE_LOCATION()) {
-    if (MONGO_unlikely(!testOK)) {
-        ::mongo::invariantFailedWithMsg(expr, contextExpr(), loc);
-    }
-}
+#define MONGO_invariant_2(Expression, contextExpr)           \
+    ::mongo::error_details::invariantWithContextAndLocation( \
+        (Expression),                                        \
+        #Expression,                                         \
+        [&] { return std::string{contextExpr}; },            \
+        MONGO_SOURCE_LOCATION())
 
 #define MONGO_invariant_EXPAND(x) x /**< MSVC workaround */
 #define MONGO_invariant_PICK(_1, _2, x, ...) x
@@ -133,4 +135,4 @@ constexpr void invariantWithContextAndLocation(const T& testOK,
 
 #define dassert MONGO_dassert
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
