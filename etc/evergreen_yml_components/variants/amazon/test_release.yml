@@ -522,6 +522,7 @@ buildvariants:
       - name: streams_kinesis
       - name: streams_aspio_gen
       - name: streams_build_and_push_gen
+      - name: generate_buildid_to_debug_symbols_mapping
 
   - name: enterprise-amazon2023-streams-arm64
     display_name: "Amazon Linux 2023 enterprise build with streams arm64"
@@ -569,6 +570,7 @@ buildvariants:
       - name: streams_build_and_push_gen
       # Only needed once to generate the streams manifest for both x86 and arm
       - name: streams_publish_manifest_al2023_gen
+      - name: generate_buildid_to_debug_symbols_mapping
 
   - name: enterprise-amazon2-streams
     display_name: "Amazon Linux 2 enterprise build with streams"
@@ -613,6 +615,7 @@ buildvariants:
       - name: streams_kinesis
       - name: streams_aspio_gen
       - name: streams_build_and_push_gen
+      - name: generate_buildid_to_debug_symbols_mapping
 
   - name: enterprise-amazon2-streams-arm64
     display_name: "Amazon Linux 2 enterprise build with streams arm64"
@@ -660,6 +663,7 @@ buildvariants:
       - name: streams_build_and_push_gen
       # Only needed once to generate the streams manifest for both x86 and arm
       - name: streams_publish_manifest_gen
+      - name: generate_buildid_to_debug_symbols_mapping
 
   - &enterprise-amazon2023-arm64-fuzzers-template
     <<: *enterprise-amazon2023-arm64-template
