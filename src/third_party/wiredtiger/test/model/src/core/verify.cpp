@@ -138,11 +138,10 @@ kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
         if (ret != 0)
             throw wiredtiger_exception(session, ret);
 
-        /* Automatically close the cursor at the end of the block. */
-        wiredtiger_cursor_guard cursor_guard(wt_cursor);
-
-        /* Verify each key-value pair. */
-        while ((ret = wt_cursor->next(wt_cursor)) == 0) {
+        /* Automatically close the cursor at the end of the iteration. */
+        for (wiredtiger_cursor_guard cursor_guard(wt_cursor);
+             (ret = wt_cursor->next(wt_cursor)) == 0;) {
+            /* Verify each key-value pair. */
             key = get_wt_cursor_key(wt_cursor);
             value = get_wt_cursor_value(wt_cursor);
             if (_verbose)
@@ -165,7 +164,6 @@ kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
                 throw verify_exception(ss.str());
             }
         }
-
         /* Make sure that we reached the end at the same time. */
         if (ret != WT_NOTFOUND)
             throw wiredtiger_exception(session, "Advancing the cursor failed", ret);
@@ -177,6 +175,26 @@ kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
         /* The model has more key-value pairs than the database. */
         if (model_cursor.has_next())
             throw verify_exception("There are still more key-value pairs in the model.");
+
+        /*
+         * Only do the verify if all the tests have passed. Make sure all cursors are closed before
+         * calling verify to avoid EBUSY. We don't need to tolerate non-fatal errors for the final
+         * step.
+         *
+         * FIXME-WT-15619 and FIXME-WT-15618: The disaggregated check should go away once it's
+         * ready.
+         */
+        if (!_table.is_disaggregated()) {
+            ret = session->verify(session, uri.c_str(), "strict");
+            if (ret == EBUSY) {
+                std::cerr << "Warning: Table " << uri << " verify is skipped because of EBUSY"
+                          << std::endl;
+                ret = 0;
+            }
+            if (ret != 0)
+                throw wiredtiger_exception(session, ret);
+        }
+
     } catch (std::exception &e) {
         if (_verbose)
             std::cerr << "Verification Failed: " << e.what() << std::endl;

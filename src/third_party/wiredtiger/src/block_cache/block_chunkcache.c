@@ -579,8 +579,9 @@ __chunkcache_eviction_thread(void *arg)
     chunkcache = &S2C(session)->chunkcache;
 
     while (!F_ISSET(chunkcache, WT_CHUNK_CACHE_EXITING)) {
+        uint64_t bytes_used = __wt_tsan_suppress_load_uint64(&chunkcache->bytes_used);
         /* Do not evict if we are not close to exceeding capacity. */
-        if ((chunkcache->bytes_used + chunkcache->chunk_size) <
+        if ((bytes_used + chunkcache->chunk_size) <
           chunkcache->evict_trigger * chunkcache->capacity / 100) {
             __wt_sleep(1, 0);
             continue;

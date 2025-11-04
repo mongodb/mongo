@@ -105,6 +105,12 @@ public:
     }
 
     /*
+     * kv_table::is_disaggregated --
+     *     Check whether the database is disaggregated.
+     */
+    bool is_disaggregated() const noexcept;
+
+    /*
      * kv_table::set_key_value_format --
      *     Set the key and value format of the table. This is not actually used by the model itself,
      *     but it is useful when interacting with WiredTiger.

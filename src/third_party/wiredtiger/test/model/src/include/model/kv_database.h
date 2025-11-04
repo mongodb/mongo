@@ -272,6 +272,16 @@ public:
       txn_id_t do_not_exclude = k_txn_none, bool is_checkpoint = false);
 
     /*
+     * kv_database::is_disaggregated --
+     *     Check whether the database is disaggregated.
+     */
+    inline bool
+    is_disaggregated() const noexcept
+    {
+        return _config.disaggregated;
+    }
+
+    /*
      * kv_database::crash --
      *     Simulate crashing the database.
      */

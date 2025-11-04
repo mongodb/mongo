@@ -796,17 +796,12 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
     /*
      * Configure scrub - which reinstates clean equivalents of reconciled dirty pages. This is
      * useful because an evicted dirty page isn't necessarily a good proxy for knowing if the page
-     * will be accessed again soon. Be more aggressive about scrubbing in disaggregated storage
-     * because the cost of retrieving a recently reconciled page is higher in that configuration. In
-     * the local storage case scrub dirty pages and keep them in cache if we are less than half way
-     * to the clean, dirty and updates triggers.
+     * will be accessed again soon.
      *
      * There's an experimental flag WT_CACHE_PREFER_SCRUB_EVICTION that can be turned on to enable
      * scrub eviction as long as cache usage overall is under half way to the trigger limit.
      */
-    if (__wt_conn_is_disagg(session) && bytes_inuse < (uint64_t)(trigger * bytes_max) / 100)
-        LF_SET(WT_EVICT_CACHE_SCRUB);
-    else if (bytes_inuse < (uint64_t)((target + trigger) * bytes_max) / 200) {
+    if (bytes_inuse < (uint64_t)((target + trigger) * bytes_max) / 200) {
         if (F_ISSET_ATOMIC_32(
               &(conn->cache->cache_eviction_controls), WT_CACHE_PREFER_SCRUB_EVICTION)) {
             LF_SET(WT_EVICT_CACHE_SCRUB);

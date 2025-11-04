@@ -25,7 +25,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-import argparse, os, subprocess
+import argparse, os, sys, subprocess
 import re
 # The script will look through all tsan logs from the current directory
 # and collect all the warnings the found under tsan logs.
@@ -132,6 +132,7 @@ def main():
             print("\n".join(warning_lines))
             print("=" * 150)
         print(f"Overall TSAN Warnings: {len(tsan_warnings_dict)}")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

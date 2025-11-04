@@ -74,6 +74,7 @@ race:__wt_page_alloc
 race:__wt_page_modify_alloc
 race:__wt_upd_alloc
 race:__sweep_discard_trees
+race:__wt_conn_dhandle_alloc
 
 # FIXME-WT-15770 Fix python testing non-disagg TSAN warnings
 race:__wt_row_modify

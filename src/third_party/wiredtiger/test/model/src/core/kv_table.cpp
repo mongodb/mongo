@@ -58,6 +58,16 @@ kv_table::type_by_key_value_format(const std::string &key_format, const std::str
 }
 
 /*
+ * kv_table::is_disaggregated --
+ *     Check whether the table is disaggregated.
+ */
+bool
+kv_table::is_disaggregated() const noexcept
+{
+    return _database.is_disaggregated();
+}
+
+/*
  * kv_table::contains_any --
  *     Check whether the table contains the given key-value pair. If there are multiple values
  *     associated with the given timestamp, return true if any of them match.

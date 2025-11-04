@@ -208,10 +208,11 @@ __txn_apply_prepare_state_update(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool 
          * TODO: we can remove the prepare locked state once we separate the prepared timestamp and
          * commit timestamp.
          */
-        upd->prepare_state = WT_PREPARE_LOCKED;
+        __wt_tsan_suppress_store_uint8_v(&upd->prepare_state, WT_PREPARE_LOCKED);
         WT_RELEASE_BARRIER();
-        upd->upd_start_ts = txn->commit_timestamp;
-        upd->upd_durable_ts = txn->durable_timestamp;
+        /* FIXME-WT-15884: data race around accesses to upd_start_ts and upd_durable_ts */
+        __wt_tsan_suppress_store_uint64(&upd->upd_start_ts, txn->commit_timestamp);
+        __wt_tsan_suppress_store_uint64(&upd->upd_durable_ts, txn->durable_timestamp);
         __wt_atomic_store_uint8_v_release(&upd->prepare_state, WT_PREPARE_RESOLVED);
     } else {
         /* Set prepare timestamp and id. */
@@ -1364,7 +1365,10 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
               upd->type == WT_UPDATE_STANDARD))
             return (WT_VISIBLE_TRUE);
 
-        upd_visible = __wt_txn_visible(session, upd->txnid, upd->upd_start_ts, upd->upd_durable_ts);
+        /* FIXME-WT-15884: data race around accesses to upd_start_ts and upd_durable_ts */
+        upd_visible =
+          __wt_txn_visible(session, upd->txnid, __wt_tsan_suppress_load_uint64(&upd->upd_start_ts),
+            __wt_tsan_suppress_load_uint64(&upd->upd_durable_ts));
 
         /*
          * The visibility check is only valid if the update does not change state. If the state does

@@ -384,17 +384,17 @@ enable_disagg(const char *mode)
     if (strcmp(mode, "leader") == 0) {
         g.opts.disagg_switch_mode = false;
         g.opts.disagg_mode = "leader";
-        g.opts.disagg_page_log = "palm";
+        g.opts.disagg_page_log = "palite";
     } else if (strcmp(mode, "follower") == 0) {
         g.opts.disagg_mode = "follower";
         g.opts.disagg_switch_mode = false;
-        g.opts.disagg_page_log = "palm";
+        g.opts.disagg_page_log = "palite";
     } else if (strcmp(mode, "switch") == 0) {
         g.opts.disagg_switch_mode = true;
         /* For switch mode, randomly pick initial role */
         bool disagg_leader = (__wt_random(&g.opts.extra_rnd) % 2) == 0;
         g.opts.disagg_mode = disagg_leader ? "leader" : "follower";
-        g.opts.disagg_page_log = "palm";
+        g.opts.disagg_page_log = "palite";
         printf("Switch mode: starting as %s\n", g.opts.disagg_mode);
     } else {
         fprintf(stderr, "Invalid disaggregated mode: %s\n", mode);
@@ -424,9 +424,10 @@ wt_connect(const char *config_open)
     fast_eviction = false;
 
     /*
-     * Randomly decide on the eviction rate (fast or default).
+     * Randomly decide on the eviction rate (fast or default). For disagg, skip fast eviction, as it
+     * can cause cache-stuck scenarios.
      */
-    if ((__wt_random(&g.opts.extra_rnd) % 15) % 2 == 0)
+    if ((__wt_random(&g.opts.extra_rnd) % 15) % 2 == 0 && !g.opts.disagg_storage)
         fast_eviction = true;
 
     /* Set up the basic configuration string first. */

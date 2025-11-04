@@ -753,8 +753,23 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
 
             /* The proxy cells of fast truncate pages must be handled in the above flows. */
-            WT_ASSERT_ALWAYS(session, vpack->type != WT_CELL_ADDR_DEL,
-              "Proxy cell is selected with original child image");
+            if (ref->page_del == NULL)
+                WT_ASSERT_ALWAYS(session, vpack->type != WT_CELL_ADDR_DEL,
+                  "Proxy cell is selected with original child image, vpack->type=%u, "
+                  "ref->page_del=NULL",
+                  vpack->type);
+            else {
+                char ts_string[2][WT_TS_INT_STRING_SIZE];
+                WT_ASSERT_ALWAYS(session, vpack->type != WT_CELL_ADDR_DEL,
+                  "Proxy cell is selected with original child image, vpack->type=%u, "
+                  "ref->page_del->txnid=%" PRIu64
+                  ", pg_del_durable_ts=%s, pg_del_start_ts=%s, committed=%s, selected_for_write=%s",
+                  vpack->type, ref->page_del->txnid,
+                  __wt_timestamp_to_string(ref->page_del->pg_del_durable_ts, ts_string[0]),
+                  __wt_timestamp_to_string(ref->page_del->pg_del_start_ts, ts_string[1]),
+                  ref->page_del->committed ? "true" : "false",
+                  ref->page_del->selected_for_write ? "true" : "false");
+            }
 
             if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
                 __wti_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);

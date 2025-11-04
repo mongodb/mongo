@@ -871,7 +871,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      * time and only write to the metadata.
      */
     __wt_writelock(session, &txn_global->rwlock);
-    txn_global->checkpoint_txn_shared = *txn_shared;
+    __wt_tsan_suppress_memcpy(&txn_global->checkpoint_txn_shared, txn_shared, sizeof(*txn_shared));
     __wt_atomic_store_uint64_v_relaxed(
       &txn_global->checkpoint_txn_shared.pinned_id, txn->snapshot_data.snap_min);
 

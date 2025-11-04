@@ -5523,6 +5523,11 @@ struct __wt_storage_source {
 #define WT_PAGE_LOG_LSN_MAX UINT64_MAX
 
 /*!
+ * LSN used by Server during node step up process to avoid evicting pages.
+ */
+#define WT_DISAGG_START_LSN ((uint64_t)1 << 32)
+
+/*!
  * The interface implemented by applications to provide a page log service
  * implementation.
  *
