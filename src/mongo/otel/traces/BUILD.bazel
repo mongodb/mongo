@@ -31,24 +31,150 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "tracing_enablement",
+    srcs = [
+        "tracing_enablement.cpp",
+        ":tracing_feature_flag_gen",
+    ],
+    hdrs = [
+        "tracing_enablement.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "tracing_utils",
+    srcs = [
+        "tracing_utils.cpp",
+    ],
+    hdrs = [
+        "tracing_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/opentelemetry-cpp/api",
+    ],
+)
+
+mongo_cc_library(
+    name = "tracing_initialization",
+    deps = [
+        ":tracing_initialization_base",
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                ":tracing_initialization_impl",
+            ],
+            "//conditions:default": [],
+        },
+    ),
+)
+
+mongo_cc_library(
+    name = "tracing_initialization_base",
+    srcs = [
+        ":trace_settings_gen",
+    ],
+    hdrs = [
+        "trace_initialization.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "tracing_initialization_impl",
+    srcs = [
+        "trace_initialization.cpp",
+        "tracer_provider_service.cpp",
+    ],
+    hdrs = [
+        "tracer_provider_service.h",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":tracing_initialization_base",
+        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
+        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
+        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+        "//src/third_party/opentelemetry-proto:resource_proto_cc",
+        "//src/third_party/opentelemetry-proto:trace_proto_cc",
+        "//src/third_party/protobuf",
+    ],
+)
+
+mongo_cc_library(
+    name = "span_telemetry_context",
+    srcs = [
+        "//src/mongo/otel/traces/span:span_telemetry_context_impl.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/otel/traces/span:span_telemetry_context_impl.h",
+    ],
+    deps = [
+        ":tracing_utils",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/otel:otel_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "telemetry_context_serialization",
+    deps = [
+        ":telemetry_context_serialization_header",
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                ":telemetry_context_serialization_impl",
+            ],
+            "//conditions:default": [],
+        },
+    ),
+)
+
+mongo_cc_library(
+    name = "telemetry_context_serialization_header",
+    hdrs = [
+        "telemetry_context_serialization.h",
+    ],
+    deps = [
+        "//src/mongo/otel:otel_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "telemetry_context_serialization_impl",
+    srcs = [
+        "bson_text_map_carrier.cpp",
+        "telemetry_context_serialization.cpp",
+    ],
+    hdrs = [
+        "bson_text_map_carrier.h",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":span_telemetry_context",
+        ":telemetry_context_serialization_header",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/opentelemetry-cpp/api",
+    ],
+)
+
 # This library is the base for both tracing and tracing_internal libraries. Files
 # included in this library must use ifdefs to provide no-op implementations if
 # MONGO_CONFIG_OTEL is not defined.
 mongo_cc_library(
     name = "tracing_base",
-    srcs = [
-        "tracing.cpp",
-        ":trace_settings_gen",
-        ":tracing_feature_flag_gen",
-    ],
     hdrs = [
-        "trace_initialization.h",
-        "tracing.h",
         "//src/mongo/otel/traces/span:span.h",
     ],
     deps = [
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",
     ],
 )
 
@@ -76,33 +202,18 @@ mongo_cc_library(
 mongo_cc_library(
     name = "tracing_internal",
     srcs = [
-        "bson_text_map_carrier.cpp",
-        "trace_initialization.cpp",
-        "tracer_provider_service.cpp",
-        "tracing_utils.cpp",
         "//src/mongo/otel/traces/span:span.cpp",
-        "//src/mongo/otel/traces/span:span_telemetry_context_impl.cpp",
-    ],
-    hdrs = [
-        "bson_text_map_carrier.h",
-        "tracer_provider_service.h",
-        "tracing_utils.h",
-        "//src/mongo/otel/traces/span:span_telemetry_context_impl.h",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
+        ":span_telemetry_context",
         ":tracing_base",
+        ":tracing_initialization",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
         "//src/mongo/otel:otel_base",
         "//src/third_party/opentelemetry-cpp/api",
-        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
-        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
-        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
-        "//src/third_party/opentelemetry-proto:resource_proto_cc",
-        "//src/third_party/opentelemetry-proto:trace_proto_cc",
-        "//src/third_party/protobuf",
     ],
 )
 
@@ -128,6 +239,7 @@ mongo_cc_unit_test(
     name = "tracing_test",
     srcs = [
         "bson_text_map_carrier_test.cpp",
+        "telemetry_context_serialization_test.cpp",
         "trace_initialization_test.cpp",
         "//src/mongo/otel/traces/span:span_telemetry_context_impl_test.cpp",
         "//src/mongo/otel/traces/span:span_test.cpp",
@@ -141,6 +253,7 @@ mongo_cc_unit_test(
         ":tracing",
         ":tracing_test_util",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/otel",
         "//src/third_party/opentelemetry-cpp/api",
     ],

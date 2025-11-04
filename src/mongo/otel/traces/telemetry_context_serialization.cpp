@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/idl/generic_argument_gen.h"
@@ -46,6 +46,7 @@
 
 namespace mongo {
 namespace otel {
+namespace traces {
 
 using opentelemetry::baggage::propagation::BaggagePropagator;
 using opentelemetry::context::propagation::CompositePropagator;
@@ -100,7 +101,7 @@ BSONObj TelemetryContextSerializer::appendTelemetryContext(OperationContext* opC
 
 namespace detail {
 std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson, TextMapPropagator& propagator) {
-    traces::BSONTextMapCarrier carrier{bson};
+    BSONTextMapCarrier carrier{bson};
     OtelContext context;
     context = propagator.Extract(carrier, context);
     return std::make_shared<traces::SpanTelemetryContextImpl>(std::move(context));
@@ -108,7 +109,7 @@ std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson, TextMapPropagato
 
 BSONObj toBSON(const TelemetryContext& context, TextMapPropagator& propagator) {
     try {
-        traces::BSONTextMapCarrier carrier;
+        BSONTextMapCarrier carrier;
         const auto* typedContext = dynamic_cast<const traces::SpanTelemetryContextImpl*>(&context);
         tassert(10012000, "Bad cast", typedContext);
         typedContext->propagate(propagator, carrier);
@@ -119,5 +120,6 @@ BSONObj toBSON(const TelemetryContext& context, TextMapPropagator& propagator) {
 }
 }  // namespace detail
 
+}  // namespace traces
 }  // namespace otel
 }  // namespace mongo

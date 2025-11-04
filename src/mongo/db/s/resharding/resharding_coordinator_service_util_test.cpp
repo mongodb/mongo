@@ -33,8 +33,8 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/otel/telemetry_context_serialization.h"
 #include "mongo/otel/traces/span/span.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/unittest/unittest.h"
 namespace mongo {
 namespace resharding {
@@ -290,7 +290,8 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 
     // Set a telemetry context
     auto telemetryContext = otel::traces::Span::createTelemetryContext();
-    coordinatorDoc.setTelemetryContext(otel::TelemetryContextSerializer::toBSON(telemetryContext));
+    coordinatorDoc.setTelemetryContext(
+        otel::traces::TelemetryContextSerializer::toBSON(telemetryContext));
 
     auto updateBSON = createReshardingFieldsUpdateForOriginalNss(
         opCtx.get(), coordinatorDoc, OID::gen(), Timestamp(1, 2));

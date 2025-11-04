@@ -885,7 +885,7 @@ mongo_cc_library(
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db:startup_warnings_common",
         "//src/mongo/idl:cluster_server_parameter_refresher",
-        "//src/mongo/otel",
+        "//src/mongo/otel/traces:tracing_initialization",
         "//src/mongo/transport:ingress_handshake_metrics",
         "//src/mongo/transport:service_executor",
         "//src/mongo/transport:session_manager",

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/otel/telemetry_context_holder.h"
@@ -44,6 +44,7 @@
 
 namespace mongo {
 namespace otel {
+namespace traces {
 namespace {
 
 using DefaultSpan = opentelemetry::trace::DefaultSpan;
@@ -154,5 +155,6 @@ TEST_F(TelemetryContextSerializationTest,
 }
 
 }  // namespace
+}  // namespace traces
 }  // namespace otel
 }  // namespace mongo

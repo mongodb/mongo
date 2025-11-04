@@ -43,7 +43,7 @@
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/otel/telemetry_context_holder.h"
-#include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/message.h"

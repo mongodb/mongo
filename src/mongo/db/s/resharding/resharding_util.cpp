@@ -67,7 +67,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/otel/telemetry_context_holder.h"
-#include "mongo/otel/telemetry_context_serialization.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -626,7 +626,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     auto& telemetryContextHolder = otel::TelemetryContextHolder::get(opCtx);
     if (telemetryContextHolder.get()) {
         auto telemetryCtxBSON =
-            otel::TelemetryContextSerializer::toBSON(telemetryContextHolder.get());
+            otel::traces::TelemetryContextSerializer::toBSON(telemetryContextHolder.get());
         coordinatorDoc.setTelemetryContext(telemetryCtxBSON);
     }
     return coordinatorDoc;

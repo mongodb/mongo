@@ -55,8 +55,8 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/telemetry_context_holder.h"
-#include "mongo/otel/telemetry_context_serialization.h"
 #include "mongo/otel/traces/span/span.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -474,7 +474,7 @@ TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocContainsTelemetryContextFromO
         operationContext(), configsvrReshardCollection, collEntry, nss(), true);
     ASSERT_TRUE(coordinatorDoc.getTelemetryContext().has_value());
     ASSERT_BSONOBJ_EQ(coordinatorDoc.getTelemetryContext().value(),
-                      otel::TelemetryContextSerializer::toBSON(telemetryCtx));
+                      otel::traces::TelemetryContextSerializer::toBSON(telemetryCtx));
 }
 
 TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocDoesNotContainTelemetryContextWhenNotSet) {

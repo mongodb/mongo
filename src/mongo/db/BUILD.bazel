@@ -3268,8 +3268,7 @@ mongo_cc_library(
         "//src/mongo/db/ttl:ttl_d",
         "//src/mongo/db/update:update_driver",
         "//src/mongo/otel/metrics:otel_metrics",
-        "//src/mongo/otel",
-        "//src/mongo/otel/traces:tracing",
+        "//src/mongo/otel/traces:tracing_initialization",
         "update_index_data",
     ] + select({
         "//bazel/config:use_tracing_profiler_enabled": [

@@ -41,8 +41,6 @@ namespace otel {
 using OtelStringView = opentelemetry::nostd::string_view;
 using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
 
-bool isTracingEnabled(OperationContext* opCtx);
-
 OtelStringView asOtelStringView(StringData data);
 StringData asStringData(OtelStringView view);
 
