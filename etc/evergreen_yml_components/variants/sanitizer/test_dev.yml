@@ -290,8 +290,8 @@ buildvariants:
       multiversion_edition: enterprise
       multiversion_architecture: aarch64
       repo_edition: enterprise
-      large_distro_name: amazon2023-arm64-atlas-latest-m8g-8xlarge
-      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-8xlarge
+      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-8xlarge
       bazel_compile_flags: >-
         --config=dbg_aubsan
         --opt=on
