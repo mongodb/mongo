@@ -63,3 +63,28 @@ def is_third_party_idl(idl_path: str) -> bool:
             return True
 
     return False
+
+
+def get_all_feature_flags(idl_dirs: List[str] = None):
+    """Generate a dict of all feature flags with their default value."""
+    default_idl_dirs = ["src", "buildscripts"]
+
+    if not idl_dirs:
+        idl_dirs = default_idl_dirs
+
+    all_flags = {}
+    for idl_dir in idl_dirs:
+        for idl_path in sorted(list_idls(idl_dir)):
+            if is_third_party_idl(idl_path):
+                continue
+            # Most IDL files do not contain feature flags.
+            # We can discard these quickly without expensive YAML parsing.
+            with open(idl_path) as idl_file:
+                if "feature_flags" not in idl_file.read():
+                    continue
+            with open(idl_path) as idl_file:
+                doc = parser.parse_file(idl_file, idl_path)
+            for feature_flag in doc.spec.feature_flags:
+                all_flags[feature_flag.name] = feature_flag
+
+    return all_flags

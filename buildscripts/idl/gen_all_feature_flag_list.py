@@ -41,37 +41,12 @@ import yaml
 sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../..")))
 
 from buildscripts.idl import lib
-from buildscripts.idl.idl import binder, parser
-
-
-def get_all_feature_flags(idl_dirs: List[str] = None):
-    """Generate a dict of all feature flags with their default value."""
-    default_idl_dirs = ["src", "buildscripts"]
-
-    if not idl_dirs:
-        idl_dirs = default_idl_dirs
-
-    all_flags = {}
-    for idl_dir in idl_dirs:
-        for idl_path in sorted(lib.list_idls(idl_dir)):
-            if lib.is_third_party_idl(idl_path):
-                continue
-            # Most IDL files do not contain feature flags.
-            # We can discard these quickly without expensive YAML parsing.
-            with open(idl_path) as idl_file:
-                if "feature_flags" not in idl_file.read():
-                    continue
-            with open(idl_path) as idl_file:
-                doc = parser.parse_file(idl_file, idl_path)
-            for feature_flag in doc.spec.feature_flags:
-                all_flags[feature_flag.name] = feature_flag
-
-    return all_flags
+from buildscripts.idl.idl import binder
 
 
 def get_all_feature_flags_turned_on_by_default(idl_dirs: List[str] = None):
     """Generate a list of all feature flags that default to true."""
-    all_flags = get_all_feature_flags(idl_dirs)
+    all_flags = lib.get_all_feature_flags(idl_dirs)
 
     return [
         name for name, flag in all_flags.items() if binder.is_feature_flag_enabled_by_default(flag)
@@ -80,7 +55,7 @@ def get_all_feature_flags_turned_on_by_default(idl_dirs: List[str] = None):
 
 def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
     """Generate a list of all feature flags that default to false."""
-    all_flags = get_all_feature_flags(idl_dirs)
+    all_flags = lib.get_all_feature_flags(idl_dirs)
     all_default_false_flags = [
         name
         for name, flag in all_flags.items()
@@ -97,7 +72,7 @@ def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
 
 def get_all_unreleased_ifr_feature_flags(idl_dirs: List[str] = None):
     """Generate a list of all features flags in the 'in_development' incremental rollout phase."""
-    all_flags = get_all_feature_flags(idl_dirs)
+    all_flags = lib.get_all_feature_flags(idl_dirs)
 
     return [
         name
@@ -135,7 +110,7 @@ def feature_flag_status():
     """Generate lists of all default-enabled feature flags, all default-disabled feature flags and
     all 'in_development' IFR feature flags, with each list on its own line
     """
-    all_flags = get_all_feature_flags()
+    all_flags = lib.get_all_feature_flags()
 
     default_enabled_flags = [
         name for name, flag in all_flags.items() if binder.is_feature_flag_enabled_by_default(flag)
