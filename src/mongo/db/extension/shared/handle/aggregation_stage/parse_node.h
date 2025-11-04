@@ -38,6 +38,7 @@
 namespace mongo::extension {
 
 class AggStageParseNodeHandle;
+
 /**
  * Represents the possible types of nodes created during expansion, as owned handles.
  *

@@ -627,12 +627,23 @@ typedef struct MongoExtensionHostServicesVTable {
      * called when the user made an error.
      */
     MongoExtensionStatus* (*user_asserted)(MongoExtensionByteView structuredErrorMessage);
+
     /**
      * Like user_asserted, but with a deferred-fatality tripwire that gets checked prior to normal
      * shutdown. Used to ensure that this assertion will both fail the operation and also cause a
      * test suite failure.
      */
     MongoExtensionStatus* (*tripwire_asserted)(MongoExtensionByteView structuredErrorMessage);
+
+    /*
+     * Creates a host-defined parse node. Use this function when you need to instantiate a parse
+     * node implemented by the host during extension parse node expansion.
+     *
+     * 'bsonSpec' is a view on the BSON specification of the host aggregation stage and is owned by
+     * the caller. The out-parameter 'node' pointer remains owned by the host.
+     */
+    MongoExtensionStatus* (*create_host_agg_stage_parse_node)(
+        MongoExtensionByteView bsonSpec, MongoExtensionAggStageParseNode** node);
 } MongoExtensionHostServicesVTable;
 
 /**

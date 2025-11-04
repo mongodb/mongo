@@ -73,6 +73,9 @@ void HostServicesHandle::_assertVTableConstraints(const VTable_t& vtable) const 
     sdk_tassert(11188201, "Host services' 'log_debug' is null", vtable.log_debug != nullptr);
     // Note that we intentionally do not validate tripwire_asserted here. If it wasn't valid, the
     // tripwire assert would fire and we would dereference the nullptr anyway.
+    sdk_tassert(11149304,
+                "Host services' 'create_host_agg_stage_parse_node' is null",
+                vtable.create_host_agg_stage_parse_node != nullptr);
 }
 
 }  // namespace mongo::extension::sdk

@@ -94,11 +94,9 @@ public:
     ~HostAggStageParseNode() = default;
 
     /**
-     * Gets the BSON representation of the host-defined aggregation stage stored in the underlying
-     * AggStageParseNode.
-     *
-     * The returned BSONObj is owned by the underlying AggStageParseNode. If you want the
-     * BSON to outlive this class instance, you should create your own copy.
+     * The underlying bytes are owned by this AggStageParseNode. The returned BSONObj
+     * is safe to use while either the returned BSONObj or this AggStageParseNode remains alive.
+     * If you need the bytes to outlive the parse node, call getOwned() on the returned value.
      */
     inline BSONObj getBsonSpec() const {
         return _parseNode->getBsonSpec();

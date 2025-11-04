@@ -83,6 +83,7 @@ static constexpr std::string_view kGetExpandedSizeLessName =
     "$getExpandedSizeLessThanActualExpansionSize";
 static constexpr std::string_view kGetExpandedSizeGreaterName =
     "$getExpandedSizeGreaterThanActualExpansionSize";
+static constexpr std::string_view kExpandToHostName = "$expandToHost";
 
 class AggStageTest : public unittest::Test {
 public:
@@ -255,6 +256,35 @@ public:
     }
 };
 
+class ExpandToHostParseNode : public extension::sdk::AggStageParseNode {
+public:
+    ExpandToHostParseNode() : extension::sdk::AggStageParseNode(kExpandToHostName) {}
+
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        std::vector<mongo::extension::VariantNodeHandle> expanded;
+        auto spec = BSON(stringViewToStringData(kExpandToHostName) << BSONObj());
+        expanded.emplace_back(
+            extension::sdk::HostServicesHandle::getHostServices()->createHostAggStageParseNode(
+                spec));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+        return std::make_unique<ExpandToHostParseNode>();
+    }
+};
+
+
 class NameMismatchParseNode : public sdk::AggStageParseNode {
 public:
     NameMismatchParseNode() : sdk::AggStageParseNode("$nameB") {}
@@ -357,6 +387,22 @@ TEST_F(AggStageTest, NestedExpansionSucceedsTest) {
 
     const auto& nestedAstHandle = asAst(nestedExpanded[0]);
     ASSERT_EQ(nestedAstHandle.getName(), stringViewToStringData(kCountingName));
+}
+
+TEST_F(AggStageTest, ExpansionToHostParseNodeSucceeds) {
+    auto expandToHostParseNode =
+        std::make_unique<ExtensionAggStageParseNode>(ExpandToHostParseNode::make());
+
+    // Transfer ownership from the SDK-style unique_ptr to the OwnedHandle.
+    auto handle = extension::AggStageParseNodeHandle{expandToHostParseNode.release()};
+
+    auto expanded = handle.expand();
+    ASSERT_EQUALS(expanded.size(), 1);
+
+    ASSERT_TRUE(std::holds_alternative<extension::AggStageParseNodeHandle>(expanded[0]));
+
+    const auto& expandHandle = asParse(expanded[0]);
+    ASSERT_EQUALS(expandHandle.getName(), stringViewToStringData(kExpandToHostName));
 }
 
 TEST_F(AggStageTest, HandlesPreventMemoryLeaksOnSuccess) {

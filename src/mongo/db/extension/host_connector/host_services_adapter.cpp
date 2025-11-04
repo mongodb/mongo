@@ -28,6 +28,7 @@
  */
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
 
+#include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/public/extension_error_types_gen.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -146,6 +147,16 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
         // Call the host's tassert implementation.
         tasserted(exceptionInfo.getErrorCode(),
                   "Extension encountered error: " + exceptionInfo.getMessage());
+    });
+}
+
+::MongoExtensionStatus* HostServicesAdapter::_extCreateHostAggStageParseNode(
+    ::MongoExtensionByteView spec, ::MongoExtensionAggStageParseNode** node) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        *node = nullptr;
+        auto parseNode = std::make_unique<host::AggStageParseNode>(bsonObjFromByteView(spec));
+        *node = static_cast<::MongoExtensionAggStageParseNode*>(
+            new host::HostAggStageParseNode(std::move(parseNode)));
     });
 }
 }  // namespace mongo::extension::host_connector

@@ -63,7 +63,14 @@ private:
     static ::MongoExtensionStatus* _extTripwireAsserted(
         ::MongoExtensionByteView structuredErrorMessage);
 
+    static MongoExtensionStatus* _extCreateHostAggStageParseNode(
+        ::MongoExtensionByteView spec, ::MongoExtensionAggStageParseNode** node) noexcept;
+
     static constexpr ::MongoExtensionHostServicesVTable VTABLE{
-        &_extLog, &_extLogDebug, &_extUserAsserted, &_extTripwireAsserted};
+        .log = &_extLog,
+        .log_debug = &_extLogDebug,
+        .user_asserted = &_extUserAsserted,
+        .tripwire_asserted = &_extTripwireAsserted,
+        .create_host_agg_stage_parse_node = &_extCreateHostAggStageParseNode};
 };
 }  // namespace mongo::extension::host_connector

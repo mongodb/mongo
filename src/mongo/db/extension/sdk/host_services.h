@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
@@ -70,6 +71,7 @@ public:
         assertValid();
         return vtable().user_asserted(structuredErrorMessage);
     }
+
     ::MongoExtensionStatus* tripwireAsserted(::MongoExtensionByteView structuredErrorMessage) {
         assertValid();
         return vtable().tripwire_asserted(structuredErrorMessage);
@@ -105,6 +107,14 @@ public:
      */
     static void setHostServices(const ::MongoExtensionHostServices* services) {
         _hostServices = HostServicesHandle(services);
+    }
+
+    AggStageParseNodeHandle createHostAggStageParseNode(BSONObj spec) const {
+        ::MongoExtensionAggStageParseNode* result = nullptr;
+        invokeCAndConvertStatusToException([&] {
+            return vtable().create_host_agg_stage_parse_node(objAsByteView(spec), &result);
+        });
+        return AggStageParseNodeHandle{result};
     }
 
 private:
