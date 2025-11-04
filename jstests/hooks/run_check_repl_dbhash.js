@@ -25,6 +25,10 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     let skipped = false;
     try {
         const conn = db.getMongo();
+        assert.soon(
+            () => assert.commandWorked(conn.adminCommand({ping: 1})),
+            "failed to connect to server when starting runCheckReplDBHash",
+        );
         const topology = DiscoverTopology.findConnectedNodes(conn);
 
         if (topology.type === Topology.kStandalone) {
