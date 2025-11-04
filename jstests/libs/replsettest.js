@@ -68,6 +68,8 @@ export class ReplSetTest {
      *     ShardingTest, the seed is generated as part of ShardingTest.
      * @param {boolean} [opts.useAutoBootstrapProcedure] If true, follow the procedure for
      *     auto-bootstrapped replica sets.
+     * @param {boolean} [opts.useMaintenancePorts=false] If true, then a maintenance port will be
+     *     opened for each node in the replica set.
      * @param {number} [opts.timeoutMS] Timeout value in milliseconds.
      */
     constructor(opts) {
@@ -304,6 +306,14 @@ export class ReplSetTest {
     getPort(n) {
         var n = this.getNodeId(n);
         return this.ports[n];
+    }
+
+    getMaintenancePort(n) {
+        const translatedN = this.getNodeId(n);
+        if (this._maintenancePorts?.[translatedN] < 1) {
+            throw new Error("Maintenance port not set for node");
+        }
+        return this._maintenancePorts[translatedN];
     }
 
     getDbPath(node) {
@@ -1007,6 +1017,10 @@ export class ReplSetTest {
             this._unbridgedPorts.push(this._allocatePortForBridge());
         }
 
+        if (this._useMaintenancePorts) {
+            this._maintenancePorts.push(this._allocatePortForNode());
+        }
+
         if (jsTestOptions().shellGRPC) {
             const nextPort = this._allocatePortForNode();
             jsTest.log.info("ReplSetTest Next gRPC port: " + nextPort);
@@ -1035,6 +1049,10 @@ export class ReplSetTest {
         if (this._useBridge) {
             this._unbridgedPorts.splice(nodeId, 1);
             this._unbridgedNodes.splice(nodeId, 1);
+        }
+
+        if (this._maintenancePorts) {
+            this._maintenancePorts.splice(nodeId, 1);
         }
     }
 
@@ -2793,6 +2811,9 @@ export class ReplSetTest {
             port: this._useBridge ? this._unbridgedPorts[n] : this.ports[n],
             dbpath: "$set-$node",
         };
+        if (this._maintenancePorts?.[n] > 0) {
+            defaults.maintenancePort = this._maintenancePorts[n];
+        }
         if (jsTestOptions().shellGRPC) {
             defaults.grpcPort = this.grpcPorts[n];
         }
@@ -3537,6 +3558,11 @@ function _constructStartNewInstances(rst, opts) {
 
     rst._bridgeOptions = opts.bridgeOptions || {};
 
+    rst._useMaintenancePorts = opts.useMaintenancePorts ?? false;
+    if (rst._useMaintenancePorts) {
+        assert(!rst._useBridge, "useMaintenancePorts is not supported when using MongoBridge.");
+    }
+
     rst._causalConsistency = opts.causallyConsistent || false;
 
     rst._configSettings = opts.settings || false;
@@ -3618,6 +3644,9 @@ function _constructStartNewInstances(rst, opts) {
         rst._unbridgedNodes = [];
     } else {
         rst.ports = opts.ports || Array.from({length: numNodes}, rst._allocatePortForNode);
+        if (rst._useMaintenancePorts) {
+            rst._maintenancePorts = Array.from({length: numNodes}, rst._allocatePortForNode);
+        }
     }
 
     for (let i = 0; i < numNodes; i++) {
@@ -3628,6 +3657,12 @@ function _constructStartNewInstances(rst, opts) {
             } else {
                 rst.ports[i] = nodeOpts.port;
             }
+        }
+        if (nodeOpts?.hasOwnProperty("maintenancePort")) {
+            if (!rst._maintenancePorts) {
+                rst._maintenancePorts = Array(numNodes).fill(-1);
+            }
+            rst._maintenancePorts[i] = nodeOpts.maintenancePort;
         }
     }
 

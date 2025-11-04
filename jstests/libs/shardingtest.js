@@ -929,6 +929,8 @@ export class ShardingTest {
      * @property {Object} [bridgeOptions={}] Options to apply to all mongobridge processes.
      * @property {Object} [rsOptions] Same as the `rs` parameter to ShardingTest constructor. Can be
      * used to specify options that are common all replica members.
+     * @property {boolean} [useMaintenancePorts=false] If true, then a maintenance port will be
+     * specified for each node in the cluster.
      *
      * // replica Set only:
      * @property {boolean} [useHostname] if true, use hostname of machine, otherwise use localhost
@@ -1116,6 +1118,7 @@ export class ShardingTest {
         otherParams.useBridge = otherParams.useBridge || false;
         otherParams.bridgeOptions = otherParams.bridgeOptions || {};
         otherParams.causallyConsistent = otherParams.causallyConsistent || false;
+        otherParams.useMaintenancePorts = otherParams.useMaintenancePorts ?? false;
 
         if (jsTestOptions().networkMessageCompressors) {
             otherParams.bridgeOptions["networkMessageCompressors"] =
@@ -1142,6 +1145,7 @@ export class ShardingTest {
                 "useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.",
             );
         }
+        this._useMaintenancePorts = otherParams.useMaintenancePorts;
 
         this._unbridgedMongos = [];
         let _allocatePortForMongos;
@@ -1221,6 +1225,7 @@ export class ShardingTest {
                     host: hostName,
                     useBridge: otherParams.useBridge,
                     bridgeOptions: otherParams.bridgeOptions,
+                    useMaintenancePorts: otherParams.useMaintenancePorts,
                     keyFile: this.keyFile,
                     waitForKeys: false,
                     name: testName + "-configRS",
@@ -1359,6 +1364,7 @@ export class ShardingTest {
                     useHostName: otherParams.useHostname,
                     useBridge: otherParams.useBridge,
                     bridgeOptions: otherParams.bridgeOptions,
+                    useMaintenancePorts: otherParams.useMaintenancePorts,
                     keyFile: this.keyFile,
                     protocolVersion: protocolVersion,
                     waitForKeys: false,
@@ -1643,6 +1649,9 @@ export class ShardingTest {
                 }
 
                 options.port = options.port || _allocatePortForMongos();
+                if (this._useMaintenancePorts || options.hasOwnProperty("maintenancePort")) {
+                    options.maintenancePort = options.hasOwnProperty("maintenancePort") ? options.maintenancePort : _allocatePortForMongos();
+                }
                 if (jsTestOptions().shellGRPC) {
                     options.grpcPort = options.grpcPort || _allocatePortForMongos();
                 }
