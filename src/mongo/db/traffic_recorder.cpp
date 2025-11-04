@@ -146,7 +146,10 @@ TrafficRecorder::Recording::Recording(const StartTrafficRecording& options,
 
 void TrafficRecorder::Recording::start() {
     _started.store(true);
-    _trafficStats.setRunning(true);
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _trafficStats.setRunning(true);
+    }
     startTime.store(_tickSource->ticksTo<Microseconds>(_tickSource->getTicks()));
     _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
         if (!boost::filesystem::is_directory(boost::filesystem::absolute(_path))) {
