@@ -29,6 +29,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/version_context.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -69,6 +70,293 @@ DEATH_TEST_F(VersionContextDecorationTest,
              "Refusing to set a VersionContext on an operation that already has one") {
     VersionContext::ScopedSetDecoration scopedVCtx(opCtx, kLastLTSVersionContext);
     VersionContext::ScopedSetDecoration(opCtx, kLastLTSVersionContext);
+}
+
+
+class VersionContextDrainTest : public ServiceContextTest {
+public:
+    // We need to hold both the client and the operation context in scope in order for the OFCV to
+    // be in use
+    using ScopedHoldOperation =
+        std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>;
+
+    const VersionContext kStaleVersion{kLatestVersionContext};
+    const VersionContext kCurrentVersion{kLastLTSVersionContext};
+
+    auto makeClient(std::string desc = "client") {
+        return getServiceContext()->getService()->makeClient(desc, nullptr /* session */);
+    }
+
+    [[nodiscard]] ScopedHoldOperation getRunningOperationWithStaleOfcv() {
+        auto client = makeClient("clientWithStaleOFCV");
+        auto opCtx = client->makeOperationContext();
+
+        {
+            ClientLock lk(opCtx->getClient());
+            VersionContext::setDecoration(lk, opCtx.get(), kStaleVersion);
+        }
+
+        return {std::move(client), std::move(opCtx)};
+    }
+
+    [[nodiscard]] ScopedHoldOperation getRunningOperationWithCurrentOrWithoutOfcv() {
+        auto client = makeClient("clientWithoutStaleOFCV");
+        auto opCtx = client->makeOperationContext();
+
+        if (SecureRandom().nextInt64() % 2) {
+            ClientLock lk(opCtx->getClient());
+            VersionContext::setDecoration(lk, opCtx.get(), kCurrentVersion);
+        }
+
+        return {std::move(client), std::move(opCtx)};
+    }
+
+    VersionContextDrainTest() : _client(makeClient("VersionContextDrainTest")) {
+        _uniqueOpCtx = _client->makeOperationContext();
+    }
+
+    OperationContext* operationContext() {
+        return _uniqueOpCtx.get();
+    }
+
+private:
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _uniqueOpCtx;
+};
+
+TEST_F(VersionContextDrainTest, NoOperationAtAll) {
+    waitForOperationsNotMatchingVersionContextToComplete(operationContext(), kCurrentVersion);
+    waitForOperationsNotMatchingVersionContextToComplete(
+        operationContext(), kCurrentVersion, Date_t::now());
+}
+
+TEST_F(VersionContextDrainTest, NoOperationToWaitOn) {
+    auto client = makeClient();
+    auto opCtx = client->makeOperationContext();
+    {
+        ClientLock lk(opCtx->getClient());
+        VersionContext::setDecoration(lk, opCtx.get(), kCurrentVersion);
+    }
+
+    waitForOperationsNotMatchingVersionContextToComplete(operationContext(), kCurrentVersion);
+    waitForOperationsNotMatchingVersionContextToComplete(
+        operationContext(), kCurrentVersion, Date_t::now());
+}
+
+TEST_F(VersionContextDrainTest, NoWaitOnKilledOperation) {
+    auto client = makeClient();
+    auto opCtx = client->makeOperationContext();
+    {
+        ClientLock lk(opCtx->getClient());
+        VersionContext::setDecoration(lk, opCtx.get(), kStaleVersion);
+    }
+    opCtx->markKilled(ErrorCodes::Interrupted);
+
+    waitForOperationsNotMatchingVersionContextToComplete(operationContext(), kCurrentVersion);
+}
+
+TEST_F(VersionContextDrainTest, OneOperationToWaitOn) {
+    SharedPromise<void> operationWithStaleVersionInitialized;
+    SharedPromise<void> drainOperationWithStaleVersion;
+
+    unittest::JoinThread threadOpWithStaleOFCV([&] {
+        auto holdClientAndOpctx = getRunningOperationWithStaleOfcv();
+        // Signal that the operation with stale OFCV has been initialized
+        operationWithStaleVersionInitialized.emplaceValue();
+        // Wait for signal to drain operations
+        drainOperationWithStaleVersion.getFuture().get();
+    });
+
+    // Wait for `threadOpWithStaleOFCV` to finish initializing the operation with stale OFCV
+    operationWithStaleVersionInitialized.getFuture().get();
+
+    unittest::JoinThread asyncWaitForOpToDrain([&] {
+        // All possible interleavings will be covered by multiple test runs since this
+        // async wait may start before/during/after drain.
+        auto client = makeClient("asyncWaitForOpsToDrain");
+        auto opCtx = client->makeOperationContext();
+        waitForOperationsNotMatchingVersionContextToComplete(opCtx.get(), kCurrentVersion);
+    });
+
+    // Also initialize an opCtx that should NOT be drained, it should not influence the wait
+    auto client = makeClient();
+    auto opCtx = client->makeOperationContext();
+    ASSERT_THROWS_CODE(waitForOperationsNotMatchingVersionContextToComplete(
+                           operationContext(), kCurrentVersion, Date_t::now() + Milliseconds(50)),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
+
+    // Signal thread that the operation with stale OFCV can drain
+    drainOperationWithStaleVersion.emplaceValue();
+    auto ignoredOpWithoutStaleOfcv = getRunningOperationWithCurrentOrWithoutOfcv();
+    waitForOperationsNotMatchingVersionContextToComplete(operationContext(), kCurrentVersion);
+}
+
+/**
+ * Reduce the internal recheck interval to 10ms, then wait for an operation to drain requiring at
+ * least 100ms. Regression test to make sure internal retries don't throw.
+ */
+TEST_F(VersionContextDrainTest, LowerRecheckOperationContextsInterval) {
+    auto failPoint = globalFailPointRegistry().find("reduceWaitForOfcvInternalIntervalTo10Ms");
+    failPoint->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([failPoint]() { failPoint->setMode(FailPoint::off); });
+
+    SharedPromise<void> operationWithStaleVersionInitialized;
+    SharedPromise<void> startWaitingForOperationsToDrain;
+    SharedPromise<void> drainOperationWithStaleVersion;
+
+    unittest::JoinThread threadOpWithStaleOFCV([&] {
+        auto holdClientAndOpctx = getRunningOperationWithStaleOfcv();
+        // Signal that the operation with stale OFCV has been initialized
+        operationWithStaleVersionInitialized.emplaceValue();
+        // Wait for signal to drain operations
+        drainOperationWithStaleVersion.getFuture().get();
+    });
+
+    // Wait for `threadOpWithStaleOFCV` to finish initializing the operation with stale OFCV
+    operationWithStaleVersionInitialized.getFuture().get();
+
+    unittest::JoinThread asyncWaitForOpToDrain([&] {
+        auto client = makeClient("asyncWaitForOpsToDrain");
+        auto opCtx = client->makeOperationContext();
+        // Future not exactly ready when starting waiting, but just before
+        startWaitingForOperationsToDrain.emplaceValue();
+        waitForOperationsNotMatchingVersionContextToComplete(opCtx.get(), kCurrentVersion);
+    });
+
+    startWaitingForOperationsToDrain.getFuture().get();
+    sleepFor(Milliseconds(100));
+
+    // Signal thread that the operation with stale OFCV can drain
+    drainOperationWithStaleVersion.emplaceValue();
+}
+
+/**
+ * Checks that when an operation context releases the OFCV, the wait finishes despite the operation
+ * context being still alive.
+ */
+TEST_F(VersionContextDrainTest, OperationContextIgnoredWhenScopedOfcvReleased) {
+    auto failPoint = globalFailPointRegistry().find("reduceWaitForOfcvInternalIntervalTo10Ms");
+    failPoint->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([failPoint]() { failPoint->setMode(FailPoint::off); });
+
+    SharedPromise<void> operationWithScopedStaleOfcvInitialized;
+    SharedPromise<void> releaseScopedOfcv;
+    SharedPromise<void> drainOperationContext;
+
+    unittest::JoinThread threadOpWithScopedStaleOFCV([&] {
+        auto client = makeClient("threadOpWithStaleOFCV");
+        auto opCtx = client->makeOperationContext();
+
+        {
+            VersionContext::ScopedSetDecoration scopedSetDecoration(opCtx.get(), kStaleVersion);
+            // Signal that the operation with scoped stale OFCV has been initialized
+            operationWithScopedStaleOfcvInitialized.emplaceValue();
+            // Wait for signal to release the scoped OFCV
+            releaseScopedOfcv.getFuture().get();
+        }
+
+        // Wait before releasing the operation context
+        drainOperationContext.getFuture().get();
+    });
+
+    operationWithScopedStaleOfcvInitialized.getFuture().get();
+
+    unittest::JoinThread asyncWaitForOfcvToBeReleased([&] {
+        auto client = makeClient("asyncWaitForOpsToDrain");
+        auto opCtx = client->makeOperationContext();
+
+        // All possible interleavings will be covered by multiple test runs since this
+        // async wait may start before/during/after the scoped OFCV is released.
+        waitForOperationsNotMatchingVersionContextToComplete(opCtx.get(), kCurrentVersion);
+        drainOperationContext.emplaceValue();
+    });
+
+    // Signal thread that the operation with stale OFCV can release it
+    releaseScopedOfcv.emplaceValue();
+}
+
+TEST_F(VersionContextDrainTest, RandomNoOperationToWaitOn) {
+    std::vector<ScopedHoldOperation> ops;
+    const int nOps = SecureRandom().nextInt64() % 5;
+    for (int i = 0; i < nOps; i++) {
+        ops.emplace_back(getRunningOperationWithCurrentOrWithoutOfcv());
+    }
+
+    waitForOperationsNotMatchingVersionContextToComplete(operationContext(), kCurrentVersion);
+    waitForOperationsNotMatchingVersionContextToComplete(
+        operationContext(), kCurrentVersion, Date_t::now());
+}
+
+TEST_F(VersionContextDrainTest, RandomOperationsToWaitOn) {
+    std::vector<ScopedHoldOperation> ops;
+    const int nOps = SecureRandom().nextInt64() % 5;
+    for (int i = 0; i < nOps; i++) {
+        ops.emplace_back(getRunningOperationWithStaleOfcv());
+    }
+
+    for (int i = 0; i < nOps; i++) {
+        ASSERT_THROWS_CODE(waitForOperationsNotMatchingVersionContextToComplete(
+                               operationContext(), kCurrentVersion, Date_t::now()),
+                           DBException,
+                           ErrorCodes::ExceededTimeLimit);
+        ops.pop_back();
+    }
+
+    waitForOperationsNotMatchingVersionContextToComplete(
+        operationContext(), kCurrentVersion, Date_t::now());
+}
+
+TEST_F(VersionContextDrainTest, RamdomMixedOperations) {
+    std::vector<ScopedHoldOperation> ops;
+    const int nOps = SecureRandom().nextInt64() % 5;
+
+    // Random running/killed operations running with or without stale OFCV
+    int nRunningOpsStaleOfcv = 0;
+    for (int i = 0; i < nOps; i++) {
+        bool opWithStaleOfcv = SecureRandom().nextInt64() % 2;
+        bool killedOp = SecureRandom().nextInt64() % 2;
+
+        if (opWithStaleOfcv) {
+            ops.emplace_back(getRunningOperationWithStaleOfcv());
+        } else {
+            ops.emplace_back(getRunningOperationWithCurrentOrWithoutOfcv());
+        }
+
+        if (killedOp) {
+            ops.back().second->markKilled(ErrorCodes::CursorKilled);
+        }
+
+        if (opWithStaleOfcv && !killedOp) {
+            nRunningOpsStaleOfcv++;
+        }
+    }
+
+    // Check that waiting with a deadline fails as long as at least one operation
+    // with stale OFCV is running
+    for (int i = 0; i < nOps; i++) {
+        if (nRunningOpsStaleOfcv == 0) {
+            break;
+        }
+
+        ASSERT_THROWS_CODE(waitForOperationsNotMatchingVersionContextToComplete(
+                               operationContext(), kCurrentVersion, Date_t::now()),
+                           DBException,
+                           ErrorCodes::ExceededTimeLimit);
+
+        const ScopedHoldOperation op = std::move(ops.back());
+        ops.pop_back();
+
+        OperationContext* opCtx = op.first->getOperationContext();
+        invariant(opCtx);
+
+        if (!opCtx->isKillPending() && VersionContext::getDecoration(opCtx) != kCurrentVersion) {
+            nRunningOpsStaleOfcv--;
+        }
+    }
+
+    waitForOperationsNotMatchingVersionContextToComplete(
+        operationContext(), kCurrentVersion, Date_t::now());
 }
 
 }  // namespace

@@ -186,4 +186,19 @@ inline const VersionContext kNoVersionContext{VersionContext::OutsideOperationTa
  */
 inline const VersionContext kVersionContextIgnored_UNSAFE{VersionContext::IgnoreOFCVTag{}};
 
+/**
+ * Synchronously wait for all operations associated with a stale version context to drain.
+ * It makes sense to call this function only when it is guaranteed that no new operations
+ * with a different version context can start (e.g. following an FCV transition).
+ *
+ * It does NOT wait for operations that are:
+ * - Associated with the passed in version context
+ * - Not associated with a version context at all
+ * - Associated with a stale version context, but that have been already killed
+ *
+ */
+void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCtx,
+                                                          const VersionContext& vCtx,
+                                                          Date_t deadline = Date_t::max());
+
 }  // namespace mongo

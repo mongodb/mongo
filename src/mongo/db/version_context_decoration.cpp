@@ -30,6 +30,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/version_context.h"
 
+// Override waitForOperationsNotMatchingVersionContextToComplete's internal re-check interval
+MONGO_FAIL_POINT_DEFINE(reduceWaitForOfcvInternalIntervalTo10Ms);
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 namespace mongo {
 
 static auto getVersionContext = OperationContext::declareDecoration<VersionContext>();
@@ -69,6 +73,107 @@ VersionContext::ScopedSetDecoration::ScopedSetDecoration(OperationContext* opCtx
 VersionContext::ScopedSetDecoration::~ScopedSetDecoration() {
     ClientLock lk(_opCtx->getClient());
     getVersionContext(_opCtx).resetToOperationWithoutOFCV();
+}
+
+void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCtx,
+                                                          const VersionContext& expectedVCtx,
+                                                          const Date_t deadline) {
+    auto serviceCtx = opCtx->getServiceContext();
+    invariant(serviceCtx);
+
+    auto getOperationsDrainingFutures = [&](bool firstTime) {
+        std::vector<SemiFuture<void>> futures;
+        for (ServiceContext::LockedClientsCursor cursor(serviceCtx);
+             Client* client = cursor.next();) {
+            ClientLock lk(client);
+
+            OperationContext* clientOpCtx = client->getOperationContext();
+            if (!clientOpCtx || clientOpCtx->isKillPending()) {
+                continue;
+            }
+
+            const auto& actualVCtx = VersionContext::getDecoration(clientOpCtx);
+            if (actualVCtx.isInitialized() && actualVCtx != expectedVCtx) {
+                if (firstTime) {
+                    LOGV2_DEBUG(11144500,
+                                1,
+                                "Operation running under stale FCV detected, adding to the list of "
+                                "operations to drain",
+                                "opId"_attr = clientOpCtx->getOpID(),
+                                "operationFcv"_attr = actualVCtx.toBSON(),
+                                "currentFcv"_attr = expectedVCtx.toBSON());
+                } else {
+                    LOGV2_DEBUG(11144501,
+                                3,
+                                "Still waiting for operation running under stale FCV to drain",
+                                "opId"_attr = clientOpCtx->getOpID(),
+                                "operationFcv"_attr = actualVCtx.toBSON(),
+                                "currentFcv"_attr = expectedVCtx.toBSON());
+                }
+                futures.emplace_back(clientOpCtx->getCancellationToken().onCancel());
+            }
+        }
+        return futures;
+    };
+
+    auto operationsDrainingFutures = getOperationsDrainingFutures(true /* firstTime */);
+    const int initialNumOpsWithStaleOfcv = operationsDrainingFutures.size();
+
+    LOGV2_DEBUG(11144502,
+                1,
+                "Starting waiting for operations running under stale FCV to drain",
+                "numOpsToDrain"_attr = initialNumOpsWithStaleOfcv,
+                "currentFcv"_attr = expectedVCtx.toBSON());
+
+    // This draining logic waits for the entire OperationContext to finish, rather than for the OFCV
+    // to be released. This may be problematic in case of long running operations just using the
+    // OFCV for a small duration.
+    // If draining takes more than 10 seconds, we re-scan the operation contexts to determine which
+    // ones should be still waited on.
+    while (operationsDrainingFutures.size() > 0) {
+        const auto kRecheckOFCVInterval =
+            MONGO_unlikely(reduceWaitForOfcvInternalIntervalTo10Ms.shouldFail())
+            ? Milliseconds(10)
+            : Milliseconds(10000);
+
+        const auto waitForInterval = std::min(deadline, Date_t::now() + kRecheckOFCVInterval);
+
+        try {
+            for (const auto& future : operationsDrainingFutures) {
+                opCtx->runWithDeadline(waitForInterval, ErrorCodes::ExceededTimeLimit, [&] {
+                    try {
+                        future.get(opCtx);
+                    } catch (const ExceptionFor<ErrorCodes::CallbackCanceled>&) {
+                        // The cancellation token's error is set to ErrorCodes::CallbackCanceled
+                        // when an operation successfully drains
+                    }
+                });
+            }
+
+            // All futures were successfully waited on, no need to loop again
+            break;
+        } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+            if (deadline < Date_t::now()) {
+                LOGV2_DEBUG(11144503,
+                            1,
+                            "Reached deadline while waiting for operations running under stale FCV "
+                            "to drain",
+                            "numOpsToDrain"_attr = initialNumOpsWithStaleOfcv,
+                            "currentFcv"_attr = expectedVCtx.toBSON(),
+                            "deadline"_attr = deadline);
+                throw;
+            }
+
+            // The deadline is in the future, re-compute list of futures to wait on and loop again
+            operationsDrainingFutures = getOperationsDrainingFutures(false /* firstTime */);
+        }
+    }
+
+    LOGV2_DEBUG(11144504,
+                1,
+                "Finished waiting for operations running under stale FCV to drain",
+                "numOpsToDrain"_attr = initialNumOpsWithStaleOfcv,
+                "currentFcv"_attr = expectedVCtx.toBSON());
 }
 
 }  // namespace mongo
