@@ -98,6 +98,26 @@ public:
     static void getNames(std::vector<std::string>& names);
 
     /**
+     * Sets the global maximum number of lines for newly created RamLogs.
+     */
+    static void setGlobalMaxLines(size_t maxLines);
+
+    /**
+     * Gets the global maximum number of lines for newly created RamLogs.
+     */
+    static size_t getGlobalMaxLines();
+
+    /**
+     * Sets the global maximum size in bytes for newly created RamLogs.
+     */
+    static void setGlobalMaxSizeBytes(size_t maxSizeBytes);
+
+    /**
+     * Gets the global maximum size in bytes for newly created RamLogs.
+     */
+    static size_t getGlobalMaxSizeBytes();
+
+    /**
      * Writes "str" as a line into the RamLog.  If "str" is longer than the maximum
      * line size of the log, it keeps two lines.
      *
@@ -111,14 +131,14 @@ public:
     void clear();
 
     /**
-     * Inspect maxLines setting
+     * Inspect maxLines setting.
      */
     size_t getMaxLines() const {
         return _maxLines;
     }
 
     /**
-     * Inspect maxSizeBytes setting
+     * Inspect maxSizeBytes setting.
      */
     size_t getMaxSizeBytes() const {
         return _maxSizeBytes;
@@ -135,20 +155,14 @@ private:
     void trimIfNeeded(size_t newStr);
 
     static RamLog* getImpl(const std::string& name,
-                           size_t maxLines = kMaxLines,
-                           size_t maxSizeBytes = kMaxSizeBytes);
+                           size_t maxLines = getGlobalMaxLines(),
+                           size_t maxSizeBytes = getGlobalMaxSizeBytes());
 
 private:
-    // Default maximum number of lines
-    static constexpr size_t kMaxLines = 1024;
-
-    // Default maximum capacity of RamLog of string data
-    static constexpr size_t kMaxSizeBytes = 1024 * 1024;
-
-    // Maximum number of lines
+    // Maximum number of lines.
     size_t _maxLines;
 
-    // Maximum capacity of RamLog of string data
+    // Maximum capacity of RamLog of string data.
     size_t _maxSizeBytes;
 
     // Guards all non-static data.

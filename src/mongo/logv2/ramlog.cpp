@@ -48,6 +48,9 @@ namespace {
 typedef std::map<string, RamLog*> RM;
 stdx::mutex* _namedLock = NULL;
 RM* _named = NULL;
+// TODO(SERVER-113226): Move these globals into a single structure to manage them better.
+Atomic<size_t> _globalMaxLines = 1024;
+Atomic<size_t> _globalMaxSizeBytes = 1024 * 1024;
 
 }  // namespace
 
@@ -206,6 +209,22 @@ void RamLog::getNames(std::vector<string>& names) {
             names.push_back(i->first);
         }
     }
+}
+
+void RamLog::setGlobalMaxLines(size_t maxLines) {
+    _globalMaxLines.store(maxLines);
+}
+
+void RamLog::setGlobalMaxSizeBytes(size_t maxSizeBytes) {
+    _globalMaxSizeBytes.store(maxSizeBytes);
+}
+
+size_t RamLog::getGlobalMaxLines() {
+    return _globalMaxLines.load();
+}
+
+size_t RamLog::getGlobalMaxSizeBytes() {
+    return _globalMaxSizeBytes.load();
 }
 
 /**

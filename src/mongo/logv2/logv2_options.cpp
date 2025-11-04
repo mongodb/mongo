@@ -28,6 +28,7 @@
  */
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -38,6 +39,8 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/logv2/logv2_options_gen.h"
+#include "mongo/logv2/ramlog.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <boost/optional/optional.hpp>
@@ -46,6 +49,35 @@
 
 
 namespace mongo {
+namespace {
+
+size_t getValue(const BSONElement& newValueElement, StringData tag) {
+    long long newVal;
+    bool success = newValueElement.coerce(&newVal);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Invalid value for {}: {}", tag, newValueElement.toString()),
+            success);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Value for {} must not be negative: {}", tag, newVal),
+            newVal >= 0);
+
+    return static_cast<size_t>(newVal);
+}
+
+size_t getValueFromString(StringData strVal, StringData tag) {
+    long long newVal;
+    auto status = NumberParser{}(strVal, &newVal);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("{} must be a numeric value, {} provided", tag, strVal),
+            status.isOK());
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Value for {} must not be negative: {}", tag, newVal),
+            newVal >= 0);
+
+    return static_cast<size_t>(newVal);
+}
+
+}  // namespace
 
 void RedactEncryptedFields::append(OperationContext* opCtx,
                                    BSONObjBuilder* b,
@@ -76,6 +108,50 @@ Status RedactEncryptedFields::setFromString(StringData str, const boost::optiona
                 str::stream() << "Invalid value for redactEncryptedFields: " << str};
     }
     return Status::OK();
+}
+
+void RamLogMaxLines::append(OperationContext* opCtx,
+                            BSONObjBuilder* b,
+                            StringData name,
+                            const boost::optional<TenantId>&) {
+    *b << name << static_cast<long long>(logv2::RamLog::getGlobalMaxLines());
+}
+
+Status RamLogMaxLines::set(const BSONElement& newValueElement,
+                           const boost::optional<TenantId>&) try {
+    logv2::RamLog::setGlobalMaxLines(getValue(newValueElement, "ramLogMaxLines"));
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
+Status RamLogMaxLines::setFromString(StringData str, const boost::optional<TenantId>&) try {
+    logv2::RamLog::setGlobalMaxLines(getValueFromString(str, "ramLogMaxLines"));
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
+void RamLogMaxSizeBytes::append(OperationContext* opCtx,
+                                BSONObjBuilder* b,
+                                StringData name,
+                                const boost::optional<TenantId>&) {
+    *b << name << static_cast<long long>(logv2::RamLog::getGlobalMaxSizeBytes());
+}
+
+Status RamLogMaxSizeBytes::set(const BSONElement& newValueElement,
+                               const boost::optional<TenantId>&) try {
+    logv2::RamLog::setGlobalMaxSizeBytes(getValue(newValueElement, "ramLogMaxSizeBytes"));
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
+Status RamLogMaxSizeBytes::setFromString(StringData str, const boost::optional<TenantId>&) try {
+    logv2::RamLog::setGlobalMaxSizeBytes(getValueFromString(str, "ramLogMaxSizeBytes"));
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 }  // namespace mongo
