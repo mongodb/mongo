@@ -53,6 +53,7 @@ mongo_cc_unit_test(
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/local_catalog:index_catalog_mock",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
     ],
 )

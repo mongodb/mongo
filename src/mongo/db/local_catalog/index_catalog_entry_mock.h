@@ -70,7 +70,7 @@ public:
     }
 
     IndexAccessMethod* accessMethod() const final {
-        MONGO_UNREACHABLE;
+        return nullptr;
     }
 
     void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final {

@@ -36,14 +36,6 @@ namespace mongo::join_ordering {
 
 namespace {
 
-/**
- * Represent sargable predicate that can be the RHS of an indexed nested loop join.
- */
-struct IndexedJoinPredicate {
-    QSNJoinPredicate::ComparisonOp op;
-    FieldPath field;
-};
-
 class ReorderContext {
 public:
     ReorderContext(const JoinGraph& joinGraph, const std::vector<ResolvedPath>& resolvedPaths)
@@ -117,24 +109,28 @@ private:
     const std::vector<ResolvedPath>& _resolvedPaths;
 };
 
+}  // namespace
+
 bool indexSatisfiesJoinPredicates(const IndexCatalogEntry& ice,
-                                  std::vector<IndexedJoinPredicate>& joinPreds) {
+                                  const std::vector<IndexedJoinPredicate>& joinPreds) {
     auto desc = ice.descriptor();
     if (desc->isHashedIdIndex() || desc->hidden() || desc->isPartial() || desc->isSparse() ||
         !desc->collation().isEmpty() || dynamic_cast<WildcardAccessMethod*>(ice.accessMethod())) {
         return false;
     }
-    StringDataSet indexedPaths;
-    for (auto&& elem : desc->keyPattern()) {
-        indexedPaths.insert(elem.fieldNameStringData());
-    }
-
+    StringSet joinFields;
     for (auto&& joinPred : joinPreds) {
-        if (!indexedPaths.contains(joinPred.field.fullPath())) {
-            return false;
+        joinFields.insert(joinPred.field.fullPath());
+    }
+    for (auto&& elem : desc->keyPattern()) {
+        auto it = joinFields.find(elem.fieldName());
+        if (it != joinFields.end()) {
+            joinFields.erase(it);
+        } else {
+            break;
         }
     }
-    return true;
+    return joinFields.empty();
 }
 
 boost::optional<IndexEntry> indexSatisfyingJoinPredicates(
@@ -164,8 +160,6 @@ boost::optional<IndexEntry> indexSatisfyingJoinPredicates(
     }
     return boost::none;
 }
-
-}  // namespace
 
 std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
     QuerySolutionMap solns,

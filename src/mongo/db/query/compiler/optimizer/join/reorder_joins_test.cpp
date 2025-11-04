@@ -31,6 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/index_catalog_entry_mock.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -122,7 +123,6 @@ TEST_F(ReorderGraphTest, SimpleGraph) {
         0);
     ASSERT(soln);
 
-    // TODO: invoke proper graph serialization
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
     goldenCtx.outStream() << soln->toString() << std::endl;
 }
@@ -180,7 +180,6 @@ TEST_F(ReorderGraphTest, TwoJoins) {
     ASSERT(soln);
     ASSERT(soln2);
 
-    // TODO: invoke proper graph serialization
     goldenCtx.outStream() << "Graph:\nC -- A -- B" << std::endl;
 
     // Demonstrate that different join orders are constructed with different seeds
@@ -226,7 +225,6 @@ TEST_F(ReorderGraphTest, SimpleINLJ) {
             std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
         ASSERT(soln);
 
-        // TODO: invoke proper graph serialization
         goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
         goldenCtx.outStream() << soln->toString() << std::endl;
     }
@@ -254,7 +252,6 @@ TEST_F(ReorderGraphTest, SimpleINLJ) {
             std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
         ASSERT(soln);
 
-        // TODO: invoke proper graph serialization
         goldenCtx.outStream() << "Graph:\nB -- A" << std::endl;
         goldenCtx.outStream() << soln->toString() << std::endl;
     }
@@ -317,7 +314,6 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
     ASSERT(soln);
     ASSERT(soln2);
 
-    // TODO: invoke proper graph serialization
     goldenCtx.outStream() << "Graph:\nC -- A -- B" << std::endl;
 
     // Demonstrate that different join orders are constructed with different seeds
@@ -367,9 +363,202 @@ TEST_F(ReorderGraphTest, INLJResidualPred) {
         constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
     ASSERT(soln);
 
-    // TODO: invoke proper graph serialization
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
     goldenCtx.outStream() << soln->toString() << std::endl;
+}
+
+// Probe using prefix
+TEST_F(ReorderGraphTest, INLJUseIndexPrefix) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+
+    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
+    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
+    createCollection(nss1);
+    createCollection(nss2);
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
+    // Index on {b: 1, c: 1}
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(),
+        nss2,
+        {BSON("v" << 2 << "name" << "b_1_c_1" << "key" << BSON("b" << 1 << "c" << 1))}));
+
+    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
+
+    JoinGraph graph;
+    QuerySolutionMap solnsPerQuery;
+
+    auto cq1 = makeCanonicalQuery(nss1);
+    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
+    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
+    auto cq2 = makeCanonicalQuery(nss2);
+    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
+
+    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
+
+    std::vector<ResolvedPath> resolvedPaths{
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+    };
+
+    graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
+
+    auto soln =
+        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
+    ASSERT(soln);
+
+    goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
+    goldenCtx.outStream() << soln->toString() << std::endl;
+}
+
+// Index {b: 1, c: 1} cannot be used to satisfy join predicate on c
+TEST_F(ReorderGraphTest, AvoidINLJOverIneligibleIndex) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+
+    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
+    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
+    createCollection(nss1);
+    createCollection(nss2);
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
+    // Index on {b: 1, c: 1}
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(),
+        nss2,
+        {BSON("v" << 2 << "name" << "b_1_c_1" << "key" << BSON("b" << 1 << "c" << 1))}));
+
+    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
+
+    JoinGraph graph;
+    QuerySolutionMap solnsPerQuery;
+
+    auto cq1 = makeCanonicalQuery(nss1);
+    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
+    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
+    auto cq2 = makeCanonicalQuery(nss2);
+    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
+    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"c"});
+
+    std::vector<ResolvedPath> resolvedPaths{
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
+    };
+
+    graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.c*/);
+
+    auto soln =
+        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
+    ASSERT(soln);
+
+    goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
+    goldenCtx.outStream() << soln->toString() << std::endl;
+}
+
+TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+
+    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
+    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
+    createCollection(nss1);
+    createCollection(nss2);
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
+    // Index on {c: 1, d: 1}
+    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+        operationContext(),
+        nss2,
+        {BSON("v" << 2 << "name" << "c_1_d_1" << "key" << BSON("c" << 1 << "d" << 1))}));
+
+    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
+
+    JoinGraph graph;
+    QuerySolutionMap solnsPerQuery;
+
+    auto cq1 = makeCanonicalQuery(nss1);
+    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
+    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
+    auto cq2 = makeCanonicalQuery(nss2);
+    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
+    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
+
+    std::vector<ResolvedPath> resolvedPaths{
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"d"}},
+    };
+
+    graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 2 /*b.c*/);
+    graph.addSimpleEqualityEdge(id1, id2, 1 /*b*/, 3 /*b.d*/);
+
+    auto soln =
+        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
+    ASSERT(soln);
+
+    goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
+    goldenCtx.outStream() << soln->toString() << std::endl;
+}
+
+IndexCatalogEntryMock makeIndexEntry(BSONObj indexSpec) {
+    IndexSpec spec;
+    spec.version(2).name("name").addKeys(indexSpec);
+    auto desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+    return IndexCatalogEntryMock{
+        nullptr /*opCtx*/, CollectionPtr{}, "" /*ident*/, std::move(desc), false /*isFrozen*/};
+}
+
+IndexedJoinPredicate makeIndexedPredicate(std::string path) {
+    return IndexedJoinPredicate{
+        .op = QSNJoinPredicate::ComparisonOp::Eq,
+        .field = path,
+    };
+}
+
+TEST(IndexSatisfiesJoinPredicates, CompoundIndex) {
+    ASSERT_TRUE(
+        indexSatisfiesJoinPredicates(makeIndexEntry(fromjson("{a: 1, b: 1}")),
+                                     std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a")}));
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{a: 1, b: 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("b")}));
+    // Predicates in different order than index components
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{a: 1, b: 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b"), makeIndexedPredicate("a")}));
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{a: 1, b: 1, c: 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("b")}));
+
+    // Not using prefix
+    ASSERT_FALSE(
+        indexSatisfiesJoinPredicates(makeIndexEntry(fromjson("{a: 1, b: 1}")),
+                                     std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b")}));
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{a: 1, b: 1, c: 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b"), makeIndexedPredicate("c")}));
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{a: 1, b: 1, c: 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("c")}));
+    // Not all components eligle to be probed
+    ASSERT_FALSE(
+        indexSatisfiesJoinPredicates(makeIndexEntry(fromjson("{a: 1, b: 1}")),
+                                     std::vector<IndexedJoinPredicate>{makeIndexedPredicate("c")}));
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{a: 1, b: 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("c")}));
+}
+
+TEST(IndexSatisfiesJoinPredicates, DottedPaths) {
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{'a.a': 1, 'b.b': 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a.a")}));
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{'a.a': 1, 'b.b': 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a.a"),
+                                          makeIndexedPredicate("b.b")}));
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(
+        makeIndexEntry(fromjson("{'a.a': 1, 'b.b': 1}")),
+        std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b.b")}));
 }
 
 }  // namespace mongo::join_ordering
