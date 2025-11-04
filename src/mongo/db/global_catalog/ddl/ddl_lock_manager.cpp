@@ -167,7 +167,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
     attrs.add("resource", ns);
     attrs.add("reason", reason);
     attrs.add("mode", modeName(mode));
-    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.hasOperationFCV()) {
         attrs.add("versionContext", vCtx);
     }
     LOGV2(6855301, "Acquired DDL lock", attrs);

@@ -45,7 +45,7 @@ const VersionContext& VersionContext::getDecoration(const OperationContext* opCt
 void VersionContext::setDecoration(ClientLock&,
                                    OperationContext* opCtx,
                                    const VersionContext& vCtx) {
-    tassert(9955801, "Expected incoming versionContext to be initialized", vCtx.isInitialized());
+    tassert(9955801, "Expected incoming versionContext to have an OFCV", vCtx.hasOperationFCV());
 
     // We disallow setting a VersionContext decoration multiple times on the same OperationContext,
     // even if it's the same one. There is no use case for it, and makes our implementation more
@@ -53,7 +53,7 @@ void VersionContext::setDecoration(ClientLock&,
     auto& originalVCtx = getVersionContext(opCtx);
     tassert(10296500,
             "Refusing to set a VersionContext on an operation that already has one",
-            !originalVCtx.isInitialized());
+            !originalVCtx.hasOperationFCV());
     originalVCtx = vCtx;
 }
 
@@ -93,7 +93,7 @@ void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCt
             }
 
             const auto& actualVCtx = VersionContext::getDecoration(clientOpCtx);
-            if (actualVCtx.isInitialized() && actualVCtx != expectedVCtx) {
+            if (actualVCtx.hasOperationFCV() && actualVCtx != expectedVCtx) {
                 if (firstTime) {
                     LOGV2_DEBUG(11144500,
                                 1,

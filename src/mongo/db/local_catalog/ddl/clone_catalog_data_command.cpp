@@ -197,7 +197,7 @@ public:
                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
                 WriteBlockBypass::get(newOpCtxPtr.get()).set(true);
                 // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators enabled on lastLTS
-                if (VersionContext::getDecoration(opCtx).isInitialized()) {
+                if (VersionContext::getDecoration(opCtx).hasOperationFCV()) {
                     ClientLock lk(newOpCtxPtr->getClient());
                     VersionContext::setDecoration(
                         lk, newOpCtxPtr.get(), VersionContext::getDecoration(opCtx));

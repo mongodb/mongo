@@ -91,10 +91,9 @@ public:
             FixedFCVRegion fcvRegion(opCtx);
 
             // The Operation FCV is currently propagated only for DDL operations,
-            // which cannot be nested. Therefore, the VersionContext shouldn't have
-            // been initialized yet.
+            // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
             // TODO Revisit this invariant once this workflow gets integrated into addShard.
-            invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+            invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
 
             if (const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
                 !feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(

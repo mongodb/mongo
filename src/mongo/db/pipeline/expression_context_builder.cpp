@@ -42,7 +42,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::opCtx(OperationContext* opCt
     params.opCtx = opCtx;
 
     VersionContext vCtx = VersionContext::getDecoration(opCtx);
-    if (vCtx.isInitialized()) {
+    if (vCtx.hasOperationFCV()) {
         params.vCtx = vCtx;
     } else if (auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                fcvSnapshot.isVersionInitialized()) {

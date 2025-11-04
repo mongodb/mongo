@@ -45,7 +45,7 @@ VersionContext::VersionContext(const BSONObj& bsonObject) {
 
 VersionContext& VersionContext::operator=(const VersionContext& other) {
     if (*this != other) {
-        _assertOFCVNotInitialized();
+        _assertHasNoOperationFCV();
         _metadataOrTag = other._metadataOrTag;
     }
     _canPropagateAcrossShards = other._canPropagateAcrossShards;
@@ -56,7 +56,7 @@ void VersionContext::setOperationFCV(FCV fcv) {
     if (_isMatchingOFCV(fcv)) {
         return;
     }
-    _assertOFCVNotInitialized();
+    _assertHasNoOperationFCV();
     _metadataOrTag.emplace<VersionContextMetadata>(fcv);
 }
 
@@ -65,7 +65,7 @@ void VersionContext::setOperationFCV(FCVSnapshot fcv) {
 }
 
 void VersionContext::resetToOperationWithoutOFCV() {
-    invariant(isInitialized());
+    invariant(hasOperationFCV());
     _metadataOrTag = OperationWithoutOFCVTag{};
     _canPropagateAcrossShards = false;
 }
@@ -84,10 +84,10 @@ bool VersionContext::_isMatchingOFCV(FCV fcv) const {
         std::get<VersionContextMetadata>(_metadataOrTag).getOFCV() == fcv;
 }
 
-void VersionContext::_assertOFCVNotInitialized() const {
+void VersionContext::_assertHasNoOperationFCV() const {
     uassert(ErrorCodes::AlreadyInitialized,
             "The operation FCV has already been set.",
-            !isInitialized());
+            !hasOperationFCV());
 }
 
 bool operator==(const VersionContext& lhs, const VersionContext& rhs) {

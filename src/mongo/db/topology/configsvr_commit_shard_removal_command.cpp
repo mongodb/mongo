@@ -105,9 +105,8 @@ public:
 
             boost::optional<FixedFCVRegion> fixedFCV{boost::in_place_init, opCtx};
             // The Operation FCV is currently propagated only for DDL operations,
-            // which cannot be nested. Therefore, the VersionContext shouldn't have
-            // been initialized yet.
-            invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+            // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
+            invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
 
             uassert(ErrorCodes::IllegalOperation,
                     "commitShardRemoval is not supported with the current FCV. Upgrade to the "

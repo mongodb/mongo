@@ -358,7 +358,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
             lsid->serialize(&lsidBuilder);
         }
 
-        if (auto& vCtx = VersionContext::getDecoration(clientOpCtx); vCtx.isInitialized()) {
+        if (auto& vCtx = VersionContext::getDecoration(clientOpCtx); vCtx.hasOperationFCV()) {
             infoBuilder->append("versionContext", vCtx.toBSON());
         }
 

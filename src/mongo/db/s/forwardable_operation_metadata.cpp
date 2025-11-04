@@ -72,7 +72,7 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
     }
 
     // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
-    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.hasOperationFCV()) {
         setVersionContext(VersionContext::getDecoration(opCtx));
     }
 

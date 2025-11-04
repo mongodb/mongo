@@ -74,7 +74,8 @@ public:
 
     /**
      * Sets the VersionContext decoration over the OperationContext over a given scope.
-     * At the end of the scope, the VersionContext decoration is reset to the uninitialized state.
+     * At the end of the scope, the VersionContext decoration is reset to its default state
+     * (i.e. operation without Operation FCV).
      * The Client lock over the opCtx's client is automatically taken on creation and destruction.
      */
     class ScopedSetDecoration {
@@ -108,8 +109,8 @@ public:
 
     void resetToOperationWithoutOFCV();
 
-    inline bool isInitialized() const {
-        return !std::holds_alternative<OperationWithoutOFCVTag>(_metadataOrTag);
+    inline bool hasOperationFCV() const {
+        return std::holds_alternative<VersionContextMetadata>(_metadataOrTag);
     }
 
     class Passkey {
@@ -163,7 +164,7 @@ public:
     }
 
 private:
-    void _assertOFCVNotInitialized() const;
+    void _assertHasNoOperationFCV() const;
 
     bool _isMatchingOFCV(FCV fcv) const;
 

@@ -126,7 +126,7 @@ repl::OpTime logOperation(OperationContext* opCtx,
     if (assignWallClockTime) {
         oplogEntry->setWallClockTime(getWallClockTimeForOpLog(opCtx));
     }
-    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.hasOperationFCV()) {
         if (feature_flags::gReplicateOFCVInOplog.isEnabled(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

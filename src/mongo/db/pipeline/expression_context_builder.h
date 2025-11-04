@@ -41,8 +41,8 @@ public:
     // When building an ExpressionContext, call exactly one of these 'opCtx()' overloads.
     //
     // Set the OperationContext and then initialize a VersionContext based on the OperationContext's
-    // VersionContext when it is initialized and the current global FeatureCompatibilityVersion
-    // otherwise.
+    // VersionContext when it has an operation FCV and the current global
+    // FeatureCompatibilityVersion otherwise.
     ExpressionContextBuilder& opCtx(OperationContext*);
 
     // Set the OperationContext and initialize the VersionContext without considering the

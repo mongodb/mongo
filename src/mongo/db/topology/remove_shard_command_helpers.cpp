@@ -60,9 +60,8 @@ RemoveShardProgress runCoordinatorRemoveShard(
         coordinatorDoc.setShardId(shardId);
         coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
         // The Operation FCV is currently propagated only for DDL operations,
-        // which cannot be nested. Therefore, the VersionContext shouldn't have
-        // been initialized yet.
-        invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+        // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
+        invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
         coordinatorDoc.setShouldUpdateClusterCardinality(
             replica_set_endpoint::isFeatureFlagEnabled(VersionContext::getDecoration(opCtx)));
         coordinatorDoc.setShardingDDLCoordinatorMetadata(
@@ -119,9 +118,8 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
                 LockMode::MODE_X};
             boost::optional<FixedFCVRegion> fixedFCV{boost::in_place_init, opCtx};
             // The Operation FCV is currently propagated only for DDL operations,
-            // which cannot be nested. Therefore, the VersionContext shouldn't have
-            // been initialized yet.
-            invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+            // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
+            invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
             if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
                     VersionContext::getDecoration(opCtx), (*fixedFCV)->acquireFCVSnapshot())) {
                 return runCoordinatorRemoveShard(opCtx, ddlLock, fixedFCV, shardId);
