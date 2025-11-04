@@ -38,9 +38,6 @@
 #include <string>
 
 namespace mongo {
-
-class Status;
-
 /**
  * 'CommitQuorumOptions' is used to determine when a primary should commit an index build. When the
  * specified 'quorum' of replica set members is reached, then the primary proceeds to commit the

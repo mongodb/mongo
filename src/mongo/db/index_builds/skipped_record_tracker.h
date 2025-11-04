@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -45,15 +43,9 @@
 #include <memory>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/type_traits/decay.hpp>
 
 namespace mongo {
-
-class IndexCatalogEntry;
-
 /**
  * Records keys that have violated index key constraints. The keys are backed by a temporary table
  * that is created and destroyed by this tracker.

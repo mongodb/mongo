@@ -31,9 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -42,7 +40,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

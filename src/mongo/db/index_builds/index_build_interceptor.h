@@ -29,14 +29,12 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/skipped_record_tracker.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
@@ -56,19 +54,9 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/type_traits/decay.hpp>
 
 namespace mongo {
-
-class BSONObj;
-class IndexAccessMethod;
-struct IndexBuildInfo;
-struct InsertDeleteOptions;
-class OperationContext;
-
 class IndexBuildInterceptor {
 public:
     using RetrySkippedRecordMode = SkippedRecordTracker::RetrySkippedRecordMode;

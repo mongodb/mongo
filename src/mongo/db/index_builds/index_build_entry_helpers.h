@@ -29,19 +29,11 @@
 
 #pragma once
 
-#include <vector>
+#include "mongo/db/index_builds/index_build_entry_gen.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
-
-class IndexBuildEntry;
-class CollectionPtr;
-class CommitQuorumOptions;
-class OperationContext;
-class Status;
-template <typename T>
-class StatusWith;
-class UUID;
-struct HostAndPort;
 
 /**
  * Format of IndexBuildEntry:

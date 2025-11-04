@@ -30,6 +30,7 @@
 #include "mongo/db/index/s2_key_generator.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/db/storage/storage_parameters_gen.h"

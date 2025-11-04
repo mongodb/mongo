@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/util/tick_source_mock.h"
-#include "mongo/util/time_support.h"
 
 
 namespace mongo {

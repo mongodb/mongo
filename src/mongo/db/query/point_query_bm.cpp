@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/query_bm_fixture.h"
+#include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

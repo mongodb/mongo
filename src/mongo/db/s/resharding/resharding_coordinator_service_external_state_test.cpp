@@ -38,6 +38,7 @@
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/mock_async_rpc.h"
 #include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future_util.h"
 

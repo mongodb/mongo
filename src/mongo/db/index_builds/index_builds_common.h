@@ -30,15 +30,13 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/version_context.h"
 
 #include <string>
 #include <vector>
 
 namespace mongo {
-
-class StorageEngine;
-class DatabaseName;
 
 /**
  * Encapsulates metadata fields associated with an index build.

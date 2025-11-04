@@ -40,7 +40,6 @@
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/matcher/expression.h"
@@ -48,29 +47,16 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/progress_meter.h"
 #include "mongo/util/uuid.h"
 
 #include <functional>
-#include <iosfwd>
 #include <memory>
-#include <set>
-#include <string>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class Collection;
-class CollectionPtr;
-class MatchExpression;
-class NamespaceString;
-class OperationContext;
-class ProgressMeterHolder;
-struct IndexBuildInfo;
-
 /**
  * Builds one or more indexes.
  *

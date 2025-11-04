@@ -26,22 +26,19 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/shardsvr_resolve_view_command_gen.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state_mock.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
-
-#include <boost/none.hpp>
-
 
 namespace mongo {
 namespace {

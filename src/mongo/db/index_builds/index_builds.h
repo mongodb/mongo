@@ -32,8 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/uuid.h"
 
-#include <string>
-
 namespace mongo {
 
 /**

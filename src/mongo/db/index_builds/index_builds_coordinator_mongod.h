@@ -32,7 +32,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -53,9 +52,6 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class OperationContext;
-class ServiceContext;
 
 /**
  * This implementation of the IndexBuildsCoordinator is for replica set member and standalone nodes.

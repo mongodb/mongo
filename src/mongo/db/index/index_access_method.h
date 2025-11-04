@@ -34,8 +34,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
@@ -59,18 +59,6 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class BSONObjBuilder;
-class MatchExpression;
-struct UpdateTicket;
-struct InsertDeleteOptions;
-class SortedDataIndexAccessMethod;
-struct CollectionOptions;
-
-namespace CollectionValidation {
-class ValidationOptions;
-}
-
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and
  * traversal of index entries is done. The class is designed so that the underlying index

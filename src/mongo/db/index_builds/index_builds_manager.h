@@ -48,24 +48,14 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/uuid.h"
 
-#include <functional>
 #include <map>
 #include <memory>
-#include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class Collection;
-class CollectionPtr;
-class OperationContext;
-class ServiceContext;
-struct IndexBuildInfo;
-
 enum IndexBuildRecoveryState { Building, Verifying, Committing };
 
 /**

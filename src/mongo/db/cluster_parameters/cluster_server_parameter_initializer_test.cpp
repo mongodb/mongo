@@ -38,6 +38,7 @@
 #include "mongo/db/cluster_parameters/cluster_server_parameter_test_util.h"
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/ddl/create_gen.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameter.h"
@@ -47,9 +48,6 @@
 
 #include <ctime>
 #include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
