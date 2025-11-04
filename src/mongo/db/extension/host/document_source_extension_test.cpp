@@ -273,8 +273,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         // $querySettings stage expects a document as argument
         out.emplace_back(new host::HostAggStageParseNode(
@@ -372,8 +372,8 @@ public:
         return 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(1);
         if (_remaining > 0) {
             out.emplace_back(new sdk::ExtensionAggStageParseNode(
@@ -402,8 +402,8 @@ public:
         return 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(1);
         out.emplace_back(
             new sdk::ExtensionAggStageParseNode(std::make_unique<AdjacentCycleParseNode>()));
@@ -424,7 +424,7 @@ public:
         return 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override;
+    std::vector<VariantNodeHandle> expand() const override;
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
@@ -439,22 +439,22 @@ public:
         return 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override;
+    std::vector<VariantNodeHandle> expand() const override;
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
     }
 };
 
-std::vector<sdk::VariantNode> NodeAParseNode::expand() const {
-    std::vector<sdk::VariantNode> out;
+std::vector<VariantNodeHandle> NodeAParseNode::expand() const {
+    std::vector<VariantNodeHandle> out;
     out.reserve(1);
     out.emplace_back(new sdk::ExtensionAggStageParseNode(std::make_unique<NodeBParseNode>()));
     return out;
 }
 
-std::vector<sdk::VariantNode> NodeBParseNode::expand() const {
-    std::vector<sdk::VariantNode> out;
+std::vector<VariantNodeHandle> NodeBParseNode::expand() const {
+    std::vector<VariantNodeHandle> out;
     out.reserve(1);
     out.emplace_back(new sdk::ExtensionAggStageParseNode(std::make_unique<NodeAParseNode>()));
     return out;
@@ -470,8 +470,8 @@ public:
         return 2;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(2);
         out.emplace_back(new sdk::ExtensionAggStageParseNode(
             std::make_unique<sdk::shared_test_stages::NoOpAggStageParseNode>()));
@@ -639,8 +639,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(
             new sdk::ExtensionAggStageAstNode(std::make_unique<NoOp2AggStageAstNode>()));

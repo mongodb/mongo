@@ -38,11 +38,25 @@
 namespace mongo::extension {
 
 class AggStageParseNodeHandle;
+/**
+ * Represents the possible types of nodes created during expansion, as owned handles.
+ *
+ * Expansion can result in four types of nodes:
+ * 1. Host-defined parse node
+ * 2. Extension-defined parse node
+ * 3. Host-defined AST node
+ * 4. Extension-defined AST node
+ *
+ * This variant allows extension developers to return both host- and extension-defined nodes in
+ * AggStageParseNode::expand() without knowing the underlying implementation of host-defined
+ * nodes.
+ *
+ * The host is responsible for differentiating between host- and extension-defined nodes later on.
+ */
 using VariantNodeHandle = std::variant<AggStageParseNodeHandle, AggStageAstNodeHandle>;
 
 /**
- * AggStageParseNodeHandle is a wrapper around a
- * MongoExtensionAggStageParseNode.
+ * AggStageParseNodeHandle is a wrapper around a MongoExtensionAggStageParseNode.
  */
 class AggStageParseNodeHandle : public OwnedHandle<::MongoExtensionAggStageParseNode> {
 public:

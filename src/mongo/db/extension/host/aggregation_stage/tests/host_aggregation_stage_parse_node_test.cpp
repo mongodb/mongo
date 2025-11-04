@@ -52,7 +52,7 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
+    std::vector<VariantNodeHandle> expand() const override {
         MONGO_UNIMPLEMENTED;
     }
 

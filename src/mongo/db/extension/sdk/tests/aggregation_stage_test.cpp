@@ -102,7 +102,7 @@ public:
         return 0;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
+    std::vector<VariantNodeHandle> expand() const override {
         return {};
     }
 
@@ -153,8 +153,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
         return expanded;
@@ -182,8 +182,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
         expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
@@ -210,8 +210,8 @@ public:
         return kExpansionSize - 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
         expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
@@ -238,8 +238,8 @@ public:
         return kExpansionSize + 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
         expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
@@ -265,8 +265,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(
             new sdk::ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make()));
@@ -435,22 +435,32 @@ DEATH_TEST_F(AggStageTest, EmptyDesugarExpansionFails, "11113803") {
     [[maybe_unused]] auto expanded = handle.expand();
 }
 
-DEATH_TEST_F(AggStageTest, GetExpandedSizeLessThanActualExpansionSizeFails, "11113802") {
+TEST_F(AggStageTest, GetExpandedSizeLessThanActualExpansionSizeFails) {
     auto getExpandedSizeLessThanActualExpansionSizeParseNode =
         new ExtensionAggStageParseNode(GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
     auto handle =
         extension::AggStageParseNodeHandle{getExpandedSizeLessThanActualExpansionSizeParseNode};
 
-    [[maybe_unused]] auto expanded = handle.expand();
+    ASSERT_THROWS_CODE(
+        [&] {
+            [[maybe_unused]] auto expanded = handle.expand();
+        }(),
+        DBException,
+        11113802);
 }
 
-DEATH_TEST_F(AggStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails, "11113802") {
+TEST_F(AggStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails) {
     auto getExpandedSizeGreaterThanActualExpansionSizeParseNode = new ExtensionAggStageParseNode(
         GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
     auto handle =
         extension::AggStageParseNodeHandle{getExpandedSizeGreaterThanActualExpansionSizeParseNode};
 
-    [[maybe_unused]] auto expanded = handle.expand();
+    ASSERT_THROWS_CODE(
+        [&] {
+            [[maybe_unused]] auto expanded = handle.expand();
+        }(),
+        DBException,
+        11113802);
 }
 
 DEATH_TEST_F(AggStageTest, DescriptorAndParseNodeNameMismatchFails, "11217602") {
@@ -601,7 +611,7 @@ public:
         return 0;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
+    std::vector<VariantNodeHandle> expand() const override {
         return {};
     }
 
@@ -640,7 +650,7 @@ public:
         return 0;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
+    std::vector<VariantNodeHandle> expand() const override {
         return {};
     }
 
@@ -732,7 +742,7 @@ public:
         return 0;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
+    std::vector<VariantNodeHandle> expand() const override {
         return {};
     }
 
@@ -819,7 +829,7 @@ public:
         return 0;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
+    std::vector<VariantNodeHandle> expand() const override {
         return {};
     }
 

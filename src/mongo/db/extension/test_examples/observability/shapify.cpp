@@ -86,8 +86,8 @@ public:
         return 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        std::vector<mongo::extension::VariantNodeHandle> expanded;
         expanded.reserve(getExpandedSize());
         expanded.emplace_back(
             new sdk::ExtensionAggStageAstNode(std::make_unique<ShapifyAstNode>(_input)));

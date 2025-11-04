@@ -81,8 +81,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(
             new sdk::ExtensionAggStageAstNode(std::make_unique<NoOpAggStageAstNode>()));
@@ -162,8 +162,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(
             new sdk::ExtensionAggStageAstNode(std::make_unique<SourceAggStageAstNode>()));
@@ -189,8 +189,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> expanded;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(
             new sdk::ExtensionAggStageAstNode(std::make_unique<SourceAggStageAstNode>()));
@@ -248,9 +248,9 @@ public:
         return 1;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
+    std::vector<VariantNodeHandle> expand() const override {
         ++expandCalls;
-        std::vector<sdk::VariantNode> out;
+        std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         out.emplace_back(
             new sdk::ExtensionAggStageParseNode(std::make_unique<NoOpAggStageParseNode>()));
@@ -294,8 +294,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         out.emplace_back(new host::HostAggStageParseNode(NoOpHostParseNode::make(kMatchSpec)));
         return out;
@@ -327,8 +327,8 @@ public:
         return kExpansionSize;
     }
 
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         out.emplace_back(
             new sdk::ExtensionAggStageAstNode(std::make_unique<NoOpAggStageAstNode>()));
@@ -402,8 +402,8 @@ public:
     size_t getExpandedSize() const override {
         return kExpansionSize;
     }
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         out.emplace_back(new sdk::ExtensionAggStageAstNode(std::make_unique<LeafAAstNode>()));
         out.emplace_back(new sdk::ExtensionAggStageAstNode(std::make_unique<LeafBAstNode>()));
@@ -421,8 +421,8 @@ public:
     size_t getExpandedSize() const override {
         return kExpansionSize;
     }
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         out.emplace_back(new sdk::ExtensionAggStageAstNode(std::make_unique<LeafCAstNode>()));
         out.emplace_back(new sdk::ExtensionAggStageAstNode(std::make_unique<LeafDAstNode>()));
@@ -440,8 +440,8 @@ public:
     size_t getExpandedSize() const override {
         return kExpansionSize;
     }
-    std::vector<sdk::VariantNode> expand() const override {
-        std::vector<sdk::VariantNode> out;
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         out.emplace_back(new sdk::ExtensionAggStageParseNode(std::make_unique<MidAParseNode>()));
         out.emplace_back(new sdk::ExtensionAggStageParseNode(std::make_unique<MidBParseNode>()));

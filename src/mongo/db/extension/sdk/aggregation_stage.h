@@ -33,6 +33,7 @@
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/get_next_result.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -196,24 +197,6 @@ private:
 };
 
 /**
- * Represents the possible types of nodes created during expansion.
- *
- * Expansion can result in four types of nodes:
- * 1. Host-defined parse node
- * 2. Extension-defined parse node
- * 3. Host-defined AST node
- * 4. Extension-defined AST node
- *
- * This variant allows extension developers to return both host- and extension-defined nodes in
- * AggStageParseNode::expand() without knowing the underlying implementation of host-defined
- * nodes.
- *
- * The host is responsible for differentiating between host- and extension-defined nodes later on.
- */
-using VariantNode =
-    std::variant<::MongoExtensionAggStageParseNode*, ::MongoExtensionAggStageAstNode*>;
-
-/**
  * AggStageParseNode is the base class for implementing the
  * ::MongoExtensionAggStageParseNode interface by an extension.
  *
@@ -232,7 +215,7 @@ public:
 
     virtual size_t getExpandedSize() const = 0;
 
-    virtual std::vector<VariantNode> expand() const = 0;
+    virtual std::vector<VariantNodeHandle> expand() const = 0;
 
 protected:
     AggStageParseNode() = delete;  // No default constructor.
@@ -306,14 +289,14 @@ private:
     struct ConsumeVariantNodeToAbi {
         ::MongoExtensionExpandedArrayElement& dst;
 
-        void operator()(::MongoExtensionAggStageParseNode* parseNode) const {
+        void operator()(AggStageParseNodeHandle&& parseNode) const {
             dst.type = kParseNode;
-            dst.parse = parseNode;
+            dst.parse = parseNode.release();
         }
 
-        void operator()(::MongoExtensionAggStageAstNode* astNode) const {
+        void operator()(AggStageAstNodeHandle&& astNode) const {
             dst.type = kAstNode;
-            dst.ast = astNode;
+            dst.ast = astNode.release();
         }
     };
 
