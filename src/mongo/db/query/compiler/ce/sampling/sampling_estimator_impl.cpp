@@ -200,7 +200,7 @@ std::unique_ptr<sbe::PlanStage> makeProjectStage(std::unique_ptr<sbe::PlanStage>
     std::vector<std::string> topLevelSampleFieldNamesVec{topLevelSampleFieldNames.begin(),
                                                          topLevelSampleFieldNames.end()};
     auto spec =
-        std::make_unique<sbe::MakeObjSpec>(FieldListScope::kClosed,
+        std::make_unique<sbe::MakeObjSpec>(sbe::MakeObjSpec::FieldListScope::kClosed,
                                            std::move(topLevelSampleFieldNamesVec),
                                            std::move(fieldActions),
                                            sbe::MakeObjSpec::NonObjInputBehavior::kReturnNothing);

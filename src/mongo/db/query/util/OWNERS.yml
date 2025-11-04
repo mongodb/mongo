@@ -7,6 +7,11 @@ filters:
     approvers:
       - 10gen/query-execution-staff-leads
       - 10gen/query-optimization-staff-leads
+  - "field_set*":
+    approvers:
+      # Note that this is currently owned by the SBE team because it is only used in the SBE stage
+      # builders.
+      - 10gen/query-execution-sbe
   - "spill_util*":
     approvers:
       - 10gen/query-execution-classic

@@ -22,7 +22,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:sbe_values",
-        "//src/mongo/util:field_set",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -104,11 +103,11 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/metadata:query_metadata",
         "//src/mongo/db/query/compiler/physical_model/index_bounds",
+        "//src/mongo/db/query/util:field_set",
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:spill_table",
-        "//src/mongo/util:field_set",
         "//src/third_party/snappy",
     ],
 )

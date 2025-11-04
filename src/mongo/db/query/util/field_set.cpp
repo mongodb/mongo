@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/field_set.h"
+#include "mongo/db/query/util/field_set.h"
 
 #include <sstream>
 

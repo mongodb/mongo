@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/util/field_set.h"
+#include "mongo/db/query/util/field_set.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 

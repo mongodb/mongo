@@ -29,11 +29,7 @@
 
 #pragma once
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/util/field_set.h"
 #include "mongo/util/string_listset.h"
 
 #include <cstddef>
@@ -47,6 +43,7 @@ struct MakeObjSpec {
 
     enum class NonObjInputBehavior { kReturnNothing, kReturnInput, kNewObj };
     enum class ActionType : uint8_t { kKeep, kDrop, kSetArg, kAddArg, kLambdaArg, kMakeObj };
+    enum class FieldListScope { kClosed, kOpen };
 
     struct Keep {
         bool operator==(const Keep& other) const = default;

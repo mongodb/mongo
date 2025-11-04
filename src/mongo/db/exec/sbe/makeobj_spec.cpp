@@ -31,9 +31,6 @@
 
 #include "mongo/db/exec/sbe/size_estimator.h"
 
-#include <algorithm>
-#include <iterator>
-
 namespace mongo::sbe {
 MakeObjSpec::FieldAction MakeObjSpec::_singleKeepAction[1] = {
     MakeObjSpec::FieldAction{MakeObjSpec::Keep{}}};

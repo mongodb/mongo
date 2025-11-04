@@ -2670,6 +2670,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/util/OWNERS.yml
 /src/mongo/db/query/util/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/util/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/util/**/field_set* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/db/query/util/**/spill_util* @10gen/query-execution-classic @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/virtual_collection/OWNERS.yml
@@ -3140,7 +3141,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/util/**/md5* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/util/**/secure* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/util/**/password* @10gen/server-security @svc-auto-approve-bot
-/src/mongo/util/**/field_set* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/util/**/generate_icu_init_cpp.py @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/util/**/icu* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/util/**/pcre* @10gen/query-execution @svc-auto-approve-bot

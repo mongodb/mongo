@@ -30,7 +30,6 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::sbe::value {
 namespace {
@@ -43,6 +42,7 @@ using SetArg = MakeObjSpec::SetArg;
 using LambdaArg = MakeObjSpec::LambdaArg;
 using MakeObj = MakeObjSpec::MakeObj;
 using NonObjInputBehavior = MakeObjSpec::NonObjInputBehavior;
+using FieldListScope = MakeObjSpec::FieldListScope;
 
 std::vector<FieldAction> makeFieldActionVector(int depth = 2) {
     std::vector<FieldAction> fi;

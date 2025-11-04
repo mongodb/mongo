@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/util/field_set.h"
+#include "mongo/db/query/util/field_set.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"

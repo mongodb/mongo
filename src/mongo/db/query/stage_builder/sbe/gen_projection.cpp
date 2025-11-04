@@ -169,6 +169,16 @@ struct ProjectionVisitorContext {
     std::stack<NestedLevel> levels;
 };
 
+sbe::MakeObjSpec::FieldListScope toSbeMakeObjSpecFieldListScope(FieldListScope scope) {
+    switch (scope) {
+        case FieldListScope::kOpen:
+            return sbe::MakeObjSpec::FieldListScope::kOpen;
+        case FieldListScope::kClosed:
+            return sbe::MakeObjSpec::FieldListScope::kClosed;
+    }
+    MONGO_UNREACHABLE_TASSERT(11340000);
+}
+
 std::unique_ptr<sbe::MakeObjSpec> buildMakeObjSpecImpl(StageBuilderState& state,
                                                        ProjectActions& pa,
                                                        SbExpr::Vector& args) {
@@ -213,7 +223,7 @@ std::unique_ptr<sbe::MakeObjSpec> buildMakeObjSpecImpl(StageBuilderState& state,
             pa.actions[i].getData()));
     }
 
-    return std::make_unique<sbe::MakeObjSpec>(pa.fieldsScope,
+    return std::make_unique<sbe::MakeObjSpec>(toSbeMakeObjSpecFieldListScope(pa.fieldsScope),
                                               std::move(pa.fields),
                                               std::move(actions),
                                               pa.nonObjInputBehavior,

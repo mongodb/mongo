@@ -235,19 +235,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "field_set",
-    srcs = [
-        "field_set.cpp",
-    ],
-    hdrs = [
-        "field_set.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
     name = "string_listset",
     srcs = [
         "string_listset.cpp",
