@@ -59,4 +59,43 @@ serverStatusMetrics = db.serverStatus({metrics: {document: false}}).metrics;
 
 assert(!serverStatusMetrics.hasOwnProperty("document"));
 
+// The {none: 1} specifier should reduce the result to minimal fields.
+let serverStatusOutput = db.serverStatus({none: 1});
+const baseKeys = ["host", "version", "process", "pid", "uptime", "uptimeMillis", "uptimeEstimate", "localTime", "ok"];
+let returnedKeys = Object.keys(serverStatusOutput);
+assert.eq(
+    returnedKeys.length,
+    baseKeys.length,
+    () =>
+        `serverStatusOutput has ${returnedKeys.length} keys when ${baseKeys.length} were expected. Actual keys: ${JSON.stringify(returnedKeys)}`,
+);
+assert.sameMembers(returnedKeys, baseKeys, JSON.stringify(returnedKeys));
+
+// Check explicit field inclusion with {none: 1}.
+serverStatusOutput = assert.commandWorked(db.serverStatus({none: 1, indexBulkBuilder: 1}));
+returnedKeys = Object.keys(serverStatusOutput);
+let expectedKeys = baseKeys.concat("indexBulkBuilder");
+assert.eq(
+    returnedKeys.length,
+    expectedKeys.length,
+    () =>
+        `serverStatusOutput has ${returnedKeys.length} keys when ${expectedKeys.length} were expected. Actual keys: ${JSON.stringify(returnedKeys)}`,
+);
+assert.sameMembers(returnedKeys, expectedKeys, JSON.stringify(returnedKeys));
+
+// Check explicit multi-field inclusions with {none: 1}.
+serverStatusOutput = assert.commandWorked(db.serverStatus({none: 1, wiredTiger: 1, connections: 1}));
+returnedKeys = Object.keys(serverStatusOutput);
+expectedKeys = baseKeys.concat("wiredTiger", "connections");
+assert.eq(
+    returnedKeys.length,
+    expectedKeys.length,
+    () =>
+        `serverStatusOutput has ${returnedKeys.length} keys when ${expectedKeys.length} were expected. Actual keys: ${JSON.stringify(returnedKeys)}`,
+);
+assert.sameMembers(returnedKeys, expectedKeys, JSON.stringify(returnedKeys));
+
+// Check conflicting options {all: 1, none: 1}.
+assert.commandFailedWithCode(db.serverStatus({all: 1, none: 1}), [ErrorCodes.InvalidOptions]);
+
 MongoRunner.stopMongod(mongod);
