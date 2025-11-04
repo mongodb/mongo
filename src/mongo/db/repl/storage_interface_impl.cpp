@@ -80,6 +80,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -340,7 +341,12 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
 
     if (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isOplog()) {
         // Simplify locking rules for oplog collection.
-        autoOplog.emplace(opCtx, OplogAccessMode::kWrite);
+        autoOplog.emplace(
+            opCtx,
+            OplogAccessMode::kWrite,
+            Date_t::max(),
+            AutoGetOplogFastPathOptions{.explicitIntent =
+                                            rss::consensus::IntentRegistry::Intent::LocalWrite});
         collection = &autoOplog->getCollection();
         if (!*collection) {
             return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};

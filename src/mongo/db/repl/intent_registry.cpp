@@ -87,15 +87,8 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
     // mutex.
     bool isReplSet =
         repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
-    auto state = repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getMemberState();
 
     std::shared_lock lock(_stateMutex);
-
-    // Downgrade Write intent to LocalWrite during initial sync.
-    if (intent == Intent::Write && isReplSet &&
-        (state == repl::MemberState::RS_STARTUP2 || state == repl::MemberState::RS_REMOVED)) {
-        intent = Intent::LocalWrite;
-    }
 
     // Do not interrupt if the killing opCtx is performing work or we are inside an
     // UninterruptibleLockGuard.
