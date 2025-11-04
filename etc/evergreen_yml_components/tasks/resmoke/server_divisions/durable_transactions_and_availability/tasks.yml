@@ -1201,6 +1201,24 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
+    name: transitioning_replica_sets_jscore_passthrough_gen
+    # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "release_critical",
+        "incompatible_debug_mode",
+        "replica_sets",
+        "common",
+        "san",
+        "large",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: replica_sets_kill_primary_jscore_passthrough_gen
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:

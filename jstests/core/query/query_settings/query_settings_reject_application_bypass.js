@@ -12,6 +12,8 @@
 //   simulate_mongoq_incompatible,
 //   # This test relies on aggregations returning specific batch-sized responses.
 //   assumes_no_implicit_cursor_exhaustion,
+//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   transitioning_replicaset_incompatible,
 // ]
 //
 

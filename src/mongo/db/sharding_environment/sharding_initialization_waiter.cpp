@@ -44,12 +44,16 @@ void awaitShardRoleReady(OperationContext* opCtx) {
     VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
     // If this node does not have a valid topology time it means this operation is not coming from
     // a mongos (since a mongoS would need to observe the addition of the shard to the cluster to
-    // contact it). This indicates either a user doing something weird or an internal bug which is
-    // accessing sharding components before they are initialized.
+    // contact it). This indicates
+    // - either we are running a replicaset with --shardsvr but we are not part of a cluster yet
+    // - or a user doing something weird
+    // - or an internal bug which is accessing sharding components before they are initialized.
     uassert(ErrorCodes::ShardingStateNotInitialized,
             "This operation tried to access components associated with a sharded cluster, but this "
-            "node has not been added to a shard. This indicates either a manually constructed "
-            "request sent directly to the shard or a possible software bug.",
+            "node has not been added to a shard, or the shard is not part of a cluster yet. This "
+            "indicates either that the node is in a transitional state between a replicatset and "
+            "sharded cluster, a manually constructed request has been sent directly to the shard, "
+            "or a possible software bug",
             VectorClock::isValidComponentTime(vt.topologyTime()));
     const auto lastSeenTopologyTime =
         repl::OpTime(vt.topologyTime().asTimestamp(), repl::OpTime::kUninitializedTerm);

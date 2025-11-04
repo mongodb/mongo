@@ -1,0 +1,5 @@
+base_suite: replica_sets_jscore_passthrough
+extends:
+  - "replica_sets.running_as_shardsvr_exclusions"
+overrides:
+  - "replica_sets.running_as_shardsvr_cli_params"

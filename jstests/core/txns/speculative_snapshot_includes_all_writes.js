@@ -9,6 +9,8 @@
  *  uses_parallel_shell,
  *  # 'setDefaultRWConcern' is not supposed to be run on shard nodes.
  *  command_not_supported_in_serverless,
+ *  # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+ *  transitioning_replicaset_incompatible,
  * ]
  */
 

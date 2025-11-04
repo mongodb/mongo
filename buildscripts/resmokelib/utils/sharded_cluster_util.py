@@ -22,6 +22,9 @@ def refresh_logical_session_cache_with_retry(mongo_client, csrs=None):
             if err.code == 70:  # ShardNotFound
                 time.sleep(0.5)  # Wait a little bit before trying again.
                 retry_count -= 1
+            # TODO(SERVER-113205): Investigate if we can remove this error code
+            elif err.code == 203:  # ShardingStateNotInitialized
+                return
             raise err
     if retry_count == 0:
         raise Exception("Unable to refresh the logical session cache for the config server.")

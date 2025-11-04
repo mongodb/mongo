@@ -4,6 +4,8 @@
  * @tags: [
  *  uses_transactions,
  *  uses_snapshot_read_concern,
+ *  # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+ *  transitioning_replicaset_incompatible,
  * ]
  */
 

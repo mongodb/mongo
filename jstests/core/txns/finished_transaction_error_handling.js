@@ -5,6 +5,8 @@
 //  not_allowed_with_signed_security_token,
 //  uses_transactions,
 //  uses_snapshot_read_concern,
+//  # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//  transitioning_replicaset_incompatible,
 //]
 // TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";

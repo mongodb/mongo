@@ -10,6 +10,8 @@
  *   simulate_atlas_proxy_incompatible,
  *   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer.
  *   assumes_balancer_off,
+ *   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+ *   transitioning_replicaset_incompatible,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

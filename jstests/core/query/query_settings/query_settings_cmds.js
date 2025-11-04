@@ -6,6 +6,8 @@
 //   does_not_support_stepdowns,
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
+//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   transitioning_replicaset_incompatible,
 // ]
 //
 

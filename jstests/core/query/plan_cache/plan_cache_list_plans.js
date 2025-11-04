@@ -28,6 +28,8 @@
 //   requires_fcv_72,
 //   multiversion_incompatible,
 //   requires_getmore,
+//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   transitioning_replicaset_incompatible,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

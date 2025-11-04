@@ -14,6 +14,8 @@
 //   not_allowed_with_signed_security_token,
 //   # Query settings commands can not be handled by atlas proxy.
 //   simulate_atlas_proxy_incompatible,
+//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   transitioning_replicaset_incompatible,
 // ]
 
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";

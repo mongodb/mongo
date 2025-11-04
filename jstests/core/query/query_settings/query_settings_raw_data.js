@@ -10,6 +10,8 @@
  *      directly_against_shardsvrs_incompatible,
  *      # Query settings commands can not be handled by atlas proxy.
  *      simulate_atlas_proxy_incompatible,
+ *      # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+ *      transitioning_replicaset_incompatible,
  * ]
  */
 

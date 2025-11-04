@@ -3,3 +3,19 @@
     selector:
       roots:
         - jstests/replsets/*.js
+
+- name: running_as_shardsvr_exclusions
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_sharding_initialized
+        - transitioning_replicaset_incompatible
+
+- name: running_as_shardsvr_cli_params
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+          shardsvr: ""
