@@ -721,6 +721,10 @@ __wti_background_compact_server_create(WT_SESSION_IMPL *session)
     if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
         return (0);
 
+    /* Disable background compact server in disagg mode. */
+    if (__wt_conn_is_disagg(session))
+        return (0);
+
     /* Set first, the thread might run before we finish up. */
     FLD_SET(conn->server_flags, WT_CONN_SERVER_COMPACT);
 

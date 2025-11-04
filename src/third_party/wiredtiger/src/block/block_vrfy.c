@@ -435,6 +435,9 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
         return (0);
 
     __wt_errx(session, "file ranges never verified: %" PRIu64, count);
+
+    __wti_block_extlist_dump_all(session, block);
+
     return (block->verify_strict ? WT_ERROR : 0);
 }
 
@@ -518,5 +521,8 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
         return (0);
 
     __wt_errx(session, "checkpoint ranges never verified: %" PRIu64, count);
+
+    __wti_block_extlist_dump_all(session, block);
+
     return (block->verify_strict ? WT_ERROR : 0);
 }

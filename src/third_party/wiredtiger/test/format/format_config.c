@@ -1555,6 +1555,8 @@ config_disagg_storage(void)
     config_off(NULL, "ops.salvage");
     config_off(NULL, "backup");
     config_off(NULL, "backup.incremental");
+
+    /* Compaction is not supported for disaggregated storage. */
     config_off(NULL, "ops.compaction");
     config_off(NULL, "background_compact");
 }

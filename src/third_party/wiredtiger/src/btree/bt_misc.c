@@ -88,17 +88,19 @@ __wt_key_string(
   WT_SESSION_IMPL *session, const void *data_arg, size_t size, const char *key_format, WT_ITEM *buf)
 {
     WT_ITEM tmp;
+    const char *ret_str = NULL;
 
 #ifdef HAVE_DIAGNOSTIC
     if (session->dump_raw)
         return (__wt_buf_set_printable(session, data_arg, size, false, buf));
 #endif
 
+    WT_CLEAR(tmp);
+
     /*
      * If the format is 'S', it's a string and our version of it may not yet be nul-terminated.
      */
     if (WT_STREQ(key_format, "S") && ((char *)data_arg)[size - 1] != '\0') {
-        WT_CLEAR(tmp);
         if (__wt_buf_fmt(session, &tmp, "%.*s", (int)size, (char *)data_arg) == 0) {
             data_arg = tmp.data;
             size = tmp.size + 1;
@@ -107,7 +109,11 @@ __wt_key_string(
             size = sizeof(WT_ERR_STRING);
         }
     }
-    return (__wt_buf_set_printable_format(session, data_arg, size, key_format, false, buf));
+
+    ret_str = __wt_buf_set_printable_format(session, data_arg, size, key_format, false, buf);
+
+    __wt_buf_free(session, &tmp);
+    return (ret_str);
 }
 
 /*

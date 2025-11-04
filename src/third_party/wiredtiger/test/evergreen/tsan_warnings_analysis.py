@@ -76,22 +76,24 @@ def get_tsan_warnings():
                     for line in file:
                         if ("WARNING:" in line.strip()):
                             start_record = True
+                        if not start_record:
                             continue
-                        if start_record:
-                            warning_lines.append(line.strip())
-                            if (line.startswith("SUMMARY:")):
-                                # Strip away the path
-                                pattern_to_remove = r"/.*/wiredtiger/"
-                                cleaned_text = re.sub(pattern_to_remove, "", line).strip()
 
-                                # Strip away the column line information.
-                                pattern_to_remove = r':(\d+):\d+'
-                                cleaned_text = re.sub(pattern_to_remove, r':\1', cleaned_text).strip()
-                                tsan_warnings_dict[cleaned_text] = (file_name, warning_lines.copy())
+                        warning_lines.append(line.strip())
 
-                                # Restart the warning recording.
-                                warning_lines = []
-                                start_record = False
+                        if (line.startswith("SUMMARY:")):
+                            # Strip away the path
+                            pattern_to_remove = r"/.*/wiredtiger/"
+                            cleaned_text = re.sub(pattern_to_remove, "", line).strip()
+
+                            # Strip away the column line information.
+                            pattern_to_remove = r':(\d+):\d+'
+                            cleaned_text = re.sub(pattern_to_remove, r':\1', cleaned_text).strip()
+                            tsan_warnings_dict[cleaned_text] = (file_name, warning_lines.copy())
+
+                            # Restart the warning recording.
+                            warning_lines = []
+                            start_record = False
     return tsan_warnings_dict
 
 
