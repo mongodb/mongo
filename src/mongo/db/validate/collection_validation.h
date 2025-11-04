@@ -31,6 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/validate/validate_options.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -48,7 +51,8 @@ namespace CollectionValidation {
  * Checks if 'hashPrefixes' contains valid hash strings. Throws if any is invalid.
  * When 'equalLength' is true, also checks all hash strings have the same length.
  */
-void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLength);
+MONGO_MOD_FILE_PRIVATE void validateHashes(const std::vector<std::string>& hashPrefixes,
+                                           bool equalLength);
 
 /**
  * Parses and checks the command object and returns a 'ValidationOptions' object used for collection
@@ -73,7 +77,7 @@ Status validate(OperationContext* opCtx,
 /**
  * Checks whether a failpoint has been hit in the above validate() code..
  */
-bool getIsValidationPausedForTest();
+MONGO_MOD_FILE_PRIVATE bool getIsValidationPausedForTest();
 
 }  // namespace CollectionValidation
 }  // namespace mongo

@@ -42,6 +42,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
 
 #include <cstddef>

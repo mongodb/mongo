@@ -580,7 +580,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         stdx::lock_guard<stdx::mutex> fsynclk(oplogApplierLockedFsync);
 
         // Obtain the validation lock to synchronise batch application with validation.
-        auto lk = CollectionValidation::ValidateState::obtainExclusiveValidationLock(&opCtx);
+        auto lk = CollectionValidation::obtainExclusiveValidationLock(&opCtx);
 
         // Apply the operations in this batch. '_applyOplogBatch' returns the optime of the
         // last op that was applied, which should be the last optime in the batch.

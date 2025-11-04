@@ -49,6 +49,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -64,6 +65,13 @@
 namespace mongo {
 
 namespace CollectionValidation {
+
+/**
+ * Returns a scoped object, which holds the 'validateLock' in exclusive mode for
+ * the given scope. It must only be used to coordinate validation with concurrent
+ * oplog batch applications.
+ */
+MONGO_MOD_PUBLIC Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx);
 
 /**
  * Contains information about the collection being validated and the user provided validation
@@ -143,20 +151,6 @@ public:
     boost::optional<Timestamp> getValidateTimestamp() {
         return _validateTs;
     }
-
-    /**
-     * Returns a scoped object, which holds the 'validateLock' in exclusive mode for
-     * the given scope. It must only be used to coordinate validation with concurrent
-     * oplog batch applications.
-     */
-    static Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx);
-
-    /**
-     * Returns a scoped object, which holds the 'validateLock' in shared mode for
-     * the given scope. It must only be used to coordinate validation with concurrent
-     * oplog batch applications.
-     */
-    static Lock::SharedLock obtainSharedValidationLock(OperationContext* opCtx);
 
 private:
     ValidateState() = delete;

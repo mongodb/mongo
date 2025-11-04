@@ -42,7 +42,6 @@
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/index_key_validate.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
-#include "mongo/db/local_catalog/throttle_cursor.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"

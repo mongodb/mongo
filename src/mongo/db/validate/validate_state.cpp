@@ -65,17 +65,33 @@
 
 namespace mongo {
 
+namespace {
+/*
+ * Oplog Batch Applier takes this lock in exclusive mode when applying the
+ * batch. Foreground validation waits on this lock to begin validation.
+ * We must synchronise these operations as foreground validation involves opening a snapshot of the
+ * most recent data and during oplog application, CRUD operations on the document are performed in a
+ * transaction separate from the fast count updates. This could potentially lead to validation
+ * opening a snapshot between these two transactions and result in an incorrectly reported fast
+ * count discrepancy.
+ */
+Lock::ResourceMutex validateLock("validateLock");
+}  // namespace
+
 MONGO_FAIL_POINT_DEFINE(hangDuringValidationInitialization);
 
 namespace CollectionValidation {
+
+Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx) {
+    return Lock::ExclusiveLock(opCtx, validateLock);
+}
 
 ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              ValidationOptions options)
     : ValidationOptions(std::move(options)),
-      _validateLock(isBackground()
-                        ? boost::none
-                        : boost::optional<Lock::SharedLock>{obtainSharedValidationLock(opCtx)}),
+      _validateLock(isBackground() ? boost::none
+                                   : boost::optional<Lock::SharedLock>{{opCtx, validateLock}}),
       _globalLock(opCtx,
                   isBackground() ? MODE_IS : MODE_IX,
                   {false,
@@ -259,27 +275,6 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // (RecordId()), which will halt iteration at the initialization step.
     auto record = _traverseRecordStoreCursor->next(opCtx);
     _firstRecordId = record ? std::move(record->id) : RecordId();
-}
-
-namespace {
-/*
- * Oplog Batch Applier takes this lock in exclusive mode when applying the
- * batch. Foreground validation waits on this lock to begin validation.
- * We must synchronise these operations as foreground validation involves opening a snapshot of the
- * most recent data and during oplog application, CRUD operations on the document are performed in a
- * transaction separate from the fast count updates. This could potentially lead to validation
- * opening a snapshot between these two transactions and result in an incorrectly reported fast
- * count discrepancy.
- */
-Lock::ResourceMutex validateLock("validateLock");
-}  // namespace
-
-Lock::ExclusiveLock ValidateState::obtainExclusiveValidationLock(OperationContext* opCtx) {
-    return Lock::ExclusiveLock(opCtx, validateLock);
-}
-
-Lock::SharedLock ValidateState::obtainSharedValidationLock(OperationContext* opCtx) {
-    return Lock::SharedLock(opCtx, validateLock);
 }
 
 }  // namespace CollectionValidation

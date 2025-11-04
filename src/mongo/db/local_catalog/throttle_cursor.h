@@ -38,12 +38,15 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
 #include <memory>
 
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

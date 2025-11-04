@@ -40,6 +40,7 @@
 #include "mongo/db/validate/index_consistency.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
 
 #include <array>

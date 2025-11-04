@@ -875,6 +875,7 @@ validate:
   meta:
     slack: storage-engines-server-integration
     jira: Server Integration
+    fully_marked: true
   files:
     - src/mongo/db/local_catalog/throttle_cursor*
     - src/mongo/db/commands/validate.cpp
