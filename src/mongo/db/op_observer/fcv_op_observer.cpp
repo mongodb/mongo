@@ -121,9 +121,9 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // transactions here to release the global IX locks held by the transactions more proactively
     // rather than waiting for the transactions to complete. FCV changes take the global S lock when
     // in the upgrading/downgrading state.
-    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     try {
-        if (newFcvSnapshot.isUpgradingOrDowngrading()) {
+        if (prevFcvSnapshot.isVersionInitialized() &&
+            prevFcvSnapshot.getVersion() != newFcvSnapshot.getVersion()) {
             SessionKiller::Matcher matcherAllSessions(
                 KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
             killSessionsAbortUnpreparedTransactions(
@@ -132,7 +132,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     } catch (const DBException&) {
         // Swallow the error when running within a recovery unit to avoid process termination.
         // The failure can be ignored here, assuming that the setFCV command will also be
-        // interrupted on _prepareToUpgrade/Downgrade() or earlier.
+        // interrupted before follow-up metadata cleanup that expect transactions to be killed.
         if (!withinRecoveryUnit) {
             throw;
         }

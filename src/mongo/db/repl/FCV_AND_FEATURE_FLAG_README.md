@@ -186,11 +186,11 @@ for more information on how to add upgrade/downgrade code to the command.
 
     - First, we do any actions to prepare for upgrade/downgrade that must be taken before the global lock.
       For example, we cancel serverless migrations in this step.
-    - Then, the global lock is acquired in shared
-      mode and then released immediately. This creates a barrier and guarantees safety for operations
-      that acquire the global lock either in exclusive or intent exclusive mode. If these operations begin
-      and acquire the global lock prior to the FCV change, they will proceed in the context of the old
-      FCV, and will guarantee to finish before the FCV change takes place. For the operations that begin
+    - Then, the global lock is acquired in shared mode and then released immediately. This creates
+      a barrier and guarantees safety for operations that acquire the global lock either in
+      exclusive or intent exclusive mode. If these operations begin and acquire the global lock
+      prior to the FCV change, they may proceed in the context of the old FCV, but setFCV waits
+      for them to finish before proceeding to the metadata cleanup. For the operations that begin
       after the FCV change, they will see the updated FCV and behave accordingly. This also means that
       in order to make this barrier truly safe, **in any given operation, we should only check the
       feature flag/FCV after acquiring the appropriate locks**. See the [section about setFCV locks](#setfcv-locks)
@@ -237,6 +237,11 @@ for more information on how to add upgrade/downgrade code to the command.
     fields of the FCV document are deleted while the `version` field is updated to
     reflect the new upgraded or downgraded state. This update is also done using `writeConcern: majority`.
     The new in-memory FCV value will be updated to reflect the on-disk changes.
+
+    - After the transition, the global lock is again acquired in shared mode and then released immediately.
+      This creates a barrier for operations that acquire the global lock either in exclusive or intent exclusive mode,
+      and guarantees that we wait until operations that may run on the context of the old FCV to
+      finish before we proceed with the tasks that can only be done after the FCV is fully upgraded/downgraded.
 
     - Note that for an FCV upgrade, we do an extra step to run `_finalizeUpgrade` **after** updating
       the FCV document to fully upgraded. This is for any tasks that cannot be done until after the
@@ -372,20 +377,19 @@ There are three locks used in the setFCV command:
     See [example](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
 - [Global lock]
   - The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/mongodb/mongo/blob/418028cf4dcf416d5ab87552721ed3559bce5507/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L551-L557)
-    after we are in the upgrading/downgrading state,
-    but before we transition from the upgrading/downgrading state to the fully upgraded/downgraded
-    state.
+    shortly after the FCV transitions to a new value (either to the upgrading/downgrading state,
+    or to the fully upgrade/downgraded state).
   - The lock creates a barrier for operations taking the global IX or X locks.
   - This is to ensure that the FCV does not _fully_ transition between the upgraded and downgraded
     versions (or vice versa) during these other operations. This is because either:
-    _ The global IX/X locked operation will start after the FCV change, see the
-    upgrading/downgrading to the new FCV and act accordingly.
-    _ The global IX/X locked operation began prior to the FCV change. The operation will proceed
-    in the context of the old FCV, and will guarantee to finish before upgrade/downgrade
-    procedures begin right after this barrier
+    _ The global IX/X locked operation will start after the FCV change, see the new FCV and act
+    accordingly.
+    _ The global IX/X locked operation began prior to the FCV change. The operation may proceed
+    in the context of the old FCV, but setFCV waits for them to finish before upgrade/downgrade
+    metadata cleanup procedures begin right after this barrier.
   - This also means that in order to make this barrier truly safe, if we want to ensure that the
-    FCV does not change during our operation, **you must take the global IX or X lock first, and
-    then check the feature flag/FCV value after that point**
+    FCV can not go through multiple transitions during our operation, **you must take the global
+    IX or X lock first, and then check the feature flag/FCV value after that point**
 
 _Code spelunking starting points:_
 
@@ -1200,8 +1204,9 @@ on a higher binary version and crash, which would be caught by these types of su
 - To make sure all generic FCV references are
   indeed meant to exist across LTS binary versions, **_a comment containing “(Generic FCV reference):”
   is required within 10 lines before a generic FCV reference._**
-- If you want to ensure that the FCV will not change during your operation, you must take the global
-  IX or X lock first, and then check the feature flag/FCV value after that point.
+- Operations that check the FCV or FCV-gated feature flags must take the global IX or X lock before
+  doing so. This ensures that operation won't outlast a full upgrade/downgrade,
+  and that the operation serializes correctly with the metadata cleanup steps of setFCV.
 - Except when using a binary-compatible feature flag, an operation should not check a feature flag
   more than once, because the flag's state may change between checks.
 - Any projects/tickets that use and enable an FCV-gated feature flag **_must_** leave that feature flag in the

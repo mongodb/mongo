@@ -1270,15 +1270,9 @@ private:
     void _prepareToUpgrade(OperationContext* opCtx,
                            const SetFeatureCompatibilityVersion& request,
                            boost::optional<Timestamp> changeTimestamp) {
-        {
-            // Take the global lock in S mode to create a barrier for operations taking the global
-            // IX or X locks. This ensures that either:
-            //   - The global IX/X locked operation will start after the FCV change, see the
-            //     upgrading to the latest FCV and act accordingly.
-            //   - The global IX/X locked operation began prior to the FCV change, is acting on that
-            //     assumption and will finish before upgrade procedures begin right after this.
-            Lock::GlobalLock lk(opCtx, MODE_S);
-        }
+        // Acquire and immediately release the global lock in S mode, which ensures that from now on
+        // all operations acquiring the global lock in X/IX mode see the 'kUpgrading' FCV state.
+        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
 
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
@@ -1386,6 +1380,17 @@ private:
         if (role && role->has(ClusterRole::ShardServer)) {
             // Shard server role actions.
         }
+    }
+
+    void _waitForConcurrentLocalWriteOperationsToComplete(OperationContext* opCtx) {
+        // Take the global lock in S mode to create a barrier for operations taking the global
+        // IX or X locks. This ensures that either:
+        //   - The global IX/X locked operation will start after the FCV change, see the
+        //     updated server FCV value and act accordingly.
+        //   - The global IX/X locked operation began prior to the FCV change, is acting on that
+        //     assumption and will finish before upgrade/downgrade metadata cleanup procedures done
+        //     right after this barrier.
+        Lock::GlobalLock lk(opCtx, MODE_S);
     }
 
     // Tell the shards to enter phase-1 or phase-2 of setFCV.
@@ -1688,15 +1693,9 @@ private:
         // this function.
         _prepareToDowngradeActions(opCtx, requestedVersion);
 
-        {
-            // Take the global lock in S mode to create a barrier for operations taking the global
-            // IX or X locks. This ensures that either:
-            //   - The global IX/X locked operation will start after the FCV change, see the
-            //     upgrading to the latest FCV and act accordingly.
-            //   - The global IX/X locked operation began prior to the FCV change, is acting on that
-            //     assumption and will finish before upgrade procedures begin right after this.
-            Lock::GlobalLock lk(opCtx, MODE_S);
-        }
+        // Acquire and immediately release the global lock in S mode, which ensures that from now on
+        // all operations acquiring the global lock in X/IX mode see the 'kDowngrading' FCV state.
+        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
 
         uassert(ErrorCodes::Error(549181),
                 "Failing downgrade due to 'failDowngrading' failpoint set",
@@ -1948,6 +1947,10 @@ private:
                     });
         }
 
+        // Acquire and immediately release the global lock in S mode, which ensures that from now on
+        // all operations acquiring the global lock in X/IX mode see the fully upgraded FCV state.
+        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
+
         // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
         if (isConfigsvr &&
             feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
@@ -2022,6 +2025,10 @@ private:
                         return ofcv != expectedOfcv;
                     });
         }
+
+        // Acquire and immediately release the global lock in S mode, which ensures that from now on
+        // all operations acquiring the global lock in X/IX mode see the fully downgraded FCV state.
+        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
 
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
         if (isConfigsvr &&

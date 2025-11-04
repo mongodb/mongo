@@ -21,13 +21,7 @@ filters:
   - "3_upgrade_replset.js":
     approvers:
       - 10gen/server-fcv
-  - "abort_unprepared_transactions_on_FCV_downgrade.js":
-    approvers:
-      - 10gen/server-fcv
   - "arbiter_always_has_latest_fcv.js":
-    approvers:
-      - 10gen/server-fcv
-  - "await_prepared_transactions_on_FCV_downgrade.js":
     approvers:
       - 10gen/server-fcv
   - "cannot_downgrade_from_latest_to_last_continuous.js":
@@ -43,6 +37,9 @@ filters:
     approvers:
       - 10gen/server-fcv
   - "downgrade_replset.js":
+    approvers:
+      - 10gen/server-fcv
+  - "drain_transactions_on_FCV_transition.js":
     approvers:
       - 10gen/server-fcv
   - "feature_compatibility_version_lagging_secondary.js":
