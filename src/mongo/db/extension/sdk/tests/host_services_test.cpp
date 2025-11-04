@@ -30,6 +30,7 @@
 #include "mongo/db/extension/sdk/host_services.h"
 
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -109,5 +110,28 @@ DEATH_TEST_REGEX_F(HostServicesTest, tripwireAsserted, "22222") {
     [[maybe_unused]] auto status =
         sdk::HostServicesHandle::getHostServices()->tripwireAsserted(errInfoByteView);
 }
+
+TEST_F(HostServicesTest, CreateIdLookup_ValidSpecReturnsHostNode) {
+    auto bsonSpec = BSON("$_internalSearchIdLookup" << BSONObj());
+    auto hostAstNode =
+        extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(bsonSpec);
+    ASSERT_TRUE(hostAstNode.getName() ==
+                std::string(DocumentSourceInternalSearchIdLookUp::kStageName));
+}
+
+TEST_F(HostServicesTest, CreateIdLookup_InvalidSpecFails) {
+    auto bsonSpec = BSON("$match" << BSONObj());
+    ASSERT_THROWS_CODE(
+        extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(bsonSpec),
+        DBException,
+        11134200);
+
+    bsonSpec = BSON("$_internalSearchIdLookup" << 5);
+    ASSERT_THROWS_CODE(
+        extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(bsonSpec),
+        DBException,
+        11134200);
+}
+
 }  // namespace
 }  // namespace mongo::extension

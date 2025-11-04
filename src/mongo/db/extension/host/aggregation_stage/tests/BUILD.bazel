@@ -18,6 +18,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/extension/host:extension_host",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host_connector:extensions_host_connector",
         "//src/mongo/db/extension/host_connector:host_services_adapter",

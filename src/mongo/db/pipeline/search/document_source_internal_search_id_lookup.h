@@ -91,9 +91,9 @@ public:
             return _ownedSpec;
         }
 
-        explicit LiteParsed(std::string parseTimeName, BSONObj ownedSpec)
+        explicit LiteParsed(std::string parseTimeName, BSONObj spec)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _ownedSpec(std::move(ownedSpec)) {}
+              _ownedSpec(spec.isOwned() ? std::move(spec) : spec.getOwned()) {}
 
     private:
         BSONObj _ownedSpec;

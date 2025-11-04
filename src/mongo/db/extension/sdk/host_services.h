@@ -117,6 +117,13 @@ public:
         return AggStageParseNodeHandle{result};
     }
 
+    AggStageAstNodeHandle createIdLookup(BSONObj spec) const {
+        ::MongoExtensionAggStageAstNode* result = nullptr;
+        invokeCAndConvertStatusToException(
+            [&] { return vtable().create_id_lookup(objAsByteView(spec), &result); });
+        return AggStageAstNodeHandle{result};
+    }
+
 private:
     static HostServicesHandle _hostServices;
 

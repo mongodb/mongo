@@ -66,11 +66,15 @@ private:
     static MongoExtensionStatus* _extCreateHostAggStageParseNode(
         ::MongoExtensionByteView spec, ::MongoExtensionAggStageParseNode** node) noexcept;
 
+    static ::MongoExtensionStatus* _extCreateIdLookup(
+        ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept;
+
     static constexpr ::MongoExtensionHostServicesVTable VTABLE{
         .log = &_extLog,
         .log_debug = &_extLogDebug,
         .user_asserted = &_extUserAsserted,
         .tripwire_asserted = &_extTripwireAsserted,
-        .create_host_agg_stage_parse_node = &_extCreateHostAggStageParseNode};
+        .create_host_agg_stage_parse_node = &_extCreateHostAggStageParseNode,
+        .create_id_lookup = &_extCreateIdLookup};
 };
 }  // namespace mongo::extension::host_connector

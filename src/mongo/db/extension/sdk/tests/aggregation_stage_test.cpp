@@ -284,6 +284,32 @@ public:
     }
 };
 
+class ExpandToIdLookupNode : public extension::sdk::AggStageParseNode {
+public:
+    ExpandToIdLookupNode() : extension::sdk::AggStageParseNode("expandToIdLookup") {}
+
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        std::vector<mongo::extension::VariantNodeHandle> expanded;
+        auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
+        expanded.emplace_back(
+            extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(spec));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
+        return std::make_unique<ExpandToIdLookupNode>();
+    }
+};
 
 class NameMismatchParseNode : public sdk::AggStageParseNode {
 public:
@@ -403,6 +429,22 @@ TEST_F(AggStageTest, ExpansionToHostParseNodeSucceeds) {
 
     const auto& expandHandle = asParse(expanded[0]);
     ASSERT_EQUALS(expandHandle.getName(), stringViewToStringData(kExpandToHostName));
+}
+
+TEST_F(AggStageTest, ExpansionToIdLookupSucceeds) {
+    auto expandToIdLookupAstNode =
+        std::make_unique<ExtensionAggStageParseNode>(ExpandToIdLookupNode::make());
+
+    // Transfer ownership from the SDK-style unique_ptr to the OwnedHandle.
+    auto handle = extension::AggStageParseNodeHandle{expandToIdLookupAstNode.release()};
+
+    auto expanded = handle.expand();
+    ASSERT_EQUALS(expanded.size(), 1);
+
+    ASSERT_TRUE(std::holds_alternative<extension::AggStageAstNodeHandle>(expanded[0]));
+
+    const auto& expandHandle = asAst(expanded[0]);
+    ASSERT_EQUALS(expandHandle.getName(), "$_internalSearchIdLookup");
 }
 
 TEST_F(AggStageTest, HandlesPreventMemoryLeaksOnSuccess) {

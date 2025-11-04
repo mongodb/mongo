@@ -28,10 +28,12 @@
  */
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
 
+#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/public/extension_error_types_gen.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_options.h"
@@ -124,7 +126,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
     // information. At the same time, we are not allowed to throw an exception across the API
     // boundary, so we immediately convert this to a MongoExtensionStatus. It will be rethrown after
     // being passed through the boundary.
-    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
         BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
         auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
             errorBson, IDLParserContext("extUassert"));
@@ -139,7 +141,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
     ::MongoExtensionByteView structuredErrorMessage) {
     // We follow the same throw-then-catch pattern here as in _extUserAsserted, for the same
     // reasons.
-    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
         BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
         auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
             errorBson, IDLParserContext("extTassert"));
@@ -157,6 +159,27 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
         auto parseNode = std::make_unique<host::AggStageParseNode>(bsonObjFromByteView(spec));
         *node = static_cast<::MongoExtensionAggStageParseNode*>(
             new host::HostAggStageParseNode(std::move(parseNode)));
+    });
+}
+
+::MongoExtensionStatus* HostServicesAdapter::_extCreateIdLookup(
+    ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        *node = nullptr;
+        BSONObj specObj = bsonObjFromByteView(bsonSpec);
+
+        uassert(11134200,
+                "create_id_lookup requires a well-formed $_internalSearchIdLookup",
+                specObj.nFields() == 1 &&
+                    specObj.firstElementFieldNameStringData() ==
+                        DocumentSourceInternalSearchIdLookUp::kStageName &&
+                    specObj.firstElementType() == BSONType::object);
+
+        auto liteParsed = std::make_unique<DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            std::string(DocumentSourceInternalSearchIdLookUp::kStageName), specObj);
+
+        *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNode(
+            std::make_unique<host::AggStageAstNode>(std::move(liteParsed))));
     });
 }
 }  // namespace mongo::extension::host_connector

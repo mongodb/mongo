@@ -644,6 +644,14 @@ typedef struct MongoExtensionHostServicesVTable {
      */
     MongoExtensionStatus* (*create_host_agg_stage_parse_node)(
         MongoExtensionByteView bsonSpec, MongoExtensionAggStageParseNode** node);
+
+    /**
+     * Creates a host-defined AST node for an $_internalSearchIdLookup stage. If the provided
+     * bsonSpec does not specify a valid $_internalSearchIdLookup stage, an error is returned. On
+     * success, 'node' is populated with the host's AST node.
+     */
+    MongoExtensionStatus* (*create_id_lookup)(MongoExtensionByteView bsonSpec,
+                                              MongoExtensionAggStageAstNode** node);
 } MongoExtensionHostServicesVTable;
 
 /**
