@@ -44,6 +44,7 @@
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 #include <chrono>
 
@@ -51,7 +52,7 @@
 namespace mongo::executor {
 
 
-class PinnedConnectionTaskExecutorTest : public ThreadPoolExecutorTest {
+class MONGO_MOD_OPEN PinnedConnectionTaskExecutorTest : public ThreadPoolExecutorTest {
     using SinkMessageCbT = std::function<Status(Message)>;
     using SourceMessageCbT = std::function<StatusWith<Message>()>;
 

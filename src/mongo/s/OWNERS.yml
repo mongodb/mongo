@@ -73,3 +73,9 @@ filters:
   - "sharding_task_executor_pool*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "sharding_task_executor.*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "sharding_task_executor_test.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

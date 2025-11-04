@@ -725,6 +725,7 @@ networking.execution:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
+    fully_marked: true
   files:
     - src/mongo/db/baton*
     - src/mongo/db/default_baton*

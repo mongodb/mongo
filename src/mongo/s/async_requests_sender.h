@@ -44,6 +44,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/time_support.h"
@@ -93,7 +94,7 @@ namespace mongo {
  *
  * Does not throw exceptions.
  */
-class AsyncRequestsSender {
+class MONGO_MOD_PUBLIC AsyncRequestsSender {
     AsyncRequestsSender(const AsyncRequestsSender&) = delete;
     AsyncRequestsSender& operator=(const AsyncRequestsSender&) = delete;
 

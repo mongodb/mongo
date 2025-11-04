@@ -35,6 +35,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
@@ -48,7 +49,7 @@ class OperationContext;
 /**
  * The most basic Baton implementation.
  */
-class DefaultBaton : public Baton {
+class MONGO_MOD_PUBLIC DefaultBaton : public Baton {
 public:
     explicit DefaultBaton(OperationContext* opCtx);
 

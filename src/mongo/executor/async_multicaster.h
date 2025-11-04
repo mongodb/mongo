@@ -34,6 +34,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
@@ -54,7 +55,7 @@ namespace executor {
 /**
  * An async harness for scatter/gathering a command across an arbitrary number of specific hosts
  */
-class AsyncMulticaster {
+class MONGO_MOD_PUBLIC AsyncMulticaster {
 public:
     using Reply = std::tuple<HostAndPort, executor::RemoteCommandResponse>;
     static constexpr size_t kMaxConcurrency = 100;

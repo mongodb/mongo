@@ -33,6 +33,7 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -44,7 +45,7 @@ namespace mongo::async_rpc {
  * shardId.
  */
 template <typename CommandType>
-ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
+MONGO_MOD_PUBLIC ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
     std::shared_ptr<AsyncRPCOptions<CommandType>> options,
     OperationContext* opCtx,
     std::unique_ptr<ShardIdTargeter> targeter) {

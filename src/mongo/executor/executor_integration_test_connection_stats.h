@@ -34,17 +34,19 @@
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::executor {
 
 /**
  * Similar to assertConnectionStatsSoon but asserts on the values immediately.
  */
-void assertConnectionStats(const AsyncClientFactory& factory,
-                           const HostAndPort& remote,
-                           std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
-                           std::function<bool(const GRPCConnectionStats&)> gRPCTest,
-                           StringData errMsg);
+MONGO_MOD_PUBLIC void assertConnectionStats(
+    const AsyncClientFactory& factory,
+    const HostAndPort& remote,
+    std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
+    std::function<bool(const GRPCConnectionStats&)> gRPCTest,
+    StringData errMsg);
 
 /**
  * Asserts that the connection stats reach a certain value within a 30 second window. If the test is
@@ -54,10 +56,11 @@ void assertConnectionStats(const AsyncClientFactory& factory,
  * failure, a stringified version of the stats will be added to the errMsg.
  * TODO: SERVER-66126 Some callsites can switched to use assertConnectionStats.
  */
-void assertConnectionStatsSoon(const AsyncClientFactory& factory,
-                               const HostAndPort& remote,
-                               std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
-                               std::function<bool(const GRPCConnectionStats&)> gRPCTest,
-                               StringData errMsg);
+MONGO_MOD_PUBLIC void assertConnectionStatsSoon(
+    const AsyncClientFactory& factory,
+    const HostAndPort& remote,
+    std::function<bool(const ConnectionStatsPer&)> connectionPoolTest,
+    std::function<bool(const GRPCConnectionStats&)> gRPCTest,
+    StringData errMsg);
 
 }  // namespace mongo::executor

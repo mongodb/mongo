@@ -30,11 +30,13 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <memory>
 
-namespace mongo::executor {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC executor {
 
 struct ExecutorPair {
     std::weak_ptr<TaskExecutor> pinned;
@@ -61,4 +63,5 @@ private:
 // Shutdown and join all pinned executors that were built on top of 'underlying'.
 void shutdownPinnedExecutors(ServiceContext* svc, const std::shared_ptr<TaskExecutor>& underlying);
 
-}  // namespace mongo::executor
+}  // namespace MONGO_MOD_PUBLIC executor
+}  // namespace mongo

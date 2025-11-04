@@ -38,13 +38,14 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
 namespace executor {
 
-class ExecutorIntegrationTestFixture : public mongo::unittest::Test {
+class MONGO_MOD_OPEN ExecutorIntegrationTestFixture : public mongo::unittest::Test {
 public:
     virtual BSONObj runSetupCommandSync(const DatabaseName& db, BSONObj cmdObj) = 0;
 

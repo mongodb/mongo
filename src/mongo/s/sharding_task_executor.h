@@ -38,6 +38,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -54,7 +55,7 @@ class ThreadPoolTaskExecutor;
  * Implementation of a TaskExecutor that uses ThreadPoolTaskExecutor to submit tasks and allows to
  * override methods if needed.
  */
-class ShardingTaskExecutor final : public TaskExecutor {
+class MONGO_MOD_PUBLIC ShardingTaskExecutor final : public TaskExecutor {
     struct Passkey {
         explicit Passkey() = default;
     };

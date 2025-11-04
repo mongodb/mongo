@@ -31,11 +31,12 @@
 
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
 namespace mongo {
-namespace executor {
+namespace MONGO_MOD_PUBLIC executor {
 
 /**
  * Returns a new TaskExecutor that does all of its RPC execution over the same transport session.
@@ -52,5 +53,5 @@ std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(std::shared_ptr<T
  */
 std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(std::shared_ptr<TaskExecutor> exec);
 
-}  // namespace executor
+}  // namespace MONGO_MOD_PUBLIC executor
 }  // namespace mongo

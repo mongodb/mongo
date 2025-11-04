@@ -33,6 +33,7 @@
 #include "mongo/db/request_execution_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -44,7 +45,7 @@ namespace mongo {
  * Requests (i.e., instances of `RequestExecutionContext`) are scheduled on a thread-pool, and
  * passed to the command-specific implementation of `handleRequest`.
  */
-class AsyncRequestExecutor {
+class MONGO_MOD_OPEN AsyncRequestExecutor {
 public:
     AsyncRequestExecutor(AsyncRequestExecutor&&) = delete;
     AsyncRequestExecutor(const AsyncRequestExecutor&) = delete;

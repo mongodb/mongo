@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/synchronized_value.h"
 
@@ -81,7 +82,7 @@ class ShardRegistry;
  * * The ServerParameters can update the Parameters which will used in the next update
  * * The SpecificPools for its ConnectionPool can updateHost with their individual States
  */
-class ShardingTaskExecutorPoolController final
+class MONGO_MOD_PUBLIC ShardingTaskExecutorPoolController final
     : public executor::ConnectionPool::ControllerInterface {
     class ReplicaSetChangeListener;
 

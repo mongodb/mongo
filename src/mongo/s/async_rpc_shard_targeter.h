@@ -46,6 +46,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 
@@ -61,7 +62,7 @@
 namespace mongo {
 namespace async_rpc {
 
-class ShardIdTargeter : public Targeter {
+class MONGO_MOD_OPEN ShardIdTargeter : public Targeter {
 public:
     ShardIdTargeter(ExecutorPtr executor,
                     OperationContext* opCtx,

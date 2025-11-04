@@ -36,6 +36,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -47,7 +48,7 @@ namespace mongo::executor {
  *
  * The underlying session is returned to the pool upon destruction of the ExhaustResponseReader.
  */
-class ExhaustResponseReaderTL : public NetworkInterface::ExhaustResponseReader {
+class MONGO_MOD_PUBLIC ExhaustResponseReaderTL : public NetworkInterface::ExhaustResponseReader {
 public:
     ExhaustResponseReaderTL(RemoteCommandRequest originalRequest,
                             RemoteCommandResponse initialResponse,

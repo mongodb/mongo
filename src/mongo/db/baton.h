@@ -32,6 +32,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
@@ -51,7 +52,7 @@ class NetworkingBaton;
 
 class Baton;
 
-using BatonHandle = std::shared_ptr<Baton>;
+using BatonHandle MONGO_MOD_PUBLIC = std::shared_ptr<Baton>;
 
 /**
  * A Baton is lightweight executor, with parallel forward progress guarantees.  Rather than
@@ -60,9 +61,9 @@ using BatonHandle = std::shared_ptr<Baton>;
  *
  * Note: This occurs automatically when opCtx waiting on a condition variable.
  */
-class Baton : public Waitable,
-              public OutOfLineExecutor,
-              public std::enable_shared_from_this<Baton> {
+class MONGO_MOD_OPEN Baton : public Waitable,
+                             public OutOfLineExecutor,
+                             public std::enable_shared_from_this<Baton> {
 public:
     ~Baton() override = default;
 
