@@ -7,8 +7,6 @@
  *   excluded_from_simulate_crash_suites,
  *   # TODO SERVER-105270 enable test in viewless timeseries suites
  *   does_not_support_viewless_timeseries_yet,
- *   # TODO SERVER-105492 enable test in multiversion suites
- *   multiversion_incompatible,
  *   # TODO SERVER-105509 enable test in config shard suites
  *   config_shard_incompatible,
  * ]
@@ -33,6 +31,14 @@ function getRandomDb(db) {
 function getRandomCollection(db) {
     return db[collPrefix + Random.randInt(collCount)];
 }
+
+// TODO(SERVER-109819): Remove once v9.0 is last LTS
+// Since binary v8.2, index operations either take a single lock, or re-check the UUID when
+// re-acquiring the lock and return CollectionUUIDMismatch if the collection was dropped.
+// Older binaries don't do this, so they can return more error codes.
+const isPreV82Binary = TestData.multiversionBinVersion &&
+    MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(TestData.multiversionBinVersion),
+                                   "8.2") < 0;
 
 export const $config = (function() {
     var data = {nsPrefix: "create_idx_", numCollections: 5};
@@ -70,6 +76,8 @@ export const $config = (function() {
                     9748800,
                     9748801,
                     9748802,
+                    // v8.1 may return this because it only has 1 out of 2 commits for SERVER-97488
+                    ...(isPreV82Binary ? [ErrorCodes.CollectionUUIDMismatch] : []),
                     // If the collection already exists and is a view
                     // TODO SERVER-85548 this should never happen
                     ErrorCodes.NamespaceExists,
@@ -104,6 +112,7 @@ export const $config = (function() {
             assert.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec), [
                 // The collection has been concurrently dropped and recreated
                 ErrorCodes.CollectionUUIDMismatch,
+                ...(isPreV82Binary ? [ErrorCodes.IllegalOperation] : []),
                 ErrorCodes.IndexBuildAborted,
                 // If the collection already exists and is a view
                 // TODO SERVER-85548 this should never happen
@@ -129,7 +138,17 @@ export const $config = (function() {
         },
         checkIndexes: function(db, collName) {
             const coll = getRandomCollection(db);
-            const indexes = coll.getIndexes();
+            let indexes;
+            try {
+                indexes = coll.getIndexes();
+            } catch (err) {
+                // Binaries before v8.2 return this error if a regular collection gets dropped
+                // then re-created as timeseries during the listIndexes command.
+                if (isPreV82Binary && err.code == ErrorCodes.CommandNotSupportedOnView) {
+                    return;
+                }
+                throw err;
+            }
             indexes.forEach(index => {
                 Object.keys(index.key).forEach(indexKey => {
                     assert(!indexKey.startsWith('control.'),
