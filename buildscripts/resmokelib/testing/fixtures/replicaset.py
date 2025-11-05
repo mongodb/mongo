@@ -1175,6 +1175,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             "analyzeShardKeySplitPoints",
             "system.sessions",
             "actionlog",
+            "transactions",
+            "image_collection",
+            "system.change_collection",
         ]
 
         # the 'system.profile' collections are unreplicated and should not be compared.

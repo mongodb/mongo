@@ -25,20 +25,7 @@ export class CollectionValidator {
                 return thread.returnData();
             });
 
-            let isMultiversion = false;
-            let version = "";
-            hostList.forEach((host) => {
-                const conn = newMongoWithRetry(host);
-                conn.setSecondaryOk();
-                jsTest.authenticate(conn);
-                let res = conn.adminCommand("buildInfo");
-                if (version === "") {
-                    version = res.version;
-                }
-                if (res.version != version) {
-                    isMultiversion = true;
-                }
-            });
+            const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 
             // Compare hashes between nodes.
             let hashes = {};
@@ -72,7 +59,7 @@ export class CollectionValidator {
                             if (db == "local") {
                                 return;
                             }
-                            if (!currHashes[db][coll]) {
+                            if (!currHashes[db] || !currHashes[db][coll]) {
                                 return;
                             }
                             assert.eq(
