@@ -17,6 +17,7 @@
  *     assumes_snapshot_transactions,
  *     requires_fcv_80,
  *     temp_disabled_embedded_router_uncategorized,
+ *     assumes_balancer_off,
  * ]
  * ]
  */

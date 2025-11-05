@@ -5,7 +5,7 @@
  * cursor manager. Threads perform find, getMore and explain commands while the database,
  * collection, or an index is dropped.
  *
- * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
+ * @tags: [uses_curop_agg_stage, state_functions_share_cursor, assumes_balancer_off]
  */
 
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
