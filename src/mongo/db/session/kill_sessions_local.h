@@ -55,6 +55,16 @@ void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              ErrorCodes::Error reason = ErrorCodes::Interrupted);
 
 /**
+ * Matches sessions which have unprepared multi-statement transactions and affected the input
+ * namespace. Kills the sessions and aborts the transactions.
+ */
+void killSessionsAbortUnpreparedTransactionsWithinNamespace(
+    OperationContext* opCtx,
+    const SessionKiller::Matcher& matcher,
+    const NamespaceString& nss,
+    ErrorCodes::Error reason = ErrorCodes::Interrupted);
+
+/**
  * Aborts any expired transactions.
  */
 void killAllExpiredTransactions(OperationContext* opCtx,

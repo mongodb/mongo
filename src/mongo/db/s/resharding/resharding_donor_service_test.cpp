@@ -119,7 +119,8 @@ public:
         return std::make_unique<ShardingRecoveryService::NoCustomAction>();
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) {
+    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx,
+                                               const NamespaceString& sourceNss) {
         _maybeThrowErrorForFunction(opCtx,
                                     ExternalFunction::kAbortUnpreparedTransactionIfNecessary);
     }
@@ -182,8 +183,9 @@ public:
         return _impl->getOnReleaseCriticalSectionCustomAction();
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
-        _impl->abortUnpreparedTransactionIfNecessary(opCtx);
+    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx,
+                                               const NamespaceString& sourceNss) override {
+        _impl->abortUnpreparedTransactionIfNecessary(opCtx, sourceNss);
     }
 
 private:
