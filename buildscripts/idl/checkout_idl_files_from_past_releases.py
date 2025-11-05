@@ -110,10 +110,19 @@ def _show_with_retry(tag: str, path: str):
     return check_output(["git", "show", f"{tag}:{path}"])
 
 
+@retry(tries=3, delay=5)
+def _fetch_with_retry(tags: List[str]):
+    return check_output(["git", "fetch", "--depth=1", "origin", *tags])
+
+
 def make_idl_directories(tags: List[str], destination: str) -> None:
     """For each tag, construct a source tree containing only its IDL files."""
     LOGGER.info("Clearing destination directory '%s'", destination)
     shutil.rmtree(destination, ignore_errors=True)
+
+    # Prefetch all tags we will use up front to avoid `git show` failures later.
+    LOGGER.info("Fetching tags: %s", tags)
+    _fetch_with_retry(tags)
 
     for tag in tags:
         LOGGER.info("Checking out IDL files in %s", tag)
