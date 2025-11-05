@@ -1,6 +1,6 @@
 /**
  * Tests that index builds access the storage engine with low priority on both primary and secondary
- * nodes when enabled, and with normal priority when storageEngineDeprioritizeBackgroundTasks is
+ * nodes when enabled, and with normal priority when executionControlDeprioritizeBackgroundTasks is
  * disabled.
  *
  * @tags: [
@@ -16,8 +16,8 @@ const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {
         setParameter: {
-            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
-            storageEngineHeuristicDeprioritizationEnabled: false,
+            executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+            executionControlHeuristicDeprioritizationEnabled: false,
         },
     },
 });
@@ -71,9 +71,9 @@ const runIndexBuildTest = function ({coll, secondaryDB, indexSpec, expectLowPrio
 
 runIndexBuildTest({coll: coll, secondaryDB: secondaryDB, indexSpec: {x: 1}, expectLowPriorityWrites: true});
 
-jsTest.log.info("Disabling storageEngineDeprioritizeBackgroundTasks on primary and secondary...");
-assert.commandWorked(primary.adminCommand({setParameter: 1, storageEngineDeprioritizeBackgroundTasks: false}));
-assert.commandWorked(secondary.adminCommand({setParameter: 1, storageEngineDeprioritizeBackgroundTasks: false}));
+jsTest.log.info("Disabling executionControlDeprioritizeBackgroundTasks on primary and secondary...");
+assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlDeprioritizeBackgroundTasks: false}));
+assert.commandWorked(secondary.adminCommand({setParameter: 1, executionControlDeprioritizeBackgroundTasks: false}));
 
 runIndexBuildTest({coll: coll, secondaryDB: secondaryDB, indexSpec: {y: 1}, expectLowPriorityWrites: false});
 

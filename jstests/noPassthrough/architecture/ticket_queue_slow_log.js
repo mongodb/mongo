@@ -15,12 +15,12 @@ const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         setParameter: {
-            storageEngineConcurrentReadTransactions: kNumReadTickets,
+            executionControlConcurrentReadTransactions: kNumReadTickets,
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
             internalQueryExecYieldIterations: 1,
             // Disable heuristic deprioritization to ensure readers are queued in the normal pool.
-            storageEngineHeuristicDeprioritizationEnabled: false,
+            executionControlHeuristicDeprioritizationEnabled: false,
         },
     },
 });
@@ -56,7 +56,11 @@ for (TestData.id = 0; TestData.id < kQueuedReaders; TestData.id++) {
                 _id: TestData.id,
                 msg: "queued reader started",
             });
-            while (db.getSiblingDB(TestData.dbName).timing_coordination.findOne({_id: "stop reading"}) == null) {
+            while (
+                db.getSiblingDB(TestData.dbName).timing_coordination.findOne({
+                    _id: "stop reading",
+                }) == null
+            ) {
                 db.getSiblingDB(TestData.dbName)[TestData.collName].aggregate([{"$count": "x"}]);
             }
         }, primary.port),

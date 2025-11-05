@@ -3257,7 +3257,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate IDLServerParameterDeprecatedAlias instance."""
 
         for alias_no, alias in enumerate(param.deprecated_name):
-            varname = f"scp_{param_no}_deprecated_alias"
+            varname = f"scp_{param_no}_deprecated_alias_{alias_no}"
             with self.get_initializer_lambda(
                 f"auto {varname}",
                 return_type="std::unique_ptr<ServerParameter>",

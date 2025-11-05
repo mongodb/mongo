@@ -66,7 +66,7 @@ Status updateSettings(const std::string& op, Updater&& updater) {
 
         if (!ticketingSystem) {
             auto message =
-                fmt::format("Attempting to modify {} on an instance without a storage engine", op);
+                fmt::format("Attempting to modify {} on an instance without execution control", op);
             return {ErrorCodes::IllegalOperation, message};
         }
 
@@ -91,9 +91,9 @@ void warnIfPrioritizationDisabled(TicketingSystem* ticketingSystem,
                                   const std::string& serverParameter) {
     if (!ticketingSystem->usesPrioritization()) {
         LOGV2_WARNING(11280901,
-                      "Updating {serverParameter} while the storage engine concurrency adjustment "
-                      "algorithm is using a single pool without prioritization. The new value will "
-                      "be stored but will not take effect.",
+                      "Updating {serverParameter} while the execution control concurrency "
+                      "adjustment algorithm is using a single pool without prioritization. The new "
+                      "value will be stored but will not take effect.",
                       "serverParameter"_attr = serverParameter);
     }
 }
@@ -107,14 +107,15 @@ bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
     //      2. We don't deprioritize operations within a multi-document transaction.
     //      3. It is illegal to demote a high-priority (exempt) operation.
     //      4. The operation is already low-priority (no-op).
-    if (!gStorageEngineHeuristicDeprioritizationEnabled.load() ||
+    if (!gExecutionControlHeuristicDeprioritizationEnabled.load() ||
         opCtx->inMultiDocumentTransaction() || priority == AdmissionContext::Priority::kExempt ||
         priority == AdmissionContext::Priority::kLow) {
         return false;
     }
 
     // If the op is eligible, downgrade it if it has yielded enough times to meet the threshold.
-    return admCtx->getAdmissions() >= gStorageEngineHeuristicNumYieldsDeprioritizeThreshold.load();
+    return admCtx->getAdmissions() >=
+        gExecutionControlHeuristicNumAdmissionsDeprioritizeThreshold.load();
 }
 
 }  // namespace
@@ -259,7 +260,7 @@ TicketingSystem::TicketingSystem(
     RWTicketHolder normal,
     RWTicketHolder low,
     Milliseconds throughputProbingInterval,
-    StorageEngineConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm)
+    ExecutionControlConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm)
     : _state({concurrencyAdjustmentAlgorithm}),
       _throughputProbing(svcCtx, normal.read.get(), normal.write.get(), throughputProbingInterval) {
     _holders[static_cast<size_t>(AdmissionContext::Priority::kNormal)] = std::move(normal);
@@ -293,8 +294,8 @@ void TicketingSystem::setConcurrentTransactions(OperationContext* opCtx,
 
 Status TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
                                                           std::string algorithmName) {
-    const auto parsedAlgorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
-        algorithmName, IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"});
+    const auto parsedAlgorithm = ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
+        algorithmName, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
 
     const TicketingState oldState = _state.loadRelaxed();
     const TicketingState newState = {parsedAlgorithm};
@@ -525,12 +526,12 @@ TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, Operatio
 
 bool TicketingSystem::TicketingState::usesPrioritization() const {
     return algorithm ==
-        StorageEngineConcurrencyAdjustmentAlgorithmEnum::
+        ExecutionControlConcurrencyAdjustmentAlgorithmEnum::
             kFixedConcurrentTransactionsWithPrioritization;
 }
 
 bool TicketingSystem::TicketingState::usesThroughputProbing() const {
-    return algorithm == StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing;
+    return algorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing;
 }
 
 bool TicketingSystem::TicketingState::isRuntimeResizable() const {
@@ -538,7 +539,7 @@ bool TicketingSystem::TicketingState::isRuntimeResizable() const {
 }
 
 void TicketingSystem::TicketingState::appendStats(BSONObjBuilder& b) const {
-    b.append("storageEngineConcurrencyAdjustmentAlgorithm", algorithm);
+    b.append("executionControlConcurrencyAdjustmentAlgorithm", algorithm);
 }
 
 }  // namespace admission

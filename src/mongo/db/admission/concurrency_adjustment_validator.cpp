@@ -40,8 +40,8 @@ namespace mongo {
 
 Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
                                               const boost::optional<TenantId>&) try {
-    StorageEngineConcurrencyAdjustmentAlgorithm_parse(
-        name, IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"});
+    ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
+        name, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();

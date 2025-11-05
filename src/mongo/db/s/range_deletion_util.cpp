@@ -339,7 +339,7 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                                                      const ChunkRange& range) {
     boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
         deprioritizeExecutionControl;
-    if (gStorageEngineDeprioritizeBackgroundTasks.load()) {
+    if (gExecutionControlDeprioritizeBackgroundTasks.load()) {
         deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
     }
 

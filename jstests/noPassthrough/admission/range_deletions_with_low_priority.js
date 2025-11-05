@@ -1,7 +1,7 @@
 /**
  * Tests that the background range deletion task on a donor shard after a chunk migration completes
  * accesses the storage engine with low priority when enabled, and with normal priority when
- * storageEngineDeprioritizeBackgroundTasks is disabled.
+ * executionControlDeprioritizeBackgroundTasks is disabled.
  *
  * @tags: [
  *    requires_wiredtiger,
@@ -16,8 +16,8 @@ const st = new ShardingTest({
     other: {
         rsOptions: {
             setParameter: {
-                storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
-                storageEngineHeuristicDeprioritizationEnabled: false,
+                executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+                executionControlHeuristicDeprioritizationEnabled: false,
             },
         },
     },
@@ -69,9 +69,9 @@ assert.gt(
     "The number of low-priority writes should increase after a range deletion runs",
 );
 
-// Disable storageEngineDeprioritizeBackgroundTasks so that range deletions run with normal
+// Disable executionControlDeprioritizeBackgroundTasks so that range deletions run with normal
 // priority. Return the chunk back to the donor and verify no low-priority writes are done there.
-assert.commandWorked(recipient.adminCommand({setParameter: 1, storageEngineDeprioritizeBackgroundTasks: false}));
+assert.commandWorked(recipient.adminCommand({setParameter: 1, executionControlDeprioritizeBackgroundTasks: false}));
 
 lowPriorityBefore = numLowPriorityWrites(recipient);
 
@@ -82,7 +82,7 @@ lowPriorityAfter = numLowPriorityWrites(recipient);
 assert.eq(
     lowPriorityAfter,
     lowPriorityBefore,
-    "Should NOT see low-priority writes when storageEngineDeprioritizeBackgroundTasks is disabled",
+    "Should NOT see low-priority writes when executionControlDeprioritizeBackgroundTasks is disabled",
 );
 
 st.stop();

@@ -62,8 +62,8 @@ bool hasNonDefaultTransactionConcurrencySettings() {
 }
 
 std::unique_ptr<TicketingSystem> createTicketingSystem(
-    ServiceContext* svcCtx, StorageEngineConcurrencyAdjustmentAlgorithmEnum algorithm) {
-    using enum StorageEngineConcurrencyAdjustmentAlgorithmEnum;
+    ServiceContext* svcCtx, ExecutionControlConcurrencyAdjustmentAlgorithmEnum algorithm) {
+    using enum ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
 
     auto delinquentReadCb = [](AdmissionContext* admCtx, Milliseconds delta) {
         static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentReadAcquisition(delta);
@@ -97,25 +97,26 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                                            false /* trackPeakUsed */,
                                            gWriteLowPriorityMaxQueueDepth.load(),
                                            delinquentWriteCb)},
-        Milliseconds{gStorageEngineConcurrencyAdjustmentIntervalMillis},
+        Milliseconds{gExecutionControlConcurrencyAdjustmentIntervalMillis},
         algorithm);
 }
 
 }  // namespace
 
 void initializeExecutionControl(ServiceContext* svcCtx) {
-    auto algorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
-        gStorageEngineConcurrencyAdjustmentAlgorithm,
-        IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"});
+    auto algorithm = ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
+        gExecutionControlConcurrencyAdjustmentAlgorithm,
+        IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
 
-    if (algorithm == StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
+    if (algorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
         (gConcurrentReadTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions ||
          gConcurrentWriteTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions)) {
-        gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
-        algorithm = StorageEngineConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions;
+        gExecutionControlConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
+        algorithm =
+            ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions;
     }
 
-    if (algorithm == StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
+    if (algorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
         hasNonDefaultTransactionConcurrencySettings()) {
         LOGV2_WARNING(11039601,
                       "When using the kThroughputProbing storage engine algorithm, all concurrent "
@@ -127,7 +128,7 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
 
     auto* ticketingSystem = TicketingSystem::get(svcCtx);
 
-    if (algorithm != StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing) {
+    if (algorithm != ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing) {
         return;
     }
 

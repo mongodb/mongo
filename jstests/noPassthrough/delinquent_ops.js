@@ -30,12 +30,15 @@ const findComment = "delinquent_ops.js-COMMENT";
 // TODO (SERVER-111527): remove to properly test delinquency stats per priority.
 function disableDeprioritizationHeuristic(conn) {
     let algorithm = assert.commandWorked(
-        conn.adminCommand({getParameter: 1, storageEngineConcurrencyAdjustmentAlgorithm: 1}),
+        conn.adminCommand({getParameter: 1, executionControlConcurrencyAdjustmentAlgorithm: 1}),
     );
-    if (algorithm.storageEngineConcurrencyAdjustmentAlgorithm == "fixedConcurrentTransactionsWithPrioritization") {
-        // Set a very high number of yields, effectively disabling the heuristic.
+    if (algorithm.executionControlConcurrencyAdjustmentAlgorithm == "fixedConcurrentTransactionsWithPrioritization") {
+        // Set a very high number of admissions, effectively disabling the heuristic.
         assert.commandWorked(
-            conn.adminCommand({setParameter: 1, storageEngineHeuristicNumYieldsDeprioritizeThreshold: 999999}),
+            conn.adminCommand({
+                setParameter: 1,
+                executionControlHeuristicNumAdmissionsDeprioritizeThreshold: 999999,
+            }),
         );
     }
 }

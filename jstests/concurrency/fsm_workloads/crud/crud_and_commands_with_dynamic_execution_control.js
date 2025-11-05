@@ -25,9 +25,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             $config.data.originalAlgorithmValue = assert.commandWorked(
                 db.adminCommand({
                     getParameter: 1,
-                    storageEngineConcurrencyAdjustmentAlgorithm: 1,
+                    executionControlConcurrencyAdjustmentAlgorithm: 1,
                 }),
-            ).storageEngineConcurrencyAdjustmentAlgorithm;
+            ).executionControlConcurrencyAdjustmentAlgorithm;
         });
     };
 
@@ -36,7 +36,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             assert.commandWorked(
                 db.adminCommand({
                     setParameter: 1,
-                    storageEngineConcurrencyAdjustmentAlgorithm: $config.data.originalAlgorithmValue,
+                    executionControlConcurrencyAdjustmentAlgorithm: $config.data.originalAlgorithmValue,
                 }),
             );
         });
@@ -45,13 +45,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.setConcurrencyAlgorithm = function (db, collName) {
         const targetAlgorithm = $config.data.algorithms[Random.randInt($config.data.algorithms.length)];
 
-        jsTest.log.info(`Attempting to set storageEngineConcurrencyAdjustmentAlgorithm to: ${targetAlgorithm}`);
+        jsTest.log.info(`Attempting to set executionControlConcurrencyAdjustmentAlgorithm to: ${targetAlgorithm}`);
 
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, storageEngineConcurrencyAdjustmentAlgorithm: targetAlgorithm}),
+            db.adminCommand({setParameter: 1, executionControlConcurrencyAdjustmentAlgorithm: targetAlgorithm}),
         );
 
-        jsTest.log.info(`Successfully set storageEngineConcurrencyAdjustmentAlgorithm to: ${targetAlgorithm}`);
+        jsTest.log.info(`Successfully set executionControlConcurrencyAdjustmentAlgorithm to: ${targetAlgorithm}`);
     };
 
     const statesProbability = {

@@ -20,9 +20,9 @@ const findComment = "delinquent_ops.js-COMMENT";
 // to enforce that all (or some fraction) of operations are not delinquent. Also lower the threshold
 // of parameters to generate low priority operations.
 let lowPriorityParams = {
-    storageEngineHeuristicDeprioritizationEnabled: true,
+    executionControlHeuristicDeprioritizationEnabled: true,
     internalQueryExecYieldIterations: 1,
-    storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+    executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
     featureFlagRecordDelinquentMetrics: true,
     delinquentAcquisitionIntervalMillis: delinquentIntervalMs,
     internalQueryStatsRateLimit: -1,

@@ -33,12 +33,12 @@ global:
         - "mongo/db/admission/concurrency_adjustment_validator.h"
 
 enums:
-    StorageEngineConcurrencyAdjustmentAlgorithm:
-        description: "Algorithm for adjusting the number of concurrent storage engine transactions"
+    ExecutionControlConcurrencyAdjustmentAlgorithm:
+        description: "Algorithm for adjusting the number of concurrent execution control transactions"
         type: string
         # 'kFixedConcurrentTransactions': Number of concurrent transactions are controlled by
-        # storageEngineConcurrentWriteTransactions/storageEngineConcurrentReadTransactions and will
-        # not be adjusted automatically based on overall system throughput.
+        # executionControlConcurrentWriteTransactions/executionControlConcurrentReadTransactions and
+        # will not be adjusted automatically based on overall system throughput.
         #
         # 'kFixedConcurrentTransactionsWithPrioritization': The number of concurrent transactions is
         # controlled by server parameters and divided into two pools based on operation priority
@@ -48,20 +48,21 @@ enums:
         # each pool.
         #
         # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
-        # increasing or decreasing concurrency in the storage engine, based on system throughput.
+        # increasing or decreasing concurrency in the execution control, based on system throughput.
         values:
             kFixedConcurrentTransactions: "fixedConcurrentTransactions"
             kFixedConcurrentTransactionsWithPrioritization: "fixedConcurrentTransactionsWithPrioritization"
             kThroughputProbing: "throughputProbing"
 
 server_parameters:
-    storageEngineConcurrentWriteTransactions:
-        description: "Storage Engine Concurrent Write Transactions"
+    executionControlConcurrentWriteTransactions:
+        description: "Execution Control Concurrent Write Transactions"
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentWriteTransactions
         on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransactions"
         deprecated_name:
+            - storageEngineConcurrentWriteTransactions
             - wiredTigerConcurrentWriteTransactions
         default:
             {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
@@ -69,8 +70,8 @@ server_parameters:
             callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions"
         redact: false
 
-    storageEngineConcurrentWriteLowPriorityTransactions:
-        description: "Storage Engine Concurrent Write Low Priority Transactions"
+    executionControlConcurrentWriteLowPriorityTransactions:
+        description: "Execution Control Concurrent Write Low Priority Transactions"
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentWriteLowPriorityTransactions
@@ -82,13 +83,14 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
-    storageEngineConcurrentReadTransactions:
-        description: "Storage Engine Concurrent Read Transactions"
+    executionControlConcurrentReadTransactions:
+        description: "Execution Control Concurrent Read Transactions"
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentReadTransactions
         on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions"
         deprecated_name:
+            - storageEngineConcurrentReadTransactions
             - wiredTigerConcurrentReadTransactions
         default:
             {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
@@ -96,8 +98,8 @@ server_parameters:
             callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactions"
         redact: false
 
-    storageEngineConcurrentReadLowPriorityTransactions:
-        description: "Storage Engine Concurrent Read Low Priority Transactions"
+    executionControlConcurrentReadLowPriorityTransactions:
+        description: "Execution Control Concurrent Read Low Priority Transactions"
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentReadLowPriorityTransactions
@@ -109,7 +111,7 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
-    storageEngineReadMaxQueueDepth:
+    executionControlReadMaxQueueDepth:
         description: >-
             Controls the maximum number of read transactions waiting in queue for a thread to be free.
             Setting this number to 0 will not allow any transaction above the max concurrency amount.
@@ -118,11 +120,13 @@ server_parameters:
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gReadMaxQueueDepth
         on_update: "admission::TicketingSystem::NormalPrioritySettings::updateReadMaxQueueDepth"
+        deprecated_name:
+            - storageEngineReadMaxQueueDepth
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
         validator: {gte: 0}
         redact: false
 
-    storageEngineReadLowPriorityMaxQueueDepth:
+    executionControlReadLowPriorityMaxQueueDepth:
         description: >-
             Controls the maximum number of read low priority transactions waiting in queue for a thread to be free.
             Setting this number to 0 will not allow any transaction above the max concurrency amount.
@@ -135,7 +139,7 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
-    storageEngineWriteMaxQueueDepth:
+    executionControlWriteMaxQueueDepth:
         description: >-
             Controls the maximum number of write transactions waiting in queue for a thread to be free.
             Setting this number to 0 will not allow any transaction above the max concurrency amount.
@@ -144,11 +148,13 @@ server_parameters:
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gWriteMaxQueueDepth
         on_update: "admission::TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth"
+        deprecated_name:
+            - storageEngineWriteMaxQueueDepth
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
         validator: {gte: 0}
         redact: false
 
-    storageEngineWriteLowPriorityMaxQueueDepth:
+    executionControlWriteLowPriorityMaxQueueDepth:
         description: >-
             Controls the maximum number of write low priority transactions waiting in queue for a thread to be free.
             Setting this number to 0 will not allow any transaction above the max concurrency amount.
@@ -161,66 +167,69 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
-    storageEngineConcurrencyAdjustmentAlgorithm:
+    executionControlConcurrencyAdjustmentAlgorithm:
         description: >-
-            The algorithm to be used for adjusting the number of concurrent storage engine transactions.
+            The algorithm to be used for adjusting the number of concurrent execution control transactions.
         set_at: [startup, runtime]
         cpp_vartype: std::string
-        cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
+        cpp_varname: gExecutionControlConcurrencyAdjustmentAlgorithm
         on_update: "admission::TicketingSystem::updateConcurrencyAdjustmentAlgorithm"
+        deprecated_name:
+            - storageEngineConcurrencyAdjustmentAlgorithm
         default: "throughputProbing"
         validator:
             callback: validateConcurrencyAdjustmentAlgorithm
         redact: false
 
-    storageEngineConcurrencyAdjustmentIntervalMillis:
+    executionControlConcurrencyAdjustmentIntervalMillis:
         description: >-
             The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
             not set to fixedConcurrentTransactions.
         set_at: startup
         cpp_vartype: int32_t
-        cpp_varname: gStorageEngineConcurrencyAdjustmentIntervalMillis
+        cpp_varname: gExecutionControlConcurrencyAdjustmentIntervalMillis
+        deprecated_name:
+            - storageEngineConcurrencyAdjustmentIntervalMillis
         default: 100
         validator:
             gte: 10
         redact: false
 
-    storageEngineHeuristicDeprioritizationEnabled:
+    executionControlHeuristicDeprioritizationEnabled:
         description: >-
             Enables a heuristic that will evaluate long-running operations and deprioritize them to
-            the low priority ticket pool. This parameter only takes effect if the storage engine's
+            the low priority ticket pool. This parameter only takes effect if the execution
             admission control with prioritization is enabled. This only takes effect if
-            `storageEngineConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
+            `executionControlConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: gStorageEngineHeuristicDeprioritizationEnabled
+        cpp_varname: gExecutionControlHeuristicDeprioritizationEnabled
         default: true
         redact: false
 
-    storageEngineHeuristicNumYieldsDeprioritizeThreshold:
+    executionControlHeuristicNumAdmissionsDeprioritizeThreshold:
         description: >-
-            The number of global lock yields an operation must perform before it is deprioritized to
-            the low-priority ticket pool. This parameter only takes effect when
-            `storageEngineHeuristicDeprioritizationEnabled` is true and `storageEngineConcurrencyAdjustmentAlgorithm`
-            is "fixedConcurrentTransactionsWithPrioritization".
+            The number of admissions an operation must perform before it is deprioritized to the low-priority
+            ticket pool. This parameter only takes effect when `executionControlHeuristicDeprioritizationEnabled`
+            is true and `executionControlConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
-        cpp_varname: gStorageEngineHeuristicNumYieldsDeprioritizeThreshold
+        cpp_varname: gExecutionControlHeuristicNumAdmissionsDeprioritizeThreshold
         default: 3
         validator:
             gte: 0
         redact: false
 
-    storageEngineDeprioritizeBackgroundTasks:
+    executionControlDeprioritizeBackgroundTasks:
         description: >-
             This controls whether background tasks (defined as index builds, range deletions, and
             TTL deletions) are automatically deprioritized to the low-priority pool. If set to false,
             these tasks will not be automatically deprioritized upon starting. However, they can
             still be deprioritized later by the heuristic if the operation exceeds the yield
-            threshold. This only takes effect if `storageEngineConcurrencyAdjustmentAlgorithm` is
+            threshold. This only takes effect if `executionControlConcurrencyAdjustmentAlgorithm` is
             "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: gStorageEngineDeprioritizeBackgroundTasks
+        cpp_varname: gExecutionControlDeprioritizeBackgroundTasks
         default: true
         redact: false

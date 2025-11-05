@@ -1,6 +1,6 @@
 /**
  * Tests that the TTL deleter accesses the storage engine with low priority when enabled,
- * and with normal priority when storageEngineDeprioritizeBackgroundTasks is disabled.
+ * and with normal priority when executionControlDeprioritizeBackgroundTasks is disabled.
  *
  * @tags: [
  *      requires_wiredtiger,
@@ -15,8 +15,8 @@ const rst = new ReplSetTest({
         setParameter: {
             ttlMonitorSleepSecs: 1,
             ttlMonitorEnabled: false,
-            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
-            storageEngineHeuristicDeprioritizationEnabled: false,
+            executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+            executionControlHeuristicDeprioritizationEnabled: false,
         },
     },
 });
@@ -94,7 +94,7 @@ jsTest.log.info("Check for low-priority writes when deprioritization is enabled"
 
 jsTest.log.info("Check for normal-priority writes when deprioritization is disabled");
 {
-    assert.commandWorked(primary.adminCommand({setParameter: 1, storageEngineDeprioritizeBackgroundTasks: false}));
+    assert.commandWorked(primary.adminCommand({setParameter: 1, executionControlDeprioritizeBackgroundTasks: false}));
 
     // Insert a new batch of documents to be deleted.
     insertExpiredDocs(coll, {numDocs: 1000, startId: 2000, payloadSize: 512});
@@ -112,7 +112,7 @@ jsTest.log.info("Check for normal-priority writes when deprioritization is disab
     assert.eq(
         lowPriorityAfter,
         lowPriorityBefore,
-        "Should NOT see low-priority writes when storageEngineDeprioritizeBackgroundTasks is disabled",
+        "Should NOT see low-priority writes when executionControlDeprioritizeBackgroundTasks is disabled",
     );
 }
 

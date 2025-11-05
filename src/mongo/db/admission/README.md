@@ -21,8 +21,8 @@ There are 2 separate pools of available tickets: one pool for global lock read r
 As of v7.0, the size of each ticket pool is managed dynamically by the server to maximize
 throughput. Details of the algorithm can be found in [Throughput Probing](#throughput-probing) This
 dynamic management can be disabled by specifying the size of each pool manually via server
-parameters `storageEngineConcurrentReadTransactions` (read ticket pool) and
-`storageEngineConcurrentWriteTransactions` (write ticket pool). #
+parameters `executionControlConcurrentReadTransactions` (read ticket pool) and
+`executionControlConcurrentWriteTransactions` (write ticket pool). #
 
 Each pool of tickets is maintained in a
 [TicketHolder](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/ticketholder.h#L52).

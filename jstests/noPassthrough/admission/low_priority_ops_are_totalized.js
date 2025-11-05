@@ -14,9 +14,9 @@ const rst = new ReplSetTest({
         setParameter: {
             // Force the query to yield frequently to better expose the low-priority behavior.
             internalQueryExecYieldIterations: 1,
-            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
-            storageEngineHeuristicDeprioritizationEnabled: true,
-            storageEngineHeuristicNumYieldsDeprioritizeThreshold: 3,
+            executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+            executionControlHeuristicDeprioritizationEnabled: true,
+            executionControlHeuristicNumAdmissionsDeprioritizeThreshold: 3,
         },
     },
 });

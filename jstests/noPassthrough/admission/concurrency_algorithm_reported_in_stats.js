@@ -17,31 +17,31 @@ const db = primary.getDB(jsTestName());
 assert.commandWorked(
     rst.getPrimary().adminCommand({
         setParameter: 1,
-        storageEngineConcurrencyAdjustmentAlgorithm: "throughputProbing",
+        executionControlConcurrencyAdjustmentAlgorithm: "throughputProbing",
     }),
 );
 
-let algorithm = db.serverStatus().queues.execution.storageEngineConcurrencyAdjustmentAlgorithm;
+let algorithm = db.serverStatus().queues.execution.executionControlConcurrencyAdjustmentAlgorithm;
 assert.eq(2, algorithm);
 
 assert.commandWorked(
     rst.getPrimary().adminCommand({
         setParameter: 1,
-        storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+        executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
     }),
 );
 
-algorithm = db.serverStatus().queues.execution.storageEngineConcurrencyAdjustmentAlgorithm;
+algorithm = db.serverStatus().queues.execution.executionControlConcurrencyAdjustmentAlgorithm;
 assert.eq(1, algorithm);
 
 assert.commandWorked(
     rst.getPrimary().adminCommand({
         setParameter: 1,
-        storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
+        executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
     }),
 );
 
-algorithm = db.serverStatus().queues.execution.storageEngineConcurrencyAdjustmentAlgorithm;
+algorithm = db.serverStatus().queues.execution.executionControlConcurrencyAdjustmentAlgorithm;
 assert.eq(0, algorithm);
 
 rst.stopSet();

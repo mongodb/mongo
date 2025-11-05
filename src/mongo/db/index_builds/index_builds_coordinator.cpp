@@ -3358,7 +3358,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     const boost::optional<RecordId>& resumeAfterRecordId) {
     boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
         deprioritizeExecutionControl;
-    if (gStorageEngineDeprioritizeBackgroundTasks.load()) {
+    if (gExecutionControlDeprioritizeBackgroundTasks.load()) {
         deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
     }
 
@@ -3396,7 +3396,7 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
         deprioritizeExecutionControl;
-    if (gStorageEngineDeprioritizeBackgroundTasks.load()) {
+    if (gExecutionControlDeprioritizeBackgroundTasks.load()) {
         deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
     }
 

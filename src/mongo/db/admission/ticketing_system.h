@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-enum class StorageEngineConcurrencyAdjustmentAlgorithmEnum;
+enum class ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
 
 namespace admission {
 
@@ -78,11 +78,12 @@ public:
         std::unique_ptr<TicketHolder> write;
     };
 
-    TicketingSystem(ServiceContext* svcCtx,
-                    RWTicketHolder normal,
-                    RWTicketHolder low,
-                    Milliseconds throughputProbingInterval,
-                    StorageEngineConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm);
+    TicketingSystem(
+        ServiceContext* svcCtx,
+        RWTicketHolder normal,
+        RWTicketHolder low,
+        Milliseconds throughputProbingInterval,
+        ExecutionControlConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm);
 
     /**
      * A collection of static methods for managing normal priority settings.
@@ -188,7 +189,7 @@ private:
      * Encapsulates the ticketing system's concurrency mode and the logic that defines its behavior.
      */
     struct TicketingState {
-        StorageEngineConcurrencyAdjustmentAlgorithmEnum algorithm;
+        ExecutionControlConcurrencyAdjustmentAlgorithmEnum algorithm;
 
         bool usesPrioritization() const;
         bool usesThroughputProbing() const;

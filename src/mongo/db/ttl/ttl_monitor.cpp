@@ -354,7 +354,7 @@ void TTLMonitor::shutdown() {
 void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
     boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
         deprioritizeExecutionControl;
-    if (gStorageEngineDeprioritizeBackgroundTasks.load()) {
+    if (gExecutionControlDeprioritizeBackgroundTasks.load()) {
         deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
     }
 
