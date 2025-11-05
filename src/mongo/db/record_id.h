@@ -364,12 +364,12 @@ public:
             case Format::kSmallStr: {
                 StringData str = _getSmallStrNoCheck();
                 return "kSmallStr size: " + std::to_string(str.size()) + " string: '" +
-                    std::string(str.data()) + "'";
+                    std::string(str.data(), str.size()) + "'";
             }
             case Format::kBigStr: {
                 StringData str = _getBigStrNoCheck();
                 return "kBigStr size: " + std::to_string(str.size()) + " string: '" +
-                    std::string(str.data()) + "'";
+                    std::string(str.data(), str.size()) + "'";
             }
             default:
                 MONGO_UNREACHABLE;
