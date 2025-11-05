@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

@@ -51,6 +51,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>

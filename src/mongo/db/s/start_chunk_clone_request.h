@@ -41,6 +41,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <string>

@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace session_catalog_migration_util {

@@ -45,6 +45,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <list>

@@ -46,6 +46,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

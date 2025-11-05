@@ -33,6 +33,7 @@
 #include "mongo/db/s/migration_batch_inserter.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/modules.h"
 
 #pragma once
 

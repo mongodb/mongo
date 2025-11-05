@@ -33,6 +33,7 @@
 #include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/s/range_deletion.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

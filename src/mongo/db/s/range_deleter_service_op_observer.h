@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
