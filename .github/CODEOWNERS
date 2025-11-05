@@ -906,6 +906,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/hooks/**/run_check_repl_dbhash*.js @10gen/server-dbhash @svc-auto-approve-bot
 /jstests/hooks/**/run_check_shard_filtering_metadata.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /jstests/hooks/**/*validate_collections*.js @10gen/server-validate @svc-auto-approve-bot
+/jstests/hooks/**/*check_metadata_consistency* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/hooks/write_conflicts/OWNERS.yml
 /jstests/hooks/write_conflicts/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

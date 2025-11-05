@@ -36,3 +36,6 @@ filters:
   - "*validate_collections*.js":
     approvers:
       - 10gen/server-validate
+  - "*check_metadata_consistency*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
