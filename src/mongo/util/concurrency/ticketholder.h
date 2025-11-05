@@ -372,8 +372,14 @@ private:
     }
 
     TicketHolder* _ticketholder;
+
+    // NOTE: Always use the snapshotted priority stored in the Ticket, rather than reading the live
+    // priority from its associated AdmissionContext. The priority of the AdmissionContext cannot be
+    // assumed to match the one originally captured by this Ticket, as the RAII object that modified
+    // it may no longer be alive. Using the live priority could therefore lead to incorrect metrics.
     AdmissionContext* _admissionContext;
     AdmissionContext::Priority _priority;
+
     TickSource::Tick _acquisitionTime;
 };
 
