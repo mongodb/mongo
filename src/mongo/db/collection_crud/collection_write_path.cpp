@@ -292,10 +292,6 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             // The 'replicatedRecordId' being set indicates that this insert belongs to a replicated
             // recordId collection, and we need to use the given recordId while inserting.
             recordId = it->replicatedRecordId;
-        } else if (!it->recordId.isNull()) {
-            // This case would only normally be called in a testing circumstance to avoid
-            // automatically generating record ids for capped collections.
-            recordId = it->recordId;
         }
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
