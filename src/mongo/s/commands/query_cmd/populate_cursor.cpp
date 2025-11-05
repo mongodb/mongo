@@ -188,7 +188,7 @@ std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
             DatabaseName::kAdmin,
             requests,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kNoRetry /* getMore is never retryable */);
+            Shard::RetryPolicy::kStrictlyNotIdempotent);
 
         while (!ars.done()) {
             // Block until a response is available.
