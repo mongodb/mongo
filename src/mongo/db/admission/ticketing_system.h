@@ -147,7 +147,7 @@ public:
      * adjust the number of concurrent transactions. This includes switching between fixed
      * concurrency and throughput probing-based algorithms.
      */
-    void setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx, std::string algorithmName);
+    Status setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx, std::string algorithmName);
 
     /**
      * Appends statistics about the ticketing system's state to a BSON.

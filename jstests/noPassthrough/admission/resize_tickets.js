@@ -412,6 +412,146 @@ describe("Storage engine concurrency adjustment algorithm", function () {
         });
     });
 
+    describe("Transition validation with zero low-priority tickets", function () {
+        let replTest, mongod;
+
+        beforeEach(function () {
+            replTest = new ReplSetTest({
+                nodes: 1,
+                nodeOptions: {
+                    setParameter: {storageEngineConcurrencyAdjustmentAlgorithm: kFixedWithPrio},
+                },
+            });
+            replTest.startSet();
+            replTest.initiate();
+            mongod = replTest.getPrimary();
+        });
+
+        afterEach(function () {
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentReadLowPriorityTransactions: 5,
+                }),
+            );
+
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentWriteLowPriorityTransactions: 5,
+                }),
+            );
+
+            if (replTest) {
+                replTest.stopSet();
+            }
+        });
+
+        it("should fail to transition from prioritization when low-priority read tickets are 0", function () {
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentReadLowPriorityTransactions: 0,
+                }),
+            );
+
+            // Attempt to transition to kFixed should fail.
+            assert.commandFailedWithCode(
+                mongod.adminCommand({setParameter: 1, storageEngineConcurrencyAdjustmentAlgorithm: kFixed}),
+                ErrorCodes.IllegalOperation,
+            );
+
+            // Attempt to transition to kThroughputProbing should also fail.
+            assert.commandFailedWithCode(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrencyAdjustmentAlgorithm: kThroughputProbing,
+                }),
+                ErrorCodes.IllegalOperation,
+            );
+        });
+
+        it("should fail to transition from prioritization when low-priority write tickets are 0", function () {
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentWriteLowPriorityTransactions: 0,
+                }),
+            );
+
+            // Attempt to transition to kFixed should fail.
+            assert.commandFailedWithCode(
+                mongod.adminCommand({setParameter: 1, storageEngineConcurrencyAdjustmentAlgorithm: kFixed}),
+                ErrorCodes.IllegalOperation,
+            );
+
+            // Attempt to transition to kThroughputProbing should also fail.
+            assert.commandFailedWithCode(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrencyAdjustmentAlgorithm: kThroughputProbing,
+                }),
+                ErrorCodes.IllegalOperation,
+            );
+        });
+
+        it("should allow staying in prioritization mode regardless of low-priority ticket values", function () {
+            // Set low-priority tickets to 0.
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentReadLowPriorityTransactions: 0,
+                }),
+            );
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentWriteLowPriorityTransactions: 0,
+                }),
+            );
+
+            // Staying in prioritization mode should succeed.
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrencyAdjustmentAlgorithm: kFixedWithPrio,
+                }),
+            );
+        });
+
+        it("should allow transitions to prioritization mode regardless of low-priority ticket values", function () {
+            // Start with non-prioritization mode.
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrencyAdjustmentAlgorithm: kThroughputProbing,
+                }),
+            );
+
+            // Set low-priority tickets to 0 (this is allowed in non-prioritization modes).
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentReadLowPriorityTransactions: 0,
+                }),
+            );
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentWriteLowPriorityTransactions: 0,
+                }),
+            );
+
+            // Transition to prioritization should succeed even with 0 low-priority tickets.
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrencyAdjustmentAlgorithm: kFixedWithPrio,
+                }),
+            );
+        });
+    });
+
     describe("Ticket alignment after transition from throughput probing", function () {
         let replTest, mongod;
 

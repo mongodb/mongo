@@ -246,10 +246,8 @@ Status TicketingSystem::updateConcurrencyAdjustmentAlgorithm(std::string algorit
                               "Cannot modify concurrency adjustment algorithm in runtime"};
             }
 
-            ticketingSystem->setConcurrencyAdjustmentAlgorithm(client->getOperationContext(),
-                                                               algorithmName);
-
-            return Status::OK();
+            return ticketingSystem->setConcurrencyAdjustmentAlgorithm(client->getOperationContext(),
+                                                                      algorithmName);
         });
 }
 
@@ -299,8 +297,8 @@ void TicketingSystem::setConcurrentTransactions(OperationContext* opCtx,
     holder->resize(opCtx, transactions, Date_t::max());
 }
 
-void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
-                                                        std::string algorithmName) {
+Status TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
+                                                          std::string algorithmName) {
     tassert(11132200,
             "Feature flag MultipleTicketPoolsExecutionControl must be enabled to change the "
             "concurrency adjustment algorithm at runtime",
@@ -311,21 +309,32 @@ void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
 
     const TicketingState oldState = _state.loadRelaxed();
     const TicketingState newState = {parsedAlgorithm};
-    _state.store(newState);
 
     const bool wasThroughputProbingRunning = oldState.usesThroughputProbing();
     const bool isThroughputProbingRunningNow = newState.usesThroughputProbing();
+    const bool transitioningAwayFromPrioritization =
+        oldState.usesPrioritization() && !newState.usesPrioritization();
+
+    if (transitioningAwayFromPrioritization &&
+        (gConcurrentReadLowPriorityTransactions.load() == 0 ||
+         gConcurrentWriteLowPriorityTransactions.load() == 0)) {
+        return Status{ErrorCodes::IllegalOperation,
+                      "Cannot transition to not use prioritization when low-priority read or write "
+                      "tickets are set to 0"};
+    }
+
+    _state.store(newState);
 
     if (wasThroughputProbingRunning == isThroughputProbingRunningNow) {
         // There has been a change in the algorithm related to the prioritization of operations, but
         // no change in the throughput probing state. There is nothing more to update.
-        return;
+        return Status::OK();
     }
 
     if (isThroughputProbingRunningNow) {
         // Throughput probing needs to start. Apart from that, there is nothing more to update.
         _throughputProbing.start();
-        return;
+        return Status::OK();
     }
 
     // There has been a change in the algorithm from throughput probing to fixed concurrency. We
@@ -349,6 +358,8 @@ void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
                               AdmissionContext::Priority::kLow,
                               OperationType::kWrite,
                               gConcurrentWriteLowPriorityTransactions.load());
+
+    return Status::OK();
 }
 
 void TicketingSystem::appendStats(BSONObjBuilder& b) const {
