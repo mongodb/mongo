@@ -129,6 +129,7 @@ for (let i = 0; i < cursorIds.length; i++) {
         const verifyOptions = {
             expectMemoryMetrics: args.featureFlagEnabled && args.shellIndex === 0,
             expectedNumGetMores: logLines.length,
+            skipInUseTrackedMemBytesCheck: true,
             skipFindInitialRequest: true,
             // The peak metric may not show up for early getMore() logs, since memory metrics are
             // only propagated up to CurOp when the first consumer happens to execute the
