@@ -47,6 +47,14 @@ const numLowPriorityReads = function () {
     return status.queues.execution.read.lowPriority.finishedProcessing;
 };
 
+/**
+ * Helper function to get the number of finished low-priority write operations on the primary.
+ */
+const numLowPriorityWrites = function () {
+    const status = primary.adminCommand({serverStatus: 1});
+    return status.queues.execution.write.lowPriority.finishedProcessing;
+};
+
 assert.commandWorked(db.createCollection(coll.getName()));
 
 // Insert a substantial number of documents to make the scan more expensive.
@@ -134,5 +142,75 @@ const testMultiDocumentTransactionIsNotDeprioritized = function () {
     assert.eq(numLowPriorityReads(), lowPriorityBefore, "Multi-document transaction should not be deprioritized");
 };
 testMultiDocumentTransactionIsNotDeprioritized();
+
+const testMultiInsertsAreDeprioritized = function () {
+    const lowPriorityBefore = numLowPriorityWrites();
+
+    // Create a large batch of documents to insert.
+    const batchSize = 1000;
+    const docs = [];
+    for (let i = numDocs; i < numDocs + batchSize; i++) {
+        docs.push({_id: i, payload: "x".repeat(512), randomStr: generateRandomString(100)});
+    }
+
+    // Perform multi-inserts which should be deprioritized due to their size.
+    assert.commandWorked(coll.insertMany(docs));
+
+    assert.gt(numLowPriorityWrites(), lowPriorityBefore, "Multi inserts should be deprioritized");
+};
+testMultiInsertsAreDeprioritized();
+
+const testMultiUpdatesAreDeprioritized = function () {
+    const lowPriorityBefore = numLowPriorityWrites();
+
+    // Perform a multi update that affects many documents.
+    const result = coll.updateMany({payload: {$exists: true}}, {$set: {updated: true, updateTime: new Date()}});
+    assert.gt(result.modifiedCount, 100);
+
+    assert.gt(numLowPriorityWrites(), lowPriorityBefore, "Multi updates should be deprioritized");
+};
+testMultiUpdatesAreDeprioritized();
+
+const testBulkWritesAreDeprioritized = function () {
+    const lowPriorityBefore = numLowPriorityWrites();
+
+    // Create a bulk write operation with mixed operations.
+    const bulk = coll.initializeUnorderedBulkOp();
+
+    // Add some inserts.
+    const startId = numDocs + 1000;
+    for (let i = startId; i < startId + 200; i++) {
+        bulk.insert({_id: i, bulkInsert: true, payload: "y".repeat(256)});
+    }
+
+    // Add some updates.
+    bulk.find({payload: {$regex: /^x/}}).update({$set: {bulkUpdated: true}});
+
+    // Add some deletes.
+    bulk.find({_id: {$gte: numDocs - 50, $lt: numDocs}}).remove();
+
+    // Execute the bulk write.
+    assert.commandWorked(bulk.execute());
+
+    assert.gt(numLowPriorityWrites(), lowPriorityBefore, "Bulk writes should be deprioritized");
+};
+testBulkWritesAreDeprioritized();
+
+const testMultiDeletesAreDeprioritized = function () {
+    const lowPriorityBefore = numLowPriorityWrites();
+
+    // Insert some documents to delete.
+    const docsToDelete = [];
+    for (let i = 0; i < 100; i++) {
+        docsToDelete.push({_id: `delete_${i}`, toDelete: true, payload: "z".repeat(128)});
+    }
+    assert.commandWorked(coll.insertMany(docsToDelete));
+
+    const deleteResult = coll.deleteMany({toDelete: true});
+    assert.gt(deleteResult.deletedCount, 50);
+
+    assert.gt(numLowPriorityWrites(), lowPriorityBefore, "Multi deletes should be deprioritized");
+};
+testMultiDeletesAreDeprioritized();
 
 rst.stopSet();
