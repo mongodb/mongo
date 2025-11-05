@@ -238,17 +238,7 @@ private:
     struct ExhaustCommandState final : public CommandStateBase {
         using CommandStateBase::CommandStateBase;
         ~ExhaustCommandState() override = default;
-
         ExecutorFuture<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
-
-        void continueExhaustRequest(StatusWith<RemoteCommandResponse> swResponse);
-
-        // Protects against race between reactor thread restarting stopwatch during exhaust
-        // request and main thread reading stopwatch elapsed time during shutdown.
-        stdx::mutex stopwatchMutex;
-
-        Promise<RemoteCommandResponse> finalResponsePromise;
-        RemoteCommandOnReplyFn onReplyFn;
     };
 
     struct AlarmState {

@@ -73,16 +73,6 @@ class NetworkInterface {
     NetworkInterface& operator=(const NetworkInterface&) = delete;
 
 public:
-    using Response = RemoteCommandResponse;
-    /**
-     * This must not throw exceptions.
-     */
-    using RemoteCommandCompletionFn = unique_function<void(const TaskExecutor::ResponseStatus&)>;
-    /**
-     * This must not throw exceptions.
-     */
-    using RemoteCommandOnReplyFn = unique_function<void(const TaskExecutor::ResponseStatus&)>;
-
     // Indicates that there is no expiration time by when a request needs to complete
     static constexpr Date_t kNoExpirationDate{Date_t::max()};
 
