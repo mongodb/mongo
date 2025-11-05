@@ -29,7 +29,6 @@
 
 #include "mongo/db/admission/execution_control_init.h"
 
-#include "mongo/db/admission/admission_feature_flags_gen.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/admission/throughput_probing.h"
@@ -122,15 +121,6 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
                       "When using the kThroughputProbing storage engine algorithm, all concurrent "
                       "transactions server parameters must remain at their default values. "
                       "Non-default values will be ignored.");
-    }
-
-    if (algorithm ==
-        StorageEngineConcurrencyAdjustmentAlgorithmEnum::
-            kFixedConcurrentTransactionsWithPrioritization) {
-        tassert(11039600,
-                "Expected to have the feature flag enabled to use "
-                "kFixedConcurrentTransactionsWithPrioritization algorithm",
-                gFeatureFlagMultipleTicketPoolsExecutionControl.isEnabled());
     }
 
     TicketingSystem::use(svcCtx, createTicketingSystem(svcCtx, algorithm));

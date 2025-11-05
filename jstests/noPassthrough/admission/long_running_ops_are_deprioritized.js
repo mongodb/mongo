@@ -3,11 +3,11 @@
  *
  * @tags: [
  *      requires_wiredtiger,
- *      featureFlagMultipleTicketPoolsExecutionControl,
  * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {getWinningPlanFromExplain, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const rst = new ReplSetTest({
     nodes: 1,
@@ -73,7 +73,7 @@ assert.commandWorked(coll.createIndex({randomStr: 1}));
 const testUnboundedCollectionScanIsDeprioritized = function (direction) {
     const lowPriorityBefore = numLowPriorityReads();
     const explain = coll.find().hint({$natural: direction}).explain();
-    assert.eq("COLLSCAN", explain.queryPlanner.winningPlan.stage, tojson(explain));
+    assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 
     assert.eq(numDocs, coll.find().hint({$natural: direction}).itcount());
 
@@ -87,8 +87,7 @@ const testUnboundedIndexScanIsDeprioritized = function () {
     const query = {payload: {$gte: ""}};
 
     const explain = coll.find(query).sort({payload: 1}).explain();
-    assert.eq("FETCH", explain.queryPlanner.winningPlan.stage);
-    assert.eq("IXSCAN", explain.queryPlanner.winningPlan.inputStage.stage);
+    assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 
     assert.eq(numDocs, coll.find(query).sort({payload: 1}).itcount());
 
@@ -102,7 +101,7 @@ const testLongRunningRegexIsDeprioritized = function () {
     const query = {randomStr: {$regex: "a.*b.*c.*d"}};
 
     const explain = coll.find(query).hint({$natural: 1}).explain();
-    assert.eq("COLLSCAN", explain.queryPlanner.winningPlan.stage);
+    assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 
     coll.find(query).hint({$natural: 1}).itcount();
 
@@ -116,8 +115,7 @@ const testIndexedLongRunningRegexIsDeprioritized = function () {
     const query = {randomStr: {$regex: "a.*b.*c.*d"}};
 
     const explain = coll.find(query).explain();
-    assert.eq("FETCH", explain.queryPlanner.winningPlan.stage);
-    assert.eq("IXSCAN", explain.queryPlanner.winningPlan.inputStage.stage);
+    assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 
     coll.find(query).itcount();
 

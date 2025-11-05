@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_replication,  # Tickets can only be resized when using the WiredTiger engine.
- *   featureFlagMultipleTicketPoolsExecutionControl,
  *   requires_wiredtiger,
  *   # The test deploys replica sets with a storage engine concurrency adjustment configured by each
  *   # test case, which should not be overwritten and expect to have 'throughputProbing' as default.

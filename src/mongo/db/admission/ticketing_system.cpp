@@ -30,7 +30,6 @@
 #include "mongo/db/admission/ticketing_system.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/admission/admission_feature_flags_gen.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/client.h"
@@ -239,16 +238,11 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions(
 }
 
 Status TicketingSystem::updateConcurrencyAdjustmentAlgorithm(std::string algorithmName) {
-    return updateSettings(
-        "concurrency adjustment algorithm", [&](Client* client, TicketingSystem* ticketingSystem) {
-            if (!gFeatureFlagMultipleTicketPoolsExecutionControl.isEnabled()) {
-                return Status{ErrorCodes::IllegalOperation,
-                              "Cannot modify concurrency adjustment algorithm in runtime"};
-            }
-
-            return ticketingSystem->setConcurrencyAdjustmentAlgorithm(client->getOperationContext(),
-                                                                      algorithmName);
-        });
+    return updateSettings("concurrency adjustment algorithm",
+                          [&](Client* client, TicketingSystem* ticketingSystem) {
+                              return ticketingSystem->setConcurrencyAdjustmentAlgorithm(
+                                  client->getOperationContext(), algorithmName);
+                          });
 }
 
 TicketingSystem* TicketingSystem::get(ServiceContext* svcCtx) {
@@ -299,11 +293,6 @@ void TicketingSystem::setConcurrentTransactions(OperationContext* opCtx,
 
 Status TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
                                                           std::string algorithmName) {
-    tassert(11132200,
-            "Feature flag MultipleTicketPoolsExecutionControl must be enabled to change the "
-            "concurrency adjustment algorithm at runtime",
-            gFeatureFlagMultipleTicketPoolsExecutionControl.isEnabled());
-
     const auto parsedAlgorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
         algorithmName, IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"});
 

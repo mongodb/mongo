@@ -1,10 +1,6 @@
 /**
  * Checks that if an operation is de-prioritized, its stats are aggregated correctly in
  * serverStatus, and it is reported as low-priority in both $currentOp and the slow query log.
- *
- * @tags: [
- *   featureFlagMultipleTicketPoolsExecutionControl,
- * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

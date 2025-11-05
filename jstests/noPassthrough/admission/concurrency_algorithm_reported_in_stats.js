@@ -1,9 +1,5 @@
 /**
  * Checks the concurrency algorithm is reported on serverStatus.
- *
- * @tags: [
- *      featureFlagMultipleTicketPoolsExecutionControl,
- * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

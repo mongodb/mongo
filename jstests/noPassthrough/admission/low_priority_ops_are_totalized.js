@@ -3,7 +3,6 @@
  *
  * @tags: [
  *      requires_wiredtiger,
- *      featureFlagMultipleTicketPoolsExecutionControl,
  * ]
  */
 

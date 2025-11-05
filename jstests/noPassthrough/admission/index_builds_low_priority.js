@@ -6,7 +6,6 @@
  * @tags: [
  *      requires_wiredtiger,
  *      requires_replication,
- *      featureFlagMultipleTicketPoolsExecutionControl,
  * ]
  */
 

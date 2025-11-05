@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   requires_replication,
- *   featureFlagMultipleTicketPoolsExecutionControl,
+ *   multiversion_incompatible,
  *  ]
  */
 
