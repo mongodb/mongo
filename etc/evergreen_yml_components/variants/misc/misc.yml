@@ -78,3 +78,17 @@ buildvariants:
     tasks:
       - name: sync_repo_with_copybara
         priority: 50
+
+  - name: devcontainer-ubuntu
+    display_name: "Devcontainer Test (ubuntu2204)"
+    tags:
+      ["assigned_to_jira_team_devprod_correctness", "auxiliary", "devcontainer"]
+    activate: true
+    paths:
+      - ".devcontainer/**"
+      - "evergreen/devcontainer*.sh"
+      - "poetry_requirements.txt"
+    run_on:
+      - ubuntu2204-small
+    tasks:
+      - name: devcontainer_test

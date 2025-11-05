@@ -1,0 +1,26 @@
+# Devcontainer Testing Tasks
+#
+# These tasks validate that the devcontainer setup works correctly
+
+################################################
+#               Task Definitions               #
+################################################
+
+tasks:
+  # Comprehensive E2E test using devcontainer CLI
+  - name: devcontainer_test
+    tags:
+      ["assigned_to_jira_team_devprod_correctness", "auxiliary", "devcontainer"]
+    commands:
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "get engflow key"
+      - func: "get engflow cert"
+      - command: subprocess.exec
+        display_name: "Test devcontainer setup (E2E)"
+        type: test
+        timeout_secs: 3600 # 1 hour for full setup
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/devcontainer_test.sh"

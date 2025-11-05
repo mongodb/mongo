@@ -15,9 +15,17 @@ sudo chown -R "$(whoami)": "${HOME}/.cache" || echo "Warning: Could not fix cach
 sudo chown -R "$(whoami)": "${WORKSPACE_FOLDER}/python3-venv" || echo "Warning: Could not fix python3-venv permissions"
 sudo chown "$(whoami)": "${WORKSPACE_FOLDER}/.." || echo "Warning: Could not fix parent directory permissions"
 
+# Fix workspace root permissions (prevents bazelrc and other file permission issues)
+echo "Fixing workspace root permissions..."
+sudo chown -R "$(whoami)": "${WORKSPACE_FOLDER}" || echo "Warning: Could not fix workspace permissions"
+
 # Fix Git repository permissions (prevents "insufficient permission" errors)
 echo "Fixing Git repository permissions..."
 sudo chown -R "$(whoami)": "${WORKSPACE_FOLDER}/.git" || echo "Warning: Could not fix .git permissions"
+
+# Configure git safe.directory (prevents "dubious ownership" warnings)
+echo "Configuring git safe.directory..."
+git config --global --add safe.directory "${WORKSPACE_FOLDER}" || echo "Warning: Could not configure git safe.directory"
 echo "[OK] Volume and Git permissions fixed"
 
 # Step 2: Configure Bazel with Docker information (one-time container setup)
@@ -121,7 +129,41 @@ fi
 
 # Step 5: Build clang configuration
 echo "Building clang configuration..."
-if bazel build compiledb --config=local --config=no-remote-exec; then
+
+# Backup existing .bazelrc.compiledb if it exists, then use our known-good config
+COMPILEDB_RC="${WORKSPACE_FOLDER}/.bazelrc.compiledb"
+COMPILEDB_RC_BACKUP="${WORKSPACE_FOLDER}/.bazelrc.compiledb.backup"
+
+if [ -f "${COMPILEDB_RC}" ]; then
+    echo "Info: Backing up existing .bazelrc.compiledb"
+    mv "${COMPILEDB_RC}" "${COMPILEDB_RC_BACKUP}"
+fi
+
+# Create our temporary config for setup (allow remote execution if auth is configured)
+echo "common --config=dbg" >"${COMPILEDB_RC}"
+
+# Check for engflow credentials (supports three auth methods: workspace certs, volume certs, or browser token)
+if [ -f "${WORKSPACE_FOLDER}/engflow.cert" ] && [ -f "${WORKSPACE_FOLDER}/engflow.key" ]; then
+    echo "Info: Engflow TLS credentials found in workspace (CI mode), using remote execution"
+elif [ -d "${HOME}/.config/engflow_auth" ] && [ -n "$(ls -A ${HOME}/.config/engflow_auth 2>/dev/null)" ]; then
+    echo "Info: Engflow auth directory exists (likely browser token), using remote execution"
+else
+    echo "Info: No engflow credentials found, using local execution"
+    echo "common --config=local" >>"${COMPILEDB_RC}"
+fi
+
+# Ensure restore happens even if build fails
+restore_compiledb_rc() {
+    if [ -f "${COMPILEDB_RC_BACKUP}" ]; then
+        echo "Info: Restoring user's .bazelrc.compiledb"
+        mv "${COMPILEDB_RC_BACKUP}" "${COMPILEDB_RC}"
+    else
+        rm -f "${COMPILEDB_RC}"
+    fi
+}
+trap restore_compiledb_rc EXIT
+
+if bazel build compiledb; then
     echo "[OK] Clang configuration built successfully"
 else
     echo "Warning: Failed to build clang configuration"
