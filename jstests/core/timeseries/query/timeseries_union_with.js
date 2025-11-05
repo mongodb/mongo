@@ -15,7 +15,8 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getUnionWithStage, getNestedProperties} from "jstests/libs/query/analyze_plan.js";
+import {getUnionWithStage, getNestedProperties, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const timeFieldName = "time";
@@ -134,6 +135,19 @@ function setUpCollections() {
     assert.commandWorked(collC.insertMany([{hostname: "host_4"}, {hostname: "host_5"}]));
 }
 
+function getUnpackStage(explain) {
+    const errMsg = "Expected to find an unpack stage in the $unionWith subpipeline. Explain: " + tojson(explain);
+    const unionWithStage = getUnionWithStage(explain);
+    if (checkSbeFullFeatureFlagEnabled(db)) {
+        const unpack = getWinningPlanFromExplain(unionWithStage["$unionWith"]);
+        assert.eq(unpack.stage, "UNPACK_TS_BUCKET", errMsg);
+        return unpack;
+    }
+    const unpack = getNestedProperties(unionWithStage["$unionWith"]["pipeline"], "$_internalUnpackBucket");
+    assert(unpack.length > 0, errMsg);
+    return unpack[0];
+}
+
 (function nestedUnionWith() {
     setUpCollections();
     const pipeline = [
@@ -187,7 +201,7 @@ function setUpCollections() {
     // $match predicate inside.
     assert(
         parsedQuery.length > 0 && Object.keys(parsedQuery[0]).length > 0,
-        `Expected parsedQuery to contain an non-empty object, got: ${tojson(parsedQuery)}`,
+        "Expected parsedQuery to contain an non-empty object. Explain: " + tojson(unionWithStage),
     );
 })();
 
@@ -206,14 +220,14 @@ function setUpCollections() {
     assertArrayEq({actual: results, expected: expected});
 
     // Run explain to ensure the optimization took place.
-    const unionWithStage = getUnionWithStage(collA.explain().aggregate(pipeline));
-    const unpackStage = getNestedProperties(unionWithStage["$unionWith"]["pipeline"], "$_internalUnpackBucket");
+    const explain = collA.explain().aggregate(pipeline);
+    const unpackStage = getUnpackStage(explain);
+
     // If the optimization happened, then the unpack stage should have internalized the projection inside its "include" field.
-    assert(unpackStage.length > 0, `Expected to find an unpack stage in the $unionWith subpipeline`);
-    const includeArray = unpackStage[0].include;
+    const includeArray = unpackStage.include;
     assertArrayEq({
         actual: includeArray,
         expected: ["tags", "hostname"],
-        message: "Expected the unpack stage to internalize the projection",
+        message: "Expected the unpack stage to internalize the projection. Explain: " + tojson(explain),
     });
 })();
