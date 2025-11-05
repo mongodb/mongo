@@ -960,7 +960,7 @@ Status AsyncResultsMerger::releaseMemory() {
                        _params.getNss().dbName(),
                        requests,
                        ReadPreferenceSetting::get(_opCtx),
-                       Shard::RetryPolicy::kNoRetry,
+                       Shard::RetryPolicy::kStrictlyNotIdempotent,
                        nullptr /*resourceYielder*/,
                        shardHostMap);
     }
