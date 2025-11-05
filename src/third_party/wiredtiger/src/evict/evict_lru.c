@@ -787,10 +787,11 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
     }
 
     /*
-     * If application threads are blocked by the total volume of data in cache, try dirty pages as
-     * well.
+     * If application threads are blocked by the total volume of data in cache or we cannot find
+     * enough pages to evict, try dirty pages as well.
      */
-    if (__wt_evict_aggressive(session) && LF_ISSET(WT_EVICT_CACHE_CLEAN_HARD))
+    if (LF_ISSET(WT_EVICT_CACHE_CLEAN_HARD) &&
+      (__wt_evict_aggressive(session) || evict->evict_empty_score > WT_EVICT_SCORE_CUTOFF))
         LF_SET(WT_EVICT_CACHE_DIRTY);
 
     /*
