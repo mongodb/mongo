@@ -49,6 +49,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/scoped_task_executor.h"
+#include "mongo/otel/telemetry_context.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/mutex.h"
@@ -151,7 +153,8 @@ public:
      */
     ExecutorFuture<void> _runUntilStrictConsistencyOrErrored(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& abortToken);
+        const CancellationToken& abortToken,
+        std::shared_ptr<otel::TelemetryContext> telemetryCtx);
 
     /**
      * Notifies the coordinator if the recipient is in kStrictConsistency or kError and waits for
@@ -396,6 +399,13 @@ private:
     boost::optional<CloningMetrics> _tryFetchCloningMetrics(OperationContext* opCtx);
 
     void _fulfillPromisesOnStepup(boost::optional<mongo::ReshardingRecipientMetrics> metrics);
+
+    /**
+     * Creates a new span with the resharding UUID set as an attribute.
+     */
+    otel::traces::Span _startSpan(std::shared_ptr<otel::TelemetryContext> telemetryCtx,
+                                  const std::string& spanName,
+                                  bool keepSpan = false);
 
     // The primary-only service instance corresponding to the recipient instance. Not owned.
     const ReshardingRecipientService* const _recipientService;

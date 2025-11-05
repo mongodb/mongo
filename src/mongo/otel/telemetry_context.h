@@ -38,12 +38,15 @@ namespace otel {
  * TelemetryContext is an interface that wraps OpenTelemetry's Context to allow for propagation of
  * state across OpenTelemetry functionality.
  */
-class TelemetryContext {
+class MONGO_MOD_PUBLIC TelemetryContext {
 public:
     virtual ~TelemetryContext() = default;
     virtual StringData type() const {
         return "TelemetryContext";
     };
+    virtual std::shared_ptr<TelemetryContext> clone() const {
+        return std::make_shared<TelemetryContext>(TelemetryContext());
+    }
 };
 
 }  // namespace otel

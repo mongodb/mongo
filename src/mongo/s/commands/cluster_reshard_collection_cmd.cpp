@@ -48,6 +48,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/async_requests_sender.h"
@@ -81,6 +82,9 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const auto& nss = ns();
+
+            auto span =
+                otel::traces::Span::start(opCtx, "ReshardCollectionCmd::Invocation::typedRun");
 
             ShardsvrReshardCollection shardsvrReshardCollection(nss);
             shardsvrReshardCollection.setDbName(request().getDbName());

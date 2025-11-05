@@ -81,8 +81,8 @@ BSONObj TelemetryContextSerializer::toBSON(const std::shared_ptr<TelemetryContex
 
 BSONObj TelemetryContextSerializer::appendTelemetryContext(OperationContext* opCtx, BSONObj bson) {
     invariant(opCtx);
-    auto& telemetryCtxHolder = TelemetryContextHolder::get(opCtx);
-    if (!telemetryCtxHolder.get()) {
+    auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx);
+    if (!telemetryCtxHolder.getTelemetryContext()) {
         return bson;
     }
 
@@ -94,7 +94,7 @@ BSONObj TelemetryContextSerializer::appendTelemetryContext(OperationContext* opC
         bob.append(field);
     }
     bob.append(GenericArguments::kTraceCtxFieldName,
-               TelemetryContextSerializer::toBSON(telemetryCtxHolder.get()));
+               TelemetryContextSerializer::toBSON(telemetryCtxHolder.getTelemetryContext()));
 
     return bob.obj();
 }

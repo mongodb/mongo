@@ -90,6 +90,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_map.h"
@@ -355,31 +356,81 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrErrored(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) {
+    const CancellationToken& abortToken,
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, executor, abortToken](const auto& factory) {
+        ->withAutomaticRetry([this, executor, abortToken, telemetryCtx = telemetryCtx->clone()](
+                                 const auto& factory) {
             return ExecutorFuture(**executor)
-                .then([this, executor, abortToken, &factory] {
+                .then([this,
+                       executor,
+                       abortToken,
+                       &factory,
+                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                    auto span = _startSpan(
+                        telemetryCtx,
+                        "ReshardingRecipientService::_"
+                        "awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection");
                     return _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
                         executor, abortToken, factory);
                 })
-                .then([this, &factory] {
+                .then([this, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                    auto span =
+                        _startSpan(telemetryCtx,
+                                   "ReshardingRecipientService::_"
+                                   "createTemporaryReshardingCollectionThenTransitionToCloning");
                     _createTemporaryReshardingCollectionThenTransitionToCloning(factory);
                 })
-                .then([this, executor, abortToken, &factory] {
+                .then([this,
+                       executor,
+                       abortToken,
+                       &factory,
+                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                    auto span = _startSpan(
+                        telemetryCtx,
+                        "ReshardingRecipientService::_cloneThenTransitionToBuildingIndex");
                     return _cloneThenTransitionToBuildingIndex(executor, abortToken, factory);
                 })
-                .then([this, executor, abortToken, &factory] {
+                .then([this,
+                       executor,
+                       abortToken,
+                       &factory,
+                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                    auto span = _startSpan(
+                        telemetryCtx,
+                        "ReshardingRecipientService::_buildIndexThenTransitionToApplying");
                     return _buildIndexThenTransitionToApplying(executor, abortToken, factory);
                 })
-                .then([this, executor, abortToken, &factory] {
+                .then([this,
+                       executor,
+                       abortToken,
+                       &factory,
+                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                    auto span = _startSpan(
+                        telemetryCtx,
+                        "ReshardingRecipientService::_createAndStartChangeStreamsMonitor");
                     return _createAndStartChangeStreamsMonitor(executor, abortToken, factory);
                 })
-                .then([this, executor, abortToken, &factory] {
+                .then([this,
+                       executor,
+                       abortToken,
+                       &factory,
+                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                    auto span =
+                        _startSpan(telemetryCtx,
+                                   "ReshardingRecipientService::_"
+                                   "awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency");
                     return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
                         executor, abortToken, factory);
                 })
-                .then([this, executor, abortToken, &factory] {
+                .then([this,
+                       executor,
+                       abortToken,
+                       &factory,
+                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                    auto span = _startSpan(
+                        telemetryCtx,
+                        "ReshardingRecipientService::_awaitChangeStreamsMonitorCompleted");
                     return _awaitChangeStreamsMonitorCompleted(executor, abortToken, factory);
                 });
         })
@@ -624,6 +675,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
 SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
+    auto telemetryCtx = _recipientCtx.getTelemetryContext()
+        ? otel::traces::TelemetryContextSerializer::fromBSON(*_recipientCtx.getTelemetryContext())
+        : otel::traces::Span::createTelemetryContext();
+    auto span = _startSpan(telemetryCtx, "ReshardingRecipientService::run");
     auto abortToken = _initAbortSource(stepdownToken);
     _markKilledExecutor->startup();
     _retryingCancelableOpCtxFactory.emplace(
@@ -633,29 +688,35 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor, abortToken] { return _startMetrics(executor, abortToken); })
-        .then([this, executor, abortToken] {
-            return _runUntilStrictConsistencyOrErrored(executor, abortToken);
+        .then([this, executor, abortToken, telemetryCtx = telemetryCtx->clone()]() mutable {
+            auto span = _startSpan(
+                telemetryCtx, "ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
+            return _runUntilStrictConsistencyOrErrored(executor, abortToken, telemetryCtx);
         })
-        .then([this, executor, abortToken] {
+        .then([this, executor, abortToken, telemetryCtx = telemetryCtx->clone()]() mutable {
+            auto span = _startSpan(
+                telemetryCtx, "ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
             return _notifyCoordinatorAndAwaitDecision(executor, abortToken);
         })
-        .onCompletion([this, executor, stepdownToken, abortToken](Status status) {
-            _retryingCancelableOpCtxFactory.emplace(
-                stepdownToken,
-                _markKilledExecutor,
-                resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
-            if (stepdownToken.isCanceled()) {
-                // Propagate any errors from the recipient stepping down.
-                return ExecutorFuture<bool>(**executor, status);
-            }
+        .onCompletion(
+            [this, executor, stepdownToken, abortToken, telemetryCtx = telemetryCtx->clone()](
+                Status status) mutable {
+                _retryingCancelableOpCtxFactory.emplace(
+                    stepdownToken,
+                    _markKilledExecutor,
+                    resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
+                if (stepdownToken.isCanceled()) {
+                    // Propagate any errors from the recipient stepping down.
+                    return ExecutorFuture<bool>(**executor, status);
+                }
 
-            if (!status.isOK() && !abortToken.isCanceled()) {
-                // Propagate any errors from the recipient failing to notify the coordinator.
-                return ExecutorFuture<bool>(**executor, status);
-            }
+                if (!status.isOK() && !abortToken.isCanceled()) {
+                    // Propagate any errors from the recipient failing to notify the coordinator.
+                    return ExecutorFuture<bool>(**executor, status);
+                }
 
-            return ExecutorFuture(**executor, abortToken.isCanceled());
-        })
+                return ExecutorFuture(**executor, abortToken.isCanceled());
+            })
         .then([this, executor, stepdownToken](bool aborted) {
             return _finishReshardingOperation(executor, stepdownToken, aborted);
         })
@@ -2170,6 +2231,15 @@ void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup
                                 _donorShards});
     }
     ensureFulfilledPromise(lk, _transitionedToCreateCollection);
+}
+
+otel::traces::Span ReshardingRecipientService::RecipientStateMachine::_startSpan(
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx,
+    const std::string& spanName,
+    bool keepSpan) {
+    auto span = otel::traces::Span::start(telemetryCtx, spanName, keepSpan);
+    TRACING_SPAN_ATTR(span, "reshardingUUID", _metadata.getReshardingUUID().toString());
+    return span;
 }
 
 }  // namespace mongo

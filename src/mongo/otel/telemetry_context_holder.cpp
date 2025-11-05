@@ -34,7 +34,7 @@ namespace otel {
 
 const mongo::OperationContext::Decoration<TelemetryContextHolder> handle =
     mongo::OperationContext::declareDecoration<TelemetryContextHolder>();
-TelemetryContextHolder& TelemetryContextHolder::get(OperationContext* opCtx) {
+TelemetryContextHolder& TelemetryContextHolder::getDecoration(OperationContext* opCtx) {
     return handle(opCtx);
 }
 

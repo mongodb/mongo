@@ -131,9 +131,9 @@ TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextReturnsIfNoTelem
 TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextAddsTelemetryContextIfExists) {
     BSONObj originalBson = BSON("key" << "value");
     auto opCtx = makeOperationContext();
-    auto& telemetryContextHolder = TelemetryContextHolder::get(opCtx.get());
+    auto& telemetryContextHolder = TelemetryContextHolder::getDecoration(opCtx.get());
     auto telemetryContext = traces::Span::createTelemetryContext();
-    telemetryContextHolder.set(telemetryContext);
+    telemetryContextHolder.setTelemetryContext(telemetryContext);
     BSONObj resultBson =
         TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
     ASSERT_BSONOBJ_NE(originalBson, resultBson);
@@ -145,9 +145,9 @@ TEST_F(TelemetryContextSerializationTest,
     BSONObj originalBson =
         BSON("key" << "value" << GenericArguments::kTraceCtxFieldName << "old_value");
     auto opCtx = makeOperationContext();
-    auto& telemetryContextHolder = TelemetryContextHolder::get(opCtx.get());
+    auto& telemetryContextHolder = TelemetryContextHolder::getDecoration(opCtx.get());
     auto telemetryContext = traces::Span::createTelemetryContext();
-    telemetryContextHolder.set(telemetryContext);
+    telemetryContextHolder.setTelemetryContext(telemetryContext);
     BSONObj resultBson =
         TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
     ASSERT_BSONOBJ_NE(originalBson, resultBson);

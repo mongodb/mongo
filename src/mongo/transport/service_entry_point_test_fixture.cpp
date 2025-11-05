@@ -606,8 +606,8 @@ void ServiceEntryPointTestFixture::testTelemetryContextDeserializedFromRequest()
 
     runCommandTestWithResponse(cmdBuilder.obj(), opCtx.get());
 
-    auto& holder = otel::TelemetryContextHolder::get(opCtx.get());
-    auto retrievedCtx = holder.get();
+    auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx.get());
+    auto retrievedCtx = holder.getTelemetryContext();
     ASSERT_NE(retrievedCtx, nullptr);
 
     auto spanCtx = std::dynamic_pointer_cast<otel::traces::SpanTelemetryContextImpl>(retrievedCtx);
@@ -621,8 +621,8 @@ void ServiceEntryPointTestFixture::testTelemetryContextNotSetWhenNotInRequest() 
 
     runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
 
-    auto& holder = otel::TelemetryContextHolder::get(opCtx.get());
-    auto retrievedCtx = holder.get();
+    auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx.get());
+    auto retrievedCtx = holder.getTelemetryContext();
     ASSERT_EQ(retrievedCtx, nullptr);
 }
 #endif  // MONGO_CONFIG_OTEL

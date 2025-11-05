@@ -105,6 +105,14 @@ public:
     void setAttribute(StringData key, int value);
 
     /**
+     * Caller should use `TRACING_SPAN_ATTR` instead of calling `setAttribute` directly.
+     *
+     * Adds a string attribute with `key` and `value` to this Span. This attribute MUST NOT
+     * contain PII.
+     */
+    void setAttribute(StringData key, StringData value);
+
+    /**
      * Set the status associated with this Span. If the status's code is non-zero the OpenTelemetry
      * span associated will have a status of `StatusCode::kError`.
      */
@@ -153,6 +161,7 @@ public:
     ~Span() {}
 
     void setAttribute(StringData, int) {}
+    void setAttribute(StringData, StringData) {}
     void setError(const Status&) {}
 };
 

@@ -466,9 +466,9 @@ TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocContainsTelemetryContextFromO
     configsvrReshardCollection.setDbName(nss().dbName());
 
     auto telemetryCtx = otel::traces::Span::createTelemetryContext();
-    auto& telemetryCtxHolder = otel::TelemetryContextHolder::get(operationContext());
+    auto& telemetryCtxHolder = otel::TelemetryContextHolder::getDecoration(operationContext());
 
-    telemetryCtxHolder.set(telemetryCtx);
+    telemetryCtxHolder.setTelemetryContext(telemetryCtx);
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
         operationContext(), configsvrReshardCollection, collEntry, nss(), true);

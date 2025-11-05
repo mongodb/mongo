@@ -142,7 +142,8 @@ TEST_F(SpanTest, AsyncSpan) {
     {
         auto span = Span::start(opCtx.get(), "firstSpan");
         auto future = Future<void>::makeReady().then(
-            [telemetryCtx = TelemetryContextHolder::get(opCtx.get()).get()]() mutable {
+            [telemetryCtx = TelemetryContextHolder::getDecoration(opCtx.get())
+                                .getTelemetryContext()]() mutable {
                 auto span = Span::start(telemetryCtx, "secondSpan");
             });
         future.get();
@@ -231,13 +232,17 @@ TEST_F(SpanTest, ErrorCode) {
 
     auto firstRecord = getSpan(0, "firstSpan");
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
-    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize() + 1);
+    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize() + 2);
     ASSERT_EQ(firstRecord->status, opentelemetry::trace::StatusCode::kError);
 
     auto value1 = firstRecord->attributes.find("errorCode");
     ASSERT_NE(value1, firstRecord->attributes.end());
     ASSERT_TRUE(absl::holds_alternative<int32_t>(value1->second));
     ASSERT_EQ(static_cast<int>(absl::get<int32_t>(value1->second)), ErrorCodes::InternalError);
+
+    auto value2 = firstRecord->attributes.find("errorCodeString");
+    ASSERT_NE(value2, firstRecord->attributes.end());
+    ASSERT_TRUE(absl::holds_alternative<std::basic_string_view<char>>(value2->second));
 }
 
 TEST_F(SpanTest, SpanDuringException) {
@@ -281,8 +286,8 @@ TEST_F(SpanTest, StartIfExistingTraceParentNoTraceParent) {
 
 TEST_F(SpanTest, StartIfExistingTraceParentIfTraceParent) {
     auto opCtx = makeOperationContext();
-    auto& telemetryCtxHolder = TelemetryContextHolder::get(opCtx.get());
-    telemetryCtxHolder.set(Span::createTelemetryContext());
+    auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx.get());
+    telemetryCtxHolder.setTelemetryContext(Span::createTelemetryContext());
     {
         auto span = Span::startIfExistingTraceParent(opCtx.get(), "firstSpan");
         TRACING_SPAN_ATTR(span, "test", 1);

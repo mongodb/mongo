@@ -89,6 +89,10 @@ public:
 
     void propagate(TextMapPropagator& propagator, TextMapCarrier& carrier) const;
 
+    std::shared_ptr<TelemetryContext> clone() const override {
+        return std::make_shared<SpanTelemetryContextImpl>(*this);
+    }
+
 private:
     OtelContext _ctx;
     bool _keepSpan{false};

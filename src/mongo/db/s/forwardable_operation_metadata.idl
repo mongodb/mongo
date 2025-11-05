@@ -75,3 +75,6 @@ structs:
                     which ensures that feature flag checks are stable through its execution."
                 # TODO SERVER-99655: make non-optional once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
                 optional: true
+            telemetryContext:
+                type: object_owned
+                optional: true

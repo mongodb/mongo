@@ -623,10 +623,10 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     }
     coordinatorDoc.setNumSamplesPerChunk(request.getNumSamplesPerChunk());
     coordinatorDoc.setDemoMode(request.getDemoMode());
-    auto& telemetryContextHolder = otel::TelemetryContextHolder::get(opCtx);
-    if (telemetryContextHolder.get()) {
-        auto telemetryCtxBSON =
-            otel::traces::TelemetryContextSerializer::toBSON(telemetryContextHolder.get());
+    auto telemetryContext =
+        otel::TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
+    if (telemetryContext) {
+        auto telemetryCtxBSON = otel::traces::TelemetryContextSerializer::toBSON(telemetryContext);
         coordinatorDoc.setTelemetryContext(telemetryCtxBSON);
     }
     return coordinatorDoc;

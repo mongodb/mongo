@@ -28,6 +28,4 @@
 - featureFlagPrimaryDrivenIndexBuilds
 # TODO SERVER-104494 SERVER-104258: Turn this back on once the issues are fixed.
 - featureFlagReshardingCloneNoRefresh
-# TODO SERVER-100132: Remove this once we know the impact of enabling tracing.
-- featureFlagTracing
 - featureFlagMultipleTicketPoolsExecutionControl

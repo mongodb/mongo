@@ -585,6 +585,9 @@ CollectionType createTempReshardingCollectionType(
         coordinatorDoc.getCommonReshardingMetadata().getProvenance());
     tempEntryReshardingFields.setPerformVerification(
         coordinatorDoc.getCommonReshardingMetadata().getPerformVerification());
+    if (coordinatorDoc.getTelemetryContext()) {
+        tempEntryReshardingFields.setTelemetryContext(*coordinatorDoc.getTelemetryContext());
+    }
 
     auto recipientFields = constructRecipientFields(coordinatorDoc);
     tempEntryReshardingFields.setRecipientFields(std::move(recipientFields));

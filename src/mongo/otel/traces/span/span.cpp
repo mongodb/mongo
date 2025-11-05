@@ -89,8 +89,13 @@ public:
         _span->SetAttribute(std::string{key}, value);
     }
 
+    void setAttribute(StringData key, StringData value) {
+        _span->SetAttribute(std::string{key}, std::string{value});
+    }
+
     void setStatus(const Status& status) {
         _span->SetAttribute(errorCodeKey, status.code());
+        _span->SetAttribute(errorCodeStringKey, status.reason());
         _error = !status.isOK();
     }
 
@@ -122,6 +127,12 @@ void Span::setAttribute(StringData key, int value) {
     }
 }
 
+void Span::setAttribute(StringData key, StringData value) {
+    if (_impl) {
+        _impl->setAttribute(key, value);
+    }
+}
+
 void Span::setStatus(const Status& status) {
     if (_impl) {
         _impl->setStatus(status);
@@ -133,12 +144,12 @@ Span Span::start(OperationContext* opCtx, const std::string& name, bool keepSpan
         return Span{};
     }
 
-    auto& telemetryCtxHolder = TelemetryContextHolder::get(opCtx);
-    auto telemetryCtx = telemetryCtxHolder.get();
+    auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx);
+    auto telemetryCtx = telemetryCtxHolder.getTelemetryContext();
 
     if (!telemetryCtx) {
         telemetryCtx = std::make_shared<SpanTelemetryContextImpl>();
-        telemetryCtxHolder.set(telemetryCtx);
+        telemetryCtxHolder.setTelemetryContext(telemetryCtx);
     }
 
     return start(telemetryCtx, name, keepSpan);
@@ -151,7 +162,7 @@ Span Span::startIfExistingTraceParent(OperationContext* opCtx,
         return Span{};
     }
 
-    auto telemetryCtx = TelemetryContextHolder::get(opCtx).get();
+    auto telemetryCtx = TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
 
     if (!telemetryCtx) {
         return Span{};

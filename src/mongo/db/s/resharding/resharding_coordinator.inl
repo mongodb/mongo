@@ -49,6 +49,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
@@ -350,12 +351,21 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
 }
 
 ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilReadyToCommit(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    return resharding::WithAutomaticRetry([this, executor] {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
+    return resharding::WithAutomaticRetry([this,
+                                           executor,
+                                           telemetryCtx = telemetryCtx->clone()]() mutable {
                return ExecutorFuture<void>(**executor)
-                   .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
-                   .then([this, executor] {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                       auto span = _startSpan(
+                           telemetryCtx, "ReshardingCoordinator::_awaitAllDonorsReadyToDonate");
+                       return _awaitAllDonorsReadyToDonate(executor);
+                   })
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
+                           auto span = _startSpan(
+                               telemetryCtx, "ReshardingCoordinator::_awaitAllRecipientsCloning");
                            if (resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
                                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                                _tellAllRecipientsToClone(executor);
@@ -365,26 +375,50 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                            _tellAllDonorsToStartChangeStreamsMonitor(executor);
                        }
                    })
-                   .then([this, executor] {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                       auto span = _startSpan(
+                           telemetryCtx,
+                           "ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors");
                        return _fetchAndPersistNumDocumentsToCloneFromDonors(executor);
                    })
-                   .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
-                   .then([this, executor] {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                       auto span =
+                           _startSpan(telemetryCtx,
+                                      "ReshardingCoordinator::_awaitAllRecipientsFinishedCloning");
+                       return _awaitAllRecipientsFinishedCloning(executor);
+                   })
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kApplying) {
+                           auto span = _startSpan(telemetryCtx,
+                                                  "ReshardingCoordinator::_tellAllDonorsToRefresh");
                            _tellAllDonorsToRefresh(executor);
                        }
                    })
-                   .then([this, executor] { return _awaitAllRecipientsFinishedApplying(executor); })
-                   .then([this, executor] {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                       auto span =
+                           _startSpan(telemetryCtx,
+                                      "ReshardingCoordinator::_awaitAllRecipientsFinishedApplying");
+                       return _awaitAllRecipientsFinishedApplying(executor);
+                   })
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kBlockingWrites) {
+                           auto span = _startSpan(
+                               telemetryCtx,
+                               "ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
                            _tellAllDonorsToRefresh(executor);
                            _tellAllRecipientsToRefresh(executor);
                        }
                    })
-                   .then([this, executor] {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                       auto span = _startSpan(
+                           telemetryCtx,
+                           "ReshardingCoordinator::_fetchAndPersistNumDocumentsFinalFromDonors");
                        return _fetchAndPersistNumDocumentsFinalFromDonors(executor);
                    })
-                   .then([this, executor] {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                       auto span = _startSpan(
+                           telemetryCtx,
+                           "ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency");
                        return _awaitAllRecipientsInStrictConsistency(executor);
                    });
            })
@@ -568,6 +602,12 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     getObserver()->reshardingCoordinatorRunCalled();
     pauseBeforeCTHolderInitialization.pauseWhileSet();
 
+    auto telemetryCtx = _coordinatorDoc.getTelemetryContext()
+        ? otel::traces::TelemetryContextSerializer::fromBSON(*_coordinatorDoc.getTelemetryContext())
+        : otel::traces::Span::createTelemetryContext();
+
+    auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::run", true);
+
     auto abortCalled = [&] {
         stdx::lock_guard<stdx::mutex> lk(_abortCalledMutex);
         _ctHolder = std::make_unique<CoordinatorCancellationTokenHolder>(stepdownToken);
@@ -586,23 +626,26 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
 
     return _isReshardingOpRedundant(executor)
         .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
-        .onCompletion([this, self = shared_from_this(), executor](
-                          StatusWith<bool> isOpRedundantSW) -> ExecutorFuture<void> {
-            if (isOpRedundantSW.isOK() && isOpRedundantSW.getValue()) {
-                this->_coordinatorService->releaseInstance(this->_id, isOpRedundantSW.getStatus());
-                _coordinatorDocWrittenPromise.emplaceValue();
-                _completionPromise.emplaceValue();
-                _reshardingCoordinatorObserver->fulfillPromisesBeforePersistingStateDoc();
-                return ExecutorFuture<void>(**executor, isOpRedundantSW.getStatus());
-            } else if (!isOpRedundantSW.isOK()) {
-                this->_coordinatorService->releaseInstance(this->_id, isOpRedundantSW.getStatus());
-                _coordinatorDocWrittenPromise.setError(isOpRedundantSW.getStatus());
-                _completionPromise.setError(isOpRedundantSW.getStatus());
-                _reshardingCoordinatorObserver->interrupt(isOpRedundantSW.getStatus());
-                return ExecutorFuture<void>(**executor, isOpRedundantSW.getStatus());
-            }
-            return _runReshardingOp(executor);
-        })
+        .onCompletion(
+            [this, self = shared_from_this(), executor, telemetryCtx = telemetryCtx->clone()](
+                StatusWith<bool> isOpRedundantSW) -> ExecutorFuture<void> {
+                if (isOpRedundantSW.isOK() && isOpRedundantSW.getValue()) {
+                    this->_coordinatorService->releaseInstance(this->_id,
+                                                               isOpRedundantSW.getStatus());
+                    _coordinatorDocWrittenPromise.emplaceValue();
+                    _completionPromise.emplaceValue();
+                    _reshardingCoordinatorObserver->fulfillPromisesBeforePersistingStateDoc();
+                    return ExecutorFuture<void>(**executor, isOpRedundantSW.getStatus());
+                } else if (!isOpRedundantSW.isOK()) {
+                    this->_coordinatorService->releaseInstance(this->_id,
+                                                               isOpRedundantSW.getStatus());
+                    _coordinatorDocWrittenPromise.setError(isOpRedundantSW.getStatus());
+                    _completionPromise.setError(isOpRedundantSW.getStatus());
+                    _reshardingCoordinatorObserver->interrupt(isOpRedundantSW.getStatus());
+                    return ExecutorFuture<void>(**executor, isOpRedundantSW.getStatus());
+                }
+                return _runReshardingOp(executor, std::move(telemetryCtx));
+            })
         .onCompletion([this, self = shared_from_this(), executor](Status status) {
             _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
             return _quiesce(executor, std::move(status));
@@ -653,13 +696,21 @@ ExecutorFuture<void> ReshardingCoordinator::_quiesce(
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
     return _initializeCoordinator(executor)
-        .then([this, executor] { return _runUntilReadyToCommit(executor); })
-        .then([this, executor](const ReshardingCoordinatorDocument& updatedCoordinatorDoc) {
+        .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+            auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::_runUntilReadyToCommit");
+            return _runUntilReadyToCommit(executor, std::move(telemetryCtx));
+        })
+        .then([this, executor, telemetryCtx = telemetryCtx->clone()](
+                  const ReshardingCoordinatorDocument& updatedCoordinatorDoc) mutable {
+            auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::committing");
             return _commitAndFinishReshardOperation(executor, updatedCoordinatorDoc);
         })
-        .onCompletion([this, executor](Status status) {
+        .onCompletion([this, executor, telemetryCtx = telemetryCtx->clone()](
+                          Status status) mutable {
+            auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::afterFinish");
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             reshardingPauseCoordinatorBeforeCompletion.executeIf(
                 [&](const BSONObj&) {
@@ -702,14 +753,17 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
             return status;
         })
         .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
-        .onCompletion([this](Status outerStatus) {
+        .onCompletion([this, telemetryCtx = telemetryCtx->clone()](Status outerStatus) mutable {
+            auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::waitForCommitMonitor");
             // Wait for the commit monitor to halt. We ignore any ignores because the
             // ReshardingCoordinator instance is already exiting at this point.
             return _commitMonitorQuiesced
                 .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
                 .onCompletion([outerStatus](Status) { return outerStatus; });
         })
-        .onCompletion([this, self = shared_from_this()](Status status) {
+        .onCompletion([this, self = shared_from_this(), telemetryCtx = telemetryCtx->clone()](
+                          Status status) mutable {
+            auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::finalize");
             _metrics->onStateTransition(_coordinatorDoc.getState(), boost::none);
             _logStatsOnCompletion(status.isOK());
 
@@ -2146,6 +2200,15 @@ const ShardId& ReshardingCoordinator::_getChangeStreamNotifierShardId() const {
     // Change stream readers expect to receive pre & post commit event notifications
     // from one of the shards holding data before the beginning of the resharding.
     return _coordinatorDoc.getDonorShards().front().getId();
+}
+
+otel::traces::Span ReshardingCoordinator::_startSpan(
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx,
+    const std::string& spanName,
+    bool keepSpan) {
+    auto span = otel::traces::Span::start(telemetryCtx, spanName, keepSpan);
+    TRACING_SPAN_ATTR(span, "reshardingUUID", _coordinatorDoc.getReshardingUUID().toString());
+    return span;
 }
 #endif  // RESHARDING_COORDINATOR_PART_4
 

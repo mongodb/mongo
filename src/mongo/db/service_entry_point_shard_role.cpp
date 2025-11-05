@@ -1628,8 +1628,8 @@ void ExecCommandDatabase::_initiateCommand() {
     if (auto& traceCtx = genericArgs.getTraceCtx()) {
         auto telemetryCtx = otel::traces::TelemetryContextSerializer::fromBSON(*traceCtx);
         if (telemetryCtx) {
-            auto& telemetryCtxHolder = otel::TelemetryContextHolder::get(opCtx);
-            telemetryCtxHolder.set(telemetryCtx);
+            auto& telemetryCtxHolder = otel::TelemetryContextHolder::getDecoration(opCtx);
+            telemetryCtxHolder.setTelemetryContext(telemetryCtx);
         }
     }
 

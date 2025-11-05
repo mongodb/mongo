@@ -36,6 +36,8 @@
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/executor/async_rpc.h"
+#include "mongo/otel/telemetry_context.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/stdx/mutex.h"
 
@@ -249,7 +251,8 @@ private:
      * Runs resharding up through preparing to persist the decision.
      */
     ExecutorFuture<ReshardingCoordinatorDocument> _runUntilReadyToCommit(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<otel::TelemetryContext> telemetryCtx);
 
     /**
      * Runs resharding through persisting the decision until cleanup.
@@ -294,7 +297,8 @@ private:
      * Runs resharding operation to completion from _initializeCoordinator().
      */
     ExecutorFuture<void> _runReshardingOp(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<otel::TelemetryContext> telemetryCtx);
 
     /**
      * Keep the instance in a quiesced state in order to handle retries.
@@ -549,6 +553,13 @@ private:
      * events for change stream readers.
      */
     const ShardId& _getChangeStreamNotifierShardId() const;
+
+    /**
+     * Creates a new span with the resharding UUID set as an attribute.
+     */
+    otel::traces::Span _startSpan(std::shared_ptr<otel::TelemetryContext> telemetryCtx,
+                                  const std::string& spanName,
+                                  bool keepSpan = false);
 
     // The unique key for a given resharding operation. InstanceID is an alias for BSONObj. The
     // value of this is the UUID that will be used as the collection UUID for the new sharded
