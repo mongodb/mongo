@@ -183,6 +183,7 @@ public:
         using Metrics = ReshardingCumulativeMetrics;
         Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
         Metrics::getForMoveCollection(sCtx)->reportForServerStatus(bob);
+        Metrics::getForRewriteCollection(sCtx)->reportForServerStatus(bob);
         Metrics::getForBalancerMoveCollection(sCtx)->reportForServerStatus(bob);
         Metrics::getForUnshardCollection(sCtx)->reportForServerStatus(bob);
     }

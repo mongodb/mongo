@@ -1,5 +1,5 @@
 /**
- * Overrides runCommand to retry "reshardCollection", "moveCollection", and "unshardCollection"
+ * Overrides runCommand to retry "reshardCollection", "rewriteCollection", "moveCollection", and "unshardCollection"
  * commands if they fail with OplogQueryMinTsMissing or SnapshotUnavailable.
  */
 
@@ -9,7 +9,7 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 const kTimeout = 20 * 60 * 1000;
 const kInterval = 100;
 
-const kRetryableCommands = ["reshardCollection", "moveCollection", "unshardCollection"];
+const kRetryableCommands = ["reshardCollection", "rewriteCollection", "moveCollection", "unshardCollection"];
 
 const kRetryableErrorCodes = [ErrorCodes.OplogQueryMinTsMissing, ErrorCodes.SnapshotUnavailable];
 

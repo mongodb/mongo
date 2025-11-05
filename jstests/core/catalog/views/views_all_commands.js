@@ -233,6 +233,7 @@ let viewsCommandTests = {
     streams_updateConnection: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     abortMoveCollection: {skip: isUnrelated},
+    abortRewriteCollection: {skip: isUnrelated},
     abortReshardCollection: {skip: isUnrelated},
     abortTransaction: {skip: isUnrelated},
     abortUnshardCollection: {skip: isUnrelated},
@@ -675,6 +676,13 @@ let viewsCommandTests = {
     resetPlacementHistory: {skip: isUnrelated},
     reshardCollection: {
         command: {reshardCollection: "test.view", key: {_id: 1}},
+        expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true,
+    },
+    rewriteCollection: {
+        command: {rewriteCollection: "test.view"},
         expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,

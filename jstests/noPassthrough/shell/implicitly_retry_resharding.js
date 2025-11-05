@@ -67,6 +67,22 @@ assert.commandWorked(
     }),
 );
 
+// Test rewriteCollection with OplogQueryMinTsMissing. The command should be retried.
+failNextCommandWithCode(testDB, "rewriteCollection", ErrorCodes.OplogQueryMinTsMissing);
+assert.commandWorked(
+    st.s.adminCommand({
+        rewriteCollection: ns,
+    }),
+);
+
+// Test rewriteCollection with SnapshotUnavailable. The command should be retried.
+failNextCommandWithCode(testDB, "rewriteCollection", ErrorCodes.SnapshotUnavailable);
+assert.commandWorked(
+    st.s.adminCommand({
+        rewriteCollection: ns,
+    }),
+);
+
 // Test moveCollection with OplogQueryMinTsMissing. The command should be retried.
 const unshardedCollName = "unshardedColl";
 const unshardedNs = dbName + "." + unshardedCollName;
@@ -129,6 +145,15 @@ assert.commandFailedWithCode(
     st.s.adminCommand({
         reshardCollection: ns,
         key: {x: "hashed"},
+    }),
+    ErrorCodes.InternalError,
+);
+
+// Test rewriteCollection with a non-retryable error.
+failNextCommandWithCode(testDB, "rewriteCollection", ErrorCodes.InternalError);
+assert.commandFailedWithCode(
+    st.s.adminCommand({
+        rewriteCollection: ns,
     }),
     ErrorCodes.InternalError,
 );

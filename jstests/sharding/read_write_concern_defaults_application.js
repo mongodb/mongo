@@ -225,6 +225,7 @@ let testCases = {
     _transferMods: {skip: "internal command"},
     abortMoveCollection: {skip: "does not accept read or write concern"},
     abortReshardCollection: {skip: "does not accept read or write concern"},
+    abortRewriteCollection: {skip: "does not accept read or write concern"},
     abortTransaction: {
         setUp: function (conn) {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: "majority"}}));
@@ -711,6 +712,7 @@ let testCases = {
     replSetUpdatePosition: {skip: "does not accept read or write concern"},
     resetPlacementHistory: {skip: "does not accept read or write concern"},
     reshardCollection: {skip: "does not accept read or write concern"},
+    rewriteCollection: {skip: "does not accept read or write concern"},
     resync: {skip: "does not accept read or write concern"},
     revokePrivilegesFromRole: {
         setUp: function (conn) {

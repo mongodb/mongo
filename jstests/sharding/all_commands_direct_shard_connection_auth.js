@@ -175,6 +175,10 @@ const allCommands = {
         // Skipping command because it requires testing through a parallel shell.
         skip: requiresParallelShell,
     },
+    abortRewriteCollection: {
+        // Skipping command because it requires testing through a parallel shell.
+        skip: requiresParallelShell,
+    },
     abortTransaction: {skip: "Requires changes to permissions or number of shards"},
     abortUnshardCollection: {
         // Skipping command because it requires testing through a parallel shell.
@@ -1045,6 +1049,7 @@ const allCommands = {
     },
     resetPlacementHistory: {skip: requiresMongoS},
     reshardCollection: {skip: requiresMongoS},
+    rewriteCollection: {skip: requiresMongoS},
     revokePrivilegesFromRole: {
         setUp: function (mongoS, withDirectConnections) {
             assert.commandWorked(withDirectConnections.getDB(dbName).runCommand({create: collName}));

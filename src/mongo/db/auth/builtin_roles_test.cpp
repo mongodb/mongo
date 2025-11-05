@@ -156,6 +156,7 @@ TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
         ActionType::splitVector,
         ActionType::refineCollectionShardKey,
         ActionType::reshardCollection,
+        ActionType::rewriteCollection,
         ActionType::analyzeShardKey,
         ActionType::configureQueryAnalyzer,
         ActionType::unshardCollection,

@@ -306,7 +306,15 @@ export class ReshardCollectionCmdTest {
         const endTime = Date.now();
         this._reshardDuration = (endTime - startTime) / 1000;
 
-        this._verifyShardKey(commandObj.key);
+        let commandShardKey = commandObj.key;
+        if ("rewriteCollection" in commandObj) {
+            // If this is a rewriteCollection command then it doesn't include a shard key, so we need to use the existing shard key for all checks.
+            const db = this._mongos.getDB(this._dbName);
+            const coll = this._timeseries ? getTimeseriesCollForDDLOps(db, db[this._collName]) : db[this._collName];
+            commandShardKey = coll.getShardKey();
+        } else {
+            this._verifyShardKey(commandShardKey);
+        }
 
         if (expectedChunks) {
             this._verifyTemporaryReshardingCollectionExistsWithCorrectOptions(
@@ -315,11 +323,11 @@ export class ReshardCollectionCmdTest {
             );
         }
 
-        this._verifyTagsDocumentsAfterOperationCompletes(this._ns, Object.keys(commandObj.key), expectedZones);
+        this._verifyTagsDocumentsAfterOperationCompletes(this._ns, Object.keys(commandShardKey), expectedZones);
 
         this._verifyChunksMatchExpected(expectedChunkNum, expectedChunks);
 
-        this._verifyIndexesCreated(indexes, commandObj.key);
+        this._verifyIndexesCreated(indexes, commandShardKey);
 
         this._verifyDocumentsExist(docs, collection);
 

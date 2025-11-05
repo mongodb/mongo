@@ -502,6 +502,9 @@ export var ReshardingTest = class {
                                 _presetReshardedChunks: newChunks,
                             };
                             break;
+                        case "rewriteCollection":
+                            command = {rewriteCollection: ns};
+                            break;
                         case "moveCollection":
                             command = {moveCollection: ns};
                             break;

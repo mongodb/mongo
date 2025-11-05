@@ -26,4 +26,6 @@ export const commandsAddedToMongosSinceLastLTS = [
     "stopTransitionToDedicatedConfigServer",
     "commitShardRemoval",
     "commitTransitionToDedicatedConfigServer",
+    "rewriteCollection",
+    "abortRewriteCollection",
 ];

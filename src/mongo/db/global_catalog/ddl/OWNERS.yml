@@ -32,3 +32,6 @@ filters:
   - "*unshard*collection*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "*rewrite*collection*":
+    approvers:
+      - 10gen/server-cluster-scalability

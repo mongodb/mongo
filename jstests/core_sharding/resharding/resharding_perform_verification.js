@@ -75,6 +75,18 @@ function runReshardCollection(host, ns, key, performVerification, countDownLatch
     return res;
 }
 
+function runRewriteCollection(host, ns, performVerification, countDownLatch) {
+    const mongos = new Mongo(host);
+    const cmdObj = {rewriteCollection: ns};
+    if (performVerification !== null) {
+        cmdObj.performVerification = performVerification;
+    }
+    const res = mongos.adminCommand(cmdObj);
+    countDownLatch.countDown();
+
+    return res;
+}
+
 function runUnshardCollection(host, ns, toShard, performVerification, countDownLatch) {
     const mongos = new Mongo(host);
     const cmdObj = {unshardCollection: ns, toShard};
@@ -204,6 +216,41 @@ function testReshardCollection(performVerification) {
     testResharding(reshardThread, reshardCountDownLatch, ns, performVerification);
 }
 
+function testRewriteCollection(performVerification) {
+    if (MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "8.3") < 0) {
+        // rewriteCollection is not supported in versions prior to 8.3, skip
+        return;
+    }
+
+    const collName = getTestCollectionName();
+    const ns = dbName + "." + collName;
+    const numDocs = 1000;
+    const docs = makeDocuments(numDocs);
+
+    assert.commandWorked(testDB.getCollection(collName).insert(docs));
+    assert.commandWorked(db.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    assert.commandWorked(db.adminCommand({split: ns, middle: {_id: 0}}));
+    assert.commandWorked(
+        db.adminCommand({
+            moveChunk: ns,
+            find: {_id: 0},
+            to: getNonOwningShardName(dbName, collName),
+            _waitForDelete: true,
+        }),
+    );
+
+    jsTest.log("Testing rewriteCollection with " + tojson({performVerification}));
+    const rewriteCountDownLatch = new CountDownLatch(1);
+    const rewriteThread = new Thread(
+        runRewriteCollection,
+        db.getMongo().host,
+        ns,
+        performVerification,
+        rewriteCountDownLatch,
+    );
+    testResharding(rewriteThread, rewriteCountDownLatch, ns, performVerification);
+}
+
 function testUnshardCollection(performVerification) {
     const collName = getTestCollectionName();
     const ns = dbName + "." + collName;
@@ -249,6 +296,7 @@ function testMoveCollection(performVerification) {
 
 function runTest(performVerification) {
     testReshardCollection(performVerification);
+    testRewriteCollection(performVerification);
     testUnshardCollection(performVerification);
     testMoveCollection(performVerification);
 }

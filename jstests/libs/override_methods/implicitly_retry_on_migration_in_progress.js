@@ -142,6 +142,7 @@ function runCommandWithRetryUponMigration(conn, dbName, commandName, commandObj,
         "createIndexes",
         "moveCollection",
         "reshardCollection",
+        "rewriteCollection",
         "unshardCollection",
     ]);
 

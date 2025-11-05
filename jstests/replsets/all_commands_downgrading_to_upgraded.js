@@ -179,6 +179,10 @@ const allCommands = {
         // Skipping command because it requires testing through a parallel shell.
         skip: requiresParallelShell,
     },
+    abortRewriteCollection: {
+        // Skipping command because it requires testing through a parallel shell.
+        skip: requiresParallelShell,
+    },
     abortTransaction: {
         doesNotRunOnStandalone: true,
         fullScenario: function (conn) {
@@ -1358,6 +1362,7 @@ const allCommands = {
         skip: "Cannot run while downgrading",
     },
     reshardCollection: {skip: cannotRunWhileDowngrading},
+    rewriteCollection: {skip: cannotRunWhileDowngrading},
     revokePrivilegesFromRole: {
         setUp: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));

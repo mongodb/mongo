@@ -89,11 +89,13 @@ const auto kReportedStateFieldNamesMap = [] {
 struct Metrics {
     ReshardingCumulativeMetrics _resharding;
     ReshardingCumulativeMetrics _moveCollection;
+    ReshardingCumulativeMetrics _rewriteCollection;
     ReshardingCumulativeMetrics _balancerMoveCollection;
     ReshardingCumulativeMetrics _unshardCollection;
 
     Metrics()
         : _moveCollection{"moveCollection"},
+          _rewriteCollection("rewriteCollection"),
           _balancerMoveCollection{"balancerMoveCollection"},
           _unshardCollection{"unshardCollection"} {};
 };
@@ -117,6 +119,12 @@ ReshardingCumulativeMetrics* ReshardingCumulativeMetrics::getForMoveCollection(
     ServiceContext* context) {
     auto& metrics = getMetrics(context);
     return &metrics->_moveCollection;
+}
+
+ReshardingCumulativeMetrics* ReshardingCumulativeMetrics::getForRewriteCollection(
+    ServiceContext* context) {
+    auto& metrics = getMetrics(context);
+    return &metrics->_rewriteCollection;
 }
 
 ReshardingCumulativeMetrics* ReshardingCumulativeMetrics::getForBalancerMoveCollection(

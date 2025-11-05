@@ -128,6 +128,7 @@ export let MongosAPIParametersUtil = (function () {
         {commandName: "_mongotConnPoolStats", skip: "internal API"},
         {commandName: "abortMoveCollection", skip: "TODO(SERVER-108802)"},
         {commandName: "abortReshardCollection", skip: "TODO(SERVER-108802)"},
+        {commandName: "abortRewriteCollection", skip: "TODO(SERVER-108802)"},
         {commandName: "abortUnshardCollection", skip: "TODO(SERVER-108802)"},
         {commandName: "analyze", skip: "TODO(SERVER-108802)"},
         {
@@ -1467,6 +1468,19 @@ export let MongosAPIParametersUtil = (function () {
                 requiresCommittedReads: true,
                 runsAgainstAdminDb: true,
                 command: () => ({reshardCollection: "db.collection", key: {_id: 1}}),
+            },
+        },
+        {
+            commandName: "rewriteCollection",
+            run: {
+                inAPIVersion1: false,
+                permittedInTxn: false,
+                shardCommandName: "_shardsvrReshardCollection",
+                requiresShardedCollection: true,
+                // rewriteCollection calls reshardCollection, which internally does atClusterTime reads.
+                requiresCommittedReads: true,
+                runsAgainstAdminDb: true,
+                command: () => ({rewriteCollection: "db.collection"}),
             },
         },
         {

@@ -221,6 +221,7 @@ const wcCommandsTests = {
     _transferMods: {skip: "internal command"},
     abortMoveCollection: {skip: "does not accept write concern"},
     abortReshardCollection: {skip: "does not accept write concern"},
+    abortRewriteCollection: {skip: "does not accept write concern"},
     abortTransaction: {
         success: {
             // Basic abort transaction
@@ -2246,6 +2247,7 @@ const wcCommandsTests = {
     replSetUpdatePosition: {skip: "does not accept write concern"},
     resetPlacementHistory: {skip: "internal command"},
     reshardCollection: {skip: "does not accept write concern"},
+    rewriteCollection: {skip: "does not accept write concern"},
     revokePrivilegesFromRole: {
         targetConfigServer: true,
         noop: {
@@ -3430,6 +3432,7 @@ const wcTimeseriesViewsCommandsTests = {
     _transferMods: {skip: "internal command"},
     abortMoveCollection: {skip: "does not accept write concern"},
     abortReshardCollection: {skip: "does not accept write concern"},
+    abortRewriteCollection: {skip: "does not accept write concern"},
     abortTransaction: {skip: "not supported on timeseries views"},
     abortUnshardCollection: {skip: "does not accept write concern"},
     addShard: {skip: "unrelated"},
@@ -4347,6 +4350,7 @@ const wcTimeseriesViewsCommandsTests = {
     revokePrivilegesFromRole: wcCommandsTests["revokePrivilegesFromRole"],
     revokeRolesFromRole: wcCommandsTests["revokeRolesFromRole"],
     revokeRolesFromUser: wcCommandsTests["revokeRolesFromUser"],
+    rewriteCollection: {skip: "does not accept write concern"},
     rolesInfo: {skip: "does not accept write concern"},
     rotateCertificates: {skip: "does not accept write concern"},
     rotateFTDC: {skip: "does not accept write concern"},

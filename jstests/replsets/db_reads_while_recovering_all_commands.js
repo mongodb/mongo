@@ -165,6 +165,7 @@ const allCommands = {
     _transferMods: {skip: isPrimaryOnly},
     abortMoveCollection: {skip: isPrimaryOnly},
     abortReshardCollection: {skip: isPrimaryOnly},
+    abortRewriteCollection: {skip: isPrimaryOnly},
     abortTransaction: {skip: isPrimaryOnly},
     abortUnshardCollection: {skip: isPrimaryOnly},
     aggregate: {

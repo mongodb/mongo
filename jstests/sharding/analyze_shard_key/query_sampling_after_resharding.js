@@ -137,6 +137,39 @@ function testReshardCollectionQuerySamplingEnabled(st) {
     assertQuerySampling(dbName, collName, true /* isActive */, st);
 }
 
+function testRewriteCollectionQuerySamplingEnabled(st) {
+    if (MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "8.3") < 0) {
+        // rewriteCollection is not supported in versions prior to 8.3, skip
+        return;
+    }
+
+    assert(st);
+
+    const {dbName, collName} = setUpCollection(st, true /* isShardedColl */);
+
+    const ns = dbName + "." + collName;
+    const srcShard = st.shard0.shardName;
+    const dstShard = st.shard1.shardName;
+    const conn = st.s;
+
+    jsTest.log(`Testing rewriteCollection ${tojson({dbName, collName, srcShard, dstShard})}`);
+
+    enableQuerySampling(st, dbName, collName);
+
+    validateQueryAnalyzerDoc(conn, dbName, collName);
+
+    // Insert enough documents with field "x" into sharded collection to meet cardinality requirement for resharding.
+    for (let i = 0; i < 1000; i++) {
+        st.s.getCollection(ns).insert({x: i});
+    }
+
+    // Reshard the sharded collection on the same shard key.
+    assert.commandWorked(st.s.adminCommand({rewriteCollection: ns}));
+
+    validateQueryAnalyzerDoc(conn, dbName, collName);
+    assertQuerySampling(dbName, collName, true /* isActive */, st);
+}
+
 function testUnshardCollectionQuerySamplingEnabled(st) {
     assert(st);
 
@@ -215,6 +248,7 @@ const mongosSetParametersOpts = {
     testMoveCollectionQuerySamplingEnabled(st);
     testUnshardCollectionQuerySamplingEnabled(st);
     testReshardCollectionQuerySamplingEnabled(st);
+    testRewriteCollectionQuerySamplingEnabled(st);
 
     for (let isShardedColl of [true, false]) {
         testReshardQuerySamplingDisabled(st, isShardedColl);

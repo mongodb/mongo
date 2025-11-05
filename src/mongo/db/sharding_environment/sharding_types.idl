@@ -47,6 +47,7 @@ enums:
             kMoveCollection: "moveCollection"
             kUnshardCollection: "unshardCollection"
             kBalancerMoveCollection: "balancerMoveCollection"
+            kRewriteCollection: "rewriteCollection"
 
 types:
     shard_id:

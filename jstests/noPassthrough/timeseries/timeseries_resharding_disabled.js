@@ -43,6 +43,13 @@ function runTest() {
     );
 
     assert.commandFailedWithCode(
+        st.s.adminCommand({
+            rewriteCollection: kFullName,
+        }),
+        ErrorCodes.IllegalOperation,
+    );
+
+    assert.commandFailedWithCode(
         st.s.adminCommand({unshardCollection: kFullName, toShard: kOther}),
         ErrorCodes.IllegalOperation,
     );

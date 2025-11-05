@@ -69,6 +69,16 @@ function reshardCollectionCmd() {
     );
 }
 
+function rewriteCollectionCmd() {
+    assert.commandWorked(
+        mongos.adminCommand({
+            rewriteCollection: kNsName,
+            numInitialChunks: 1,
+            zones: [{zone: zoneName, min: {_id: MinKey}, max: {_id: MaxKey}}],
+        }),
+    );
+}
+
 function moveCollectionCmd() {
     assert.commandWorked(mongos.adminCommand({moveCollection: kNsName, toShard: nonPrimaryShard}));
 }
@@ -157,6 +167,33 @@ for (let watchCollectionParameter of [kCollName, 1]) {
                         "zone": "zone1",
                         "min": {"newKey": {"$minKey": 1}},
                         "max": {"newKey": {"$maxKey": 1}},
+                    },
+                ],
+            },
+        },
+    );
+
+    jsTest.log(`Validate behavior of rewriteCollection against a change stream watching at '${watchLevel}' level`);
+    validateExpectedEventAndConfirmResumability(
+        prepareShardedCollection,
+        rewriteCollectionCmd,
+        watchCollectionParameter,
+        {
+            "operationType": "reshardCollection",
+            "collectionUUID": 0,
+            "ns": {"db": "reshard_collection_event", "coll": "coll"},
+            "operationDescription": {
+                "reshardUUID": 0,
+                "shardKey": {"_id": 1},
+                "oldShardKey": {"_id": 1},
+                "unique": false,
+                "numInitialChunks": NumberLong(1),
+                "provenance": "rewriteCollection",
+                "zones": [
+                    {
+                        "zone": "zone1",
+                        "min": {"_id": {"$minKey": 1}},
+                        "max": {"_id": {"$maxKey": 1}},
                     },
                 ],
             },

@@ -478,6 +478,19 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "abortRewriteCollection",
+            command: {abortRewriteCollection: "test.x"},
+            skipUnlessSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                    privileges: [{resource: {db: "test", collection: "x"}, actions: ["rewriteCollection"]}],
+                    expectFail: true,
+                },
+            ],
+        },
+        {
             testname: "abortUnshardCollection",
             command: {abortUnshardCollection: "test.x"},
             skipUnlessSharded: true,
@@ -6851,7 +6864,21 @@ export const authCommandsLib = {
                 {runOnDb: secondDbName, roles: {}},
             ],
         },
-
+        {
+            testname: "rewriteCollection",
+            command: {rewriteCollection: "test.x"},
+            skipUnlessSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                    privileges: [{resource: {db: "test", collection: "x"}, actions: ["rewriteCollection"]}],
+                    expectFail: true,
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}},
+            ],
+        },
         {
             testname: "_configsvrReshardCollection",
             command: {_configsvrReshardCollection: "test.x", key: {_id: 1}},

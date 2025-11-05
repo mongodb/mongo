@@ -180,6 +180,8 @@ public:
             switch (provenance) {
                 case ReshardingProvenanceEnum::kMoveCollection:
                     return ReshardingCumulativeMetrics::getForMoveCollection(serviceContext);
+                case ReshardingProvenanceEnum::kRewriteCollection:
+                    return ReshardingCumulativeMetrics::getForRewriteCollection(serviceContext);
                 case ReshardingProvenanceEnum::kBalancerMoveCollection:
                     return ReshardingCumulativeMetrics::getForBalancerMoveCollection(
                         serviceContext);

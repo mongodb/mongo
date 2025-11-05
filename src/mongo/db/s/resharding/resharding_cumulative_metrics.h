@@ -88,6 +88,7 @@ public:
 
     static ReshardingCumulativeMetrics* getForResharding(ServiceContext* context);
     static ReshardingCumulativeMetrics* getForMoveCollection(ServiceContext* context);
+    static ReshardingCumulativeMetrics* getForRewriteCollection(ServiceContext* context);
     static ReshardingCumulativeMetrics* getForBalancerMoveCollection(ServiceContext* context);
     static ReshardingCumulativeMetrics* getForUnshardCollection(ServiceContext* context);
 

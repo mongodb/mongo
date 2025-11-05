@@ -181,6 +181,7 @@ enums:
             revokePrivilegesFromRole: "revokePrivilegesFromRole" # ID only
             revokeRolesFromRole: "revokeRolesFromRole" # ID only
             revokeRolesFromUser: "revokeRolesFromUser" # ID only
+            rewriteCollection: "rewriteCollection"
             rotateCertificates: "rotateCertificates"
             runAsLessPrivilegedUser: "runAsLessPrivilegedUser"
             serverStatus: "serverStatus"

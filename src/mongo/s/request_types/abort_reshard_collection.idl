@@ -81,6 +81,14 @@ commands:
         api_version: ""
         type: namespacestring
 
+    abortRewriteCollection:
+        description: "The public command on mongos that aborts a rewriteCollection commmand."
+        command_name: abortRewriteCollection
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+
     abortUnshardCollection:
         description: "The public command on mongos that aborts a unshardCollection commmand."
         command_name: abortUnshardCollection
