@@ -48,6 +48,7 @@ buildvariants:
       - devprod_coverity
     tasks:
       - name: publish-sast-report
+      - name: publish-augmented-sbom
 
   - name: promote-custom-build
     display_name: "Promote Custom Build"
