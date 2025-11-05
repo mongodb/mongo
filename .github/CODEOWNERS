@@ -1271,6 +1271,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/oplog/**/* @10gen/server-oplog @svc-auto-approve-bot
 /jstests/noPassthrough/oplog/**/check_for_oplog_cap_maintainer_thread.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/overload_retryability/OWNERS.yml
+/jstests/noPassthrough/overload_retryability/**/* @10gen/server-workload-resilience @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/profile/OWNERS.yml
 /jstests/noPassthrough/profile/**/* @10gen/query-integration-observability @svc-auto-approve-bot
 

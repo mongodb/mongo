@@ -111,4 +111,28 @@ void ShardSharedStateCache::_updateRetryBudgetRateParameters(double returnRate, 
     }
 }
 
+void ShardSharedStateCache::report(BSONObjBuilder* bob) const {
+    auto latestShardStateById = [&] {
+        std::shared_lock _{_mutex};
+        return _shardStateById;
+    }();
+
+    for (const auto& [shardId, state] : latestShardStateById) {
+        BSONObjBuilder shardBob = bob->subobjStart(shardId.toString());
+        state->stats.appendStats(bob);
+        state->retryBudget.appendStats(bob);
+    }
+}
+
+void ShardSharedStateCache::Stats::appendStats(BSONObjBuilder* bob) const {
+    bob->append("numOperationsAttempted", numOperationsAttempted.loadRelaxed());
+    bob->append("numOperationsRetriedAtLeastOnceDueToOverload",
+                numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed());
+    bob->append("numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded",
+                numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed());
+    bob->append("numRetriesDueToOverloadAttempted", numRetriesDueToOverloadAttempted.loadRelaxed());
+    bob->append("numOverloadErrorsReceived", numOverloadErrorsReceived.loadRelaxed());
+    bob->append("totalBackoffTimeMillis", totalBackoffTimeMillis.loadRelaxed());
+}
+
 }  // namespace mongo

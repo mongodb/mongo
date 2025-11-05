@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/backoff_with_jitter.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/unordered_set.h"
@@ -486,6 +487,11 @@ public:
         void updateRateParameters(double returnRate, double capacity);
 
         double getBalance_forTest() const;
+
+        /**
+         * Appends the stats for the retry budget metrics.
+         */
+        void appendStats(BSONObjBuilder* bob) const;
 
     private:
         friend AdaptiveRetryStrategy;

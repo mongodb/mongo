@@ -119,6 +119,12 @@ public:
         grid->catalogCache()->report(&result);
         grid->shardRegistry()->report(&result);
 
+        auto const& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
+        {
+            auto shards = BSONObjBuilder{result.subobjStart("shards")};
+            shardSharedStateCache.report(&shards);
+        }
+
         return result.obj();
     }
 };

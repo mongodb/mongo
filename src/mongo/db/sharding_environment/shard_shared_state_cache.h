@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/retry_strategy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -82,6 +83,11 @@ public:
          * The total amount of milliseconds waited due to backing off.
          */
         Atomic<std::int64_t> totalBackoffTimeMillis;
+
+        /**
+         * Appends the stats for the shard metrics.
+         */
+        void appendStats(BSONObjBuilder* bob) const;
     };
 
     /**
@@ -115,6 +121,11 @@ public:
      * Invoked when the value of the server parameters 'ShardRetryTokenBucketCapacity' is updated.
      */
     static Status updateRetryBudgetCapacity(std::int32_t capacity);
+
+    /**
+     * Report the metrics for all shards.
+     */
+    void report(BSONObjBuilder* bob) const;
 
 private:
     void _updateRetryBudgetRateParameters(double returnRate, double capacity);

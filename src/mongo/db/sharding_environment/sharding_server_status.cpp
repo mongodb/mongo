@@ -151,9 +151,16 @@ public:
             auto const grid = Grid::get(opCtx);
             auto const catalogCache = grid->catalogCache();
             auto const routingInfoCache = RoutingInformationCache::get(opCtx);
+            auto const& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
 
             ShardingStatistics::get(opCtx).report(&result);
             catalogCache->report(&result);
+
+            {
+                auto shards = BSONObjBuilder{result.subobjStart("shards")};
+                shardSharedStateCache.report(&shards);
+            }
+
             if (routingInfoCache && !feature_flags::gDualCatalogCache.isEnabled()) {
                 routingInfoCache->report(&result);
             }

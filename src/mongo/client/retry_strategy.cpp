@@ -152,4 +152,8 @@ double AdaptiveRetryStrategy::RetryBudget::getBalance_forTest() const {
     return _balance.load();
 }
 
+void AdaptiveRetryStrategy::RetryBudget::appendStats(BSONObjBuilder* bob) const {
+    bob->append("retryBudgetTokenBucketBalance", _balance.loadRelaxed());
+}
+
 }  // namespace mongo
