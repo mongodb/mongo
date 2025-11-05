@@ -47,6 +47,7 @@
 #include "mongo/util/hierarchical_acquisition.h"
 
 #include <algorithm>
+#include <condition_variable>
 #include <cstdint>
 #include <deque>
 #include <exception>
@@ -145,7 +146,7 @@ private:
     /**
      * This is the run loop of a worker thread, invoked by _workerThreadBody.
      */
-    void _consumeTasks();
+    void _consumeTasks(const std::string& threadName);
 
     /**
      * Implementation of shutdown once _mutex is locked.
@@ -421,7 +422,7 @@ void ThreadPool::Impl::_workerThreadBody(const std::string& threadName) noexcept
                 "Starting thread",
                 "threadName"_attr = threadName,
                 "poolName"_attr = _options.poolName);
-    _consumeTasks();
+    _consumeTasks(threadName);
     LOGV2_DEBUG(23105,
                 1,
                 "Shutting down thread",
@@ -429,7 +430,7 @@ void ThreadPool::Impl::_workerThreadBody(const std::string& threadName) noexcept
                 "poolName"_attr = _options.poolName);
 }
 
-void ThreadPool::Impl::_consumeTasks() {
+void ThreadPool::Impl::_consumeTasks(const std::string& threadName) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (_state == running) {
         if (!_pendingTasks.empty()) {
@@ -455,6 +456,7 @@ void ThreadPool::Impl::_consumeTasks() {
                 LOGV2_DEBUG(23106,
                             1,
                             "Reaping this thread",
+                            "threadName"_attr = threadName,
                             "nextThreadRetirementDate"_attr =
                                 _lastFullUtilizationDate + _options.maxIdleThreadAge);
                 break;
@@ -463,6 +465,7 @@ void ThreadPool::Impl::_consumeTasks() {
             LOGV2_DEBUG(23107,
                         3,
                         "Not reaping this thread",
+                        "threadName"_attr = threadName,
                         "nextThreadRetirementDate"_attr = nextRetirement);
             waitDeadline = nextRetirement;
         } else {
@@ -473,6 +476,7 @@ void ThreadPool::Impl::_consumeTasks() {
             LOGV2_DEBUG(23108,
                         3,
                         "Waiting for work",
+                        "threadName"_attr = threadName,
                         "numThreads"_attr = _threads.size(),
                         "minThreads"_attr = _options.minThreads);
         }

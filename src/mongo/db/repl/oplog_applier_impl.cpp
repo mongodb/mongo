@@ -711,14 +711,29 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             // but applyOplogBatchPerWorker will modify the vectors that it contains.
             invariant(writerVectors.size() == statusVector.size());
             for (size_t i = 0; i < writerVectors.size(); i++) {
-                if (writerVectors[i].empty())
+                if (writerVectors[i].empty()) {
                     continue;
+                }
 
                 _workerPool->schedule([this,
+                                       scheduled = Date_t::now(),
                                        &writer = writerVectors.at(i),
                                        &status = statusVector.at(i),
                                        &multikeyVector = multikeyVector.at(i),
-                                       isDataConsistent = isDataConsistent](auto scheduleStatus) {
+                                       isDataConsistent = isDataConsistent](Status scheduleStatus) {
+                    const auto dispatched = Date_t::now();
+                    const auto dispatchLatency = dispatched - scheduled;
+                    if (MONGO_unlikely(dispatchLatency > Seconds{10})) {
+                        LOGV2_DEBUG(9255700,
+                                    1,
+                                    "Oplog applier task took longer than expected to be dispatched "
+                                    "after being scheduled",
+                                    "dispatchLatency"_attr = dispatchLatency.toString(),
+                                    "scheduled"_attr = scheduled.toString(),
+                                    "dispatched"_attr = dispatched.toString(),
+                                    "scheduleStatus"_attr = scheduleStatus.toString());
+                    }
+
                     invariant(scheduleStatus);
                     auto opCtx = cc().makeOperationContext();
 
@@ -726,6 +741,17 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                         return applyOplogBatchPerWorker(
                             opCtx.get(), &writer, &multikeyVector, isDataConsistent);
                     });
+
+                    const auto completed = Date_t::now();
+                    const auto executionTime = completed - scheduled;
+                    if (MONGO_unlikely(executionTime > Seconds{10})) {
+                        LOGV2_DEBUG(9255701,
+                                    1,
+                                    "Oplog applier task took longer to complete than expected",
+                                    "executionTime"_attr = executionTime.toString(),
+                                    "dispatched"_attr = dispatched.toString(),
+                                    "completed"_attr = completed.toString());
+                    }
                 });
             }
 
