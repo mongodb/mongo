@@ -32,7 +32,6 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/id_generator.h"
 
 namespace mongo {
 /**

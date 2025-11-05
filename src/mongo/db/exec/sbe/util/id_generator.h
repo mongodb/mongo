@@ -35,32 +35,27 @@ namespace mongo {
  * increment to the previously generated id. This generator is not thread safe; calls to
  * generateByIncrementing must be serialized.
  */
-template <class T>
+template <class T, T IncrementStep = 1>
 class IncrementingIdGenerator {
 protected:
     /**
-     * Constructs a new generator using 'startingId' as the first generated id and 'incrementStep'
-     * as the value to add to generate subsequent ids. Note that 'incrementStep' may be negative but
-     * must not be zero.
+     * Constructs a new generator using 'startingId' as the first generated id.
      */
-    IncrementingIdGenerator(T startingId, T incrementStep)
-        : _currentId(startingId), _incrementStep(incrementStep) {}
+    IncrementingIdGenerator(T startingId) : _currentId(startingId) {}
 
     T generateByIncrementing() {
-        _currentId += _incrementStep;
+        _currentId += IncrementStep;
         return _currentId;
     }
 
 private:
     T _currentId;
-    T _incrementStep;
 };
 
-template <class T, class Container = std::vector<T>>
-class IdGenerator : IncrementingIdGenerator<T> {
+template <class T, class Container = std::vector<T>, T IncrementStep = 1>
+class IdGenerator : IncrementingIdGenerator<T, IncrementStep> {
 public:
-    IdGenerator(T startingId = 0, T incrementStep = 1)
-        : IncrementingIdGenerator<T>(startingId, incrementStep) {}
+    IdGenerator(T startingId = 0) : IncrementingIdGenerator<T, IncrementStep>(startingId) {}
 
     T generate() {
         return this->generateByIncrementing();

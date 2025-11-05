@@ -66,9 +66,7 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/id_generator.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
@@ -525,12 +523,10 @@ public:
     size_t taggedMatchExpressionHash{0};
 
 private:
-    using QsnIdGenerator = IdGenerator<PlanNodeId>;
-
     QuerySolution(const QuerySolution&) = delete;
     QuerySolution& operator=(const QuerySolution&) = delete;
 
-    void assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode& node);
+    void assignNodeIds(PlanNodeId& lastNodeId, QuerySolutionNode& node);
 
     std::unique_ptr<QuerySolutionNode> _root;
     PlanNodeId _unextendedRootId{kEmptyPlanNodeId};

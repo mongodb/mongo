@@ -31,10 +31,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
+#include "mongo/db/exec/sbe/util/id_generator.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/util/id_generator.h"
 
 #include <type_traits>
 

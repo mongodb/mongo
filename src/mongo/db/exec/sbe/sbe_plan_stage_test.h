@@ -65,7 +65,6 @@
 #include "mongo/db/yieldable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/id_generator.h"
 
 namespace mongo::sbe {
 

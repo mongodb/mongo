@@ -60,7 +60,6 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/id_generator.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>

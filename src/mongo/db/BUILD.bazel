@@ -2237,6 +2237,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:stages.h",
         "//src/mongo/db/exec/sbe/stages:window.h",
         "//src/mongo/db/exec/sbe/util:debug_print.h",
+        "//src/mongo/db/exec/sbe/util:id_generator.h",
         "//src/mongo/db/exec/sbe/util:print_options.h",
         "//src/mongo/db/exec/sbe/util:spilling.h",
         "//src/mongo/db/exec/sbe/values:arith_common.h",

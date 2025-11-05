@@ -297,11 +297,11 @@ std::string QuerySolution::summaryString() const {
     return sb.str();
 }
 
-void QuerySolution::assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode& node) {
+void QuerySolution::assignNodeIds(PlanNodeId& lastNodeId, QuerySolutionNode& node) {
     for (auto&& child : node.children) {
-        assignNodeIds(idGenerator, *child);
+        assignNodeIds(lastNodeId, *child);
     }
-    node._nodeId = idGenerator.generate();
+    node._nodeId = ++lastNodeId;
 }
 
 void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot) {
@@ -338,8 +338,8 @@ void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
     _root = std::move(root);
     _enumeratorExplainInfo.hitScanLimit = _root->getScanLimit();
 
-    QsnIdGenerator idGenerator;
-    assignNodeIds(idGenerator, *_root);
+    PlanNodeId lastNodeId = 0;
+    assignNodeIds(lastNodeId, *_root);
 }
 
 std::vector<NamespaceStringOrUUID> QuerySolution::getAllSecondaryNamespaces(
