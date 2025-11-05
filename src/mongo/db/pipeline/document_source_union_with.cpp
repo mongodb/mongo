@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
@@ -638,7 +639,12 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
 
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
-    // This will just parse the pipeline, with or without a view definition.
+    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
+        isRawDataOperation(expCtx->getOperationContext())) {
+        // Raw Data operations on timeseries collections operate without the timeseries view.
+        return pipeline_factory::makePipeline(currentPipeline, subExpCtx, opts);
+    }
+
     return pipeline_factory::makePipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }

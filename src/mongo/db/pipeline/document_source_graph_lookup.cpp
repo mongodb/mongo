@@ -44,6 +44,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/namespace_string_util.h"
@@ -313,8 +314,13 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
 
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match
     // stage we'll eventually construct from the input document.
-    _fromPipeline.reserve(resolvedNamespace.pipeline.size() + 1);
-    _fromPipeline = resolvedNamespace.pipeline;
+    if (!isRawDataOperation(expCtx->getOperationContext()) ||
+        !resolvedNamespace.ns.isTimeseriesBucketsCollection()) {
+        _fromPipeline.reserve(resolvedNamespace.pipeline.size() + 1);
+        _fromPipeline = resolvedNamespace.pipeline;
+    } else {
+        _fromPipeline.reserve(1);
+    }
     _fromPipeline.push_back(BSON("$match" << BSONObj()));
 }
 

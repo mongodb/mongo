@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
@@ -455,7 +456,9 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
             return buildPipelineFromViewDefinition(
                 fromExpCtx,
                 e->getNamespace(),
-                e->getPipeline(),
+                isRawDataOperation(pExpCtx->getOperationContext()) && e->timeseries()
+                    ? std::vector<BSONObj>{}
+                    : e->getPipeline(),
                 true /* attachCursorAfterOptimizing */,
                 shardTargetingPolicy,
                 pipeline_optimization::optimizeAndValidatePipeline);
@@ -485,12 +488,15 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         // This exception returns the information we need to resolve a sharded view. Update the
         // pipeline with the resolved view definition and retry to attach the cursor.
-        pipeline = buildPipelineFromViewDefinition(fromExpCtx,
-                                                   e->getNamespace(),
-                                                   e->getPipeline(),
-                                                   !cacheIsServing,
-                                                   shardTargetingPolicy,
-                                                   optimizePipeline);
+        pipeline = buildPipelineFromViewDefinition(
+            fromExpCtx,
+            e->getNamespace(),
+            isRawDataOperation(pExpCtx->getOperationContext()) && e->timeseries()
+                ? std::vector<BSONObj>{}
+                : e->getPipeline(),
+            !cacheIsServing,
+            shardTargetingPolicy,
+            optimizePipeline);
     }
 
     // If the cache has been abandoned, release it.

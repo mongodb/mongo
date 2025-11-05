@@ -80,6 +80,9 @@ selector:
     # Expects to successfully drop invalid views. As drops are no-oped, the leftover
     # invalid views fail the data consistency checker.
     - jstests/core/catalog/list_catalog_stage_consistency.js
+
+    # TODO: SERVER-113468 remove this exclusion.
+    - jstests/core/timeseries/query/timeseries_raw_data_inner_pipelines.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

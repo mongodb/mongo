@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
@@ -239,7 +240,13 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     const auto& resolvedNamespace = expCtx->getResolvedNamespace(_fromNs);
     _resolvedNs = resolvedNamespace.ns;
     _fromNsIsAView = resolvedNamespace.involvedNamespaceIsAView;
-    _sharedState->resolvedPipeline = resolvedNamespace.pipeline;
+
+    // Prevent view resolution for rawData timeseries commands.
+    if (!resolvedNamespace.involvedNamespaceIsAView ||
+        !isRawDataOperation(expCtx->getOperationContext()) ||
+        !resolvedNamespace.ns.isTimeseriesBucketsCollection()) {
+        _sharedState->resolvedPipeline = resolvedNamespace.pipeline;
+    }
 
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNamespace.ns, resolvedNamespace.uuid, _fromNs);
