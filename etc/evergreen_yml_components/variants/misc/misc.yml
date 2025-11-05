@@ -48,6 +48,7 @@ buildvariants:
     - devprod_coverity
   tasks:
     - name: publish-sast-report
+    - name: publish-augmented-sbom
 
 - name: &copybara-sync-between-repos copybara-sync-between-repos
   display_name: "* Copybara Sync Between Repos"
