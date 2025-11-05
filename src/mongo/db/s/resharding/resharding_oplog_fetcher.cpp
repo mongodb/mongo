@@ -318,6 +318,13 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
     return std::move(_onInsertFuture);
 }
 
+void ReshardingOplogFetcher::awaitBatchProcessed(int numBatchesProcessed) {
+    stdx::unique_lock lk(_mutex);
+    _batchProcessedCV.wait(lk, [this, numBatchesProcessed] {
+        return _totalNumBatchesProcessed == numBatchesProcessed;
+    });
+}
+
 ExecutorFuture<void> ReshardingOplogFetcher::schedule(
     std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
     if (_startAt == kFinalOpAlreadyFetched) {
@@ -613,7 +620,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
     auto aggRequest = _makeAggregateCommandRequest(client, factory);
 
     auto opCtxRaii = factory.makeOperationContext(client);
-    int batchesProcessed = 0;
+    int currentNumBatchesProcessed = 0;
     bool moreToCome = true;
 
     auto tickSource = opCtxRaii->getServiceContext()->getTickSource();
@@ -624,7 +631,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
     uassertStatusOK(shard->runAggregation(
         opCtxRaii.get(),
         aggRequest,
-        [this, &batchesProcessed, &moreToCome, &opCtxRaii, &batchTimer, factory](
+        [this, &currentNumBatchesProcessed, &moreToCome, &opCtxRaii, &batchTimer, factory](
             const std::vector<BSONObj>& aggregateBatch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
             _env->metrics()->onBatchRetrievedDuringOplogFetching(Milliseconds(batchTimer.millis()));
@@ -745,7 +752,10 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
             batchTimer.reset();
 
-            if (_maxBatches > -1 && ++batchesProcessed >= _maxBatches) {
+            stdx::lock_guard lk(_mutex);
+            ++_totalNumBatchesProcessed;
+            _batchProcessedCV.notify_all();
+            if (_maxBatches > -1 && ++currentNumBatchesProcessed >= _maxBatches) {
                 return false;
             }
 

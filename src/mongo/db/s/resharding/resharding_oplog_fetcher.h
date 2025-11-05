@@ -97,6 +97,8 @@ public:
 
     Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override;
 
+    void awaitBatchProcessed(int numBatchesProcessed);
+
     /**
      * Schedules a task that will do the following:
      *
@@ -224,10 +226,16 @@ private:
 
     // The mutex that protects all the members below.
     mutable stdx::mutex _mutex;
+
     ReshardingDonorOplogId _startAt;
     boost::optional<Date_t> _lastUpdatedProgressMarkAt;
+
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
+
+    stdx::condition_variable _batchProcessedCV;
+    int _totalNumBatchesProcessed = 0;
+
     AtomicWord<bool> _isPreparingForCriticalSection;
     // The cancellation source for the current aggregation.
     boost::optional<CancellationSource> _aggCancelSource;
