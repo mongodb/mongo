@@ -1291,7 +1291,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                     {
                         op: "c",
                         ns: db.getName() + ".$cmd",
-                        o: {create: bucketsCollName, timeseries: {timeField: "t"}},
+                        o: {create: bucketsCollName, clusteredIndex: true, timeseries: {timeField: "t"}},
                     },
                 ],
             }),
@@ -1330,7 +1330,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                     {
                         op: "c",
                         ns: db.getName() + ".$cmd",
-                        o: {create: bucketsCollName, timeseries: {timeField: "t"}},
+                        o: {create: bucketsCollName, clusteredIndex: true, timeseries: {timeField: "t"}},
                     },
                 ],
             }),

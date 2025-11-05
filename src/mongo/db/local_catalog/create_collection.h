@@ -68,12 +68,10 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd);
 /**
  * Creates the collection or the view as described by 'options'.
  */
-Status createCollection(
-    OperationContext* opCtx,
-    const NamespaceString& ns,
-    const CollectionOptions& options,
-    const boost::optional<BSONObj>& idIndex,
-    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none);
+Status createCollection(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const CollectionOptions& options,
+                        const boost::optional<BSONObj>& idIndex);
 
 /**
  * Creates a virtual collection as described by 'vopts'.

@@ -370,6 +370,53 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
     });
 }
 
+Status _performCollectionCreationChecks(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const CollectionOptions& options) {
+    auto status = userAllowedCreateNS(opCtx, ns);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    uassert(ErrorCodes::CommandNotSupported,
+            "'recordIdsReplicated' option may not be run without featureFlagRecordIdsReplicated "
+            "enabled",
+            !options.recordIdsReplicated ||
+                gFeatureFlagRecordIdsReplicated.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+    const auto createViewlessTimeseriesColl =
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "the 'validator' option cannot be set when creating viewless time-series collection",
+            !createViewlessTimeseriesColl || !options.timeseries.has_value() ||
+                options.validator.isEmpty());
+
+    // TODO SERVER-109289: Investigate whether this is safe on viewless time-series collections.
+    uassert(
+        ErrorCodes::OperationNotSupportedInTransaction,
+        str::stream() << "Cannot create a time-series collection in a multi-document transaction.",
+        !options.timeseries || !opCtx->inMultiDocumentTransaction());
+
+    // system.profile must be a simple collection since new document insertions directly work
+    // against the usual collection API. See introspect.cpp for more details.
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot create system.profile as a timeseries collection",
+            !options.timeseries || !ns.isSystemDotProfile());
+
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot create system collection " << ns.toStringForErrorMsg()
+                          << " within a transaction.",
+            !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
+
+    return Status::OK();
+}
+
+
 void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* db) {
     // Create 'system.views' in a separate WUOW if it does not exist.
     if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
@@ -383,6 +430,19 @@ void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* d
 Status _createView(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const CollectionOptions& collectionOptions) {
+    // system.profile will have new document inserts due to profiling. Inserts aren't supported
+    // on views.
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot create system.profile as a view",
+            !nss.isSystemDotProfile());
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot create a view in a multi-document "
+                             "transaction.",
+            !opCtx->inMultiDocumentTransaction());
+    uassert(ErrorCodes::Error(6026500),
+            "The 'clusteredIndex' option is not supported with views",
+            !collectionOptions.clusteredIndex);
+
     // This must be checked before we take locks in order to avoid attempting to take multiple locks
     // on the <db>.system.views namespace: first a IX lock on 'ns' and then a X lock on the database
     // system.views collection.
@@ -675,9 +735,11 @@ Status _createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
+    const bool isForApplyOps,
     const boost::optional<BSONObj>& idIndex,
     const boost::optional<VirtualCollectionOptions>& virtualCollectionOptions = boost::none,
     const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none) {
+
     return writeConflictRetry(opCtx, "create", nss, [&] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX /* database lock mode*/, boost::none);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
@@ -752,8 +814,20 @@ Status _createCollection(
         // We create the index on time and meta, which is used for query-based reopening, here for
         // viewless time-series collections if we are creating the collection on a primary. This is
         // done within the same WUOW as the collection creation.
+        //
+        // It should be safe to create the index in a separate WUOW from the collection creation,
+        // this is currently what is done on secondaries. There is a risk that the index creation
+        // entry gets rolled back, leaving the collection without the index, but this is easily
+        // remedied by manually creating the index again. If the collection creation and index
+        // creation are moved to separate WUOWs, which could simplify the code a bit, we would need
+        // to take the X lock instead of the IX lock to prevent writes to the collection from being
+        // performed before we have built the default index on it. TODO SERVER-107681 consider
+        // performing the two creations in separate WUOWs on primaries as well.
         if (collectionOptions.timeseries && !nss.isTimeseriesBucketsCollection() &&
-            opCtx->writesAreReplicated()) {
+            !isForApplyOps) {
+            tassert(1111800,
+                    "Expected to be creating time-series collection from primary",
+                    opCtx->writesAreReplicated());
             CollectionWriter collWriter(opCtx, nss);
             invariant(collWriter->isNewTimeseriesWithoutView());
 
@@ -838,84 +912,6 @@ StatusWith<CollectionOptions> parseCollectionOptionsFromCreateCmdObj(
             translateOptionsIfClusterByDefault(nss, std::move(collectionOptions), idIndex);
     }
     return collectionOptions;
-}
-
-Status createCollectionHelper(
-    OperationContext* opCtx,
-    const NamespaceString& ns,
-    const CollectionOptions& options,
-    const boost::optional<BSONObj>& idIndex,
-    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none) {
-    auto status = userAllowedCreateNS(opCtx, ns);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    uassert(ErrorCodes::CommandNotSupported,
-            "'recordIdsReplicated' option may not be run without featureFlagRecordIdsReplicated "
-            "enabled",
-            !options.recordIdsReplicated ||
-                gFeatureFlagRecordIdsReplicated.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
-    const auto createViewlessTimeseriesColl =
-        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-    uassert(ErrorCodes::InvalidOptions,
-            "the 'validator' option cannot be set when creating viewless time-series collection",
-            !createViewlessTimeseriesColl || !options.timeseries.has_value() ||
-                options.validator.isEmpty());
-
-    // TODO SERVER-109289: Investigate whether this is safe on viewless time-series collections.
-    uassert(
-        ErrorCodes::OperationNotSupportedInTransaction,
-        str::stream() << "Cannot create a time-series collection in a multi-document transaction.",
-        !options.timeseries || !opCtx->inMultiDocumentTransaction());
-
-    if (options.isView()) {
-        // system.profile will have new document inserts due to profiling. Inserts aren't supported
-        // on views.
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot create system.profile as a view",
-                !ns.isSystemDotProfile());
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create a view in a multi-document "
-                                 "transaction.",
-                !opCtx->inMultiDocumentTransaction());
-        uassert(ErrorCodes::Error(6026500),
-                "The 'clusteredIndex' option is not supported with views",
-                !options.clusteredIndex);
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot create view with collection specific catalog "
-                "identifiers",
-                !catalogIdentifier.has_value());
-        return _createView(opCtx, ns, options);
-    } else if (options.timeseries && opCtx->writesAreReplicated() &&
-               !createViewlessTimeseriesColl) {
-        // system.profile must be a simple collection since new document insertions directly work
-        // against the usual collection API. See introspect.cpp for more details.
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot create system.profile as a timeseries collection",
-                !ns.isSystemDotProfile());
-        // This helper is designed for user-created time-series collections on primaries. If a
-        // time-series buckets collection is created explicitly or during replication, treat this as
-        // a normal collection creation.
-        return _createLegacyTimeseries(opCtx, ns, options, idIndex, catalogIdentifier);
-    } else {
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create system collection " << ns.toStringForErrorMsg()
-                              << " within a transaction.",
-                !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        return _createCollection(opCtx,
-                                 ns,
-                                 options,
-                                 idIndex,
-                                 /*virtualCollectionOptions=*/boost::none,
-                                 catalogIdentifier);
-    }
 }
 
 }  // namespace
@@ -1006,21 +1002,43 @@ Status createCollectionForApplyOps(
     auto& collectionOptions = swCollectionOptions.getValue();
     collectionOptions.uuid = ui ? ui : collectionOptions.uuid;
 
-    return createCollectionHelper(
-        opCtx, newCollectionName, collectionOptions, idIndex, catalogIdentifier);
+    if (collectionOptions.timeseries) {
+        auto bucketingStatus = _setBucketingParametersAndAddClusteredIndex(collectionOptions);
+        if (!bucketingStatus.isOK()) {
+            return bucketingStatus;
+        }
+    }
+
+    // TODO SERVER-112876: Disallow creating views with 'c' oplog entries via the applyOps command.
+    if (collectionOptions.isView()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot create view with collection specific catalog "
+                "identifiers",
+                !catalogIdentifier.has_value());
+        return _createView(opCtx, newCollectionName, collectionOptions);
+    }
+
+    return _createCollection(opCtx,
+                             newCollectionName,
+                             collectionOptions,
+                             /*isForApplyOps=*/true,
+                             idIndex,
+                             /*virtualCollectionOptions=*/boost::none,
+                             catalogIdentifier);
 }
 
 
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CollectionOptions& optionsArg,
-                        const boost::optional<BSONObj>& idIndex,
-                        const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
+                        const boost::optional<BSONObj>& idIndex) {
     const auto createViewlessTimeseriesColl = optionsArg.timeseries &&
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
     auto options = optionsArg;
+
     if (createViewlessTimeseriesColl) {
         auto status = _setBucketingParametersAndAddClusteredIndex(options);
         if (!status.isOK()) {
@@ -1028,7 +1046,27 @@ Status createCollection(OperationContext* opCtx,
         }
     }
 
-    return createCollectionHelper(opCtx, ns, options, idIndex, catalogIdentifier);
+    auto status = _performCollectionCreationChecks(opCtx, ns, options);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (options.isView()) {
+        return _createView(opCtx, ns, options);
+    }
+    if (options.timeseries && opCtx->writesAreReplicated() && !createViewlessTimeseriesColl) {
+        // This helper is designed for user-created time-series collections on primaries. If a
+        // time-series buckets collection is created explicitly or during replication, treat this as
+        // a normal collection creation.
+        return _createLegacyTimeseries(
+            opCtx, ns, options, idIndex, /*catalogIdentifier=*/boost::none);
+    }
+    return _createCollection(opCtx,
+                             ns,
+                             options,
+                             /*isForApplyOps=*/false,
+                             idIndex,
+                             /*virtualCollectionOptions=*/boost::none);
 }
 
 
@@ -1040,8 +1078,13 @@ Status createVirtualCollection(OperationContext* opCtx,
             computeModeEnabled);
     CollectionOptions options;
     options.setNoIdIndex();
-    return _createCollection(
-        opCtx, ns, options, boost::none, vopts, /*catalogIdentifier=*/boost::none);
+    return _createCollection(opCtx,
+                             ns,
+                             options,
+                             /*isForApplyOps=*/false,
+                             boost::none,
+                             vopts,
+                             /*catalogIdentifier=*/boost::none);
 }
 
 CollectionOptions translateOptionsIfClusterByDefault(const NamespaceString& nss,
