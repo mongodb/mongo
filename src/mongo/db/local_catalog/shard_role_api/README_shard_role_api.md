@@ -76,6 +76,7 @@ If the prerequisites can be met, then the acquisition will succeed and one or mu
 - CollectionPtr: The local catalog.
 - CollectionDescription: The sharding catalog.
 - ShardingOwnershipFilter: Used to filter out orphaned documents.
+- PostReshardingCollectionPlacement: If the collection is undergoing resharding, provides the chunk placement according to the new shard key pattern. Only available for acquisitions of type kWrite.
 
 Additionally, these objects hold several resources during their lifetime:
 
@@ -100,7 +101,7 @@ collection.getShardingFilter();
 
 ## TransactionResources
 
-`CollectionAcquisition`/`CollectionOrViewAcquisition` are reference-counted views to a `TransactionResources` object. `TransactionResources` is the holder of the acquisition's resources, which include the global/db/collection locks (in case of a locked acquisition), the local catalog snapshot (collectionPtr), the sharding catalog snapshot (collectionDescription) and ownershipFilter.
+`CollectionAcquisition`/`CollectionOrViewAcquisition` are reference-counted views to a `TransactionResources` object. `TransactionResources` is the holder of the acquisition's resources, which include the global/db/collection locks (in case of a locked acquisition), the local catalog snapshot (collectionPtr), the sharding catalog snapshot (collectionDescription), the ownershipFilter and the post-resharding placement (in case of resharding running on the nss).
 
 Copying a `CollectionAcquisition`/`CollectionOrViewAcquisition` object increases its associated `TransactionResources` reference counter. When it reaches zero, the resources are released.
 
@@ -191,6 +192,27 @@ while (...) {
 }
 
 // ~HandleTransactionResourcesFromCursor will re-stash the TransactionResources to 'cursorPin'
+```
+
+## Resharding Metadata
+
+The Shard Role API provides resharding related metadata for collections undergoing resharding operations through the `PostReshardingCollectionPlacement` class. This component helps determine document placement during the resharding process.
+
+The post-resharding placement information:
+
+- Is available for write operations on collections being resharded
+- Provides the post-resharding document routing based on the new shard key pattern
+- Remains consistent throughout the operation's lifetime
+
+Access through CollectionAcquisition:
+
+```cpp
+CollectionAcquisition collection = acquireCollection(opCtx, ... AcquisitionPrerequisites::kWrite);
+if (collection.getPostReshardingPlacement()) {
+    // The collection is undergoing resharding
+    const ShardId& destinedShard =
+        collection.getPostReshardingPlacement()->getReshardingDestinedRecipient(document);
+}
 ```
 
 ## Shard Role Loop - Handling Stale Metadata Errors
