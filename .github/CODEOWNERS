@@ -386,6 +386,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/streams* @10gen/streams-engine @svc-auto-approve-bot
 /evergreen/generate_sast_report.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /evergreen/write_sast_report_env_file.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
+/evergreen/generate_symbol_check_report.py @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./evergreen/functions/security_reporting_scripts/OWNERS.yml
 /evergreen/functions/security_reporting_scripts/ @10gen/platsec-server @svc-auto-approve-bot

@@ -1851,6 +1851,34 @@ functions:
     - *f_expansions_write
     - *generate_clang_tidy_report_sh
 
+  "generate symbol-check report sh": &generate_symbol_check_report_sh
+    command: subprocess.exec
+    display_name: "generate symbol-check report"
+    type: test
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/generate_symbol_check_report.py"
+
+  "enable run_for_symbol_check expansions update":
+    &enable_run_for_symbol_check_expansions_update
+    command: expansions.update
+    display_name: "enable bazel test report creation"
+    params:
+      updates:
+        - key: run_for_symbol_check
+          value: "true"
+
+  "enable run_for_symbol_check expansions":
+    - *f_expansions_write
+    - *enable_run_for_symbol_check_expansions_update
+    - *f_expansions_write
+
+  "generate symbol-check report":
+    - *f_expansions_write
+    - *generate_symbol_check_report_sh
+
   "bazel run sh": &bazel_run_sh
     command: subprocess.exec
     display_name: "bazel run sh"

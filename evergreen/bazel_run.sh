@@ -45,7 +45,7 @@ echo "bazel run --verbose_failures ${LOCAL_ARG} ${INVOCATION_WITH_REDACTION}" >b
 # capture exit code
 set +o errexit
 export RETRY_ON_FAIL=0
-bazel_evergreen_shutils::retry_bazel_cmd 5 "$BAZEL_BINARY" \
+bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
     run --verbose_failures ${LOCAL_ARG} ${target} ${args} 2>&1 | tee -a bazel_output.log
 RET=${PIPESTATUS[0]}
 : "${RET:=1}"

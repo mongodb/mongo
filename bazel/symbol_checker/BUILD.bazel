@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "symbol_extractor.py",
+    "symbol_checker.py",
+])

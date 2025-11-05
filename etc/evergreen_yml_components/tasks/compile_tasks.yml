@@ -344,6 +344,27 @@ tasks:
           bazel_args: --config=clang-tidy --mongo_toolchain_version=${clang_tidy_toolchain|v5} --keep_going
       - func: "generate clang-tidy report"
 
+  - name: run_symbol_checker
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "requires_large_host",
+      ]
+    exec_timeout_secs: 1800 # 30 mins
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: archive_dist_test
+    commands:
+      - func: "do bazel setup"
+      - func: "enable run_for_symbol_check expansions"
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          bazel_args: --config=evg --config=symbol-checker
+      - func: "generate symbol-check report"
+
   - name: run_bazel_compiledb
     tags:
       [

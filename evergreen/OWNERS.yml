@@ -48,3 +48,6 @@ filters:
   - "write_sast_report_env_file.sh":
     approvers:
       - 10gen/devprod-release-infrastructure
+  - "generate_symbol_check_report.py":
+    approvers:
+      - 10gen/devprod-build
