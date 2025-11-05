@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/util/base64.h"
 
 // There are two decoding APIs. For all data that pass validation, both decoder implementations
