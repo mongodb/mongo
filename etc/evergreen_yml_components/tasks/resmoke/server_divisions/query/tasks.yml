@@ -1883,6 +1883,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-1"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_query_shape_hash_stability_generated_test
@@ -1911,6 +1912,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-2"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_query_shape_hash_stability_generated_test
@@ -1939,6 +1941,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-3"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_query_shape_hash_stability_generated_test
@@ -1967,6 +1970,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-4"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_query_shape_hash_stability_generated_test
@@ -2216,6 +2220,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-1"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_generated_test
@@ -2244,6 +2249,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-2"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_generated_test
@@ -2272,6 +2278,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-3"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_generated_test
@@ -2300,6 +2307,7 @@ tasks:
         vars:
           # The name of test repo that we want this task to clone.
           repo_name: "query-correctness-tests-4"
+      - func: "attach QueryTester information"
       - func: "run tests"
         vars:
           suite: query_correctness_generated_test

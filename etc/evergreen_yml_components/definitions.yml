@@ -3280,6 +3280,18 @@ functions:
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
 
+  "attach QueryTester information":
+    - *f_expansions_write
+    - command: attach.artifacts
+      params:
+        exact_file_names: true
+        optional: false
+        files:
+          # Note that due to the way the query_tester jobs are set up,
+          # this file will be taken from the current mongodb:master,
+          # not from your dev branch.
+          - src/src/mongo/db/query/query_tester/evergreen_information.json
+
   "attach bazel invocation":
     command: s3.put
     params:

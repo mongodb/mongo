@@ -10,6 +10,10 @@ QueryTester does not currently support extensive setup or complex infrastructure
 
 Each QueryTester use case expects three files to work together: a `.test`, a `.results`, and a `.coll`. See [below](#file-types-and-formats) for templates of each.
 
+## Debugging BFs
+
+See [Runbook: Triaging Query Correctness BFs](https://docs.google.com/document/d/1lIdwnR_pMoYEBKL8Np8X4igMqIUultegy8As_9g2R8Y/edit?tab=t.0#heading=h.13k8s02tb8j3)
+
 ## Getting Started
 
 You can compile the tester using the following command:
