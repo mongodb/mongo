@@ -48,3 +48,6 @@ filters:
   - "implicitly_retry_on_conflicting_operation_during_fuzztest.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "validate_collections_on_shutdown.js":
+    approvers:
+      - 10gen/server-validate

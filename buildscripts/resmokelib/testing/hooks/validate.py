@@ -200,11 +200,13 @@ def validate_database(
             "skipValidationOnInvalidViewDefinitions", False
         )
         skipValidationOnNamespaceNotFound = test_data.get("skipValidationOnNamespaceNotFound", True)
-        # TODO (SERVER-112502): Remove this and always set "full" to true.
-        doesNotSupportWTVerify = test_data.get("doesNotSupportWTVerify", False)
 
         validate_opts = {
-            "full": not doesNotSupportWTVerify,
+            # Run non-full validation because certain test fixtures run validate while
+            # the oplog applier is still active, and full:true can cause the oplog applier
+            # thread to encounter ObjectIsBusy errors during internal finds.
+            "full": False,
+            "checkBSONConformance": True,
             # TODO (SERVER-24266): Always enforce fast counts, once they are always accurate
             "enforceFastCount": not skipEnforceFastCountOnValidate,
         }

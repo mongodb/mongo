@@ -146,11 +146,6 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
                 validateOptions.enforceFastCount = false;
             }
 
-            // TODO(SERVER-112502): Remove this check.
-            if (TestData.doesNotSupportWTVerify) {
-                validateOptions.full = false;
-            }
-
             try {
                 const token = tenant ? _createTenantToken({tenant}) : undefined;
                 conn._setSecurityToken(token);
