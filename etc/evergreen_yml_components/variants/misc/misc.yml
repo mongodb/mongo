@@ -16,6 +16,7 @@ buildvariants:
       - devprod_coverity
     tasks:
       - name: publish-sast-report
+      - name: publish-augmented-sbom
 
   - name: upload-sbom-if-changed
     display_name: "Upload SBOM if changed"

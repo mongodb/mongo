@@ -112,3 +112,81 @@ tasks:
             WORKING_DIR: ${workdir}
             SBOM_REPO_PATH: sbom.json
             LOCAL_REPO_PATH: src
+
+  - name: publish-augmented-sbom
+    tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    exec_timeout_secs: 600 # 10 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "get version expansions"
+      - func: "apply version expansions"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - command: ec2.assume_role
+        display_name: Assume Silkbomb IAM role
+        params:
+          role_arn: arn:aws:iam::119629040606:role/silkbomb
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        display_name: Write temporary AWS credentials to Silkbomb environment file
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/functions/security_reporting_scripts/write_aws_creds_to_silkbomb_env_file.sh"
+          include_expansions_in_env:
+            [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
+      - command: ec2.assume_role
+        display_name: Assume DevProd Platforms ECR readonly IAM role
+        params:
+          role_arn: arn:aws:iam::901841024863:role/ecr-role-evergreen-ro
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        display_name: Run Silkbomb to augment SBOM with VEX data
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/functions/security_reporting_scripts/augment_sbom.sh"
+          include_expansions_in_env:
+            [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
+          env:
+            REQUESTER: ${requester}
+            BRANCH_NAME: ${branch_name}
+            GITHUB_ORG: ${github_org}
+            GITHUB_REPO: ${github_repo}
+            CONTAINER_COMMAND: docker # podman or docker
+            CONTAINER_OPTIONS: --pull=always --platform=linux/amd64 -i --rm
+            CONTAINER_ENV_FILES: ${workdir}/silkbomb.env
+            CONTAINER_VOLUMES: -v ${workdir}:/workdir
+            CONTAINER_IMAGE: 901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/silkbomb:2.0
+            SBOM_REPO_PATH: sbom.json
+            SBOM_OUT_PATH: ${workdir}/sbom-with-vex-${branch_name}.json
+            SILKBOMB_COMMAND: augment
+            SILKBOMB_ARGS: --sbom-in /workdir/src/sbom.json --sbom-out /workdir/src/sbom-with-vex-${branch_name}.json --repo ${github_repo} --branch ${branch_name}
+      - command: subprocess.exec
+        display_name: Upload SBOM to Google Drive"
+        params:
+          binary: bash
+          args:
+            - "${workdir}/src/evergreen/run_python_script.sh"
+            - "${workdir}/src/evergreen/functions/security_reporting_scripts/upload_to_google_drive.py"
+            - "${workdir}/src/sbom-with-vex-${branch_name}.json"
+          env:
+            WORK_DIR: ${workdir}
+            GITHUB_COMMIT: ${github_commit}
+            TRIGGERED_BY_GIT_TAG: ${triggered_by_git_tag}
+            MONGODB_VERSION: ${version}
+            MONGODB_RELEASE_BRANCH: ${branch_name}
+            SBOM_OUT_PATH: ${workdir}/sbom-with-vex-${branch_name}.json
+            UPLOAD_FILE_NAME: "[${version}] MongoDB Server Enterprise SBOM"
+            SBOM_REPORT_TEST_GOOGLE_DRIVE_FOLDER_ID: ${SBOM_REPORT_TEST_GOOGLE_DRIVE_FOLDER_ID}
+            SBOM_REPORT_RELEASES_GOOGLE_DRIVE_FOLDER_ID: ${SBOM_REPORT_RELEASES_GOOGLE_DRIVE_FOLDER_ID}
+            SAST_REPORT_UPLOAD_GOOGLE_CLIENT_ID: ${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_ID}
+            SAST_REPORT_UPLOAD_GOOGLE_CLIENT_REFRESH_TOKEN: ${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_REFRESH_TOKEN}
+            SAST_REPORT_UPLOAD_GOOGLE_CLIENT_SECRET: ${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_SECRET}

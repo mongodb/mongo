@@ -1,0 +1,17 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "augment_sbom",
+    srcs = ["augment_sbom.sh"],
+)
+
+sh_binary(
+    name = "write_aws_creds_to_silkbomb_env_file",
+    srcs = ["write_aws_creds_to_silkbomb_env_file.sh"],
+)
+
+py_library(
+    name = "all_python_files",
+    srcs = glob(["*.py"]),
+    visibility = ["//visibility:public"],
+)
