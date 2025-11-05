@@ -784,6 +784,20 @@ def _impl(ctx):
         ],
     )
 
+    thread_safety_warnings_feature = feature(
+        name = "thread_safety_warnings",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    # Warn about thread safety issues
+                    "-Wthread-safety",
+                ])],
+            ),
+        ],
+    )
+
     disable_warnings_for_third_party_libraries_clang_feature = feature(
         name = "disable_warnings_for_third_party_libraries_clang",
         enabled = ctx.attr.compiler == COMPILERS.CLANG,
@@ -1418,6 +1432,7 @@ def _impl(ctx):
         pessimizing_move_warning_feature,
         no_class_memaccess_warning_feature,
         no_interference_size_warning_feature,
+        thread_safety_warnings_feature,
         disable_warnings_for_third_party_libraries_clang_feature,
         disable_warnings_for_third_party_libraries_gcc_feature,
         disable_floating_point_contractions_feature,

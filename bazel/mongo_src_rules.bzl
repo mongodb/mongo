@@ -231,6 +231,7 @@ SYMBOL_ORDER_FILES = [
 RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES = select({
     "//bazel/config:compiler_type_clang": [
         "-disable_warnings_for_third_party_libraries_clang",
+        "thread_safety_warnings",
     ],
     "//bazel/config:compiler_type_gcc": [
         "-disable_warnings_for_third_party_libraries_gcc",

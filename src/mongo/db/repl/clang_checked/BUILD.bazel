@@ -1,0 +1,30 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(glob(["*.h"]))
+
+mongo_cc_library(
+    name = "clang_checked",
+    hdrs = [
+        "checked_mutex.h",
+        "lockable_concepts.h",
+        "mutex.h",
+        "thread_safety_annotations.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "clang_checked_test",
+    srcs = [
+        "checked_mutex_test.cpp",
+        "mutex_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo/db/repl/clang_checked",
+    ],
+)

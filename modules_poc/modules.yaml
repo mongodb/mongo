@@ -985,6 +985,14 @@ replicated_storage_service:
   files:
     - src/mongo/db/rss
 
+replication.clang_checked:
+  meta:
+    slack: server-replication
+    jira: Replication
+    fully_marked: true
+  files:
+    - src/mongo/db/repl/clang_checked/*
+
 replication.hello:
   meta:
     slack: server-replication
