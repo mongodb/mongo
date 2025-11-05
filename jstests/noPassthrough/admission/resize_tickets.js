@@ -514,5 +514,50 @@ describe("Storage engine concurrency adjustment algorithm", function () {
             assert.eq(stats.read.lowPriority.totalTickets, customLowPrioReadTickets);
             assert.eq(stats.write.lowPriority.totalTickets, customLowPrioWriteTickets);
         });
+
+        it(`should preserve dynamically adjusted tickets when transitioning from '${
+            kThroughputProbing
+        }' to '${kFixedWithPrio}'`, function () {
+            replTest = new ReplSetTest({
+                nodes: 1,
+                nodeOptions: {
+                    setParameter: {
+                        storageEngineConcurrencyAdjustmentAlgorithm: kThroughputProbing,
+                    },
+                },
+            });
+            replTest.startSet();
+            replTest.initiate();
+            mongod = replTest.getPrimary();
+
+            // Capture the current ticket counts that throughput probing may have dynamically
+            // adjusted.
+            const beforeStatus = assert.commandWorked(mongod.adminCommand({serverStatus: 1}));
+            const beforeStats = beforeStatus.queues.execution;
+            const throughputProbingReadTickets = beforeStats.read.normalPriority.totalTickets;
+            const throughputProbingWriteTickets = beforeStats.write.normalPriority.totalTickets;
+
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentReadTransactions: throughputProbingReadTickets,
+                }),
+            );
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    storageEngineConcurrentWriteTransactions: throughputProbingWriteTickets,
+                }),
+            );
+
+            // Transition to prioritization algorithm.
+            setAlgorithm(mongod, kFixedWithPrio);
+
+            // Verify that the previous dynamically determined tickets count are preserved.
+            const afterStatus = assert.commandWorked(mongod.adminCommand({serverStatus: 1}));
+            const afterStats = afterStatus.queues.execution;
+            assert.eq(throughputProbingReadTickets, afterStats.read.normalPriority.totalTickets);
+            assert.eq(throughputProbingWriteTickets, afterStats.write.normalPriority.totalTickets);
+        });
     });
 });
