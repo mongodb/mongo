@@ -1270,14 +1270,15 @@ private:
     void _prepareToUpgrade(OperationContext* opCtx,
                            const SetFeatureCompatibilityVersion& request,
                            boost::optional<Timestamp> changeTimestamp) {
-        // Acquire and immediately release the global lock in S mode, which ensures that from now on
-        // all operations acquiring the global lock in X/IX mode see the 'kUpgrading' FCV state.
-        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
-
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
         const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
         const auto requestedVersion = request.getCommandParameter();
+
+        // This wait serves as a barrier to guarantee that, from now on:
+        // - No operations with an OFCV lower than the upgrading OFCV will be running
+        // - All operations acquiring the global lock in X/IX mode see the 'kUpgrading' FCV state
+        _waitForOperationsRelyingOnStaleFcvToComplete(opCtx, fcvSnapshot.getVersion());
 
         _userCollectionsUassertsForUpgrade(opCtx, requestedVersion, originalVersion);
 
@@ -1382,7 +1383,16 @@ private:
         }
     }
 
-    void _waitForConcurrentLocalWriteOperationsToComplete(OperationContext* opCtx) {
+    /**
+     * This function:
+     * - Waits for operations using a stale OFCV to complete
+     * - Acquires the global lock in shared mode to make sure that:
+     * --- All operations that may potentially have started on an old FCV complete
+     * --- All new operations are guaranteed to see at least the current FCV state
+     */
+    void _waitForOperationsRelyingOnStaleFcvToComplete(OperationContext* opCtx, FCV version) {
+        waitForOperationsNotMatchingVersionContextToComplete(opCtx, VersionContext(version));
+
         // Take the global lock in S mode to create a barrier for operations taking the global
         // IX or X locks. This ensures that either:
         //   - The global IX/X locked operation will start after the FCV change, see the
@@ -1693,9 +1703,13 @@ private:
         // this function.
         _prepareToDowngradeActions(opCtx, requestedVersion);
 
-        // Acquire and immediately release the global lock in S mode, which ensures that from now on
-        // all operations acquiring the global lock in X/IX mode see the 'kDowngrading' FCV state.
-        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+
+        // This wait serves as a barrier to gurantee that, from now on:
+        // - No operations with an OFCV greater than the downgrading OFCV will be running
+        // - All operations acquiring the global lock in X/IX mode see the 'kDowngrading' FCV state
+        _waitForOperationsRelyingOnStaleFcvToComplete(opCtx, fcvSnapshot.getVersion());
 
         uassert(ErrorCodes::Error(549181),
                 "Failing downgrade due to 'failDowngrading' failpoint set",
@@ -1714,10 +1728,7 @@ private:
         // this helper function can only have the CannotDowngrade error code indicating that the
         // user must manually clean up some user data in order to retry the FCV downgrade.
 
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        invariant(fcvSnapshot.isUpgradingOrDowngrading());
         const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
-
         _userCollectionsUassertsForDowngrade(opCtx, requestedVersion, originalVersion);
     }
 
@@ -1947,9 +1958,10 @@ private:
                     });
         }
 
-        // Acquire and immediately release the global lock in S mode, which ensures that from now on
-        // all operations acquiring the global lock in X/IX mode see the fully upgraded FCV state.
-        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
+        // This wait serves as a barrier to gurantee that, from now on:
+        // - No operations with OFCV lower than the target version will be running
+        // - All operations acquiring the global lock in X/IX mode see the fully upgraded FCV state
+        _waitForOperationsRelyingOnStaleFcvToComplete(opCtx, requestedVersion);
 
         // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
         if (isConfigsvr &&
@@ -2026,9 +2038,11 @@ private:
                     });
         }
 
-        // Acquire and immediately release the global lock in S mode, which ensures that from now on
-        // all operations acquiring the global lock in X/IX mode see the fully downgraded FCV state.
-        _waitForConcurrentLocalWriteOperationsToComplete(opCtx);
+        // This wait serves as a barrier to guarantee that, from now on:
+        // - No operations with OFCV higher than the target version will be running
+        // - All operations acquiring the global lock in X/IX mode see the fully downgraded FCV
+        // state
+        _waitForOperationsRelyingOnStaleFcvToComplete(opCtx, requestedVersion);
 
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
         if (isConfigsvr &&
