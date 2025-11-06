@@ -45,6 +45,7 @@ suites:
     - jstests/core/timeseries/write/timeseries_delete_with_meta_concurrent.js
     - jstests/core/timeseries/write/timeseries_findAndModify_deletes_hints.js
     - jstests/core/timeseries/write/timeseries_findAndModify_updates_hints.js
+    - jstests/core/timeseries/write/timeseries_hint_id.js
     - jstests/core/timeseries/write/timeseries_insert.js
     - jstests/core/timeseries/write/timeseries_insert_after_delete.js
     - jstests/core/timeseries/write/timeseries_insert_after_update.js

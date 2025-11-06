@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/local_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -978,7 +979,16 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     boost::optional<BSONObj> hintedIndexBson = boost::none;
     if (!params.indexFiltersApplied && !params.querySettingsApplied) {
         if (auto hintObj = query.getFindCommandRequest().getHint(); !hintObj.isEmpty()) {
-            hintedIndexBson = hintObj;
+            if (params.mainCollectionInfo.stats.isTimeseries &&
+                hintObj.firstElement().valueStringDataSafe() == IndexConstants::kIdIndexName) {
+                // The index name '_id_' is reserved for the _id index on the underlying buckets
+                // collection of a timeseries collection. The user will never be able to specify the
+                // _id index name '_id_' in the hint.
+                return Status(ErrorCodes::BadValue,
+                              "cannot hint on '_id_' for timeseries collections");
+            } else {
+                hintedIndexBson = hintObj;
+            }
         }
     }
 
