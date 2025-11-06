@@ -112,6 +112,8 @@ public:
         return isError() && getStatus() == ErrorCodes::WouldChangeOwningShard;
     }
 
+    bool isShutdownError() const;
+
 private:
     // This field may hold either a CommandReplyVariant, an error, or boost::none.
     boost::optional<StatusWith<CommandReplyVariant>> _swReply;

@@ -68,6 +68,13 @@ ErrorCodes::Error getErrorCodeForShardItemPair(const std::pair<ShardId, ItemVari
 }
 
 template <typename ResultT>
+void handleShutdownError(OperationContext* opCtx, const ResultT& result) {
+    if (result.isShutdownError()) {
+        uassertStatusOK(result.getStatus());
+    }
+}
+
+template <typename ResultT>
 void handleTransientTxnError(OperationContext* opCtx,
                              const ResultT& result,
                              boost::optional<HostAndPort> target = boost::none) {
@@ -248,12 +255,13 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     if (response.isError()) {
         const auto& status = response.getStatus();
 
-        // TODO SERVER-105303 Handle interruption/shutdown.
         // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
         LOGV2_DEBUG(10896500,
                     4,
                     "Cluster write op executing in internal transaction failed with error",
                     "error"_attr = redact(status));
+
+        handleShutdownError(opCtx, response);
 
         handleTransientTxnError(opCtx, response);
 
@@ -387,6 +395,8 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
         if (isRetryableErr) {
             noteRetryableError(opCtx, routingCtx, boost::none /*op*/, status);
         }
+
+        handleShutdownError(opCtx, response);
 
         handleTransientTxnError(opCtx, response, hostAndPort);
 

@@ -40,6 +40,7 @@
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
+#include "mongo/util/exit.h"
 
 #include <boost/optional.hpp>
 
@@ -156,6 +157,14 @@ CommandReplyVariant& BasicResponse::getReply() {
 const CommandReplyVariant& BasicResponse::getReply() const {
     tassert(11272102, "Expected OK status", isOK());
     return _swReply->getValue();
+}
+
+bool BasicResponse::isShutdownError() const {
+    if (isError()) {
+        return ErrorCodes::isShutdownError(getStatus()) ||
+            (getStatus() == ErrorCodes::CallbackCanceled && globalInShutdownDeprecated());
+    }
+    return false;
 }
 
 bool WriteBatchExecutor::usesProvidedRoutingContext(const WriteBatch& batch) const {
@@ -428,7 +437,6 @@ ShardResponse WriteBatchExecutor::makeShardResponse(
 
     // If there was a local error, return a ShardResponse that reports this local error.
     if (!swResponse.isOK()) {
-        // TODO SERVER-105303 Handle interruption/shutdown.
         // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
         const Status& status = swResponse.getStatus();
 
@@ -623,6 +631,8 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                         std::move(arsResponse.shardHostAndPort),
                                                         shardId);
 
+        const bool isShutdownError = shardResponse.isShutdownError();
+
         const bool hasTransientTxnError = shardResponse.hasTransientTxnError();
         const bool hasTopLevelErrorThatAbortsTxn =
             (inTransaction && shardResponse.isError() && !hasTransientTxnError &&
@@ -635,11 +645,14 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 
         const bool hasItemErrorThatAbortsTxn = inTransaction && numItemErrors > 0;
 
-        if (hasTransientTxnError || hasTopLevelErrorThatAbortsTxn || hasItemErrorThatAbortsTxn) {
+        if (isShutdownError || hasTransientTxnError || hasTopLevelErrorThatAbortsTxn ||
+            hasItemErrorThatAbortsTxn) {
             LOGV2_DEBUG(11272105,
                         4,
-                        "Stopped parsing of shard responses due to error in transaction",
+                        "Stopped parsing of shard responses due to error in transaction "
+                        "or shutdown error",
                         "topLevelStatus"_attr = shardResponse.getStatus(),
+                        "isShutdownError"_attr = (isShutdownError ? "true" : "false"),
                         "numItemErrors"_attr = numItemErrors,
                         "shardId"_attr = shardId,
                         "host"_attr = shardResponse.getHostAndPort());
