@@ -170,4 +170,5 @@ private:
     std::vector<JoinNode> _nodes;
     std::vector<JoinEdge> _edges;
 };
+
 }  // namespace mongo::join_ordering
