@@ -843,6 +843,8 @@ class TestRunner(Subcommand):
             executor_config.setdefault("hooks", []).append({"class": "FuzzRuntimeStress"})
         if config.FUZZ_RUNTIME_STRESS in ("signals", "all"):
             executor_config.setdefault("hooks", []).append({"class": "PeriodicStackTrace"})
+        if config.NO_HOOKS:
+            executor_config["hooks"] = []
 
         try:
             executor = testing.executor.TestSuiteExecutor(
@@ -1249,7 +1251,11 @@ class RunPlugin(PluginInterface):
         parser = subparsers.add_parser("run", help="Runs the specified tests.")
 
         parser.set_defaults(
-            dry_run="off", shuffle="auto", stagger_jobs="off", majority_read_concern="on"
+            dry_run="off",
+            shuffle="auto",
+            stagger_jobs="off",
+            majority_read_concern="on",
+            no_hooks=False,
         )
 
         parser.add_argument(
@@ -1268,6 +1274,13 @@ class RunPlugin(PluginInterface):
                 " positional arguments, they will be run using the suites'"
                 " configurations."
             ),
+        )
+
+        parser.add_argument(
+            "--no-hooks",
+            dest="no_hooks",
+            action="store_true",
+            help=("Disables all test executor hooks. This is useful for debugging purposes."),
         )
 
         parser.add_argument(

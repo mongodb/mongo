@@ -212,6 +212,8 @@ DEFAULTS = {
     "mocha_grep": None,
     # Loads all test extensions into the server.
     "load_all_extensions": False,
+    # Avoids running hooks as part of the suite.
+    "no_hooks": False,
 }
 
 _SuiteOptions = collections.namedtuple(
@@ -844,3 +846,6 @@ PAUSE_AFTER_POPULATE = None
 
 # Loads all test extensions into the server.
 LOAD_ALL_EXTENSIONS = False
+
+# Avoids running hooks as part of the suite.
+NO_HOOKS = False

@@ -776,6 +776,7 @@ flags in common: {common_set}
     _config.SANITY_CHECK = config.pop("sanity_check")
     _config.PAUSE_AFTER_POPULATE = config.pop("pause_after_populate")
     _config.LOAD_ALL_EXTENSIONS = config.pop("load_all_extensions")
+    _config.NO_HOOKS = config.pop("no_hooks")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")
