@@ -58,6 +58,7 @@ buildvariants:
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2-latest-small
+    tags: ["emergency_release"]
     expansions:
       additional_package_targets: >-
         archive-mongocryptd-stripped
@@ -156,6 +157,7 @@ buildvariants:
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2-arm64-latest-m8g-xlarge
+    tags: ["emergency_release"]
     expansions:
       additional_package_targets: >-
         archive-mongocryptd-stripped
@@ -250,7 +252,7 @@ buildvariants:
 
   - name: enterprise-amazon2023
     display_name: "Enterprise Amazon Linux 2023.3"
-    tags: ["forbid_tasks_tagged_with_experimental"]
+    tags: ["forbid_tasks_tagged_with_experimental", "emergency_release"]
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-small
@@ -388,7 +390,7 @@ buildvariants:
   - &enterprise-amazon2023-arm64-template
     name: &enterprise-amazon2023-arm64 enterprise-amazon2023-arm64
     display_name: "Enterprise Amazon Linux 2023.3 arm64"
-    tags: ["forbid_tasks_tagged_with_experimental"]
+    tags: ["forbid_tasks_tagged_with_experimental", "emergency_release"]
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-arm64-m8g-xlarge
@@ -688,6 +690,7 @@ buildvariants:
     name: enterprise-amazon2023-arm64-fuzzers-roll-back-incremental-feature-flags
     display_name: "Enterprise Amazon Linux 2023.3 arm64 Fuzzers (roll back incremental feature flags)"
     cron: "0 1 1-31/2 * *" # For cost reasons, we run this variant every other day
+    tags: []
     expansions:
       <<: *enterprise-amazon2023-arm64-dynamic-expansions
       test_flags: >-
