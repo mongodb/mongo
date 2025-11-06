@@ -168,15 +168,6 @@ config_fuzzer_params = {
             "fuzz_at": ["startup", "runtime"],
         },
         "replWriterThreadCount": {"min": 1, "max": 256, "fuzz_at": ["startup"]},
-        "storageEngineConcurrencyAdjustmentAlgorithm": {
-            "choices": ["throughputProbing", "fixedConcurrentTransactions"],
-            "fuzz_at": ["startup"],
-        },
-        "storageEngineConcurrencyAdjustmentIntervalMillis": {
-            "min": 10,
-            "max": 1000,
-            "fuzz_at": ["startup"],
-        },
         # Default value 1000; many tests don't insert enough measurements to rollover due to count, so we enable a larger range for this parameter.
         "timeseriesBucketMaxCount": {
             "min": 20,
@@ -271,8 +262,6 @@ config_fuzzer_params = {
         },
         "wiredTigerCursorCacheSize": {"min": -100, "max": 0, "fuzz_at": ["startup"]},
         "wiredTigerSessionCloseIdleTimeSecs": {"min": 0, "max": 300, "fuzz_at": ["startup"]},
-        "wiredTigerConcurrentReadTransactions": {"min": 5, "max": 32, "fuzz_at": ["startup"]},
-        "wiredTigerConcurrentWriteTransactions": {"min": 5, "max": 32, "fuzz_at": ["startup"]},
         "wiredTigerSizeStorerPeriodicSyncHits": {"min": 1, "max": 100_000, "fuzz_at": ["startup"]},
         "wiredTigerSizeStorerPeriodicSyncPeriodMillis": {
             "min": 1,
@@ -501,6 +490,84 @@ config_fuzzer_params = {
             "min": 0,
             "max": 30,
             "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlConcurrentWriteTransactions": {
+            "min": 5,
+            "max": 128,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlConcurrentWriteLowPriorityTransactions": {
+            "min": 3,
+            "max": 32,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlConcurrentReadTransactions": {
+            "min": 5,
+            "max": 128,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlConcurrentReadLowPriorityTransactions": {
+            "min": 3,
+            "max": 32,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlReadMaxQueueDepth": {
+            "min": 100,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlReadLowPriorityMaxQueueDepth": {
+            "min": 100,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlWriteMaxQueueDepth": {
+            "min": 100,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlWriteLowPriorityMaxQueueDepth": {
+            "min": 100,
+            "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlConcurrencyAdjustmentIntervalMillis": {
+            "min": 10,
+            "max": 1_000,
+            "fuzz_at": ["startup"],
+        },
+        "executionControlConcurrencyAdjustmentAlgorithm": {
+            "choices": [
+                "fixedConcurrentTransactions",
+                "fixedConcurrentTransactionsWithPrioritization",
+                "throughputProbing",
+            ],
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlHeuristicDeprioritizationEnabled": {
+            "choices": [True, False],
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlHeuristicNumAdmissionsDeprioritizeThreshold": {
+            "min": 1,
+            "max": 10,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlDeprioritizeBackgroundTasks": {
+            "choices": [True, False],
+            "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
     },
