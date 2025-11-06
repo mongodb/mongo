@@ -81,8 +81,8 @@ install_nodejs() {
         log "Adding NodeSource repository via https://nodesource.com/products/distributions"
         wget -qO- "https://rpm.nodesource.com/setup_${NODE_VERSION}.x" | bash -
 
-        log "Installing Node.js and npm"
-        yum install -y nodejs npm
+        log "Installing Node.js (npm is included)"
+        yum install -y nodejs
 
         log "Cleaning up"
         yum clean all
@@ -91,8 +91,8 @@ install_nodejs() {
         log "Adding NodeSource repository via https://nodesource.com/products/distributions"
         wget -qO- "https://rpm.nodesource.com/setup_${NODE_VERSION}.x" | bash -
 
-        log "Installing Node.js and npm"
-        dnf install -y nodejs npm
+        log "Installing Node.js (npm is included)"
+        dnf install -y nodejs
 
         log "Cleaning up"
         dnf clean all
@@ -101,8 +101,8 @@ install_nodejs() {
         log "Adding NodeSource repository via https://nodesource.com/products/distributions"
         wget -qO- "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash -
 
-        log "Installing Node.js and npm"
-        apt-get install -y nodejs npm
+        log "Installing Node.js (npm is included)"
+        apt-get install -y nodejs
 
         log "Cleaning up"
         apt-get clean
@@ -174,7 +174,7 @@ build_js_engine() {
 
     # Install dependencies
     log "Running npm ci to install dependencies..."
-    npm ci
+    npm ci --legacy-peer-deps
 
     # Build production output
     log "Running npm run build to create production output..."
