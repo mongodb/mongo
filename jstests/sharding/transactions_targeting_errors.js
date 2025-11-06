@@ -18,6 +18,13 @@ const session = st.s.startSession();
 const sessionDB = session.getDatabase("test");
 
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDB)) {
+    // Starting in 8.0, the filtering metadata refresh during shardCollection is performed outside
+    // the critical section in a best effort way to avoid holding the critical section while talking
+    // to the config server. Therefore, it is possible for the filtering metadata to still be
+    // unknown when the transaction below starts. Given this, perform a find to trigger a filtering
+    // metadata refresh to prevent the transaction from hitting a StaleConfig error.
+    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {}}));
+
     session.startTransaction();
     assert.commandWorked(sessionDB.runCommand(
         {update: collName, updates: [{q: {skey: {$lte: 5}}, u: {$set: {x: 1}}, multi: false}]}));
