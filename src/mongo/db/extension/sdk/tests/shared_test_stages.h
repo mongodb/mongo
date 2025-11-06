@@ -465,4 +465,115 @@ public:
     }
 };
 
+// Test stages for static properties
+static constexpr std::string_view kNoneName = "$none";
+static constexpr std::string_view kFirstName = "$first";
+static constexpr std::string_view kLastName = "$last";
+static constexpr std::string_view kBadPosName = "$badPos";
+static constexpr std::string_view kBadPosTypeName = "$badPosType";
+static constexpr std::string_view kUnknownPropertyName = "$unknownProperty";
+
+class NonePosAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    NonePosAggStageAstNode() : sdk::AggStageAstNode(kNoneName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("position" << "none");
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<NonePosAggStageAstNode>();
+    }
+};
+
+class FirstPosAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    FirstPosAggStageAstNode() : sdk::AggStageAstNode(kFirstName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("position" << "first");
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<FirstPosAggStageAstNode>();
+    }
+};
+
+class LastPosAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    LastPosAggStageAstNode() : sdk::AggStageAstNode(kLastName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("position" << "last");
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<LastPosAggStageAstNode>();
+    }
+};
+
+class BadPosAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    BadPosAggStageAstNode() : sdk::AggStageAstNode(kBadPosName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("position" << "bogus");
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<BadPosAggStageAstNode>();
+    }
+};
+
+class BadPosTypeAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    BadPosTypeAggStageAstNode() : sdk::AggStageAstNode(kBadPosTypeName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("position" << BSONArray(BSON_ARRAY(1)));
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<BadPosTypeAggStageAstNode>();
+    }
+};
+
+
+class UnknownPropertyAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    UnknownPropertyAggStageAstNode() : sdk::AggStageAstNode(kUnknownPropertyName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("unknownProperty" << "null");
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<UnknownPropertyAggStageAstNode>();
+    }
+};
+
 }  // namespace mongo::extension::sdk::shared_test_stages

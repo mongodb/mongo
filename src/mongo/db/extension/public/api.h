@@ -461,6 +461,13 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
     MongoExtensionByteView (*get_name)(const MongoExtensionAggStageAstNode* astNode);
 
     /**
+     * Returns static properties of this stage related to pipeline optimization as a serialized BSON
+     * document.
+     */
+    MongoExtensionStatus* (*get_properties)(const MongoExtensionAggStageAstNode* astNode,
+                                            MongoExtensionByteBuf** properties);
+
+    /**
      * Populates `logicalStage` with the stage's runtime implementation of the optimization
      * interface, ownership of which is transferred to the caller. This step should be called after
      * validating `astNode` and is used when converting into an optimizable stage.

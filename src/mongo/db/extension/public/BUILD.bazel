@@ -11,6 +11,7 @@ exports_files(
 mongo_cc_library(
     name = "extensions_api_public",
     srcs = [
+        ":extension_agg_stage_static_properties_gen",
         ":extension_error_types_gen",
     ],
     hdrs = [],
@@ -30,6 +31,14 @@ mongo_cc_library(
 idl_generator(
     name = "extension_error_types_gen",
     src = "extension_error_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "extension_agg_stage_static_properties_gen",
+    src = "extension_agg_stage_static_properties.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],

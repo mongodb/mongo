@@ -118,6 +118,15 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsGetName, "11217601"
     handle.assertVTableConstraints(vtable);
 }
 
+DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsGetProperties, "11347800") {
+    auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
+    auto handle = TestHostAstNodeVTableHandle{noOpAstNode.release()};
+
+    auto vtable = handle.vtable();
+    vtable.get_properties = nullptr;
+    handle.assertVTableConstraints(vtable);
+}
+
 DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsBind, "11113700") {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
         std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
@@ -129,6 +138,13 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsBind, "11113700") {
     handle.assertVTableConstraints(vtable);
 }
 
+DEATH_TEST(HostAstNodeTest, HostGetPropertiesUnimplemented, "11347801") {
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
+    auto handle = AggStageAstNodeHandle{noOpAstNode};
+
+    ::MongoExtensionByteBuf** buf = nullptr;
+    handle.vtable().get_properties(noOpAstNode, buf);
+}
 
 DEATH_TEST(HostAstNodeTest, HostBindUnimplemented, "11133600") {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));

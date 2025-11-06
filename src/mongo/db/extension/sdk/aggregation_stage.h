@@ -133,6 +133,10 @@ public:
         return _name;
     }
 
+    virtual BSONObj getProperties() const {
+        return BSONObj();
+    }
+
     virtual std::unique_ptr<LogicalAggStage> bind() const = 0;
 
 protected:
@@ -180,6 +184,19 @@ private:
             static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl().getName());
     }
 
+    static ::MongoExtensionStatus* _extGetProperties(
+        const ::MongoExtensionAggStageAstNode* astNode,
+        ::MongoExtensionByteBuf** properties) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&] {
+            *properties = nullptr;
+
+            const auto& impl = static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl();
+
+            // Allocate a buffer on the heap. Ownership is transferred to the caller.
+            *properties = new VecByteBuf(impl.getProperties());
+        });
+    }
+
     static ::MongoExtensionStatus* _extBind(
         const ::MongoExtensionAggStageAstNode* astNode,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
@@ -191,8 +208,11 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {
-        .destroy = &_extDestroy, .get_name = &_extGetName, .bind = &_extBind};
+    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {.destroy = &_extDestroy,
+                                                                     .get_name = &_extGetName,
+                                                                     .get_properties =
+                                                                         &_extGetProperties,
+                                                                     .bind = &_extBind};
     std::unique_ptr<AggStageAstNode> _astNode;
 };
 

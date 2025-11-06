@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/shared/handle/handle.h"
@@ -57,6 +58,8 @@ public:
         return StringData{stringView.data(), stringView.size()};
     }
 
+    MongoExtensionStaticProperties getProperties() const;
+
     /**
      * Returns a logical stage with the stage's runtime implementation of the optimization
      * interface.
@@ -70,6 +73,8 @@ public:
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
+        tassert(
+            11347800, "AggStageAstNode 'get_properties' is null", vtable.get_properties != nullptr);
         tassert(11113700, "AggStageAstNode 'bind' is null", vtable.bind != nullptr);
     }
 };

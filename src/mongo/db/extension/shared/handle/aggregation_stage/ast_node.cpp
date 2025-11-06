@@ -28,9 +28,25 @@
  */
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 
+#include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
 namespace mongo::extension {
+
+MongoExtensionStaticProperties AggStageAstNodeHandle::getProperties() const {
+    ::MongoExtensionByteBuf* buf;
+    invokeCAndConvertStatusToException([&]() { return vtable().get_properties(get(), &buf); });
+
+    tassert(
+        11347802,
+        "Extension implementation of `getProperties` encountered nullptr inside the output buffer.",
+        buf != nullptr);
+
+    ExtensionByteBufHandle ownedBuf{buf};
+    const auto propertiesObj = bsonObjFromByteView(ownedBuf.getByteView());
+    return MongoExtensionStaticProperties::parse(propertiesObj);
+}
 
 LogicalAggStageHandle AggStageAstNodeHandle::bind() const {
     ::MongoExtensionLogicalAggStage* logicalStagePtr;

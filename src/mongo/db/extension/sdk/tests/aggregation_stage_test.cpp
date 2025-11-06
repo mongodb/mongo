@@ -608,6 +608,60 @@ TEST_F(AggStageTest, NoOpAstNodeTest) {
     [[maybe_unused]] auto logicalStageHandle = handle.bind();
 }
 
+TEST_F(AggStageTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle.getProperties();
+    ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+}
+
+TEST_F(AggStageTest, NonePosAstNodeSucceeds) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NonePosAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle.getProperties();
+    ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+}
+
+TEST_F(AggStageTest, FirstPosAstNodeSucceeds) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::FirstPosAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle.getProperties();
+    ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
+}
+
+TEST_F(AggStageTest, LastPosAstNodeSucceeds) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::LastPosAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle.getProperties();
+    ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kLast);
+}
+
+TEST_F(AggStageTest, BadPosAstNodeFails) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::BadPosAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::BadValue);
+}
+
+TEST_F(AggStageTest, BadPosTypeAstNodeFails) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::BadPosTypeAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::TypeMismatch);
+}
+
+TEST_F(AggStageTest, UnknownPropertyAstNodeIsIgnored) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::UnknownPropertyAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle.getProperties();
+    ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+}
+
 DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableFailsGetName, "11217601") {
     auto noOpAstNode =
         new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
@@ -625,6 +679,16 @@ DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableBind, "11113700") {
 
     auto vtable = handle.vtable();
     vtable.bind = nullptr;
+    handle.assertVTableConstraints(vtable);
+}
+
+DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTableGetProperties, "11347800") {
+    auto noOpAstNode =
+        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
+    auto handle = TestAstNodeVTableHandle{noOpAstNode};
+
+    auto vtable = handle.vtable();
+    vtable.get_properties = nullptr;
     handle.assertVTableConstraints(vtable);
 }
 
