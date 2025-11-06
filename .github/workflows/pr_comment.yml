@@ -16,52 +16,66 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const targetBranch = context.payload.pull_request.base.ref;
-            if (targetBranch !== "v8.0-staging") {
-              console.log(`PR targets ${targetBranch}, not v8.0-staging. Skipping.`);
-              return;
-            }
-          
-            console.log("Checking for existing backport policy comment...");
-            const commentHeader = "[Backport Policy](https://wiki.corp.mongodb.com/spaces/KERNEL/pages/155324063/Database+SERVER+Backports+Policy+and+Workflow)";
-          
-            const { data: comments } = await github.rest.issues.listComments({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
-            
-            const alreadyCommented = comments.some(comment =>
-              comment.body && comment.body.includes(commentHeader)
-            );
-          
-            if (alreadyCommented) {
-              console.log("Backport Policy comment already exists. Skipping.");
-              return;
-            }
+            const prNumber = context.issue.number;  
+            const prAuthor = context.payload.pull_request.user.login; 
 
-            const prAuthor = context.payload.pull_request.user.login;
-            
-            const comment_body =
-              "### ✅ [Backport Policy](https://wiki.corp.mongodb.com/spaces/KERNEL/pages/155324063/Database+SERVER+Backports+Policy+and+Workflow) Overview\n\n" +
-              "@" + prAuthor + ", please ensure the following before auto-merge is enabled:\n\n" +
-              "- A full Evergreen patch has been run and and the patch link has been posted in this PR. Any failures should be reviewed and confirmed in the comment as unrelated.\n" +
-              "- The PR has been reviewed by a member of [server-backport-mergers](https://github.com/orgs/10gen/teams/server-backport-mergers).\n" +
-              "  - If this PR requires a break-glass rebase, **do not enable auto-merge**. Post in [#10gen-mongo-break-glass-requests](https://mongodb.enterprise.slack.com/archives/C0877CMLRB4) for a manual review.\n\n" +
-              "---\n"+
-              "Once auto-merge is enabled, @svc-auto-approve-bot will automatically approve on behalf of server-release when:\n\n" +
-              "- Any associated BACKPORT ticket meets all upstream release requirements\n" +
-              "- Any associated Jira ticket is in a valid status\n\n" +
-              "If upstream release requirements are not met, @svc-auto-approve-bot will leave a comment and periodically recheck until the PR becomes eligible.\n\n" +
-              "---\n"+
-              "Check Release Dates: [Server Release Schedule](https://jira.mongodb.org/secure/Dashboard.jspa?selectPageId=33483).\n"+
-              "Please reach out in [#server-release](https://mongodb.enterprise.slack.com/archives/C1XQ502TA) if you have any questions.";
+            // Define regex patterns for production release and staging branches  
+            const productionBranchRegex = /^v[0-9]\.[0-9]$/;
+            const stagingBranchRegex = /^v[0-9]\.[0-9]-staging$/; 
 
+            console.log(`PR target branch: ${targetBranch}`);  
 
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment_body
-            });
-          
-            console.log("✅ Comment posted.");
+            // Define comments for each branch  
+            let commentBody = null; 
+
+            if (stagingBranchRegex.test(targetBranch)) { 
+
+              commentBody =    
+                "### [Backport Policy](https://wiki.corp.mongodb.com/x/nw5CCQ) Overview\n\n" +    
+                "@" + prAuthor + ", please ensure the following:\n\n" +    
+                "- A full Evergreen patch has been run, and the patch link has been posted in this PR. Any failures should be reviewed and explicitly confirmed as unrelated in the PR comments.\n" +    
+                "- The PR has been reviewed by a member of the [server-backport-mergers](https://github.com/orgs/10gen/teams/server-backport-mergers) team.\n" +    
+                "- For feature backports requiring a break-glass rebase: **Do not enable auto-merge**. Instead, post in [#10gen-mongo-break-glass-requests](https://mongodb.enterprise.slack.com/archives/C0877CMLRB4) for manual review.\n\n" +    
+                "The [server-backport-mergers](https://github.com/orgs/10gen/teams/server-backport-mergers) reviewer is responsible for enabling auto-merge after completing their review. Once auto-merge is enabled, @svc-auto-approve-bot will periodically evaluate merge readiness and approve the PR on behalf of Server Release when criteria is met.\n\n" +    
+                "---\n" + 
+                "Check Release Dates: [Server Release Schedule](https://jira.mongodb.org/secure/Dashboard.jspa?selectPageId=33483).\n" +    
+                "For questions, please reach out in [#server-release](https://mongodb.enterprise.slack.com/archives/C1XQ502TA).";    
+              
+            } else if (productionBranchRegex.test(targetBranch)) {  
+              const correspondingStagingBranch = `${targetBranch}-staging`;
+              commentBody =
+                "### [Backport Policy](https://wiki.corp.mongodb.com/x/nw5CCQ) Overview\n\n" +
+                "@" + prAuthor + ", This branch (`" + targetBranch + "`) is a production release branch and does not accept direct PRs.\n" +
+                "All changes must flow through the corresponding staging branch (`" + correspondingStagingBranch + "`), where they are tested and validated before being promoted into `" + targetBranch + "` by the Server Release team.\n\n" +
+                "**Next step:** Please re-open this PR against `" + correspondingStagingBranch + "`.\n\n"+
+                "Please reach out in [#server-release](https://mongodb.enterprise.slack.com/archives/C1XQ502TA) if you have any questions.";
+              
+            } else {  
+              console.log(`Branch ${targetBranch} does not match the Server Release branch pattern. Skipping.`);  
+              return;  
+            }  
+
+            // Check if the comment for this branch already exists  
+            console.log("Checking for existing comments...");  
+            const { data: comments } = await github.rest.issues.listComments({  
+              issue_number: prNumber,  
+              owner: context.repo.owner,  
+              repo: context.repo.repo,  
+            });  
+
+            const alreadyCommented = comments.some(comment => comment.body && comment.body.includes(commentBody));  
+
+            if (alreadyCommented) {  
+              console.log("Comment already posted for this branch. Skipping.");  
+              return;  
+            }  
+
+            // Post the comment if it hasn't been posted yet  
+            await github.rest.issues.createComment({  
+              issue_number: prNumber,  
+              owner: context.repo.owner,  
+              repo: context.repo.repo,  
+              body: commentBody,  
+            });  
+
+            console.log(`Comment posted: ${commentBody}`);
