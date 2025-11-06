@@ -1,7 +1,7 @@
 /**
  * Tests that the implicitly_retry_resharding.js override automatically retries reshardCollection,
- * moveCollection, and unshardCollection commands when they fail with OplogQueryMinTsMissing or
- * SnapshotUnavailable errors.
+ * rewriteCollection, moveCollection, and unshardCollection commands when they fail with
+ * OplogQueryMinTsMissing, SnapshotUnavailable, or SnapshotTooOld errors.
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -49,97 +49,57 @@ for (let i = 0; i < numDocs; i++) {
 }
 assert.commandWorked(testColl.insert(docs));
 
-// Test reshardCollection with OplogQueryMinTsMissing. The command should be retried.
-failNextCommandWithCode(testDB, "reshardCollection", ErrorCodes.OplogQueryMinTsMissing);
-assert.commandWorked(
-    st.s.adminCommand({
-        reshardCollection: ns,
-        key: {x: "hashed"},
-    }),
-);
+const retryableErrorCodes = [
+    ErrorCodes.OplogQueryMinTsMissing,
+    ErrorCodes.SnapshotUnavailable,
+    ErrorCodes.SnapshotTooOld,
+];
 
-// Test reshardCollection with SnapshotUnavailable. The command should be retried.
-failNextCommandWithCode(testDB, "reshardCollection", ErrorCodes.SnapshotUnavailable);
-assert.commandWorked(
-    st.s.adminCommand({
-        reshardCollection: ns,
-        key: {x: 1},
-    }),
-);
+// Test complete workflow (reshard -> rewrite -> unshard -> move) for each retryable error code.
+for (const errorCode of retryableErrorCodes) {
+    jsTest.log("Testing retryable error:" + errorCode);
 
-// Test rewriteCollection with OplogQueryMinTsMissing. The command should be retried.
-failNextCommandWithCode(testDB, "rewriteCollection", ErrorCodes.OplogQueryMinTsMissing);
-assert.commandWorked(
-    st.s.adminCommand({
-        rewriteCollection: ns,
-    }),
-);
+    failNextCommandWithCode(testDB, "reshardCollection", errorCode);
+    assert.commandWorked(
+        st.s.adminCommand({
+            reshardCollection: ns,
+            key: {x: "hashed"},
+        }),
+    );
 
-// Test rewriteCollection with SnapshotUnavailable. The command should be retried.
-failNextCommandWithCode(testDB, "rewriteCollection", ErrorCodes.SnapshotUnavailable);
-assert.commandWorked(
-    st.s.adminCommand({
-        rewriteCollection: ns,
-    }),
-);
+    failNextCommandWithCode(testDB, "rewriteCollection", errorCode);
+    assert.commandWorked(
+        st.s.adminCommand({
+            rewriteCollection: ns,
+        }),
+    );
 
-// Test moveCollection with OplogQueryMinTsMissing. The command should be retried.
-const unshardedCollName = "unshardedColl";
-const unshardedNs = dbName + "." + unshardedCollName;
-assert.commandWorked(testDB[unshardedCollName].insert({y: 1}));
+    failNextCommandWithCode(testDB, "unshardCollection", errorCode);
+    assert.commandWorked(
+        st.s.adminCommand({
+            unshardCollection: ns,
+            toShard: st.shard0.shardName,
+        }),
+    );
 
-failNextCommandWithCode(testDB, "moveCollection", ErrorCodes.OplogQueryMinTsMissing);
-assert.commandWorked(
-    st.s.adminCommand({
-        moveCollection: unshardedNs,
-        toShard: st.shard0.shardName,
-    }),
-);
+    failNextCommandWithCode(testDB, "moveCollection", errorCode);
+    assert.commandWorked(
+        st.s.adminCommand({
+            moveCollection: ns,
+            toShard: st.shard1.shardName,
+        }),
+    );
 
-// Test moveCollection with SnapshotUnavailable. The command should be retried.
-failNextCommandWithCode(testDB, "moveCollection", ErrorCodes.SnapshotUnavailable);
-assert.commandWorked(
-    st.s.adminCommand({
-        moveCollection: unshardedNs,
-        toShard: st.shard1.shardName,
-    }),
-);
+    // Reshard the collection for the next iteration.
+    assert.commandWorked(
+        st.s.adminCommand({
+            shardCollection: ns,
+            key: {x: 1},
+        }),
+    );
+}
 
-// Test unshardCollection with OplogQueryMinTsMissing. The command should be retried.
-failNextCommandWithCode(testDB, "unshardCollection", ErrorCodes.OplogQueryMinTsMissing);
-assert.commandWorked(
-    st.s.adminCommand({
-        unshardCollection: ns,
-        toShard: st.shard0.shardName,
-    }),
-);
-
-// Re-shard the collection for the next test case.
-assert.commandWorked(
-    st.s.adminCommand({
-        shardCollection: ns,
-        key: {x: 1},
-    }),
-);
-
-// Test unshardCollection with SnapshotUnavailable. The command should be retried.
-failNextCommandWithCode(testDB, "unshardCollection", ErrorCodes.SnapshotUnavailable);
-assert.commandWorked(
-    st.s.adminCommand({
-        unshardCollection: ns,
-        toShard: st.shard1.shardName,
-    }),
-);
-
-// Test that other error codes are not retried.
-assert.commandWorked(
-    st.s.adminCommand({
-        shardCollection: ns,
-        key: {x: 1},
-    }),
-);
-
-// Test reshardCollection with a non-retryable error.
+jsTest.log("Testing non-retryable error");
 failNextCommandWithCode(testDB, "reshardCollection", ErrorCodes.InternalError);
 assert.commandFailedWithCode(
     st.s.adminCommand({
@@ -149,7 +109,6 @@ assert.commandFailedWithCode(
     ErrorCodes.InternalError,
 );
 
-// Test rewriteCollection with a non-retryable error.
 failNextCommandWithCode(testDB, "rewriteCollection", ErrorCodes.InternalError);
 assert.commandFailedWithCode(
     st.s.adminCommand({
@@ -158,22 +117,24 @@ assert.commandFailedWithCode(
     ErrorCodes.InternalError,
 );
 
-// Test moveCollection with a non-retryable error.
-failNextCommandWithCode(testDB, "moveCollection", ErrorCodes.InternalError);
-assert.commandFailedWithCode(
-    st.s.adminCommand({
-        moveCollection: unshardedNs,
-        toShard: st.shard0.shardName,
-    }),
-    ErrorCodes.InternalError,
-);
-
-// Test unshardCollection with a non-retryable error.
 failNextCommandWithCode(testDB, "unshardCollection", ErrorCodes.InternalError);
 assert.commandFailedWithCode(
     st.s.adminCommand({
         unshardCollection: ns,
         toShard: st.shard0.shardName,
+    }),
+    ErrorCodes.InternalError,
+);
+
+const unshardedCollName = "unshardedColl";
+const unshardedNs = dbName + "." + unshardedCollName;
+assert.commandWorked(testDB[unshardedCollName].insert({y: 1}));
+
+failNextCommandWithCode(testDB, "moveCollection", ErrorCodes.InternalError);
+assert.commandFailedWithCode(
+    st.s.adminCommand({
+        moveCollection: unshardedNs,
+        toShard: st.shard1.shardName,
     }),
     ErrorCodes.InternalError,
 );

@@ -1,6 +1,9 @@
 /**
  * Overrides runCommand to retry "reshardCollection", "rewriteCollection", "moveCollection", and "unshardCollection"
- * commands if they fail with OplogQueryMinTsMissing or SnapshotUnavailable.
+ * commands if they fail with retryable error codes.
+ *
+ * Errors like OplogQueryMinTsMissing, SnapshotUnavailable, and SnapshotTooOld can occur when
+ * initial sync runs concurrently with resharding, since initial sync does not maintain pinned history.
  */
 
 import {getCommandName} from "jstests/libs/cmd_object_utils.js";
@@ -11,7 +14,11 @@ const kInterval = 100;
 
 const kRetryableCommands = ["reshardCollection", "rewriteCollection", "moveCollection", "unshardCollection"];
 
-const kRetryableErrorCodes = [ErrorCodes.OplogQueryMinTsMissing, ErrorCodes.SnapshotUnavailable];
+const kRetryableErrorCodes = [
+    ErrorCodes.OplogQueryMinTsMissing,
+    ErrorCodes.SnapshotUnavailable,
+    ErrorCodes.SnapshotTooOld,
+];
 
 function isRetryableOplogOrSnapshotError(cmdObj, res) {
     const commandName = getCommandName(cmdObj);
