@@ -512,7 +512,7 @@ std::unique_ptr<MultiLineWithCRS> MultiLineWithCRS::clone() const {
     cloned->crs = crs;
 
     for (const auto& line : lines) {
-        invariant(line);
+        tassert(9911944, "", line);
         cloned->lines.emplace_back(line->Clone());
     }
 
@@ -524,7 +524,7 @@ std::unique_ptr<MultiPolygonWithCRS> MultiPolygonWithCRS::clone() const {
     cloned->crs = crs;
 
     for (const auto& polygon : polygons) {
-        invariant(polygon);
+        tassert(9911945, "", polygon);
         cloned->polygons.emplace_back(polygon->Clone());
     }
 
@@ -835,7 +835,7 @@ bool ShapeProjection::supportsProject(const PointWithCRS& point, const CRS crs) 
     if (point.crs == crs || point.crs == SPHERE)
         return true;
 
-    invariant(point.crs == FLAT);
+    tassert(9911946, "", point.crs == FLAT);
     // If crs is FLAT, we might be able to upgrade the point to SPHERE if it's a valid SPHERE
     // point (lng/lat in bounds).  In this case, we can use FLAT data with SPHERE predicates.
     return isValidLngLat(point.oldPoint.x, point.oldPoint.y);
@@ -853,7 +853,7 @@ void ShapeProjection::projectInto(PointWithCRS* point, CRS crs) {
 
     if (FLAT == point->crs) {
         // Prohibit projection to STRICT_SPHERE CRS
-        invariant(SPHERE == crs);
+        tassert(9911947, "", SPHERE == crs);
 
         // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
         S2LatLng latLng = S2LatLng::FromDegrees(point->oldPoint.y, point->oldPoint.x).Normalized();
@@ -865,7 +865,7 @@ void ShapeProjection::projectInto(PointWithCRS* point, CRS crs) {
     }
 
     // Prohibit projection to STRICT_SPHERE CRS
-    invariant(SPHERE == point->crs && FLAT == crs);
+    tassert(9911948, "", SPHERE == point->crs && FLAT == crs);
     // Just remove the additional spherical information
     point->point = S2Point();
     point->cell = S2Cell();
@@ -877,7 +877,7 @@ void ShapeProjection::projectInto(PolygonWithCRS* polygon, CRS crs) {
         return;
 
     // Only project from STRICT_SPHERE to SPHERE
-    invariant(STRICT_SPHERE == polygon->crs && SPHERE == crs);
+    tassert(9911949, "", STRICT_SPHERE == polygon->crs && SPHERE == crs);
     polygon->crs = SPHERE;
 }
 
