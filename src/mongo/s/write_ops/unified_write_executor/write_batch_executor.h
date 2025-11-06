@@ -44,36 +44,29 @@ namespace unified_write_executor {
 using CommandReplyVariant =
     std::variant<BulkWriteCommandReply, write_ops::FindAndModifyCommandReply>;
 
-struct ShardResponse {
-    // This field may hold either a CommandReplyVariant, an error, or boost::none.
-    boost::optional<StatusWith<CommandReplyVariant>> swReply;
+class BasicResponse {
+public:
+    BasicResponse(boost::optional<StatusWith<CommandReplyVariant>> swReply,
+                  boost::optional<WriteConcernErrorDetail> wce,
+                  std::vector<WriteOp> ops,
+                  bool transientTxnError,
+                  bool errorsOnly,
+                  boost::optional<HostAndPort> hostAndPort = boost::none)
+        : _swReply(std::move(swReply)),
+          _wce(std::move(wce)),
+          _ops(std::move(ops)),
+          _transientTxnError(transientTxnError),
+          _errorsOnly(errorsOnly),
+          _hostAndPort(std::move(hostAndPort)) {}
 
-    // This field holds the write concern error (if one occurred).
-    boost::optional<WriteConcernErrorDetail> wce;
-
-    // Ops referencing the original command from the client in the order they were specified in the
-    // command to the shard. The items in this array should appear in the order you would see them
-    // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] should return
-    // the corresponding WriteOp from the original command from the client.
-    std::vector<WriteOp> ops;
-
-    // This field indicates if 'swReply' contains a transient transaction error.
-    bool transientTxnError = false;
-
-    // For debugging purposes.
-    boost::optional<HostAndPort> hostAndPort;
-
-    // These methods are used to check if the ShardResponse has a top-level "OK" status, or if it
-    // has a top-level error, or if it's empty. For a given ShardResponse, at any given time exactly
-    // one of these conditions will be true and the other two conditions will be false.
     bool isOK() const {
-        return swReply && swReply->isOK();
+        return _swReply && _swReply->isOK();
     }
     bool isError() const {
-        return swReply && !swReply->isOK();
+        return _swReply && !_swReply->isOK();
     }
     bool isEmpty() const {
-        return !swReply;
+        return !_swReply;
     }
 
     // Returns the status of this ShardResponse. This method may only be called when either 'isOK()'
@@ -85,10 +78,18 @@ struct ShardResponse {
     CommandReplyVariant& getReply();
     const CommandReplyVariant& getReply() const;
 
+    const boost::optional<WriteConcernErrorDetail>& getWriteConcernError() const {
+        return _wce;
+    }
+
+    const std::vector<WriteOp>& getOps() const {
+        return _ops;
+    }
+
     // Returns true if this ShardResponse contains a transient transaction error, otherwise returns
     // false.
     bool hasTransientTxnError() const {
-        return isError() && transientTxnError;
+        return isError() && _transientTxnError;
     }
 
     // Returns the transient transaction error contained within this NoRetryWriteBatchResponse.
@@ -98,62 +99,58 @@ struct ShardResponse {
         return getStatus();
     }
 
+    bool getErrorsOnly() const {
+        return _errorsOnly;
+    }
+
+    const boost::optional<HostAndPort>& getHostAndPort() const {
+        return _hostAndPort;
+    }
+
     // Returns true if this ShardResponse contains a WouldChangeOwningShard error.
     bool isWouldChangeOwningShardError() const {
         return isError() && getStatus() == ErrorCodes::WouldChangeOwningShard;
     }
+
+private:
+    // This field may hold either a CommandReplyVariant, an error, or boost::none.
+    boost::optional<StatusWith<CommandReplyVariant>> _swReply;
+
+    // This field holds the write concern error (if one occurred).
+    boost::optional<WriteConcernErrorDetail> _wce;
+
+    // Ops referencing the original command from the client in the order they were specified in the
+    // command to the shard. The items in this array should appear in the order you would see them
+    // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] should return
+    // the corresponding WriteOp from the original command from the client.
+    std::vector<WriteOp> _ops;
+
+    // This field indicates if 'swReply' contains a transient transaction error.
+    bool _transientTxnError = false;
+
+    // This flag indicates if the shard request had the 'errorsOnly' parameter set to true.
+    bool _errorsOnly = false;
+
+    // For debugging purposes.
+    boost::optional<HostAndPort> _hostAndPort;
+};
+
+class ShardResponse : public BasicResponse {
+public:
+    using BasicResponse::BasicResponse;
 };
 
 struct EmptyBatchResponse {};
 
 using SimpleWriteBatchResponse = std::vector<std::pair<ShardId, ShardResponse>>;
 
-struct NoRetryWriteBatchResponse {
-    // This field may hold either a CommandReplyVariant or an error.
-    StatusWith<CommandReplyVariant> swReply;
+class NoRetryWriteBatchResponse : public BasicResponse {
+public:
+    using BasicResponse::BasicResponse;
 
-    // This field holds the write concern error (if one occurred).
-    boost::optional<WriteConcernErrorDetail> wce;
-
-    // Op referencing the original command from the client.
-    WriteOp op;
-
-    // This field indicates if 'swReply' contains a transient transaction error.
-    bool transientTxnError = false;
-
-    bool isOK() const {
-        return swReply.isOK();
-    }
-    bool isError() const {
-        return !swReply.isOK();
-    }
-
-    // Returns the status of this NoRetryWriteBatchResponse.
-    const Status& getStatus() const {
-        return swReply.getStatus();
-    }
-
-    // Helper methods for accessing the CommandReplyVariant object. These methods may only be
-    // called when 'isOK()' is true.
-    CommandReplyVariant& getReply();
-    const CommandReplyVariant& getReply() const;
-
-    // Returns true if this NoRetryWriteBatchResponse contains a transient transaction error,
-    // otherwise returns false.
-    bool hasTransientTxnError() const {
-        return isError() && transientTxnError;
-    }
-
-    // Returns the transient transaction error contained within this NoRetryWriteBatchResponse.
-    // This method may only be called if hasTransientTxnError() is true.
-    const Status& getTransientTxnError() const {
-        tassert(11272107, "Expected transient transaction error", hasTransientTxnError());
-        return getStatus();
-    }
-
-    // Returns true if this NoRetryWriteBatchResponse contains a WouldChangeOwningShard error.
-    bool isWouldChangeOwningShardError() const {
-        return isError() && getStatus() == ErrorCodes::WouldChangeOwningShard;
+    const WriteOp& getOp() const {
+        tassert(11182200, "Expected vector to contain exactly one op", getOps().size() == 1);
+        return getOps().front();
     }
 };
 
@@ -168,6 +165,7 @@ public:
     static ShardResponse makeShardResponse(StatusWith<executor::RemoteCommandResponse> swResponse,
                                            std::vector<WriteOp> ops,
                                            bool inTransaction = false,
+                                           bool errorsOnly = false,
                                            boost::optional<HostAndPort> hostAndPort = boost::none,
                                            boost::optional<const ShardId&> shardId = boost::none);
 
@@ -175,7 +173,17 @@ public:
      * Creates an "empty" ShardResponse. This method is used when there is no RemoteCommandResponse
      * for a given 'shardId' (in cases where we decided to break out of the ARS loop early).
      */
-    static ShardResponse makeEmptyShardResponse(std::vector<WriteOp> ops);
+    static ShardResponse makeEmptyShardResponse(std::vector<WriteOp> ops, bool errorsOnly = false);
+
+    /**
+     * Creates a NoRetryWriteBatchResponse from the supplied BSONObj response.
+     */
+    static NoRetryWriteBatchResponse makeNoRetryWriteBatchResponse(
+        const StatusWith<BSONObj>& swResponse,
+        boost::optional<WriteConcernErrorDetail> wce,
+        const WriteOp& op,
+        bool inTransaction,
+        bool errorsOnly);
 
     /**
      * Returns true if the scheduler must provide a RoutingContext when executing the specified
@@ -247,6 +255,7 @@ private:
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
+        bool errorsOnly,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
         IsEmbeddedCommand isEmbeddedCommand) const;
 
@@ -255,6 +264,7 @@ private:
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
+        bool errorsOnly,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
         IsEmbeddedCommand isEmbeddedCommand,
         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
@@ -274,10 +284,13 @@ private:
                          const std::vector<WriteOp>& ops,
                          const std::map<NamespaceString, ShardEndpoint>& versionByNss,
                          const std::map<WriteOpId, UUID>& sampleIds,
+                         bool errorsOnly,
                          boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                          IsEmbeddedCommand isEmbeddedCommand,
                          ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
                          ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
+
+    bool getErrorsOnlyForShardRequest(const std::vector<WriteOp>& ops) const;
 
     const WriteCommandRef _cmdRef;
     const BSONObj _originalCmdObj;

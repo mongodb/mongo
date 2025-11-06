@@ -48,10 +48,6 @@ selector:
     # Any query using an auto yielding policy will likely return a QueryPlanKilled error if a moveCollection commit happens during the query execution.
     - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
     - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
-
-    # TODO SERVER-105762: add support for errorsOnly to UWE.
-    - jstests/core/write/bulk/bulk_write_insert_cursor.js
-
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

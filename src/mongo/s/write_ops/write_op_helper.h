@@ -37,42 +37,42 @@ namespace write_op_helpers {
 
 bool isRetryErrCode(int errCode);
 
-template <typename ErrorType, typename GetErrCodeFn>
-bool errorsAllSame(const std::vector<ErrorType>& errorItems, GetErrCodeFn getCodeFn) {
-    tassert(10412301, "Expected at least one error item", !errorItems.empty());
+template <typename ItemType, typename GetCodeFn>
+bool errorsAllSame(const std::vector<ItemType>& items, GetCodeFn getCodeFn) {
+    tassert(10412301, "Expected at least one item", !items.empty());
 
-    auto errCode = getCodeFn(errorItems.front());
-    return std::all_of(
-        ++errorItems.begin(), errorItems.end(), [errCode, &getCodeFn](const ErrorType& errorItem) {
-            return getCodeFn(errorItem) == errCode;
+    auto code = getCodeFn(items.front());
+    return std::all_of(++items.begin(), items.end(), [code, &getCodeFn](const ItemType& item) {
+        return getCodeFn(item) == code;
+    });
+}
+
+template <typename ItemType, typename GetCodeFn>
+bool hasOnlyOneNonRetryableError(const std::vector<ItemType>& items, GetCodeFn getCodeFn) {
+    return std::count_if(items.begin(), items.end(), [&getCodeFn](const ItemType& item) {
+               auto code = getCodeFn(item);
+               return code != ErrorCodes::OK && !isRetryErrCode(code);
+           }) == 1;
+}
+
+template <typename ItemType, typename GetCodeFn>
+bool hasAnyNonRetryableError(const std::vector<ItemType>& items, GetCodeFn getCodeFn) {
+    return std::count_if(items.begin(), items.end(), [&getCodeFn](const ItemType& item) {
+               auto code = getCodeFn(item);
+               return code != ErrorCodes::OK && !isRetryErrCode(code);
+           }) > 0;
+}
+
+template <typename ItemType, typename GetCodeFn>
+ItemType getFirstNonRetryableError(const std::vector<ItemType>& items, GetCodeFn getCodeFn) {
+    auto nonRetryableError =
+        std::find_if(items.begin(), items.end(), [&getCodeFn](const ItemType& item) {
+            auto code = getCodeFn(item);
+            return code != ErrorCodes::OK && !isRetryErrCode(code);
         });
-}
 
-template <typename ErrorType, typename GetErrCodeFn>
-bool hasOnlyOneNonRetryableError(const std::vector<ErrorType>& errorItems, GetErrCodeFn getCodeFn) {
-    return std::count_if(
-               errorItems.begin(), errorItems.end(), [&getCodeFn](const ErrorType& errorItem) {
-                   return !isRetryErrCode(getCodeFn(errorItem));
-               }) == 1;
-}
-
-template <typename ErrorType, typename GetErrCodeFn>
-bool hasAnyNonRetryableError(const std::vector<ErrorType>& errorItems, GetErrCodeFn getCodeFn) {
-    return std::count_if(
-               errorItems.begin(), errorItems.end(), [&getCodeFn](const ErrorType& errorItem) {
-                   return !isRetryErrCode(getCodeFn(errorItem));
-               }) > 0;
-}
-
-template <typename ErrorType, typename GetErrCodeFn>
-ErrorType getFirstNonRetryableError(const std::vector<ErrorType>& errorItems,
-                                    GetErrCodeFn getCodeFn) {
-    auto nonRetryableErr = std::find_if(
-        errorItems.begin(), errorItems.end(), [&getCodeFn](const ErrorType& errorItem) {
-            return !isRetryErrCode(getCodeFn(errorItem));
-        });
-    tassert(10412307, "No non-retryable error found", nonRetryableErr != errorItems.end());
-    return *nonRetryableErr;
+    tassert(10412307, "No non-retryable error found", nonRetryableError != items.end());
+    return *nonRetryableError;
 }
 
 /**

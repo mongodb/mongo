@@ -209,13 +209,19 @@ public:
 
     virtual ~WriteOpBatcher() = default;
 
-    // XXX Update comment
     /**
      * This method makes a new batch using ops taken from the producer and returns it. Depending on
      * the results from analyzing the ops from the producer, the batch returned may have different
      * types. If the producer has no more ops, this function returns an EmptyBatch.
      */
     virtual BatcherResult getNextBatch(OperationContext* opCtx, RoutingContext& routingCtx) = 0;
+
+    /**
+     * This method consumes all remaining ops from the producer and returns these ops in a vector.
+     */
+    std::vector<WriteOp> getAllRemainingOps() {
+        return _producer.consumeAllRemainingOps();
+    }
 
     /**
      * Mark a write op to be reprocessed, which will in turn be reanalyzed and rebatched.
@@ -261,7 +267,6 @@ public:
     void setRetryOnTargetError(bool b) {
         _retryOnTargetError = b;
     }
-
 
     /**
      * Marks the shards that ops already succeeded in case we only need to retry parts

@@ -39,6 +39,12 @@ function bulkWriteBasicTest(ordered) {
     const staleConfigOrangeLog = /(7279201|10346900).*Noting stale config response.*orange/;
     const staleDbTest2Log = /(7279202|10411403).*Noting stale database response.*test2/;
 
+    function opMayNeedToBeRetriedLog(opId, collName) {
+        return new RegExp(
+            `(7695304|11182210).*(Duplicating|need to be retried).*opIdx":[",0-9 ]*\\b${opId}\\b.*${collName}`,
+        );
+    }
+
     jsTestLog("Case 1: Collection does't exist yet.");
     // Case 1: The collection doesn't exist yet. This results in a CannotImplicitlyCreateCollection
     // error on the shards and consequently mongos and the shards must all refresh. Then mongos
@@ -62,11 +68,10 @@ function bulkWriteBasicTest(ordered) {
     let insertedDocs = getCollection(banana).find({}).toArray();
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
     assert(checkLog.checkContainsOnce(st.s0, staleConfigBananaLog));
-    if (!ordered && !isUnifiedWriteExecutor) {
-        // Check that the error for the 0th op was duplicated and used for the 1st op as well.
-        // TODO SERVER-106418 This logic is currently not ported to the UWE project so skip the
-        // assertion.
-        assert(checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":1.*banana/));
+    if (!ordered) {
+        // The retryable error for op 0 should cause the router to log that op 1 may need to be
+        // retried.
+        assert(checkLog.checkContainsOnce(st.s0, opMayNeedToBeRetriedLog(1, "banana")));
     }
 
     jsTestLog("Case 2: The collection exists for some of writes, but not for others.");
@@ -181,25 +186,22 @@ function bulkWriteBasicTest(ordered) {
         insertedDocs = getCollection(strawberry).find({}).toArray();
         assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
 
-        if (!isUnifiedWriteExecutor) {
-            // The CannotImplicitlyCreateCollection error on op 0 should have been duplicated to all
-            // operations.
-            for (let i = 1; i < 5; i++) {
-                assert(
-                    checkLog.checkContainsOnce(st.s0, new RegExp(`7695304.*Duplicating the error.*opIdx":${i}.*mango`)),
-                );
-            }
-
-            // The CannotImplicitlyCreateCollection error on op 3 should have been duplicated to
-            // op 4.
-            assert(
-                checkLog.checkContainsOnce(
-                    st.s0,
-                    /8037206.*Noting cannotImplicitlyCreateCollection response.*strawberry/,
-                ) || checkLog.checkContainsOnce(st.s0, /7279201.*Noting stale config response.*strawberry/),
-            );
-            assert(checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":4.*strawberry/));
+        // The retryable error for op 0 should cause the router to log that ops 1-4 may need to
+        // be retried.
+        for (let i = 1; i < 5; i++) {
+            assert(checkLog.checkContainsOnce(st.s0, opMayNeedToBeRetriedLog(i, "mango")));
         }
+
+        // The retryable error for op 3 should cause the router to log that op 4 may need to be
+        // retried.
+        assert(
+            checkLog.checkContainsOnce(
+                st.s0,
+                /(8037206|11182203).*Noting cannotImplicitlyCreateCollection response.*strawberry/,
+            ) || checkLog.checkContainsOnce(st.s0, /(7279201|10346900).*Noting stale config response.*strawberry/),
+        );
+
+        assert(checkLog.checkContainsOnce(st.s0, opMayNeedToBeRetriedLog(4, "strawberry")));
     }
 
     st.stop();

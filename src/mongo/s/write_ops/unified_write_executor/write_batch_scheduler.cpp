@@ -49,16 +49,14 @@ void WriteBatchScheduler::run(OperationContext* opCtx) {
     // Keep executing rounds until the batcher says it can't make any more batches or until an
     // unrecoverable error or exception occurs.
     while (!_batcher.isDone()) {
-        // If there have been too many consecutive rounds without progress, fail the remaining ops
-        // and break out of the loop.
+        // If there have been too many consecutive rounds without progress, record an error for
+        // the remaining ops and break out of the loop.
         if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
             Status status{ErrorCodes::NoProgressMade,
                           str::stream() << "No progress was made executing write ops in after "
                                         << kMaxRoundsWithoutProgress << " rounds (" << rounds
                                         << " rounds total)"};
-
-            _processor.recordErrorForRemainingOps(opCtx, status);
-            _batcher.stopMakingBatches();
+            recordErrorForRemainingOps(opCtx, status);
             break;
         }
 
@@ -84,7 +82,7 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
     const auto nssList = std::vector<NamespaceString>{_nssSet.begin(), _nssSet.end()};
 
     // If we've exceeded our memory limit, stop execution.
-    if (_processor.checkBulkWriteReplyMaxSize()) {
+    if (_processor.checkBulkWriteReplyMaxSize(opCtx)) {
         _batcher.stopMakingBatches();
         return false;
     }
@@ -99,7 +97,7 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
 
     // Capture how many OK responses there have been at the start of the round so we can compare
     // against it when the round has finished.
-    const size_t previousNumOkResponses = _processor.getNumOkResponsesProcessed();
+    const size_t previousNumOkItems = _processor.getNumOkItemsProcessed();
 
     auto result = routing_context_utils::runAndValidate(
         *swRoutingCtx.getValue(), [&](RoutingContext& routingCtx) -> ProcessorResult {
@@ -117,7 +115,7 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
         });
 
     // Check if any progress was made during this round.
-    bool madeProgress = _processor.getNumOkResponsesProcessed() > previousNumOkResponses;
+    bool madeProgress = _processor.getNumOkItemsProcessed() > previousNumOkItems;
 
     // If a write error occurred -AND- if the write command is ordered or running in a transaction,
     // call stopMakingBatches() to stop any further execution of this command and then return.
@@ -212,13 +210,19 @@ void WriteBatchScheduler::handleInitRoutingContextError(OperationContext* opCtx,
 
     // If creating the RoutingContext failed and nothing has been processed yet, throw the error
     // as an exception.
-    if (!_processor.getNumOkResponsesProcessed() && !_processor.getNumErrorsRecorded()) {
+    if (!_processor.getNumOkItemsProcessed() && !_processor.getNumErrorsRecorded()) {
         uassertStatusOK(status);
     }
 
-    // Get the non-OK Status from 'routingCtx' and record an error for all remaining ops, and
-    // then call stopMakingBatches() to stop any further execution of this command.
-    _processor.recordErrorForRemainingOps(opCtx, status);
+    // Record an error for the remaining ops.
+    recordErrorForRemainingOps(opCtx, status);
+}
+
+void WriteBatchScheduler::recordErrorForRemainingOps(OperationContext* opCtx,
+                                                     const Status& status) {
+    for (auto& op : _batcher.getAllRemainingOps()) {
+        _processor.recordError(opCtx, op, status);
+    }
     _batcher.stopMakingBatches();
 }
 
@@ -236,14 +240,6 @@ WriteBatch WriteBatchScheduler::getNextBatchAndHandleTargetErrors(OperationConte
         // If an unrecoverable error occurred, discard the batch, call stopMakingBatches() to
         // stop any further execution of this command, and then return an empty batch.
         if (ordered || inTransaction) {
-            if (inTransaction) {
-                const auto& status = result.opsWithErrors.front().second;
-                LOGV2_DEBUG(10896514,
-                            2,
-                            "Aborting write command due to error in transaction",
-                            "error"_attr = redact(status));
-            }
-
             _batcher.markBatchReprocess(std::move(result.batch));
             _batcher.stopMakingBatches();
             return WriteBatch{};

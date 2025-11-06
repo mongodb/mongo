@@ -6,9 +6,7 @@
 import {BulkWriteUtils} from "jstests/libs/crud_ops_to_bulk_write_lib.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
-// TODO SERVER-105762: Support for errorsOnly in UWE
-const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
-const errorsOnly = uweEnabled ? false : Math.random() < 0.5;
+const errorsOnly = Math.random() < 0.5;
 
 jsTestLog("Running single op bulkWrite override with `errorsOnly:" + errorsOnly + "`");
 

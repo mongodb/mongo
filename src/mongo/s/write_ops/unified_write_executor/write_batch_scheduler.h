@@ -78,6 +78,13 @@ protected:
     void handleInitRoutingContextError(OperationContext* opCtx, const Status& status);
 
     /**
+     * This method is records errors for the remaining ops. If the write command is ordered or
+     * running in a transaction, this method will only record one error (for the remaining op with
+     * the lowest ID). Otherwise, this method will record errors for all remaining ops.
+     */
+    void recordErrorForRemainingOps(OperationContext* opCtx, const Status& status);
+
+    /**
      * Helper method that calls getNextBatch(), handles target errors that occurred during batch
      * creation (if any), and then returns the next batch.
      */

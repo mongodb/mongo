@@ -230,10 +230,6 @@ selector:
     - jstests/core/**/find_and_modify_new_upsert_sort.js
     - jstests/core/**/upsert_shell.js
 
-    # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO SERVER-105762: add support for errorsOnly to UWE.
-    - jstests/core/write/bulk/bulk_write_insert_cursor.js
-
   exclude_with_any_tags:
     ##
     # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js

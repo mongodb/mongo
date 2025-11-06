@@ -120,6 +120,10 @@ public:
         return _ref.getMulti();
     }
 
+    bool isUpsert() const {
+        return _ref.getUpsert();
+    }
+
     WriteCommandRef getCommand() const {
         return _ref.getCommand();
     }

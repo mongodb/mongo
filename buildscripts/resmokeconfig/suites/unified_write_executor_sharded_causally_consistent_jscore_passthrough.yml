@@ -36,10 +36,6 @@ selector:
     # This test uses `benchRun` which spawns connections which do not inherit the causal session.
     - jstests/core/**/benchrun_pipeline_updates.js
 
-    # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO SERVER-105762: add support for errorsOnly to UWE.
-    - jstests/core/write/bulk/bulk_write_insert_cursor.js
-
   exclude_with_any_tags:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections
     # can't be created on `getCollection` call.

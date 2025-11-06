@@ -70,6 +70,12 @@ public:
     void advance();
 
     /**
+     * This method builds a vector containing all currently active write ops, marks all these ops
+     * as inactive, and returns the vector.
+     */
+    std::vector<WriteOp> consumeAllRemainingOps();
+
+    /**
      * Mark a write op as active. The internal pointer will be updated to the active write op with
      * the lowest id.
      */

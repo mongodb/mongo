@@ -47,37 +47,16 @@ struct ProcessorResult {
         stdx::unordered_map<NamespaceString,
                             std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
 
-    std::vector<WriteOp> opsToRetry;    // Ops to be retried due to recoverable errors
-    CollectionsToCreate collsToCreate;  // Collections to be explicitly created
-    std::map<WriteOpId, std::set<ShardId>>
-        successfulShardSet{};  // Shards where each op succeeded. This is used to track the
-                               // shards that we don't need to retry on because of
-                               // retryable(staleness/collection doesn't exist errors) because
-                               // the operation was already executed.
+    // Ops to be retried due to recoverable errors
+    std::vector<WriteOp> opsToRetry;
 
-    void combine(const ProcessorResult other) {
-        opsToRetry.insert(opsToRetry.end(),
-                          std::make_move_iterator(other.opsToRetry.begin()),
-                          std::make_move_iterator(other.opsToRetry.end()));
+    // Collections to be explicitly created
+    CollectionsToCreate collsToCreate;
 
-
-        for (auto& [nss, info] : other.collsToCreate) {
-            if (auto it = collsToCreate.find(nss); it == collsToCreate.cend()) {
-                collsToCreate.emplace(nss, std::move(info));
-            }
-        }
-
-        for (auto& [opId, otherSuccessfulShards] : other.successfulShardSet) {
-            auto it = successfulShardSet.find(opId);
-            if (it == successfulShardSet.cend()) {
-                successfulShardSet.emplace(opId, std::move(otherSuccessfulShards));
-            } else {
-                std::move(otherSuccessfulShards.begin(),
-                          otherSuccessfulShards.end(),
-                          std::inserter(it->second, it->second.end()));
-            }
-        }
-    }
+    // Shards where each op succeeded. This is used to track the shards that we don't need to retry
+    // on because of retryable(staleness/collection doesn't exist errors) because the operation was
+    // already executed.
+    std::map<WriteOpId, std::set<ShardId>> successfulShardSet;
 };
 
 /**
@@ -99,15 +78,41 @@ struct ProcessorResult {
  */
 class WriteBatchResponseProcessor {
 public:
+    struct BulkWriteOpResults {
+        std::vector<BulkWriteReplyItem> items;
+        bool hasSuccess = false;
+        bool hasError = false;
+    };
+
+    /**
+     * The 'Unexecuted' struct is used by 'ItemVariant' to represent an op that was scheduled
+     * to execute on a shard but didn't execute.
+     */
+    struct Unexecuted {};
+
+    /**
+     * When the 'errorsOnly' parameter is true, the 'SucceededWithoutItem' struct is used by
+     * 'ItemVariant' to represent an op that executed on a shard and completed succesfully
+     * without producing an explicit "reply item".
+     */
+    struct SucceededWithoutItem {};
+
+    using FindAndModifyReplyItem = StatusWith<write_ops::FindAndModifyCommandReply>;
+
+    using OpResultVariant = std::variant<BulkWriteOpResults, FindAndModifyReplyItem>;
+
+    using ItemVariant =
+        std::variant<Unexecuted, SucceededWithoutItem, BulkWriteReplyItem, FindAndModifyReplyItem>;
+
     using CollectionsToCreate = ProcessorResult::CollectionsToCreate;
 
-    using ReplyItemsByShard = std::map<ShardId, BulkWriteReplyItem>;
-    struct WriteOpResults {
-        std::variant<ReplyItemsByShard,
-                     BulkWriteReplyItem,
-                     StatusWith<write_ops::FindAndModifyCommandReply>>
-            replies;
-        bool hasNonRetryableError = false;
+    using GroupItemsResult =
+        std::pair<std::map<WriteOp, std::vector<std::pair<ShardId, ItemVariant>>>, bool>;
+
+    struct ShardResult {
+        boost::optional<BulkWriteCommandReply> bulkWriteReply;
+        boost::optional<WriteConcernErrorDetail> wce;
+        std::vector<std::pair<WriteOp, ItemVariant>> items;
     };
 
     explicit WriteBatchResponseProcessor(WriteCommandRef cmdRef,
@@ -163,12 +168,9 @@ public:
     void recordTargetErrors(OperationContext* opCtx, const BatcherResult& batcherResult);
 
     /**
-     * This method is called by the scheduler to record errors for the remaining ops that don't have
-     * results yet. If the write command is ordered or running in a transaction, this method will
-     * only record one error (for the remaining op with the lowest ID). Otherwise, this method will
-     * record errors for all remaining ops.
+     * Records an error attributed to 'op', adding the error to _results and updating _nErrors.
      */
-    void recordErrorForRemainingOps(OperationContext* opCtx, const Status& status);
+    void recordError(OperationContext* opCtx, const WriteOp& op, const Status& status);
 
     /**
      * Returns the number of errors recorded so far.
@@ -180,15 +182,15 @@ public:
     /**
      * Returns the number of OK responses that have been processed so far.
      */
-    size_t getNumOkResponsesProcessed() const {
-        return _numOkResponses;
+    size_t getNumOkItemsProcessed() const {
+        return _numOkItemsProcessed;
     }
 
     /**
      * Returns true if we've exceeded the max reply size, false otherwise. If we have exceeded the
      * max size, we record this as an error for the next write op.
      */
-    bool checkBulkWriteReplyMaxSize();
+    bool checkBulkWriteReplyMaxSize(OperationContext* opCtx);
 
 private:
     ProcessorResult _onWriteBatchResponse(OperationContext* opCtx,
@@ -202,47 +204,31 @@ private:
                                           const NoRetryWriteBatchResponse& response);
 
     /**
-     * Process a response from a shard, handle errors, and collect statistics. Returns an array
-     * containing ops that did not complete successfully that need to be resent.
+     * This method performs some initial processing on the specified ShardResponse object and
+     * returns a ShardResult.
+     *
+     * If 'response' has a top-level error, this method will handle transient txn errors and
+     * it will inform 'routingCtx' about stale errors, and it will generate item errors for
+     * individual ops as appropriate. Then it will return a ShardResult containing the top-level
+     * error and the generated item errors.
+     *
+     * If 'response' doesn't have a top-level erorr, this method will get all the reply items
+     * (if they didn't all fit in the first batch), it will handle any stale errors in the reply
+     * items, and it will determine which ops didn't execute (if any). If 'errorsOnly' is true,
+     * this method will also determine which ops executed successfully that were not listed in the
+     * reply items. This method will then return a ShardResult containing the parsed response, the
+     * reply items, and info about which ops executed successfully and which ops didn't execute.
      */
-    ProcessorResult onShardResponse(OperationContext* opCtx,
-                                    RoutingContext& routingCtx,
-                                    const ShardId& shardId,
-                                    const ShardResponse& response);
-
-    /**
-     * Process a FindAndModifyCommandReply attributed to 'op', adding it to _results and updating
-     * _numOkResponses.
-     */
-    void processFindAndModifyReply(OperationContext* opCtx,
-                                   const WriteOp& op,
-                                   write_ops::FindAndModifyCommandReply reply);
+    ShardResult onShardResponse(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const ShardId& shardId,
+                                const ShardResponse& response);
 
     /**
      * Process the counters and the list of retried stmtIds from the BulkWriteCommandReply. Note
-     * that this method does _not_ update '_numOkResponses' or '_nErrors'.
+     * that this method does not update _numOkResponses or _nErrors.
      */
     void processCountersAndRetriedStmtIds(const BulkWriteCommandReply& parsedReply);
-
-    /**
-     * Adds all of the reply items in a shard response to '_results' and handles retryable errors.
-     * Also notes the operations that shards succeeded on in the case of a multi-write that need to
-     * be retried on specific shards only. Further processing of the replies is done in
-     * 'finalizeRepliesForOps' which aggregates the responses from all of the shards for each op.
-     */
-    ProcessorResult processOpsInReplyItems(OperationContext* opCtx,
-                                           RoutingContext& routingCtx,
-                                           ShardId shardId,
-                                           const std::vector<WriteOp>& ops,
-                                           const std::vector<BulkWriteReplyItem>&);
-
-    /**
-     * If an op was not in the ReplyItems, this function processes it and decides if a retry is
-     * needed.
-     */
-    std::vector<WriteOp> processOpsNotInReplyItems(const std::vector<WriteOp>& requestedOps,
-                                                   const std::vector<BulkWriteReplyItem>&,
-                                                   std::vector<WriteOp>&& toRetry);
 
     /**
      * Helper to keep _approximateSize up to date when appending to _replies.
@@ -250,61 +236,74 @@ private:
     void updateApproximateSize(const BulkWriteReplyItem& replyItem);
 
     /**
-     * Iterates through all of the the _results and combines all of the reply items for each op into
+     * Iterates through all of the _results and combines all of the reply items for each op into
      * a single reply item. This is called when we are ready to generate the client response.
      */
-    std::map<WriteOpId, BulkWriteReplyItem> finalizeRepliesForOps(OperationContext* opCtx);
+    std::vector<std::pair<WriteOpId, boost::optional<BulkWriteReplyItem>>> finalizeRepliesForOps(
+        OperationContext* opCtx);
 
     /**
-     * Remove ops that already have non-retryable errors from ops to retry.
-     **/
-    void removeFailedOpsFromOpsToRetry(ProcessorResult& result);
-
-    /**
-     * Adds a single reply item to '_results'.
+     * Add a boost::optional<BulkWriteReplyItem> attributed to 'op' to _results, and also update
+     * _numOkResponses and _nErrors appropriately.
      */
-    void addReplyToResults(WriteOpId opId,
-                           BulkWriteReplyItem item,
-                           boost::optional<ShardId> shardId);
-
-    /**
-     * Process a single ReplyItem attributed to 'op', adding it to _results and updating
-     * _numOkResponses and _nErrors.
-     */
-    void processReplyItem(OperationContext* opCtx,
-                          const WriteOp& op,
-                          BulkWriteReplyItem item,
-                          boost::optional<ShardId> shardId);
-
-    /**
-     * Process an error attributed to 'op', adding it to _results and updating _nErrors.
-     */
-    void processError(OperationContext* opCtx,
+    void recordResult(OperationContext* opCtx,
                       const WriteOp& op,
-                      const Status& status,
-                      boost::optional<ShardId> shardId);
+                      boost::optional<BulkWriteReplyItem> item);
 
     /**
-     * Process a local or top-level error attributed to an entire batch of WriteOps ('ops'),
-     * updating _results and _nErrors appropriately.
+     * Add a FindAndModifyReplyItem attributed to 'op' to _results, and also update _numOkResponses
+     * and _nErrors appropriately.
      */
-    void processErrorForBatch(OperationContext* opCtx,
-                              const std::vector<WriteOp>& ops,
-                              const Status& status,
-                              boost::optional<ShardId> shardId);
+    void recordResult(OperationContext* opCtx, const WriteOp& op, FindAndModifyReplyItem item);
 
     /**
-     * Handle retryable error marking if we need to retry or create a collection.
+     * Informs 'routingCtx' about the stale error given by 'status' if needed.
      */
-    ProcessorResult handleRetryableError(OperationContext* opCtx,
-                                         RoutingContext& routingCtx,
-                                         boost::optional<WriteOp> op,
-                                         const Status& status);
+    void noteRetryableError(OperationContext* opCtx,
+                            RoutingContext& routingCtx,
+                            boost::optional<WriteOp> op,
+                            const Status& status);
 
-    ProcessorResult handleRetryableErrorForBatch(OperationContext* opCtx,
-                                                 RoutingContext& routingCtx,
-                                                 const std::vector<WriteOp>& ops,
-                                                 const Status& status);
+    /**
+     * Helper method that adds 'op' to 'toRetry' and also copies CannotImplicityCreateCollection
+     * errors into 'collsToCreate'.
+     */
+    void queueOpForRetry(const WriteOp& op,
+                         boost::optional<const Status&> status,
+                         std::set<WriteOp>& toRetry,
+                         CollectionsToCreate& collsToCreate) const;
+
+    /**
+     * Generate an ItemVariant for 'op' with an error given by 'status'.
+     */
+    ItemVariant makeErrorItem(const WriteOp& op, const Status& status) const;
+
+    /**
+     * This method scans the items from 'shardResults' and groups the items together by op. This
+     * method also checks if 'shardResults' contains an unrecoverable error.
+     */
+    GroupItemsResult groupItemsByOp(
+        OperationContext* opCtx, std::vector<std::pair<ShardId, ShardResult>>& shardResults) const;
+
+    /**
+     * Gets the BulkWriteReplyItems from 'result.bulkWriteReply' and puts them into 'result.items'.
+     */
+    void retrieveBulkWriteReplyItems(OperationContext* opCtx,
+                                     RoutingContext& routingCtx,
+                                     const ShardId& shardId,
+                                     const std::vector<WriteOp>& ops,
+                                     bool errorsOnly,
+                                     ShardResult& result);
+
+    /**
+     * This method scans 'items' and verifies that the "idx" values are valid and that they appear
+     * in increasing order. If 'errorsOnly' is false, this method also verifies that 'items' has
+     * a reply item for each op that succeeded.
+     */
+    void validateBulkWriteReplyItems(OperationContext* opCtx,
+                                     const std::vector<BulkWriteReplyItem>& items,
+                                     size_t numOps,
+                                     bool errorsOnly);
 
     /**
      * Returns the retriedStmtIds to set them in the client response.
@@ -324,8 +323,10 @@ private:
     size_t _nModified{0};
     size_t _nUpserted{0};
     size_t _nDeleted{0};
-    size_t _numOkResponses{0};
-    std::map<WriteOpId, WriteOpResults> _results;
+    size_t _numOkItemsProcessed{0};
+
+    std::map<WriteOpId, OpResultVariant> _results;
+
     int32_t _approximateSize = 0;
     std::vector<ShardWCError> _wcErrors;
     stdx::unordered_set<StmtId> _retriedStmtIds;
