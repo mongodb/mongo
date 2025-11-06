@@ -27,7 +27,6 @@ const waitPerIterationMs = 200;
 const delinquentIntervalMs = waitPerIterationMs - 20;
 const findComment = "delinquent_ops.js-COMMENT";
 
-// TODO (SERVER-111527): remove to properly test delinquency stats per priority.
 function disableDeprioritizationHeuristic(conn) {
     let algorithm = assert.commandWorked(
         conn.adminCommand({getParameter: 1, executionControlConcurrencyAdjustmentAlgorithm: 1}),
