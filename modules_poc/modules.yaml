@@ -895,6 +895,7 @@ compact:
   meta:
     slack: storage-engines-server-integration
     jira: Server Integration
+    fully_marked: true
   files:
     - src/mongo/db/local_catalog/collection_compact*
     - src/mongo/db/commands/auto_compact*
@@ -928,6 +929,7 @@ cache_pressure:
   meta:
     slack: storage-engines-server-integration
     jira: Server Integration
+    fully_marked: true
   files:
     - src/mongo/db/periodic_runner_cache_pressure_rollback*
 

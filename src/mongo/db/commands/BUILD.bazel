@@ -1077,7 +1077,6 @@ mongo_cc_library(
         "//src/mongo/db/user_write_block:set_user_write_block_mode_command.cpp",
     ],
     hdrs = [
-        "auto_compact.h",
         "oplog_application_checks.h",
         "//src/mongo/db/commands/query_cmd:map_reduce_command_base.h",
         "//src/mongo/s/commands:internal_transactions_test_command.h",
