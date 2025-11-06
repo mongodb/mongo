@@ -30,13 +30,13 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_expandable.h"
-#include "mongo/db/extension/host/extension_stage.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
 namespace mongo::extension::host {
+
+ALLOCATE_DOCUMENT_SOURCE_ID(extension, DocumentSourceExtension::id);
 
 class DocumentSourceExtension::LiteParsedExpandable::ExpansionValidationFrame {
 public:
@@ -153,7 +153,6 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
 // static
 void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor.getName();
-    auto id = DocumentSource::allocateId(nameStringData);
     auto stageName = std::string(nameStringData);
 
     using LiteParseFn = std::function<std::unique_ptr<LiteParsedDocumentSource>(
@@ -176,22 +175,8 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
             return DocumentSourceExtensionExpandable::create(expCtx, specElem.wrap(), descriptor);
         });
 
-    // Register the correct exec::agg to execute the stage with.
-    exec::agg::registerDocumentSourceToStageFn(
-        id, [](const boost::intrusive_ptr<DocumentSource>& source) {
-            auto* documentSource = dynamic_cast<DocumentSourceExtension*>(source.get());
-
-            tassert(10980400, "expected 'DocumentSourceExtension' type", documentSource);
-
-            return make_intrusive<exec::agg::ExtensionStage>(documentSource->getSourceName(),
-                                                             documentSource->getExpCtx());
-        });
-
     LiteParsedDocumentSource::registerParser(
         stageName, std::move(parser), AllowedWithApiStrict::kAlways, AllowedWithClientType::kAny);
-
-    // Add the allocated id to the static map for lookup upon object construction.
-    stageToIdMap[stageName] = id;
 }
 
 void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) {
@@ -200,16 +185,14 @@ void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) 
 
 DocumentSourceExtension::DocumentSourceExtension(
     StringData name, const boost::intrusive_ptr<ExpressionContext>& exprCtx)
-    : DocumentSource(name, exprCtx),
-      _stageName(std::string(name)),
-      _id(findStageId(std::string(name))) {}
+    : DocumentSource(name, exprCtx), _stageName(std::string(name)) {}
 
 const char* DocumentSourceExtension::getSourceName() const {
     return _stageName.c_str();
 }
 
 DocumentSource::Id DocumentSourceExtension::getId() const {
-    return _id;
+    return id;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
@@ -228,15 +211,6 @@ StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeSta
                                         UnionRequirement::kNotAllowed,
                                         ChangeStreamRequirement::kDenylist);
     return constraints;
-}
-
-DocumentSourceExtension::Id DocumentSourceExtension::findStageId(std::string stageName) {
-    auto it = stageToIdMap.find(stageName);
-    tassert(11250700,
-            str::stream() << "Could not find id associated with extension stage " << stageName,
-            it != stageToIdMap.end());
-
-    return it->second;
 }
 
 DocumentSourceExtension::~DocumentSourceExtension() = default;

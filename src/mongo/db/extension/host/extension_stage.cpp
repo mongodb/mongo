@@ -29,7 +29,25 @@
 
 #include "mongo/db/extension/host/extension_stage.h"
 
-namespace mongo::exec::agg {
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/extension/host/document_source_extension.h"
+namespace mongo {
+
+using namespace extension::host;
+
+boost::intrusive_ptr<exec::agg::Stage> documentSourceExtensionToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& source) {
+    auto* documentSource = dynamic_cast<DocumentSourceExtension*>(source.get());
+    tassert(10980400, "expected 'DocumentSourceExtension' type", documentSource);
+    return make_intrusive<exec::agg::ExtensionStage>(documentSource->getSourceName(),
+                                                     documentSource->getExpCtx());
+}
+
+namespace exec::agg {
+
+REGISTER_AGG_STAGE_MAPPING(extensionStage,
+                           DocumentSourceExtension::id,
+                           documentSourceExtensionToStageFn);
 
 ExtensionStage::ExtensionStage(StringData name,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
@@ -41,4 +59,5 @@ GetNextResult ExtensionStage::doGetNext() {
     }
     return GetNextResult::makeEOF();
 }
-}  // namespace mongo::exec::agg
+}  // namespace exec::agg
+}  // namespace mongo

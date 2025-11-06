@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
-#include "mongo/db/extension/host/test_stage_id_registrar.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -64,17 +63,6 @@ protected:
     sdk::ExtensionAggStageDescriptor _expandToMixedDescriptor{
         sdk::shared_test_stages::ExpandToMixedDescriptor::make()};
     sdk::ExtensionAggStageDescriptor _topDescriptor{sdk::shared_test_stages::TopDescriptor::make()};
-
-    TestStageIdRegistrar _id{sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName,
-                             sdk::shared_test_stages::ExpandToExtAstDescriptor::kStageName,
-                             sdk::shared_test_stages::ExpandToExtParseDescriptor::kStageName,
-                             sdk::shared_test_stages::ExpandToHostParseDescriptor::kStageName,
-                             sdk::shared_test_stages::ExpandToMixedDescriptor::kStageName,
-                             sdk::shared_test_stages::TopDescriptor::kStageName,
-                             std::string(sdk::shared_test_stages::kLeafAName),
-                             std::string(sdk::shared_test_stages::kLeafBName),
-                             std::string(sdk::shared_test_stages::kLeafCName),
-                             std::string(sdk::shared_test_stages::kLeafDName)};
 };
 
 TEST_F(DocumentSourceExtensionExpandableTest, ExpandToExtAst) {

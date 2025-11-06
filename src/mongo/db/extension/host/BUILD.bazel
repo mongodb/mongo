@@ -108,12 +108,3 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
     ],
 )
-
-mongo_cc_library(
-    name = "host_test_helpers",
-    hdrs = ["test_stage_id_registrar.h"],
-    deps = [
-        ":extension_host",
-        "//src/mongo:base",
-    ],
-)

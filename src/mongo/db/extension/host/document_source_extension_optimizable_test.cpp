@@ -29,7 +29,6 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 
-#include "mongo/db/extension/host/test_stage_id_registrar.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -50,8 +49,6 @@ protected:
 
     sdk::ExtensionAggStageDescriptor _noOpAggregationStageDescriptor{
         sdk::shared_test_stages::NoOpAggStageDescriptor::make()};
-
-    TestStageIdRegistrar _ids{sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName};
 };
 
 TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {

@@ -1703,7 +1703,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/extension/host:extension_loader",
-        "//src/mongo/db/extension/host:host_test_helpers",
         "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/extension/sdk/tests:shared_test_stages",
         "//src/mongo/db/local_catalog:catalog_test_fixture",
