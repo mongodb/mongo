@@ -50,6 +50,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -65,7 +66,8 @@
 
 namespace mongo {
 
-class RangeDeleterService : public ReplicaSetAwareServiceShardSvr<RangeDeleterService> {
+class MONGO_MOD_NEEDS_REPLACEMENT RangeDeleterService
+    : public ReplicaSetAwareServiceShardSvr<RangeDeleterService> {
 public:
     RangeDeleterService() = default;
 
@@ -210,8 +212,8 @@ public:
      * NB: in case an overlapping range deletion task is registered AFTER invoking this method,
      * it will not be taken into account. Handling this scenario is responsibility of the caller.
      * */
-    SharedSemiFuture<void> getOverlappingRangeDeletionsFuture(const UUID& collectionUUID,
-                                                              const ChunkRange& range);
+    MONGO_MOD_NEEDS_REPLACEMENT SharedSemiFuture<void> getOverlappingRangeDeletionsFuture(
+        const UUID& collectionUUID, const ChunkRange& range);
 
     /**
      * Checks if the range deleter service is disabled.
@@ -238,7 +240,7 @@ public:
     /*
      * Returns the total number of range deletion tasks registered on the service.
      */
-    long long totalNumOfRegisteredTasks();
+    MONGO_MOD_NEEDS_REPLACEMENT long long totalNumOfRegisteredTasks();
 
     /* Returns a shared semi-future marked as ready once the service is initialized */
     SharedSemiFuture<void> getRangeDeleterServiceInitializationFuture() {

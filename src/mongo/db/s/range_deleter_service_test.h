@@ -45,6 +45,7 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <map>
@@ -127,7 +128,7 @@ std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngo
     boost::optional<KeyPattern> keyPattern = boost::none,
     const ChunkVersion& shardVersion = ChunkVersion::IGNORED());
 
-SharedSemiFuture<void> registerAndCreatePersistentTask(
+MONGO_MOD_NEEDS_REPLACEMENT SharedSemiFuture<void> registerAndCreatePersistentTask(
     OperationContext* opCtx,
     const RangeDeletionTask& rdt,
     SemiFuture<void>&& waitForActiveQueriesToComplete);

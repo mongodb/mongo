@@ -40,6 +40,7 @@
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/optional.hpp>
@@ -64,32 +65,33 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
 /**
  * Check if there is at least one range deletion task for the specified collection.
  */
-bool hasAtLeastOneRangeDeletionTaskForCollection(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const UUID& collectionUuid);
+MONGO_MOD_PUBLIC bool hasAtLeastOneRangeDeletionTaskForCollection(OperationContext* opCtx,
+                                                                  const NamespaceString& nss,
+                                                                  const UUID& collectionUuid);
 
 /**
  * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`
  * - Associates tasks to the target collection
  * - Stores tasks in `config.rangeDeletionsForRename`
  */
-void snapshotRangeDeletionsForRename(OperationContext* opCtx,
-                                     const NamespaceString& fromNss,
-                                     const NamespaceString& toNss);
+MONGO_MOD_PUBLIC void snapshotRangeDeletionsForRename(OperationContext* opCtx,
+                                                      const NamespaceString& fromNss,
+                                                      const NamespaceString& toNss);
 
 /**
  * Copies `config.rangeDeletionsForRename` tasks for the specified namespace to
  * `config.rangeDeletions`.
  */
-void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const NamespaceString& nss);
+MONGO_MOD_PUBLIC void restoreRangeDeletionTasksForRename(OperationContext* opCtx,
+                                                         const NamespaceString& nss);
 
 /**
  * - Deletes range deletion tasks for the FROM namespace from `config.rangeDeletions`.
  * - Deletes range deletion tasks for the TO namespace from `config.rangeDeletionsForRename`
  */
-void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
-                                       const NamespaceString& fromNss,
-                                       const NamespaceString& toNss);
+MONGO_MOD_PUBLIC void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
+                                                        const NamespaceString& fromNss,
+                                                        const NamespaceString& toNss);
 
 /**
  * Updates the range deletion task document to increase or decrease numOrphanedDocs
@@ -108,7 +110,8 @@ void removePersistentTask(OperationContext* opCtx, const UUID& taskId);
  * Removes all range deletion task documents from `config.rangeDeletions` for the specified
  * collection.
  */
-void removeAllPersistentTasksForCollection(OperationContext* opCtx, const UUID& collectionUuid);
+MONGO_MOD_PUBLIC void removeAllPersistentTasksForCollection(OperationContext* opCtx,
+                                                            const UUID& collectionUuid);
 
 /**
  * Creates a query object that can used to find overlapping ranges in the pending range deletions
@@ -141,27 +144,28 @@ long long retrieveNumOrphansFromShard(OperationContext* opCtx,
 /**
  * Retrieves the shard key pattern from the local range deletion task.
  */
-boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(OperationContext* opCtx,
-                                                                    const UUID& migrationId);
+MONGO_MOD_NEEDS_REPLACEMENT boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(
+    OperationContext* opCtx, const UUID& migrationId);
 
 /**
  * Deletes the range deletion task document with the specified id from config.rangeDeletions and
  * waits for majority write concern.
  */
-void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
-                                    const UUID& collectionUuid,
-                                    const ChunkRange& range,
-                                    const WriteConcernOptions& writeConcern);
+MONGO_MOD_NEEDS_REPLACEMENT void deleteRangeDeletionTaskLocally(
+    OperationContext* opCtx,
+    const UUID& collectionUuid,
+    const ChunkRange& range,
+    const WriteConcernOptions& writeConcern);
 
 /**
  * Deletes the range deletion task document with the specified id from config.rangeDeletions on the
  * specified shard and waits for majority write concern.
  */
-void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
-                                        const ShardId& recipientId,
-                                        const UUID& collectionUuid,
-                                        const ChunkRange& range,
-                                        const UUID& migrationId);
+MONGO_MOD_NEEDS_REPLACEMENT void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                                                    const ShardId& recipientId,
+                                                                    const UUID& collectionUuid,
+                                                                    const ChunkRange& range,
+                                                                    const UUID& migrationId);
 
 /**
  * Removes the 'pending' flag from the range deletion task document with the specified id from
@@ -192,6 +196,6 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
  *
  * TODO SERVER-103046: Remove once 9.0 becomes last lts.
  */
-void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx);
+MONGO_MOD_PUBLIC void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx);
 }  // namespace rangedeletionutil
 }  // namespace mongo
