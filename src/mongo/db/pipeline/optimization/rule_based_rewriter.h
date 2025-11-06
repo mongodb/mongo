@@ -92,11 +92,7 @@ public:
 
     PipelineRewriteContext(const DocumentSourceVisitorRegistry& registry,
                            DocumentSourceContainer& container)
-        : _container(container),
-          _itr(_container.begin()),
-          _oldItr(_itr),
-          _oldDocSource(_itr == _container.end() ? nullptr : _itr->get()),
-          _registry(registry) {}
+        : _container(container), _itr(_container.begin()), _registry(registry) {}
 
     bool hasMore() const final {
         return _itr != _container.end();
@@ -111,14 +107,6 @@ public:
 
     void advance() final;
     void enqueueRules() final;
-
-    /**
-     * Returns true if the current stage has changed position or been replaced by another stage.
-     * Used to decide if previously applied rules could be reapplied.
-     */
-    bool didChangePosition() const {
-        return !hasMore() || _itr != _oldItr || _oldDocSource != _itr->get();
-    }
 
     template <size_t N>
     bool hasAtLeastNPrevStages() const {
@@ -158,8 +146,6 @@ public:
 private:
     DocumentSourceContainer& _container;
     DocumentSourceContainer::iterator _itr;
-    DocumentSourceContainer::iterator _oldItr;
-    DocumentSource* _oldDocSource;
 
     const DocumentSourceVisitorRegistry& _registry;
 

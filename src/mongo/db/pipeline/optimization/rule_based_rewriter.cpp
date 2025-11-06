@@ -38,20 +38,6 @@ inline auto prevOrFirstItr(DocumentSourceContainer& container,
     return itr == container.begin() ? itr : std::prev(itr);
 }
 
-inline auto eraseAt(DocumentSourceContainer& container, DocumentSourceContainer::iterator itr) {
-    container.erase(itr);
-    // The stage before the erased stage may be able to optimize further.
-    return prevOrFirstItr(container, itr);
-}
-
-inline auto insertAt(DocumentSourceContainer& container,
-                     DocumentSourceContainer::iterator itr,
-                     DocumentSource& ds) {
-    container.insert(itr, &ds);
-    // The stage before the inserted stage may be able to optimize further.
-    return prevOrFirstItr(container, itr);
-}
-
 /**
  * Swaps two adjacent stages in the pipeline. The first iterator must precede the second one.
  */
@@ -78,17 +64,14 @@ void PipelineRewriteContext::enqueueRules() {
     // Invoke the function pointer returned from the registry. May be a noop for stages with no
     // optimizations registered.
     queueTransforms(&visitorCtx, ds);
-
-    // Track the old position to help decide whether previously applied rules could be reapplied.
-    _oldItr = _itr;
-    _oldDocSource = _itr->get();
 }
 
 std::string PipelineRewriteContext::debugString() const {
     str::stream ss;
     ss << "Container (current position " << std::distance(_container.begin(), _itr) << "):\n";
+    size_t pos = 0;
     for (auto&& stage : _container) {
-        ss << "\t" << stage->serializeToBSONForDebug() << "\n";
+        ss << "\t" << pos++ << ": " << stage->serializeToBSONForDebug() << "\n";
     }
     return ss;
 }
@@ -96,38 +79,36 @@ std::string PipelineRewriteContext::debugString() const {
 bool CommonTransforms::swapStageWithNext(PipelineRewriteContext& ctx) {
     tassert(11010009, "Already at the end of the container", ctx.hasMore());
     ctx._itr = swapStages(ctx._container, ctx._itr, std::next(ctx._itr));
-    return ctx.didChangePosition();
+    return true;
 }
 
 bool CommonTransforms::swapStageWithPrev(PipelineRewriteContext& ctx) {
     tassert(11010011, "Can't swap first stage with prev", !ctx.atFirstStage());
     ctx._itr = swapStages(ctx._container, std::prev(ctx._itr), ctx._itr);
-    return ctx.didChangePosition();
+    return true;
 }
 
 bool CommonTransforms::insertBefore(PipelineRewriteContext& ctx, DocumentSource& d) {
     ctx._container.insert(ctx._itr, &d);
-    return ctx.didChangePosition();
+    ctx._itr = std::prev(ctx._itr);
+    return true;
 }
 
 bool CommonTransforms::insertAfter(PipelineRewriteContext& ctx, DocumentSource& d) {
-    insertAt(ctx._container, std::next(ctx._itr), d);
-    return ctx.didChangePosition();
+    ctx._container.insert(std::next(ctx._itr), &d);
+    return false;
 }
 
 bool CommonTransforms::erase(PipelineRewriteContext& ctx) {
     ctx._itr = ctx._container.erase(ctx._itr);
     ctx._itr = prevOrFirstItr(ctx._container, ctx._itr);
-    // The old position is no longer valid as it was erased.
-    ctx._oldItr = ctx._container.end();
-    ctx._oldDocSource = nullptr;
-    return ctx.didChangePosition();
+    return true;
 }
 
 bool CommonTransforms::eraseNext(PipelineRewriteContext& ctx) {
     tassert(11010020, "Already at the last stage", !ctx.atLastStage());
     ctx._container.erase(std::next(ctx._itr));
-    return ctx.didChangePosition();
+    return false;
 }
 
 namespace registration_detail {

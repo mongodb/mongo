@@ -165,6 +165,10 @@ TEST_F(PipelineRewriteEngineTest, EraseNextStage) {
 }
 
 TEST_F(PipelineRewriteEngineTest, InsertStageBeforeCurrent) {
+    static auto prevIsNotMatch = [](PipelineRewriteContext& ctx) {
+        return ctx.atFirstStage() ||
+            ctx.prevStage()->getSourceName() != DocumentSourceMatch::kStageName;
+    };
     static auto insertMatchBefore = [](PipelineRewriteContext& ctx) {
         auto filter = ctx.currentAs<DocumentSourceSort>()
                           .getSortKeyPattern()
@@ -175,7 +179,7 @@ TEST_F(PipelineRewriteEngineTest, InsertStageBeforeCurrent) {
     };
 
     REGISTER_TEST_RULES(DocumentSourceSort,
-                        {"INSERT_MATCH_BEFORE_SORT", alwaysTrue, insertMatchBefore, 1.0});
+                        {"INSERT_MATCH_BEFORE_SORT", prevIsNotMatch, insertMatchBefore, 1.0});
 
     runTest(getExpCtx(),
             {
