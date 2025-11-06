@@ -1480,6 +1480,8 @@ export let MongosAPIParametersUtil = (function () {
                 // rewriteCollection calls reshardCollection, which internally does atClusterTime reads.
                 requiresCommittedReads: true,
                 runsAgainstAdminDb: true,
+                // Fails due to there being too few documents in the collection to meet the shard key cardinality requirement.
+                expectedFailureCode: 4952606,
                 command: () => ({rewriteCollection: "db.collection"}),
             },
         },
