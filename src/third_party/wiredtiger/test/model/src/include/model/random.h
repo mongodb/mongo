@@ -29,6 +29,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include "model/core.h"
 
 extern "C" {
@@ -126,5 +127,27 @@ private:
  *     The default case within a probability switch.
  */
 #define probability_default if (__r >= 0)
+
+/*
+ * weight_init_block --
+ *     A convenience macro to wrap initialization of weights that don't have to add up to 1.0. It
+ *     also creates a function for computing the sum of a set of weights.
+ */
+#define weight_init_block(total_func)                                                           \
+    for (                                                                                       \
+      std::function<float()> __tmp_total = [this]() { return 0.0f; },                           \
+                             __tmp_done = []() { return -1; } /* execute the body just once */; \
+      __tmp_done() < 0; total_func = std::move(__tmp_total), __tmp_done = []() { return 1; })
+
+/*
+ * weight_init --
+ *     A convenience macro to initialize a weight and update the total function.
+ */
+#define weight_init(name, value)                                                \
+    {                                                                           \
+        name = (value);                                                         \
+        auto __prev_total = __tmp_total;                                        \
+        __tmp_total = [__prev_total, this]() { return __prev_total() + name; }; \
+    }
 
 } /* namespace model */

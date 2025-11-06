@@ -159,10 +159,26 @@ functions:
     params:
       shell: bash
       script: |
-        set -o errexit
         set -o verbose
+        max_attempts=5
+        command="git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git"
         if ! [ -d "./automation-scripts" ]; then
-          git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Attempt $attempt of $max_attempts cloning automation-scripts'"
+            $command
+            # Check the exit status of the command
+            if [ $? -eq 0 ]; then
+              echo "Clone succeeded on attempt $attempt."
+              exit 0
+            else
+              if [ $attempt -eq $max_attempts ]; then
+                echo "Clone failed after $max_attempts attempts."
+                exit 1
+              fi
+            fi
+            # Delay before reattempting the clone
+            sleep 1
+          done
         fi
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -1570,7 +1586,7 @@ variables:
           format_args: disagg.page_log=palite disagg.mode=switch runs.timer=10:15
           times: 5
 
-  - &format-stress-test-disagg-follower
+  - &format-stress-test-disagg-follower-palite
     depends_on:
       - name: compile
     commands:
@@ -1579,6 +1595,16 @@ variables:
         vars:
           format_args: disagg.page_log=palite disagg.mode=follower runs.timer=10:15
           times: 10
+
+  - &format-stress-test-disagg-follower
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.mode=follower runs.timer=10:15
+          times: 5
 
   - &format-stress-data-validation-test-disagg-follower
     depends_on:
@@ -4585,12 +4611,15 @@ tasks:
     name: format-stress-data-validation-test-disagg-leader-3
     tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-follower
-    name: format-stress-test-disagg-follower-1
+    name: format-stress-test-disagg-follower-palm
     tags: ["stress-test-disagg", "stress-test-disagg-san-fail"]
-  - <<: *format-stress-test-disagg-follower
+  - <<: *format-stress-test-disagg-follower-palite
+    name: format-stress-test-disagg-follower-1
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-test-disagg-follower-palite
     name: format-stress-test-disagg-follower-2
     tags: ["stress-test-disagg"]
-  - <<: *format-stress-test-disagg-follower
+  - <<: *format-stress-test-disagg-follower-palite
     name: format-stress-test-disagg-follower-3
     tags: ["stress-test-disagg"]
   - <<: *format-stress-data-validation-test-disagg-follower
@@ -7454,7 +7483,6 @@ buildvariants:
   tasks:
     - name: compile
     - name: ".stress-test-disagg-san-fail"
-    - name: checkpoint-test
 
 - name: amazon2023-disagg-ubsan-stress
   display_name: "[Failure Expected] (ARMV9) Amazon 2023 UBSAN Disagg Stress tests"

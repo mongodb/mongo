@@ -336,12 +336,14 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
       F_ISSET(r, WT_REC_CALL_URGENT) && !r->update_used && r->cache_write_restore_invisible &&
       !r->has_upd_chain_all_aborted && !r->key_removed_from_disk_image) {
         /*
-         * If leaf delta is enabled, we should have built an empty delta if this page has been
-         * reconciled before as we don't make any progress.
+         * If leaf delta is enabled, we should have created an empty delta if this page has been
+         * reconciled before, as no progress is made unless the maximum consecutive delta limit has
+         * been reached.
          */
         WT_ASSERT(session,
           !WT_DELTA_ENABLED_FOR_PAGE(session, page->type) || F_ISSET(r, WT_REC_EMPTY_DELTA) ||
-            page->disagg_info->block_meta.page_id == WT_BLOCK_INVALID_PAGE_ID);
+            page->disagg_info->block_meta.page_id == WT_BLOCK_INVALID_PAGE_ID ||
+            page->disagg_info->block_meta.delta_count == conn->page_delta.max_consecutive_delta);
         /*
          * If eviction didn't make any progress, let application threads know they should refresh
          * the transaction's snapshot (and try to evict the latest content).

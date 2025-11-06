@@ -1906,6 +1906,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction passes of a file",
   "cache: eviction server candidate queue empty when topping up",
   "cache: eviction server candidate queue not empty when topping up",
+  "cache: eviction server races with the reconfigure API call in disagg",
   "cache: eviction server skips dirty pages during a running checkpoint",
   "cache: eviction server skips ingest btrees in disagg",
   "cache: eviction server skips internal pages as it has an active child.",
@@ -2906,6 +2907,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_walk_passes = 0;
     stats->eviction_queue_empty = 0;
     stats->eviction_queue_not_empty = 0;
+    stats->eviction_server_race_reconfigure_disagg = 0;
     stats->eviction_server_skip_dirty_pages_during_checkpoint = 0;
     stats->eviction_server_skip_ingest_trees = 0;
     stats->eviction_server_skip_intl_page_with_active_child = 0;
@@ -3887,6 +3889,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_walk_passes += WT_STAT_CONN_READ(from, eviction_walk_passes);
     to->eviction_queue_empty += WT_STAT_CONN_READ(from, eviction_queue_empty);
     to->eviction_queue_not_empty += WT_STAT_CONN_READ(from, eviction_queue_not_empty);
+    to->eviction_server_race_reconfigure_disagg +=
+      WT_STAT_CONN_READ(from, eviction_server_race_reconfigure_disagg);
     to->eviction_server_skip_dirty_pages_during_checkpoint +=
       WT_STAT_CONN_READ(from, eviction_server_skip_dirty_pages_during_checkpoint);
     to->eviction_server_skip_ingest_trees +=

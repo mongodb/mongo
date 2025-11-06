@@ -1763,8 +1763,20 @@ retry:
     loop_count = 0;
     while (slot < max_entries && loop_count++ < conn->dhandle_count) {
         /* We're done if shutting down or reconfiguring. */
-        if (F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING | WT_CONN_RECONFIGURING))
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING))
             break;
+
+        /*
+         * A temporary fix has been implemented to allow the eviction server to run during the
+         * reconfigure API call in a disaggregated setup. This is necessary because operations such
+         * as picking up checkpoints, step-up, and step-down require eviction to function in order
+         * to perform metadata read and write processes.
+         */
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING)) {
+            if (!__wt_conn_is_disagg(session))
+                break;
+            WT_STAT_CONN_INCR(session, eviction_server_race_reconfigure_disagg);
+        }
 
         /*
          * If another thread is waiting on the eviction server to clear the walk point in a tree,
