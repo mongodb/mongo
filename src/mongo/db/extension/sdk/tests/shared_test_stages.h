@@ -32,6 +32,12 @@
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 
+namespace mongo::extension::sdk {
+inline StringData stringViewToStringData(std::string_view sv) {
+    return StringData{sv.data(), sv.size()};
+}
+}  // namespace mongo::extension::sdk
+
 namespace mongo::extension::sdk::shared_test_stages {
 
 /**
@@ -558,7 +564,6 @@ public:
     }
 };
 
-
 class UnknownPropertyAggStageAstNode : public sdk::AggStageAstNode {
 public:
     UnknownPropertyAggStageAstNode() : sdk::AggStageAstNode(kUnknownPropertyName) {}
@@ -573,6 +578,244 @@ public:
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<UnknownPropertyAggStageAstNode>();
+    }
+};
+
+static constexpr std::string_view kDesugarToEmptyName = "$desugarToEmpty";
+static constexpr std::string_view kCountingName = "$counting";
+static constexpr std::string_view kNestedDesugaringName = "$nestedDesugaring";
+static constexpr std::string_view kGetExpandedSizeLessName =
+    "$getExpandedSizeLessThanActualExpansionSize";
+static constexpr std::string_view kGetExpandedSizeGreaterName =
+    "$getExpandedSizeGreaterThanActualExpansionSize";
+static constexpr std::string_view kExpandToHostName = "$expandToHost";
+
+class DesugarToEmptyParseNode : public sdk::AggStageParseNode {
+public:
+    DesugarToEmptyParseNode() : sdk::AggStageParseNode(kDesugarToEmptyName) {}
+
+    size_t getExpandedSize() const override {
+        return 0;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        return {};
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<DesugarToEmptyParseNode>();
+    }
+};
+
+class CountingAst final : public sdk::AggStageAstNode {
+public:
+    static int alive;
+
+    CountingAst() : sdk::AggStageAstNode(kCountingName) {
+        ++alive;
+    }
+
+    ~CountingAst() override {
+        --alive;
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<CountingAst>();
+    }
+};
+
+class CountingParse final : public sdk::AggStageParseNode {
+public:
+    static constexpr size_t kExpansionSize = 1;
+    static int alive;
+
+    CountingParse() : sdk::AggStageParseNode(kCountingName) {
+        ++alive;
+    }
+
+    ~CountingParse() override {
+        --alive;
+    }
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<CountingParse>();
+    }
+};
+
+inline int CountingParse::alive = 0;
+inline int CountingAst::alive = 0;
+
+class NestedDesugaringParseNode final : public sdk::AggStageParseNode {
+public:
+    NestedDesugaringParseNode() : sdk::AggStageParseNode(kNestedDesugaringName) {}
+
+    static constexpr size_t kExpansionSize = 2;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<NestedDesugaringParseNode>();
+    }
+};
+
+class GetExpandedSizeLessThanActualExpansionSizeParseNode final : public sdk::AggStageParseNode {
+public:
+    GetExpandedSizeLessThanActualExpansionSizeParseNode()
+        : sdk::AggStageParseNode(kGetExpandedSizeLessName) {}
+
+    static constexpr size_t kExpansionSize = 2;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize - 1;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<GetExpandedSizeLessThanActualExpansionSizeParseNode>();
+    }
+};
+
+class GetExpandedSizeGreaterThanActualExpansionSizeParseNode final : public sdk::AggStageParseNode {
+public:
+    GetExpandedSizeGreaterThanActualExpansionSizeParseNode()
+        : sdk::AggStageParseNode(kGetExpandedSizeGreaterName) {}
+
+    static constexpr size_t kExpansionSize = 2;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize + 1;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(CountingAst::make()));
+        expanded.emplace_back(new sdk::ExtensionAggStageParseNode(CountingParse::make()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<GetExpandedSizeGreaterThanActualExpansionSizeParseNode>();
+    }
+};
+
+class ExpandToHostParseNode : public sdk::AggStageParseNode {
+public:
+    ExpandToHostParseNode() : sdk::AggStageParseNode(kExpandToHostName) {}
+
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        std::vector<mongo::extension::VariantNodeHandle> expanded;
+        auto spec = BSON(stringViewToStringData(kExpandToHostName) << BSONObj());
+        expanded.emplace_back(
+            sdk::HostServicesHandle::getHostServices()->createHostAggStageParseNode(spec));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<ExpandToHostParseNode>();
+    }
+};
+
+class NameMismatchParseNode : public sdk::AggStageParseNode {
+public:
+    NameMismatchParseNode() : sdk::AggStageParseNode("$nameB") {}
+
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(NoOpAggStageAstNode::make()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<NameMismatchParseNode>();
+    }
+};
+
+class NameMismatchStageDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string("$nameA");
+
+    NameMismatchStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
+        return std::make_unique<NameMismatchParseNode>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
+        return std::make_unique<NameMismatchStageDescriptor>();
     }
 };
 
