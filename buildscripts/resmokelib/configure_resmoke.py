@@ -333,6 +333,16 @@ def _set_up_tracing(
             evg_auth = get_auth()
             if evg_auth is not None:
                 extra_context["user.evg"] = evg_auth.username
+
+            try:
+                repo = git.Repo()
+                branch_name = repo.active_branch.name
+                extra_context["git.branch_name"] = branch_name
+            except Exception:
+                print(
+                    "Unable to setup git repo. This will result in incomplete telemetry data being uploaded."
+                )
+
             processor = BatchedBaggageSpanProcessor(OTLPSpanExporter(endpoint=COLLECTOR_ENDPOINT))
             provider.add_span_processor(processor)
         except Exception:
