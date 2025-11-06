@@ -26,17 +26,53 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/executable_agg_stage.h"
+#include "mongo/db/extension/host_connector/handle/executable_agg_stage.h"
 
 #include "mongo/db/extension/shared/extension_status.h"
 
 namespace mongo::extension::host_connector {
 
-ExtensionGetNextResult ExecAggStageHandle::getNext() {
+ExtensionGetNextResult ExecAggStageHandle::getNext(
+    MongoExtensionQueryExecutionContext* execCtxPtr) {
     ::MongoExtensionGetNextResult result{};
-    invokeCAndConvertStatusToException([&]() { return vtable().get_next(get(), &result); });
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().get_next(get(), execCtxPtr, &result); });
 
     return convertCRepresentationToGetNextResult(&result);
+}
+
+namespace {
+std::string_view _internalGetName(const MongoExtensionExecAggStageVTable& vtable,
+                                  const MongoExtensionExecAggStage* stage) {
+    return byteViewAsStringView(vtable.get_name(stage));
+}
+
+HostOperationMetricsHandle _internalCreateMetrics(const MongoExtensionExecAggStageVTable& vtable,
+                                                  const MongoExtensionExecAggStage* stage) {
+    MongoExtensionOperationMetrics* metrics = nullptr;
+    invokeCAndConvertStatusToException([&]() { return vtable.create_metrics(stage, &metrics); });
+
+    tassert(11213505, "Result of `create_metrics` was nullptr", metrics != nullptr);
+
+    // Take ownership of the created metrics and return the result.
+    return HostOperationMetricsHandle(metrics);
+}
+}  // namespace
+
+std::string_view ExecAggStageHandle::getName() const {
+    return _internalGetName(vtable(), get());
+}
+
+HostOperationMetricsHandle ExecAggStageHandle::createMetrics() const {
+    return _internalCreateMetrics(vtable(), get());
+}
+
+std::string_view UnownedExecAggStageHandle::getName() const {
+    return _internalGetName(vtable(), get());
+}
+
+HostOperationMetricsHandle UnownedExecAggStageHandle::createMetrics() const {
+    return _internalCreateMetrics(vtable(), get());
 }
 
 }  // namespace mongo::extension::host_connector

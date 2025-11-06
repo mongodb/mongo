@@ -28,11 +28,36 @@
  */
 #pragma once
 
+#include "mongo/db/extension/host_connector/handle/executable_agg_stage.h"
+#include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
+
+/**
+ * QueryExecutionContextBase defines the abstract interface for query execution context
+ * that extensions need to access during pipeline execution.
+ *
+ * This interface allows extensions to:
+ * - Check if the current operation has been interrupted or cancelled
+ * - Retrieve operation metrics and debugging information for specific aggregation stages
+ *
+ * Concrete implementations of this interface provide the bridge between the extension
+ * framework and the host process's query execution state, encapsulating access to
+ * OperationContext and operation debugging information.
+ *
+ * Implementations of this interface should be wrapped by QueryExecutionContextAdapter
+ * for exposure to the public extension API.
+ */
+class QueryExecutionContextBase {
+public:
+    QueryExecutionContextBase() = default;
+    virtual ~QueryExecutionContextBase() = default;
+    virtual Status checkForInterrupt() const = 0;
+    virtual HostOperationMetricsHandle* getMetrics(
+        const std::string& stageName, const UnownedExecAggStageHandle& execStage) const = 0;
+};
 
 /**
  * QueryExecutionContextAdapter is an adapter to ::MongoExtensionQueryExecutionContext,
@@ -40,20 +65,25 @@ namespace mongo::extension::host_connector {
  */
 class QueryExecutionContextAdapter final : public ::MongoExtensionQueryExecutionContext {
 public:
-    QueryExecutionContextAdapter(const ExpressionContext* ctx)
-        : ::MongoExtensionQueryExecutionContext{&VTABLE}, _ctx(ctx) {}
+    QueryExecutionContextAdapter(std::unique_ptr<QueryExecutionContextBase> ctx)
+        : ::MongoExtensionQueryExecutionContext{&VTABLE}, _ctx(std::move(ctx)) {}
 
-    const ExpressionContext* getCtxImpl() const {
-        return _ctx;
+    const QueryExecutionContextBase& getCtxImpl() const {
+        return *_ctx;
     }
 
 private:
     static MongoExtensionStatus* _extCheckForInterrupt(
         const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept;
 
-    static constexpr ::MongoExtensionQueryExecutionContextVTable VTABLE{&_extCheckForInterrupt};
+    static MongoExtensionStatus* _extGetMetrics(const MongoExtensionQueryExecutionContext* ctx,
+                                                const MongoExtensionExecAggStage* execAggStage,
+                                                MongoExtensionOperationMetrics** metrics) noexcept;
 
-    const ExpressionContext* _ctx;
+    static constexpr ::MongoExtensionQueryExecutionContextVTable VTABLE{
+        .check_for_interrupt = &_extCheckForInterrupt, .get_metrics = &_extGetMetrics};
+
+    std::unique_ptr<QueryExecutionContextBase> _ctx;
 };
 
 }  // namespace mongo::extension::host_connector

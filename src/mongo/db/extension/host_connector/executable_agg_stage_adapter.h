@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/host/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -86,10 +87,27 @@ private:
      * result in the ::MongoExtensionGetNextResult is transferred to the caller.
      */
     static ::MongoExtensionStatus* _hostGetNext(::MongoExtensionExecAggStage* execAggStage,
+                                                ::MongoExtensionQueryExecutionContext* execCtxPtr,
                                                 ::MongoExtensionGetNextResult* apiResult) noexcept;
 
+    static MongoExtensionByteView _hostGetName(
+        const ::MongoExtensionExecAggStage* execAggStage) noexcept;
+
+    static MongoExtensionStatus* _hostCreateMetrics(
+        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionOperationMetrics** metrics) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(11213501,
+                      "_hostCreateMetrics should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    }
+
     static constexpr ::MongoExtensionExecAggStageVTable VTABLE{.destroy = &_hostDestroy,
-                                                               .get_next = &_hostGetNext};
+                                                               .get_next = &_hostGetNext,
+                                                               .get_name = &_hostGetName,
+                                                               .create_metrics =
+                                                                   &_hostCreateMetrics};
 
     std::unique_ptr<host::ExecAggStage> _execAggStage;
 };

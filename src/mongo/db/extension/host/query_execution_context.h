@@ -28,40 +28,44 @@
  */
 #pragma once
 
-#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/extension/host_connector/handle/executable_agg_stage.h"
+#include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
-
-#include <memory>
 
 namespace mongo::extension::host {
 
 /**
- * Host-defined ExecAggStage node.
+ * QueryExecutionContext provides concrete host implementation of the query execution context
+ * interface for extensions running within the host process.
  *
- * Wraps an exec::agg::Stage (an execution stage) such that a host-defined execution stage can
- * forward the results from itself execution stage to the extension-defined transform stage.
+ * The context wraps an ExpressionContext, which holds references to the active OperationContext
+ * and other query state needed during pipeline execution. It delegates interrupt checks to the
+ * underlying OperationContext and exposes operation metrics through OpDebug's extension metrics
+ * registry.
+ *
+ * This class is intended for use by the extension host connector framework and should not be
+ * instantiated directly by extension code.
  */
-class ExecAggStage {
+class QueryExecutionContext : public host_connector::QueryExecutionContextBase {
 public:
-    ExecAggStage(std::unique_ptr<exec::agg::Stage> execAggStage, const std::string& stageName)
-        : _execAggStage(std::move(execAggStage)), _stageName(stageName) {}
+    QueryExecutionContext(const ExpressionContext* ctx) : _ctx(ctx) {}
 
-    ~ExecAggStage() = default;
-
-    /**
-     * Returns the next result from the underlying execution stage.
-     */
-    exec::agg::GetNextResult getNext() {
-        return _execAggStage->getNext();
+    Status checkForInterrupt() const override {
+        return _ctx->getOperationContext()->checkForInterruptNoAssert();
     }
 
-    std::string_view getName() const {
-        return _stageName;
+    host_connector::HostOperationMetricsHandle* getMetrics(
+        const std::string& stageName,
+        const host_connector::UnownedExecAggStageHandle& execStage) const override {
+        auto& opDebug = CurOp::get(_ctx->getOperationContext())->debug();
+        auto& opDebugMetrics = opDebug.extensionMetrics;
+        return opDebugMetrics.getOrCreateMetrics(stageName, execStage);
     }
 
 private:
-    std::unique_ptr<exec::agg::Stage> _execAggStage;
-    const std::string _stageName;
+    const ExpressionContext* _ctx;
 };
 
-};  // namespace mongo::extension::host
+}  // namespace mongo::extension::host

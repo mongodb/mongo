@@ -36,7 +36,9 @@
 namespace mongo::extension::host_connector {
 
 ::MongoExtensionStatus* HostExecAggStageAdapter::_hostGetNext(
-    ::MongoExtensionExecAggStage* execAggStage, ::MongoExtensionGetNextResult* apiResult) noexcept {
+    ::MongoExtensionExecAggStage* execAggStage,
+    ::MongoExtensionQueryExecutionContext* execCtxPtr,
+    ::MongoExtensionGetNextResult* apiResult) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
         apiResult->result = nullptr;
@@ -75,6 +77,13 @@ namespace mongo::extension::host_connector {
             }
         }
     });
+}
+
+::MongoExtensionByteView HostExecAggStageAdapter::_hostGetName(
+    const ::MongoExtensionExecAggStage* execAggStage) noexcept {
+    auto sv = static_cast<const HostExecAggStageAdapter*>(execAggStage)->getImpl().getName();
+    StringData sd{sv.data(), sv.length()};
+    return stringDataAsByteView(sd);
 }
 
 };  // namespace mongo::extension::host_connector

@@ -43,7 +43,7 @@ public:
     }
 
     // Call the underlying object's serialize function and return the resulting BSON object.
-    BSONObj serialize() {
+    BSONObj serialize() const {
         assertValid();
 
         ::MongoExtensionByteBuf* buf;

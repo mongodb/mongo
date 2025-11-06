@@ -945,6 +945,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/exec/mutable_bson",
+        "//src/mongo/db/extension/host:extension_operation_metrics_registry",
         "//src/mongo/db/local_catalog:collection_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/local_catalog:local_oplog_info",
         "//src/mongo/db/query:common_query_enums_and_helpers",

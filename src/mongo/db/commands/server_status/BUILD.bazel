@@ -292,6 +292,7 @@ mongo_cc_library(
     }),
     deps = [
         "//src/mongo/db:profile_settings",
+        "//src/mongo/db/extension/host:extension_operation_metrics_registry",
         "//src/mongo/db/query/algebra",
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/storage:container",

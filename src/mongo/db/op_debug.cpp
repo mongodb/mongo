@@ -298,6 +298,11 @@ void OpDebug::report(OperationContext* opCtx,
     if (mongotCursorId) {
         pAttrs->add("mongot", makeMongotDebugStatsObject());
     }
+
+    if (!extensionMetrics.empty()) {
+        pAttrs->add("extensionMetrics", extensionMetrics.serialize());
+    }
+
     OPDEBUG_TOATTR_HELP_BOOL(exhaust);
 
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
@@ -572,6 +577,11 @@ void OpDebug::append(OperationContext* opCtx,
     if (mongotCursorId) {
         b.append("mongot", makeMongotDebugStatsObject());
     }
+
+    if (!extensionMetrics.empty()) {
+        b.append("extensionMetrics", extensionMetrics.serialize());
+    }
+
     OPDEBUG_APPEND_BOOL(b, exhaust);
 
     OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
@@ -887,6 +897,11 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
     addIfNeeded("mongot", [](auto field, auto args, auto& b) {
         if (args.op.mongotCursorId) {
             b.append(field, args.op.makeMongotDebugStatsObject());
+        }
+    });
+    addIfNeeded("extensionMetrics", [](auto field, auto args, auto& b) {
+        if (!args.op.extensionMetrics.empty()) {
+            b.append(field, args.op.extensionMetrics.serialize());
         }
     });
     addIfNeeded("exhaust", [](auto field, auto args, auto& b) {

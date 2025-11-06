@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/extension/host/query_execution_context.h"
+
 #include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -46,6 +48,7 @@ protected:
         _expCtx =
             make_intrusive<ExpressionContextForTest>(_opCtx.get(), _nss, SerializationContext());
     }
+
     QueryTestServiceContext _testCtx;
     ServiceContext::UniqueOperationContext _opCtx;
     NamespaceString _nss;
@@ -53,7 +56,9 @@ protected:
 };
 
 TEST_F(QueryExecutionContextTestFixture, CheckForInterruptOk) {
-    host_connector::QueryExecutionContextAdapter adapter(_expCtx.get());
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_EQ(handle.checkForInterrupt(), ExtensionGenericStatus());
@@ -62,7 +67,9 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptOk) {
 TEST_F(QueryExecutionContextTestFixture, CheckForInterruptDefaultKillCode) {
     _opCtx->markKilled();
 
-    host_connector::QueryExecutionContextAdapter adapter(_expCtx.get());
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
     sdk::QueryExecutionContextHandle handle(&adapter);
     auto status = handle.checkForInterrupt();
 
@@ -74,7 +81,9 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptCustomKillCode) {
     ErrorCodes::Error customKillCode = ErrorCodes::Error(11098301);
     _opCtx->markKilled(customKillCode);
 
-    host_connector::QueryExecutionContextAdapter adapter(_expCtx.get());
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_EQ(handle.checkForInterrupt(),

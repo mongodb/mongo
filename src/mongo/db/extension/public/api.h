@@ -157,6 +157,53 @@ const int32_t MONGO_EXTENSION_STATUS_RUNTIME_ERROR = -1;
 const int32_t MONGO_EXTENSION_STATUS_OK = 0;
 
 /**
+ * Operation metrics exposed by extensions.
+ *
+ * This struct represents performance and execution statistics collected during extension
+ * operations. Extensions can implement this interface to track and report various arbitrary metrics
+ * about their execution, such as timing information, resource usage, or operation counts. The host
+ * will periodically query these metrics for monitoring, diagnostics, and performance analysis
+ * purposes.
+ *
+ * Extensions are responsible for implementing the collection and aggregation of metrics,
+ * while the host is responsible for periodically retrieving, persisting, and exposing these metrics
+ * through MongoDB's monitoring interfaces.
+ *
+ * Note that metrics are scoped to each operation - ie, query or getMore invocation. The lifetime of
+ * the metrics is managed by the host and the extension should not persist or aggregate the metrics
+ * itself across the query's lifetime.
+ *
+ * Metrics will be exposed via the serialize() function and prefaced by the extension's stage name.
+ * For example, if an extension returned {counter: 1} from the serialize() implementation, the
+ * metrics would be exposed via the host in the format {$stageName: {counter: 1}}.
+ */
+typedef struct MongoExtensionOperationMetrics {
+    const struct MongoExtensionOperationMetricsVTable* vtable;
+} MongoExtensionOperationMetrics;
+
+typedef struct MongoExtensionOperationMetricsVTable {
+    /**
+     * Destroy `metrics` and free any related resources.
+     */
+    void (*destroy)(MongoExtensionOperationMetrics* metrics);
+
+    /**
+     * Serializes the collected metrics into an arbitrary BSON object. Ownership is allocated by the
+     * extension and transferred to the host.
+     */
+    MongoExtensionStatus* (*serialize)(const MongoExtensionOperationMetrics* metrics,
+                                       MongoExtensionByteBuf** output);
+
+    /**
+     * Updates and aggregates existing metrics with current execution metrics. Note that the
+     * `arguments` byte view can be any format - for example, an opaque pointer, a serialized BSON
+     * message, a serialized struct, etc.
+     */
+    MongoExtensionStatus* (*update)(MongoExtensionOperationMetrics* metrics,
+                                    MongoExtensionByteView arguments);
+} MongoExtensionOperationMetricsVTable;
+
+/**
  * MongoExtensionQueryExecutionContext exposes helpers for an extension to call certain
  * functionality on a wrapped ExpressionContext. It is owned by the host and used by an extension.
  */
@@ -164,11 +211,9 @@ typedef struct MongoExtensionQueryExecutionContext {
     const struct MongoExtensionQueryExecutionContextVTable* vtable;
 } MongoExtensionQueryExecutionContext;
 
+// Forward declare
+struct MongoExtensionExecAggStage;
 typedef struct MongoExtensionQueryExecutionContextVTable {
-    /**
-     * Call checkForInterruptNoAssert() on the wrapped ExpressionContext and populate the
-     * `queryStatus` with the resulting code/reason.
-     */
     /**
      * Call checkForInterruptNoAssert() on the wrapped ExpressionContext and populate the
      * `queryStatus` with the resulting code/reason. Populates queryStatus with
@@ -178,6 +223,20 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
      */
     MongoExtensionStatus* (*check_for_interrupt)(const MongoExtensionQueryExecutionContext* ctx,
                                                  MongoExtensionStatus* queryStatus);
+
+    /**
+     * Check if any existing metrics for this extension exist on the wrapped OperationContext and
+     * return an unowned pointer inside of `metrics`, to either a new set of metrics or the existing
+     * set of metrics.
+     *
+     * When this method is first called during an operation (e.g. query or getMore), the host will
+     * initialize a new set of metrics and return them. Otherwise, the existing metrics for the
+     * current operation will be returned. Note that multiple instances of the same aggregation
+     * stage in a single pipeline will share operation metrics.
+     */
+    MongoExtensionStatus* (*get_metrics)(const MongoExtensionQueryExecutionContext* ctx,
+                                         const MongoExtensionExecAggStage* execAggStage,
+                                         MongoExtensionOperationMetrics** metrics);
 } MongoExtensionQueryExecutionContextVTable;
 
 /**
@@ -223,45 +282,6 @@ typedef struct MongoExtensionHostQueryShapeOptsVTable {
                                                MongoExtensionByteView bsonElement,
                                                MongoExtensionByteBuf** output);
 } MongoExtensionHostQueryShapeOptsVTable;
-
-/**
- * Operation metrics exposed by extensions.
- *
- * This struct represents performance and execution statistics collected during extension
- * operations. Extensions can implement this interface to track and report various arbitrary metrics
- * about their execution, such as timing information, resource usage, or operation counts. The host
- * will periodically query these metrics for monitoring, diagnostics, and performance analysis
- * purposes.
- *
- * Extensions are responsible for implementing the collection and aggregation of metrics,
- * while the host is responsible for periodically retrieving, persisting, and exposing these metrics
- * through MongoDB's monitoring interfaces.
- */
-typedef struct MongoExtensionOperationMetrics {
-    const struct MongoExtensionOperationMetricsVTable* vtable;
-} MongoExtensionOperationMetrics;
-
-typedef struct MongoExtensionOperationMetricsVTable {
-    /**
-     * Destroy `metrics` and free any related resources.
-     */
-    void (*destroy)(MongoExtensionOperationMetrics* metrics);
-
-    /**
-     * Serializes the collected metrics into an arbitrary BSON object. Ownership is allocated by the
-     * extension and transferred to the host.
-     */
-    MongoExtensionStatus* (*serialize)(const MongoExtensionOperationMetrics* metrics,
-                                       MongoExtensionByteBuf** output);
-
-    /**
-     * Updates and aggregates existing metrics with current execution metrics. Note that the
-     * `arguments` byte view can be any format - for example, an opaque pointer, a serialized BSON
-     * message, a serialized struct, etc.
-     */
-    MongoExtensionStatus* (*update)(MongoExtensionOperationMetrics* metrics,
-                                    MongoExtensionByteView arguments);
-} MongoExtensionOperationMetricsVTable;
 
 /**
  * Possible explain verbosity levels.
@@ -534,7 +554,22 @@ typedef struct MongoExtensionExecAggStageVTable {
      *      a byte buffer. Ownership of the buffer is transferred to the Host.
      */
     MongoExtensionStatus* (*get_next)(MongoExtensionExecAggStage* execAggStage,
+                                      MongoExtensionQueryExecutionContext* execCtxPtr,
                                       MongoExtensionGetNextResult* getNextResult);
+
+    /**
+     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
+     */
+    MongoExtensionByteView (*get_name)(const MongoExtensionExecAggStage* astNode);
+
+    /**
+     * Creates a MongoExtensionOperationMetrics object to collect metrics for this aggregation
+     * stage, then populates `metrics` with the location. Ownership of the metrics object is
+     * transferred to the caller.
+     */
+    MongoExtensionStatus* (*create_metrics)(const MongoExtensionExecAggStage* execAggStage,
+                                            MongoExtensionOperationMetrics** metrics);
+
 } MongoExtensionExecAggStageVTable;
 
 /**

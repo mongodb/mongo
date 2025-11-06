@@ -35,14 +35,28 @@ namespace mongo::extension::host_connector {
 MongoExtensionStatus* QueryExecutionContextAdapter::_extCheckForInterrupt(
     const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& expCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
-        Status interrupted = expCtx->getOperationContext()->checkForInterruptNoAssert();
+        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
+        Status interrupted = execCtx.checkForInterrupt();
 
         MongoExtensionByteView reasonByteView{stringViewAsByteView(interrupted.reason())};
         // Note that we don't need invokeCAndConvertStatusToException here because
         // set_code/set_reason do not throw errors.
         queryStatus->vtable->set_code(queryStatus, interrupted.code());
         queryStatus->vtable->set_reason(queryStatus, reasonByteView);
+    });
+}
+
+MongoExtensionStatus* QueryExecutionContextAdapter::_extGetMetrics(
+    const MongoExtensionQueryExecutionContext* ctx,
+    const MongoExtensionExecAggStage* execAggStage,
+    MongoExtensionOperationMetrics** metrics) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
+
+        auto execStageHandle = UnownedExecAggStageHandle(execAggStage);
+        const std::string stageName = std::string(execStageHandle.getName());
+
+        *metrics = execCtx.getMetrics(stageName, execStageHandle)->get();
     });
 }
 

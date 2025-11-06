@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/host/operation_metrics_registry.h"
 #include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -559,6 +560,11 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
+
+    // Stores metrics handles for extensions to properly manage their lifetimes. The contents of
+    // these stats are opaque to the MongoDB host - this object allows extensions to implement their
+    // own custom aggregation and serialization logic.
+    extension::host::OperationMetricsRegistry extensionMetrics;
 
 private:
     // The hash of query_shape::QueryShapeHash.

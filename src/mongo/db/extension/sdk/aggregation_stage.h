@@ -30,6 +30,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/sdk/operation_metrics_adapter.h"
+#include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/get_next_result.h"
@@ -475,10 +477,25 @@ private:
  */
 class ExecAggStage {
 public:
-    ExecAggStage() = default;
     virtual ~ExecAggStage() = default;
 
-    virtual ExtensionGetNextResult getNext() = 0;
+    virtual ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
+                                           const MongoExtensionExecAggStage* execStage) = 0;
+
+    std::string_view getName() const {
+        return _name;
+    }
+
+    // Extensions are not required to provide metrics if they do not need to.
+    virtual std::unique_ptr<OperationMetricsBase> createMetrics() const {
+        return nullptr;
+    }
+
+protected:
+    ExecAggStage(std::string_view name) : _name(name) {}
+
+private:
+    const std::string _name;
 };
 
 /**
@@ -564,21 +581,46 @@ private:
     }
 
     static ::MongoExtensionStatus* _extGetNext(::MongoExtensionExecAggStage* execAggStage,
+                                               ::MongoExtensionQueryExecutionContext* execCtxPtr,
                                                ::MongoExtensionGetNextResult* apiResult) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
             apiResult->result = nullptr;
 
+            QueryExecutionContextHandle execCtx(execCtxPtr);
+
             auto& impl = static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl();
 
             // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            ExtensionGetNextResult extensionResult = impl.getNext();
+            ExtensionGetNextResult extensionResult = impl.getNext(execCtx, execAggStage);
             convertExtensionGetNextResultToCRepresentation(apiResult, extensionResult);
         });
     };
 
-    static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {.destroy = &_extDestroy,
-                                                                  .get_next = &_extGetNext};
+    static ::MongoExtensionByteView _extGetName(
+        const ::MongoExtensionExecAggStage* execAggStage) noexcept {
+        const auto& impl = static_cast<const ExtensionExecAggStage*>(execAggStage)->getImpl();
+        return stringViewAsByteView(impl.getName());
+    }
+
+    static ::MongoExtensionStatus* _extCreateMetrics(
+        const ::MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionOperationMetrics** metrics) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            const auto& impl = static_cast<const ExtensionExecAggStage*>(execAggStage)->getImpl();
+            auto result = impl.createMetrics();
+
+            auto adapter = new OperationMetricsAdapter(std::move(result));
+            *metrics = adapter;
+        });
+    }
+
+    static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {
+        .destroy = &_extDestroy,
+        .get_next = &_extGetNext,
+        .get_name = &_extGetName,
+        .create_metrics = &_extCreateMetrics,
+    };
     std::unique_ptr<ExecAggStage> _execAggStage;
 };
 }  // namespace mongo::extension::sdk

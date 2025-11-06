@@ -11,8 +11,10 @@ exports_files(
 mongo_cc_library(
     name = "host_handles",
     srcs = [
+        "executable_agg_stage.cpp",
     ],
     hdrs = [
+        "executable_agg_stage.h",
         "host_operation_metrics_handle.h",
     ],
     deps = [

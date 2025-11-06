@@ -33,8 +33,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/extension/host_connector/executable_agg_stage.h"
+#include "mongo/db/extension/host/query_execution_context.h"
+#include "mongo/db/extension/host_connector/handle/executable_agg_stage.h"
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
+#include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
@@ -43,6 +45,7 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -697,7 +700,11 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
 
 class ValidExtensionExecAggStage : public extension::sdk::ExecAggStage {
 public:
-    extension::ExtensionGetNextResult getNext() override {
+    ValidExtensionExecAggStage(std::string stageName) : extension::sdk::ExecAggStage(stageName) {}
+
+    extension::ExtensionGetNextResult getNext(
+        const QueryExecutionContextHandle& expCtx,
+        const MongoExtensionExecAggStage* execAggStage) override {
         if (_results.empty()) {
             return extension::ExtensionGetNextResult::eof();
         }
@@ -716,7 +723,7 @@ public:
     }
 
     static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
-        return std::make_unique<ValidExtensionExecAggStage>();
+        return std::make_unique<ValidExtensionExecAggStage>("$noOp");
     }
 
 private:
@@ -729,19 +736,21 @@ TEST(AggregationStageTest, ValidExecAggStageVTableGetNextSucceeds) {
         new extension::sdk::ExtensionExecAggStage(ValidExtensionExecAggStage::make());
     auto handle = extension::host_connector::ExecAggStageHandle{validExecAggStage};
 
-    auto getNext = handle.getNext();
+    auto nullExecCtx = host_connector::QueryExecutionContextAdapter(nullptr);
+
+    auto getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
     ASSERT_BSONOBJ_EQ(BSON("$meow" << "adithi"), getNext.res.get());
 
-    getNext = handle.getNext();
+    getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
     ASSERT_EQ(boost::none, getNext.res);
 
-    getNext = handle.getNext();
+    getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
     ASSERT_BSONOBJ_EQ(BSON("$meow" << "cedric"), getNext.res.get());
 
-    getNext = handle.getNext();
+    getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
     ASSERT_EQ(boost::none, getNext.res);
 };
@@ -763,13 +772,93 @@ TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
         });
     ASSERT_EQ(static_cast<::MongoExtensionGetNextResultCode>(10), result.code);
     ASSERT_EQ(nullptr, result.result);
+}
 
-    result = {.code = ::MongoExtensionGetNextResultCode::kAdvanced,
-              .result = new VecByteBuf(BSON("$adithi" << "{cats: 0}"))};
-    auto converted = extension::host_connector::convertCRepresentationToGetNextResult(&result);
-    ASSERT_EQ(GetNextCode::kAdvanced, converted.code);
-    ASSERT_BSONOBJ_EQ(BSON("$adithi" << "{cats: 0}"), converted.res.get());
+class GetMetricsExtensionOperationMetrics : public OperationMetricsBase {
+public:
+    BSONObj serialize() const override {
+        return BSON("counter" << _counter);
+    }
+
+    void update(MongoExtensionByteView) override {
+        _counter++;
+    }
+
+private:
+    int _counter = 0;
 };
+
+class GetMetricsExtensionExecAggStage
+    : public extension::sdk::ExecAggStage,
+      std::enable_shared_from_this<GetMetricsExtensionExecAggStage> {
+public:
+    GetMetricsExtensionExecAggStage(std::string stageName)
+        : extension::sdk::ExecAggStage(stageName) {}
+
+    extension::ExtensionGetNextResult getNext(
+        const extension::sdk::QueryExecutionContextHandle& execCtx,
+        const MongoExtensionExecAggStage* execAggStage) override {
+
+        auto metrics = execCtx.getMetrics(execAggStage);
+        metrics.update(MongoExtensionByteView{nullptr, 0});
+
+        auto metricsBson = metrics.serialize();
+        auto counterVal = metricsBson["counter"].Int();
+        if (counterVal == 1) {
+            return extension::ExtensionGetNextResult::advanced(BSON("hi" << "finley"));
+        } else if (counterVal == 2) {
+            return extension::ExtensionGetNextResult::eof();
+        }
+
+        tasserted(11213508, "counterVal can only be 1 or 2 at this point");
+    }
+
+    std::unique_ptr<OperationMetricsBase> createMetrics() const override {
+        return std::make_unique<GetMetricsExtensionOperationMetrics>();
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<GetMetricsExtensionExecAggStage>("$getMetrics");
+    }
+};
+
+TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
+    QueryTestServiceContext testCtx;
+    auto opCtx = testCtx.makeOperationContext();
+
+    auto getMetricsExecAggStage =
+        new extension::sdk::ExtensionExecAggStage(GetMetricsExtensionExecAggStage::make());
+    auto handle = extension::host_connector::ExecAggStageHandle{getMetricsExecAggStage};
+
+    // Create a test expression context that can be wrapped by QueryExecutionContextAdapter.
+    auto expCtx = make_intrusive<ExpressionContextForTest>(
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+        SerializationContext());
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+
+    // Call getNext which triggers the getMetrics call logic.
+    auto getNext = handle.getNext(&adapter);
+    ASSERT_EQUALS(extension::GetNextCode::kAdvanced,
+                  getNext.code);  // should return Advanced, since the metrics counter should be 1.
+
+    // Call getNext again, which should build on the existing metrics from the last call.
+    getNext = handle.getNext(&adapter);
+    ASSERT_EQUALS(extension::GetNextCode::kEOF,
+                  getNext.code);  // should return EOF, since the metrics counter should be 2.
+
+    // Now switch out the OpCtx and make sure that the metrics also get reset.
+    QueryTestServiceContext newTestCtx;
+    auto newOpCtx = newTestCtx.makeOperationContext();
+    expCtx->setOperationContext(newOpCtx.get());
+
+    // Call getNext which triggers the getMetrics call logic.
+    getNext = handle.getNext(&adapter);
+    ASSERT_EQUALS(extension::GetNextCode::kAdvanced,
+                  getNext.code);  // should return Advanced, since the metrics counter should be 1.
+}
 
 }  // namespace
 

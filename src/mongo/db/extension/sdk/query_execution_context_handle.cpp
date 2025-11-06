@@ -40,4 +40,15 @@ ExtensionGenericStatus QueryExecutionContextHandle::checkForInterrupt() const {
     return queryStatus;
 }
 
+ExtensionOperationMetricsHandle QueryExecutionContextHandle::getMetrics(
+    const MongoExtensionExecAggStage* execStage) const {
+    assertValid();
+
+    MongoExtensionOperationMetrics* metrics = nullptr;
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().get_metrics(get(), execStage, &metrics); });
+
+    return ExtensionOperationMetricsHandle(metrics);
+}
+
 }  // namespace mongo::extension::sdk
