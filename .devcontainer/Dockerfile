@@ -40,7 +40,7 @@ RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/devcontaineruser 
     chmod 0440 /etc/sudoers.d/devcontaineruser
 
 # Toolchain installation with SHA256 verification
-# Run "python3 toolchain.py generate" to update toolchain_config.env
+# Run "python3 toolchain.py" to update toolchain_config.env
 ARG TARGETPLATFORM
 COPY .devcontainer/toolchain_config.env /tmp/toolchain_config.env
 RUN set -e; \
@@ -68,6 +68,34 @@ RUN echo "Extracting toolchain..."; \
   mkdir -p /opt/mongodbtoolchain/revisions && tar -xzf /tmp/toolchain.tar.gz -C /opt/mongodbtoolchain/revisions; \
   rm /tmp/toolchain.tar.gz; \
   chown -R ${USERNAME} /opt/mongodbtoolchain;
+
+# Evergreen CLI installation with SHA256 verification
+# Run "python3 evergreen_cli.py" to update evergreen_cli_config.env
+COPY .devcontainer/evergreen_cli_config.env /tmp/evergreen_cli_config.env
+RUN set -e; \
+  . /tmp/evergreen_cli_config.env; \
+  if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    EVERGREEN_CLI_URL="$EVERGREEN_CLI_ARM64_URL"; \
+    EVERGREEN_CLI_SHA256="$EVERGREEN_CLI_ARM64_SHA256"; \
+    ARCH="arm64"; \
+  elif [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    EVERGREEN_CLI_URL="$EVERGREEN_CLI_AMD64_URL"; \
+    EVERGREEN_CLI_SHA256="$EVERGREEN_CLI_AMD64_SHA256"; \
+    ARCH="amd64"; \
+  else \
+    echo "Unsupported platform for Evergreen CLI: $TARGETPLATFORM"; \
+    exit 1; \
+  fi; \
+  echo "Installing Evergreen CLI for: $ARCH"; \
+  echo "URL: $EVERGREEN_CLI_URL"; \
+  echo "Expected SHA256: $EVERGREEN_CLI_SHA256"; \
+  curl -fSL "$EVERGREEN_CLI_URL" -o /tmp/evergreen; \
+  echo "Verifying checksum..."; \
+  echo "$EVERGREEN_CLI_SHA256  /tmp/evergreen" | sha256sum -c -; \
+  echo "Installing to /usr/local/bin/evergreen..."; \
+  mv /tmp/evergreen /usr/local/bin/evergreen; \
+  chmod +x /usr/local/bin/evergreen; \
+  echo "Evergreen CLI installation complete"
 
 USER $USERNAME
 ENV USER=${USERNAME}

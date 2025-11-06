@@ -116,6 +116,10 @@ echo "Checking Git..."
 devcontainer_run git --version
 
 echo ""
+echo "Checking Evergreen CLI..."
+devcontainer_run evergreen --version
+
+echo ""
 echo "Checking clangd configuration..."
 if ! devcontainer_run test -f compile_commands.json; then
     echo "ERROR: compile_commands.json not found - clangd setup failed"

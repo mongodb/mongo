@@ -1,114 +1,56 @@
 #!/usr/bin/env python3
 """
-MongoDB Toolchain Management for DevContainers
+MongoDB Toolchain configuration generator for DevContainers.
 
-This script handles fetching, downloading, and configuring MongoDB toolchains from S3.
-Supports both dynamic (latest) and static (locked with SHA256) approaches.
+Generates toolchain_config.env with URLs and SHA256 checksums for both ARM64 and AMD64.
 """
 
-import argparse
-import hashlib
 import os
 import sys
-import xml.etree.ElementTree as ET
+import tempfile
 from datetime import datetime
-from typing import Optional
-from urllib import request
-from urllib.error import HTTPError, URLError
+
+# Add script directory to path for importing local modules
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from s3_artifact_utils import calculate_sha256, download_file, list_s3_objects
+
+# S3 bucket and prefix
+BUCKET = "boxes.10gen.com"
+PREFIX = "build/toolchain/mongodbtoolchain-ubuntu2404"
 
 
-def list_s3_objects(bucket: str, prefix: str) -> list[dict]:
-    """Query S3 REST API for objects matching prefix."""
-    try:
-        url = f"https://s3.amazonaws.com/{bucket}?list-type=2&prefix={prefix}"
-        print(f"Querying S3: {url}", file=sys.stderr)
+def fetch_toolchain_info(arch: str) -> dict:
+    """Fetch toolchain info for a specific architecture."""
+    print(f"\n🔍 Fetching {arch} toolchain...", file=sys.stderr)
 
-        with request.urlopen(url) as response:
-            xml_data = response.read()
+    # Use path-style URL because bucket name contains dots (boxes.10gen.com)
+    # amd64 toolchains don't have an architecture suffix, so we need to exclude arm64
+    if arch == "amd64":
+        arch_prefix = PREFIX
+        exclude_pattern = "-arm64-"
+    else:
+        arch_prefix = f"{PREFIX}-{arch}"
+        exclude_pattern = None
 
-        root = ET.fromstring(xml_data)
-        ns = {"s3": "http://s3.amazonaws.com/doc/2006-03-01/"}
-
-        objects = []
-        for content in root.findall("s3:Contents", ns):
-            key_elem = content.find("s3:Key", ns)
-            modified_elem = content.find("s3:LastModified", ns)
-
-            if key_elem is not None and modified_elem is not None:
-                objects.append(
-                    {
-                        "Key": key_elem.text,
-                        "LastModified": datetime.fromisoformat(
-                            modified_elem.text.replace("Z", "+00:00")
-                        ),
-                    }
-                )
-
-        return objects
-
-    except (HTTPError, URLError, ET.ParseError) as e:
-        print(f"Error querying S3: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def find_latest(
-    bucket: str, prefix: str, exclude_pattern: Optional[str] = None
-) -> tuple[str, str, datetime]:
-    """Find most recently modified artifact."""
-    objects = list_s3_objects(bucket, prefix)
+    objects = list_s3_objects(BUCKET, arch_prefix, path_style=True)
 
     # Filter out excluded patterns
     if exclude_pattern:
         objects = [obj for obj in objects if exclude_pattern not in obj["Key"]]
 
     if not objects:
-        print(f"No artifacts found with prefix: {prefix}", file=sys.stderr)
+        print(f"No artifacts found with prefix: {arch_prefix}", file=sys.stderr)
         sys.exit(1)
 
     latest = max(objects, key=lambda x: x["LastModified"])
-    url = f"https://s3.amazonaws.com/{bucket}/{latest['Key']}"
+    url = f"https://s3.amazonaws.com/{BUCKET}/{latest['Key']}"
+    key = latest["Key"]
+    last_modified = latest["LastModified"]
 
-    print(f"Latest: {latest['Key']}", file=sys.stderr)
-    print(f"Modified: {latest['LastModified']}", file=sys.stderr)
-
-    return url, latest["Key"], latest["LastModified"]
-
-
-def download_file(url: str, output_path: str) -> None:
-    """Download file from URL."""
-    print(f"Downloading {url}...", file=sys.stderr)
-    try:
-        request.urlretrieve(url, output_path)
-        print(f"Saved to {output_path}", file=sys.stderr)
-    except (HTTPError, URLError) as e:
-        print(f"Download failed: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def calculate_sha256(file_path: str) -> str:
-    """Calculate SHA256 checksum of file."""
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            sha256_hash.update(chunk)
-    return sha256_hash.hexdigest()
-
-
-def fetch_toolchain_info(bucket: str, prefix: str, arch: str) -> dict:
-    """Fetch toolchain info for a specific architecture."""
-    print(f"\n🔍 Fetching {arch} toolchain...", file=sys.stderr)
-    # amd64 toolchains don't have an architecture suffix, so we need to exclude arm64
-    if arch == "amd64":
-        arch_prefix = prefix
-        exclude_pattern = "-arm64-"
-    else:
-        arch_prefix = f"{prefix}-{arch}"
-        exclude_pattern = None
-    url, key, last_modified = find_latest(bucket, arch_prefix, exclude_pattern)
+    print(f"Latest: {key}", file=sys.stderr)
+    print(f"Modified: {last_modified}", file=sys.stderr)
 
     # Download to temp location to calculate checksum
-    import tempfile
-
     with tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz") as tmp:
         tmp_path = tmp.name
 
@@ -130,16 +72,20 @@ def fetch_toolchain_info(bucket: str, prefix: str, arch: str) -> dict:
     }
 
 
-def generate_config(bucket: str, prefix: str, output_file: str) -> None:
-    """Generate locked toolchain configuration with SHA256 for both arm64 and amd64."""
+def main():
+    """Generate toolchain configuration file."""
     # Fetch both architectures
-    arm64_info = fetch_toolchain_info(bucket, prefix, "arm64")
-    amd64_info = fetch_toolchain_info(bucket, prefix, "amd64")
+    arm64_info = fetch_toolchain_info("arm64")
+    amd64_info = fetch_toolchain_info("amd64")
 
-    # Write config file with both architectures
+    # Determine output path
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_file = os.path.join(script_dir, "toolchain_config.env")
+
+    # Write config file
     with open(output_file, "w") as f:
         f.write("# Generated by toolchain.py\n")
-        f.write("# DO NOT EDIT MANUALLY - run: python3 toolchain.py generate\n")
+        f.write("# DO NOT EDIT MANUALLY - run: python3 toolchain.py\n")
         f.write("#\n")
         f.write(f"# Generated: {datetime.now().isoformat()}\n")
         f.write("\n")
@@ -160,52 +106,9 @@ def generate_config(bucket: str, prefix: str, output_file: str) -> None:
         f.write(f'TOOLCHAIN_AMD64_LAST_MODIFIED="{amd64_info["last_modified"].isoformat()}"\n')
 
     print(f"\n✅ Configuration written to: {output_file}", file=sys.stderr)
-    print(f"\nContents:", file=sys.stderr)
+    print("\nContents:", file=sys.stderr)
     with open(output_file) as f:
         print(f.read(), file=sys.stderr)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="MongoDB Toolchain Management")
-    subparsers = parser.add_subparsers(dest="command", help="Command")
-
-    # find-latest: Just print the latest URL
-    find_parser = subparsers.add_parser("find-latest", help="Find latest toolchain URL")
-    find_parser.add_argument("--bucket", default="boxes.10gen.com")
-    find_parser.add_argument("--prefix", default="build/toolchain/mongodbtoolchain-ubuntu24")
-
-    # generate: Generate locked config
-    gen_parser = subparsers.add_parser("generate", help="Generate locked config with SHA256")
-    gen_parser.add_argument("--bucket", default="boxes.10gen.com")
-    gen_parser.add_argument("--prefix", default="build/toolchain/mongodbtoolchain-ubuntu24")
-    gen_parser.add_argument("--output", default="toolchain_config.env")
-
-    # download: Download to file
-    dl_parser = subparsers.add_parser("download", help="Download toolchain")
-    dl_parser.add_argument("--bucket", default="boxes.10gen.com")
-    dl_parser.add_argument("--prefix", default="build/toolchain/mongodbtoolchain-ubuntu24")
-    dl_parser.add_argument("--output", required=True, help="Output file path")
-
-    args = parser.parse_args()
-
-    if not args.command:
-        parser.print_help()
-        sys.exit(1)
-
-    if args.command == "find-latest":
-        url, _, _ = find_latest(args.bucket, args.prefix)
-        print(url)
-
-    elif args.command == "generate":
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        output_path = (
-            args.output if os.path.isabs(args.output) else os.path.join(script_dir, args.output)
-        )
-        generate_config(args.bucket, args.prefix, output_path)
-
-    elif args.command == "download":
-        url, _, _ = find_latest(args.bucket, args.prefix)
-        download_file(url, args.output)
 
 
 if __name__ == "__main__":
