@@ -126,11 +126,11 @@ protected:
     }
 
 private:
-    using HashTableType = std::unordered_map<value::MaterializedRow,  // NOLINT
+    using HashTableType = std::unordered_map<value::FixedSizeRow<1 /*N*/>,
                                              std::vector<size_t>,
-                                             value::MaterializedRowHasher,
-                                             value::MaterializedRowEq>;
-    using BufferType = std::vector<value::MaterializedRow>;
+                                             value::FixedSizeSingleRowHasher,
+                                             value::SingleRowFixedSizeRowEq>;
+    using BufferType = std::vector<value::FixedSizeRow<1 /*N*/>>;
     using HashKeyAccessor = value::MaterializedRowKeyAccessor<HashTableType::iterator>;
     using BufferAccessor = value::MaterializedRowAccessor<BufferType>;
 

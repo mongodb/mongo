@@ -72,8 +72,8 @@ void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
                 PrepareConflictBehavior::kIgnoreConflicts);
 }
 
-std::pair<RecordId, key_string::TypeBits> encodeKeyString(key_string::Builder& kb,
-                                                          const value::MaterializedRow& value) {
+std::pair<RecordId, key_string::TypeBits> encodeKeyString(
+    key_string::Builder& kb, const value::FixedSizeRow<1 /* N */>& value) {
     value.serializeIntoKeyString(kb);
     auto typeBits = kb.getTypeBits();
     auto rid = RecordId(kb.getView());
@@ -160,8 +160,8 @@ Status SpillingStore::insertRecords(OperationContext* opCtx, std::vector<Record>
     return _spillTable->insertRecords(opCtx, inOutRecords);
 }
 
-boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(OperationContext* opCtx,
-                                                                           const RecordId& rid) {
+boost::optional<value::FixedSizeRow<1 /* N */>> SpillingStore::readFromRecordStore(
+    OperationContext* opCtx, const RecordId& rid) {
     RecordData record;
     auto found = [&] {
         auto lk = acquireLock(opCtx);
@@ -170,7 +170,7 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
 
     if (found) {
         auto valueReader = BufReader(record.data(), record.size());
-        return value::MaterializedRow::deserializeForSorter(valueReader, {});
+        return value::FixedSizeRow<1 /* N */>::deserializeForSorter(valueReader, {});
     }
     return boost::none;
 }
@@ -189,6 +189,5 @@ void SpillingStore::updateSpillStorageStatsForOperation(OperationContext* opCtx)
     CurOp::get(opCtx)->updateSpillStorageStats(
         _spillTable->computeOperationStatisticsSinceLastCall());
 }
-
 }  // namespace sbe
 }  // namespace mongo

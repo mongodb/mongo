@@ -177,9 +177,8 @@ void HashLookupStage::open(bool reOpen) {
 
     // Insert the inner side into the hash table.
     innerChild()->open(false);
+    value::FixedSizeRow<1 /*N*/> value{1};
     while (innerChild()->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow value{1};
-
         // Copy the projected value.
         auto [tag, val] = _inInnerProjectAccessor->getCopyOfValue();
         value.reset(0, true, tag, val);

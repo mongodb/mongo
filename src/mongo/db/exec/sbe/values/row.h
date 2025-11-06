@@ -392,6 +392,7 @@ private:
     const ComparatorType* _comparator = nullptr;
 };
 typedef RowEq<MaterializedRow> MaterializedRowEq;
+typedef RowEq<FixedSizeRow<1 /*N*/>> SingleRowFixedSizeRowEq;
 
 template <typename RowType>
 struct RowLess {
@@ -447,6 +448,7 @@ private:
 };
 
 typedef RowHasher<MaterializedRow> MaterializedRowHasher;
+typedef RowHasher<FixedSizeRow<1 /*N*/>> FixedSizeSingleRowHasher;
 
 int getApproximateSize(TypeTags tag, Value val);
 

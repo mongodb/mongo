@@ -50,11 +50,11 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
-using HashTableType = std::unordered_map<value::MaterializedRow,  // NOLINT
+using HashTableType = std::unordered_map<value::FixedSizeRow<1 /*N*/>,  // NOLINT
                                          std::vector<size_t>,
-                                         value::MaterializedRowHasher,
-                                         value::MaterializedRowEq>;
-using BufferType = std::vector<value::MaterializedRow>;
+                                         value::FixedSizeSingleRowHasher,
+                                         value::SingleRowFixedSizeRowEq>;
+using BufferType = std::vector<value::FixedSizeRow<1 /*N*/>>;
 using RecordIndexCollection = std::variant<std::vector<size_t>*, std::set<size_t>*>;
 
 class LookupHashTable;
@@ -156,7 +156,7 @@ private:
     std::set<size_t>::const_iterator _hashTableMatchSetIter;
 
     // Outer key used to probe the hash table.
-    value::MaterializedRow _iterProbeKey{1 /* columns */};
+    value::FixedSizeRow<1 /*N*/> _iterProbeKey{1 /* columns */};
 };  // class LookupHashTableIter
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,19 +176,18 @@ public:
     void addHashTableEntry(value::SlotAccessor* keyAccessor, size_t valueIndex);
 
     /**
-     * Adds to the hash table's buffer of docs each inner doc as a MaterializedRow that has just a
+     * Adds to the hash table's buffer of docs each inner doc as a FixedSizeRow<1> that has just a
      * single column containing the inner doc. The doc ID ("index") in the memory portion of the
      * buffer is a 0-based incrementing size_t which is used as the index into the '_buffer' vector,
      * while the index in the disk portion ('_recordStoreBuf') is 1-based (so ID N in memory becomes
-     * ID N+1 on disk) because SpillingStore does not support RecordIds of 0.
-     *
-     * RowBase::getViewOfValue() can be used to view (tag, val) of a column from a MaterializedRow,
+     * ID N+1 on disk) because SpillingStore does not support RecordIds of * 0.
+     * RowBase::getViewOfValue() can be used to view(tag, val) of a column from a FixedSizeRow<1>,
      * given the column index in the row, which in the case of this stage is always 0.
      *
      * The current method adds to the memory buffer until it gets too big, then calls
      * spillBufferedValueToDisk() to start spilling to disk.
      */
-    size_t bufferValueOrSpill(value::MaterializedRow& value);
+    size_t bufferValueOrSpill(value::FixedSizeRow<1 /*N*/>& value);
 
     void forceSpill();
 
@@ -253,8 +252,8 @@ public:
 private:
     void init() {
         if (_collator) {
-            const value::MaterializedRowHasher hasher(_collator);
-            const value::MaterializedRowEq equator(_collator);
+            const value::FixedSizeSingleRowHasher hasher(_collator);
+            const value::SingleRowFixedSizeRowEq equator(_collator);
             _memoryHt.emplace(0, hasher, equator);
         } else {
             _memoryHt.emplace();
@@ -287,13 +286,13 @@ private:
                                                                     value::Value valKey);
 
     std::pair<RecordId, key_string::TypeBits> serializeKeyForRecordStore(
-        const value::MaterializedRow& key) const;
+        const value::FixedSizeRow<1 /*N*/>& key) const;
 
     // Writes an inner collection doc to the disk buffer. via upsertToRecordStore(). These can be
     // read back from the disk store via SpillingStore::readFromRecordStore() (spilling.h).
     void spillBufferedValueToDisk(SpillingStore* rs,
                                   size_t bufferIdx,
-                                  const value::MaterializedRow&);
+                                  const value::FixedSizeRow<1 /*N*/>&);
 
     void spillIndicesToRecordStore(SpillingStore* rs,
                                    value::TypeTags tagKey,
@@ -337,13 +336,13 @@ private:
     size_t _valueId{0};
 
     // Outer key used to probe the hash table.
-    value::MaterializedRow _htProbeKey{1 /* columns */};
+    value::FixedSizeRow<1 /*N*/> _htProbeKey{1 /* columns */};
 
     HashLookupStats _hashLookupStats;
 
-    // Used to hold a copy of a MaterializedRow from the disk store, so it does not go out of scope
+    // Used to hold a copy of a FixedSizeRow from the disk store, so it does not go out of scope
     // when getValueAtIndex() returns a view of it.
-    boost::optional<value::MaterializedRow> _bufValueRecordStore;
+    boost::optional<value::FixedSizeRow<1 /*N*/>> _bufValueRecordStore;
 
     // Amount of bytes spilled since last time we performed the disk space check. We reset this
     // value and perform the disk space check everytime it crosses 100 MB.

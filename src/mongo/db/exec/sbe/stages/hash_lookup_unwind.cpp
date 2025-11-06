@@ -153,7 +153,7 @@ void HashLookupUnwindStage::open(bool reOpen) {
     // Insert the inner side into the hash table.
     innerChild()->open(false);
     while (innerChild()->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow value{1 /* columns */};
+        value::FixedSizeRow<1 /*N*/> value;
 
         // Copy the projected value.
         auto [tag, val] = _inInnerProjectAccessor->getCopyOfValue();

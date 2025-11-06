@@ -41,14 +41,18 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     std::ostream& stream,
     const StageResultsPrinters::SlotNames& slotNames,
     PlanStage* stage,
-    bool expectMemUse) {
+    bool expectMemUse,
+    bool getStats,
+    bool executeWithSpill) {
     prepareTree(ctx, stage);
 
     // Execute the stage normally.
     std::stringstream firstStream;
     StageResultsPrinters::make(firstStream, printOptions).printStageResults(ctx, slotNames, stage);
-    stream << "--- First Stats\n";
-    printHashLookupStats(stream, stage);
+    if (getStats) {
+        stream << "--- First Stats\n";
+        printHashLookupStats(stream, stage);
+    }
     auto* stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto firstPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT(stage->getMemoryTracker());
@@ -66,8 +70,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     std::stringstream secondStream;
     StageResultsPrinters::make(secondStream, printOptions).printStageResults(ctx, slotNames, stage);
     ASSERT_EQ(firstStream.view(), secondStream.view());
-    stream << "--- Second Stats\n";
-    printHashLookupStats(stream, stage);
+    if (getStats) {
+        stream << "--- Second Stats\n";
+        printHashLookupStats(stream, stage);
+    }
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto secondPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(firstPeakTrackedMemBytes, secondPeakTrackedMemBytes);
@@ -83,8 +89,10 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     std::stringstream thirdStream;
     StageResultsPrinters::make(thirdStream, printOptions).printStageResults(ctx, slotNames, stage);
     ASSERT_EQ(firstStream.view(), thirdStream.view());
-    stream << "--- Third Stats\n";
-    printHashLookupStats(stream, stage);
+    if (getStats) {
+        stream << "--- Third Stats\n";
+        printHashLookupStats(stream, stage);
+    }
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto thirdPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(firstPeakTrackedMemBytes, thirdPeakTrackedMemBytes);
@@ -94,6 +102,11 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
         ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
     }
     stage->close();
+
+    if (!executeWithSpill) {
+        stream << "-- OUTPUT " << firstStream.view();
+        return;
+    }
 
     // Execute the stage with spilling to disk.
     RAIIServerParameterControllerForTest maxMemoryLimit(
@@ -106,9 +119,11 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     std::stringstream fourthStream;
     StageResultsPrinters::make(fourthStream, printOptions).printStageResults(ctx, slotNames, stage);
     ASSERT_EQ(firstStream.view(), fourthStream.view());
-    stream << "--- Fourth Stats\n";
-    printHashLookupStats(stream, stage);
-    stream << '\n';
+    if (getStats) {
+        stream << "--- Fourth Stats\n";
+        printHashLookupStats(stream, stage);
+        stream << '\n';
+    }
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto fourthPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -120,9 +135,11 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     std::stringstream fifthStream;
     StageResultsPrinters::make(fifthStream, printOptions).printStageResults(ctx, slotNames, stage);
     ASSERT_EQ(firstStream.view(), fifthStream.view());
-    stream << "--- Fifth Stats\n";
-    printHashLookupStats(stream, stage);
-    stream << '\n';
+    if (getStats) {
+        stream << "--- Fifth Stats\n";
+        printHashLookupStats(stream, stage);
+        stream << '\n';
+    }
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto fifthPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -134,9 +151,11 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     std::stringstream sixthStream;
     StageResultsPrinters::make(sixthStream, printOptions).printStageResults(ctx, slotNames, stage);
     ASSERT_EQ(firstStream.view(), sixthStream.view());
-    stream << "--- Sixth Stats\n";
-    printHashLookupStats(stream, stage);
-    stream << '\n';
+    if (getStats) {
+        stream << "--- Sixth Stats\n";
+        printHashLookupStats(stream, stage);
+        stream << '\n';
+    }
     stats = static_cast<const HashLookupStats*>(stage->getSpecificStats());
     auto sixthPeakTrackedMemBytes = stats->peakTrackedMemBytes;
     ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);

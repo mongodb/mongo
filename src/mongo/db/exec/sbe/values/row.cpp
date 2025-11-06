@@ -872,17 +872,17 @@ int RowBase<RowType>::memUsageForSorter() const {
 }
 
 template class RowBase<MaterializedRow>;
-template class RowBase<FixedSizeRow<1>>;
-template class RowBase<FixedSizeRow<2>>;
-template class RowBase<FixedSizeRow<3>>;
+template class RowBase<FixedSizeRow<1 /*N*/>>;
+template class RowBase<FixedSizeRow<2 /*N*/>>;
+template class RowBase<FixedSizeRow<3 /*N*/>>;
 
 
 // This check is needed to ensure that 'std::vector<MaterializedRow>' uses move constructor of
 // 'MaterializedRow' during reallocation. This way, values inside 'MaterializedRow' are not copied
 // during reallocation and references to them remain valid.
 static_assert(std::is_nothrow_move_constructible_v<MaterializedRow>);
-static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<1>>);
-static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<2>>);
-static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<3>>);
+static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<1 /*N*/>>);
+static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<2 /*N*/>>);
+static_assert(std::is_nothrow_move_constructible_v<FixedSizeRow<3 /*N*/>>);
 
 }  // namespace mongo::sbe::value

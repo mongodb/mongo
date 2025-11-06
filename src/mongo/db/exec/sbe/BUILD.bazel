@@ -520,3 +520,21 @@ mongo_cc_benchmark(
         "//src/mongo/util:pcre_wrapper",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "sbe_hash_lookup_bm",
+    srcs = [
+        "sbe_hash_lookup_shared_test.cpp",
+        "//src/mongo/db/exec/sbe:sbe_hash_lookup_bm.cpp",
+    ],
+    private_hdrs = [
+        ":sbe_block_test_helpers.h",
+        ":sbe_hash_lookup_shared_test.h",
+        "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test_fixture.h",
+    ],
+    deps = [
+        ":sbe_plan_stage_test",
+        ":sbe_unittest_base",
+        "//src/mongo/unittest",
+    ],
+)

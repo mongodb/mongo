@@ -204,7 +204,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
         const long long newMemUsage = _computedTotalMemUsage +
             size_estimator::estimate(tagKeyView, valKeyView) + sizeof(size_t);
 
-        value::MaterializedRow key{1};
+        value::FixedSizeRow<1 /*N*/> key{1};
         if (!hasSpilledHtToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
             // We have to insert an owned key, attempt a move, but force copy if necessary when we
             // haven't spilled to the '_recordStore' yet.
@@ -239,7 +239,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
                 makeTemporaryRecordStore();
             }
 
-            value::MaterializedRow key{1};
+            value::FixedSizeRow<1 /*N*/> key{1};
             key.reset(0, true, tagKeyView, valKeyView);
             _computedTotalMemUsage -= size_estimator::estimate(tagKeyView, valKeyView);
 
@@ -256,7 +256,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
 
 void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
                                                size_t bufferIdx,
-                                               const value::MaterializedRow& val) {
+                                               const value::FixedSizeRow<1 /*N*/>& val) {
     // Ensure there is sufficient disk space for spilling
     if (shouldCheckDiskSpace()) {
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
@@ -284,7 +284,7 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
     _recordStoreBuf->updateSpillStorageStatsForOperation(_opCtx);
 }
 
-size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
+size_t LookupHashTable::bufferValueOrSpill(value::FixedSizeRow<1 /*N*/>& value) {
     const long long newMemUsage = _computedTotalMemUsage + size_estimator::estimate(value);
     if (!hasSpilledBufToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
         _buffer.emplace_back(std::move(value));
@@ -311,7 +311,7 @@ int64_t LookupHashTable::writeIndicesToRecordStore(SpillingStore* rs,
         buf.appendNum(static_cast<size_t>(idx));
     }
 
-    value::MaterializedRow key{1};
+    value::FixedSizeRow<1 /*N*/> key{1};
     key.reset(0, false, tagKey, valKey);
     auto [rid, typeBits] = serializeKeyForRecordStore(key);
 
@@ -389,7 +389,7 @@ void LookupHashTable::makeTemporaryRecordStore() {
 }
 
 std::pair<RecordId, key_string::TypeBits> LookupHashTable::serializeKeyForRecordStore(
-    const value::MaterializedRow& key) const {
+    const value::FixedSizeRow<1 /*N*/>& key) const {
     key_string::Builder kb{key_string::Version::kLatestVersion};
     return encodeKeyString(kb, key);
 }
@@ -400,9 +400,9 @@ boost::optional<std::pair<value::TypeTags, value::Value>> LookupHashTable::getVa
         // Document is in memory buffer, always in column 0.
         return _buffer[index].getViewOfValue(0);
     } else if (_recordStoreBuf) {
-        // Document is in disk buffer, always in column 0. The MaterializedRow object constructed
-        // from this must be copied to a place that does not go out of scope when this method
-        // returns, for which we use '_bufValueRecordStore'.
+        // Document is in disk buffer, always in column 0. The FixedSizeRow<1 /*N*/> object
+        // constructed from this must be copied to a place that does not go out of scope when this
+        // method returns, for which we use '_bufValueRecordStore'.
         _bufValueRecordStore =
             _recordStoreBuf->readFromRecordStore(_opCtx, LookupHashTable::getValueRecordId(index));
         if (_bufValueRecordStore) {

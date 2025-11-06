@@ -239,6 +239,16 @@ inline size_t estimate(const value::MaterializedRow& row) {
     return size;
 }
 
+template <size_t N>
+inline size_t estimate(const value::FixedSizeRow<N>& row) {
+    size_t size = 0;
+    for (size_t idx = 0; idx < N; ++idx) {
+        auto [tag, val] = row.getViewOfValue(idx);
+        size += estimate(tag, val);
+    }
+    return size;
+}
+
 inline size_t estimate(const StringListSet& vec) {
     size_t size = size_estimator::estimate(vec.getUnderlyingVector());
     size += size_estimator::estimate(vec.getUnderlyingMap());

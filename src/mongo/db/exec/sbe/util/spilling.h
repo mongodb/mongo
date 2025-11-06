@@ -54,8 +54,8 @@ namespace sbe {
 void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx);
 
 // Encode key as a RecordId and TypeBits.
-std::pair<RecordId, key_string::TypeBits> encodeKeyString(key_string::Builder&,
-                                                          const value::MaterializedRow& value);
+std::pair<RecordId, key_string::TypeBits> encodeKeyString(
+    key_string::Builder&, const value::FixedSizeRow<1 /* N */>& value);
 
 // Reconstructs the KeyString carried in RecordId using 'typeBits'.
 key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits typeBits);
@@ -105,8 +105,9 @@ public:
     Status insertRecords(OperationContext* opCtx, std::vector<Record>* inOutRecords);
 
     // Reads a materialized row from the record store.
-    boost::optional<value::MaterializedRow> readFromRecordStore(OperationContext* opCtx,
-                                                                const RecordId& rid);
+    // This is currently only used with FixedSizeRow<1>
+    boost::optional<value::FixedSizeRow<1 /* N */>> readFromRecordStore(OperationContext* opCtx,
+                                                                        const RecordId& rid);
 
     bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out);
 

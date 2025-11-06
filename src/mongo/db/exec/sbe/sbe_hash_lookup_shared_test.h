@@ -107,7 +107,9 @@ public:
                                        std::ostream& stream,
                                        const StageResultsPrinters::SlotNames& slotNames,
                                        PlanStage* stage,
-                                       bool expectMemUse = true);
+                                       bool expectMemUse = true,
+                                       bool getStats = true,
+                                       bool executeWithSpill = true);
 
 public:
     PrintOptions printOptions =

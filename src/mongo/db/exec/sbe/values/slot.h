@@ -431,6 +431,7 @@ private:
     const size_t _slot;
 };
 typedef SingleRowAccessor<MaterializedRow> MaterializedSingleRowAccessor;
+typedef SingleRowAccessor<FixedSizeRow<1 /*N*/>> FixedSizeSingleRowAccessor;
 
 /**
  * Read the components of the 'keyString' value and populate 'accessors' with those components. Some
