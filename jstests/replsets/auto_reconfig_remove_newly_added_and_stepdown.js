@@ -80,4 +80,8 @@ jsTestLog("Proceeding with newlyAdded field removal");
 checkLog.contains(primary, "Safe reconfig rejected due to detected pending stepdown");
 checkLog.containsJson(nodes[1], 4634504, {"memberId": 3});
 blockHeartbeatStepdownFailPoint.off();
+// Wait for the old primary to fully step down, transition to a secondary, and catch up. This
+// ensures it won't enter a rollback state when validation runs during the 'stopSet' procedure.
+rst.awaitSecondaryNodes();
+rst.awaitReplication();
 rst.stopSet();
