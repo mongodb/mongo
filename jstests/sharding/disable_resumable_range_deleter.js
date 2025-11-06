@@ -150,6 +150,24 @@ jsTest.log("Test Case: Disabling the server parameter does not affect moving non
     );
 })();
 
+jsTest.log("Test Case: moveChunk with _waitForDelete should succeed and not hang when the range deleter is disabled");
+(() => {
+    // Disable the resumable range deleter on shard0.
+    st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: true});
+
+    // The moveChunk command should succeed because the migration commits successfully, even though
+    // the range deleter cannot be waited on due to being disabled.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard1.shardName, _waitForDelete: true}),
+    );
+
+    // Re-enable the range deleter on shard0 to allow cleanup.
+    st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
+
+    // Move the chunk back to its original shard to maintain consistency for subsequent test cases.
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard0.shardName}));
+})();
+
 jsTest.log(
     "Restart shard0 with a delay between range deletions and a low wait timeout, this way, with a " +
         "large enough collection, there will be a timeout on a recipient when waiting for the range" +

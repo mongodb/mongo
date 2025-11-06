@@ -646,6 +646,14 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
         task->clearPending();
     }
 
+    if (isDisabled()) {
+        return SemiFuture<void>::makeReady(
+                   Status(ErrorCodes::ResumableRangeDeleterDisabled,
+                          "Not waiting to complete the range deletion task because the resumable "
+                          "range deleter is disabled"))
+            .share();
+    }
+
     return task->getCompletionFuture();
 }
 
