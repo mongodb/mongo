@@ -30,10 +30,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
-#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
 #include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -48,10 +46,6 @@ class ShardingWriteRouter {
 public:
     ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss);
 
-    CollectionShardingState* getCss() const {
-        return _scopedCss ? &(**_scopedCss) : nullptr;
-    }
-
     const boost::optional<ScopedCollectionDescription>& getCollDesc() const {
         return _collDesc;
     }
@@ -65,7 +59,6 @@ private:
     // are short lived and the last in the stack of locks.
     DisableLockerRuntimeOrderingChecks _disableRuntimeChecks;
 
-    boost::optional<CollectionShardingState::ScopedCollectionShardingState> _scopedCss;
     boost::optional<ScopedCollectionDescription> _collDesc;
 
     boost::optional<ScopedCollectionFilter> _ownershipFilter;

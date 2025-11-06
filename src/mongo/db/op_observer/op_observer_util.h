@@ -102,13 +102,4 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc);
 
 DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern, BSONObj const& doc);
 
-/**
- * Provides access to the ShardingWriteRouter attached to the op accumulator.
- * The ShardingWriteRouter instance is created in OpObserverImpl and subsequently
- * destroyed in MigrationChunkClonerSourceOpObserver.
- *
- */
-extern const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
-    shardingWriteRouterOpStateAccumulatorDecoration;
-
 }  // namespace MONGO_MOD_PUB mongo

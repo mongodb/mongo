@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/chunk.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/cluster_role.h"
@@ -46,8 +47,8 @@ namespace mongo {
 ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss)
     : _disableRuntimeChecks(opCtx) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        _scopedCss.emplace(CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss));
-        _collDesc = (*_scopedCss)->getCollectionDescription(opCtx);
+        auto css = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
+        _collDesc = css->getCollectionDescription(opCtx);
 
         if (!_collDesc->hasRoutingTable()) {
             invariant(!_collDesc->getReshardingKeyIfShouldForwardOps());
@@ -56,10 +57,8 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
 
         _reshardingKeyPattern = _collDesc->getReshardingKeyIfShouldForwardOps();
         if (_reshardingKeyPattern) {
-            _ownershipFilter =
-                (*_scopedCss)
-                    ->getOwnershipFilter(
-                        opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
+            _ownershipFilter = css->getOwnershipFilter(
+                opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
 
             const auto& reshardingFields = _collDesc->getReshardingFields();
             invariant(reshardingFields);

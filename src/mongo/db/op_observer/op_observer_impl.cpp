@@ -819,8 +819,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     if (opAccumulator) {
         opAccumulator->insertOpTimes = std::move(opTimeList);
-        shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator) =
-            std::move(shardingWriteRouter);
     }
 }
 
@@ -995,11 +993,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
         onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord, nss);
-    }
-
-    if (opAccumulator) {
-        shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator) =
-            std::move(shardingWriteRouter);
     }
 }
 

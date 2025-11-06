@@ -138,16 +138,6 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     std::vector<bool> fromMigrate,
     bool defaultFromMigrate,
     OpStateAccumulator* opAccumulator) {
-    // Take ownership of ShardingWriteRouter attached to the op accumulator by OpObserverImpl.
-    // Release upon return from this function because this resource is not needed by downstream
-    // OpObserver instances.
-    // If there's no ShardingWriteRouter instance available, it means that OpObserverImpl did not
-    // get far enough to require one so there's nothing to do here but return early.
-    auto shardingWriteRouter =
-        std::move(shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator));
-    if (!shardingWriteRouter) {
-        return;
-    }
 
     if (defaultFromMigrate) {
         return;
@@ -158,7 +148,8 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
         return;
     }
 
-    auto* const css = shardingWriteRouter->getCss();
+    auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
+    CollectionShardingState* css = &(*scopedCss);
     css->checkShardVersionOrThrow(opCtx);
     DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
@@ -202,17 +193,6 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
 void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
                                                     const OplogUpdateEntryArgs& args,
                                                     OpStateAccumulator* opAccumulator) {
-    // Take ownership of ShardingWriteRouter attached to the op accumulator by OpObserverImpl.
-    // Release upon return from this function because this resource is not needed by downstream
-    // OpObserver instances.
-    // If there's no ShardingWriteRouter instance available, it means that OpObserverImpl did not
-    // get far enough to require one so there's nothing to do here but return early.
-    auto shardingWriteRouter =
-        std::move(shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator));
-    if (!shardingWriteRouter) {
-        return;
-    }
-
     if (args.updateArgs->source == OperationSource::kFromMigrate) {
         return;
     }
@@ -229,7 +209,8 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
     const auto& preImageDoc = args.updateArgs->preImageDoc;
     const auto& postImageDoc = args.updateArgs->updatedDoc;
 
-    auto* const css = shardingWriteRouter->getCss();
+    auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
+    CollectionShardingState* css = &(*scopedCss);
     css->checkShardVersionOrThrow(opCtx);
     DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
@@ -275,8 +256,8 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    ShardingWriteRouter shardingWriteRouter(opCtx, nss);
-    auto* const css = shardingWriteRouter.getCss();
+    auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
+    CollectionShardingState* css = &(*scopedCss);
     css->checkShardVersionOrThrow(opCtx);
     DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
