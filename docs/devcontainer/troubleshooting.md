@@ -32,6 +32,54 @@ Restart VSCode. If you install Rancher Desktop while you already have VSCode ope
 
 ## Container Build Issues
 
+### Build Fails with SSH Bind Mount Error
+
+**Symptoms:**
+
+```
+Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /Users/username/.ssh
+```
+
+Or on macOS/Linux systems using certain Docker providers:
+
+```
+Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /socket_mnt/...
+```
+
+**Root Cause:**
+
+The devcontainer configuration mounts your `~/.ssh` directory to enable Git operations over SSH. If this directory doesn't exist on your host machine, the container fails to start. **This directory is required even if you plan to use HTTPS instead of SSH for cloning.**
+
+**Solutions:**
+
+1. **Create the .ssh directory on your host machine:**
+
+   ```bash
+   # On your HOST machine (not in container)
+   mkdir -p ~/.ssh
+   ```
+
+2. **Rebuild the container:**
+
+   - Command Palette → "Dev Containers: Rebuild Container"
+
+**Note on SSH Agent Forwarding:**
+
+SSH agent forwarding behavior varies by Docker provider on macOS:
+
+- **Docker Desktop**: Automatic SSH agent forwarding built-in
+- **OrbStack**: Automatic SSH agent forwarding built-in
+- **Rancher Desktop**:
+  - With dockerd runtime: Automatic agent forwarding
+  - With containerd runtime: Agent forwarding requires additional setup
+
+To use SSH agent forwarding, ensure your SSH keys are added to your host's SSH agent before starting the container:
+
+```bash
+ssh-add ~/.ssh/id_ed25519  # or your key name
+ssh-add -l  # verify keys are loaded
+```
+
 ### Build Fails with "No Space Left on Device"
 
 **Symptoms:**

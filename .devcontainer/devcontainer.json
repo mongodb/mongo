@@ -12,6 +12,11 @@
   },
   "mounts": [
     {
+      "source": "mongo-dev-home",
+      "target": "/home",
+      "type": "volume"
+    },
+    {
       "source": "engflow_auth",
       "target": "/home/${localEnv:USER}/.config/engflow_auth",
       "type": "volume"
@@ -22,14 +27,15 @@
       "type": "volume"
     },
     {
-      "source": "mongo-bashhistory",
-      "target": "/commandhistory",
-      "type": "volume"
-    },
-    {
       "source": "${containerWorkspaceFolderBasename}-python3-venv",
       "target": "${containerWorkspaceFolder}/python3-venv",
       "type": "volume"
+    },
+    {
+      "source": "${localEnv:HOME}/.ssh",
+      "target": "/home/${localEnv:USER}/.ssh",
+      "type": "bind",
+      "readonly": true
     }
   ],
   "containerEnv": {

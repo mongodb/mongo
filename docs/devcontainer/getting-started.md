@@ -67,18 +67,29 @@ For Linux users, you can use Docker Engine directly.
 **Installation:**
 Follow the official guide: [docs.docker.com/engine/install](https://docs.docker.com/engine/install/)
 
-### 2. Install Visual Studio Code
+### 2. Create SSH Directory (Required)
+
+> **⚠️ Critical:** You **must** have a `~/.ssh` directory on your host machine before building the devcontainer. The devcontainer requires this directory to exist, regardless of whether you use SSH or HTTPS to clone the repository.
+
+```bash
+# On your HOST machine (not inside the container)
+mkdir -p ~/.ssh
+```
+
+If you skip this step, you'll encounter bind mount errors when trying to start the devcontainer.
+
+### 3. Install Visual Studio Code
 
 Download and install VS Code from [code.visualstudio.com](https://code.visualstudio.com/)
 
-### 3. Install Dev Containers Extension
+### 4. Install Dev Containers Extension
 
 1. Open VS Code
 2. Go to Extensions (⌘/Ctrl+Shift+X)
 3. Search for "Dev Containers"
 4. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension by Microsoft
 
-### 4. Configure SSH Keys (Recommended)
+### 5. Configure SSH Keys (Recommended)
 
 To clone the repository using SSH (recommended for contributors), you'll need SSH keys configured with GitHub.
 

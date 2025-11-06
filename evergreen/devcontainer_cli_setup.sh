@@ -26,11 +26,15 @@ fi
 echo "npm version:"
 npm --version
 
-# Install devcontainer CLI locally in task workdir
+# Install devcontainer CLI to temp directory
 echo ""
 echo "Installing @devcontainers/cli..."
-INSTALL_DIR="$PWD/.devcontainer-cli"
-mkdir -p "$INSTALL_DIR"
+# Use CLI_INSTALL_DIR set by caller
+if [ -z "${CLI_INSTALL_DIR:-}" ]; then
+    echo "ERROR: CLI_INSTALL_DIR not set by caller"
+    exit 1
+fi
+INSTALL_DIR="$CLI_INSTALL_DIR"
 npm install -g --prefix "$INSTALL_DIR" @devcontainers/cli
 
 # Add to PATH for this script and subsequent commands

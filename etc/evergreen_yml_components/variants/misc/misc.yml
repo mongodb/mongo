@@ -89,6 +89,6 @@ buildvariants:
       - "evergreen/devcontainer*.sh"
       - "poetry_requirements.txt"
     run_on:
-      - ubuntu2204-small
+      - ubuntu2204-large
     tasks:
       - name: devcontainer_test

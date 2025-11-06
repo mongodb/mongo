@@ -39,13 +39,6 @@ RUN chmod +x /usr/local/bin/xdg-open-wrapper.sh && \
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/devcontaineruser && \
     chmod 0440 /etc/sudoers.d/devcontaineruser
 
-# Persistent bash history
-RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
-  && mkdir /commandhistory \
-  && touch /commandhistory/.bash_history \
-  && chown -R $USERNAME /commandhistory \
-  && echo "$SNIPPET" >> "/home/$USERNAME/.bashrc"
-
 # Toolchain installation with SHA256 verification
 # Run "python3 toolchain.py generate" to update toolchain_config.env
 ARG TARGETPLATFORM
@@ -80,35 +73,41 @@ USER $USERNAME
 ENV USER=${USERNAME}
 RUN /opt/mongodbtoolchain/revisions/*/scripts/install.sh; echo "Toolchain installation complete"
 
-# Add MongoDB toolchain to PATH
-ENV PATH="/opt/mongodbtoolchain/v5/bin:${PATH}"
-
-# Setup bash profile to source .bashrc
-RUN echo "" >> "$HOME/.bash_profile" && \
-  echo "# BEGIN Source .bashrc" >> "$HOME/.bash_profile" && \
-  echo "if [[ -f ~/.bashrc ]]; then" >> "$HOME/.bash_profile" && \
-  echo "    source ~/.bashrc" >> "$HOME/.bash_profile" && \
-  echo "fi" >> "$HOME/.bash_profile" && \
-  echo "# END Source .bashrc" >> "$HOME/.bash_profile"
+# Add MongoDB toolchain to PATH via system-wide profile
+USER root
+RUN echo 'export PATH="/opt/mongodbtoolchain/v5/bin:${PATH}"' > /etc/profile.d/02-mongodbtoolchain.sh \
+  && chmod +x /etc/profile.d/02-mongodbtoolchain.sh
+USER $USERNAME
 
 # Create MongoDB data directory
 USER root
 RUN mkdir -p /data/db && chown -R ${USERNAME}:${USERNAME} /data/db
 USER $USERNAME
 
-# Bazel telemetry
-RUN echo "common --bes_keywords=devcontainer:use=true" >> "$HOME/.bazelrc" && \
-  echo "common --bes_keywords=devcontainer:image=$BASE_IMAGE" >> "$HOME/.bazelrc" && \
-  echo "common --bes_keywords=devcontainer:username=$USERNAME" >> "$HOME/.bazelrc"
+# Bazel telemetry - configure system-wide defaults
+# These will be imported by user's .bazelrc in post-create script
+USER root
+RUN mkdir -p /etc/devcontainer && \
+  echo "# MongoDB Devcontainer Bazel Configuration" > /etc/devcontainer/bazelrc && \
+  echo "common --bes_keywords=devcontainer:use=true" >> /etc/devcontainer/bazelrc && \
+  echo "common --bes_keywords=devcontainer:image=$BASE_IMAGE" >> /etc/devcontainer/bazelrc && \
+  chmod 644 /etc/devcontainer/bazelrc
+USER $USERNAME
 
 # Install pipx (Python package manager for tools)
+# Add ~/.local/bin to PATH for pipx-installed tools
+USER root
+RUN echo 'export PATH="$HOME/.local/bin:${PATH}"' > /etc/profile.d/03-local-bin.sh \
+  && chmod +x /etc/profile.d/03-local-bin.sh
+USER $USERNAME
+
 ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
 RUN /opt/mongodbtoolchain/v5/bin/python3 -m venv /tmp/pipx-venv && \
   /tmp/pipx-venv/bin/python -m pip install --upgrade "pip<20.3" && \
   /tmp/pipx-venv/bin/python -m pip install pipx && \
   /tmp/pipx-venv/bin/pipx install pipx --python /opt/mongodbtoolchain/v5/bin/python3 --force && \
-  /tmp/pipx-venv/bin/pipx ensurepath --force && \
   rm -rf /tmp/pipx-venv
+# Note: PATH is configured via /etc/profile.d, not ~/.bashrc, to avoid modifying home volume
 
 # Install db-contrib-tool using pipx
 RUN /home/${USERNAME}/.local/bin/pipx install db-contrib-tool

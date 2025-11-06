@@ -13,6 +13,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Create temp directory for devcontainer CLI installation
+CLI_INSTALL_DIR=$(mktemp -d)
+export CLI_INSTALL_DIR
+
+# Set up cleanup trap to remove temp directory on exit
+cleanup() {
+    if [ -d "$CLI_INSTALL_DIR" ]; then
+        echo "Cleaning up devcontainer CLI installation..."
+        rm -rf "$CLI_INSTALL_DIR"
+    fi
+}
+trap cleanup EXIT
+
 # Set a non-conflicting username for CI
 # In CI, USER is often "ubuntu" which conflicts with system users
 # Use a distinct name that won't conflict
@@ -37,8 +50,8 @@ if ! command -v devcontainer &>/dev/null; then
     echo "Installing devcontainer CLI..."
     bash "$SCRIPT_DIR/devcontainer_cli_setup.sh"
 
-    # Add CLI to PATH (installed locally by cli_setup.sh)
-    export PATH="$PWD/.devcontainer-cli/bin:$PATH"
+    # Add CLI to PATH (installed by cli_setup.sh)
+    export PATH="${CLI_INSTALL_DIR}/bin:$PATH"
 fi
 
 echo "Using devcontainer CLI version:"
@@ -76,30 +89,35 @@ echo "Container ID: $CONTAINER_ID"
 echo ""
 echo "=== Testing inside devcontainer ==="
 
-# Run commands inside the container using devcontainer exec
+# Helper function to run commands inside the container
+# Pass CI=true to all exec commands so engflow_auth wrapper skips credential helper setup
 # Pass the same --id-label so it can find the container we created
+devcontainer_run() {
+    devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" --remote-env CI=true "$@"
+}
+
 echo "Checking GCC version..."
-devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" gcc --version
+devcontainer_run gcc --version
 
 echo ""
 echo "Checking Python version..."
-devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" python3 --version
+devcontainer_run python3 --version
 
 echo ""
 echo "Checking Python venv..."
-devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" bash -c "source python3-venv/bin/activate && python --version"
+devcontainer_run bash -c "source python3-venv/bin/activate && python --version"
 
 echo ""
 echo "Checking Bazel..."
-devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" bazel --version
+devcontainer_run bazel --version
 
 echo ""
 echo "Checking Git..."
-devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" git --version
+devcontainer_run git --version
 
 echo ""
 echo "Checking clangd configuration..."
-if ! devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" test -f compile_commands.json; then
+if ! devcontainer_run test -f compile_commands.json; then
     echo "ERROR: compile_commands.json not found - clangd setup failed"
     exit 1
 fi
@@ -107,11 +125,41 @@ echo "✓ compile_commands.json exists"
 
 echo ""
 echo "Checking .clang-tidy configuration..."
-if ! devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" test -f .clang-tidy; then
+if ! devcontainer_run test -f .clang-tidy; then
     echo "ERROR: .clang-tidy not found - clang-tidy setup failed"
     exit 1
 fi
 echo "✓ .clang-tidy exists"
+
+echo ""
+echo "=== Running representative user operations ==="
+
+echo ""
+echo "Running C++ unit test..."
+devcontainer_run bazel test //src/mongo/bson:bson_test --config=local --test_output=errors
+
+echo ""
+echo "Building IDL target (tests code generation)..."
+devcontainer_run bazel build //src/mongo/bson:bson_validate --config=local
+
+echo ""
+echo "Building install-dist-test target (necessary for resmoke below)..."
+devcontainer_run bazel build install-dist-test
+
+echo ""
+echo "Running Python test via resmoke..."
+devcontainer_run python3 buildscripts/resmoke.py run --suite=core --sanityCheck
+
+echo ""
+echo "Checking code formatting..."
+devcontainer_run bazel run format
+
+echo ""
+echo "Running linter..."
+devcontainer_run bazel run lint
+
+echo ""
+echo "✅ All representative operations passed"
 
 echo ""
 echo "=== Stopping devcontainer ==="
