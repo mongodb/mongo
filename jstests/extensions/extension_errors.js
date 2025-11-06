@@ -28,7 +28,8 @@ function checkAssertionFailure({errmsg, code, assertionType}) {
         }),
         code,
     );
-    assert.eq(res.errmsg, "Extension encountered error: " + errmsg, res);
+    const expectedErrMsg = assertionType == "uassert" ? errmsg : "Extension encountered error: " + errmsg;
+    assert.eq(res.errmsg, expectedErrMsg, res);
     return res;
 }
 

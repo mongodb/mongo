@@ -400,9 +400,7 @@ TEST_F(ExtensionErrorsTest, ExtensionUasserts) {
         BSON("$assert" << BSON("errmsg" << "a new error" << "code" << 54321 << "assertionType"
                                         << "uassert"))};
     ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 54321);
-    ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx),
-                       AssertionException,
-                       "Extension encountered error: a new error");
+    ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx), AssertionException, "a new error");
 }
 
 DEATH_TEST_REGEX_F(ExtensionErrorsTest, ExtensionTasserts, "98765.*another new error") {

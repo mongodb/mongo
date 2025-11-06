@@ -132,8 +132,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
             errorBson, IDLParserContext("extUassert"));
 
         // Call the host's uassert implementation.
-        uasserted(exceptionInfo.getErrorCode(),
-                  "Extension encountered error: " + exceptionInfo.getMessage());
+        uasserted(exceptionInfo.getErrorCode(), exceptionInfo.getMessage());
     });
 }
 
