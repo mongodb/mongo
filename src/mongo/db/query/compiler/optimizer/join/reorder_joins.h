@@ -60,4 +60,14 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
 bool indexSatisfiesJoinPredicates(const IndexCatalogEntry& ice,
                                   const std::vector<IndexedJoinPredicate>& joinPreds);
 
+/**
+ * Returns the best index that can satify the indexed predicates by "index probe". If there is no
+ * index that can satisfy it then return boost::none. If multiple indexes can satisfy the join
+ * predicates, this function selects one using deterministic heuristics:
+ *  1. Prefer the index with fewer fields.
+ *  2. If tied, prefer the index whose key pattern is lexicographically earlier.
+ */
+boost::optional<IndexEntry> bestIndexSatisfyingJoinPredicates(
+    const IndexCatalog& indexCatalog, const std::vector<IndexedJoinPredicate>& joinPreds);
+
 }  // namespace mongo::join_ordering

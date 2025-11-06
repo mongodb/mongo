@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/local_catalog/index_catalog_entry_mock.h"
+#include "mongo/db/local_catalog/index_catalog_mock.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -499,12 +500,18 @@ TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
     goldenCtx.outStream() << soln->toString() << std::endl;
 }
 
-IndexCatalogEntryMock makeIndexEntry(BSONObj indexSpec) {
+IndexDescriptor makeIndexDescriptor(BSONObj indexSpec) {
     IndexSpec spec;
     spec.version(2).name("name").addKeys(indexSpec);
-    auto desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
-    return IndexCatalogEntryMock{
-        nullptr /*opCtx*/, CollectionPtr{}, "" /*ident*/, std::move(desc), false /*isFrozen*/};
+    return IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+}
+
+IndexCatalogEntryMock makeIndexEntry(BSONObj indexSpec) {
+    return IndexCatalogEntryMock{nullptr /*opCtx*/,
+                                 CollectionPtr{},
+                                 "" /*ident*/,
+                                 makeIndexDescriptor(indexSpec),
+                                 false /*isFrozen*/};
 }
 
 IndexedJoinPredicate makeIndexedPredicate(std::string path) {
@@ -512,6 +519,14 @@ IndexedJoinPredicate makeIndexedPredicate(std::string path) {
         .op = QSNJoinPredicate::ComparisonOp::Eq,
         .field = path,
     };
+}
+
+IndexCatalogMock makeIndexCatalog(std::vector<std::string> keyPatterns) {
+    IndexCatalogMock catalog;
+    for (auto&& kp : keyPatterns) {
+        catalog.createIndexEntry(nullptr, nullptr, makeIndexDescriptor(fromjson(kp)), {});
+    }
+    return catalog;
 }
 
 TEST(IndexSatisfiesJoinPredicates, CompoundIndex) {
@@ -559,6 +574,47 @@ TEST(IndexSatisfiesJoinPredicates, DottedPaths) {
     ASSERT_FALSE(indexSatisfiesJoinPredicates(
         makeIndexEntry(fromjson("{'a.a': 1, 'b.b': 1}")),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b.b")}));
+}
+
+TEST(IndexSatisfyingJoinPredicates, PreferShorterKeyPattern) {
+    auto catalog = makeIndexCatalog({
+        "{a: 1, b: 1, c: 1}",
+        "{a: 1, b: 1}",
+    });
+    auto res = bestIndexSatisfyingJoinPredicates(catalog,
+                                                 std::vector<IndexedJoinPredicate>{
+                                                     makeIndexedPredicate("a"),
+                                                     makeIndexedPredicate("b"),
+                                                 });
+    ASSERT_TRUE(res.has_value());
+    ASSERT_BSONOBJ_EQ(fromjson("{a: 1, b: 1}"), res->keyPattern);
+}
+
+TEST(IndexSatisfyingJoinPredicates, SameNumberOfKeys) {
+    auto catalog = makeIndexCatalog({
+        "{a: 1, b: 1, d: 1}",
+        "{a: 1, b: 1, c: 1}",
+    });
+    auto res = bestIndexSatisfyingJoinPredicates(catalog,
+                                                 std::vector<IndexedJoinPredicate>{
+                                                     makeIndexedPredicate("a"),
+                                                     makeIndexedPredicate("b"),
+                                                 });
+    ASSERT_TRUE(res.has_value());
+    ASSERT_BSONOBJ_EQ(fromjson("{a: 1, b: 1, c: 1}"), res->keyPattern);
+}
+
+TEST(IndexSatisfyingJoinPredicates, NoSatisfyingIndex) {
+    auto catalog = makeIndexCatalog({
+        "{a: 1, b: 1, d: 1}",
+        "{a: 1, b: 1, c: 1}",
+    });
+    auto res = bestIndexSatisfyingJoinPredicates(catalog,
+                                                 std::vector<IndexedJoinPredicate>{
+                                                     makeIndexedPredicate("a"),
+                                                     makeIndexedPredicate("c"),
+                                                 });
+    ASSERT_FALSE(res.has_value());
 }
 
 }  // namespace mongo::join_ordering
