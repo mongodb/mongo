@@ -159,7 +159,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                 nss,
                 SessionsCollection::generateCreateIndexesCmd(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kNoRetry,
+                Shard::RetryPolicy::kStrictlyNotIdempotent,
                 BSONObj() /*query*/,
                 BSONObj() /*collation*/,
                 boost::none /*letParameters*/,

@@ -170,7 +170,7 @@ public:
                                 dbInfo,
                                 renameCollRequest.toBSON(),
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                Shard::RetryPolicy::kNoRetry);
+                                Shard::RetryPolicy::kStrictlyNotIdempotent);
 
                         const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
                         const auto resultObj =

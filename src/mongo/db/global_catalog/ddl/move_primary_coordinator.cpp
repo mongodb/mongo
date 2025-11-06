@@ -610,7 +610,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,
             command,
-            Shard::RetryPolicy::kNoRetry);
+            Shard::RetryPolicy::kStrictlyNotIdempotent);
 
         uassertStatusOKWithContext(
             Shard::CommandResponse::getEffectiveStatus(cloneResponse),
