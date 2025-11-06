@@ -1,26 +1,14 @@
 # Advanced Dev Container Usage
 
-This guide covers advanced topics for power users who want to customize and extend their devcontainer setup.
+This guide covers advanced workflows and power user features for managing multiple containers, backups, and complex development scenarios.
+
+**Looking to customize your devcontainer?** See the [Customization Guide](./customization.md) for dotfiles, VS Code settings, extensions, and performance tuning.
 
 ## Table of Contents
 
-- [Customizing the Container](#customizing-the-container)
 - [Working with Multiple Containers](#working-with-multiple-containers)
-- [Adding Custom Features](#adding-custom-features)
-- [VS Code Customization](#vs-code-customization)
-- [Performance Tuning](#performance-tuning)
 - [Backup and Migration](#backup-and-migration)
 - [Development Workflows](#development-workflows)
-
-## Customizing the Container
-
-### Persistent Dotfiles
-
-[Learn more about personalizing with dotfiles →](https://code.visualstudio.com/docs/devcontainers/containers#_personalizing-with-dotfile-repositories)
-
-### Always Installed Features
-
-[Learn more about adding a set of personalized features](https://code.visualstudio.com/docs/devcontainers/containers#_always-installed-features)
 
 ## Working with Multiple Containers
 
@@ -59,176 +47,6 @@ common --bes_keywords=devcontainer:docker_server_platform=<platform>
 ```
 
 This helps the team understand devcontainer adoption and troubleshoot issues.
-
-## Adding Custom Features
-
-### Creating a Custom Feature
-
-Features are modular additions to your devcontainer. Create one:
-
-```bash
-mkdir -p .devcontainer/features/my-feature
-cd .devcontainer/features/my-feature
-```
-
-**Create `devcontainer-feature.json`:**
-
-```json
-{
-  "id": "my-feature",
-  "version": "1.0.0",
-  "name": "My Custom Feature",
-  "description": "Adds my custom tools and configuration",
-  "options": {
-    "version": {
-      "type": "string",
-      "default": "latest",
-      "description": "Version to install"
-    }
-  }
-}
-```
-
-**Create `install.sh`:**
-
-```bash
-#!/usr/bin/env bash
-set -e
-
-VERSION="${VERSION:-latest}"
-
-echo "Installing my-feature version $VERSION..."
-
-# Your installation logic here
-apt-get update
-apt-get install -y my-package
-
-echo "my-feature installation complete!"
-```
-
-**Note**: Custom features are typically contributed to the main devcontainer configuration through pull requests rather than added individually.
-
-### Example: MongoDB Compass Feature
-
-```bash
-# .devcontainer/features/compass/install.sh
-#!/usr/bin/env bash
-set -e
-
-echo "Installing MongoDB Compass..."
-
-wget https://downloads.mongodb.com/compass/mongodb-compass_latest_amd64.deb
-sudo dpkg -i mongodb-compass_latest_amd64.deb || true
-sudo apt-get install -f -y
-rm mongodb-compass_latest_amd64.deb
-
-echo "Compass installed!"
-```
-
-### Example: Database Tools Feature
-
-```bash
-# .devcontainer/features/db-tools/install.sh
-#!/usr/bin/env bash
-set -e
-
-echo "Installing MongoDB Database Tools..."
-
-wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.9.4.deb
-sudo dpkg -i mongodb-database-tools-*.deb
-rm mongodb-database-tools-*.deb
-
-echo "Database tools installed: mongodump, mongorestore, etc."
-```
-
-## VS Code Customization
-
-### User-Specific Settings
-
-Override devcontainer settings in user `settings.json`.
-
-[Learn more about container-specific settings →](https://code.visualstudio.com/docs/devcontainers/containers#_container-specific-settings)
-
-```json
-{
-  // Your personal preferences
-  "editor.fontSize": 14,
-  "editor.tabSize": 2,
-  "terminal.integrated.fontSize": 13,
-
-  // Override theme
-  "workbench.colorTheme": "Monokai",
-
-  // Additional formatters
-  "editor.defaultFormatter": "esbenp.prettier-vscode"
-}
-```
-
-### Additional Extensions
-
-Install extra extensions without modifying `devcontainer.json`:
-
-```bash
-# Via command line
-code --install-extension ms-vscode.hexeditor
-
-# Or manually in Extensions panel
-```
-
-### Port Forwarding
-
-VS Code automatically forwards ports from the container to your host machine. When a service listens on a port inside the container, VS Code detects it and makes it accessible from your browser.
-
-```bash
-# Start mongod on default port 27017
-./bazel-bin/src/mongo/mongod --dbpath /data/db
-
-# VS Code will automatically forward port 27017
-# Access from host: localhost:27017
-```
-
-**Manual port forwarding:**
-
-- Click on the Ports tab in VS Code terminal panel
-- Add port → Enter port number
-- Access forwarded ports from your host browser or tools
-- **Note**: Some firewall configurations may block forwarded ports
-
-[Learn more about port forwarding →](https://code.visualstudio.com/docs/devcontainers/containers#_forwarding-or-publishing-a-port)
-
-## Performance Tuning
-
-### Docker Performance
-
-**macOS:**
-
-- Use VirtioFS instead of osxfs (Docker Desktop 4.6+)
-- Settings → Experimental → VirtioFS
-
-**All platforms:**
-
-- Allocate as many resources as possible to Docker (see [Getting Started](./getting-started.md))
-- Use named volumes (not bind mounts)
-- Enable BuildKit (for faster image builds):
-  ```bash
-  export DOCKER_BUILDKIT=1
-  ```
-
-### File Watching
-
-Reduce file watcher overhead:
-
-```json
-// Add to VS Code settings.json
-{
-  "files.watcherExclude": {
-    "**/bazel-*/**": true,
-    "**/node_modules/**": true,
-    "**/.cache/**": true,
-    "**/python3-venv/**": true
-  }
-}
-```
 
 ## Backup and Migration
 
@@ -331,6 +149,7 @@ du -sh /opt/mongodbtoolchain/*
 
 **See Also:**
 
+- [Customization](./customization.md) - Personalize your devcontainer
 - [Architecture](./architecture.md) - How it all works
 - [Troubleshooting](./troubleshooting.md) - Fix issues
 - [FAQ](./faq.md) - Common questions

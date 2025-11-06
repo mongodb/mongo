@@ -15,6 +15,13 @@ This is the comprehensive guide for developing MongoDB using Dev Containers. Cho
 - First-time configuration
 - Verifying your setup
 
+### 🎨 [Customization](./customization.md)
+
+**Personal customizations without modifying the devcontainer setup**
+
+- Persistent dotfiles
+- Always-installed features
+
 ### 🏗️ [Architecture & Technical Details](./architecture.md)
 
 **Understand how the devcontainer works under the hood**
@@ -38,14 +45,12 @@ This is the comprehensive guide for developing MongoDB using Dev Containers. Cho
 
 ### 💡 [Advanced Usage](./advanced.md)
 
-**Power user features and customization**
+**Power user workflows and complex scenarios**
 
-- Customizing your devcontainer
 - Working with multiple containers
-- Remote execution with EngFlow
-- Custom toolchain versions
-- Integration with CI/CD
-- Extending with additional features
+- Backup and migration strategies
+- Development workflows and debugging
+- EngFlow telemetry integration
 
 ### ❓ [FAQ](./faq.md)
 
