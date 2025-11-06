@@ -39,6 +39,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/processinfo.h"
 
 #include <utility>
 
@@ -238,12 +239,42 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions(
     });
 }
 
+Status TicketingSystem::LowPrioritySettings::validateConcurrentWriteTransactions(
+    const int32_t& newWriteTransactions, const boost::optional<TenantId>) {
+    if (newWriteTransactions < 0 &&
+        newWriteTransactions != TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue) {
+        return Status(ErrorCodes::BadValue,
+                      "Invalid value for 'executionControlConcurrentWriteLowPriorityTransactions': "
+                      "must be >= 0, or -1 to use the number of logical CPU cores.");
+    }
+    return Status::OK();
+}
+
+Status TicketingSystem::LowPrioritySettings::validateConcurrentReadTransactions(
+    const int32_t& newReadTransactions, const boost::optional<TenantId>) {
+    if (newReadTransactions < 0 &&
+        newReadTransactions != TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue) {
+        return Status(ErrorCodes::BadValue,
+                      "Invalid value for 'executionControlConcurrentReadLowPriorityTransactions': "
+                      "must be >= 0, or -1 to use the number of logical CPU cores.");
+    }
+    return Status::OK();
+}
+
 Status TicketingSystem::updateConcurrencyAdjustmentAlgorithm(std::string algorithmName) {
     return updateSettings("concurrency adjustment algorithm",
                           [&](Client* client, TicketingSystem* ticketingSystem) {
                               return ticketingSystem->setConcurrencyAdjustmentAlgorithm(
                                   client->getOperationContext(), algorithmName);
                           });
+}
+
+int TicketingSystem::resolveLowPriorityTickets(const AtomicWord<int32_t>& serverParam) {
+    const int loadedValue = serverParam.load();
+
+    return loadedValue == kUnsetLowPriorityConcurrentTransactionsValue
+        ? static_cast<int32_t>(ProcessInfo::getNumLogicalCores())
+        : loadedValue;
 }
 
 TicketingSystem* TicketingSystem::get(ServiceContext* svcCtx) {
@@ -340,14 +371,16 @@ Status TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCt
                               AdmissionContext::Priority::kNormal,
                               OperationType::kWrite,
                               gConcurrentWriteTransactions.load());
-    setConcurrentTransactions(opCtx,
-                              AdmissionContext::Priority::kLow,
-                              OperationType::kRead,
-                              gConcurrentReadLowPriorityTransactions.load());
-    setConcurrentTransactions(opCtx,
-                              AdmissionContext::Priority::kLow,
-                              OperationType::kWrite,
-                              gConcurrentWriteLowPriorityTransactions.load());
+    setConcurrentTransactions(
+        opCtx,
+        AdmissionContext::Priority::kLow,
+        OperationType::kRead,
+        TicketingSystem::resolveLowPriorityTickets(gConcurrentReadLowPriorityTransactions));
+    setConcurrentTransactions(
+        opCtx,
+        AdmissionContext::Priority::kLow,
+        OperationType::kWrite,
+        TicketingSystem::resolveLowPriorityTickets(gConcurrentWriteLowPriorityTransactions));
 
     return Status::OK();
 }

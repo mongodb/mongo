@@ -65,8 +65,8 @@ namespace admission {
  */
 class TicketingSystem {
 public:
-    static constexpr auto kDefaultConcurrentTransactions = 128;
-    static constexpr auto kDefaultLowPriorityConcurrentTransactions = 5;
+    static constexpr auto kDefaultConcurrentTransactionsValue = 128;
+    static constexpr auto kUnsetLowPriorityConcurrentTransactionsValue = -1;
     static constexpr auto kExemptPriorityName = "exempt"_sd;
     static constexpr auto kLowPriorityName = "lowPriority"_sd;
     static constexpr auto kNormalPriorityName = "normalPriority"_sd;
@@ -109,9 +109,21 @@ public:
         static Status updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth);
         static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
+        static Status validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,
+                                                          boost::optional<TenantId>);
+        static Status validateConcurrentReadTransactions(const int32_t& newReadTransactions,
+                                                         boost::optional<TenantId>);
     };
 
     static Status updateConcurrencyAdjustmentAlgorithm(std::string newAlgorithm);
+
+    /**
+     * Resolves the configured number of low-priority tickets.
+     *
+     * If the server parameter matches the default, this function returns the number of logical
+     * cores. Otherwise, it returns the specific value loaded from the atomic.
+     */
+    static int resolveLowPriorityTickets(const AtomicWord<int32_t>& serverParam);
 
     static TicketingSystem* get(ServiceContext* svcCtx);
 

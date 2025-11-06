@@ -56,7 +56,9 @@ enums:
 
 server_parameters:
     executionControlConcurrentWriteTransactions:
-        description: "Execution Control Concurrent Write Transactions"
+        description: >-
+            The number of maximum concurrent write transactions (write tickets) allowed for
+            execution control.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentWriteTransactions
@@ -65,26 +67,34 @@ server_parameters:
             - storageEngineConcurrentWriteTransactions
             - wiredTigerConcurrentWriteTransactions
         default:
-            {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
+            {
+                expr: "admission::TicketingSystem::kDefaultConcurrentTransactionsValue",
+            }
         validator:
             callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions"
         redact: false
 
     executionControlConcurrentWriteLowPriorityTransactions:
-        description: "Execution Control Concurrent Write Low Priority Transactions"
+        description: >-
+            The number of maximum concurrent write low-priority transactions (write tickets) allowed
+            for execution control. Using the default value means to use the number of logical CPU
+            cores.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentWriteLowPriorityTransactions
         on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions"
         default:
             {
-                expr: "admission::TicketingSystem::kDefaultLowPriorityConcurrentTransactions",
+                expr: "admission::TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue",
             }
-        validator: {gte: 0}
+        validator:
+            callback: "admission::TicketingSystem::LowPrioritySettings::validateConcurrentWriteTransactions"
         redact: false
 
     executionControlConcurrentReadTransactions:
-        description: "Execution Control Concurrent Read Transactions"
+        description: >-
+            The number of maximum concurrent read transactions (read tickets) allowed for execution
+            control.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentReadTransactions
@@ -93,22 +103,28 @@ server_parameters:
             - storageEngineConcurrentReadTransactions
             - wiredTigerConcurrentReadTransactions
         default:
-            {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
+            {
+                expr: "admission::TicketingSystem::kDefaultConcurrentTransactionsValue",
+            }
         validator:
             callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactions"
         redact: false
 
     executionControlConcurrentReadLowPriorityTransactions:
-        description: "Execution Control Concurrent Read Low Priority Transactions"
+        description: >-
+            The number of maximum concurrent read low-priority transactions (read tickets) allowed
+            for execution control. Using the default value means to use the number of logical CPU
+            cores.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentReadLowPriorityTransactions
         on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions"
         default:
             {
-                expr: "admission::TicketingSystem::kDefaultLowPriorityConcurrentTransactions",
+                expr: "admission::TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue",
             }
-        validator: {gte: 0}
+        validator:
+            callback: "admission::TicketingSystem::LowPrioritySettings::validateConcurrentReadTransactions"
         redact: false
 
     executionControlReadMaxQueueDepth:

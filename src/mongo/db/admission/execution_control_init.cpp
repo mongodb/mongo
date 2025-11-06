@@ -52,10 +52,10 @@ bool hasNonDefaultTransactionConcurrencySettings() {
                             gConcurrentReadLowPriorityTransactions.load(),
                             gConcurrentWriteLowPriorityTransactions.load()};
 
-    const std::array defaults{TicketingSystem::kDefaultConcurrentTransactions,
-                              TicketingSystem::kDefaultConcurrentTransactions,
-                              TicketingSystem::kDefaultLowPriorityConcurrentTransactions,
-                              TicketingSystem::kDefaultLowPriorityConcurrentTransactions};
+    const std::array defaults{TicketingSystem::kDefaultConcurrentTransactionsValue,
+                              TicketingSystem::kDefaultConcurrentTransactionsValue,
+                              TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue,
+                              TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue};
 
     auto [actIt, defIt] = std::mismatch(actual.begin(), actual.end(), defaults.begin());
     return actIt != actual.end();
@@ -87,16 +87,18 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                                            gWriteMaxQueueDepth.load(),
                                            delinquentWriteCb)},
         TicketingSystem::RWTicketHolder{
-            std::make_unique<TicketHolder>(svcCtx,
-                                           gConcurrentReadLowPriorityTransactions.load(),
-                                           false /* trackPeakUsed */,
-                                           gReadLowPriorityMaxQueueDepth.load(),
-                                           delinquentReadCb),
-            std::make_unique<TicketHolder>(svcCtx,
-                                           gConcurrentWriteLowPriorityTransactions.load(),
-                                           false /* trackPeakUsed */,
-                                           gWriteLowPriorityMaxQueueDepth.load(),
-                                           delinquentWriteCb)},
+            std::make_unique<TicketHolder>(
+                svcCtx,
+                TicketingSystem::resolveLowPriorityTickets(gConcurrentReadLowPriorityTransactions),
+                false /* trackPeakUsed */,
+                gReadLowPriorityMaxQueueDepth.load(),
+                delinquentReadCb),
+            std::make_unique<TicketHolder>(
+                svcCtx,
+                TicketingSystem::resolveLowPriorityTickets(gConcurrentWriteLowPriorityTransactions),
+                false /* trackPeakUsed */,
+                gWriteLowPriorityMaxQueueDepth.load(),
+                delinquentWriteCb)},
         Milliseconds{gExecutionControlConcurrencyAdjustmentIntervalMillis},
         algorithm);
 }
@@ -109,8 +111,10 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
         IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
 
     if (algorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
-        (gConcurrentReadTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions ||
-         gConcurrentWriteTransactions.load() != TicketingSystem::kDefaultConcurrentTransactions)) {
+        (gConcurrentReadTransactions.load() !=
+             TicketingSystem::kDefaultConcurrentTransactionsValue ||
+         gConcurrentWriteTransactions.load() !=
+             TicketingSystem::kDefaultConcurrentTransactionsValue)) {
         gExecutionControlConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
         algorithm =
             ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions;
