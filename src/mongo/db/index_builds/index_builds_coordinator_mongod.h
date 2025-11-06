@@ -123,43 +123,6 @@ public:
 
 private:
     /**
-     * Keeps track of the relevant replica set member states. Index builds are managed differently
-     * depending on the state of the replica set member.
-     *
-     * These states follow the replica set member states, as maintained by MemberState in the
-     * ReplicationCoordinator. If not in Primary or InitialSync modes, then the default will be
-     * Secondary, with the expectation that a replica set member must always transition to Secondary
-     * before Primary.
-     */
-    enum class ReplState { Primary, Secondary, InitialSync };
-
-    /**
-     * TODO: not yet implemented.
-     */
-    Status _finishScanningPhase();
-
-    /**
-     * TODO: not yet implemented.
-     */
-    Status _finishVerificationPhase();
-
-    /**
-     * TODO: not yet implemented.
-     */
-    Status _finishCommitPhase();
-
-    /**
-     * TODO: not yet implemented.
-     */
-    StatusWith<bool> _checkCommitQuorum(const BSONObj& commitQuorum,
-                                        const std::vector<HostAndPort>& confirmedMembers);
-
-    /**
-     * TODO: not yet implemented.
-     */
-    void _refreshReplStateFromPersisted(OperationContext* opCtx, const UUID& buildUUID);
-
-    /**
      * Signals index builder to commit.
      */
     void _sendCommitQuorumSatisfiedSignal(OperationContext* opCtx,

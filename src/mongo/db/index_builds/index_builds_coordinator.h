@@ -934,10 +934,4 @@ protected:
     // The thread spawned during step-up to verify the builds.
     stdx::thread _stepUpThread;
 };
-
-// These fail points are used to control index build progress. Declared here to be shared
-// temporarily between createIndexes command and IndexBuildsCoordinator.
-extern FailPoint hangAfterIndexBuildFirstDrain;
-extern FailPoint hangAfterIndexBuildDumpsInsertsFromBulk;
-
 }  // namespace mongo

@@ -1153,30 +1153,4 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {
-    // TODO: implement.
-    return Status::OK();
-}
-
-Status IndexBuildsCoordinatorMongod::_finishVerificationPhase() {
-    // TODO: implement.
-    return Status::OK();
-}
-
-Status IndexBuildsCoordinatorMongod::_finishCommitPhase() {
-    // TODO: implement.
-    return Status::OK();
-}
-
-StatusWith<bool> IndexBuildsCoordinatorMongod::_checkCommitQuorum(
-    const BSONObj& commitQuorum, const std::vector<HostAndPort>& confirmedMembers) {
-    // TODO: not yet implemented.
-    return false;
-}
-
-void IndexBuildsCoordinatorMongod::_refreshReplStateFromPersisted(OperationContext* opCtx,
-                                                                  const UUID& buildUUID) {
-    // TODO: not yet implemented.
-}
-
 }  // namespace mongo
