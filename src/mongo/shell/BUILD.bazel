@@ -1,5 +1,5 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@poetry//:dependencies.bzl", "dependency")
-load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "windows_rc")
 load("//bazel/config:render_template.bzl", "render_template")
 
@@ -324,6 +324,7 @@ MONGO_SERVER_CPP_JS_FILES = [
     "bridge_global.js",
     "data_consistency_checker.js",
     "data_consistency_checker_global.js",
+    "feature_compatibility_version.js",
     "feature_compatibility_version_global.js",
     "keyvault.js",
     "servers.js",
@@ -547,6 +548,8 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fifth_group"],
     deps = ["shell_test_dependencies"],
 )
+
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 
 mongo_js_library(
     name = "all",

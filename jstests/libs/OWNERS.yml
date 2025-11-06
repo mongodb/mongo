@@ -96,9 +96,6 @@ filters:
   - "host_ipaddr.js":
     approvers:
       - 10gen/server-networking-and-observability
-  - "feature_compatibility_version.js":
-    approvers:
-      - 10gen/server-fcv
   - "*.pem":
     approvers:
       - 10gen/server-security

@@ -9,8 +9,6 @@
  * ]
  */
 
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
-
 const coll = db["coll"];
 const indexField = "a";
 const bucketRoundingSecondsHours = 60 * 60 * 24;
@@ -27,7 +25,7 @@ function createTestColl() {
     assert.commandWorked(coll.createIndex({[indexField]: 1}));
 }
 
-let timeseriesOptions = [
+const timeseriesOptions = [
     {"timeseries": {"granularity": "minutes"}},
     {
         "timeseries": {
@@ -35,15 +33,8 @@ let timeseriesOptions = [
             "bucketRoundingSeconds": bucketRoundingSecondsHours,
         },
     },
+    {"timeseriesBucketsMayHaveMixedSchemaData": true},
 ];
-
-// TODO SERVER-105548 always include `timeseriesBucketsMayHaveMixedSchemaData` in the list of timeseries options above.
-if (isFCVgte(db, "8.3")) {
-    // Starting from SERVER-105337 (8.3) we started blocking CRUD operations also for
-    // timeseriesBucketsMayHaveMixedSchemaData collmod options.
-    timeseriesOptions.push({"timeseriesBucketsMayHaveMixedSchemaData": true});
-}
-
 const nonTimeseriesValidOptions = [
     {"index": {"keyPattern": {[indexField]: 1}, "hidden": true}},
     {"expireAfterSeconds": 60},

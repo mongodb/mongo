@@ -1,56 +1,30 @@
-/**
- * Contains helpers for checking the featureCompatibilityVersion.
- */
-
-function getFCVDocument(conn) {
-    let adminDB = typeof conn.getDB === "function" ? conn.getDB("admin") : conn.getSiblingDB("admin");
-    return adminDB["system.version"].findOne({_id: "featureCompatibilityVersion"});
-}
-
-export function getCurrentFCV(conn) {
-    const FCVDoc = getFCVDocument(conn);
-    assert(FCVDoc, "Failed to retrieve FCV document");
-    return FCVDoc.version;
-}
+// Contains helpers for checking the featureCompatibilityVersion and constants for the current
+// featureCompatibilityVersion values.
 
 /**
- * Returns true if we are running in a test suite with stable FCV.
+ * These constants represent the current "latest", "last-continuous" and "last-lts" values for the
+ * featureCompatibilityVersion parameter. They should only be used for testing of upgrade-downgrade
+ * scenarios that are intended to be maintained between releases.
+ *
+ * We cannot use `const` when declaring them because it must be possible to load() this file
+ * multiple times.
  */
-export function isStableFCVSuite() {
-    return !TestData.isRunningFCVUpgradeDowngradeSuite;
-}
 
-export function isFCVgt(conn, targetVersion) {
-    const lowestFCV = isStableFCVSuite() ? getCurrentFCV(conn) : lastLTSFCV;
-    return MongoRunner.compareBinVersions(lowestFCV, targetVersion) > 0;
-}
+let fcvConstants = getFCVConstants();
 
-export function isFCVgte(conn, targetVersion) {
-    const lowestFCV = isStableFCVSuite() ? getCurrentFCV(conn) : lastLTSFCV;
-    return MongoRunner.compareBinVersions(lowestFCV, targetVersion) >= 0;
-}
-
-export function isFCVlt(conn, targetVersion) {
-    const highestFCV = isStableFCVSuite() ? getCurrentFCV(conn) : latestFCV;
-    return MongoRunner.compareBinVersions(highestFCV, targetVersion) < 0;
-}
-
-export function isFCVlte(conn, targetVersion) {
-    const highestFCV = isStableFCVSuite() ? getCurrentFCV(conn) : latestFCV;
-    return MongoRunner.compareBinVersions(highestFCV, targetVersion) <= 0;
-}
-
-export function isFCVeq(conn, targetVersion) {
-    assert(isStableFCVSuite(), "Can't use `isFCVeq` function in suites that perform backround FCV transitions.");
-    const currentFCV = getCurrentFCV(conn);
-    return MongoRunner.compareBinVersions(currentFCV, targetVersion) == 0;
-}
+let latestFCV = fcvConstants.latest;
+let lastContinuousFCV = fcvConstants.lastContinuous;
+let lastLTSFCV = fcvConstants.lastLTS;
+// The number of versions since the last-lts version. When numVersionsSinceLastLTS = 1,
+// lastContinuousFCV is equal to lastLTSFCV. This is used to calculate the expected minWireVersion
+// in jstests that use the lastLTSFCV.
+let numVersionsSinceLastLTS = fcvConstants.numSinceLastLTS;
 
 /**
  * Returns the FCV associated with a binary version.
  * eg. An input of 'last-lts' will return lastLTSFCV.
  */
-export function binVersionToFCV(binVersion) {
+function binVersionToFCV(binVersion) {
     if (binVersion === "latest") {
         return latestFCV;
     }
@@ -64,7 +38,7 @@ export function binVersionToFCV(binVersion) {
  * of the form {featureCompatibilityVersion: {version: <required>, targetVersion: <optional>,
  * previousVersion: <optional>}, ok: 1}.
  */
-export function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata) {
+function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata) {
     // When both version and targetVersion are equal to lastContinuousFCV or lastLTSFCV, downgrade
     // is in progress. This tests that previousVersion is always equal to latestFCV in downgrading
     // states or undefined otherwise.
@@ -136,9 +110,22 @@ export function checkFCV(adminDB, version, targetVersion, isCleaningServerMetada
 }
 
 /**
+ * Returns true if checkFCV runs successfully.
+ */
+function isFCVEqual(adminDB, version, targetVersion) {
+    try {
+        checkFCV(adminDB, version, targetVersion);
+    } catch (e) {
+        jsTestLog("checkFCV failed with error: " + tojson(e));
+        return false;
+    }
+    return true;
+}
+
+/**
  * Since SERVER-29453 disallowed removal of the FCV document, we need to do this hack to remove it.
  */
-export function removeFCVDocument(adminDB) {
+function removeFCVDocument(adminDB) {
     let res = adminDB.runCommand({listCollections: 1, filter: {name: "system.version"}});
     assert.commandWorked(res, "failed to list collections");
     let originalUUID = res.cursor.firstBatch[0].info.uuid;
@@ -174,7 +161,7 @@ export function removeFCVDocument(adminDB) {
  *
  * 'testFunc' is expected to be a function that accepts a valid downgrade FCV as input.
  */
-export function runFeatureFlagMultiversionTest(featureFlag, testFunc) {
+function runFeatureFlagMultiversionTest(featureFlag, testFunc) {
     jsTestLog("Running standalone to gather parameter info about featureFlag: " + featureFlag);
     // Spin up a standalone to check the release version of 'featureFlag'.
     let standalone = MongoRunner.runMongod();
@@ -207,3 +194,15 @@ export function runFeatureFlagMultiversionTest(featureFlag, testFunc) {
         testFunc(lastContinuousFCV);
     }
 }
+
+export {
+    binVersionToFCV,
+    checkFCV,
+    isFCVEqual,
+    lastContinuousFCV,
+    lastLTSFCV,
+    latestFCV,
+    numVersionsSinceLastLTS,
+    removeFCVDocument,
+    runFeatureFlagMultiversionTest,
+};

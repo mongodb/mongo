@@ -71,6 +71,7 @@ export default [
                 // src/mongo/shell/feature_compatibility_version_global.js
                 binVersionToFCV: true,
                 checkFCV: true,
+                isFCVEqual: true,
                 lastContinuousFCV: true,
                 lastLTSFCV: true,
                 latestFCV: true,

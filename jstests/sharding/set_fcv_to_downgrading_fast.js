@@ -19,19 +19,6 @@ const latest = "latest";
 // Windows is slower but usually can make it in 4s, so we allow it to finish in 6s.
 const timeoutSeconds = _isWindows() ? 6 : 3;
 
-/**
- * Returns true if checkFCV runs successfully.
- */
-function isFCVEqual(adminDB, version, targetVersion) {
-    try {
-        checkFCV(adminDB, version, targetVersion);
-    } catch (e) {
-        jsTestLog("checkFCV failed with error: " + tojson(e));
-        return false;
-    }
-    return true;
-}
-
 function runStandaloneTest() {
     jsTestLog("Running standalone test");
     const conn = MongoRunner.runMongod({binVersion: latest});
