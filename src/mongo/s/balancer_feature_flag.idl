@@ -38,5 +38,6 @@ feature_flags:
     featureFlagBalancerWindowDOW:
         description: "Feature flag for enabling day-of-week specific balancing windows."
         cpp_varname: gFeatureFlagBalancerWindowDOW
-        default: false
+        default: true
         fcv_gated: true
+        version: 8.3

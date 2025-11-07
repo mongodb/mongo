@@ -742,6 +742,8 @@ TEST_F(BalancerSettingsTestFixture, ActiveWindowAndActiveWindowDOWPrecedence) {
 
 // ===== Feature Flag Disabled Tests =====
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWDisabled_IgnoresActiveWindowDOW) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
+                                                               false);
     BalancerConfiguration config;
     unittest::LogCaptureGuard logs;
     BalancerSettings settings = assertGet(
@@ -759,6 +761,8 @@ TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWDisabled_IgnoresActiveWind
 
 
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWDisabled_FallsBackToActiveWindow) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
+                                                               false);
     BalancerConfiguration config;
     unittest::LogCaptureGuard logs;
 
