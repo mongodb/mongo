@@ -562,6 +562,11 @@ def validate_atlas(sources_text, edition, binfile):
             raise Exception(f"Failed to find atlas code in {edition} binary {binfile}.")
 
 
+def validate_no_libdwarf(sources_text, edition, binfile):
+    if "third_party/libdwarf" in sources_text:
+        raise Exception(f"Found LGPL code from libdwarf in {edition} binary {binfile}.")
+
+
 arches: Set[str] = set()
 oses: Set[str] = set()
 editions: Set[str] = set()
@@ -750,6 +755,7 @@ if args.command == "branch":
                 output_text = p.stdout + p.stderr
                 logging.info(output_text)
 
+                validate_no_libdwarf(output_text, args.edition, binfile)
                 validate_enterprise(output_text, args.edition, binfile)
                 validate_atlas(output_text, args.edition, binfile)
 
