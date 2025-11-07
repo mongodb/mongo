@@ -188,10 +188,6 @@ public:
 
     const char* getSourceName() const override;
 
-    static const Id& id;
-
-    Id getId() const override;
-
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}

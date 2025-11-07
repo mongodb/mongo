@@ -31,6 +31,8 @@
 
 namespace mongo::extension::host {
 
+ALLOCATE_DOCUMENT_SOURCE_ID(extensionOptimizable, DocumentSourceExtensionOptimizable::id);
+
 Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& opts) const {
     tassert(11217800,
             "SerializationOptions should keep literals unchanged while represented as a "
@@ -44,6 +46,10 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
         return Value(_logicalStage.serialize());
     }
     return Value(BSONObj());
+}
+
+DocumentSource::Id DocumentSourceExtensionOptimizable::getId() const {
+    return id;
 }
 
 }  // namespace mongo::extension::host

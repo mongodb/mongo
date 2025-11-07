@@ -37,8 +37,6 @@
 
 namespace mongo::extension::host {
 
-ALLOCATE_DOCUMENT_SOURCE_ID(extension, DocumentSourceExtension::id);
-
 class DocumentSourceExtension::LiteParsedExpandable::ExpansionValidationFrame {
 public:
     ExpansionValidationFrame(ExpansionState& state, std::string stageName)
@@ -200,10 +198,6 @@ DocumentSourceExtension::DocumentSourceExtension(
 
 const char* DocumentSourceExtension::getSourceName() const {
     return _stageName.c_str();
-}
-
-DocumentSource::Id DocumentSourceExtension::getId() const {
-    return id;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>

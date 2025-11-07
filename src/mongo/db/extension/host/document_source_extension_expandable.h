@@ -50,6 +50,10 @@ public:
         return expandImpl(getExpCtx(), _parseNode);
     }
 
+    static const Id& id;
+
+    Id getId() const override;
+
 private:
     const AggStageParseNodeHandle _parseNode;
 

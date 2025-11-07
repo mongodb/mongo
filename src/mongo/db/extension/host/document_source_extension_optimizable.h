@@ -47,6 +47,10 @@ public:
 
     Value serialize(const SerializationOptions& opts) const override;
 
+    static const Id& id;
+
+    Id getId() const override;
+
 protected:
     const LogicalAggStageHandle _logicalStage;
 

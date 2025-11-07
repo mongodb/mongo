@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/host/document_source_extension_expandable.h"
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
@@ -36,6 +37,8 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 
 namespace mongo::extension::host {
+
+ALLOCATE_DOCUMENT_SOURCE_ID(extensionExpandable, DocumentSourceExtensionExpandable::id);
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandable::expandImpl(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -104,6 +107,10 @@ Value DocumentSourceExtensionExpandable::serialize(const SerializationOptions& o
 
     host_connector::QueryShapeOptsAdapter adapter{&opts};
     return Value(_parseNode.getQueryShape(adapter));
+}
+
+DocumentSource::Id DocumentSourceExtensionExpandable::getId() const {
+    return id;
 }
 
 }  // namespace mongo::extension::host
