@@ -54,10 +54,6 @@ genrule(
     cat bazel-out/volatile-status.txt  > $@
     """,
     stamp = True,
-    tags = [
-        "external",
-        "no-cache",
-    ],  # Consuming volatile-status, so this should not cache
     visibility = ["//visibility:public"],
 )
 
@@ -69,10 +65,6 @@ genrule(
     awk '/^TEST_RUNTIMES/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
     """,
     stamp = True,
-    tags = [
-        "external",
-        "no-cache",
-    ],  # Consuming volatile-status, so this should not cache
     visibility = ["//visibility:public"],
 )
 

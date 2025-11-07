@@ -1349,8 +1349,6 @@ functions:
         build_variant: ${build_variant}
         version_id: ${version_id}
         requester: ${requester}
-        otel_trace_id: ${otel_trace_id}
-        otel_parent_id: ${otel_parent_id}
       args:
         - "./src/evergreen/resmoke_tests_execute_bazel.sh"
 
