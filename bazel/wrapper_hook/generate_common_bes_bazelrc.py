@@ -1,14 +1,18 @@
 import base64
 import hashlib
 import json
-import multiprocessing
 import os
 import pathlib
-import platform
 import socket
 import sys
 
 import git
+
+from bazel.wrapper_hook.wrapper_util import (
+    cpu_info,
+    filesystem_info,
+    memory_info,
+)
 
 
 def write_workstation_bazelrc(args):
@@ -78,49 +82,10 @@ def write_workstation_bazelrc(args):
         pass
 
     # Collect system resource information
-    cpu_count = "Unknown"
-    total_memory_gb = "Unknown"
-    available_memory_gb = "Unknown"
-    filesystem_type = "Unknown"
-
-    # CPU count - works on all platforms
-    try:
-        cpu_count = str(os.cpu_count() or multiprocessing.cpu_count())
-    except Exception:
-        pass
-
-    # Memory - Linux only
-    try:
-        if platform.system() == "Linux":
-            with open("/proc/meminfo", "r") as f:
-                for line in f:
-                    if line.startswith("MemTotal:"):
-                        kb = int(line.split()[1])
-                        total_memory_gb = str(round(kb / (1024 * 1024), 2))
-                    elif line.startswith("MemAvailable:"):
-                        kb = int(line.split()[1])
-                        available_memory_gb = str(round(kb / (1024 * 1024), 2))
-    except Exception:
-        pass
-
-    # Filesystem type - Linux only
-    try:
-        if platform.system() == "Linux":
-            repo_path = str(repo_root)
-            with open("/proc/mounts", "r") as f:
-                best_mountpoint_len = 0
-                for line in f:
-                    parts = line.split()
-                    if len(parts) >= 3:
-                        mountpoint, fstype = parts[1], parts[2]
-                        if (
-                            repo_path.startswith(mountpoint)
-                            and len(mountpoint) > best_mountpoint_len
-                        ):
-                            filesystem_type = fstype
-                            best_mountpoint_len = len(mountpoint)
-    except Exception:
-        pass
+    cpu_count = cpu_info()  # CPU count - works on all platforms
+    total_memory_gb = memory_info("MemTotal")  # Total memory - Linux only
+    available_memory_gb = memory_info("MemAvailable")  # Available memory - Linux only
+    filesystem_type, best_mountpoint_len = filesystem_info()  # Filesystem type - Linux only
 
     filtered_args = args[1:]
     if "--" in filtered_args:
