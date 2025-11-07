@@ -445,7 +445,8 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     WT_CURSOR* cursor =
         session.getNewCursor(std::string{_container.uri()}, "debug=(dump_version=(enabled=true))");
 
-    setKey(cursor, keyString.getKeyAndRecordIdView());
+    const auto keyView = keyString.getKeyAndRecordIdView();
+    setKey(cursor, keyView);
 
     int ret = cursor->search(cursor);
     while (ret != WT_NOTFOUND) {
@@ -470,10 +471,15 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
                                         &value),
                       cursor->session);
 
+        BufReader br(value.data, value.size);
+        const auto typeBits = key_string::TypeBits::fromBuffer(getKeyStringVersion(), &br);
+
         LOGV2(6601200,
               "WiredTiger index entry metadata",
               "keyString"_attr = keyString,
-              "indexKey"_attr = key_string::toBson(keyString, _ordering),
+              "indexKey"_attr = key_string::toBson(keyView, _ordering, typeBits),
+              "typeBitsValue"_attr =
+                  hexblob::encode(static_cast<const char*>(value.data), value.size),
               "startTxnId"_attr = startTxnId,
               "startTs"_attr = Timestamp(startTs),
               "startDurableTs"_attr = Timestamp(startDurableTs),
