@@ -1312,6 +1312,70 @@ tasks:
             - "SERVER-110427-${revision}"
             - "${MONGO_PR_BOT_APP_ID}"
             - "${MONGO_PR_BOT_PRIVATE_KEY}"
+  - name: publish_crypt_packages
+    run_on: rhel8.7-small
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "incompatible_aubsan",
+        "incompatible_community",
+        "incompatible_development_variant",
+        "incompatible_mac",
+        "incompatible_tsan",
+        "incompatible_windows",
+        "publish_crypt",
+        "release_critical",
+        "requires_compile_variant",
+      ]
+    # This should prevent this task from running in patch builds, where we
+    # don't want to publish packages.
+    patchable: false
+    stepback: false
+    # Same dependencies as "push" below
+    depends_on:
+      - name: crypt_push
+      - name: crypt_lib_package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "f_expansions_write"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${repo_aws_key}
+          aws_secret_remote: ${repo_aws_secret}
+      - func: "set up notary client credentials"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          silent: true
+          args:
+            - "./src/evergreen/container_registry_login.sh"
+      - command: s3.get
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: packages.tgz
+          remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+          bucket: mciuploads
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            AWS_ACCESS_KEY_ID: ${upload_lock_access_key_id}
+            AWS_SECRET_ACCESS_KEY: ${upload_lock_secret_access_key}
+            UPLOAD_LOCK_IMAGE: ${upload_lock_image}
+            UPLOAD_BUCKET: ${upload_lock_bucket}
+            AWS_REGION: ${upload_lock_region}
+            EVERGREEN_TASK_ID: ${task_id}
+          args:
+            - "./src/evergreen/packages_crypt_publish.sh"
 
 ################################################
 #                 Task Groups                  #
