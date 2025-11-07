@@ -176,10 +176,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.setFCV = function(db, collName, connCache) {
         try {
-            const fcvValues = [latestFCV, lastContinuousFCV, lastLTSFCV];
-            const targetFCV = fcvValues[Random.randInt(3)];
+            // If we downgrade to v7.3 FCV with unsharded collections outside the DB primary,
+            // we run into a deadlock situation, because:
+            // - We can't complete the downgrade to v7.3 FCV until those collections are untracked.
+            // - We can't untrack those collections while we are on the 'downgrading to v7.3' FCV.
+            // - There isn't a "downgrading to upgrading" path to upgrade back to the v8.0 FCV.
+            //
+            // We can technically resolve the deadlock by dropping the collections.
+            // But since v7.3 is end-of-life at the time of writing, stop testing this scenario.
+            //
+            // (Note that for the downgrade to v7.0 FCV, there is a "downgrading to upgrading" path
+            // that can resolve this situation by upgrading back to v8.0 FCV).
+            const fcvValues = [latestFCV, lastLTSFCV];
+            const targetFCV = fcvValues[Random.randInt(fcvValues.length)];
             jsTestLog('STATE:setFCV setting FCV to ' + targetFCV);
-            if (targetFCV === lastContinuousFCV || targetFCV === lastLTSFCV) {
+            if (targetFCV === lastLTSFCV) {
                 // Best effort move all collections to their database primary shard to prevent
                 // CannotDowngrade errors.
                 $config.data.moveCollectionsToDbPrimary(db);
