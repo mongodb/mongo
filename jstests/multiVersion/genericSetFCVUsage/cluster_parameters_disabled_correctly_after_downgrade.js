@@ -16,7 +16,9 @@ const ignoredParams = [
     "testStrClusterParameter",
     "testMinFcvClusterParameter",
     "cwspTestNeedsFeatureFlagBlender",
-    "cwspTestNeedsLatestFCV"
+    "cwspTestNeedsLatestFCV",
+    // TODO(SERVER-113476): Remove this exception when 8.0.16 released
+    "ddlLockOptimisticRecoveryWaitTimeout",
 ];
 
 // The maxAnchorCompactionSize field was added in 7.1.
