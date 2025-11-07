@@ -1325,7 +1325,7 @@ tasks:
       - func: "get mongot version"
       - func: "run tests"
         vars:
-          resmoke_jobs_max: 1
+          resmoke_jobs_max: 5
 
   - <<: *task_template
     name: mongot_e2e_single_shard
