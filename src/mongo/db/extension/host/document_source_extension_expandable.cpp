@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/host/document_source_extension_expandable.h"
 
+#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
@@ -65,11 +66,22 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandabl
                         outExpanded.splice(outExpanded.end(), children);
                     }
                 }
-                // Case 2: AST node handle. Construct a DocumentSourceExtensionOptimizable and
-                // release the AST node handle.
+                // Case 2: AST node handle.
+                //   a) Host-allocated AST node: convert directly to a host DocumentSource using
+                //      the host-provided BSON spec.
+                //   b) Extension-allocated AST node: Construct a
+                //      DocumentSourceExtensionOptimizable and release the AST node handle.
                 else if constexpr (std::is_same_v<H, AggStageAstNodeHandle>) {
-                    outExpanded.emplace_back(
-                        DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle)));
+                    if (HostAggStageAstNode::isHostAllocated(*handle.get())) {
+                        const BSONObj& bsonSpec =
+                            static_cast<host::HostAggStageAstNode*>(handle.get())
+                                ->getIdLookupSpec();
+                        outExpanded.splice(outExpanded.end(),
+                                           DocumentSource::parse(expCtx, bsonSpec));
+                    } else {
+                        outExpanded.emplace_back(
+                            DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle)));
+                    }
                 }
             },
             variantNodeHandle);

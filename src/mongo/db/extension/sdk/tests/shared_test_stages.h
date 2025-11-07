@@ -29,8 +29,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/host_services.h"
 
 namespace mongo::extension::sdk {
 inline StringData stringViewToStringData(std::string_view sv) {
@@ -155,9 +157,11 @@ public:
 static constexpr std::string_view kExpandToExtAstName = "$expandToExtAst";
 static constexpr std::string_view kExpandToExtParseName = "$expandToExtParse";
 static constexpr std::string_view kExpandToHostParseName = "$expandToHostParse";
+static constexpr std::string_view kExpandToHostAstName = "$expandToHostAst";
 static constexpr std::string_view kExpandToMixedName = "$expandToMixed";
 
 static const BSONObj kMatchSpec = BSON("$match" << BSON("a" << 1));
+static const BSONObj kIdLookupSpec = BSON("$_internalSearchIdLookup" << BSONObj());
 
 class SourceAggStageParseNode : public sdk::AggStageParseNode {
 public:
@@ -323,11 +327,53 @@ public:
     }
 };
 
+class ExpandToHostAstParseNode : public sdk::AggStageParseNode {
+public:
+    ExpandToHostAstParseNode() : sdk::AggStageParseNode(kExpandToHostAstName) {}
+
+    static constexpr size_t kExpansionSize = 1;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
+        out.reserve(kExpansionSize);
+        out.emplace_back(
+            extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(kIdLookupSpec));
+        return out;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<ExpandToHostAstParseNode>();
+    }
+};
+
+class ExpandToHostAstDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string(kExpandToHostAstName);
+
+    ExpandToHostAstDescriptor() : sdk::AggStageDescriptor(kStageName) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj) const override {
+        return std::make_unique<ExpandToHostAstParseNode>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
+        return std::make_unique<ExpandToHostAstDescriptor>();
+    }
+};
+
 class ExpandToMixedParseNode : public sdk::AggStageParseNode {
 public:
     ExpandToMixedParseNode() : sdk::AggStageParseNode(kExpandToMixedName) {}
 
-    static constexpr size_t kExpansionSize = 3;
+    static constexpr size_t kExpansionSize = 4;
 
     size_t getExpandedSize() const override {
         return kExpansionSize;
@@ -341,6 +387,8 @@ public:
         out.emplace_back(
             new sdk::ExtensionAggStageParseNode(std::make_unique<NoOpAggStageParseNode>()));
         out.emplace_back(new host::HostAggStageParseNode(NoOpHostParseNode::make(kMatchSpec)));
+        out.emplace_back(
+            extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(kIdLookupSpec));
         return out;
     }
 

@@ -30,6 +30,7 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_expandable.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
@@ -136,12 +137,22 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
                         outExpanded.splice(outExpanded.end(), children);
                     }
                 }
-                // Case 2: AST node handle. Wrap in LiteParsedExpanded and append directly to the
-                // expanded result.
+                // Case 2: AST node handle.
+                //   a) Host-allocated AST node: convert directly to a host LiteParsedDocumentSource
+                //      using the host-provided BSON spec.
+                //   b) Extension-allocated AST node: Wrap in a LiteParsedExpanded and append
+                //      directly to the expanded result.
                 else if constexpr (std::is_same_v<H, AggStageAstNodeHandle>) {
-                    outExpanded.emplace_back(
-                        std::make_unique<DocumentSourceExtension::LiteParsedExpanded>(
-                            std::string(handle.getName()), std::move(handle)));
+                    if (host::HostAggStageAstNode::isHostAllocated(*handle.get())) {
+                        const auto& spec = static_cast<host::HostAggStageAstNode*>(handle.get())
+                                               ->getIdLookupSpec();
+                        outExpanded.emplace_back(
+                            LiteParsedDocumentSource::parse(nss, spec, options));
+                    } else {
+                        outExpanded.emplace_back(
+                            std::make_unique<DocumentSourceExtension::LiteParsedExpanded>(
+                                std::string(handle.getName()), std::move(handle)));
+                    }
                 }
             },
             variantNodeHandle);

@@ -37,10 +37,13 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/host_portal.h"
+#include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -53,6 +56,12 @@ public:
     DocumentSourceExtensionTest() : DocumentSourceExtensionTest(nss) {}
     explicit DocumentSourceExtensionTest(NamespaceString nsString)
         : AggregationContextFixture(std::move(nsString)) {};
+
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        extension::sdk::HostServicesHandle::setHostServices(
+            extension::host_connector::HostServicesAdapter::get());
+    }
 
     /**
      * Helper to create test pipeline.
@@ -213,11 +222,12 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMixed) {
         LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
-    ASSERT_EQUALS(expanded.size(), 3);
+    ASSERT_EQUALS(expanded.size(), 4);
 
     const auto it0 = expanded.begin();
     const auto it1 = std::next(expanded.begin(), 1);
     const auto it2 = std::next(expanded.begin(), 2);
+    const auto it3 = std::next(expanded.begin(), 3);
 
     auto* first = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it0->get());
     ASSERT_TRUE(first != nullptr);
@@ -231,10 +241,16 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMixed) {
         dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it2->get());
     ASSERT_TRUE(notExpanded == nullptr);
 
+    auto* fourth = dynamic_cast<LiteParsedDocumentSource*>(it3->get());
+    ASSERT_TRUE(fourth != nullptr);
+
     ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
     ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
     ASSERT_EQ(third->getParseTimeName(), std::string(DocumentSourceMatch::kStageName));
+    ASSERT_EQ(fourth->getParseTimeName(),
+              std::string(DocumentSourceInternalSearchIdLookUp::kStageName));
 }
+
 TEST_F(DocumentSourceExtensionTest, ExpandedPipelineIsComputedOnce) {
     sdk::shared_test_stages::ExpandToExtParseParseNode::expandCalls = 0;
 
@@ -287,6 +303,27 @@ public:
     }
 };
 }  // namespace
+
+TEST_F(DocumentSourceExtensionTest, ExpandToHostAst) {
+    auto rootParseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToHostAstParseNode>());
+    AggStageParseNodeHandle rootHandle{rootParseNode};
+
+    host::DocumentSourceExtension::LiteParsedExpandable lp(
+        std::string(sdk::shared_test_stages::kExpandToHostAstName),
+        std::move(rootHandle),
+        _nss,
+        LiteParserOptions{});
+
+    const auto& expanded = lp.getExpandedPipeline();
+    ASSERT_EQUALS(expanded.size(), 1);
+
+    // Expanded pipeline contains LiteParsedDocumentSource.
+    auto* lpds = dynamic_cast<LiteParsedDocumentSource*>(expanded.front().get());
+    ASSERT_TRUE(lpds != nullptr);
+    ASSERT_EQ(lpds->getParseTimeName(),
+              std::string(DocumentSourceInternalSearchIdLookUp::kStageName));
+}
 
 TEST_F(DocumentSourceExtensionTest, ExpandPropagatesHostLiteParseFailure) {
     auto* rootParseNode =
