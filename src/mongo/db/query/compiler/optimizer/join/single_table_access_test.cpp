@@ -35,7 +35,7 @@
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo::optimizer {
+namespace mongo::join_ordering {
 
 using namespace mongo::cost_based_ranker;
 
@@ -114,7 +114,7 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     ce::createCollAndInsertDocuments(opCtx, nss2, docs);
 
     {
-        auto mca = join_ordering::multipleCollectionAccessor(opCtx, {nss1, nss2});
+        auto mca = multipleCollectionAccessor(opCtx, {nss1, nss2});
         auto nss1UUID = mca.lookupCollection(nss1)->uuid();
         auto nss2UUID = mca.lookupCollection(nss2)->uuid();
 
@@ -125,7 +125,7 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     }
 
     // Get new MultiCollectionAccessor after all DDLs are done.
-    auto mca = join_ordering::multipleCollectionAccessor(opCtx, {nss1, nss2});
+    auto mca = multipleCollectionAccessor(opCtx, {nss1, nss2});
 
     SamplingEstimatorMap estimators;
     estimators[nss1] = samplingEstimator(mca, nss1);
@@ -135,7 +135,7 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     auto filter2 = fromjson("{a: 1, b: 1}");
 
     // Mock a JoinGraph for testing purposes.
-    join_ordering::JoinGraph graph;
+    JoinGraph graph;
     graph.addNode(nss1, makeCanonicalQuery(nss1, filter1), boost::none);
     graph.addNode(nss2, makeCanonicalQuery(nss2, filter2), boost::none);
     auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators);
@@ -149,4 +149,4 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     }
 }
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::join_ordering

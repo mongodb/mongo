@@ -35,15 +35,14 @@
 
 #include <fmt/format.h>
 
-namespace mongo::optimizer {
+namespace mongo::join_ordering {
 
-optimizer::SamplingEstimatorMap makeSamplingEstimators(
-    const MultipleCollectionAccessor& collections,
-    const mongo::join_ordering::JoinGraph& graph,
-    PlanYieldPolicy::YieldPolicy yieldPolicy) {
+SamplingEstimatorMap makeSamplingEstimators(const MultipleCollectionAccessor& collections,
+                                            const JoinGraph& graph,
+                                            PlanYieldPolicy::YieldPolicy yieldPolicy) {
     const auto numNodes = graph.numNodes();
 
-    optimizer::SamplingEstimatorMap samplingEstimators;
+    SamplingEstimatorMap samplingEstimators;
     samplingEstimators.reserve(numNodes);
 
     for (size_t i = 0; i < numNodes; i++) {
@@ -73,9 +72,9 @@ optimizer::SamplingEstimatorMap makeSamplingEstimators(
 StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
-    const mongo::join_ordering::JoinGraph& graph,
+    const JoinGraph& graph,
     const SamplingEstimatorMap& samplingEstimators) {
-    join_ordering::QuerySolutionMap solns;
+    QuerySolutionMap solns;
     cost_based_ranker::EstimateMap estimates;
 
     const auto numNodes = graph.numNodes();
@@ -120,4 +119,4 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     };
 }
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::join_ordering
