@@ -43,6 +43,8 @@ imports:
 
 enums:
     Decision:
+        # TODO: Move FilteringMetadataCache::_recoverMigrationCoordinations to data_movement module.
+        mod_visibility: needs_replacement
         description: "Whether the migration committed or aborted."
         type: string
         values:
@@ -63,6 +65,8 @@ types:
 
 structs:
     migrationCoordinatorDocument:
+        # TODO: Move FilteringMetadataCache::_recoverMigrationCoordinations to data_movement module.
+        mod_visibility: needs_replacement
         description: "Represents an in-progress migration on the migration donor."
         generate_comparison_operators: false
         strict: false

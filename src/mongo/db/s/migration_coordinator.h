@@ -39,6 +39,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <utility>
@@ -53,7 +54,7 @@ namespace migrationutil {
  * Manages the migration commit/abort process, including updates to config.rangeDeletions on the
  * donor and the recipient, and updates to the routing table on the config server.
  */
-class MigrationCoordinator {
+class MONGO_MOD_NEEDS_REPLACEMENT MigrationCoordinator {
 public:
     MigrationCoordinator(MigrationSessionId sessionId,
                          ShardId donorShard,

@@ -47,6 +47,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -145,7 +146,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
  * migration coordination to completion.
  */
-void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
+MONGO_MOD_PUBLIC void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
 
 /**
  * Instructs the recipient shard to release its critical section.
@@ -173,7 +174,7 @@ void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUI
  * If there was any ongoing receiveChunk that requires recovery (i.e that has reached the
  * critical section stage), restores the MigrationDestinationManager state.
  */
-void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
+MONGO_MOD_PUBLIC void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
 
 /**
  * Recovers all unfinished migrations pending recovery.
@@ -192,7 +193,7 @@ SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* o
  * within the context of a FCV downgrade.
  * TODO SERVER-103838 Remove this method and its invocations once 9.0 becomes LTS.
  */
-void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
+MONGO_MOD_PUBLIC void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
 
 }  // namespace migrationutil
 }  // namespace mongo
