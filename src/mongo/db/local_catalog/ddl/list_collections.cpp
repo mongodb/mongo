@@ -186,7 +186,25 @@ void _addWorkingSetMember(OperationContext* opCtx,
     results.emplace_back(std::move(id));
 }
 
-BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
+BSONObj buildInfoField(OperationContext* opCtx,
+                       bool readOnly,
+                       const NamespaceString& nss,
+                       boost::optional<UUID> uuid) {
+    BSONObjBuilder infoBuilder;
+    infoBuilder.append("readOnly", readOnly);
+    if (uuid) {
+        infoBuilder.appendElements(uuid->toBSON());
+    }
+
+    if (const auto configDebugDump =
+            catalog::getConfigDebugDump(VersionContext::getDecoration(opCtx), nss);
+        configDebugDump.has_value()) {
+        infoBuilder.append("configDebugDump", *configDebugDump);
+    }
+    return infoBuilder.obj();
+}
+
+BSONObj buildViewBson(OperationContext* opCtx, const ViewDefinition& view, bool nameOnly) {
     invariant(!view.timeseries());
 
     BSONObjBuilder b;
@@ -205,8 +223,7 @@ BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     }
     optionsBuilder.doneFast();
 
-    BSONObj info = BSON("readOnly" << true);
-    b.append("info", info);
+    b.append("info", buildInfoField(opCtx, true /*readOnly*/, view.name(), boost::none /*uuid*/));
     return b.obj();
 }
 
@@ -224,14 +241,14 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const Collection* collectio
     builder.append("options",
                    collection->getCollectionOptions().toBSON(
                        false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions));
-    builder.append("info", BSON("readOnly" << opCtx->readOnly()));
-
+    builder.append(
+        "info", buildInfoField(opCtx, opCtx->readOnly(), collection->ns(), boost::none /*uuid*/));
     return builder.obj();
 }
 
-BSONObj buildTimeseriesBson(OperationContext* opCtx, StringData collName, bool nameOnly) {
+BSONObj buildTimeseriesBson(OperationContext* opCtx, const NamespaceString& nss, bool nameOnly) {
     BSONObjBuilder builder;
-    builder.append("name", collName);
+    builder.append("name", nss.coll());
     builder.append("type", "timeseries");
 
     if (nameOnly) {
@@ -239,7 +256,7 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, StringData collName, bool n
     }
 
     builder.append("options", BSONObj{});
-    builder.append("info", BSON("readOnly" << opCtx->readOnly()));
+    builder.append("info", buildInfoField(opCtx, opCtx->readOnly(), nss, boost::none /*uuid*/));
 
     return builder.obj();
 }
@@ -289,18 +306,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     // unsettable read-only property, so put it in the 'info' section. Pass 'false' to toBSON so
     // it doesn't include 'uuid' here.
     b.append("options", options.toBSON(false /* includeUUID */, includeOptionsFields));
-
-    BSONObjBuilder infoBuilder;
-    infoBuilder.append("readOnly", opCtx->readOnly());
-    if (options.uuid) {
-        infoBuilder.appendElements(options.uuid->toBSON());
-    }
-    if (const auto configDebugDump =
-            catalog::getConfigDebugDump(VersionContext::getDecoration(opCtx), nss);
-        configDebugDump.has_value()) {
-        infoBuilder.append("configDebugDump", *configDebugDump);
-    }
-    b.append("info", infoBuilder.obj());
+    b.append("info", buildInfoField(opCtx, opCtx->readOnly(), collection->ns(), options.uuid));
 
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
     if (idIndex) {
@@ -534,7 +540,7 @@ public:
                                     // with the buckets collection above.
                                     _addWorkingSetMember(
                                         opCtx,
-                                        buildTimeseriesBson(opCtx, view.name().coll(), nameOnly),
+                                        buildTimeseriesBson(opCtx, view.name(), nameOnly),
                                         matcher.get(),
                                         ws.get(),
                                         results);
@@ -542,7 +548,7 @@ public:
                                 return true;
                             }
 
-                            BSONObj viewBson = buildViewBson(view, nameOnly);
+                            BSONObj viewBson = buildViewBson(opCtx, view, nameOnly);
                             if (!viewBson.isEmpty()) {
                                 _addWorkingSetMember(
                                     opCtx, viewBson, matcher.get(), ws.get(), results);

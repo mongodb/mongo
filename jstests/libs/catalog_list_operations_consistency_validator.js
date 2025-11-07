@@ -44,8 +44,6 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
     const {
         name: nsName,
         type: nsType,
-        // Note that this field can come on both collections/views/timeseries on $listCatalog,
-        // but is only mapped onto the response of listCollections for collections.
         configDebugDump: nsConfigDebugDump,
         // Redundant namespace information can be safely thrown away.
         db: _ns1,
@@ -140,7 +138,10 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
                 pipeline: viewPipeline,
                 ...(viewCollation !== undefined && {collation: viewCollation}),
             },
-            info: {readOnly: true},
+            info: {
+                readOnly: true,
+                ...(nsConfigDebugDump !== undefined && {configDebugDump: nsConfigDebugDump}),
+            },
         };
     } else if (nsType === "timeseries") {
         // TODO SERVER-101594 remove once 9.0 becomes lastLTS
@@ -190,7 +191,10 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
             name: nsName,
             type: nsType,
             options: tsOptions,
-            info: {readOnly: isDbReadOnly},
+            info: {
+                readOnly: isDbReadOnly,
+                ...(nsConfigDebugDump !== undefined && {configDebugDump: nsConfigDebugDump}),
+            },
         };
     } else {
         assert(false, `Unknown namespace type ${nsType} for namespace ${nsName}.`);
@@ -571,7 +575,8 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         !isMongos &&
         assert.commandWorked(
             db.serverStatus({
-                // This server status section attempts to get WiredTiger storage size statistics,
+                // This server status section attempts to get WiredTiger storage size
+                // statistics,
                 // and fails if a validate is in progress, similarly to the ObjectIsBusy error
                 // below. Since we don't need it, we can just exclude it from the output.
                 changeStreamPreImages: 0,
