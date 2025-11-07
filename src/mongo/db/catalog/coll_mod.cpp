@@ -1088,6 +1088,14 @@ Status _collModInternal(OperationContext* opCtx,
 
 }  // namespace
 
+bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
+    if (!request.getTimeseries().has_value()) {
+        return false;
+    }
+    auto& ts = request.getTimeseries();
+    return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
+}
+
 void staticValidateCollMod(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const CollModRequest& request) {
@@ -1099,6 +1107,25 @@ void staticValidateCollMod(OperationContext* opCtx,
             "collMod on a time-series collection's underlying buckets collection is not "
             "supported.",
             !nss.isTimeseriesBucketsCollection());
+
+    if (hasTimeSeriesBucketingUpdate(request)) {
+        auto containsNotTimeseriesOptions = false;
+        for (const auto& field : request.toBSON()) {
+            if (field.fieldName() != CollModRequest::kTimeseriesFieldName) {
+                containsNotTimeseriesOptions = true;
+                break;
+            }
+        }
+
+        // Prevents catalog inconsistency (SERVER-108801) in sharded collMod.
+        // The timeseries option changes are applied to the global catalog before
+        // forwarding all options to shards. If subsequent options fail on a shard, the global
+        // and shard-local catalogs can become inconsistent.
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot combine timeseries option with other modification options in a single "
+                "collMod command. Send separate collMod commands for timeseries and other options.",
+                !containsNotTimeseriesOptions);
+    }
 }
 
 bool isCollModIndexUniqueConversion(const CollModRequest& request) {

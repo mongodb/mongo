@@ -90,14 +90,6 @@ MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
 namespace {
 
 
-bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
-    if (!request.getTimeseries().has_value()) {
-        return false;
-    }
-    auto& ts = request.getTimeseries();
-    return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
-}
-
 template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShards(
     OperationContext* opCtx,

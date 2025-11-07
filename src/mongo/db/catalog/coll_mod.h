@@ -76,6 +76,11 @@ Status processCollModCommand(OperationContext* opCtx,
                              BSONObjBuilder* result);
 
 /**
+ * Returns true if the given collmod @request contains parameters to modify buckets span.
+ */
+bool hasTimeSeriesBucketingUpdate(const CollModRequest& request);
+
+/**
  * Performs static validation of CollMod request.
  *
  * Static checks are the ones perfomed exclusively on the request itself without accessing the
