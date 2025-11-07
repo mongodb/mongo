@@ -307,7 +307,7 @@ TEST_F(VersionContextDrainTest, RandomOperationsToWaitOn) {
         operationContext(), kCurrentVersion, Date_t::now());
 }
 
-TEST_F(VersionContextDrainTest, RamdomMixedOperations) {
+TEST_F(VersionContextDrainTest, RandomMixedOperations) {
     std::vector<ScopedHoldOperation> ops;
     const int nOps = SecureRandom().nextInt64() % 5;
 
@@ -350,7 +350,10 @@ TEST_F(VersionContextDrainTest, RamdomMixedOperations) {
         OperationContext* opCtx = op.first->getOperationContext();
         invariant(opCtx);
 
-        if (!opCtx->isKillPending() && VersionContext::getDecoration(opCtx) != kCurrentVersion) {
+        const bool notKillPending = !opCtx->isKillPending();
+        const bool withStaleVersion = VersionContext::getDecoration(opCtx) == kStaleVersion;
+
+        if (notKillPending && withStaleVersion) {
             nRunningOpsStaleOfcv--;
         }
     }
