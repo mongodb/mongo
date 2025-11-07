@@ -1,0 +1,4 @@
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "concurrency_adjustment_algorithm.replica_sets_reconfig_hooks"
+  - "concurrency_adjustment_algorithm.replica_sets_reconfig_archive"

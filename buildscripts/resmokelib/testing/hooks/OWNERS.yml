@@ -60,6 +60,9 @@ filters:
   - "drop_sessions_collection.py":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "rotate_concurrency_adjustment_algorithm.py":
+    approvers:
+      - 10gen/server-workload-resilience
   - "fuzz_runtime_parameters.py":
     approvers:
       - 10gen/server-programmability

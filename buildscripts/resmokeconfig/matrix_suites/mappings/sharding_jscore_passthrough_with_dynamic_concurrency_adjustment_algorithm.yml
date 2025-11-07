@@ -1,0 +1,4 @@
+base_suite: sharding_jscore_passthrough
+overrides:
+  - "concurrency_adjustment_algorithm.sharding_reconfig_hooks"
+  - "concurrency_adjustment_algorithm.sharding_reconfig_archive"

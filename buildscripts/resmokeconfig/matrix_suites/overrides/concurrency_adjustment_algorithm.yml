@@ -1,0 +1,54 @@
+### Overrides for some suites with RotateConcurrencyAdjustmentAlgorithm hook ###
+
+- name: replica_sets_reconfig_hooks
+  value:
+    executor:
+      hooks:
+        - class: RunDBCheckInBackground
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplDBHashInBackground
+        - class: ValidateCollectionsInBackground
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
+        - class: RotateConcurrencyAdjustmentAlgorithm
+
+- name: replica_sets_reconfig_archive
+  value:
+    executor:
+      archive:
+        test: true
+        hooks:
+          - RunDBCheckInBackground
+          - CheckReplDBHashInBackground
+          - ValidateCollectionsInBackground
+          - CheckReplDBHash
+          - CheckReplOplogs
+          - ValidateCollections
+          - RotateConcurrencyAdjustmentAlgorithm
+
+- name: sharding_reconfig_hooks
+  value:
+    executor:
+      hooks:
+        - class: CheckReplDBHash
+        - class: CheckMetadataConsistencyInBackground
+        - class: ValidateCollections
+        - class: CheckOrphansDeleted
+        - class: CleanEveryN
+          n: 20
+        - class: RotateConcurrencyAdjustmentAlgorithm
+
+- name: sharding_reconfig_archive
+  value:
+    executor:
+      archive:
+        hooks:
+          - CheckReplDBHash
+          - CheckMetadataConsistencyInBackground
+          - ValidateCollections
+          - RotateConcurrencyAdjustmentAlgorithm

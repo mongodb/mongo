@@ -124,6 +124,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*primary_driven_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*query_shape_hash_stability* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/replica_sets_recordids_replicated_jscore_passthrough.yml @10gen/server-collection-write-path @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/generated_suites/*with_dynamic_concurrency_adjustment_algorithm.yml @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/transitioning_replica_sets_jscore_passthrough.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/unified_write_executor* @10gen/query-execution-router @svc-auto-approve-bot
 
@@ -153,6 +154,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/*primary_driven_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_kill_secondaries_jscore_passthrough.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_recordids_replicated_jscore_passthrough.yml @10gen/server-collection-write-path @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/*with_dynamic_concurrency_adjustment_algorithm.yml @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/transitioning_replica_sets_jscore_passthrough.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/unified_write_executor* @10gen/query-execution-router @svc-auto-approve-bot
 
@@ -173,6 +175,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/primary_driven_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/replica_sets_kill_secondary.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/recordids_replicated.yml @10gen/server-collection-write-path @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/concurrency_adjustment_algorithm.yml @10gen/server-workload-resilience @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
 /buildscripts/resmokeconfig/suites/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
@@ -268,6 +271,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/generate_and_check_perf_results.py @10gen/devprod-performance-analysis @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/replicaset_transition_to_and_from_csrs.py @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/drop_sessions_collection.py @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/rotate_concurrency_adjustment_algorithm.py @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/fuzz_runtime_parameters.py @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/validate.py @10gen/devprod-correctness @10gen/server-validate @svc-auto-approve-bot
 

@@ -48,3 +48,6 @@ filters:
   - "recordids_replicated.yml":
     approvers:
       - 10gen/server-collection-write-path
+  - "concurrency_adjustment_algorithm.yml":
+    approvers:
+      - 10gen/server-workload-resilience
