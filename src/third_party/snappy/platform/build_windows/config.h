@@ -50,7 +50,7 @@
 #define SNAPPY_HAVE_X86_CRC32 1
 
 /* Define to 1 if you target processors with BMI2+ and have <bmi2intrin.h>. */
-#define SNAPPY_HAVE_BMI2 1
+#define SNAPPY_HAVE_BMI2 0
 
 /* Define to 1 if you target processors with NEON and have <arm_neon.h>. */
 #define SNAPPY_HAVE_NEON 0
