@@ -71,7 +71,8 @@ void fetchSplitPoints(OperationContext* opCtx,
                       const BSONObj& splitPointsFilter,
                       const Timestamp& splitPointsAfterClusterTime,
                       boost::optional<ShardId> splitPointsShard,
-                      std::function<void(const BSONObj&)> callbackFn) {
+                      std::function<void(const BSONObj&)> callbackFn,
+                      std::function<void(const Status&)> resetOnRetry) {
     auto sort = BSON(AnalyzeShardKeySplitPointDocument::kSplitPointFieldName << 1);
     auto readConcern = repl::ReadConcernArgs(LogicalTime{splitPointsAfterClusterTime},
                                              repl::ReadConcernLevel::kLocalReadConcern);
@@ -93,15 +94,19 @@ void fetchSplitPoints(OperationContext* opCtx,
         aggRequest.setWriteConcern(WriteConcernOptions());
         aggRequest.setUnwrappedReadPref(ReadPreferenceSetting::get(opCtx).toContainingBSON());
 
+        // TODO(SERVER-113504): Consider using kIdempotent since onRetry allows read only
+        // aggregation processes to be restarted.
         uassertStatusOK(shard->runAggregation(
             opCtx,
             aggRequest,
+            Shard::RetryPolicy::kStrictlyNotIdempotent,
             [&](const std::vector<BSONObj>& docs, const boost::optional<BSONObj>&) -> bool {
                 for (const auto& doc : docs) {
                     callbackFn(doc);
                 }
                 return true;
-            }));
+            },
+            resetOnRetry));
     } else {
         uassertStatusOK(
             repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(opCtx, readConcern));
@@ -166,6 +171,11 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
             auto splitPoint = splitPointDoc.getSplitPoint();
             uassertShardKeyValueNotContainArrays(splitPoint);
             appendChunk(lastChunkMax, splitPoint);
+        },
+        [&](const Status&) {
+            chunks.clear();
+            version = ChunkVersion{{epoch, validAfter}, {1, 0}};
+            lastChunkMax = shardKey.globalMin();
         });
 
     appendChunk(lastChunkMax, shardKey.globalMax());

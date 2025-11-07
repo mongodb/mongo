@@ -628,9 +628,11 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
     // Note that the oplog entries are *not* being copied with a tailable cursor.
     // Shard::runAggregation() will instead return upon hitting the end of the donor's oplog.
+    // TODO(SERVER-113504): Consider using kIdempotent and properly implement onRetry.
     uassertStatusOK(shard->runAggregation(
         opCtxRaii.get(),
         aggRequest,
+        Shard::RetryPolicy::kNoRetry,
         [this, &currentNumBatchesProcessed, &moreToCome, &opCtxRaii, &batchTimer, factory](
             const std::vector<BSONObj>& aggregateBatch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
@@ -760,6 +762,9 @@ bool ReshardingOplogFetcher::consume(Client* client,
             }
 
             return true;
+        },
+        [](const Status&) {
+            // Do nothing on retry since we don't allow retries.
         }));
 
     return moreToCome;

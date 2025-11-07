@@ -252,9 +252,12 @@ long long getCollectionsToMoveForShardCount(OperationContext* opCtx,
 
     long long collectionsCounter = 0;
 
+    // TODO(SERVER-113504): Consider using kIdempotent since onRetry allows read only aggregation
+    // processes to be restarted.
     uassertStatusOK(shard->runAggregation(
         opCtx,
         listCollectionAggReq,
+        Shard::RetryPolicy::kStrictlyNotIdempotent,
         [&collectionsCounter](const std::vector<BSONObj>& batch,
                               const boost::optional<BSONObj>& postBatchResumeToken) {
             if (batch.size() > 0) {
@@ -262,7 +265,8 @@ long long getCollectionsToMoveForShardCount(OperationContext* opCtx,
                 collectionsCounter = batch[0].getField("totalCount").safeNumberLong();
             }
             return true;
-        }));
+        },
+        [&collectionsCounter](const Status&) { collectionsCounter = 0; }));
 
     return collectionsCounter;
 }
@@ -273,16 +277,20 @@ long long getChunkForShardCount(OperationContext* opCtx, Shard* shard, const Sha
 
     long long chunkCounter = 0;
 
+    // TODO(SERVER-113504): Consider using kIdempotent since onRetry allows read only aggregation
+    // processes to be restarted.
     uassertStatusOK(shard->runAggregation(
         opCtx,
         chunkCounterAggReq,
+        Shard::RetryPolicy::kStrictlyNotIdempotent,
         [&chunkCounter](const std::vector<BSONObj>& batch,
                         const boost::optional<BSONObj>& postBatchResumeToken) {
             if (batch.size() > 0) {
                 chunkCounter = batch[0].getField("totalChunks").safeNumberLong();
             }
             return true;
-        }));
+        },
+        [&chunkCounter](const Status&) { chunkCounter = 0; }));
 
     return chunkCounter;
 }

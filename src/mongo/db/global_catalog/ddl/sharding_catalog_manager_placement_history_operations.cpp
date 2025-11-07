@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/base/status.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
@@ -880,8 +881,20 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
                                const boost::optional<BSONObj>& postBatchResumeToken) {
             return true;
         };
-        Status status = _localConfigShard->runAggregation(
-            snapshotReadsOpCtx.get(), createInitialSnapshotAggReq, noopCallback);
+
+        auto noopOnRetry = [](const Status&) {
+        };
+
+        // This aggregation cannot be retried because it performs writes in one of its steps.
+        // Restarting the aggregation process would potentially perform the write again, so we
+        // prohibit retries for this one.
+        // TODO(SERVER-113598): Consider finding a way to not need noop callbacks when no retries
+        // are needed.
+        Status status = _localConfigShard->runAggregation(snapshotReadsOpCtx.get(),
+                                                          createInitialSnapshotAggReq,
+                                                          Shard::RetryPolicy::kNoRetry,
+                                                          noopCallback,
+                                                          noopOnRetry);
         uassertStatusOK(status);
     }
 
@@ -901,8 +914,16 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
             return true;
         };
 
-        uassertStatusOK(_localConfigShard->runAggregation(
-            snapshotReadsOpCtx.get(), findAllShardsReq, consumeBatchResponse));
+        auto resetOnRetriableFailure = [&](const Status& status) {
+            shardsAtInitializationTime.clear();
+        };
+
+        uassertStatusOK(
+            _localConfigShard->runAggregation(snapshotReadsOpCtx.get(),
+                                              findAllShardsReq,
+                                              Shard::RetryPolicy::kStrictlyNotIdempotent,
+                                              consumeBatchResponse,
+                                              resetOnRetriableFailure));
 
         setInitializationTimeOnPlacementHistory(
             opCtx, initializationTime, std::move(shardsAtInitializationTime));
@@ -998,7 +1019,14 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
         return true;
     };
 
-    uassertStatusOK(_localConfigShard->runAggregation(opCtx, aggRequest, callback));
+    auto onRetry = [&](const Status&) {
+        deleteStatements.clear();
+    };
+
+    // TODO(SERVER-113416): Consider using kIdempotent since onRetry allows read only aggregation
+    // processes to be restarted.
+    uassertStatusOK(_localConfigShard->runAggregation(
+        opCtx, aggRequest, Shard::RetryPolicy::kStrictlyNotIdempotent, callback, onRetry));
 
     LOGV2_DEBUG(7068806,
                 2,

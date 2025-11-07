@@ -402,17 +402,28 @@ public:
                                                          Milliseconds maxTimeMSOverride);
 
     /**
-     * Synchronously run the aggregation request, with a best effort honoring of request
-     * options. `callback` will be called with the batch and resume token contained in each
-     * response. `callback` should return `true` to execute another getmore. Returning `false` will
-     * send a `killCursors`. If the aggregation results are exhausted, there will be no additional
-     * calls to `callback`.
+     * Synchronously runs the aggregation request, with a best effort to honor the request
+     * options. `onBatch` is a callback that will be called with the batch and resume token
+     * contained in each response. `onBatch` should return `true` to execute another getmore.
+     * Returning `false` will send a `killCursors`. If the aggregation results are exhausted,
+     * there will be no additional calls to `onBatch`.
+     *
+     * `onRetry` is a callback that will be called when the aggregation process is restarted.
+     * Depending on the retry policy, the function might restart the entire aggregation process. The
+     * `onRetry` callback is used to signal a retry so that the caller can cleanup any state
+     * affected by the `onBatch` callback.
+     *
+     * If using a retry policy other than kNoRetry, the entire aggregation may be retried after some
+     * batches have already been processed, so the onRetry callback should reset any state modified
+     * by previous invocations of onBatch.
      */
     Status runAggregation(
         OperationContext* opCtx,
         const AggregateCommandRequest& aggRequest,
+        RetryPolicy retryPolicy,
         std::function<bool(const std::vector<BSONObj>& batch,
-                           const boost::optional<BSONObj>& postBatchResumeToken)> callback);
+                           const boost::optional<BSONObj>& postBatchResumeToken)> onBatch,
+        std::function<void(const Status&)> onRetry);
 
     /**
      * Synchronously run an aggregation request like runAggregation, but return a vector containing

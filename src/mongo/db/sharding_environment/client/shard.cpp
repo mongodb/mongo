@@ -492,13 +492,15 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
 Status Shard::runAggregation(
     OperationContext* opCtx,
     const AggregateCommandRequest& aggRequest,
+    RetryPolicy retryPolicy,
     std::function<bool(const std::vector<BSONObj>& batch,
-                       const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
-    RetryStrategy retryStrategy{*this, RetryPolicy::kNoRetry};
+                       const boost::optional<BSONObj>& postBatchResumeToken)> onBatch,
+    std::function<void(const Status&)> onRetry) {
+    RetryStrategyWithFailureRetryHook retryStrategy{RetryStrategy{*this, retryPolicy}, onRetry};
 
     auto status =
         runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
-            return _runAggregation(opCtx, targetingMetadata, aggRequest, callback);
+            return _runAggregation(opCtx, targetingMetadata, aggRequest, onBatch);
         });
 
     return status.getStatus();

@@ -266,19 +266,23 @@ std::vector<NamespaceString> getCollectionsToMoveForShard(OperationContext* opCt
 
     std::vector<NamespaceString> collections;
 
-    uassertStatusOK(
-        shard->runAggregation(opCtx,
-                              listCollectionAggReq,
-                              [&collections](const std::vector<BSONObj>& batch,
-                                             const boost::optional<BSONObj>& postBatchResumeToken) {
-                                  for (const auto& doc : batch) {
-                                      collections.push_back(NamespaceStringUtil::deserialize(
-                                          boost::none,
-                                          doc.getField("ns").String(),
-                                          SerializationContext::stateDefault()));
-                                  }
-                                  return true;
-                              }));
+    // TODO(SERVER-113416): Consider using kIdempotent since onRetry allows read only aggregation
+    // processes to be restarted.
+    uassertStatusOK(shard->runAggregation(
+        opCtx,
+        listCollectionAggReq,
+        Shard::RetryPolicy::kStrictlyNotIdempotent,
+        [&collections](const std::vector<BSONObj>& batch,
+                       const boost::optional<BSONObj>& postBatchResumeToken) {
+            for (const auto& doc : batch) {
+                collections.push_back(
+                    NamespaceStringUtil::deserialize(boost::none,
+                                                     doc.getField("ns").String(),
+                                                     SerializationContext::stateDefault()));
+            }
+            return true;
+        },
+        [&collections](const Status&) { collections.clear(); }));
 
     return collections;
 }
