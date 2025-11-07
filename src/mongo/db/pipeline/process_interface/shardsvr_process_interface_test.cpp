@@ -44,6 +44,8 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
@@ -64,12 +66,21 @@ auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
 
 class ShardsvrProcessInterfaceTest : public ShardedAggTestFixture {
 public:
+    static inline auto kMyShardName = ShardId{"DummyShard"};
+
     void setUp() override {
         ShardedAggTestFixture::setUp();
         auto service = expCtx()->getOperationContext()->getServiceContext();
         repl::ReplSettings settings;
 
         settings.setReplSetString("lookupTestSet/node1:12345");
+
+
+        ShardingState::get(getServiceContext())
+            ->setRecoveryCompleted({OID::gen(),
+                                    ClusterRole::ShardServer,
+                                    ConnectionString{kConfigHostAndPort},
+                                    kMyShardName});
 
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, settings);
