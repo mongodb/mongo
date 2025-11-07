@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/global_catalog/router_role_api/collection_uuid_mismatch.h"
 #include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
@@ -727,8 +728,34 @@ void WriteBatchResponseProcessor::validateBulkWriteReplyItems(
 }
 
 namespace {
+std::shared_ptr<const CollectionUUIDMismatchInfo> getCollectionUUIDMismatchInfo(
+    const Status& status) {
+    if (status == ErrorCodes::CollectionUUIDMismatch) {
+        auto info = status.extraInfo<CollectionUUIDMismatchInfo>();
+        tassert(11273500, "Expected to find CollectionUUIDMismatchInfo", info != nullptr);
+
+        return info;
+    }
+
+    return {};
+}
+
 BulkWriteReplyItem getFirstError(const std::vector<BulkWriteReplyItem>& items) {
     tassert(11182216, "Expected vector to contain at least one item", !items.empty());
+
+    // If 'items' has multiple errors and the first error is a CollectionUUIDMismatch error, then
+    // check if 'items' contains a CollectionUUIDMismatch error with actualCollection() set, and if
+    // so return that.
+    if (items.size() > 1 && items.front().getStatus() == ErrorCodes::CollectionUUIDMismatch) {
+        for (const auto& item : items) {
+            auto info = getCollectionUUIDMismatchInfo(item.getStatus());
+            if (info && info->actualCollection()) {
+                return item;
+            }
+        }
+    }
+
+    // Return the first error in 'items'.
     return items.front();
 }
 
@@ -804,6 +831,49 @@ BulkWriteReplyItem combineErrorReplies(WriteOpId opId, std::vector<BulkWriteRepl
 
     return BulkWriteReplyItem(opId, Status(MultipleErrorsOccurredInfo(errB.arr()), msg.str()));
 }
+
+/**
+ * Attempts to populate the "actualCollection" field of a CollectionUUIDMismatch error if it's not
+ * populated already, contacting the primary shard if necessary.
+ */
+void addActualCollectionForCollUUIDMismatchError(OperationContext* opCtx,
+                                                 Status& error,
+                                                 boost::optional<std::string>& actualCollection,
+                                                 bool& hasContactedPrimaryShard) {
+    // Return early if 'error' is not a CollectionUUIDMismatch error or if it's not missing the
+    // "actualCollection" field.
+    auto info = getCollectionUUIDMismatchInfo(error);
+    if (!info || info->actualCollection()) {
+        return;
+    }
+
+    LOGV2_DEBUG(11273501,
+                4,
+                "Encountered collection uuid mismatch when processing errors",
+                "error"_attr = redact(error));
+
+    if (actualCollection) {
+        // If the 'actualCollection' parameter is set, add it to 'error' and return.
+        error = Status{CollectionUUIDMismatchInfo{info->dbName(),
+                                                  info->collectionUUID(),
+                                                  info->expectedCollection(),
+                                                  *actualCollection},
+                       error.reason()};
+    } else if (!hasContactedPrimaryShard) {
+        // Otherwise, if 'hasContactedPrimaryShard', try contacting the primary shard to get the
+        // "actualCollection", and if successful add it to 'error' and return.
+        error = populateCollectionUUIDMismatch(opCtx, error);
+
+        if (error == ErrorCodes::CollectionUUIDMismatch) {
+            hasContactedPrimaryShard = true;
+
+            if (auto& populatedActualCollection =
+                    getCollectionUUIDMismatchInfo(error)->actualCollection()) {
+                actualCollection = populatedActualCollection;
+            }
+        }
+    }
+}
 }  // namespace
 
 void WriteBatchResponseProcessor::updateApproximateSize(const BulkWriteReplyItem& item) {
@@ -865,6 +935,32 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     std::vector<std::pair<WriteOpId, boost::optional<BulkWriteReplyItem>>> aggregatedReplies;
+    std::map<NamespaceString, boost::optional<std::string>> actualCollections;
+    std::map<NamespaceString, bool> hasContactedPrimaryShard;
+    bool hasCollUUIDMismatchErrorsWithNoActualCollection = false;
+
+    for (const auto& nss : _cmdRef.getNssSet()) {
+        actualCollections.emplace(nss, boost::none);
+        hasContactedPrimaryShard.emplace(nss, false);
+    }
+
+    // For CollectionUUIDMismatch errors, this lambda checks if "actualCollection" is set, and
+    // it updates the 'actualCollection' and 'hasCollUUIDMismatchErrorsWithNoActualCollection'
+    // variables appropriately.
+    auto noteCollUUIDMismatchError = [&](const WriteOp& op, const Status& status) {
+        auto info = getCollectionUUIDMismatchInfo(status);
+        if (!info) {
+            return;
+        }
+
+        if (info->actualCollection()) {
+            if (auto& actualCollection = actualCollections[op.getNss()]; !actualCollection) {
+                actualCollection = info->actualCollection();
+            }
+        } else {
+            hasCollUUIDMismatchErrorsWithNoActualCollection = true;
+        }
+    };
 
     for (const auto& [opId, opResultVar] : _results) {
         auto* opResults = get_if<BulkWriteOpResults>(&opResultVar);
@@ -901,6 +997,10 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
                 reply = boost::none;
             }
 
+            if (reply && reply->getStatus() == ErrorCodes::CollectionUUIDMismatch) {
+                noteCollUUIDMismatchError(op, reply->getStatus());
+            }
+
             if (!successfulReplies.empty()) {
                 auto successReply = combineSuccessfulReplies(opId, std::move(successfulReplies));
 
@@ -918,6 +1018,10 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
             // Handle the case where we have errors and no successful replies.
             auto reply = combineErrorReplies(opId, items);
 
+            if (reply.getStatus() == ErrorCodes::CollectionUUIDMismatch) {
+                noteCollUUIDMismatchError(op, reply.getStatus());
+            }
+
             aggregatedReplies.emplace_back(opId, std::move(reply));
         } else if (opResults->hasSuccess) {
             // Handle the case where we have successful replies and no errors.
@@ -925,6 +1029,23 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
                 aggregatedReplies.emplace_back(opId, combineSuccessfulReplies(opId, items));
             } else {
                 aggregatedReplies.emplace_back(opId, boost::none);
+            }
+        }
+    }
+
+    // If there were any CollectionUUIDMismatch errors where "actualCollection" is not set, then
+    // call addActualCollectionForCollUUIDMismatchError() to populate the "actualCollection" field.
+    if (hasCollUUIDMismatchErrorsWithNoActualCollection) {
+        for (auto& [opId, item] : aggregatedReplies) {
+            if (item && item->getStatus() == ErrorCodes::CollectionUUIDMismatch) {
+                auto op = WriteOp{_cmdRef.getOp(opId)};
+                const NamespaceString& nss = op.getNss();
+
+                auto error = item->getStatus();
+                addActualCollectionForCollUUIDMismatchError(
+                    opCtx, error, actualCollections[nss], hasContactedPrimaryShard[nss]);
+
+                item->setStatus(std::move(error));
             }
         }
     }
