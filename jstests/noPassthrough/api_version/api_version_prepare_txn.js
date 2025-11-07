@@ -1,7 +1,7 @@
 /**
  * Tests prepared transactions with an explicitly set apiVersion.
  */
-// TODO (SERVER-106141): Move this test to 'replsets' to be part of passthrough suites.
+// TODO (SERVER-111718): Remove this test if it will be covered elsewhere, or relocate it.
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -51,6 +51,10 @@ const runTest = function (failover, commit) {
         rst.stepUp(primary);
         rst.waitForState(primary, ReplSetTest.State.PRIMARY);
         rst.awaitSecondaryNodes(null, [secondary]);
+        // This is needed after restarting the node because the 'lastCommitted' is not set until
+        // receiving heartbeats. We need to wait for the 'lastCommitted' OpTime to be past the
+        // 'prepareTimestamp' before committing the prepared transaction.
+        PrepareHelpers.awaitMajorityCommitted(rst, prepareTimestamp);
     }
 
     const newPrimary = rst.getPrimary();
