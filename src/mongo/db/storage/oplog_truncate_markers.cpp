@@ -64,6 +64,9 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createEmptyOplogTrun
 
 std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(OperationContext* opCtx,
                                                                             RecordStore& rs) {
+    LOGV2(10621000,
+          "Beginning initial marker creation.",
+          "Asynchronous sampling:"_attr = gOplogSamplingAsyncEnabled);
     // Sample
     long long maxSize = rs.oplog()->getMaxSize();
     invariant(maxSize > 0);
@@ -138,9 +141,6 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
 
 std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateMarkers(
     OperationContext* opCtx, RecordStore& rs) {
-    LOGV2(10621000,
-          "Creating oplog markers",
-          "sampling asynchronously"_attr = gOplogSamplingAsyncEnabled);
     if (!gOplogSamplingAsyncEnabled) {
         return sampleAndUpdate(opCtx, rs);
     }
