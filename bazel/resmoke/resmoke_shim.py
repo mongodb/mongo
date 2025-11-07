@@ -47,6 +47,8 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--variantName=", "build_variant")
     add_volatile_arg(args, "--versionId=", "version_id")
     add_volatile_arg(args, "--requester=", "requester")
+    add_volatile_arg(args, "--otelTraceId=", "otel_trace_id")
+    add_volatile_arg(args, "--otelParentId=", "otel_parent_id")
 
 
 class ResmokeShimContext:

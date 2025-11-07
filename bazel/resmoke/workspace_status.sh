@@ -18,5 +18,7 @@ echo task_name ${task_name}
 echo build_variant ${build_variant}
 echo version_id ${version_id}
 echo requester ${requester}
+echo otel_trace_id ${otel_trace_id}
+echo otel_parent_id ${otel_parent_id}
 
 python bazel/resmoke/workspace_status.py

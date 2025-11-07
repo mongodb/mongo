@@ -129,6 +129,15 @@ find bazel-testlogs/ -path '*data_archives/*.tgz' -print0 |
         ln -sf $source $target
     done
 
+# Symlink OTel metrics from multiple tests/shards to ${workdir}/build/OTelTraces for Evergreen to parse.
+find bazel-testlogs/ -type f -path '*test.outputs/build/metrics*' -print0 |
+    while IFS= read -r -d '' metrics; do
+        source=${workdir}/src/$metrics
+        target=${workdir}/build/OTelTraces/$(echo $metrics | sed -e 's/bazel-testlogs\///g' -e 's/test\.outputs\/build\/metrics\///g' -e 's/\//_/g')
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
+
 # Combine reports from potentially multiple tests/shards.
 find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit -o report.json
 
