@@ -767,7 +767,7 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
                 .transitional_ignore();
         }
 
-        // The NetworkInterface can recieve multiple responses for a particular request (e.g.
+        // The NetworkInterface can receive multiple responses for a particular request (e.g.
         // cancellation and a 'true' scheduled response). But each request can only have one logical
         // response. This choice of the one logical response is mediated by the _isFinished field of
         // the NetworkOperation; whichever response sets this first via
@@ -775,7 +775,7 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
         // if the given response was accepted by the NetworkOperation as its sole logical response.
         //
         // We care about this here because we only want to increment the counters for operations
-        // succeeded/failed for the responses that are actually used,
+        // succeeded/failed for the responses that are actually used.
         Status localResponseStatus = response.response.status;
         bool noiUsedThisResponse = noi->fulfillResponse_inlock(lk, std::move(response));
         if (noiUsedThisResponse) {

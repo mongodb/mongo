@@ -42,8 +42,9 @@ namespace mongo {
 namespace executor {
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
-    // TODO SERVER-103733 Consider if we can fix the pool size to 1 once getMores from router
-    // to shards happen on the baton.
+    // The default task executor pool size is 1, which should be fine in almost all cases.
+    // The default value can still be overriden via startup parameter if absolutely required.
+    // TODO SERVER-113360: Consider fixing the task executor pool size to 1.
     size_t numPools = []() -> size_t {
         if (gTaskExecutorPoolSize > 0) {
             return gTaskExecutorPoolSize;

@@ -564,7 +564,7 @@ public:
 
 private:
     void setEvent(std::shared_ptr<EventState> event) {
-        _event = event;
+        _event = std::move(event);
     }
 
     EventState* getEvent() const {

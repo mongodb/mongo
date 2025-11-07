@@ -249,7 +249,7 @@ protected:
         responses.emplace_back(kTestNss, CursorId(1), batch1, boost::none, pbrt);
         scheduleNetworkResponses(std::move(responses));
 
-        executor()->waitForEvent(readyEvent);
+        ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
         ASSERT_TRUE(arm->ready());
 
@@ -269,7 +269,7 @@ protected:
         responses.emplace_back(kTestNss, CursorId(1), batch2, boost::none, pbrt);
         scheduleNetworkResponses(std::move(responses));
 
-        executor()->waitForEvent(readyEvent);
+        ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
         // No change expected for the high water mark.
         ASSERT_FALSE(arm->ready());
@@ -287,7 +287,7 @@ protected:
 
         scheduleNetworkResponses(std::move(responses));
 
-        executor()->waitForEvent(readyEvent);
+        ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
         // High water mark should not have been updated by receiving the batch.
         ASSERT_TRUE(arm->ready());
@@ -329,6 +329,7 @@ protected:
      */
     void scheduleNetworkResponses(std::vector<CursorResponse> responses) {
         std::vector<BSONObj> objs;
+        objs.reserve(responses.size());
         for (const auto& cursorResponse : responses) {
             // For tests of the AsyncResultsMerger, all CursorResponses scheduled by the tests are
             // subsequent responses, since the AsyncResultsMerger will only ever run getMores.

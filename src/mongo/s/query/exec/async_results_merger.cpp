@@ -41,6 +41,7 @@
 #include "mongo/db/query/client_cursor/release_memory_gen.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/remote_command_request.h"
@@ -48,6 +49,7 @@
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -155,7 +157,8 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
       _tailableMode(_params.getTailableMode().value_or(TailableModeEnum::kNormal)),
       _mergeQueue(MergingComparator(_params.getSort().value_or(BSONObj()),
                                     _params.getCompareWholeSortKey())),
-      _promisedMinSortKeys(PromisedMinSortKeyComparator(_params.getSort().value_or(BSONObj()))) {
+      _promisedMinSortKeys(PromisedMinSortKeyComparator(_params.getSort().value_or(BSONObj()))),
+      _subBaton(opCtx->getBaton()->makeSubBaton()) {
 
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
         // Build a default handler for determining the next high water mark. This can be replaced
@@ -220,6 +223,8 @@ std::shared_ptr<AsyncResultsMerger> AsyncResultsMerger::create(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     AsyncResultsMergerParams params) {
+    tassert(10373300, "Attempted to create an AsyncResultsMerger without an opCtx", opCtx);
+
     // We cannot use 'std::make_shared<T>' if T's constructor is private. This is a workaround so
     // that we can still call 'make_shared()' on an object that is derived from the
     // 'AsyncResultsMerger'.
@@ -289,6 +294,8 @@ void AsyncResultsMerger::detachFromOperationContext() {
     // when it's been stashed between cursor checkouts or after it's been marked as killed.
     _processAdditionalTransactionParticipants(_opCtx);
 
+    _subBaton.shutdown();
+
     _opCtx = nullptr;
 
     // If we were about ready to return a boost::none because a tailable cursor reached the end of
@@ -310,6 +317,7 @@ void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
     }
     invariant(!_opCtx);
     _opCtx = opCtx;
+    _subBaton = _opCtx->getBaton()->makeSubBaton();
 }
 
 bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyIncreasing(
@@ -1037,9 +1045,9 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
 Status AsyncResultsMerger::_sendRequestWithRetries(WithLock lk,
                                                    const executor::RemoteCommandRequest& request,
                                                    const RemoteCursorPtr& remote) {
-
     auto callbackStatus = _executor->scheduleRemoteCommand(
-        request, [self = shared_from_this(), remote /* intrusive_ptr copy! */](auto const& cbData) {
+        request,
+        [self = shared_from_this(), remote /* intrusive_ptr copy! */](auto const& cbData) {
             // Parse response outside of the mutex.
             auto parsedResponse = [&](const auto& cbData) -> StatusWith<CursorResponse> {
                 if (!cbData.response.isOK()) {
@@ -1057,7 +1065,8 @@ Status AsyncResultsMerger::_sendRequestWithRetries(WithLock lk,
             // Handle the response and update the remote's status under the mutex.
             stdx::lock_guard<stdx::mutex> lk(self->_mutex);
             self->_handleBatchResponse(lk, cbData, parsedResponse, remote);
-        });
+        },
+        *_subBaton);
 
     if (!callbackStatus.isOK()) {
         return callbackStatus.getStatus();
@@ -1341,13 +1350,26 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                        parsedResponse.getStatus(),
                        remote->shardHostAndPort,
                        cbData.response.getErrorLabels())) {
-
+            // Schedule a retry for the request on the baton. The 'AsyncResultsMerger' instance is
+            // captured here using a weak_ptr, so that the scheduled retry operation does not block
+            // the destruction of the instance. If the retry is scheduled after the instance was
+            // destroyed, we will notice this inside the callback and do nothing.
             const auto delay = retryStrategy.getNextRetryDelay();
-            _executor->sleepFor(delay, _cancellationSource.token())
-                .getAsync([self = shared_from_this(),
+            _subBaton
+                ->waitUntil(getGlobalServiceContext()->getPreciseClockSource()->now() + delay,
+                            _cancellationSource.token())
+                .getAsync([weak = weak_from_this(),
                            request = cbData.request,
                            remote /* intrusive_ptr copy! */,
                            delay](Status s) {
+                    auto self = weak.lock();
+                    if (!self) {
+                        // Do not continue here if the last shared_ptr pointing to this
+                        // 'AsyncResultsMerger' instance has already gone out of scope. In this case
+                        // there is no need to schedule further retries.
+                        return;
+                    }
+
                     stdx::lock_guard<stdx::mutex> lk(self->_mutex);
 
                     if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
@@ -1370,7 +1392,7 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
         } else {
             _cleanUpFailedBatch(lk, parsedResponse.getStatus(), *remote);
         }
-    } catch (DBException const& e) {
+    } catch (const DBException& e) {
         remote->status = e.toStatus();
 
         // '_cleanUpFailedBatch()' can reset the status of the remote from non-OK to ok if
@@ -1602,6 +1624,9 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     for (const auto& remote : _remotes) {
         _cancelCallbackForRemote(lk, remote);
     }
+
+    _subBaton.shutdown();
+
     return _killCompleteInfo->getFuture();
 }
 

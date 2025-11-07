@@ -99,7 +99,7 @@ public:
      * Invokes the passed callback with a deadline guard active initialized with the passed
      * deadline.  Additionally handles the dance of try/catching the invocation and checking
      * checkForInterrupt with the guard inactive, to allow an interruption or timeout error _not_
-     * caused by the provided deadline to propogate out / take precedence over an error produced
+     * caused by the provided deadline to propagate out / take precedence over an error produced
      * due to the provided deadline.
      */
     template <typename Callback>

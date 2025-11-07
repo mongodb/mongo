@@ -193,22 +193,30 @@ public:
         return _arm->takeMetrics();
     }
 
+    /**
+     * Returns the next event to wait upon. This makes 'getNextEvent()', which is private,
+     * accessible from within unit tests.
+     */
+    StatusWith<executor::TaskExecutor::EventHandle> getNextEvent_forTest() {
+        return getNextEvent();
+    }
+
 private:
     /**
-     * Awaits the next result from the ARM with no time limit.
+     * Awaits the next result from the AsyncResultsMerger with no time limit.
      */
     StatusWith<ClusterQueryResult> blockUntilNext(OperationContext* opCtx);
 
     /**
-     * Awaits the next result from the ARM up to the time limit specified on 'opCtx'. If this is the
-     * user's initial find or we have already obtained at least one result for this batch, this
-     * method returns EOF immediately rather than blocking.
+     * Awaits the next result from the AsyncResultsMerger up to the time limit specified on 'opCtx'.
+     * If this is the user's initial find or we have already obtained at least one result for this
+     * batch, this method returns EOF immediately rather than blocking.
      */
     StatusWith<ClusterQueryResult> awaitNextWithTimeout(OperationContext* opCtx);
 
     /**
-     * Returns the next event to wait upon - either a new event from the ARM, or a valid preceding
-     * event which we scheduled during the previous call to next().
+     * Returns the next event to wait upon - either a new event from the AsyncResultsMerger, or a
+     * valid preceding event which we scheduled during the previous call to next().
      */
     StatusWith<executor::TaskExecutor::EventHandle> getNextEvent();
 
@@ -231,8 +239,8 @@ private:
     executor::TaskExecutor::EventHandle _leftoverEventFromLastTimeout;
 
     // The 'AsyncResultsMerger' is fully owned by this 'BlockingResultsMerger', but we need a
-    // shared_ptr to keep the ARM alive and valid until all of its async requests have been
-    // processed successfully.
+    // shared_ptr to keep the AsyncResultsMerger alive and valid until all of its async requests
+    // have been processed successfully.
     std::shared_ptr<AsyncResultsMerger> _arm;
 
     // Provides interface for yielding and "unyielding" resources while waiting for results from

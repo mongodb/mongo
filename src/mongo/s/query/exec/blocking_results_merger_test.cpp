@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/s/query/exec/blocking_results_merger.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -42,7 +39,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
@@ -52,8 +48,8 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
 
-#include <mutex>
-#include <system_error>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -113,6 +109,80 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilDeadlineExpires) {
         return CursorResponse(kTestNss, 0LL, {BSONObj()})
             .toBSON(CursorResponse::ResponseType::SubsequentResponse);
     });
+    blockingMerger.kill(operationContext());
+}
+
+
+TEST_F(ResultsMergerTestFixture, ShouldBeAbleToRetrieveResultAfterHittingTimeoutOnceAndDetaching) {
+    // Set the deadline to be two seconds in the future. We always test that the deadline
+    // expires, so there's no racing.
+    awaitDataState(operationContext()).waitForInsertsDeadline =
+        getMockClockSource()->now() + Milliseconds{2000};
+    awaitDataState(operationContext()).shouldWaitForInserts = true;
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto params = makeARMParamsFromExistingCursors(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    BlockingResultsMerger blockingMerger(
+        operationContext(), std::move(params), executor(), nullptr);
+
+    // Issue a blocking wait for the next result asynchronously on a different thread.
+    auto future = launchAsync([&]() {
+        // Pass kGetMoreNoResultsYet so that the BRM will block and not just
+        // return an empty batch immediately.
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
+
+        // The timeout should hit, and return EOF.
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    // Wait for a bit. Hopefully the other thread will be waiting for the clock to advance.
+    // If not, we just advance the clock now, and when the other thread gets to that point
+    // it will see that "now" has passed the deadline.
+    sleepsecs(1);
+
+    getMockClockSource()->advance(Milliseconds{3000});
+
+    future.default_timed_get();
+    ASSERT_FALSE(blockingMerger.remotesExhausted());
+
+    // Detach and reattach.
+    blockingMerger.detachFromOperationContext();
+
+    blockingMerger.reattachToOperationContext(operationContext());
+
+    awaitDataState(operationContext()).waitForInsertsDeadline =
+        getMockClockSource()->now() + Milliseconds{2000};
+    awaitDataState(operationContext()).shouldWaitForInserts = true;
+
+    // Answer the getMore, so that there are no more outstanding requests.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return CursorResponse(kTestNss, 0LL, {BSON("foo" << "bar"), BSON("bar" << "baz")})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
+
+    // Issue a blocking wait for the next results asynchronously on a different thread.
+    future = launchAsync([&]() {
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
+
+        // We should get back a result immediately now.
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("foo" << "bar"));
+
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("bar" << "baz"));
+
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    future.default_timed_get();
+
+    // All results are consumed now.
+    ASSERT_TRUE(blockingMerger.remotesExhausted());
+
     blockingMerger.kill(operationContext());
 }
 
@@ -179,10 +249,14 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
     stdx::mutex mutex;
     stdx::unique_lock<stdx::mutex> lk(mutex);
 
+    auto readyEvent = unittest::assertGet(blockingMerger.getNextEvent_forTest());
+
     // Issue a blocking wait for the next result asynchronously on a different thread.
     future = launchAsync([&]() {
         // Block until the main thread has responded to the getMore.
         stdx::unique_lock<stdx::mutex> lk(mutex);
+
+        ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
         auto next = unittest::assertGet(blockingMerger.next(operationContext()));
         ASSERT_FALSE(next.isEOF());
