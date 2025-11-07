@@ -774,8 +774,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     }
 
     // Start up health log writer thread.
-    HealthLogInterface::set(serviceContext, std::make_unique<HealthLog>());
-    HealthLogInterface::get(startupOpCtx.get())->startup();
+    if (rss.getPersistenceProvider().supportsLocalCollections()) {
+        HealthLogInterface::set(serviceContext, std::make_unique<HealthLog>());
+        HealthLogInterface::get(startupOpCtx.get())->startup();
+    }
 
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),

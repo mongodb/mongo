@@ -68,6 +68,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -2240,6 +2241,12 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "dbCheck can only be run when local collections are supported",
+                rss::ReplicatedStorageService::get(opCtx)
+                    .getPersistenceProvider()
+                    .supportsLocalCollections());
+
         auto job = getRun(opCtx, dbName, cmdObj);
         (new DbCheckJob(opCtx->getService(), std::move(job)))->go();
         return true;

@@ -747,6 +747,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl/dbcheck",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/util:md5",
         "//src/mongo/util:progress_meter",
     ],
