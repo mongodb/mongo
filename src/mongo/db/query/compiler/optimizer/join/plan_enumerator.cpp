@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
+#include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
+
 namespace mongo::join_ordering {
 
 PlanEnumeratorContext::PlanEnumeratorContext(const JoinGraph& joinGraph) : _joinGraph(joinGraph) {}
@@ -39,7 +41,12 @@ const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
 
 void PlanEnumeratorContext::enumerateJoinSubsets() {
     int numNodes = _joinGraph.numNodes();
-    _joinSubsets.resize(numNodes);
+    // Use CombinationSequence to efficiently calculate the final size of each level of the dynamic
+    // programming table.
+    CombinationSequence cs(numNodes);
+    // Skip over C(numNodes, 0). The size of the first level of the table is C(numNodes, 1).
+    cs.next();
+    _joinSubsets.resize(cs.next());
 
     // Initialize base level of joinSubsets, representing single collections (no joins).
     for (int i = 0; i < numNodes; ++i) {
@@ -51,6 +58,8 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
     for (int level = 1; level < numNodes; ++level) {
         const std::vector<JoinSubset>& joinSubsetsPrevLevel = _joinSubsets[level - 1];
         auto& joinSubsetsCurrLevel = _joinSubsets[level];
+        // Preallocate entries for all subsets in the current level.
+        joinSubsetsCurrLevel.reserve(cs.next());
         stdx::unordered_set<NodeSet> seenSubsets;
 
         // For each join subset of size level-1, iterate through nodes 0 to n-1 and use bitwise-or

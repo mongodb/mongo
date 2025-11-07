@@ -29,9 +29,57 @@
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
+#include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
+
+TEST(PlanEnumeratorHelpers, CombinationsEdgeCases) {
+    ASSERT_EQ(1, combinations(0, 0));
+    ASSERT_EQ(0, combinations(0, -1));
+    ASSERT_EQ(0, combinations(0, 1));
+    ASSERT_EQ(1, combinations(1, 0));
+    ASSERT_EQ(0, combinations(-1, 0));
+    ASSERT_EQ(0, combinations(-1, -1));
+    ASSERT_EQ(0, combinations(1, 2));
+    ASSERT_EQ(0, combinations(-1, 2));
+    ASSERT_EQ(0, combinations(1, -2));
+}
+
+TEST(PlanEnumeratorHelpers, Combinations) {
+    // Known small values
+    ASSERT_EQ(1, combinations(5, 0));
+    ASSERT_EQ(5, combinations(5, 1));
+    ASSERT_EQ(10, combinations(5, 2));
+    ASSERT_EQ(10, combinations(5, 3));
+    ASSERT_EQ(5, combinations(5, 4));
+    ASSERT_EQ(1, combinations(5, 5));
+
+    // Symmetry check
+    ASSERT_EQ(combinations(10, 3), combinations(10, 7));
+
+    // Known large value
+    ASSERT_EQ(184756, combinations(20, 10));
+}
+
+TEST(PlanEnumeratorHelpers, CombinationSequence) {
+    CombinationSequence cs(5);
+    ASSERT_EQ(1, cs.next());
+    ASSERT_EQ(5, cs.next());
+    ASSERT_EQ(10, cs.next());
+    ASSERT_EQ(10, cs.next());
+    ASSERT_EQ(5, cs.next());
+    ASSERT_EQ(1, cs.next());
+}
+
+DEATH_TEST(PlanEnumeratorHelpers, TooManyInvocationsOfCombinationSequence, "10986301") {
+    CombinationSequence cs(5);
+    for (int i = 0; i < 6; ++i) {
+        cs.next();
+    }
+    cs.next();  // tasserts
+}
 
 TEST(JoinPlanEnumerator, InitializeSubsetsTwo) {
     JoinGraph graph;
@@ -73,22 +121,6 @@ TEST(JoinPlanEnumerator, InitializeSubsetsThree) {
     auto& level2 = ctx.getSubsets(2);
     ASSERT_EQ(NodeSet{"111"}, level2[0].subset);
     ASSERT_EQ(1, level2.size());
-}
-
-// Calculate N choose K. C(n, k) = n! / (k! * (n-k)!).
-// Perform this calculation in iterative fashion by alternating multiplication and division avoiding
-// explicit factorial calculation to avoid integer overflow problems.
-unsigned long long combinations(int n, int k) {
-    if (n == k) {
-        return 1;
-    }
-    // Optimization C(n, k) = C(n, n-k)
-    k = std::min(k, n - k);
-    unsigned long long res = 1;
-    for (int i = 1; i <= k; ++i) {
-        res = res * (n - i + 1) / i;
-    }
-    return res;
 }
 
 TEST(JoinPlanEnumerator, InitialzeLargeSubsets) {

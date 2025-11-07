@@ -39,9 +39,11 @@ mongo_cc_library(
     name = "plan_enumerator",
     srcs = [
         "plan_enumerator.cpp",
+        "plan_enumerator_helpers.cpp",
     ],
     hdrs = [
         "plan_enumerator.h",
+        "plan_enumerator_helpers.h",
     ],
     deps = [
         ":join_ordering",
