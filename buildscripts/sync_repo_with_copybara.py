@@ -384,7 +384,7 @@ def main():
     if os.path.exists("copybara"):
         print("Copybara directory already exists.")
     else:
-        run_command("git clone https://github.com/10gen/copybara.git")
+        run_command("git clone --branch d03973e9fe1 https://github.com/10gen/copybara.git")
 
     # Navigate to the Copybara directory and build the Copybara Docker image
     run_command("cd copybara && docker build --rm -t copybara .")
