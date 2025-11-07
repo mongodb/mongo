@@ -1,5 +1,9 @@
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/server-jstest-infra
+
   - "reshard_collection_util.js":
     approvers:
       - 10gen/server-cluster-scalability
