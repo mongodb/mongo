@@ -32,22 +32,16 @@
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
-#include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 #include "mongo/db/pipeline/document_source_internal_list_collections.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_internal_replace_root.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
-#include "mongo/db/pipeline/document_source_redact.h"
-#include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/document_source_streaming_group.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -57,24 +51,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::rule_based_rewrites::pipeline {
-
-// These will become redundant in a follow-up PR under SERVER-110104.
-REGISTER_RULES(DocumentSourceStreamingGroup, OPTIMIZE_AT_RULE(DocumentSourceStreamingGroup));
-REGISTER_RULES(DocumentSourceInternalGeoNearDistance,
-               OPTIMIZE_AT_RULE(DocumentSourceInternalGeoNearDistance));
-REGISTER_RULES(DocumentSourceSetVariableFromSubPipeline,
-               OPTIMIZE_AT_RULE(DocumentSourceSetVariableFromSubPipeline));
-
 // TODO(SERVER-112281): Split these into separate files by team ownership.
 
 // Owned by the Query Optimization team.
-REGISTER_RULES(DocumentSourceMatch, OPTIMIZE_AT_RULE(DocumentSourceMatch));
-REGISTER_RULES(DocumentSourceInternalChangeStreamMatch,
-               OPTIMIZE_AT_RULE(DocumentSourceInternalChangeStreamMatch));
-REGISTER_RULES(DocumentSourceSample, OPTIMIZE_AT_RULE(DocumentSourceSample));
-REGISTER_RULES(DocumentSourceRedact, OPTIMIZE_AT_RULE(DocumentSourceRedact));
-REGISTER_RULES(DocumentSourceSingleDocumentTransformation,
-               OPTIMIZE_AT_RULE(DocumentSourceSingleDocumentTransformation));
 REGISTER_RULES(DocumentSourceSkip, OPTIMIZE_AT_RULE(DocumentSourceSkip));
 REGISTER_RULES(DocumentSourceListMqlEntities, OPTIMIZE_AT_RULE(DocumentSourceListMqlEntities));
 REGISTER_RULES(DocumentSourceLimit, OPTIMIZE_AT_RULE(DocumentSourceLimit));
@@ -105,8 +84,6 @@ REGISTER_RULES(DocumentSourceInternalSearchIdLookUp,
                OPTIMIZE_AT_RULE(DocumentSourceInternalSearchIdLookUp));
 REGISTER_RULES(DocumentSourceSearch, OPTIMIZE_AT_RULE(DocumentSourceSearch));
 REGISTER_RULES(DocumentSourceInternalDensify, OPTIMIZE_AT_RULE(DocumentSourceInternalDensify));
-REGISTER_RULES(DocumentSourceInternalUnpackBucket,
-               OPTIMIZE_AT_RULE(DocumentSourceInternalUnpackBucket));
 
 // Owned by Catalog & Routing
 REGISTER_RULES(DocumentSourceInternalListCollections,

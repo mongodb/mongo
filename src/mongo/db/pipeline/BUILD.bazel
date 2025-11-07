@@ -588,9 +588,11 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_list_catalog.cpp",
         "//src/mongo/db/pipeline:document_source_list_cluster_catalog.cpp",
         "//src/mongo/db/pipeline:document_source_sharded_data_distribution.cpp",
+        "//src/mongo/db/pipeline/optimization:match_rules.cpp",
         "//src/mongo/db/pipeline/optimization:optimize.cpp",
         "//src/mongo/db/pipeline/optimization:rule_based_rewriter.cpp",
         "//src/mongo/db/pipeline/optimization:rules_to_move.cpp",
+        "//src/mongo/db/pipeline/optimization:simple_rules.cpp",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.cpp",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.cpp",
         "//src/mongo/db/pipeline/search:document_source_list_search_indexes.cpp",
@@ -959,7 +961,6 @@ mongo_cc_library(
     srcs = [
         "document_source_internal_apply_oplog_update.cpp",
         "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.cpp",
-        "//src/mongo/db/pipeline/optimization:oplog_update_rules.cpp",
     ],
     hdrs = [
         "document_source_internal_apply_oplog_update.h",

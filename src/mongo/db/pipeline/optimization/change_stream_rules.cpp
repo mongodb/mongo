@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
-#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
-#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
-#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
-#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change_v2.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
@@ -47,17 +42,5 @@ REGISTER_RULES(DocumentSourceChangeStreamOplogMatch,
                OPTIMIZE_AT_RULE(DocumentSourceChangeStreamOplogMatch));
 REGISTER_RULES(DocumentSourceChangeStreamSplitLargeEvent,
                OPTIMIZE_AT_RULE(DocumentSourceChangeStreamSplitLargeEvent));
-
-// These will become redundant in a follow-up PR under SERVER-110104.
-REGISTER_RULES(DocumentSourceChangeStreamAddPostImage,
-               OPTIMIZE_AT_RULE(DocumentSourceChangeStreamAddPostImage));
-REGISTER_RULES(DocumentSourceChangeStreamAddPreImage,
-               OPTIMIZE_AT_RULE(DocumentSourceChangeStreamAddPreImage));
-REGISTER_RULES(DocumentSourceChangeStreamEnsureResumeTokenPresent,
-               OPTIMIZE_AT_RULE(DocumentSourceChangeStreamEnsureResumeTokenPresent));
-REGISTER_RULES(DocumentSourceChangeStreamHandleTopologyChangeV2,
-               OPTIMIZE_AT_RULE(DocumentSourceChangeStreamHandleTopologyChangeV2));
-REGISTER_RULES(DocumentSourceChangeStreamHandleTopologyChange,
-               OPTIMIZE_AT_RULE(DocumentSourceChangeStreamHandleTopologyChange));
 
 }  // namespace mongo::rule_based_rewrites::pipeline

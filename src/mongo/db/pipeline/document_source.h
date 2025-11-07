@@ -204,6 +204,10 @@ namespace exec::agg {
 class ListMqlEntitiesStage;
 }  // namespace exec::agg
 
+namespace rule_based_rewrites::pipeline {
+struct CommonTransforms;
+}  // namespace rule_based_rewrites::pipeline
+
 class DocumentSource : public RefCountable {
 public:
     // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
@@ -502,6 +506,8 @@ public:
      *
      * Subclasses should override doOptimizeAt() if they can apply some optimization(s) based on
      * subsequent stages in the pipeline.
+     *
+     * TODO(SERVER-110107): Remove this.
      */
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
@@ -775,6 +781,10 @@ private:
     // Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
     // it from all other stages.
     friend class exec::agg::ListMqlEntitiesStage;
+
+    // TODO(SERVER-110107): Remove.
+    // Give access to 'doOptimizeAt()' to allow it to be registered as an unconditional rule.
+    friend struct rule_based_rewrites::pipeline::CommonTransforms;
 
     // Used to keep track of which DocumentSources are registered under which name. Initialized
     // during process initialization and const thereafter.

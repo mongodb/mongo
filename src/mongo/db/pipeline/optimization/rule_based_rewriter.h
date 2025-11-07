@@ -166,6 +166,14 @@ struct CommonTransforms {
     static bool insertAfter(PipelineRewriteContext& ctx, DocumentSource& d);
     static bool erase(PipelineRewriteContext& ctx);
     static bool eraseNext(PipelineRewriteContext& ctx);
+
+    /**
+     * Pushes 'pushdownPart' before the previous stage. Assumes that 'ctx.current()' is the match
+     * we're pushing down.
+     */
+    static bool partialPushdown(PipelineRewriteContext& ctx,
+                                boost::intrusive_ptr<DocumentSource> pushdownPart,
+                                boost::intrusive_ptr<DocumentSource> remainingPart);
     /**
      * Convenience for "sentinel" rules that detect conditions and queue other rules, but may not
      * result in other transformations.
@@ -184,7 +192,7 @@ struct CommonTransforms {
         };
 
         auto stagesBefore = getAdjacentStages(ctx._itr);
-        auto resultItr = ctx.current().optimizeAt(ctx._itr, &ctx._container);
+        auto resultItr = ctx.current().doOptimizeAt(ctx._itr, &ctx._container);
         // If nothing changed, resultItr points to the next position.
         auto stagesAfter = getAdjacentStages(
             resultItr == ctx._container.begin() ? resultItr : std::prev(resultItr));
@@ -195,7 +203,8 @@ struct CommonTransforms {
         // iterators would be undefined behavior.
         if (stagesBefore == stagesAfter &&
             (resultItr == ctx._container.end() || resultItr == std::next(ctx._itr))) {
-            // Current position may have been erased and re-inserted by optimizeAt().
+            // We know that optimizeAt() didn't do anything. Current position may still have been
+            // erased (and re-inserted) by optimizeAt(), so we need to re-set it just in case.
             ctx._itr = std::prev(resultItr);
             return false;
         }
@@ -216,6 +225,7 @@ inline bool alwaysTrue(PipelineRewriteContext&) {
 [[maybe_unused]] static auto insertAfter = CommonTransforms::insertAfter;
 [[maybe_unused]] static auto erase = CommonTransforms::erase;
 [[maybe_unused]] static auto eraseNext = CommonTransforms::eraseNext;
+[[maybe_unused]] static auto partialPushdown = CommonTransforms::partialPushdown;
 [[maybe_unused]] static auto noop = CommonTransforms::noop;
 
 namespace registration_detail {

@@ -111,6 +111,31 @@ bool CommonTransforms::eraseNext(PipelineRewriteContext& ctx) {
     return false;
 }
 
+bool CommonTransforms::partialPushdown(PipelineRewriteContext& ctx,
+                                       boost::intrusive_ptr<DocumentSource> pushdownPart,
+                                       boost::intrusive_ptr<DocumentSource> remainingPart) {
+    tassert(11010401, "Expected non-null stage for pushdown", pushdownPart);
+
+    // Erase the original stage. 'ctx._itr' will now point to the previous stage (i.e., the stage
+    // that we want in between the pushdown part and the remaining part).
+    erase(ctx);
+
+    // Insert the pushed down part before the current stage.
+    ctx._container.insert(ctx._itr, std::move(pushdownPart));
+
+    // If 'remainingPart' is not null, the 'pushdownPart' of the $match expression
+    // was only one component of the original $match. So, we need to create a new $match stage for
+    // the remaining 'remainingPart' and insert it after 'this' - effectively keeping it in
+    // its original position in the pipeline.
+    if (remainingPart) {
+        ctx._container.insert(std::next(ctx._itr), std::move(remainingPart));
+    }
+
+    // May be able to optimize stage before the pushed down $match further.
+    ctx._itr = prevOrFirstItr(ctx._container, std::prev(ctx._itr));
+    return true;
+}
+
 namespace registration_detail {
 namespace {
 const auto getRegisteredRuleNames = ServiceContext::declareDecoration<std::set<std::string>>();
