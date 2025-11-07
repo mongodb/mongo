@@ -46,13 +46,16 @@ public:
 
     Value serialize(const SerializationOptions& opts) const override;
 
-    std::list<boost::intrusive_ptr<DocumentSource>> expand() {
+    std::list<boost::intrusive_ptr<DocumentSource>> expand() const {
         return expandImpl(getExpCtx(), _parseNode);
     }
 
     static const Id& id;
 
     Id getId() const override;
+
+    // Define how to desugar a DocumentSourceExtensionExpandable.
+    static Desugarer::StageExpander stageExpander;
 
 private:
     const AggStageParseNodeHandle _parseNode;

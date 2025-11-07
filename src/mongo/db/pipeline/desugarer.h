@@ -26,36 +26,40 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 
-#include "mongo/db/extension/host/document_source_extension.h"
+namespace mongo {
 
-namespace mongo::extension {
-
-/**
- * RAII helper used in tests to temporarily allocate Ids for stages in unit tests. This removes the
- * need for unit tests to have to fully register stages when they only need to construct
- * DocumentSourceExtensions instead of fully parsing from BSON.
- */
-class TestStageIdRegistrar {
+class Desugarer {
 public:
-    explicit TestStageIdRegistrar(std::initializer_list<StringData> stageNames) {
-        for (auto name : stageNames) {
-            const std::string key = std::string(name);
-            if (host::DocumentSourceExtension::stageToIdMap.find(key) ==
-                host::DocumentSourceExtension::stageToIdMap.end()) {
-                _inserted.emplace_back(key);
-                host::DocumentSourceExtension::stageToIdMap[key] = DocumentSource::allocateId(key);
-            }
-        }
+    using StageExpander = std::function<DocumentSourceContainer::iterator(
+        Desugarer*, DocumentSourceContainer::iterator, const DocumentSource&)>;
+
+    explicit Desugarer(Pipeline* pipeline) : _sources(pipeline->getSources()) {}
+
+    // Desugars the pipeline.
+    void operator()();
+
+    static void registerStageExpander(DocumentSource::Id id, StageExpander stageExpander) {
+        _stageExpanders[id] = std::move(stageExpander);
     }
-    ~TestStageIdRegistrar() {
-        for (auto& key : _inserted) {
-            host::DocumentSourceExtension::stageToIdMap.erase(key);
-        }
-    }
+
+    // Adds in newSources at position itr in _sources and returns the iterator *after* the sources
+    // added.
+    DocumentSourceContainer::iterator replaceStageWith(
+        DocumentSourceContainer::iterator itr,
+        std::list<boost::intrusive_ptr<DocumentSource>>&& newSources);
 
 private:
-    std::vector<std::string> _inserted;
+    // Associate a stage expander for each stage that should desugar.
+    // NOTE: this map is *not* thread safe. DocumentSources should register their stageExpander
+    // using MONGO_INITIALIZER to ensure thread safety. See DocumentSourceExtensionExpandable for an
+    // example.
+    inline static stdx::unordered_map<DocumentSource::Id, StageExpander> _stageExpanders{};
+
+    DocumentSourceContainer& _sources;
 };
 
-}  // namespace mongo::extension
+}  // namespace mongo

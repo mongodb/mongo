@@ -124,26 +124,6 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
     // The extensions is in the form of DocumentSourceExtensionExpandable at this point, which
     // serializes to its query shape. There is no query shape for the no-op extension.
     ASSERT_BSONOBJ_EQ(serializedPipeline[0], BSONObj());
-
-    const auto* documentSourceExtension =
-        dynamic_cast<const host::DocumentSourceExtension*>(stagePtr);
-    ASSERT_TRUE(documentSourceExtension != nullptr);
-    auto extensionStage =
-        exec::agg::buildStage(const_cast<host::DocumentSourceExtension*>(documentSourceExtension));
-    // Ensure our stage is indeed a NoOp.
-    ASSERT_TRUE(extensionStage->getNext().isEOF());
-    Document inputDoc = Document{{"foo", 1}};
-    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    extensionStage->setSource(mock.get());
-    auto next = extensionStage->getNext();
-    ASSERT(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), inputDoc);
-
-    {
-        // Test that a parsing failure correctly rethrows the uassert.
-        std::vector<BSONObj> testPipeline{kInvalidSpec};
-        ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 10596407);
-    }
 }
 
 TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {
@@ -163,7 +143,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {
     auto* first =
         dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
     ASSERT_TRUE(first != nullptr);
-    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kSourceName));
+    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
 }
 
 TEST_F(DocumentSourceExtensionTest, ExpandToExtParse) {

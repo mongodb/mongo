@@ -1493,6 +1493,7 @@ mongo_cc_unit_test(
         "change_stream_test.cpp",
         "data_to_shards_allocation_query_service_test.cpp",
         "dependencies_test.cpp",
+        "desugarer_test.cpp",
         "dispatch_shard_pipeline_test.cpp",
         "document_path_support_test.cpp",
         "document_source_add_fields_test.cpp",
@@ -1877,5 +1878,15 @@ idl_generator(
     src = "document_source_list_cluster_catalog.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "desugarer",
+    srcs = ["desugarer.cpp"],
+    hdrs = ["desugarer.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/mongo/db/pipeline",
     ],
 )

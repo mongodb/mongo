@@ -203,7 +203,7 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(
-            new sdk::ExtensionAggStageAstNode(std::make_unique<SourceAggStageAstNode>()));
+            new sdk::ExtensionAggStageAstNode(std::make_unique<NoOpAggStageAstNode>()));
         return expanded;
     }
 

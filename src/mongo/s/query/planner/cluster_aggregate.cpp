@@ -53,6 +53,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_hint_translation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/desugarer.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -561,6 +562,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             },
             hasChangeStream);
     }
+
+    // Find stages with stage expanders and desugar. We desugar after registering query stats to
+    // ensure that the query shape is representative of the user's original query.
+    Desugarer(pipeline.get())();
+
     return pipeline;
 }
 

@@ -94,16 +94,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandabl
 }
 
 Value DocumentSourceExtensionExpandable::serialize(const SerializationOptions& opts) const {
-    // TODO SERVER-109780: Remove this block and add an assert to check that only the query shape is
-    // requested at this point.
-    if (opts.isKeepingLiteralsUnchanged()) {
-        // Convert to Optimizable representation to get the non-query shape serialization.
-        auto expanded = expandImpl(getExpCtx(), _parseNode);
-
-        std::vector<Value> tmp;
-        expanded.front()->serializeToArray(tmp, opts);
-        return std::move(tmp.front());
-    }
+    tassert(10978000,
+            "SerializationOptions should change literals while represented as a "
+            "DocumentSourceExtensionExpandable",
+            !opts.isKeepingLiteralsUnchanged());
 
     host_connector::QueryShapeOptsAdapter adapter{&opts};
     return Value(_parseNode.getQueryShape(adapter));
@@ -111,6 +105,24 @@ Value DocumentSourceExtensionExpandable::serialize(const SerializationOptions& o
 
 DocumentSource::Id DocumentSourceExtensionExpandable::getId() const {
     return id;
+}
+
+Desugarer::StageExpander DocumentSourceExtensionExpandable::stageExpander =
+    [](Desugarer* desugarer, DocumentSourceContainer::iterator itr, const DocumentSource& stage) {
+        tassert(10978001, "Desugarer iterator does not match current stage", itr->get() == &stage);
+
+        const auto& expandable = static_cast<const DocumentSourceExtensionExpandable&>(stage);
+        std::list<boost::intrusive_ptr<DocumentSource>> expandedExtension = expandable.expand();
+        tassert(10978002, "Expanded extension pipeline is empty", !expandedExtension.empty());
+
+        // Replaces the extension stage with its expanded form and moves the iterator to *after* the
+        // new stages added.
+        return desugarer->replaceStageWith(itr, std::move(expandedExtension));
+    };
+
+MONGO_INITIALIZER(RegisterStageExpanderForExtensionExpandable)(InitializerContext*) {
+    Desugarer::registerStageExpander(DocumentSourceExtensionExpandable::id,
+                                     DocumentSourceExtensionExpandable::stageExpander);
 }
 
 }  // namespace mongo::extension::host

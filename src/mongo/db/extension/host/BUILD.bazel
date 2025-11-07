@@ -51,6 +51,7 @@ mongo_cc_library(
         "//src/mongo/db/extension/host_connector:host_services_adapter",
         "//src/mongo/db/extension/shared/handle/aggregation_stage",
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:desugarer",
     ],
 )
 

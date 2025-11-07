@@ -178,4 +178,14 @@ TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandRecursesMultipleLev
               std::string(sdk::shared_test_stages::kLeafDName));
 }
 
+DEATH_TEST_F(DocumentSourceExtensionExpandableTest, SerializeWithWrongOptsFails, "10978000") {
+    auto rawStage =
+        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
+
+    auto expandable = host::DocumentSourceExtensionExpandable::create(
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_noOpStageDescriptor));
+
+    [[maybe_unused]] auto serialized = expandable->serialize(SerializationOptions{});
+}
+
 }  // namespace mongo::extension

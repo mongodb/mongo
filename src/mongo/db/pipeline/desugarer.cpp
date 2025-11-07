@@ -27,37 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/host/extension_stage.h"
+#include "mongo/db/pipeline/desugarer.h"
 
-#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 namespace mongo {
 
-using namespace extension::host;
+void Desugarer::operator()() {
+    auto srcItr = _sources.begin();
+    while (srcItr != _sources.end()) {
+        tassert(10978003, "Invalid desugarer iterator", srcItr->get());
+        const auto& stage = *srcItr->get();
 
-boost::intrusive_ptr<exec::agg::Stage> documentSourceExtensionToStageFn(
-    const boost::intrusive_ptr<DocumentSource>& source) {
-    auto* documentSource = dynamic_cast<DocumentSourceExtensionOptimizable*>(source.get());
-    tassert(10980400, "expected 'DocumentSourceExtensionOptimizable' type", documentSource);
-    return make_intrusive<exec::agg::ExtensionStage>(documentSource->getSourceName(),
-                                                     documentSource->getExpCtx());
-}
-
-namespace exec::agg {
-
-REGISTER_AGG_STAGE_MAPPING(extensionStage,
-                           DocumentSourceExtensionOptimizable::id,
-                           documentSourceExtensionToStageFn);
-
-ExtensionStage::ExtensionStage(StringData name,
-                               const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : Stage(name, pExpCtx) {}
-
-GetNextResult ExtensionStage::doGetNext() {
-    if (pSource) {
-        return pSource->getNext();
+        // Check if the stage is desugarable by looking in the stageExpander map.
+        if (auto stageExpanderItr = _stageExpanders.find(stage.getId());
+            stageExpanderItr != _stageExpanders.end()) {
+            srcItr = stageExpanderItr->second(this, srcItr, stage);
+        } else {
+            srcItr = std::next(srcItr);
+        }
     }
-    return GetNextResult::makeEOF();
 }
-}  // namespace exec::agg
+
+DocumentSourceContainer::iterator Desugarer::replaceStageWith(
+    DocumentSourceContainer::iterator itr,
+    std::list<boost::intrusive_ptr<DocumentSource>>&& newSources) {
+    _sources.splice(itr, newSources);
+    auto next = std::next(itr);
+    _sources.erase(itr);
+    return next;
+}
+
 }  // namespace mongo
