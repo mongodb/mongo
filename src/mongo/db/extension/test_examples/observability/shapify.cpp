@@ -50,6 +50,15 @@ using namespace mongo;
  */
 static constexpr std::string kShapifyStageName = "$shapify";
 
+/**
+ * Extension desugar stage with a non-default query shape implementation. Syntax:
+ *
+ * {$shapifyDesugar: {random object>}}
+ *
+ * ShapifyDesugar will expand into multiple $shapify stages for query shape testing purposes.
+ */
+static constexpr std::string kShapifyDesugarStageName = "$shapifyDesugar";
+
 class ShapifyLogicalStage : public sdk::LogicalAggStage {
 public:
     ShapifyLogicalStage(BSONObj input) : _input(input) {}
@@ -153,10 +162,56 @@ public:
     }
 };
 
+class ShapifyDesugarParseNode : public sdk::AggStageParseNode {
+public:
+    ShapifyDesugarParseNode(BSONObj input)
+        : sdk::AggStageParseNode(kShapifyDesugarStageName), _input(input) {}
+
+    size_t getExpandedSize() const override {
+        return 3;
+    }
+
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        std::vector<mongo::extension::VariantNodeHandle> expanded;
+        expanded.reserve(getExpandedSize());
+        BSONObj shapifySpec =
+            BSON(kShapifyStageName << BSON("int" << 1 << "ident_name" << "Alice"));
+        expanded.emplace_back(
+            new sdk::ExtensionAggStageParseNode(std::make_unique<ShapifyParseNode>(shapifySpec)));
+        expanded.emplace_back(
+            new sdk::ExtensionAggStageParseNode(std::make_unique<ShapifyParseNode>(shapifySpec)));
+        expanded.emplace_back(
+            new sdk::ExtensionAggStageParseNode(std::make_unique<ShapifyParseNode>(shapifySpec)));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSON(kShapifyDesugarStageName << _input);
+    }
+
+private:
+    BSONObj _input;
+};
+
+class ShapifyDesugarStageDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string(kShapifyDesugarStageName);
+
+    ShapifyDesugarStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
+        sdk::validateStageDefinition(stageBson, kStageName);
+
+        return std::make_unique<ShapifyDesugarParseNode>(stageBson[kStageName].Obj().getOwned());
+    }
+};
+
+
 class ShapifyExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         _registerStage<ShapifyStageDescriptor>(portal);
+        _registerStage<ShapifyDesugarStageDescriptor>(portal);
     }
 };
 

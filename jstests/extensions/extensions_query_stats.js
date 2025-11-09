@@ -18,6 +18,14 @@ function insertEmptyShape(coll) {
     return [{"$shapify": {}}];
 }
 
+function insertShapeForDesugarStage(coll) {
+    const spec = {$shapifyDesugar: {a: 1, b: 2}};
+    coll.aggregate([spec]).toArray();
+
+    // Expected shape.
+    return [spec];
+}
+
 function insertLiteralShape(coll) {
     // Shape with literals. Test different values to ensure they all map to the same shape.
     let literalShape = {
@@ -245,3 +253,6 @@ statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithIdentifiers3, 
 statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithTransformedIdentifiers4, statsSoFar, true);
 statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithTransformedIdentifiers5, statsSoFar, true);
 statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithTransformedIdentifiers6, statsSoFar, true);
+
+// Test that a desugar stage's query shape is calculated from the pre-desugared stage, not the post-desugared stages.
+statsSoFar = insertShapeAndValidateResults(testDb, insertShapeForDesugarStage, statsSoFar);
