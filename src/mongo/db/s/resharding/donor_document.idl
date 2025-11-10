@@ -32,6 +32,7 @@
 # resharding_donor_service.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

@@ -40,6 +40,7 @@
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

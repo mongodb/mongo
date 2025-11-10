@@ -41,6 +41,7 @@ structs:
             "Represents a donor shard for a particular resharding operation on the
             coordinator."
         generate_comparison_operators: false
+        mod_visibility: private
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
         # before the upgrade or downgrade can complete.
@@ -66,6 +67,7 @@ structs:
             "Represents a recipient shard for a particular resharding operation on the
             coordinator."
         generate_comparison_operators: false
+        mod_visibility: private
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
         # before the upgrade or downgrade can complete.
@@ -78,6 +80,7 @@ structs:
 
     ReshardingCoordinatorMetrics:
         description: "Contains metrics about the resharding operation on the coordinator."
+        mod_visibility: private
         strict: false
         fields:
             operationRuntime:
@@ -98,6 +101,7 @@ structs:
 
     ReshardingCoordinatorDocument:
         description: "Represents a resharding operation on the coordinator."
+        mod_visibility: needs_replacement
         inline_chained_structs: true
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata

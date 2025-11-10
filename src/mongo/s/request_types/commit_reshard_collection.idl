@@ -26,44 +26,44 @@
 # it in the license file.
 #
 
-# This file defines the format of documents stored in config.system.sharding_ddl_coordinators, used
-# by the shard coordinator to guarantee resilience in the event of stepdowns while resharding
-# collections.
+# commitReshardCollection
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
-    - "mongo/db/global_catalog/ddl/sharded_ddl_commands.idl"
 
-enums:
-    ReshardCollectionCoordinatorPhase:
-        description: "Current reshard collection coordinator's operation state."
-        type: string
-        values:
-            kUnset: "unset"
-            kReshard: "reshard"
+commands:
+    commitReshardCollection:
+        description: "The public commitReshardCollection command on mongos."
+        command_name: commitReshardCollection
+        strict: true
+        namespace: type
+        api_version: ""
+        type: namespacestring
 
-structs:
-    ReshardCollectionCoordinatorDocument:
-        description: "Represents a reshard collection operation on the coordinator shard."
-        generate_comparison_operators: false
+    _configsvrCommitReshardCollection:
+        command_name: _configsvrCommitReshardCollection
+        cpp_name: ConfigsvrCommitReshardCollection
+        description: "The internal commitReshardCollection command on the config server."
         strict: false
-        chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
-            ReshardCollectionRequest: ReshardCollectionRequest
+        namespace: type
+        api_version: ""
+        type: namespacestring
+
+    _shardsvrCommitReshardCollection:
+        command_name: _shardsvrCommitReshardCollection
+        cpp_name: ShardsvrCommitReshardCollection
+        description: "The internal commitReshardCollection command on the shard server."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        reply_type: OkReply
         fields:
-            phase:
-                type: ReshardCollectionCoordinatorPhase
-                description: "Coordinator phase."
-                default: kUnset
-            oldShardKey:
-                type: object
-                description: "The shard key of the collection before resharding."
-                optional: true
-            oldCollectionUUID:
+            reshardingUUID:
                 type: uuid
-                description: "The UUID of the collection before resharding."
-                optional: true
+                optional: false
+                description: "The UUID for this resharding operation"

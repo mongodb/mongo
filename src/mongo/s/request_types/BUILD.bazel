@@ -66,6 +66,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "commit_reshard_collection_gen",
+    src = "commit_reshard_collection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "configure_collection_balancing_gen",
     src = "configure_collection_balancing.idl",
     deps = [

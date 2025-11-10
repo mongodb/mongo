@@ -200,16 +200,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "reshard_collection_coordinator_document_gen",
-    src = "reshard_collection_coordinator_document.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
-    ],
-)
-
-idl_generator(
     name = "set_allow_migrations_coordinator_document_gen",
     src = "set_allow_migrations_coordinator_document.idl",
     deps = [
@@ -281,15 +271,6 @@ idl_generator(
 idl_generator(
     name = "add_shard_to_zone_gen",
     src = "add_shard_to_zone.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "commit_reshard_collection_gen",
-    src = "commit_reshard_collection.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",

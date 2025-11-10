@@ -30,6 +30,7 @@
 # the recipient shard for a resharding operation.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

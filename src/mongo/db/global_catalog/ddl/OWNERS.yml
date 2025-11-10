@@ -23,15 +23,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-ddl
       - 10gen/server-security
-  - "*move*collection*":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "*refine_collection_shard_key*":
-    approvers:
-      - 10gen/server-cluster-scalability
-  - "*unshard*collection*":
-    approvers:
-      - 10gen/server-cluster-scalability
-  - "*rewrite*collection*":
     approvers:
       - 10gen/server-cluster-scalability

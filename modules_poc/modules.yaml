@@ -535,6 +535,9 @@ data_movement:
     slack: server-sharding
     jira: Cluster Scalability
   files:
+    # data movement commands on mongos
+    - src/mongo/s/commands/data_movement/*
+
     # resharding
     - src/mongo/db/s/*reshard*
     - src/mongo/db/s/config/*reshard*

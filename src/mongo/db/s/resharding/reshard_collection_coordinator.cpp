@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/global_catalog/ddl/reshard_collection_coordinator.h"
+#include "mongo/db/s/resharding/reshard_collection_coordinator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"

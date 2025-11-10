@@ -35,7 +35,6 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/ddl/commit_reshard_collection_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/request_types/commit_reshard_collection_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
