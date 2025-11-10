@@ -5,6 +5,9 @@
 //   requires_getmore,
 //   requires_persistence,
 //   assumes_unsharded_collection,
+//   # If the collection uuid changes while the find command in this test is running, the command
+//   # is expected to fail with QueryPlanKilled.
+//   assumes_stable_collection_uuid,
 //   # Insertions make transactions too big
 //   does_not_support_transactions
 // ]
