@@ -421,6 +421,10 @@ HostAndPort ReplicationCoordinatorMock::getMyHostAndPort() const {
     return HostAndPort();
 }
 
+boost::optional<int> ReplicationCoordinatorMock::getMyMaintenancePort() const {
+    return boost::none;
+}
+
 Status ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 

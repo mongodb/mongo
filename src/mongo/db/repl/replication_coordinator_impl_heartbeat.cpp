@@ -764,8 +764,11 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                 return _selfIndex;
             }
         }
-        return validateConfigForHeartbeatReconfig(
-            _externalState.get(), newConfig, getMyHostAndPort(), cc().getServiceContext());
+        return validateConfigForHeartbeatReconfig(_externalState.get(),
+                                                  newConfig,
+                                                  getMyHostAndPort(),
+                                                  getMyMaintenancePort(),
+                                                  cc().getServiceContext());
     }();
 
     if (myIndex.getStatus() == ErrorCodes::NodeNotFound) {

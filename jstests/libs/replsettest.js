@@ -331,7 +331,11 @@ export class ReplSetTest {
         return p;
     }
 
-    getReplSetConfig() {
+    // TODO (SERVER-112863): The ignoreMaintenancePort parameter is used to allow sharded clusters
+    // to initiate without the maintenance port and then reconfigure with it since shard servers
+    // start up with FCV lastLTS in which the maintenance port is not allowed. This can be removed
+    // once sharded clusters can initiate with the maintenance port.
+    getReplSetConfig(ignoreMaintenancePort = false) {
         let cfg = {};
         cfg._id = this.name;
         cfg.protocolVersion = 1;
@@ -345,6 +349,10 @@ export class ReplSetTest {
             member.host = this.host;
             if (!member.host.includes("/")) {
                 member.host += ":" + this.ports[i];
+            }
+
+            if (!ignoreMaintenancePort && this._maintenancePorts?.[i] > 0) {
+                member.maintenancePort = this._maintenancePorts[i];
             }
 
             let nodeOpts = this.nodeOptions["n" + i];

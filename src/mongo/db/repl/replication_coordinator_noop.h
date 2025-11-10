@@ -206,6 +206,8 @@ public:
 
     HostAndPort getMyHostAndPort() const final;
 
+    boost::optional<int> getMyMaintenancePort() const final;
+
     Status setFollowerMode(const MemberState&) final;
 
     Status setFollowerModeRollback(OperationContext* opCtx) final;

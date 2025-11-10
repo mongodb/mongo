@@ -69,6 +69,13 @@ structs:
             host:
                 type: string
                 description: "The hostname and, if specified, the port number, of the set member"
+            maintenancePort:
+                type: safeInt
+                optional: true
+                validator: {gte: 1, lte: 65535}
+                description:
+                    "If provided, specifies the maintenance port for this set member. This port must
+                    match the one opened on the server if it is specified in the config."
             votes:
                 type: safeInt64
                 default: 1

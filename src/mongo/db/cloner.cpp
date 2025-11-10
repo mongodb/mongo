@@ -526,7 +526,7 @@ Status DefaultClonerImpl::setupConn(OperationContext* opCtx, const std::string& 
     std::vector<HostAndPort> csServers = cs.getServers();
     for (std::vector<HostAndPort>::const_iterator iter = csServers.begin(); iter != csServers.end();
          ++iter) {
-        if (!repl::isSelf(*iter, opCtx->getServiceContext()))
+        if (!repl::isSelf(*iter, /* maintenancePort */ boost::none, opCtx->getServiceContext()))
             continue;
 
         masterSameProcess = true;

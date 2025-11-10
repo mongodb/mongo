@@ -228,6 +228,8 @@ public:
 
     HostAndPort getMyHostAndPort() const override;
 
+    boost::optional<int> getMyMaintenancePort() const override;
+
     Status setFollowerMode(const MemberState& newState) override;
 
     Status setFollowerModeRollback(OperationContext* opCtx) override;

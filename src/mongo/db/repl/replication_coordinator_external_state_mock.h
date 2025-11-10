@@ -90,9 +90,12 @@ public:
     void onApplierDrainComplete(OperationContext* opCtx) override;
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
     void forwardSecondaryProgress(bool prioritized) override;
-    bool isSelf(const HostAndPort& host, ServiceContext* service) override;
-    bool isSelfFastPath(const HostAndPort& host) final;
+    bool isSelf(const HostAndPort& host,
+                const boost::optional<int>& maintenancePort,
+                ServiceContext* service) override;
+    bool isSelfFastPath(const HostAndPort& host, const boost::optional<int>& maintenancePort) final;
     bool isSelfSlowPath(const HostAndPort& host,
+                        const boost::optional<int>& maintenancePort,
                         ServiceContext* service,
                         Milliseconds timeout) final;
     HostAndPort getClientHostAndPort(const OperationContext* opCtx) override;

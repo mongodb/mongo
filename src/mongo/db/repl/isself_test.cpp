@@ -56,8 +56,11 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv4) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
-        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
-        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
+                              serverGlobalParams.maintenancePort));
+        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port),
+                      serverGlobalParams.maintenancePort,
+                      getGlobalServiceContext()));
     }
 #else
     ASSERT(true);
@@ -74,8 +77,11 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
-        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
-        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
+                              serverGlobalParams.maintenancePort));
+        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port),
+                      serverGlobalParams.maintenancePort,
+                      getGlobalServiceContext()));
     }
 #else
     ASSERT(true);
@@ -97,7 +103,8 @@ TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathEnoughAttempts) {
     // Fastpath should agree with the result of getBoundAddrs and should be able to resolve
     // the addresses even with the (transient) failures.
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
-        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
+                              serverGlobalParams.maintenancePort));
     }
 #else
     ASSERT(true);
@@ -118,7 +125,8 @@ TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathAttemptsExhausted)
 
     // Fastpath should not be able to resolve any of the addresses.
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
-        ASSERT_FALSE(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
+        ASSERT_FALSE(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
+                                    serverGlobalParams.maintenancePort));
     }
 #else
     ASSERT(true);

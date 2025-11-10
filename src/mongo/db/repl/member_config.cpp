@@ -198,6 +198,9 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, getId().getData());
     configBuilder.append(kHostFieldName, _host().toString());
+    if (getMaintenancePort()) {
+        configBuilder.append(kMaintenancePortFieldName, *getMaintenancePort());
+    }
     configBuilder.append(kArbiterOnlyFieldName, getArbiterOnly());
 
     if (!omitNewlyAddedField && getNewlyAdded()) {

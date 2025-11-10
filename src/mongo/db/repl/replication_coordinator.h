@@ -546,6 +546,12 @@ public:
     virtual HostAndPort getMyHostAndPort() const = 0;
 
     /**
+     * Returns the maintenance port for this node as specified in the current replica set
+     * configuration.
+     */
+    virtual boost::optional<int> getMyMaintenancePort() const = 0;
+
+    /**
      * Sets this node into a specific follower mode.
      *
      * Returns OK if the follower mode was successfully set.  Returns NotSecondary if the

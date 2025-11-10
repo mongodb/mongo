@@ -3101,6 +3101,14 @@ HostAndPort ReplicationCoordinatorImpl::getMyHostAndPort() const {
     return _rsConfig.unsafePeek().getMemberAt(_selfIndex).getHostAndPort();
 }
 
+boost::optional<int> ReplicationCoordinatorImpl::getMyMaintenancePort() const {
+    stdx::unique_lock lk(_mutex);
+    if (_selfIndex == -1) {
+        return boost::none;
+    }
+    return _rsConfig.unsafePeek().getMemberAt(_selfIndex).getMaintenancePort();
+}
+
 int ReplicationCoordinatorImpl::_getMyId(WithLock lk) const {
     const MemberConfig& self = _rsConfig.unsafePeek().getMemberAt(_selfIndex);
     return self.getId().getData();
@@ -3742,8 +3750,9 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     // as we are not allowed to have the same HostAndPort in the config twice. Matching HostandPort
     // implies matching isSelf, and it is actually preferrable to avoid checking the latter as it is
     // susceptible to transient DNS errors.
-    auto quickIndex =
-        _selfIndex >= 0 ? findOwnHostInConfigQuick(newConfig, getMyHostAndPort()) : -1;
+    auto quickIndex = _selfIndex >= 0
+        ? findOwnHostInConfigQuick(newConfig, getMyHostAndPort(), getMyMaintenancePort())
+        : -1;
     if (quickIndex >= 0) {
         if (!force) {
             auto electableStatus = checkElectable(newConfig, quickIndex);
@@ -4255,8 +4264,7 @@ Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
                           << ", command line set name: " << _settings.ourSetName());
     }
 
-    StatusWith<int> myIndex =
-        validateConfigForInitiate(_externalState.get(), newConfig, opCtx->getServiceContext());
+    StatusWith<int> myIndex = validateConfigForInitiate(_externalState.get(), newConfig, opCtx);
     if (!myIndex.isOK()) {
         LOGV2_ERROR(21425,
                     "replSetInitiate error while validating config",

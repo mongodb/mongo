@@ -78,7 +78,9 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
  * Does a quick pass to see whether a host exists in the new config. Not as precise as
  * findSelfInConfig.
  */
-int findOwnHostInConfigQuick(const ReplSetConfig& newConfig, HostAndPort host);
+int findOwnHostInConfigQuick(const ReplSetConfig& newConfig,
+                             HostAndPort host,
+                             boost::optional<int> maintenancePort);
 
 /**
  * Validates that "newConfig" is a legal configuration that the current
@@ -100,7 +102,7 @@ StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* ex
  */
 StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* externalState,
                                           const ReplSetConfig& newConfig,
-                                          ServiceContext* ctx);
+                                          OperationContext* opCtx);
 
 /**
  * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
@@ -120,18 +122,17 @@ Status validateConfigForReconfig(const VersionContext& vCtx,
                                  bool allowSplitHorizonIP);
 
 /**
- * Validates that "newConfig" is an acceptable configuration when
- * received in a heartbeat reasponse.
+ * Validates that "newConfig" is an acceptable configuration when received in a heartbeat response.
  *
- * If the new configuration omits the current node, but is
- * otherwise valid, returns ErrorCodes::NodeNotFound.  If the
- * configuration is wholly valid, returns Status::OK(). Otherwise,
+ * If the new configuration omits the current node, but is otherwise valid, returns
+ * ErrorCodes::NodeNotFound. If the configuration is wholly valid, returns Status::OK(). Otherwise,
  * returns some other error status.
  */
 StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
     const ReplSetConfig& newConfig,
     HostAndPort ownHost,
+    boost::optional<int> ownMaintenancePort,
     ServiceContext* ctx);
 }  // namespace repl
 }  // namespace MONGO_MOD_PUB mongo

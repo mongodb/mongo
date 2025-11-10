@@ -70,8 +70,9 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
                                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                  << "h1"))),
                                              newReplSetId);
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForInitiate(&rses, config, getServiceContext()).getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::NewReplicaSetConfigurationIncompatible,
+        validateConfigForInitiate(&rses, config, makeOperationContext().get()).getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
@@ -86,7 +87,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
                                                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                       << "h1"))),
                                                   newReplSetId);
-    ASSERT_OK(validateConfigForInitiate(&rses, config, getServiceContext()).getStatus());
+    ASSERT_OK(validateConfigForInitiate(&rses, config, makeOperationContext().get()).getStatus());
     ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
 }
 
@@ -102,7 +103,44 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_memberId) {
                    << BSON_ARRAY(BSON("_id" << 256 << "host"
                                             << "h1"))),
         newReplSetId);
-    ASSERT_OK(validateConfigForInitiate(&rses, validConfig, getGlobalServiceContext()).getStatus());
+    ASSERT_OK(
+        validateConfigForInitiate(&rses, validConfig, makeOperationContext().get()).getStatus());
+}
+
+// TODO (SERVER-112863): Remove feature flag controller and FF Disabled test
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_MaintenancePortFFEnabled) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicationUsageOfMaintenancePort", true);
+    ReplicationCoordinatorExternalStateMock rses;
+    rses.addSelf(HostAndPort("h1"));
+
+    OID newReplSetId = OID::gen();
+    auto validConfig = ReplSetConfig::parseForInitiate(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 256 << "host"
+                                            << "h1" << "maintenancePort" << 20))),
+        newReplSetId);
+    ASSERT_OK(
+        validateConfigForInitiate(&rses, validConfig, makeOperationContext().get()).getStatus());
+}
+
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_MaintenancePortFFDisabled) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReplicationUsageOfMaintenancePort", false);
+    ReplicationCoordinatorExternalStateMock rses;
+    rses.addSelf(HostAndPort("h1"));
+
+    OID newReplSetId = OID::gen();
+    auto validConfig = ReplSetConfig::parseForInitiate(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 256 << "host"
+                                            << "h1" << "maintenancePort" << 20))),
+        newReplSetId);
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidOptions,
+        validateConfigForInitiate(&rses, validConfig, makeOperationContext().get()).getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
@@ -125,15 +163,17 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
     presentTwiceExternalState.addSelf(HostAndPort("h3"));
     presentTwiceExternalState.addSelf(HostAndPort("h1"));
 
-    ASSERT_EQUALS(ErrorCodes::NodeNotFound,
-                  validateConfigForInitiate(&notPresentExternalState, config, getServiceContext())
-                      .getStatus());
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  validateConfigForInitiate(&presentTwiceExternalState, config, getServiceContext())
-                      .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::NodeNotFound,
+        validateConfigForInitiate(&notPresentExternalState, config, makeOperationContext().get())
+            .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidReplicaSetConfig,
+        validateConfigForInitiate(&presentTwiceExternalState, config, makeOperationContext().get())
+            .getStatus());
     ASSERT_EQUALS(1,
                   unittest::assertGet(validateConfigForInitiate(
-                      &presentOnceExternalState, config, getServiceContext())));
+                      &presentOnceExternalState, config, makeOperationContext().get())));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
@@ -153,9 +193,10 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
-    ASSERT_EQUALS(ErrorCodes::NodeNotElectable,
-                  validateConfigForInitiate(&presentOnceExternalState, config, getServiceContext())
-                      .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::NodeNotElectable,
+        validateConfigForInitiate(&presentOnceExternalState, config, makeOperationContext().get())
+            .getStatus());
 }
 
 DEATH_TEST_REGEX_F(ServiceContextTest,
@@ -172,7 +213,8 @@ DEATH_TEST_REGEX_F(ServiceContextTest,
         newReplSetId);
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    validateConfigForInitiate(&presentOnceExternalState, config, getServiceContext()).getStatus();
+    validateConfigForInitiate(&presentOnceExternalState, config, makeOperationContext().get())
+        .getStatus();
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOrOne) {
@@ -218,14 +260,16 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
 
-    ASSERT_OK(validateConfigForInitiate(&presentOnceExternalState, zeroConfig, getServiceContext())
+    ASSERT_OK(validateConfigForInitiate(
+                  &presentOnceExternalState, zeroConfig, makeOperationContext().get())
                   .getStatus());
-    ASSERT_OK(validateConfigForInitiate(&presentOnceExternalState, oneConfig, getServiceContext())
+    ASSERT_OK(validateConfigForInitiate(
+                  &presentOnceExternalState, oneConfig, makeOperationContext().get())
                   .getStatus());
-    ASSERT_EQUALS(
-        ErrorCodes::InvalidReplicaSetConfig,
-        validateConfigForInitiate(&presentOnceExternalState, twoConfig, getServiceContext())
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  validateConfigForInitiate(
+                      &presentOnceExternalState, twoConfig, makeOperationContext().get())
+                      .getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) {
@@ -259,14 +303,14 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
 
-    auto status =
-        validateConfigForInitiate(&presentOnceExternalState, firstNewlyAdded, getServiceContext())
-            .getStatus();
+    auto status = validateConfigForInitiate(
+                      &presentOnceExternalState, firstNewlyAdded, makeOperationContext().get())
+                      .getStatus();
     ASSERT_EQUALS(status, ErrorCodes::InvalidReplicaSetConfig);
     ASSERT_TRUE(status.reason().find("newly_added_h1") != std::string::npos);
-    status =
-        validateConfigForInitiate(&presentOnceExternalState, lastNewlyAdded, getServiceContext())
-            .getStatus();
+    status = validateConfigForInitiate(
+                 &presentOnceExternalState, lastNewlyAdded, makeOperationContext().get())
+                 .getStatus();
     ASSERT_EQUALS(status, ErrorCodes::InvalidReplicaSetConfig);
     ASSERT_TRUE(status.reason().find("newly_added_h3") != std::string::npos);
 }
@@ -720,10 +764,10 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(
-        ErrorCodes::BadValue,
-        validateConfigForInitiate(&presentOnceExternalState, newConfig, getServiceContext())
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  validateConfigForInitiate(
+                      &presentOnceExternalState, newConfig, makeOperationContext().get())
+                      .getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigInvalid) {
@@ -861,10 +905,11 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigInvalid) 
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(ErrorCodes::BadValue,
-                  validateConfigForHeartbeatReconfig(
-                      &presentOnceExternalState, newConfig, HostAndPort(), getServiceContext())
-                      .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        validateConfigForHeartbeatReconfig(
+            &presentOnceExternalState, newConfig, HostAndPort(), boost::none, getServiceContext())
+            .getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
@@ -881,9 +926,10 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_OK(validateConfigForHeartbeatReconfig(
-                  &presentOnceExternalState, newConfig, HostAndPort(), getServiceContext())
-                  .getStatus());
+    ASSERT_OK(
+        validateConfigForHeartbeatReconfig(
+            &presentOnceExternalState, newConfig, HostAndPort(), boost::none, getServiceContext())
+            .getStatus());
 }
 
 DEATH_TEST_REGEX_F(ServiceContextTest,
@@ -903,11 +949,12 @@ DEATH_TEST_REGEX_F(ServiceContextTest,
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_THROWS_CODE(validateConfigForHeartbeatReconfig(
-                           &presentOnceExternalState, newConfig, HostAndPort(), getServiceContext())
-                           .getStatus(),
-                       AssertionException,
-                       5624103);
+    ASSERT_THROWS_CODE(
+        validateConfigForHeartbeatReconfig(
+            &presentOnceExternalState, newConfig, HostAndPort(), boost::none, getServiceContext())
+            .getStatus(),
+        AssertionException,
+        5624103);
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {
@@ -1322,29 +1369,44 @@ TEST_F(ServiceContextTest, FindSelfInConfigFastAndSlow) {
 
 TEST_F(ServiceContextTest, FindOwnHostInConfigQuick) {
     ReplSetConfig newConfig;
-    newConfig =
-        ReplSetConfig::parse(BSON("_id" << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1:1234")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2:1234")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3:1234")
-                                                      << BSON("_id" << 4 << "host"
-                                                                    << "h2:1234"))));
+    newConfig = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 2 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                            << "h1:1234")
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2:1234")
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3:1234")
+                                 << BSON("_id" << 4 << "host"
+                                               << "h2:1234")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h4:1234" << "maintenancePort" << 5678))));
 
     // Does not exist.
-    ASSERT_EQUALS(-1, findOwnHostInConfigQuick(newConfig, HostAndPort("non-existent")));
+    ASSERT_EQUALS(-1,
+                  findOwnHostInConfigQuick(newConfig, HostAndPort("non-existent"), boost::none));
+
+    // Maintenance port specified when none exists locally.
+    ASSERT_EQUALS(-1, findOwnHostInConfigQuick(newConfig, HostAndPort("h4:1234"), boost::none));
+
+    // Maintenance port wrong.
+    ASSERT_EQUALS(-1, findOwnHostInConfigQuick(newConfig, HostAndPort("h4:1234"), 2345));
 
     // First in config, not duplicated.
-    ASSERT_EQUALS(0, findOwnHostInConfigQuick(newConfig, HostAndPort("h1:1234")));
+    ASSERT_EQUALS(0, findOwnHostInConfigQuick(newConfig, HostAndPort("h1:1234"), boost::none));
 
     // Not first in config but also not duplicated.
-    ASSERT_EQUALS(2, findOwnHostInConfigQuick(newConfig, HostAndPort("h3:1234")));
+    ASSERT_EQUALS(2, findOwnHostInConfigQuick(newConfig, HostAndPort("h3:1234"), boost::none));
 
     // First match in a tie.
-    ASSERT_EQUALS(1, findOwnHostInConfigQuick(newConfig, HostAndPort("h2:1234")));
+    ASSERT_EQUALS(1, findOwnHostInConfigQuick(newConfig, HostAndPort("h2:1234"), boost::none));
+
+    // Match with maintenance port.
+    ASSERT_EQUALS(4, findOwnHostInConfigQuick(newConfig, HostAndPort("h4:1234"), 5678));
+
+    // Maintenance port not in config but open locally is fine.
+    ASSERT_EQUALS(0, findOwnHostInConfigQuick(newConfig, HostAndPort("h1:1234"), 5678));
 }
 
 }  // namespace

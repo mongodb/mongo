@@ -183,16 +183,68 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
     return out;
 }
 
-}  // namespace
+bool canConnectToHostAndPort(const HostAndPort& hostAndPort,
+                             ServiceContext* const ctx,
+                             Milliseconds timeout) {
+    try {
+        DBClientConnection conn;
+        double timeoutSeconds = static_cast<double>(durationCount<Milliseconds>(timeout)) / 1000.0;
+        conn.setSoTimeout(timeoutSeconds);
 
-bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx, Milliseconds timeout) {
-    if (isSelfFastPath(hostAndPort)) {
-        return true;
+        // We need to avoid the "hello" call triggered by a normal connect, which would cause a
+        // deadlock. 'isSelf' is called by the Replication Coordinator when validating a replica set
+        // configuration document, but the "hello" command requires a lock on the replication
+        // coordinator to execute. As such we call we call 'connectNoHello', which does not call
+        // "hello".
+        try {
+            conn.connectNoHello(hostAndPort, boost::none);
+        } catch (const DBException& e) {
+            LOGV2(4834700,
+                  "isSelf could not connect via connectNoHello",
+                  "hostAndPort"_attr = hostAndPort,
+                  "error"_attr = e);
+            return false;
+        }
+
+        if (auth::isInternalAuthSet()) {
+            try {
+                conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen);
+            } catch (const DBException& e) {
+                LOGV2(4834701,
+                      "isSelf could not authenticate internal user",
+                      "hostAndPort"_attr = hostAndPort,
+                      "error"_attr = e);
+                return false;
+            }
+        }
+        BSONObj out;
+        bool ok = conn.runCommand(DatabaseName::kAdmin, BSON("_isSelf" << 1), out);
+        bool me = ok && out["id"].type() == BSONType::oid && instanceId == out["id"].OID();
+
+        return me;
+    } catch (const std::exception& e) {
+        LOGV2_WARNING(21209,
+                      "Couldn't check isSelf",
+                      "hostAndPort"_attr = hostAndPort,
+                      "error"_attr = e.what());
     }
-    return isSelfSlowPath(hostAndPort, ctx, timeout);
+
+    return false;
 }
 
-bool isSelfFastPath(const HostAndPort& hostAndPort) {
+}  // namespace
+
+bool isSelf(const HostAndPort& hostAndPort,
+            const boost::optional<int>& maintenancePort,
+            ServiceContext* const ctx,
+            Milliseconds timeout) {
+    if (isSelfFastPath(hostAndPort, maintenancePort)) {
+        return true;
+    }
+    return isSelfSlowPath(hostAndPort, maintenancePort, ctx, timeout);
+}
+
+bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& maintenancePort) {
     if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
         LOGV2(356490,
               "failIsSelfCheck failpoint activated, returning false from isSelfFastPath",
@@ -200,10 +252,11 @@ bool isSelfFastPath(const HostAndPort& hostAndPort) {
         return false;
     }
 
-    // Fastpath: check if the host&port in question is bound to one
-    // of the interfaces on this machine.
-    // No need for ip match if the ports do not match
-    if (hostAndPort.port() == serverGlobalParams.port) {
+    // Fastpath: check if the host&port in question is bound to one of the interfaces on this
+    // machine. No need for ip match if the ports do not match. Since the bind_ip is used for both
+    // main and maintenance ports, if both ports match we only need to check the hosts once.
+    if (hostAndPort.port() == serverGlobalParams.port &&
+        (!maintenancePort.has_value() || *maintenancePort == serverGlobalParams.maintenancePort)) {
         std::vector<std::string> myAddrs = serverGlobalParams.bind_ips;
 
         // If any of the bound addresses is the default route (0.0.0.0 on IPv4) it means we are
@@ -255,6 +308,7 @@ bool isSelfFastPath(const HostAndPort& hostAndPort) {
 }
 
 bool isSelfSlowPath(const HostAndPort& hostAndPort,
+                    const boost::optional<int>& maintenancePort,
                     ServiceContext* const ctx,
                     Milliseconds timeout) {
     ctx->waitForStartupComplete();
@@ -265,50 +319,13 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
         return false;
     }
 
-    try {
-        DBClientConnection conn;
-        double timeoutSeconds = static_cast<double>(durationCount<Milliseconds>(timeout)) / 1000.0;
-        conn.setSoTimeout(timeoutSeconds);
+    // If a maintenance port is specified, we need to verify that we can connect both to the
+    // hostAndPort but also to the host and maintenance port.
+    bool canConnectToMainPort = canConnectToHostAndPort(hostAndPort, ctx, timeout);
+    bool canConnectToMaintenancePort = !maintenancePort.has_value() ||
+        canConnectToHostAndPort(HostAndPort(hostAndPort.host(), *maintenancePort), ctx, timeout);
 
-        // We need to avoid the "hello" call triggered by a normal connect, which would cause a
-        // deadlock. 'isSelf' is called by the Replication Coordinator when validating a replica set
-        // configuration document, but the "hello" command requires a lock on the replication
-        // coordinator to execute. As such we call we call 'connectNoHello', which does not call
-        // "hello".
-        try {
-            conn.connectNoHello(hostAndPort, boost::none);
-        } catch (const DBException& e) {
-            LOGV2(4834700,
-                  "isSelf could not connect via connectNoHello",
-                  "hostAndPort"_attr = hostAndPort,
-                  "error"_attr = e);
-            return false;
-        }
-
-        if (auth::isInternalAuthSet()) {
-            try {
-                conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen);
-            } catch (const DBException& e) {
-                LOGV2(4834701,
-                      "isSelf could not authenticate internal user",
-                      "hostAndPort"_attr = hostAndPort,
-                      "error"_attr = e);
-                return false;
-            }
-        }
-        BSONObj out;
-        bool ok = conn.runCommand(DatabaseName::kAdmin, BSON("_isSelf" << 1), out);
-        bool me = ok && out["id"].type() == BSONType::oid && instanceId == out["id"].OID();
-
-        return me;
-    } catch (const std::exception& e) {
-        LOGV2_WARNING(21209,
-                      "Couldn't check isSelf",
-                      "hostAndPort"_attr = hostAndPort,
-                      "error"_attr = e.what());
-    }
-
-    return false;
+    return canConnectToMainPort && canConnectToMaintenancePort;
 }
 
 /**

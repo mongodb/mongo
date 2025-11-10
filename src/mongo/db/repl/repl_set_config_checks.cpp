@@ -310,6 +310,30 @@ Status validateOldAndNewConfigsCompatible(const VersionContext& vCtx,
 
     return Status::OK();
 }
+
+// Ensure that maintenance port can only be specified in a ReplSetConfig if the feature flag is
+// enabled. This should not be checked in the heartbeat reconfiguration or the startup config checks
+// to ensure that lagged secondaries that have not yet upgraded their FCV do not encounter issues.
+Status validateMaintenancePortSettings(const VersionContext& vCtx, const ReplSetConfig& newConfig) {
+    // TODO (SERVER-112863) Remove this check.
+    // TODO (SERVER-113217) Ensure FCV stability of this check.
+    // TODO (SERVER-113402) Check horizons for maintenance port as well.
+    // TODO (SERVER-113536) Handle this check for disaggregated storage.
+    // If any member config specifies a maintenance port, ensure that we are in an FCV which can
+    // handle this.
+    for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
+         iter != newConfig.membersEnd();
+         ++iter) {
+        if (iter->getMaintenancePort().has_value() &&
+            !feature_flags::gFeatureFlagReplicationUsageOfMaintenancePort.isEnabled(
+                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            return {ErrorCodes::InvalidOptions,
+                    "Maintenance port is not supported on the current FCV"};
+        }
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 /**
@@ -348,7 +372,7 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
          iter != newConfig.membersEnd();
          ++iter) {
-        if (externalState->isSelfFastPath(iter->getHostAndPort())) {
+        if (externalState->isSelfFastPath(iter->getHostAndPort(), iter->getMaintenancePort())) {
             meConfigs.push_back(iter);
         }
     }
@@ -357,7 +381,8 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
         for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
              iter != newConfig.membersEnd();
              ++iter) {
-            if (externalState->isSelfSlowPath(iter->getHostAndPort(), ctx, Seconds(30))) {
+            if (externalState->isSelfSlowPath(
+                    iter->getHostAndPort(), iter->getMaintenancePort(), ctx, Seconds(30))) {
                 meConfigs.push_back(iter);
             }
         }
@@ -402,7 +427,9 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
     return result;
 }
 
-int findOwnHostInConfigQuick(const ReplSetConfig& newConfig, HostAndPort host) {
+int findOwnHostInConfigQuick(const ReplSetConfig& newConfig,
+                             HostAndPort host,
+                             boost::optional<int> maintenancePort) {
     if (host.empty()) {
         return -1;
     }
@@ -414,7 +441,8 @@ int findOwnHostInConfigQuick(const ReplSetConfig& newConfig, HostAndPort host) {
          iter != newConfig.membersEnd();
          ++iter) {
 
-        if (iter->getHostAndPort() == host) {
+        if (iter->getHostAndPort() == host &&
+            (!iter->getMaintenancePort() || iter->getMaintenancePort() == maintenancePort)) {
             firstMatchIndex = currIndex;
             invariant(firstMatchIndex >= 0);
             break;
@@ -447,7 +475,7 @@ StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* ex
 
 StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* externalState,
                                           const ReplSetConfig& newConfig,
-                                          ServiceContext* ctx) {
+                                          OperationContext* opCtx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
         return StatusWith<int>(status);
@@ -461,6 +489,11 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
                               "getLastErrorDefaults, which "
                               "has been deprecated and is now ignored. Use setDefaultRWConcern "
                               "instead to set a cluster-wide default writeConcern."});
+    }
+
+    status = validateMaintenancePortSettings(VersionContext::getDecoration(opCtx), newConfig);
+    if (!status.isOK()) {
+        return StatusWith<int>(status);
     }
 
     status = validateArbiterPriorities(newConfig);
@@ -485,7 +518,7 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
             str::stream() << "Configuration used to initiate a replica set must have term "
                           << OpTime::kInitialTerm << ", but found " << newConfig.getConfigTerm());
     }
-    return findSelfInConfigIfElectable(externalState, newConfig, ctx);
+    return findSelfInConfigIfElectable(externalState, newConfig, opCtx->getServiceContext());
 }
 
 Status validateConfigForReconfig(const VersionContext& vCtx,
@@ -505,6 +538,11 @@ Status validateConfigForReconfig(const VersionContext& vCtx,
             "been deprecated and is now ignored. Use setDefaultRWConcern instead to "
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
+
+    status = validateMaintenancePortSettings(vCtx, newConfig);
+    if (!status.isOK()) {
+        return status;
+    }
 
     status = validateOldAndNewConfigsCompatible(vCtx, oldConfig, newConfig);
     if (!status.isOK()) {
@@ -533,6 +571,7 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
     const ReplSetConfig& newConfig,
     HostAndPort ownHost,
+    boost::optional<int> ownMaintenancePort,
     ServiceContext* ctx) {
     Status status = newConfig.validateAllowingSplitHorizonIP();
     if (!status.isOK()) {
@@ -546,7 +585,7 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
 
-    auto quickIndex = findOwnHostInConfigQuick(newConfig, ownHost);
+    auto quickIndex = findOwnHostInConfigQuick(newConfig, ownHost, ownMaintenancePort);
     if (quickIndex >= 0) {
         LOGV2(6475001,
               "Was able to quickly find new index in config. Skipping full isSelf checks",

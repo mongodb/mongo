@@ -49,23 +49,29 @@ namespace repl {
 extern OID instanceId;
 
 /**
- * Returns true if "hostAndPort" identifies this instance.
+ * Returns true if "hostAndPort" and "maintenancePort" identify this instance. If no maintenancePort
+ * is specified then the checks on that field will be skipped.
  */
 bool isSelf(const HostAndPort& hostAndPort,
+            const boost::optional<int>& maintenancePort,
             ServiceContext* ctx,
             Milliseconds timeout = Seconds(30));
 
 /**
- * Returns true if "hostAndPort" identifies this instance by checking our bound IP addresses,
- * without going out to the network and running the _isSelf command on the node.
+ * Returns true if "hostAndPort" and "maintenancePort" identify this instance by checking our bound
+ * IP addresses, without going out to the network and running the _isSelf command on the node.
  */
-bool isSelfFastPath(const HostAndPort& hostAndPort);
+bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& maintenancePort);
 
 /**
- * Returns true if "hostAndPort" identifies this instance by running the _isSelf command on the
- * node.
+ * Returns true if "hostAndPort" and "maintenancePort" identify this instance by running the _isSelf
+ * command on the node. If the "maintenancePort" is specified, will also run _isSelf against
+ * host:maintenancePort.
  */
-bool isSelfSlowPath(const HostAndPort& hostAndPort, ServiceContext* ctx, Milliseconds timeout);
+bool isSelfSlowPath(const HostAndPort& hostAndPort,
+                    const boost::optional<int>& maintenancePort,
+                    ServiceContext* ctx,
+                    Milliseconds timeout);
 
 /**
  * Returns all the IP addresses bound to the network interfaces of this machine.

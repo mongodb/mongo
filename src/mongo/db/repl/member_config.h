@@ -59,6 +59,7 @@ class MemberConfig : private MemberConfigBase {
 public:
     // Expose certain member functions used externally.
     using MemberConfigBase::getId;
+    using MemberConfigBase::getMaintenancePort;
 
     using MemberConfigBase::kArbiterOnlyFieldName;
     using MemberConfigBase::kBuildIndexesFieldName;
@@ -66,6 +67,7 @@ public:
     using MemberConfigBase::kHorizonsFieldName;
     using MemberConfigBase::kHostFieldName;
     using MemberConfigBase::kIdFieldName;
+    using MemberConfigBase::kMaintenancePortFieldName;
     using MemberConfigBase::kNewlyAddedFieldName;
     using MemberConfigBase::kPriorityFieldName;
     using MemberConfigBase::kSecondaryDelaySecsFieldName;

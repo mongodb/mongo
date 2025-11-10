@@ -66,7 +66,7 @@ std::tuple<std::string, std::vector<HostAndPort>> parseReplSetSeedList(
         uassert(
             10283303, "can't use localhost in replset seed host list", !hostAndPort.isLocalHost());
 
-        if (externalState->isSelf(hostAndPort, getGlobalServiceContext())) {
+        if (externalState->isSelf(hostAndPort, boost::none, getGlobalServiceContext())) {
             LOGV2_DEBUG(10283304, 1, "Ignoring seed (=self)", "seed"_attr = hostAndPort.toString());
         } else {
             seeds.emplace_back(hostAndPort);

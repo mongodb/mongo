@@ -298,6 +298,10 @@ HostAndPort ReplicationCoordinatorNoOp::getMyHostAndPort() const {
     MONGO_UNREACHABLE;
 }
 
+boost::optional<int> ReplicationCoordinatorNoOp::getMyMaintenancePort() const {
+    MONGO_UNREACHABLE;
+}
+
 StatusWith<BSONObj> ReplicationCoordinatorNoOp::prepareReplSetUpdatePositionCommand() const {
     MONGO_UNREACHABLE;
 }
