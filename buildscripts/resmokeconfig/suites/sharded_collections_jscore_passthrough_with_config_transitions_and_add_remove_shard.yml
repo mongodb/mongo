@@ -171,6 +171,8 @@ selector:
     - jstests/core/**/query/exhaust.js
     # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
     - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
+    # TODO SERVER-113662 Re-enable this test once the cause for timeout is found and fixed.
+    - src/mongo/db/modules/enterprise/jstests/fle2/bulk_write_update.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
