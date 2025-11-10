@@ -34,18 +34,11 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
-#include <mutex>
-#include <shared_mutex>
-#include <utility>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -63,32 +56,30 @@ public:
         : _factory(std::move(factory)) {}
 
     struct CSSAndLock {
-        CSSAndLock(const NamespaceString& nss, std::unique_ptr<CollectionShardingState> css)
-            : css(std::move(css)) {}
+        CSSAndLock(std::unique_ptr<CollectionShardingState> css) : css(std::move(css)) {}
 
         std::shared_mutex cssMutex;  // NOLINT
         std::unique_ptr<CollectionShardingState> css;
     };
 
     CSSAndLock* getOrCreate(const NamespaceString& nss) {
-        std::shared_lock lk(_mutex);  // NOLINT
+        std::shared_lock readLock(_mutex);  // NOLINT
         if (auto it = _collections.find(nss); MONGO_likely(it != _collections.end())) {
-            return it->second.get();
+            return &it->second;
         }
-        lk.unlock();
+        readLock.unlock();
         stdx::lock_guard writeLock(_mutex);
-        auto [it, _] =
-            _collections.emplace(nss, std::make_unique<CSSAndLock>(nss, _factory->make(nss)));
-        return it->second.get();
+        auto [it, _] = _collections.emplace(nss, _factory->make(nss));
+        return &it->second;
     }
 
     void appendInfoForShardingStateCommand(BSONObjBuilder* builder) const {
-        std::vector<CSSAndLock*> cssAndLocks;
+        std::vector<const CSSAndLock*> cssAndLocks;
         {
             std::shared_lock lk(_mutex);  // NOLINT
             cssAndLocks.reserve(_collections.size());
             for (const auto& [_, cssAndLock] : _collections) {
-                cssAndLocks.emplace_back(cssAndLock.get());
+                cssAndLocks.emplace_back(&cssAndLock);
             }
         }
 
@@ -122,8 +113,8 @@ private:
     mutable RWMutex _mutex;
 
     // Entries of the _collections map must never be deleted or replaced. This is to guarantee that
-    // a 'nss' is always associated to the same 'ResourceMutex'.
-    using CollectionsMap = absl::flat_hash_map<NamespaceString, std::unique_ptr<CSSAndLock>>;
+    // a 'nss' is always associated to the same 'cssMutex'.
+    using CollectionsMap = stdx::unordered_map<NamespaceString, CSSAndLock>;
     CollectionsMap _collections;
 };
 

@@ -334,7 +334,12 @@ private:
     // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
 
-    // Protects state around the metadata manager below
+    // CSS/CSR objects are normally synchronized via the CSS mutex (which lives outside the objects
+    // themselves). However, components like the range deleter and state dumping access CSS/CSR
+    // pointers directly, bypassing normal synchronization. This mutex protects state modifications
+    // for those cases.
+    //
+    // TODO (SERVER-113665): Remove this mutex and instead rely on the CSS mutex
     mutable stdx::mutex _metadataManagerLock;
 
     // Track status of filtering metadata for a specific collection

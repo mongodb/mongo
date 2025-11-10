@@ -31,12 +31,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/stdx/mutex.h"
 
@@ -72,9 +70,10 @@ public:
     static ShardingState* get(OperationContext* operationContext);
 
     /**
-     * Returns whether this node is in sharding maintenance mode, which means the cluste role will
-     * never be recovered. Sharding maintenance mode means that the node will serve as replica set
-     * or sharded clusters but none of the sharding infrastructure will be enabled or consulted.
+     * Returns whether this node is in sharding maintenance mode, which means there will not be an
+     * attempt to recover the cluster role. Sharding maintenance mode means that the node will serve
+     * as a replica set or a shard but none of the sharding infrastructure will be enabled or
+     * consulted.
      */
     bool inMaintenanceMode() const;
 
@@ -154,6 +153,8 @@ public:
 private:
     const bool _inMaintenanceMode;
 
+    // Mutex which only protects the setting of the cluster recovery promise below. This happens at
+    // most once for the lifetime of a process, so this mutex is never contended.
     mutable stdx::mutex _mutex;
 
     // Promise/future pair which will be set when the recovery of the shard role completes

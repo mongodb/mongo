@@ -29,14 +29,12 @@
 
 #include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state.h"
 
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-
-#include <memory>
-#include <mutex>
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {
@@ -60,21 +58,18 @@ public:
     };
 
     DSSAndLock* getOrCreate(const DatabaseName& dbName) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-        auto it = _databases.find(dbName);
-        if (it == _databases.end()) {
-            auto inserted = _databases.try_emplace(
-                dbName, std::make_unique<DSSAndLock>(_factory->make(dbName)));
-            invariant(inserted.second);
-            it = std::move(inserted.first);
+        std::shared_lock readLock(_mutex);  // NOLINT
+        if (auto it = _databases.find(dbName); MONGO_likely(it != _databases.end())) {
+            return &it->second;
         }
-
-        return it->second.get();
+        readLock.unlock();
+        stdx::lock_guard writeLock(_mutex);
+        auto [it, _] = _databases.emplace(dbName, _factory->make(dbName));
+        return &it->second;
     }
 
     std::vector<DatabaseName> getDatabaseNames() {
-        stdx::lock_guard lg(_mutex);
+        std::shared_lock lk(_mutex);  // NOLINT
         std::vector<DatabaseName> result;
         result.reserve(_databases.size());
         for (const auto& [dbName, _] : _databases) {
@@ -90,11 +85,14 @@ public:
 private:
     std::unique_ptr<DatabaseShardingStateFactory> _factory;
 
-    stdx::mutex _mutex;
+    // Adding entries to `_databases` is expected to be very infrequent and far apart (first
+    // database access), so the majority of accesses to this map are read-only and benefit from
+    // using a shared mutex type for synchronization.
+    mutable RWMutex _mutex;
 
     // Entries of the _databases map must never be deleted or replaced. This is to guarantee that a
-    // 'dbName' is always associated to the same 'ResourceMutex'.
-    using DatabasesMap = stdx::unordered_map<DatabaseName, std::unique_ptr<DSSAndLock>>;
+    // 'dbName' is always associated to the same 'dssMutex'.
+    using DatabasesMap = stdx::unordered_map<DatabaseName, DSSAndLock>;
     DatabasesMap _databases;
 };
 
