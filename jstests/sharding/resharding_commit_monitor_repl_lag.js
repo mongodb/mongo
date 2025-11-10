@@ -22,7 +22,15 @@ import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_
 const maxMajorityReplicationLagMillis = 25;
 
 function validateShardsvrReshardingOperationTimeResponse(res, isRecipient) {
-    assert.eq(res.hasOwnProperty("majorityReplicationLagMillis"), true, res);
+    // In v8.0 multiversion tests, donor-only shards do not return majorityReplicationLagMillis
+    // as donor lag reporting (SERVER-104531) was not backported.
+    const skipLagCheckForDonor = (Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+                                  Boolean(TestData.multiversionBinVersion)) &&
+        !isRecipient;
+    if (!skipLagCheckForDonor) {
+        assert.eq(res.hasOwnProperty("majorityReplicationLagMillis"), true, res);
+    }
+
     assert.eq(res.hasOwnProperty("elapsedMillis"), isRecipient, res);
     assert.eq(res.hasOwnProperty("remainingMillis"), isRecipient, res);
 }
@@ -36,7 +44,9 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
             primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
         jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res0));
         validateShardsvrReshardingOperationTimeResponse(res0, isRecipient);
-        return res0.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
+
+        return !res0.hasOwnProperty("majorityReplicationLagMillis") ||
+            res0.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
     });
 
     jsTest.log("Test the case where there is replication lag on only one secondary on " +
@@ -47,15 +57,14 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
     // Perform a write and and wait for it to replicate to the other secondary.
     assert.commandWorked(
         primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 2}}));
-    const res1 = assert.commandWorked(
-        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
-    validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
     assert.soon(() => {
         const res1 = assert.commandWorked(
             primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
         jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res1));
         validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
-        return res1.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
+
+        return !res1.hasOwnProperty("majorityReplicationLagMillis") ||
+            res1.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
     });
 
     jsTest.log("Test the case where there is replication lag on both secondaries on " +
@@ -70,7 +79,10 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
     const res2 = assert.commandWorked(
         primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
     validateShardsvrReshardingOperationTimeResponse(res2, isRecipient);
-    assert.gte(res2.majorityReplicationLagMillis, sleepMillis2, {res2});
+
+    if (res2.hasOwnProperty("majorityReplicationLagMillis")) {
+        assert.gte(res2.majorityReplicationLagMillis, sleepMillis2, {res2});
+    }
 
     jsTest.log("Test the case where there is replication lag on only one secondary again on " +
                participantRst.name);
@@ -82,7 +94,9 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
             primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
         jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res3));
         validateShardsvrReshardingOperationTimeResponse(res3, isRecipient);
-        return res3.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
+
+        return !res3.hasOwnProperty("majorityReplicationLagMillis") ||
+            res3.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
     });
 
     restartServerReplication(participantRst.getSecondaries()[1]);
