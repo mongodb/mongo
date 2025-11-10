@@ -2096,6 +2096,15 @@ __wt_checkpoint_tree_reconcile_update(WT_SESSION_IMPL *session, WT_TIME_AGGREGAT
             ckpt->run_write_gen = btree->run_write_gen;
             WT_TIME_AGGREGATE_COPY(&ckpt->ta, ta);
         }
+
+    /*
+     * During RTS, recovery, or shutdown reset the maximum timestamp used for reconciliation to a
+     * value that is the same as the maximum between the start and stop durable timestamps. In those
+     * specific scenarios, we should always reflect the state of the stable content.
+     */
+    if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE) ||
+      F_ISSET(S2C(session), WT_CONN_CLOSING_CHECKPOINT | WT_CONN_RECOVERING))
+        btree->rec_max_timestamp = WT_MAX(ta->newest_start_durable_ts, ta->newest_stop_durable_ts);
 }
 
 /*

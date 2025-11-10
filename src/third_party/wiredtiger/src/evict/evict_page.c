@@ -85,7 +85,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      */
     if (ref->page != NULL && !__wt_page_evict_clean(ref->page)) {
         WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
-        WT_RET(__wt_curhs_cache(session));
+        ret = __wt_curhs_cache(session);
+        if (ret != 0) {
+            WT_ASSERT(session, locked);
+            WT_REF_SET_STATE(ref, previous_state);
+            return (ret);
+        }
     }
     (void)__wt_atomic_addv32(&btree->evict_busy, 1);
     ret = __wt_evict(session, ref, previous_state, evict_flags);
@@ -652,8 +657,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
                 visible = true;
             else
                 visible = __wt_page_del_visible_all(session, child->page_del, false);
-            /* FIXME-WT-9780: is there a reason this doesn't use WT_REF_UNLOCK? */
-            child->state = WT_REF_DELETED;
+            WT_REF_SET_STATE(child, WT_REF_DELETED);
             if (!visible)
                 return (__wt_set_return(session, EBUSY));
             break;
@@ -753,7 +757,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     }
     /*
      * If reconciliation is disabled for this thread (e.g., during an eviction that writes to the
-     * history store), give up.
+     * history store or reading a checkpoint), give up.
      */
     if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
         return (__wt_set_return(session, EBUSY));
