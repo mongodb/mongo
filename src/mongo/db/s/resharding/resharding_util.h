@@ -60,6 +60,7 @@
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
@@ -79,7 +80,7 @@
 namespace mongo {
 namespace resharding {
 
-constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
 constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"_sd;
 static const auto kReshardErrorMaxBytes = 2000;
 
@@ -290,7 +291,8 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
  *      <db>.system.resharding.<existing collection's UUID>
  * or   <db>.system.buckets.resharding.<existing collection's UUID> for a timeseries source ns.
  */
-NamespaceString constructTemporaryReshardingNss(const NamespaceString& nss, const UUID& sourceUuid);
+MONGO_MOD_NEEDS_REPLACEMENT NamespaceString
+constructTemporaryReshardingNss(const NamespaceString& nss, const UUID& sourceUuid);
 
 /**
  * Asserts that there is not a hole or overlap in the chunks.

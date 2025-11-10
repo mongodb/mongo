@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 
@@ -65,7 +66,7 @@ namespace mongo {
  * {clusterTime: <transaction commit timestamp>, ts: <applyOps optime.ts>}. For all other documents,
  * this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class DocumentSourceReshardingIterateTransaction : public DocumentSource {
+class MONGO_MOD_PUBLIC DocumentSourceReshardingIterateTransaction : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalReshardingIterateTransaction"_sd;
     static constexpr StringData kIncludeCommitTransactionTimestampFieldName =

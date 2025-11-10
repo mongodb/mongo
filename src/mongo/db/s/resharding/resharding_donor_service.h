@@ -55,6 +55,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -66,7 +67,7 @@
 
 namespace mongo {
 
-class ReshardingDonorService : public repl::PrimaryOnlyService {
+class MONGO_MOD_PUBLIC ReshardingDonorService : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ReshardingDonorService"_sd;
 
@@ -74,27 +75,28 @@ public:
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingDonorService() override = default;
 
-    class DonorStateMachine;
+    class MONGO_MOD_PRIVATE DonorStateMachine;
 
-    class DonorStateMachineExternalState;
+    class MONGO_MOD_PRIVATE DonorStateMachineExternalState;
 
-    StringData getServiceName() const override {
+    MONGO_MOD_PRIVATE StringData getServiceName() const override {
         return kServiceName;
     }
 
-    NamespaceString getStateDocumentsNS() const override {
+    MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override {
         return NamespaceString::kDonorReshardingOperationsNamespace;
     }
 
-    ThreadPool::Limits getThreadPoolLimits() const override;
+    MONGO_MOD_PRIVATE ThreadPool::Limits getThreadPoolLimits() const override;
 
     // The service implemented its own conflict check before this method was added.
-    void checkIfConflictsWithOtherInstances(
+    MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
         const std::vector<const Instance*>& existingInstances) override {}
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
+    MONGO_MOD_PRIVATE std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+        BSONObj initialState) override;
 
 private:
     ServiceContext* _serviceContext;

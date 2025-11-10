@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 
@@ -53,7 +54,7 @@ namespace mongo {
  * transaction, this will be {clusterTime: <transaction commit timestamp>, ts: <applyOps
  * optime.ts>}. For all other documents, this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class DocumentSourceReshardingAddResumeId : public DocumentSource {
+class MONGO_MOD_PUBLIC DocumentSourceReshardingAddResumeId : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_addReshardingResumeId"_sd;
 

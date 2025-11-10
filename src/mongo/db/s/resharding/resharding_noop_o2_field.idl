@@ -40,6 +40,7 @@ imports:
 
 structs:
     ReshardProgressMarkO2Field:
+        mod_visibility: private
         description: >-
             Represents the "o2" field of a noop oplog entry inserted by a resharding oplog
             fetcher on a recipient to mark its progress.

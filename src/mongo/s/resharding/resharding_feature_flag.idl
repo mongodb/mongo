@@ -36,6 +36,7 @@ imports:
 
 feature_flags:
     featureFlagMoveCollection:
+        mod_visibility: public
         description: "Feature flag for implementing online move collection."
         cpp_varname: gFeatureFlagMoveCollection
         default: true
@@ -43,6 +44,7 @@ feature_flags:
         fcv_gated: true
         fcv_context_unaware: true
     featureFlagUnshardCollection:
+        mod_visibility: public
         description: "Feature flag for implementing unshard collection."
         cpp_varname: gFeatureFlagUnshardCollection
         default: true
@@ -50,6 +52,7 @@ feature_flags:
         fcv_gated: true
         fcv_context_unaware: true
     featureFlagReshardingForTimeseries:
+        mod_visibility: public
         description: "Feature flag for enabling resharding a timeseries collection."
         cpp_varname: gFeatureFlagReshardingForTimeseries
         default: true
@@ -57,12 +60,14 @@ feature_flags:
         fcv_gated: true
         fcv_context_unaware: true
     featureFlagRelaxedMode:
+        mod_visibility: public
         description: "Feature flag for implmenting relaxed resharding mode."
         cpp_varname: gFeatureFlagReshardingRelaxedMode
         default: true
         version: 8.1
         fcv_gated: true
     featureFlagReshardingSkipCloningAndApplyingIfApplicable:
+        mod_visibility: public
         description:
             "Feature flag to make recipient shards that are not going to own any chunks for
             the collection after resharding only clone the options and indexes for the
@@ -72,6 +77,7 @@ feature_flags:
         default: false
         fcv_gated: true
     featureFlagReshardingSkipCloningIfApplicable:
+        mod_visibility: public
         description:
             "Feature flag to make recipient shards that are not going to own any chunks for
             the collection after resharding only clone the options and indexes for the
@@ -82,6 +88,7 @@ feature_flags:
         default: false
         fcv_gated: true
     featureFlagReshardingStoreOplogFetcherProgress:
+        mod_visibility: public
         description:
             "Feature flag to make recipient shards store the count of oplog entries fetched
             in a progress document and use this count instead of the fast count to recover
@@ -91,12 +98,14 @@ feature_flags:
         version: 8.2
         fcv_gated: true
     featureFlagReshardingNumSamplesPerChunk:
+        mod_visibility: public
         description: "Feature flag for adding numSamplesPerChunk as a field in reshardCollection."
         cpp_varname: gfeatureFlagReshardingNumSamplesPerChunk
         default: true
         version: 8.1
         fcv_gated: true
     featureFlagReshardingVerification:
+        mod_visibility: public
         description:
             "Feature flag to enable data loss and consistency verification steps during
             resharding to ensure correctness."
@@ -104,12 +113,14 @@ feature_flags:
         default: false
         fcv_gated: true
     featureFlagReshardingCloneNoRefresh:
+        mod_visibility: public
         description: "Feature flag to enable not using shard version refresh for resharding."
         cpp_varname: gFeatureFlagReshardingCloneNoRefresh
         default: false
         fcv_gated: true
         fcv_context_unaware: true
     featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage:
+        mod_visibility: public
         description:
             "Feature flag to enable using exponential moving average when estimating the
             remaining time to reach strict consistency."
@@ -117,6 +128,7 @@ feature_flags:
         default: false
         fcv_gated: true
     featureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
+        mod_visibility: public
         description: >-
             Feature flag to make resharding donors abort in-progress unprepared transactions
             after transitioning to the "preparing-to-block-writes" state. Aborting unprepared

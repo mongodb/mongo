@@ -37,6 +37,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <mutex>
 
@@ -44,7 +45,7 @@
 
 namespace mongo {
 
-class ReshardingCumulativeMetrics {
+class MONGO_MOD_NEEDS_REPLACEMENT ReshardingCumulativeMetrics {
 public:
     using Role = ReshardingMetricsCommon::Role;
     using StateTracker =

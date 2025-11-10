@@ -34,12 +34,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
 namespace mongo {
 
-class ReshardingCoordinatorServiceConflictingOperationInProgressInfo final : public ErrorExtraInfo {
+class MONGO_MOD_PUBLIC ReshardingCoordinatorServiceConflictingOperationInProgressInfo final
+    : public ErrorExtraInfo {
 public:
     static constexpr auto code =
         ErrorCodes::ReshardingCoordinatorServiceConflictingOperationInProgress;

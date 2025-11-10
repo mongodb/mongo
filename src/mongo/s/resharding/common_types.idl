@@ -39,6 +39,7 @@ imports:
 enums:
     CoordinatorState:
         description: "The current state of a resharding operation on the coordinator."
+        mod_visibility: public
         type: string
         values:
             kUnused: "unused"
@@ -54,6 +55,7 @@ enums:
 
     DonorState:
         description: "The current state of a donor shard for a resharding operation."
+        mod_visibility: public
         type: string
         values:
             kUnused: "unused"
@@ -67,6 +69,7 @@ enums:
 
     RecipientState:
         description: "The current state of a recipient shard for a resharding operation."
+        mod_visibility: public
         type: string
         values:
             kUnused: "unused"
@@ -81,6 +84,7 @@ enums:
 
     ReshardingOperationStatus:
         description: "The status of the current or most recent resharding operation."
+        mod_visibility: public
         type: string
         values:
             kSuccess: "success"
@@ -92,6 +96,7 @@ enums:
 structs:
     CommonReshardingMetadata:
         description: "Immutable metadata shared across all node types for a resharding operation."
+        mod_visibility: private
         generate_comparison_operators: false
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
@@ -138,6 +143,7 @@ structs:
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."
+        mod_visibility: private
         # Use strict:false to avoid complications around upgrade/downgrade. This setting has no
         # practical effect because this type is only meant to be used as a chained struct with
         # inline_chained_structs:true and only the strictness setting of the wrapping struct type
@@ -154,6 +160,7 @@ structs:
 
     ReshardingMetricsTimeInterval:
         description: "Contains the start and stop time of a resharding operation phase."
+        mod_visibility: private
         strict: false
         fields:
             start:
@@ -169,6 +176,7 @@ structs:
         description:
             "Mutable state for a donor shard tracked both locally by a donor shard and
             remotely by the resharding coordinator."
+        mod_visibility: private
         inline_chained_structs: true
         chained_structs:
             AbortReason: AbortReasonStruct
@@ -221,6 +229,7 @@ structs:
 
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
+        mod_visibility: private
         strict: false
         generate_comparison_operators: false
         fields:
@@ -238,6 +247,7 @@ structs:
         description:
             "Mutable state for a recipient shard tracked both locally by a recipient shard
             and remotely by the resharding coordinator."
+        mod_visibility: private
         inline_chained_structs: true
         chained_structs:
             AbortReason: AbortReasonStruct
@@ -284,6 +294,7 @@ structs:
 
     ReshardingApproxCopySize:
         description: "Not meant to be used directly. Only use internal fields."
+        mod_visibility: private
         # Use strict:false to avoid complications around upgrade/downgrade. This setting has no
         # practical effect because this type is only meant to be used as a chained struct with
         # inline_chained_structs:true and only the strictness setting of the wrapping struct type
@@ -299,6 +310,7 @@ structs:
 
     ReshardingSourceId:
         description: "Identifier for a shard involved in a particular resharding operation."
+        mod_visibility: private
         # Use strict:true because this type is used as the structure for the _id value in documents
         # and requires being an exact match.
         strict: true
@@ -313,6 +325,7 @@ structs:
     ReshardingZoneType:
         description: >-
             Object describing a zone for the collection being resharded using the new shard key.
+        mod_visibility: needs_replacement
         # Use strict:false to avoid complications around upgrade/downgrade.
         strict: false
         fields:
@@ -328,6 +341,7 @@ structs:
 
     ReshardedChunk:
         description: "ReshardedChunk"
+        mod_visibility: needs_replacement
         fields:
             recipientShardId:
                 type: shard_id
@@ -343,6 +357,7 @@ structs:
         description:
             "A struct representing the information needed for a resharding pipeline to
             determine which documents belong to a particular shard."
+        mod_visibility: private
         strict: true
         query_shape_component: true
         fields:
@@ -363,6 +378,7 @@ structs:
                 optional: true
     ShardKeyRange:
         description: "A struct to represent the key ranges of shards."
+        mod_visibility: needs_replacement
         fields:
             min:
                 type: object_owned
@@ -377,6 +393,7 @@ structs:
                 description: "Id of the shard for this shard key range."
     ChangeStreamsMonitorContext:
         description: "Contains information about the change stream monitor's progress"
+        mod_visibility: private
         strict: false
         fields:
             startAtOperationTime:

@@ -34,6 +34,7 @@
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <type_traits>
@@ -77,7 +78,7 @@ inline constexpr ReshardingMetricsCommon::Role getRoleForStateDocument() {
     MONGO_UNREACHABLE;
 }
 
-void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info);
+MONGO_MOD_PUBLIC void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info);
 
 template <typename T>
 std::string getMetricsPrefix() {

@@ -42,6 +42,7 @@ structs:
     ReshardBeginChangeEventO2Field:
         description: >-
             Represents a change event which signifies the beginning of a resharding operation on a donor shard.
+        mod_visibility: public
         generate_comparison_operators: true
         strict: false
         fields:
@@ -54,6 +55,7 @@ structs:
     ReshardBlockingWritesChangeEventO2Field:
         description: >-
             Represents a change event which signifies the start of the critical section of a resharding operation on a donor shard.
+        mod_visibility: public
         generate_comparison_operators: true
         strict: false
         fields:
@@ -71,6 +73,7 @@ structs:
     ReshardDoneCatchUpChangeEventO2Field:
         description: >-
             Represents a change event which signifies the end of the catchup phase of a resharding operation on a recipient shard.
+        mod_visibility: public
         generate_comparison_operators: true
         strict: false
         fields:

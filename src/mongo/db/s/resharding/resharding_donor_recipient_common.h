@@ -37,6 +37,7 @@
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -119,16 +120,18 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
  *     1. The reshardingFields state indicates that the resharding operation is new, and
  *     2. A state machine does not exist on this node for the given namespace.
  */
-void processReshardingFieldsForCollection(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const CollectionMetadata& metadata,
-                                          const ReshardingFields& reshardingFields);
+MONGO_MOD_PUBLIC void processReshardingFieldsForCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionMetadata& metadata,
+    const ReshardingFields& reshardingFields);
 
-void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
+MONGO_MOD_PUBLIC void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
 
-void clearFilteringMetadata(OperationContext* opCtx,
-                            stdx::unordered_set<NamespaceString> namespacesToRefresh,
-                            bool scheduleAsyncRefresh);
+MONGO_MOD_PUBLIC void clearFilteringMetadata(
+    OperationContext* opCtx,
+    stdx::unordered_set<NamespaceString> namespacesToRefresh,
+    bool scheduleAsyncRefresh);
 
 void refreshShardVersion(OperationContext* opCtx, const NamespaceString& nss);
 

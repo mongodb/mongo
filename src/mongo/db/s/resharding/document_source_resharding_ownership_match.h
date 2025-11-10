@@ -39,6 +39,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -55,7 +56,7 @@ namespace mongo {
  * resharding pipelines which need to be able to answer this question very quickly. To do so, it
  * re-uses pieces of sharding infrastructure rather than applying a MatchExpression.
  */
-class DocumentSourceReshardingOwnershipMatch final : public DocumentSource {
+class MONGO_MOD_PUBLIC DocumentSourceReshardingOwnershipMatch final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalReshardingOwnershipMatch"_sd;
 
