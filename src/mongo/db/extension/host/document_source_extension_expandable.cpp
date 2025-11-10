@@ -120,7 +120,16 @@ Desugarer::StageExpander DocumentSourceExtensionExpandable::stageExpander =
         return desugarer->replaceStageWith(itr, std::move(expandedExtension));
     };
 
-MONGO_INITIALIZER(RegisterStageExpanderForExtensionExpandable)(InitializerContext*) {
+/**
+ * Register the stage expander only after DocumentSource ID allocation is complete. This ensures
+ * that the expander is not registered under kUnallocatedId (0).
+ */
+MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForExtensionExpandable,
+                                     ("EndDocumentSourceIdAllocation"))
+(InitializerContext*) {
+    tassert(11368000,
+            "DocumentSourceExtensionExpandable::id must be allocated before registering expander",
+            DocumentSourceExtensionExpandable::id != DocumentSource::kUnallocatedId);
     Desugarer::registerStageExpander(DocumentSourceExtensionExpandable::id,
                                      DocumentSourceExtensionExpandable::stageExpander);
 }
