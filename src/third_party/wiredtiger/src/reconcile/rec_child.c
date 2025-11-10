@@ -233,6 +233,7 @@ __wti_rec_child_modify(
                 break;
             ret = __rec_child_deleted(session, r, ref, cmsp);
             WT_REF_SET_STATE(ref, WT_REF_DELETED);
+            WT_RET(ret);
             goto done;
 
         case WT_REF_LOCKED:
@@ -336,14 +337,15 @@ __wti_rec_child_modify(
                     break;
 
                 /* This is a very small race window, but check just in case. */
-                if (mod->instantiated == false) {
+                if (!mod->instantiated) {
                     WT_REF_SET_STATE(ref, WT_REF_MEM);
                     /* Retry from the top; we may now have a rec_result. */
                     break;
                 }
 
-                WT_RET(__rec_child_deleted(session, r, ref, cmsp));
+                ret = __rec_child_deleted(session, r, ref, cmsp);
                 WT_REF_SET_STATE(ref, WT_REF_MEM);
+                WT_RET(ret);
                 goto done;
             }
 

@@ -68,6 +68,8 @@ __wt_page_type_str(uint8_t val)
         return ("WT_PAGE_ROW_INT");
     case WT_PAGE_ROW_LEAF:
         return ("WT_PAGE_ROW_LEAF");
+    case WT_PAGE_TYPE_COUNT:
+        return ("WT_PAGE_TYPE_COUNT");
     }
 
     return ("PAGE_TYPE_INVALID");

@@ -112,6 +112,8 @@ __ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state, uint8_
     WT_UNUSED(func);
     WT_UNUSED(line);
 
+    WT_ASSERT(session, old_state != new_state);
+
     cas_result = __wt_atomic_casv8(&ref->__state, old_state, new_state);
 
 #ifdef HAVE_REF_TRACK

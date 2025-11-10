@@ -35,11 +35,12 @@
 #define WT_REC_CHECKPOINT_RUNNING 0x008u
 #define WT_REC_CLEAN_AFTER_REC 0x010u
 #define WT_REC_EVICT 0x020u
-#define WT_REC_HS 0x040u
-#define WT_REC_IN_MEMORY 0x080u
-#define WT_REC_SCRUB 0x100u
-#define WT_REC_VISIBILITY_ERR 0x200u
-#define WT_REC_VISIBLE_ALL 0x400u
+#define WT_REC_EVICT_CALL_CLOSING 0x040u
+#define WT_REC_HS 0x080u
+#define WT_REC_IN_MEMORY 0x100u
+#define WT_REC_SCRUB 0x200u
+#define WT_REC_VISIBILITY_ERR 0x400u
+#define WT_REC_VISIBLE_ALL 0x800u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*
@@ -723,6 +724,7 @@ struct __wt_page {
 #define WT_PAGE_OVFL 5          /* Overflow page */
 #define WT_PAGE_ROW_INT 6       /* Row-store internal page */
 #define WT_PAGE_ROW_LEAF 7      /* Row-store leaf page */
+#define WT_PAGE_TYPE_COUNT 8    /* First value beyond valid for checks */
     uint8_t type;               /* Page type */
 
     /* 1 byte hole expected. */

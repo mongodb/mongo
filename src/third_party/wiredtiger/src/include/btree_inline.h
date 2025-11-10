@@ -2000,11 +2000,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * an internal page discards its WT_REF array, and a thread traversing the original parent page
      * index might see a freed WT_REF.
      *
-     * One special case where we know this is safe is if the handle is dead or locked exclusively,
-     * that is, no readers can be looking at an old index.
+     * One special case where we know this is safe is if the handle is dead, that is, no readers can
+     * be looking at an old index.
      */
-    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) &&
-      !F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) &&
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) && !F_ISSET(session->dhandle, WT_DHANDLE_DEAD) &&
       __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen)) {
         WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_internal_page_split);
         return (false);
@@ -2402,15 +2401,16 @@ __wt_btcur_skip_page(
 
         /*
          * Otherwise, check the timestamp information. We base this decision on the aggregate stop
-         * point added to the page during the last reconciliation.
+         * point added to the page during the last reconciliation. Never skip a page with prepared
+         * transaction data.
          */
-        if (WT_TIME_AGGREGATE_HAS_STOP(&addr.ta) &&
+        if (WT_TIME_AGGREGATE_HAS_STOP(&addr.ta) && !addr.ta.prepare &&
           __wt_txn_snap_min_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts,
             addr.ta.newest_stop_durable_ts)) {
             *skipp = true;
             walk_skip_stats->total_del_pages_skipped++;
         }
-    } else if (clean_page && __wt_get_page_modify_ta(session, ref->page, &ta) &&
+    } else if (clean_page && __wt_get_page_modify_ta(session, ref->page, &ta) && !ta->prepare &&
       __wt_txn_snap_min_visible(
         session, ta->newest_stop_txn, ta->newest_stop_ts, ta->newest_stop_durable_ts)) {
         /*

@@ -85,7 +85,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      */
     if (ref->page != NULL && !__wt_page_evict_clean(ref->page)) {
         WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
-        WT_RET(__wt_curhs_cache(session));
+        ret = __wt_curhs_cache(session);
+        if (ret != 0) {
+            WT_ASSERT(session, locked);
+            WT_REF_SET_STATE(ref, previous_state);
+            return (ret);
+        }
     }
     (void)__wt_atomic_addv32(&btree->evict_busy, 1);
     ret = __wt_evict(session, ref, previous_state, evict_flags);
@@ -285,10 +290,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     /* After this spot, the only recoverable failure is EBUSY. */
     ebusy_only = true;
 
-    /* Check we are not evicting an accessible internal page with an active split generation. */
+    /*
+     * Check we are not evicting an accessible internal page with an active split generation. We
+     * should be able to evict anything if we are closing the dhandle and when the dhandle is
+     * already dead.
+     */
     WT_ASSERT(session,
       closing || !F_ISSET(ref, WT_REF_FLAG_INTERNAL) ||
-        F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) ||
+        F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
         !__wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen));
 
     /* Count evictions of internal pages during normal operation. */
@@ -687,7 +696,6 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
                 visible = true;
             else
                 visible = __wt_page_del_visible_all(session, child->page_del, false);
-            /* FIXME-WT-9780: is there a reason this doesn't use WT_REF_UNLOCK? */
             WT_REF_SET_STATE(child, WT_REF_DELETED);
             if (!visible)
                 return (__wt_set_return(session, EBUSY));
@@ -952,7 +960,7 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
      * cannot read.
      */
     if (closing)
-        LF_SET(WT_REC_VISIBILITY_ERR);
+        LF_SET(WT_REC_EVICT_CALL_CLOSING | WT_REC_VISIBILITY_ERR);
     /*
      * Don't set any other flags for internal pages: there are no update lists to be saved and
      * restored, changes can't be written into the history store table, nor can we re-create

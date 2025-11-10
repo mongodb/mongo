@@ -85,7 +85,8 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
      * permitted. The page's state could have changed while we were waiting to acquire the lock
      * (e.g., the page could have split).
      */
-    if (LF_ISSET(WT_REC_EVICT) && !__wt_page_can_evict(session, ref, NULL))
+    if (LF_ISSET(WT_REC_EVICT) && !LF_ISSET(WT_REC_EVICT_CALL_CLOSING) &&
+      !__wt_page_can_evict(session, ref, NULL))
         WT_ERR(__wt_set_return(session, EBUSY));
 
     /*
@@ -869,8 +870,12 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *addr_
     WT_PAGE_HEADER *dsk;
     size_t result_len;
 
+    dsk = buf->mem;
     btree = S2BT(session);
     result_len = 0;
+
+    if (dsk->type == WT_PAGE_INVALID || dsk->type >= WT_PAGE_TYPE_COUNT)
+        return (__wt_illegal_value(session, dsk->type));
 
     if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_DISK_VALIDATE)) {
         /* Checkpoint calls are different than standard calls. */
@@ -887,7 +892,6 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *addr_
          * We're passed a table's disk image. Decompress if necessary and verify the image. Always
          * check the in-memory length for accuracy.
          */
-        dsk = buf->mem;
         if (compressed) {
             WT_ASSERT_ALWAYS(session, __wt_scr_alloc(session, dsk->mem_size, &ctmp),
               "Failed to allocate scratch buffer");
@@ -2706,13 +2710,6 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
      * to the history store.
      */
     WT_ERR(__wt_hs_delete_updates(session, r));
-
-    /* Check if there's work to do. */
-    for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-        if (multi->supd != NULL)
-            break;
-    if (i == r->multi_next)
-        return (0);
 
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
         if (multi->supd != NULL) {

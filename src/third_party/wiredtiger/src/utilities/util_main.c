@@ -24,6 +24,7 @@ static const char *mongodb_config = "log=(enabled=true,path=journal,compressor=s
 #define REC_LOGOFF "log=(enabled=false)"
 #define REC_RECOVER "log=(recover=on)"
 #define SALVAGE "salvage=true"
+#define VERIFY_METADATA "verify_metadata=true"
 
 /*
  * wt_explicit_zero --
@@ -84,7 +85,8 @@ main(int argc, char *argv[])
     size_t len;
     int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
-    const char *cmd_config, *config, *p1, *p2, *p3, *readonly_config, *rec_config, *salvage_config;
+    const char *cmd_config, *config, *metadata_config, *p1, *p2, *p3, *readonly_config, *rec_config,
+      *salvage_config;
     bool backward_compatible, disable_prefetch, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
@@ -106,7 +108,7 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
 
-    cmd_config = config = readonly_config = salvage_config = secretkey = NULL;
+    cmd_config = config = metadata_config = readonly_config = salvage_config = secretkey = NULL;
     /*
      * We default to returning an error if recovery needs to be run. Generally we expect this to be
      * run after a clean shutdown. The printlog command disables logging entirely. If recovery is
@@ -143,7 +145,7 @@ main(int argc, char *argv[])
             logoff = true;
             break;
         case 'm': /* verify metadata on connection open */
-            cmd_config = "verify_metadata=true";
+            metadata_config = VERIFY_METADATA;
             meta_verify = true;
             break;
         case 'p':
@@ -292,6 +294,8 @@ open:
         len += strlen(config);
     if (cmd_config != NULL)
         len += strlen(cmd_config);
+    if (metadata_config != NULL)
+        len += strlen(metadata_config);
     if (readonly_config != NULL)
         len += strlen(readonly_config);
     if (salvage_config != NULL)
@@ -307,8 +311,9 @@ open:
         (void)util_err(NULL, errno, NULL);
         goto err;
     }
-    if ((ret = __wt_snprintf(p, len, "error_prefix=wt,%s,%s,%s,%s,%s%s%s%s",
+    if ((ret = __wt_snprintf(p, len, "error_prefix=wt,%s,%s,%s,%s,%s,%s%s%s%s",
            config == NULL ? "" : config, cmd_config == NULL ? "" : cmd_config,
+           metadata_config == NULL ? "" : metadata_config,
            readonly_config == NULL ? "" : readonly_config, rec_config,
            salvage_config == NULL ? "" : salvage_config, p1, p2, p3)) != 0) {
         (void)util_err(NULL, ret, NULL);
