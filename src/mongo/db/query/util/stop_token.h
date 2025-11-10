@@ -36,6 +36,7 @@
  */
 
 #include "mongo/platform/atomic.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

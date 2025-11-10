@@ -49,6 +49,9 @@ mongo_cc_library(
     hdrs = [
         "string_util.h",
     ],
+    deps = [
+        "//src/mongo:base",
+    ],
 )
 
 mongo_cc_library(

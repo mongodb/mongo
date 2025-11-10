@@ -44,6 +44,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <functional>
 #include <type_traits>
 
@@ -112,7 +114,7 @@ using result_t = typename ResultOf<T>::type;
  * @tparam ResultType Type of the result to generate on demand (deduced if possible).
  */
 template <class InitializerType, class ResultType = detail::result_t<InitializerType>>
-class Deferred {
+class MONGO_MOD_PUBLIC Deferred {
 public:
     using T = ResultType;
 
@@ -285,7 +287,7 @@ private:
  * Of this alias could be re-written as an inheriting struct.
  */
 template <class Ret, class... Args>
-using DeferredFn = Deferred<std::function<Ret(Args...)>>;
+using DeferredFn MONGO_MOD_PUBLIC = Deferred<std::function<Ret(Args...)>>;
 
 /**
  * Helper for when the Initializer type can be deduced, but the
@@ -311,7 +313,7 @@ using DeferredFn = Deferred<std::function<Ret(Args...)>>;
  */
 
 template <class T>
-auto deferred(auto&& function) {
+MONGO_MOD_PUBLIC auto deferred(auto&& function) {
     return Deferred<decltype(function), T>(std::forward<decltype(function)>(function));
 }
 

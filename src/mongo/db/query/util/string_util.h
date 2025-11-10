@@ -28,6 +28,8 @@
  */
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 #include <vector>
 

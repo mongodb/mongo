@@ -29,14 +29,16 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <list>
 #include <type_traits>
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
-namespace detail {
+namespace MONGO_MOD_PRIVATE detail {
 
 /**
  * Appends an element with an operator* to the end of a data structure. If the operator* produces
@@ -80,7 +82,7 @@ struct vecTypeHelper<void, Args...> {
 template <typename T, typename... Args>
 using vecTypeHelperT = typename vecTypeHelper<T, Args...>::type;
 
-}  // namespace detail
+}  // namespace MONGO_MOD_PRIVATE detail
 
 /**
  * Create a vector. Unlike an initializer list, this function will allow passing elements by Rvalue
@@ -124,4 +126,4 @@ auto makeFlattenedList(Args&&... args) {
     return l;
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

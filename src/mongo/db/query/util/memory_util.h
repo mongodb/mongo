@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
