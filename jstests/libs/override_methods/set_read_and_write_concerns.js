@@ -93,6 +93,11 @@ function runCommandWithReadAndWriteConcerns(conn, dbName, commandName, commandOb
             shouldForceReadConcern = false;
         }
 
+        if (OverrideHelpers.isAggregationWithPlanCacheStatsStage(commandName, commandObj)) {
+            // The $planCacheStats stage can only be used with readConcern={level: "local"}.
+            shouldForceReadConcern = false;
+        }
+
         if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObj)) {
             // The $out stage can only be used with readConcern={level: "local"} or
             // readConcern={level: "majority"}

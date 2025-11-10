@@ -34,6 +34,7 @@ assert.commandWorked(bulk.execute());
 (function testSearchStagesDisallowedOnTsCollection() {
     const searchPipelines = [
         [{$search: {index: "default", text: {query: "example", path: metaFieldName}}}],
+        [{$searchBeta: {text: {query: "example", path: metaFieldName}}}],
         [{$vectorSearch: {index: "default", vector: {$meta: "searchVector"}}}],
         [{$searchMeta: {index: "default", text: {query: "example", path: metaFieldName}}}],
         [
@@ -76,7 +77,7 @@ assert.commandWorked(bulk.execute());
     searchPipelines.forEach((pipeline) => {
         assert.commandFailedWithCode(
             db[viewName].runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-            [10557302, 10623000],
+            [10557302, 10623000, 40602],
             `Expected failure for pipeline: ${tojson(pipeline)}`,
         );
     });

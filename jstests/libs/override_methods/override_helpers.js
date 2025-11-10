@@ -116,6 +116,7 @@ export const OverrideHelpers = (function () {
         isAggregationWithOutOrMergeStage: isAggregationWithOutOrMergeStage,
         isAggregationWithCurrentOpStage: makeIsAggregationWithFirstStage("$currentOp"),
         isAggregationWithChangeStreamStage: makeIsAggregationWithFirstStage("$changeStream"),
+        isAggregationWithPlanCacheStatsStage: makeIsAggregationWithFirstStage("$planCacheStats"),
         isAggregationWithInternalListCollections: makeIsAggregationWithFirstStage("$_internalListCollections"),
         isAggregationWithListClusterCatalog: makeIsAggregationWithFirstStage("$listClusterCatalog"),
         isAggregationWithQuerySettings: makeIsAggregationWithFirstStage("$querySettings"),
