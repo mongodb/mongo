@@ -29,14 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
-
-class RecordStore;
-class OperationContext;
-
-namespace oplog_truncation {
+namespace mongo::oplog_truncation {
 
 /**
  * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
@@ -48,5 +46,4 @@ namespace oplog_truncation {
  */
 RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayTruncateUpTo);
 
-}  // namespace oplog_truncation
-}  // namespace mongo
+}  // namespace mongo::oplog_truncation

@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/spill_table.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Manages the lifetime of a temporary RecordStore. Unless keep() is called, the managed RecordStore
@@ -67,4 +67,4 @@ protected:
     std::unique_ptr<RecordStore> _rs;
     bool _keep = false;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

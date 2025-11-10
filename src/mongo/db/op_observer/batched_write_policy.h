@@ -34,16 +34,15 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /*
  * Determines which Records should be placed in the next batch of Oplog
@@ -64,7 +63,7 @@ namespace mongo {
  * returns: vector of InsertStatements that doesn't exceed limits for a batch of
  *  Oplog ApplyOps writes.
  */
-static void buildBatchedWritesWithPolicy(size_t batchedWriteMaxSizeBytes,
+inline void buildBatchedWritesWithPolicy(size_t batchedWriteMaxSizeBytes,
                                          size_t batchedWriteMaxNumberOfInserts,
                                          std::function<boost::optional<Record>()> getNextRecord,
                                          boost::optional<Record>& record,
@@ -94,4 +93,4 @@ static void buildBatchedWritesWithPolicy(size_t batchedWriteMaxSizeBytes,
     }
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

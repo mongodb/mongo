@@ -29,11 +29,14 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
 #include <string>
 
 #include <boost/filesystem.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /*
  * Represents the file blocks returned by the KVEngine during both full and incremental
@@ -54,8 +57,8 @@ public:
                            std::uint64_t offset = 0,
                            std::uint64_t length = 0,
                            std::uint64_t fileSize = 0)
-        : _ident(ident),
-          _filePath(filePath),
+        : _ident(std::move(ident)),
+          _filePath(std::move(filePath)),
           _offset(offset),
           _length(length),
           _fileSize(fileSize) {
@@ -96,4 +99,4 @@ private:
     const std::uint64_t _fileSize;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

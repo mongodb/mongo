@@ -32,22 +32,23 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Manages the lifetime of a TemporaryRecordStore that is eventually dropped after destruction.
  */
-class DeferredDropRecordStore : public TemporaryRecordStore {
+class DeferredDropRecordStore final : public TemporaryRecordStore {
 public:
     DeferredDropRecordStore(std::unique_ptr<RecordStore> rs, StorageEngine* storageEngine)
         : TemporaryRecordStore(std::move(rs)), _storageEngine(storageEngine) {};
     ~DeferredDropRecordStore() override;
 
-protected:
+private:
     StorageEngine* _storageEngine{nullptr};
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

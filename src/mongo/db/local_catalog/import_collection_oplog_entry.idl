@@ -38,6 +38,7 @@ structs:
     ImportCollectionOplogEntry:
         description: "The object field of an importCollection oplog entry"
         strict: false
+        mod_visibility: public
         fields:
             importCollection:
                 description: "Namespace of the collection being imported"

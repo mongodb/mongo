@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/storage/container_base.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
-class StubIntegerKeyedContainer : public IntegerKeyedContainerBase {
+class StubIntegerKeyedContainer final : public IntegerKeyedContainerBase {
 public:
     StubIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
     Status insert(RecoveryUnit& ru, int64_t key, std::span<const char> value) final {
@@ -44,7 +45,7 @@ public:
     }
 };
 
-class StubStringKeyedContainer : public StringKeyedContainerBase {
+class StubStringKeyedContainer final : public StringKeyedContainerBase {
 public:
     StubStringKeyedContainer() : StringKeyedContainerBase(nullptr) {}
     Status insert(RecoveryUnit& ru, std::span<const char> key, std::span<const char> value) final {
@@ -55,4 +56,4 @@ public:
     }
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

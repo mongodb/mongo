@@ -38,6 +38,7 @@ structs:
         description: Reply from the dataSize command.
         strict: false
         is_command_reply: true
+        mod_visibility: private
         fields:
             size:
                 description: Total, possibly estimated size of data.
@@ -61,6 +62,7 @@ structs:
         description: "Reply from {dbStats: 1, scale: 1} command. Size fields are reduced by scale field."
         strict: false
         is_command_reply: true
+        mod_visibility: public
         fields:
             db:
                 description: Name of database being examined.
@@ -136,6 +138,7 @@ commands:
         inline_chained_structs: true
         chained_structs:
             StorageStatsSpec: StorageStatsSpec
+        mod_visibility: private
         fields:
             validationLevel:
                 description: "Strictness of validation rules application."
@@ -157,6 +160,7 @@ commands:
         namespace: type
         type: namespacestring
         reply_type: DataSizeReply
+        mod_visibility: private
         fields:
             min:
                 description: The lower bound of the key range to be examined.
@@ -203,6 +207,7 @@ commands:
         api_version: ""
         namespace: ignored
         reply_type: DBStats
+        mod_visibility: public
         fields:
             scale:
                 description: |-

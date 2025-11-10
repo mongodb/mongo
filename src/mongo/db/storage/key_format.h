@@ -29,7 +29,9 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * The data format of a RecordStore's RecordId keys.
@@ -40,4 +42,4 @@ enum class KeyFormat {
     /** Variable-length binary comparable data */
     String,
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

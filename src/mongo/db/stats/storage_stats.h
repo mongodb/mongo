@@ -35,12 +35,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Appends to 'builder' storage related statistics for the collection represented by 'nss'. This
@@ -109,4 +109,4 @@ Status appendCollectionRecordCount(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    BSONObjBuilder* builder);
 
-};  // namespace mongo
+};  // namespace MONGO_MOD_PUBLIC mongo

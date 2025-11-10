@@ -30,23 +30,20 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/future.h"
-#include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
-
-class OperationContext;
-
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * A periodic and signalable thread that flushes data to disk. Constructor parameter will dictate
  * whether to periodically flush or only on signal.
@@ -62,7 +59,7 @@ class OperationContext;
  *  - waitUntilDurable() calls update the replication JournalListener, so more frequent calls may be
  *    helpful to unblock replication related operations more quickly.
  */
-class JournalFlusher : public BackgroundJob {
+class JournalFlusher final : public BackgroundJob {
 public:
     /**
      * Setting 'disablePeriodicFlushes' to true will cause the JournalFlusher thread to only execute
@@ -181,4 +178,4 @@ private:
     bool _disablePeriodicFlushes;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

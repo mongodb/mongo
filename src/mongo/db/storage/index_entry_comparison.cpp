@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/db/storage/index_entry_comparison.h"
 
 #include "mongo/bson/bsontypes.h"

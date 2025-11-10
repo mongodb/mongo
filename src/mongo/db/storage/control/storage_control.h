@@ -29,18 +29,17 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/base/status.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
-class OperationContext;
-class ServiceContext;
-class Status;
+MONGO_MOD_PUBLIC;
 
 /**
  * Helper functions to manipulate independent processes that perform actions against the storage
  * engine.
  */
-namespace StorageControl {
-
+namespace mongo::StorageControl {
 /**
  * Responsible for initializing independent processes for replication that interact with the storage
  * layer.
@@ -68,7 +67,4 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly = fal
  * startStorageControls() must be called after to resume the JournalFlusher if forRestart is used.
  */
 void stopStorageControls(ServiceContext* serviceContext, const Status& reason, bool forRestart);
-
-}  // namespace StorageControl
-
-}  // namespace mongo
+}  // namespace mongo::StorageControl

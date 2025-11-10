@@ -40,3 +40,4 @@ commands:
         strict: false
         namespace: ignored
         api_version: ""
+        mod_visibility: private

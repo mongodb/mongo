@@ -31,6 +31,7 @@
 
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -42,9 +43,8 @@ namespace mongo {
  * HarnessHelper implementation. The newRecoveryUnit() implementation dictates what RecoveryUnit
  * implementation the OperationContext has.
  */
-class HarnessHelper : public ScopedGlobalServiceContextForTest {
+class MONGO_MOD_OPEN HarnessHelper : public ScopedGlobalServiceContextForTest {
 public:
-    ~HarnessHelper() override = default;
     explicit HarnessHelper()
         : _threadClient(getGlobalServiceContext()->getService(ClusterRole::ShardServer)) {}
 

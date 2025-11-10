@@ -38,10 +38,10 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/validate/validate_results.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
-namespace index_repair {
-
+MONGO_MOD_PUBLIC;
+namespace mongo::index_repair {
 /**
  * Deletes the record containing a duplicate key and inserts it into a local lost and found
  * collection titled "local.lost_and_found.<original collection UUID>". Returns the size of the
@@ -64,6 +64,4 @@ int repairMissingIndexEntry(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionPtr& coll,
                             ValidateResults* results);
-
-}  // namespace index_repair
-}  // namespace mongo
+}  // namespace mongo::index_repair

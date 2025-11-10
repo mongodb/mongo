@@ -31,8 +31,9 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Group multiple writes into a single applyOps entry.
@@ -95,4 +96,4 @@ private:
     BatchedOperations _batchedOperations;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -32,6 +32,8 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -40,7 +42,6 @@
 namespace mongo {
 
 class DiskSpaceMonitor;
-class StorageEngine;
 
 /**
  * SpillTable provides an interface for interacting with a RecordStore used for spilling
@@ -50,7 +51,7 @@ class StorageEngine;
  * any cursors created from it at any given time. Note that the underlying RecordStore creates its
  * own RecoveryUnit instance and uses it for all operations performed through this class.
  */
-class SpillTable {
+class MONGO_MOD_PUBLIC SpillTable final {
 public:
     class Cursor {
     public:
@@ -83,7 +84,7 @@ public:
                DiskSpaceMonitor& diskMonitor,
                int64_t thresholdBytes);
 
-    virtual ~SpillTable();
+    ~SpillTable();
 
     StringData ident() const;
 
@@ -157,12 +158,11 @@ public:
 
     RecordStore* getRecordStore_forTest();
 
-protected:
+private:
     std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;
     StorageEngine& _storageEngine;
 
-private:
     Status _checkDiskSpace() const;
 
     class DiskState {

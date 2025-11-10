@@ -35,12 +35,13 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
@@ -124,4 +125,4 @@ private:
     const RecordStore::Oplog& _oplog;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

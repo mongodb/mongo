@@ -31,10 +31,7 @@
 
 #include "mongo/db/local_catalog/local_oplog_info.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
-#include "mongo/db/storage/record_store.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

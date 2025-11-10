@@ -36,18 +36,15 @@
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/database.h"
 #include "mongo/db/local_catalog/db_raii.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/unittest/unittest.h"
-
-#include <memory>
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
-namespace dbtests {
+MONGO_MOD_PUBLIC;
+namespace mongo::dbtests {
 
 /**
  * Creates an index if it does not already exist.
@@ -96,5 +93,4 @@ private:
     boost::optional<AutoStatsTracker> _tracker;
 };
 
-}  // namespace dbtests
-}  // namespace mongo
+}  // namespace mongo::dbtests

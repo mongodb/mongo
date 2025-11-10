@@ -39,6 +39,7 @@ commands:
         namespace: ignored
         api_version: ""
         strict: true
+        mod_visibility: private
         fields:
             lock:
                 description: "Takes a lock on the server or cluster and blocks all write operations."

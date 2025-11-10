@@ -30,11 +30,12 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Perform an fsync on the file.
@@ -54,4 +55,4 @@ Status fsyncParentDirectory(const boost::filesystem::path& file);
  */
 Status fsyncRename(const boost::filesystem::path& source, const boost::filesystem::path& dest);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

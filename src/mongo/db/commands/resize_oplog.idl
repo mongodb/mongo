@@ -41,6 +41,7 @@ commands:
         namespace: type
         api_version: ""
         type: safeInt64
+        mod_visibility: private
         fields:
             size:
                 description: "Size of the oplog in MB"

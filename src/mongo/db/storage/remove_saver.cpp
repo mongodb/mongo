@@ -41,24 +41,18 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <fstream>  // IWYU pragma: keep
+#include <fstream>
 #include <utility>
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-
-using std::ofstream;
-using std::string;
-using std::stringstream;
-
 namespace mongo {
 
-RemoveSaver::RemoveSaver(const string& a,
-                         const string& b,
-                         const string& why,
+RemoveSaver::RemoveSaver(const std::string& a,
+                         const std::string& b,
+                         const std::string& why,
                          std::unique_ptr<Storage> storage)
     : _storage(std::move(storage)) {
     static int NUM = 0;
@@ -71,10 +65,8 @@ RemoveSaver::RemoveSaver(const string& a,
     MONGO_verify(a.size() || b.size());
 
     _file = _root;
-
-    stringstream ss;
-    ss << why << "." << terseCurrentTimeForFilename() << "." << NUM++ << ".bson";
-    _file /= ss.str();
+    _file /= str::stream() << why << "." << terseCurrentTimeForFilename() << "." << NUM++
+                           << ".bson";
 
     auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
     if (encryptionHooks->enabled()) {
@@ -145,8 +137,8 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
 
         if (_out->fail()) {
             auto ec = lastSystemError();
-            string msg = str::stream() << "couldn't create file: " << _file.string()
-                                       << " for remove saving: " << redact(errorMessage(ec));
+            std::string msg = str::stream() << "couldn't create file: " << _file.string()
+                                            << " for remove saving: " << redact(errorMessage(ec));
             LOGV2_ERROR(23734,
                         "Failed to create file for remove saving",
                         "file"_attr = _file.generic_string(),
@@ -183,8 +175,8 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
 
     if (_out->fail()) {
         auto errorStr = redact(errorMessage(lastSystemError()));
-        string msg = str::stream() << "couldn't write document to file: " << _file.string()
-                                   << " for remove saving: " << errorStr;
+        std::string msg = str::stream() << "couldn't write document to file: " << _file.string()
+                                        << " for remove saving: " << errorStr;
         LOGV2_ERROR(23735,
                     "Couldn't write document to file for remove saving",
                     "file"_attr = _file.generic_string(),

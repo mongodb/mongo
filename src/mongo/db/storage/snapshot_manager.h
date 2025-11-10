@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ namespace mongo {
  * Implementations must be able to handle concurrent access to any methods. No methods are allowed
  * to acquire locks from the LockManager.
  */
-class SnapshotManager {
+class MONGO_MOD_OPEN SnapshotManager {
 public:
     /**
      * Sets the snapshot to be used for committed reads.

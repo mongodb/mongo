@@ -29,18 +29,16 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
-class BSONObj;
-class NamespaceString;
-class OperationContext;
-class RecordId;
-class ValidateResults;
+MONGO_MOD_PUBLIC;
 
 /**
  * Helpers to facilitate unit test debugging in the case of test failure.
  */
-namespace StorageDebugUtil {
+namespace mongo::StorageDebugUtil {
 
 /**
  * Prints all the document entries in the collection table and index tables associated with
@@ -56,6 +54,4 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
  */
 void printValidateResults(const ValidateResults& results);
 
-}  // namespace StorageDebugUtil
-
-}  // namespace mongo
+}  // namespace mongo::StorageDebugUtil

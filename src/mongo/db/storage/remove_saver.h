@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/data_protector.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <ostream>
@@ -39,7 +40,7 @@
 
 #include <boost/filesystem/path.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This class provides facility for saving bson objects to a flat file. The common use case is for
@@ -82,7 +83,7 @@ public:
     }
     void file() && = delete;
 
-    class Storage {
+    class MONGO_MOD_OPEN Storage {
     public:
         virtual ~Storage() = default;
         virtual std::unique_ptr<std::ostream> makeOstream(const boost::filesystem::path& file,
@@ -98,4 +99,4 @@ private:
     std::unique_ptr<Storage> _storage;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

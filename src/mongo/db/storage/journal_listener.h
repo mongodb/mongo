@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
+
 #include <memory>
 
 namespace mongo {
-
-class OperationContext;
-
 /**
  * This class allows for the storageEngine to alert the rest of the system about journaled write
  * progress.
@@ -46,9 +46,9 @@ class OperationContext;
  * The second method, onDurable(), takes this token as an argument and relays to the rest of the
  * system that writes through that point have been journaled.
  */
-class JournalListener {
+class MONGO_MOD_OPEN JournalListener {
 public:
-    class Token {
+    class MONGO_MOD_OPEN Token {
     public:
         virtual ~Token() = default;
     };

@@ -51,7 +51,6 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -60,12 +59,9 @@
 #include <cstdint>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
-namespace index_repair {
+namespace mongo::index_repair {
 
 StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
                                          const NamespaceString& nss,
@@ -253,5 +249,4 @@ int repairMissingIndexEntry(OperationContext* opCtx,
     return numInserted;
 }
 
-}  // namespace index_repair
-}  // namespace mongo
+}  // namespace mongo::index_repair

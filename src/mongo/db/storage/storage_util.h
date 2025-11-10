@@ -33,12 +33,13 @@
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
-namespace mongo {
-namespace storage_helpers {
+MONGO_MOD_PUBLIC;
 
+namespace mongo::storage_helpers {
 /**
  * Inserts the batch of documents 'docs' using the provided callable object 'insertFn'.
  *
@@ -88,6 +89,4 @@ Status insertBatchAndHandleRetry(OperationContext* opCtx,
 
     return Status::OK();
 }
-}  // namespace storage_helpers
-
-}  // namespace mongo
+}  // namespace mongo::storage_helpers

@@ -49,9 +49,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -60,6 +60,48 @@
 namespace mongo {
 
 namespace {
+/**
+ * Responsible for deleting oplog truncate markers once their max capacity has been reached.
+ */
+class OplogCapMaintainerThread final : public BackgroundJob {
+public:
+    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
+
+    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
+    static OplogCapMaintainerThread* get(OperationContext* opCtx);
+    static void set(ServiceContext* serviceCtx,
+                    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread);
+
+    std::string name() const override {
+        return _name;
+    }
+
+    void run() override;
+
+    /**
+     * Waits until the maintainer thread finishes. Must not be called concurrently with start().
+     */
+    void shutdown(const Status& reason);
+
+private:
+    /**
+     * Returns true iff there was an oplog to delete from.
+     */
+    bool _deleteExcessDocuments(OperationContext* opCtx);
+
+    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
+    mutable stdx::mutex _opCtxMutex;
+
+    // Saves a reference to the cap maintainer thread's operation context.
+    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
+
+    mutable stdx::mutex _stateMutex;
+    bool _shuttingDown = false;
+    Status _shutdownReason = Status::OK();
+
+    std::string _name = std::string("OplogCapMaintainerThread-") +
+        toStringForLogging(NamespaceString::kRsOplogNamespace);
+};
 
 const auto getMaintainerThread =
     ServiceContext::declareDecoration<std::unique_ptr<OplogCapMaintainerThread>>();
