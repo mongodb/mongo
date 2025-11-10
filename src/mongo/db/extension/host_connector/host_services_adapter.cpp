@@ -35,8 +35,6 @@
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/logv2/attribute_storage.h"
-#include "mongo/logv2/log_detail.h"
-#include "mongo/logv2/log_options.h"
 
 namespace mongo::extension::host_connector {
 
@@ -66,17 +64,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(
         std::int32_t code = static_cast<std::int32_t>(logMessage->code);
 
         // Convert C enum to logv2 severity.
-        logv2::LogSeverity severity = [&]() {
-            switch (logMessage->severityOrLevel.severity) {
-                case ::MongoExtensionLogSeverity::kWarning:
-                    return logv2::LogSeverity::Warning();
-                case ::MongoExtensionLogSeverity::kError:
-                    return logv2::LogSeverity::Error();
-                case ::MongoExtensionLogSeverity::kInfo:
-                default:
-                    return logv2::LogSeverity::Info();
-            }
-        }();
+        logv2::LogSeverity severity = convertSeverity(logMessage->severityOrLevel.severity);
 
         // TODO SERVER-111339 Populate attributes from logMessage->attributes.
         logv2::TypeErasedAttributeStorage attrs;
@@ -179,6 +167,23 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
 
         *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNode(
             std::make_unique<host::AggStageAstNode>(std::move(liteParsed))));
+    });
+}
+
+MongoExtensionStatus* HostServicesAdapter::_extShouldLog(
+    ::MongoExtensionLogSeverity levelOrSeverity,
+    ::MongoExtensionLogType logType,
+    bool* out) noexcept {
+    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
+        logv2::LogSeverity severity = logv2::LogSeverity::Debug(5);  // Dummy initialization.
+        if (logType == ::MongoExtensionLogType::kDebug) {
+            severity =
+                logv2::LogSeverity::Debug(std::min(5, std::max(1, int32_t(levelOrSeverity))));
+        } else {
+            severity = convertSeverity(levelOrSeverity);
+        }
+        bool result = logv2::shouldLog(logv2::LogComponent::kExtensionMongot, severity);
+        *out = result;
     });
 }
 }  // namespace mongo::extension::host_connector

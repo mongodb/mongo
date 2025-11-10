@@ -9,19 +9,28 @@ import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 const coll = db[jsTestName()];
 
-function checkLogs(db, debugLogLevel) {
+function checkLogs(db, debugLogLevel, shouldLog) {
     const globalLogs = db.adminCommand({getLog: "global"});
+    // Parse() is called twice - once when the LiteParsed stage is created, and once when the full
+    // DocumentSource stage is created. Log lines are printed in both cases.
+    const parseCallCount = 2;
+
     // The log code defined in debug_logging.cpp is 11134100.
     // The component is "EXTENSION-MONGOT".
     // The severity is "D<logLevel>", for example "D3" for a debug log with level 3.
     const debugLog = {s: "D" + String(debugLogLevel), c: "EXTENSION-MONGOT", id: 11134100};
-    const matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, debugLog)];
-    // Parse() is called twice - once when the LiteParsed stage is created, and once when the full
-    // DocumentSource stage is created. Log lines are printed in both cases.
-    const parseCallCount = 2;
+    const matchingDebugLogLines = [...iterateMatchingLogLines(globalLogs.log, debugLog)];
     // Make sure there is at most one matching log line per parse call.
-    assert.lte(matchingLogLines.length, parseCallCount);
-    return matchingLogLines.length == parseCallCount;
+    assert.lte(matchingDebugLogLines.length, parseCallCount);
+
+    // After adding the 'shouldLog' optimization, $debugLog also prints a warning log indicating
+    // whether the debug log should be printed or not.
+    const warningLogShouldLog = {s: "W", c: "EXTENSION-MONGOT", id: shouldLog ? 11134101 : 11134102};
+    const matchingWarningLogLines = [...iterateMatchingLogLines(globalLogs.log, warningLogShouldLog)];
+    // Since the warning line always gets printed, we expect one warning log line per parse call.
+    assert.eq(matchingWarningLogLines.length, parseCallCount);
+
+    return matchingDebugLogLines.length == parseCallCount;
 }
 
 function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog}) {
@@ -29,7 +38,7 @@ function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog}) {
     assert.commandWorked(db.setLogLevel(serverLogLevel, "extension"));
     coll.aggregate([{$debugLog: {level: debugLogLevel}}]);
     const realLogLevel = Math.max(1, Math.min(5, debugLogLevel));
-    const wasLogged = checkLogs(db, realLogLevel);
+    const wasLogged = checkLogs(db, realLogLevel, commandShouldLog);
     assert.eq(wasLogged, commandShouldLog, {serverLogLevel, debugLogLevel});
 }
 

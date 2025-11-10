@@ -86,6 +86,11 @@ public:
              MongoExtensionLogSeverity severity = MongoExtensionLogSeverity::kInfo) const {
         assertValid();
 
+        // Prevent materializing log messages that would not be logged.
+        if (!shouldLog(severity, ::MongoExtensionLogType::kLog)) {
+            return;
+        }
+
         // TODO SERVER-111339 Add attributes.
         ::MongoExtensionLogMessage logMessage = createLogMessageStruct(message, code, severity);
 
@@ -94,6 +99,11 @@ public:
 
     void logDebug(const std::string& message, std::int32_t code, std::int32_t level = 1) const {
         assertValid();
+
+        // Prevent materializing log messages that would not be logged.
+        if (!shouldLog(::MongoExtensionLogSeverity(level), ::MongoExtensionLogType::kDebug)) {
+            return;
+        }
 
         // TODO SERVER-111339 Add attributes.
         ::MongoExtensionLogMessage logMessage = createDebugLogMessageStruct(message, code, level);
@@ -122,6 +132,15 @@ public:
         invokeCAndConvertStatusToException(
             [&] { return vtable().create_id_lookup(objAsByteView(spec), &result); });
         return AggStageAstNodeHandle{result};
+    }
+
+    bool shouldLog(::MongoExtensionLogSeverity levelOrSeverity,
+                   ::MongoExtensionLogType logType) const {
+        assertValid();
+        bool out = false;
+        invokeCAndConvertStatusToException(
+            [&]() { return vtable().should_log(levelOrSeverity, logType, &out); });
+        return out;
     }
 
 private:

@@ -694,6 +694,16 @@ typedef struct MongoExtensionHostServicesVTable {
      */
     MongoExtensionStatus* (*create_id_lookup)(MongoExtensionByteView bsonSpec,
                                               MongoExtensionAggStageAstNode** node);
+
+    /**
+     * This provides an optimization to the logging service, as it compares the provided log
+     * level/severity against the server's current log level before materializing and sending a log
+     * over the wire. 'logType' indicates whether levelOrSeverity is a level (kDebug) or a severity
+     * (kLog), as in the latter case in case we need to transform the value to a logv2::LogSeverity.
+     */
+    MongoExtensionStatus* (*should_log)(MongoExtensionLogSeverity levelOrSeverity,
+                                        ::MongoExtensionLogType logType,
+                                        bool* out);
 } MongoExtensionHostServicesVTable;
 
 /**

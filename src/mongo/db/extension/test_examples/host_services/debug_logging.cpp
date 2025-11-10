@@ -64,6 +64,17 @@ public:
                         bsonSpec.getField(kDebugLogLevelField).isNumber());
 
         int level = bsonSpec.getIntField(kDebugLogLevelField);
+
+        // This tests the functionality of the shouldLog host service.
+        if (sdk::HostServicesHandle::getHostServices()->shouldLog(
+                ::MongoExtensionLogSeverity(level), ::MongoExtensionLogType::kDebug)) {
+            sdk::HostServicesHandle::getHostServices()->log(
+                "Log level is enough", 11134101, ::MongoExtensionLogSeverity::kWarning);
+        } else {
+            sdk::HostServicesHandle::getHostServices()->log(
+                "Log level is not enough", 11134102, ::MongoExtensionLogSeverity::kWarning);
+        }
+
         sdk::HostServicesHandle::getHostServices()->logDebug("Test log message", 11134100, level);
 
         return std::make_unique<DebugLogParseNode>(stageBson);

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo::extension::host_connector {
 /**
@@ -69,12 +70,29 @@ private:
     static ::MongoExtensionStatus* _extCreateIdLookup(
         ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept;
 
+    static ::MongoExtensionStatus* _extShouldLog(::MongoExtensionLogSeverity levelOrSeverity,
+                                                 ::MongoExtensionLogType logType,
+                                                 bool* out) noexcept;
+
+    static constexpr logv2::LogSeverity convertSeverity(::MongoExtensionLogSeverity severity) {
+        switch (severity) {
+            case ::MongoExtensionLogSeverity::kWarning:
+                return logv2::LogSeverity::Warning();
+            case ::MongoExtensionLogSeverity::kError:
+                return logv2::LogSeverity::Error();
+            case ::MongoExtensionLogSeverity::kInfo:
+            default:
+                return logv2::LogSeverity::Info();
+        }
+    }
+
     static constexpr ::MongoExtensionHostServicesVTable VTABLE{
         .log = &_extLog,
         .log_debug = &_extLogDebug,
         .user_asserted = &_extUserAsserted,
         .tripwire_asserted = &_extTripwireAsserted,
         .create_host_agg_stage_parse_node = &_extCreateHostAggStageParseNode,
-        .create_id_lookup = &_extCreateIdLookup};
+        .create_id_lookup = &_extCreateIdLookup,
+        .should_log = &_extShouldLog};
 };
 }  // namespace mongo::extension::host_connector
