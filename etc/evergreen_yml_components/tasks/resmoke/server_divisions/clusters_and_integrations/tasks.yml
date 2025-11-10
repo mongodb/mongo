@@ -2375,27 +2375,25 @@ tasks:
 
   - <<: *gen_task_template
     name: sharding_jscore_passthrough_with_dynamic_concurrency_adjustment_algorithm_gen
-    tags: [
+    tags:
+      [
         "assigned_to_jira_team_server_workload_scheduling",
         "default",
         "sharding",
         "jscore",
         "common",
-        # TODO (SERVER-111526): Remove the `requires_all_feature_flags` tag
-        "requires_all_feature_flags",
       ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: replica_sets_jscore_passthrough_with_dynamic_concurrency_adjustment_algorithm_gen
-    tags: [
+    tags:
+      [
         "assigned_to_jira_team_server_workload_scheduling",
         "default",
         "jscore",
         "common",
-        # TODO (SERVER-111526): Remove the `requires_all_feature_flags` tag
-        "requires_all_feature_flags",
       ]
     commands:
       - func: "generate resmoke tasks"
