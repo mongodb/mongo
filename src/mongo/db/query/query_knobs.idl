@@ -1728,6 +1728,18 @@ server_parameters:
         cpp_vartype: bool
         default: false
         redact: false
+
+    internalQueryMaxNumExprFieldPathComponentsSupportedInSbe:
+        description: >-
+            A cap on the number of nested ExpressionFieldPath components a query may contain before SBE is disabled. Toplevel fields do not contribute to this count.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryMaxNumExprFieldPathComponentsSupportedInSbe
+        cpp_vartype: AtomicWord<int>
+        default: 256
+        validator:
+            gte: 0
+            lte: 1024
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

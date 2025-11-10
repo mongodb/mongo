@@ -1274,6 +1274,11 @@ bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery&
         return false;
     }
 
+    if (expCtx->getNumNestedExpressionFieldPathComponentsParsed() >
+        queryKnob.getInternalQueryMaxNumExprFieldPathComponentsSupportedInSbe()) {
+        return false;
+    }
+
     // Queries against the oplog are not supported. Also queries on the inner side of a $lookup are
     // not considered for SBE except search queries.
     if ((expCtx->getInLookup() && !cq.isSearchQuery()) || nss.isOplog() ||
