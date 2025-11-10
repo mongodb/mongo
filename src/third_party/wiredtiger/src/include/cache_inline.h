@@ -15,7 +15,7 @@
 static WT_INLINE uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache)
 {
-    return (cache->pages_inmem - cache->pages_evicted);
+    return (__wt_atomic_load_uint64_relaxed(&cache->pages_inmem) - cache->pages_evicted);
 }
 
 /*

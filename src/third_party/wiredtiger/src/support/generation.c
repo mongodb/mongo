@@ -387,8 +387,8 @@ __stash_discard(WT_SESSION_IMPL *session, int which)
         if (stash->gen >= oldest)
             break;
 
-        (void)__wt_atomic_sub_uint64(&conn->stashed_bytes, stash->len);
-        (void)__wt_atomic_sub_uint64(&conn->stashed_objects, 1);
+        (void)__wt_atomic_sub_uint64_relaxed(&conn->stashed_bytes, stash->len);
+        (void)__wt_atomic_sub_uint64_relaxed(&conn->stashed_objects, 1);
 
         /*
          * It's a bad thing if another thread is in this memory after we free it, make sure nothing

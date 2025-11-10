@@ -423,8 +423,8 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
       __wt_atomic_load_uint64_relaxed(&evict->evict_max_ms));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_milliseconds_per_checkpoint,
       __wt_atomic_load_uint64_relaxed(&evict->evict_max_ms_per_checkpoint));
-    WT_STATP_CONN_SET(
-      session, stats, eviction_reentry_hs_eviction_milliseconds, evict->reentry_hs_eviction_ms);
+    WT_STATP_CONN_SET(session, stats, eviction_reentry_hs_eviction_milliseconds,
+      __wt_atomic_load_uint64_relaxed(&evict->reentry_hs_eviction_ms));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_unvisited_gen_gap,
       __wt_atomic_load_uint64_relaxed(&evict->evict_max_unvisited_gen_gap));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_unvisited_gen_gap_per_checkpoint,
@@ -435,13 +435,14 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
       __wt_atomic_load_uint64_relaxed(&evict->evict_max_visited_gen_gap_per_checkpoint));
     WT_STATP_CONN_SET(
       session, stats, eviction_state, __wt_atomic_load_uint32_relaxed(&evict->flags));
-    WT_STATP_CONN_SET(session, stats, eviction_aggressive_set, evict->evict_aggressive_score);
+    WT_STATP_CONN_SET(session, stats, eviction_aggressive_set,
+      __wt_atomic_load_uint32_relaxed(&evict->evict_aggressive_score));
     WT_STATP_CONN_SET(session, stats, eviction_empty_score, evict->evict_empty_score);
 
     WT_STATP_CONN_SET(session, stats, eviction_active_workers,
       __wt_atomic_load_uint32_relaxed(&conn->evict_threads.current_threads));
-    WT_STATP_CONN_SET(
-      session, stats, eviction_stable_state_workers, evict->evict_tune_workers_best);
+    WT_STATP_CONN_SET(session, stats, eviction_stable_state_workers,
+      __wt_atomic_load_uint32_relaxed(&evict->evict_tune_workers_best));
 
     /*
      * The number of files with active walks ~= number of hazard pointers in the walk session. Note:

@@ -73,7 +73,7 @@ __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs
     }
 
     __wt_verbose_debug2(session, WT_VERB_MUTEX, "wait %s", cond->name);
-    WT_STAT_CONN_INCR(session, cond_wait);
+    WT_STAT_CONN_INCR_ATOMIC(session, cond_wait);
 
     WT_ERR(pthread_mutex_lock(&cond->mtx));
     locked = true;

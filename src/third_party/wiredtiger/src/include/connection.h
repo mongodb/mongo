@@ -460,11 +460,11 @@ struct __wt_name_flag {
         TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);                                            \
         TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);                              \
         ++(conn)->dh_bucket_count[bucket];                                                       \
-        ++(conn)->dhandle_count;                                                                 \
+        (void)__wt_atomic_add_uint64_relaxed(&(conn)->dhandle_count, 1);                         \
         if (WT_DHANDLE_IS_CHECKPOINT(dhandle))                                                   \
-            ++(conn)->dhandle_checkpoint_count;                                                  \
+            (void)__wt_atomic_add_uint64_relaxed(&(conn)->dhandle_checkpoint_count, 1);          \
         WT_ASSERT(session, (dhandle)->type < WT_DHANDLE_TYPE_NUM);                               \
-        ++(conn)->dhandle_types_count[(dhandle)->type];                                          \
+        (void)__wt_atomic_add_uint64_relaxed(&(conn)->dhandle_types_count[(dhandle)->type], 1);  \
     } while (0)
 
 #define WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket)                                            \
@@ -473,11 +473,11 @@ struct __wt_name_flag {
         TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);                                                 \
         TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);                                   \
         --(conn)->dh_bucket_count[bucket];                                                       \
-        --(conn)->dhandle_count;                                                                 \
+        (void)__wt_atomic_sub_uint64_relaxed(&(conn)->dhandle_count, 1);                         \
         if (WT_DHANDLE_IS_CHECKPOINT(dhandle))                                                   \
-            --(conn)->dhandle_checkpoint_count;                                                  \
+            (void)__wt_atomic_sub_uint64_relaxed(&(conn)->dhandle_checkpoint_count, 1);          \
         WT_ASSERT(session, (dhandle)->type < WT_DHANDLE_TYPE_NUM);                               \
-        --(conn)->dhandle_types_count[(dhandle)->type];                                          \
+        (void)__wt_atomic_sub_uint64_relaxed(&(conn)->dhandle_types_count[(dhandle)->type], 1);  \
     } while (0)
 
 /*
@@ -646,11 +646,11 @@ struct __wt_connection_impl {
     WT_CHECKPOINT_CLEANUP cc_cleanup; /* Checkpoint cleanup */
     WT_CHUNKCACHE chunkcache;         /* Chunk cache */
 
-    uint64_t *dh_bucket_count;         /* Locked: handles in each bucket */
-    uint64_t dhandle_count;            /* Locked: handles in the queue */
-    uint64_t dhandle_checkpoint_count; /* Locked: checkpoint handles in the queue */
+    uint64_t *dh_bucket_count;                   /* Locked: handles in each bucket */
+    wt_shared uint64_t dhandle_count;            /* Locked: handles in the queue */
+    wt_shared uint64_t dhandle_checkpoint_count; /* Locked: checkpoint handles in the queue */
     /* Locked: handles by type in the queue */
-    uint64_t dhandle_types_count[WT_DHANDLE_TYPE_NUM];
+    wt_shared uint64_t dhandle_types_count[WT_DHANDLE_TYPE_NUM];
     wt_shared u_int open_btree_count;        /* Locked: open writable btree count */
     uint32_t next_file_id;                   /* Locked: file ID counter */
     wt_shared uint32_t open_file_count;      /* Atomic: open file handle count */

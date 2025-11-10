@@ -178,6 +178,9 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
  * The read statistics are separated into data-source or connection statistics as the counter slots
  * for the statistics are separate. The write statistics do not rely on counter slots in this way so
  * they do not need to be split.
+ *
+ * FIXME-WT-15752: Remove __wt_tsan_suppress_* wrappers and implement proper atomics synchronization
+ * where needed.
  */
 #define WT_STAT_ENABLED(session) (S2C(session)->stat_flags != 0)
 
@@ -202,6 +205,7 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
         if (WT_STAT_ENABLED(session))                                     \
             __wt_tsan_suppress_sub_int64(&(stat)->fld, (int64_t)(value)); \
     } while (0)
+/* FIXME-WT-15754: Consider using relaxed memory order for all statistic operations. */
 #define WT_STAT_DECRV_ATOMIC_BASE(session, stat, fld, value)             \
     do {                                                                 \
         if (WT_STAT_ENABLED(session))                                    \
@@ -242,6 +246,7 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
     WT_STAT_INCRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
 #define WT_STAT_CONN_INCR(session, fld) WT_STAT_CONN_INCRV(session, fld, 1)
 
+/* FIXME-WT-15961 Introduce thread-safe stats interfaces. */
 #define WT_STATP_CONN_SET(session, stats, fld, value)                           \
     do {                                                                        \
         if (WT_STAT_ENABLED(session)) {                                         \

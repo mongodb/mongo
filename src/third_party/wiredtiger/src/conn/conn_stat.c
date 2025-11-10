@@ -78,22 +78,26 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
     __wt_evict_stats_update(session);
     __wt_txn_stats_update(session);
 
-    WT_STATP_CONN_SET(session, stats, file_open, conn->open_file_count);
+    WT_STATP_CONN_SET(
+      session, stats, file_open, __wt_atomic_load_uint32_relaxed(&conn->open_file_count));
     WT_STATP_CONN_SET(
       session, stats, cursor_open_count, __wt_atomic_load_uint32_relaxed(&conn->open_cursor_count));
-    WT_STATP_CONN_SET(session, stats, dh_conn_handle_count, conn->dhandle_count);
     WT_STATP_CONN_SET(
-      session, stats, dh_conn_handle_btree_count, conn->dhandle_types_count[WT_DHANDLE_TYPE_BTREE]);
-    WT_STATP_CONN_SET(
-      session, stats, dh_conn_handle_table_count, conn->dhandle_types_count[WT_DHANDLE_TYPE_TABLE]);
+      session, stats, dh_conn_handle_count, __wt_atomic_load_uint64_relaxed(&conn->dhandle_count));
+    WT_STATP_CONN_SET(session, stats, dh_conn_handle_btree_count,
+      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_BTREE]));
+    WT_STATP_CONN_SET(session, stats, dh_conn_handle_table_count,
+      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TABLE]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_tiered_count,
-      conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED]);
+      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_tiered_tree_count,
-      conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED_TREE]);
-    WT_STATP_CONN_SET(
-      session, stats, dh_conn_handle_checkpoint_count, conn->dhandle_checkpoint_count);
-    WT_STATP_CONN_SET(session, stats, rec_split_stashed_objects, conn->stashed_objects);
-    WT_STATP_CONN_SET(session, stats, rec_split_stashed_bytes, conn->stashed_bytes);
+      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED_TREE]));
+    WT_STATP_CONN_SET(session, stats, dh_conn_handle_checkpoint_count,
+      __wt_atomic_load_uint64_relaxed(&conn->dhandle_checkpoint_count));
+    WT_STATP_CONN_SET(session, stats, rec_split_stashed_objects,
+      __wt_atomic_load_uint64_relaxed(&conn->stashed_objects));
+    WT_STATP_CONN_SET(session, stats, rec_split_stashed_bytes,
+      __wt_atomic_load_uint64_relaxed(&conn->stashed_bytes));
 }
 
 /*

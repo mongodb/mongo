@@ -691,6 +691,19 @@ __wt_checkpoint_verbose_timer_started(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __checkpoint_timer_stats_set --
+ *     Update checkpoint timer stats for a specific timer.
+ */
+static void
+__checkpoint_timer_stats_set(WTI_CKPT_TIMER *timer, uint64_t msec)
+{
+    __wt_atomic_stats_max(&timer->max, msec);
+    __wt_atomic_stats_min(&timer->min, msec);
+    __wt_atomic_store_uint64_relaxed(&timer->recent, msec);
+    (void)__wt_atomic_add_uint64_relaxed(&timer->total, msec);
+}
+
+/*
  * __checkpoint_stats --
  *     Update checkpoint timer stats.
  */
@@ -710,33 +723,15 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
     /* Compute end-to-end timer statistics for checkpoint. */
     __wt_epoch(session, &stop);
     msec = WT_TIMEDIFF_MS(stop, conn->ckpt.ckpt_api.timer_start);
-
-    if (msec > conn->ckpt.ckpt_api.max)
-        conn->ckpt.ckpt_api.max = msec;
-    if (msec < conn->ckpt.ckpt_api.min)
-        conn->ckpt.ckpt_api.min = msec;
-    conn->ckpt.ckpt_api.recent = msec;
-    conn->ckpt.ckpt_api.total += msec;
+    __checkpoint_timer_stats_set(&conn->ckpt.ckpt_api, msec);
 
     /* Compute timer statistics for the scrub. */
     msec = WT_TIMEDIFF_MS(conn->ckpt.scrub.timer_end, conn->ckpt.ckpt_api.timer_start);
-
-    if (msec > conn->ckpt.scrub.max)
-        conn->ckpt.scrub.max = msec;
-    if (msec < conn->ckpt.scrub.min)
-        conn->ckpt.scrub.min = msec;
-    conn->ckpt.scrub.recent = msec;
-    conn->ckpt.scrub.total += msec;
+    __checkpoint_timer_stats_set(&conn->ckpt.scrub, msec);
 
     /* Compute timer statistics for the checkpoint prepare. */
     msec = WT_TIMEDIFF_MS(conn->ckpt.prepare.timer_end, conn->ckpt.prepare.timer_start);
-
-    if (msec > conn->ckpt.prepare.max)
-        conn->ckpt.prepare.max = msec;
-    if (msec < conn->ckpt.prepare.min)
-        conn->ckpt.prepare.min = msec;
-    conn->ckpt.prepare.recent = msec;
-    conn->ckpt.prepare.total += msec;
+    __checkpoint_timer_stats_set(&conn->ckpt.prepare, msec);
 }
 
 /*
@@ -1208,13 +1203,13 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     __wt_atomic_store_uint64_relaxed(&evict->evict_max_dirty_page_size_per_checkpoint, 0);
     __wt_atomic_store_uint64_relaxed(&evict->evict_max_updates_page_size_per_checkpoint, 0);
     __wt_atomic_store_uint64_relaxed(&evict->evict_max_ms_per_checkpoint, 0);
-    evict->reentry_hs_eviction_ms = 0;
+    __wt_atomic_store_uint64_relaxed(&evict->reentry_hs_eviction_ms, 0);
     __wt_atomic_store_uint32_relaxed(&conn->heuristic_controls.obsolete_tw_btree_count, 0);
-    conn->rec_maximum_hs_wrapup_milliseconds = 0;
-    conn->rec_maximum_image_build_milliseconds = 0;
-    conn->rec_maximum_milliseconds = 0;
-    conn->page_delta.max_internal_delta_count = 0;
-    conn->page_delta.max_leaf_delta_count = 0;
+    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_hs_wrapup_milliseconds, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_image_build_milliseconds, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_milliseconds, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_internal_delta_count, 0);
+    __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_leaf_delta_count, 0);
 
     /* Initialize the verbose tracking timer */
     __wt_epoch(session, &conn->ckpt.ckpt_api.timer_start);

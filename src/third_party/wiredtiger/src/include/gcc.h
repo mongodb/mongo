@@ -349,6 +349,10 @@
     {                                                                                   \
         return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));                           \
     }                                                                                   \
+    static inline _type __wt_atomic_sub_##suffix##_relaxed(_type *vp, _type v)          \
+    {                                                                                   \
+        return (__atomic_sub_fetch(vp, v, __ATOMIC_RELAXED));                           \
+    }                                                                                   \
     static inline _type __wt_atomic_add_##suffix##_v(volatile _type *vp, _type v)       \
     {                                                                                   \
         return (__atomic_add_fetch(vp, v, __ATOMIC_SEQ_CST));                           \

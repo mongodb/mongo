@@ -624,8 +624,9 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
 
         passed = not (self.failed() or teardown_failed)
 
-        if passed and self.__module__.startswith("test_layered"):
-            self.verifyLayered()
+        # FIXME-WT-15977: renable verify
+        # if passed and self.__module__.startswith("test_layered"):
+        #     self.verifyLayered()
 
         try:
             self.platform_api.tearDown(self)

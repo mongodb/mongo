@@ -233,12 +233,22 @@ __wt_tsan_suppress_store_pointer(void **vp, void *v)
 
 /*
  * __wt_tsan_suppress_memcpy --
- *     TSAN warnings suppression for memory copy.
+ *     TSAN warnings suppression for memcpy.
  */
 static WT_INLINE void *
 __wt_tsan_suppress_memcpy(void *dest, void *src, size_t count)
 {
     return (memcpy(dest, src, count));
+}
+
+/*
+ * __wt_tsan_suppress_memset --
+ *     TSAN warnings suppression for memset.
+ */
+static WT_INLINE void *
+__wt_tsan_suppress_memset(void *ptr, int val, size_t size)
+{
+    return (memset(ptr, val, size));
 }
 
 /*

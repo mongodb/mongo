@@ -460,7 +460,7 @@ set:
      * largest durable_timestamp so it moves forward whenever transactions are assigned timestamps).
      */
     if (has_durable) {
-        txn_global->durable_timestamp = durable_ts;
+        __wt_tsan_suppress_store_uint64(&txn_global->durable_timestamp, durable_ts);
         txn_global->has_durable_timestamp = true;
         WT_STAT_CONN_INCR(session, txn_set_ts_durable_upd);
         __wt_verbose_timestamp(session, durable_ts, "Updated global durable timestamp");
@@ -469,7 +469,7 @@ set:
     if (has_oldest &&
       (!__wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp) || force ||
         oldest_ts > txn_global->oldest_timestamp)) {
-        txn_global->oldest_timestamp = oldest_ts;
+        __wt_atomic_store_uint64_relaxed(&txn_global->oldest_timestamp, oldest_ts);
         WT_STAT_CONN_INCR(session, txn_set_ts_oldest_upd);
         __wt_atomic_store_bool_relaxed(&txn_global->has_oldest_timestamp, true);
         txn_global->oldest_is_pinned = false;
@@ -966,7 +966,7 @@ __wti_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
             return (EINVAL);
         }
     } else
-        txn_shared->read_timestamp = read_ts;
+        __wt_tsan_suppress_store_uint64(&txn_shared->read_timestamp, read_ts);
 
     F_SET(txn, WT_TXN_SHARED_TS_READ);
     __wt_readunlock(session, &txn_global->rwlock);

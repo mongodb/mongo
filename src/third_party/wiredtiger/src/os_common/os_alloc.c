@@ -63,7 +63,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
     WT_ASSERT(session, number != 0 && size != 0);
 
     if (session != NULL)
-        WT_STAT_CONN_INCR(session, memory_allocation);
+        WT_STAT_CONN_INCR_ATOMIC(session, memory_allocation);
 
     if ((p = calloc(number, size)) == NULL)
         WT_RET_MSG(session, __wt_errno(), "memory allocation of %" WT_SIZET_FMT " bytes failed",
@@ -94,7 +94,7 @@ __wt_malloc(WT_SESSION_IMPL *session, size_t bytes_to_allocate, void *retp)
     WT_ASSERT(session, bytes_to_allocate != 0);
 
     if (session != NULL)
-        WT_STAT_CONN_INCR(session, memory_allocation);
+        WT_STAT_CONN_INCR_ATOMIC(session, memory_allocation);
 
     if ((p = malloc(bytes_to_allocate)) == NULL)
         WT_RET_MSG(session, __wt_errno(), "memory allocation of %" WT_SIZET_FMT " bytes failed",

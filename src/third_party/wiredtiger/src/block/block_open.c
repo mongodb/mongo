@@ -467,7 +467,8 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
     WT_STAT_WRITE(session, stats, block_magic, WT_BLOCK_MAGIC);
     WT_STAT_WRITE(session, stats, block_major, WT_BLOCK_MAJOR_VERSION);
     WT_STAT_WRITE(session, stats, block_minor, WT_BLOCK_MINOR_VERSION);
-    WT_STAT_WRITE(session, stats, block_reuse_bytes, (int64_t)block->live.avail.bytes);
+    WT_STAT_WRITE(session, stats, block_reuse_bytes,
+      (int64_t)(__wt_atomic_load_uint64_relaxed(&block->live.avail.bytes)));
     WT_STAT_WRITE(session, stats, block_size, block->size);
 }
 

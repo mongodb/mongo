@@ -522,3 +522,17 @@ __wt_atomic_stats_max(uint64_t *stat, uint64_t value)
         __wt_atomic_store_uint64_relaxed(stat, value);
     }
 }
+
+/*
+ * __wt_atomic_stats_min --
+ *     Calculate min statistic values. Currently we use load + store for that purpose since
+ *     statistic is allowed to be fuzzy. FIXME-WT-15755: Consider using relaxed CAS instead to
+ *     ensure it is lossless.
+ */
+static inline void
+__wt_atomic_stats_min(uint64_t *stat, uint64_t value)
+{
+    if (value < __wt_atomic_load_uint64_relaxed(stat)) {
+        __wt_atomic_store_uint64_relaxed(stat, value);
+    }
+}

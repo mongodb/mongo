@@ -1327,8 +1327,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
      */
     if (eviction_progress_rate > evict->evict_tune_progress_rate_max) {
         evict->evict_tune_progress_rate_max = eviction_progress_rate;
-        evict->evict_tune_workers_best =
-          __wt_atomic_load_uint32_relaxed(&conn->evict_threads.current_threads);
+        current_threads = __wt_atomic_load_uint32_relaxed(&conn->evict_threads.current_threads);
+        __wt_atomic_store_uint32_relaxed(&evict->evict_tune_workers_best, current_threads);
     }
 
     /*

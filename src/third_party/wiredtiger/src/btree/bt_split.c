@@ -814,12 +814,21 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     split_gen = __wt_gen(session, WT_GEN_SPLIT);
     parent->pg_intl_split_gen = split_gen;
 
+    /*
+     * Mark the page ref's rec_state as dirty. We cannot race with checkpoint as internal page
+     * cannot split during checkpoint.
+     */
+    if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+        __wt_atomic_store_uint8_v_release(&ref->rec_state, WT_REF_REC_DIRTY);
+
+    /* Disable building delta for the parent page if we split. */
+    F_SET_ATOMIC_16(parent, WT_PAGE_INTL_PINDEX_UPDATE);
+
     if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER))
         WT_WITH_PAGE_INDEX(session, __split_verify_intl_key_order(session, parent));
 
     /* The split is complete and verified, ignore benign errors. */
     complete = WT_ERR_IGNORE;
-    F_SET_ATOMIC_16(parent, WT_PAGE_INTL_PINDEX_UPDATE);
 
     /*
      * The new page index is in place. Threads cursoring in the tree are blocked because the WT_REF
@@ -1026,6 +1035,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
         } else
             ref->ref_recno = (*page_refp)->ref_recno;
         F_SET(ref, WT_REF_FLAG_INTERNAL);
+
+        if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+            __wt_atomic_store_uint8_v_relaxed(&ref->rec_state, WT_REF_REC_DIRTY);
+
         WT_REF_SET_STATE(ref, WT_REF_MEM);
 
         /*
@@ -1921,6 +1934,9 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
         }
     }
 
+    if (WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)))
+        __wt_atomic_store_uint8_v_relaxed(&ref->rec_state, WT_REF_REC_DIRTY);
+
     /*
      * If we have a disk image and we're not closing the file, re-instantiate the page.
      *
@@ -2027,6 +2043,10 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     child = split_ref[1];
     child->page = right;
     F_SET(child, WT_REF_FLAG_LEAF);
+
+    if (WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)))
+        __wt_atomic_store_uint8_v_relaxed(&child->rec_state, WT_REF_REC_DIRTY);
+
     WT_REF_SET_STATE(child, WT_REF_MEM); /* Visible as soon as the split completes. */
     if (type == WT_PAGE_ROW_LEAF) {
         WT_ERR(__wti_row_ikey(

@@ -133,7 +133,8 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
     if (ret != 0)
         F_SET_ATOMIC_16(ref->page, WT_PAGE_REC_FAIL);
     else
-        F_CLR_ATOMIC_16(ref->page, WT_PAGE_REC_FAIL | WT_PAGE_INMEM_SPLIT);
+        F_CLR_ATOMIC_16(
+          ref->page, WT_PAGE_REC_FAIL | WT_PAGE_INMEM_SPLIT | WT_PAGE_INTL_PINDEX_UPDATE);
 
 err:
     if (page_locked)
@@ -459,8 +460,6 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     btree = S2BT(session);
     page = r->page;
     mod = page->modify;
-
-    F_CLR_ATOMIC_16(page, WT_PAGE_INTL_PINDEX_UPDATE);
 
     /*
      * Track the page's maximum transaction ID (used to decide if we can evict a clean page and
