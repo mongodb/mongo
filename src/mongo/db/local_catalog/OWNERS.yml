@@ -6,9 +6,6 @@ filters:
   - "collection_compact*":
     approvers:
       - 10gen/server-compact
-  - "health_log*":
-    approvers:
-      - 10gen/server-dbcheck
   - "import*":
     approvers:
       - 10gen/server-storage-engine-integration

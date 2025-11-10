@@ -39,6 +39,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <chrono>
 #include <cstdint>

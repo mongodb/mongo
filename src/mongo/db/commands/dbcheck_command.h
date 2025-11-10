@@ -36,6 +36,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/background.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
 

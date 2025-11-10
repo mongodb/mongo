@@ -21,6 +21,64 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "health_log_gen",
+    src = "health_log.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "deferred_writer",
+    srcs = [
+        "deferred_writer.cpp",
+    ],
+    hdrs = [
+        "deferred_writer.h",
+    ],
+    deps = [
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/local_catalog:catalog_helpers",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "health_log",
+    srcs = [
+        "health_log.cpp",
+    ],
+    hdrs = [
+        "health_log.h",
+    ],
+    deps = [
+        ":deferred_writer",
+        ":health_log_interface",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/local_catalog:collection_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "health_log_interface",
+    srcs = [
+        "health_log_gen",
+        "health_log_interface.cpp",
+    ],
+    hdrs = [
+        "health_log_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
 mongo_cc_library(
     name = "dbcheck",
     srcs = [
@@ -33,13 +91,13 @@ mongo_cc_library(
         "dbcheck_idl.h",
     ],
     deps = [
+        ":health_log_interface",
         "//src/mongo/bson:bson_validate",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/local_catalog:collection_options",
-        "//src/mongo/db/local_catalog:health_log_interface",
         "//src/mongo/db/local_catalog:throttle_cursor",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/util:md5",
@@ -57,6 +115,8 @@ mongo_cc_library(
     ],
     deps = [
         ":dbcheck",
+        ":health_log",
+        ":health_log_interface",
         "//src/mongo:base",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:service_context_d_test_fixture",
@@ -64,8 +124,6 @@ mongo_cc_library(
         "//src/mongo/db/commands:dbcheck_command",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/local_catalog:catalog_test_fixture",
-        "//src/mongo/db/local_catalog:health_log",
-        "//src/mongo/db/local_catalog:health_log_interface",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/repl:storage_interface",
@@ -89,9 +147,9 @@ mongo_cc_unit_test(
     deps = [
         ":dbcheck",
         ":dbcheck_test_fixture",
+        ":health_log",
         "//src/mongo/db/local_catalog:catalog_helpers",
         "//src/mongo/db/local_catalog:catalog_test_fixture",
-        "//src/mongo/db/local_catalog:health_log",
         "//src/mongo/unittest",
         "//src/mongo/unittest:task_executor_proxy",
         "//src/mongo/util:clock_source_mock",

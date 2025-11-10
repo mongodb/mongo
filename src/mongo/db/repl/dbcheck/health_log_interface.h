@@ -29,11 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/health_log_gen.h"
+#include "mongo/db/repl/dbcheck/health_log_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

@@ -38,6 +38,7 @@
 #include "mongo/db/repl/dbcheck/dbcheck_gen.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

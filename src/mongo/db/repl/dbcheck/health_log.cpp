@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/local_catalog/health_log.h"
+#include "mongo/db/repl/dbcheck/health_log.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/local_catalog/collection_options.h"
-#include "mongo/db/local_catalog/health_log_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/dbcheck/health_log_gen.h"
 
 #include <cstdint>
 

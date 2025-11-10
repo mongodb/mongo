@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,33 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/db/local_catalog/health_log_interface.h"
+#pragma once
 
-#include "mongo/db/operation_context.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
+#include "mongo/db/repl/dbcheck/deferred_writer.h"
+#include "mongo/db/repl/dbcheck/health_log_gen.h"
+#include "mongo/db/repl/dbcheck/health_log_interface.h"
+#include "mongo/util/modules.h"
 
-#include <utility>
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
-namespace {
-const auto getHealthLog = ServiceContext::declareDecoration<std::unique_ptr<HealthLogInterface>>();
-}  // namespace
+class HealthLogEntry;
 
-void HealthLogInterface::set(ServiceContext* serviceContext,
-                             std::unique_ptr<HealthLogInterface> newHealthLog) {
-    auto& healthLog = getHealthLog(serviceContext);
-    invariant(!healthLog);
+class HealthLog : public HealthLogInterface {
+    HealthLog(const HealthLog&) = delete;
+    HealthLog& operator=(const HealthLog&) = delete;
 
-    healthLog = std::move(newHealthLog);
-}
+public:
+    /**
+     * Required to use HealthLog as a ServiceContext decorator.
+     *
+     * Should not be used anywhere else.
+     */
+    HealthLog();
 
-HealthLogInterface* HealthLogInterface::get(ServiceContext* svcCtx) {
-    return getHealthLog(svcCtx).get();
-}
+    void startup() override;
 
-HealthLogInterface* HealthLogInterface::get(OperationContext* opCtx) {
-    return getHealthLog(opCtx->getServiceContext()).get();
-}
+    void shutdown() override;
+
+    bool log(const HealthLogEntry& entry) override;
+
+private:
+    DeferredWriter _writer;
+};
 }  // namespace mongo

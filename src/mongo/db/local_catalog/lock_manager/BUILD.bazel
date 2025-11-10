@@ -90,24 +90,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "deferred_writer",
-    srcs = [
-        "deferred_writer.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db:deferred_writer.h",
-    ],
-    deps = [
-        "//src/mongo/db:dbhelpers",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/local_catalog:catalog_helpers",
-        "//src/mongo/db/local_catalog/lock_manager:exception_util",
-        "//src/mongo/util/concurrency:thread_pool",
-    ],
-)
-
 mongo_cc_unit_test(
     name = "exception_util_test",
     srcs = [

@@ -29,6 +29,7 @@
 # IDL basic types
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/repl/dbcheck/dbcheck_idl.h"

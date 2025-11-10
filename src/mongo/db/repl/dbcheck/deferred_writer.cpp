@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/deferred_writer.h"
+#include "mongo/db/repl/dbcheck/deferred_writer.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"

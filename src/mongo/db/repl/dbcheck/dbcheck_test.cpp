@@ -28,10 +28,10 @@
  */
 
 #include "mongo/bson/bson_validate_gen.h"
-#include "mongo/db/local_catalog/health_log.h"
-#include "mongo/db/local_catalog/health_log_gen.h"
-#include "mongo/db/local_catalog/health_log_interface.h"
 #include "mongo/db/repl/dbcheck/dbcheck_test_fixture.h"
+#include "mongo/db/repl/dbcheck/health_log.h"
+#include "mongo/db/repl/dbcheck/health_log_gen.h"
+#include "mongo/db/repl/dbcheck/health_log_interface.h"
 
 #include <boost/optional/optional.hpp>
 

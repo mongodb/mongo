@@ -1849,7 +1849,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/cursor_in_use_info* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/**/crud_bm* @10gen/performance @svc-auto-approve-bot
 /src/mongo/db/**/tenant_id* @10gen/server-security @svc-auto-approve-bot
-/src/mongo/db/**/deferred_writer* @10gen/server-dbcheck @svc-auto-approve-bot
 /src/mongo/db/**/flow_control_ticketholder* @10gen/server-workload-resilience @svc-auto-approve-bot
 /src/mongo/db/**/replication_state_transition_lock_guard* @10gen/server-replication-reviewers @svc-auto-approve-bot
 /src/mongo/db/**/local_executor* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
@@ -2099,7 +2098,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/local_catalog/OWNERS.yml
 /src/mongo/db/local_catalog/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /src/mongo/db/local_catalog/**/collection_compact* @10gen/server-compact @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/health_log* @10gen/server-dbcheck @svc-auto-approve-bot
 /src/mongo/db/local_catalog/**/import* @10gen/server-catalog-and-routing-shard-catalog @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/local_catalog/**/index_key_validate* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/local_catalog/**/index_spec_validate* @10gen/server-index-builds @svc-auto-approve-bot

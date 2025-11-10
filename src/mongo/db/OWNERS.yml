@@ -300,9 +300,6 @@ filters:
   - "tenant_id*":
     approvers:
       - 10gen/server-security
-  - "deferred_writer*":
-    approvers:
-      - 10gen/server-dbcheck
   - "flow_control_ticketholder*":
     approvers:
       - 10gen/server-workload-resilience

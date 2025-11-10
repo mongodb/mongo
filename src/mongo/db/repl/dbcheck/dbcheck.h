@@ -35,17 +35,18 @@
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_options.h"
-#include "mongo/db/local_catalog/health_log_gen.h"
 #include "mongo/db/local_catalog/throttle_cursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/dbcheck/dbcheck_gen.h"
+#include "mongo/db/repl/dbcheck/health_log_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/md5.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -326,8 +327,8 @@ namespace repl {
  * Returns a `Status` to match the type used for oplog command hooks, but in fact always handles
  * errors (primarily by writing to the health log), so always returns `Status::OK`.
  */
-Status dbCheckOplogCommand(OperationContext* opCtx,
-                           const repl::OplogEntry& entry,
-                           OplogApplication::Mode mode);
+MONGO_MOD_PUBLIC Status dbCheckOplogCommand(OperationContext* opCtx,
+                                            const repl::OplogEntry& entry,
+                                            OplogApplication::Mode mode);
 }  // namespace repl
 }  // namespace mongo

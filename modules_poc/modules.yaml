@@ -907,10 +907,9 @@ dbcheck:
   meta:
     slack: storage-engines-server-integration
     jira: Server Integration
+    fully_marked: true
   files:
-    - src/mongo/db/local_catalog/health_log*
     - src/mongo/db/commands/dbcheck*
-    - src/mongo/db/deferred_writer*
     - src/mongo/dbtests/deferred_writer.cpp
     - src/mongo/db/repl/dbcheck*
 
