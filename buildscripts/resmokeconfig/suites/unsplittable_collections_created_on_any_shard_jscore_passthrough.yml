@@ -47,7 +47,7 @@ selector:
     # TODO: SERVER-85773 Reenable the following test once `cloneCollectionAsCapped` is supported on any shard
     - jstests/core/ddl/clone_collection_as_capped.js
 
-    # TODO: SERVER-113468 remove this exclusion.
+    # TODO: SERVER-113591 Remove this exclusion.
     - jstests/core/timeseries/query/timeseries_raw_data_inner_pipelines.js
 
   exclude_with_any_tags:

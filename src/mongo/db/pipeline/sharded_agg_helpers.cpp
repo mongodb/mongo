@@ -216,10 +216,10 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     auto shardCommand = cmdForShards.freeze().toBson();
     auto filteredCommand = CommandHelpers::filterCommandRequestForPassthrough(shardCommand);
 
-    // TODO(SERVER-108928): rawData should be declared as should_forward_to_shards: true
-    // If rawData was explicitly set on the aggregate command, it will have been stripped by the
-    // call to filterCommandRequestForPassthrough. For rawData operations, it will be added back
-    // by the egress hook. However, if sending a rawData aggregate command from a non-rawData
+    // TODO(SERVER-108928): 'rawData' should be declared as should_forward_to_shards: true
+    // If 'rawData' was explicitly set on the aggregate command, it will have been stripped by the
+    // call to filterCommandRequestForPassthrough. For 'rawData' operations, it will be added back
+    // by the egress hook. However, if sending a 'rawData' aggregate command from a non-'rawData'
     // operation, we must add it back for it to be included in the outgoing network request.
     auto cmdRawData = shardCommand.getField(GenericArguments::kRawDataFieldName);
     if (!cmdRawData.eoo()) {
