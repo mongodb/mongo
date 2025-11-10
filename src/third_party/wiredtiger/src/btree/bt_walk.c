@@ -108,12 +108,13 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
   int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool, bool *), void *func_cookie,
   uint32_t flags)
 {
+    struct timespec start, stop;
     WT_BTREE *btree;
     WT_DECL_RET;
     WT_PAGE_INDEX *pindex;
     WT_REF *couple, *ref, *ref_orig;
     WT_REF_STATE current_state;
-    uint64_t restart_sleep, restart_yield;
+    uint64_t restart_sleep, restart_yield, time_diff_ms;
     uint32_t slot;
     bool empty_internal, prev, skip;
 
@@ -187,6 +188,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
      */
     WT_ENTER_PAGE_INDEX(session);
 
+    __wt_epoch(session, &start);
     /* If no page is active, begin a walk from the start/end of the tree. */
     if ((ref = ref_orig) == NULL) {
         if (0) {
@@ -391,6 +393,11 @@ descend:
     }
 
 done:
+    __wt_epoch(session, &stop);
+    time_diff_ms = WT_TIMEDIFF_MS(stop, start);
+    if (time_diff_ms > 10 * WT_THOUSAND)
+        __wt_verbose_warning(session, WT_VERB_READ,
+          "tree walk took more than 10 seconds (%" PRIu64 "ms)", time_diff_ms);
 err:
     WT_TRET(__wt_page_release(session, couple, flags));
     WT_TRET(__wt_page_release(session, ref_orig, flags));

@@ -124,7 +124,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      */
     if (ref->page != NULL && !__wt_page_evict_clean(ref->page)) {
         WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
-        WT_RET(__wt_curhs_cache(session));
+        ret = __wt_curhs_cache(session);
+        if (ret != 0) {
+            WT_ASSERT(session, locked);
+            WT_REF_SET_STATE(ref, previous_state);
+            return (ret);
+        }
     }
     (void)__wt_atomic_addv32(&btree->evict_busy, 1);
     ret = __wt_evict(session, ref, previous_state, evict_flags);
@@ -316,12 +321,14 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
     WT_PAGE *page;
     WT_REF_STATE current_state;
     WT_TXN *txn;
+    size_t sleep_count;
     uint64_t sleep_usecs, yield_cnt;
     int force_attempts;
     bool busy, cache_work, evict_skip, read_from_disk, stalled, wont_need;
 
     btree = S2BT(session);
     txn = session->txn;
+    sleep_count = 0;
 
     if (F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE))
         LF_SET(WT_READ_IGNORE_CACHE_SIZE);
@@ -332,6 +339,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
      */
     if (!LF_ISSET(WT_READ_CACHE)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested);
+        if (WT_IS_HS(session->dhandle))
+            WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested_hs);
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
             WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested_internal);
         else
@@ -562,6 +571,10 @@ skip_evict:
                 continue;
         }
         __wt_spin_backoff(&yield_cnt, &sleep_usecs);
+        ++sleep_count;
+        if (sleep_count > 10 * WT_THOUSAND && sleep_count % (10 * WT_THOUSAND) == 0)
+            __wt_verbose_warning(session, WT_VERB_READ,
+              "sleep to wait the page %p for %" WT_SIZET_FMT " times", (void *)ref, sleep_count);
         WT_STAT_CONN_INCRV(session, page_sleep, sleep_usecs);
     }
 }

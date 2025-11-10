@@ -215,4 +215,4 @@ class test_truncate18(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         # Now verify the tree. In the problem scenario described above, this will assert.
-        self.session.verify(ds.uri, None)
+        self.verifyUntilSuccess(uri=ds.uri)

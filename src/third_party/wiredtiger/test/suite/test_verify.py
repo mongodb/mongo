@@ -222,7 +222,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         offset = 0
         lines = open('dump.out').readlines()
         for line in lines:
-            m = re.search('(\d+)-(\d+).*row-store leaf', line)
+            m = re.search(r'(\d+)-(\d+).*row-store leaf', line)
             if m:
                 offset = int((int(m.group(2)) - int(m.group(1)))/2)
                 break

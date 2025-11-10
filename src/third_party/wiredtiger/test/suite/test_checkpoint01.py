@@ -97,7 +97,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
     # should, and no other checkpoints exist.
     def check(self):
         # Physically verify the file, including the individual checkpoints.
-        self.session.verify(self.uri, None)
+        self.verifyUntilSuccess()
 
         for checkpoint_name, entry in self.checkpoints.items():
             if entry[1] == 0:

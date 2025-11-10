@@ -88,14 +88,14 @@ __gen_drain_callback(
     struct timespec stop;
     WT_CONNECTION_IMPL *conn;
     WT_GENERATION_DRAIN_COOKIE *cookie;
-    uint64_t time_diff_ms, v;
-#ifdef HAVE_DIAGNOSTIC
     WT_VERBOSE_LEVEL verbose_orig_level[WT_VERB_NUM_CATEGORIES];
-    WT_CLEAR(verbose_orig_level);
-#endif
+    uint64_t time_diff_ms, v;
+    bool timeout_triggered;
 
+    WT_CLEAR(verbose_orig_level);
     cookie = (WT_GENERATION_DRAIN_COOKIE *)cookiep;
     conn = S2C(session);
+    timeout_triggered = false;
 
     for (;;) {
         /* Ensure we only read the value once. */
@@ -108,23 +108,20 @@ __gen_drain_callback(
          * The thread's generation may be 0 (that is, not set).
          */
         if (v == 0 || v >= cookie->base.target_generation) {
-#ifdef HAVE_DIAGNOSTIC
             /*
-             * We turn on additional logging just before generation drain times out, but it's
-             * possible that we get unblocked after increasing the traces but before hitting the
-             * timeout. If this occurs set verbose levels back to their original values so we can
-             * continue normal operation.
+             * We turn on additional logging just before generation drain times out, restore the
+             * original verbose level after we have been unblocked.
              */
-            if (cookie->verbose_timeout_flags == true) {
-                if (cookie->base.which == WT_GEN_EVICT)
+            if (cookie->verbose_timeout_flags) {
+                if (cookie->base.which == WT_GEN_EVICT) {
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICTION);
-                else if (cookie->base.which == WT_GEN_CHECKPOINT) {
+                    WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_RECONCILE);
+                } else if (cookie->base.which == WT_GEN_CHECKPOINT) {
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT);
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT_CLEANUP);
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT_PROGRESS);
                 }
             }
-#endif
             break;
         }
         /* If we're waiting on ourselves, we're deadlocked. */
@@ -165,15 +162,16 @@ __gen_drain_callback(
             if (conn->gen_drain_timeout_ms == 0)
                 continue;
 
-#ifdef HAVE_DIAGNOSTIC
-            /* In diagnostic mode, enable extra logs 20ms before reaching the timeout. */
+            /* Enable extra logs 20ms before reaching the timeout. */
             if (!cookie->verbose_timeout_flags &&
               (conn->gen_drain_timeout_ms < 20 ||
                 time_diff_ms > (conn->gen_drain_timeout_ms - 20))) {
-                if (cookie->base.which == WT_GEN_EVICT)
+                if (cookie->base.which == WT_GEN_EVICT) {
                     WT_VERBOSE_SET_AND_SAVE(
                       session, verbose_orig_level, WT_VERB_EVICTION, WT_VERBOSE_DEBUG_1);
-                else if (cookie->base.which == WT_GEN_CHECKPOINT) {
+                    WT_VERBOSE_SET_AND_SAVE(
+                      session, verbose_orig_level, WT_VERB_RECONCILE, WT_VERBOSE_DEBUG_1);
+                } else if (cookie->base.which == WT_GEN_CHECKPOINT) {
                     WT_VERBOSE_SET_AND_SAVE(
                       session, verbose_orig_level, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_1);
                     WT_VERBOSE_SET_AND_SAVE(
@@ -182,13 +180,16 @@ __gen_drain_callback(
                       session, verbose_orig_level, WT_VERB_CHECKPOINT_PROGRESS, WT_VERBOSE_DEBUG_1);
                 }
                 cookie->verbose_timeout_flags = true;
-                /* Now we have enabled more logs, spin another time to get some information. */
+                /* Now we have enabled more logs, continue waiting to get more information. */
                 continue;
             }
-#endif
-            if (time_diff_ms >= conn->gen_drain_timeout_ms) {
+
+            if (!timeout_triggered && time_diff_ms >= conn->gen_drain_timeout_ms) {
                 __wt_verbose_error(session, WT_VERB_GENERATION, "%s generation drain timed out",
                   __gen_name(cookie->base.which));
+#ifndef HAVE_DIAGNOSTIC
+                timeout_triggered = true;
+#endif
                 WT_ASSERT(session, false);
             }
         }

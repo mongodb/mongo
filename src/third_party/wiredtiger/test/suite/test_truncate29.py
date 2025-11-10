@@ -97,4 +97,4 @@ class test_truncate29(wttest.WiredTigerTestCase):
         pinned_cursor.close()
         s1.rollback_transaction()
 
-        self.session.verify(self.uri, None)
+        self.verifyUntilSuccess()
