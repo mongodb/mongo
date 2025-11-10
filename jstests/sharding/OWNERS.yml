@@ -136,3 +136,6 @@ filters:
   - "reporting_compound_wildcard_index_prefixed_by_shard_key.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "availability_canaries_under_transitions.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
