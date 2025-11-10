@@ -107,6 +107,7 @@ MONGO_STATIC_ASSERT(sizeof(kTypeInfoTable) == 32);
 
 constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
 constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
+constexpr ErrorCodes::Error InvalidBSONColumn = ErrorCodes::InvalidBSONColumn;
 
 class DefaultValidator {
 public:
@@ -116,7 +117,7 @@ public:
 
     void popLevel() {}
 
-    BSONValidateModeEnum validateMode() {
+    BSONValidateModeEnum validateMode() const {
         return BSONValidateModeEnum::kDefault;
     }
 };
@@ -124,141 +125,37 @@ public:
 class ExtendedValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
-        // Checks the field name before the element, if inside array.
-        checkArrIndex(ptr);
         // Increments the pointer to the actual element value.
         BSONElementValue bsonElemVal(ptr + offsetToValue);
         switch (type) {
-            case stdx::to_underlying(BSONType::undefined):
-            case stdx::to_underlying(BSONType::dbRef):
-            case stdx::to_underlying(BSONType::symbol):
-            case stdx::to_underlying(BSONType::codeWScope):
-                uasserted(NonConformantBSON, fmt::format("Use of deprecated BSON type {}", type));
-                break;
-            case stdx::to_underlying(BSONType::array):
-                addIndexLevel(true /* isArr */);
-                break;
-            case stdx::to_underlying(BSONType::object):
-                addIndexLevel(false /* isArr */);
-                break;
-            case stdx::to_underlying(BSONType::regEx): {
-                _checkRegexOptions(bsonElemVal);
-                break;
-            }
             case stdx::to_underlying(BSONType::binData): {
-                auto binData = bsonElemVal.BinData();
-                auto subtype = binData.type;
-                switch (subtype) {
-                    case BinDataType::BinDataGeneral:
-                    case BinDataType::Function:
-                    case BinDataType::Sensitive:
-                    case BinDataType::bdtCustom:
-                    case BinDataType::Vector:
-                        break;
-                    case BinDataType::Column:
-                        break;
-                    case BinDataType::ByteArrayDeprecated:
-                    case BinDataType::bdtUUID:
-                        uasserted(
-                            NonConformantBSON,
-                            fmt::format("Use of deprecated BSON binary data subtype {}", subtype));
-                        break;
-                    case BinDataType::newUUID: {
-                        constexpr int32_t UUIDLength = 16;
-                        auto l = binData.length;
-                        uassert(ErrorCodes::NonConformantBSON,
-                                fmt::format(
-                                    "BSON UUID length should be 16 bytes. Found {} instead.", l),
-                                l == UUIDLength);
+                const auto binData = bsonElemVal.BinData();
+                switch (binData.type) {
+                    case BinDataType::Column: {
+                        // Check for exceptions when decompressing.
+                        // Calling size() decompresses the entire column.
+                        BSONColumn(BSONElement(ptr)).size();
                         break;
                     }
-                    case BinDataType::MD5Type: {
-                        constexpr int32_t md5Length = 16;
-                        auto l = binData.length;
-                        uassert(NonConformantBSON,
-                                fmt::format("MD5 must be 16 bytes, got {} instead.", l),
-                                l == md5Length);
-                        break;
-                    }
-                    case BinDataType::Encrypt: {
+                    case BinDataType::Encrypt:
                         _checkEncryptedBSONValue(binData);
                         break;
-                    }
                     default:
-                        uasserted(ErrorCodes::NonConformantBSON,
-                                  fmt::format("Unknown BSON Binary Data Type {}", subtype));
+                        // No additional checks on other BinTypes
+                        break;
                 }
                 break;
             }
         }
     }
 
-    void checkDuplicateFieldName() {}
+    void popLevel() {}
 
-    void popLevel() {
-        if (!indexCount.empty()) {
-            indexCount.pop_back();
-        }
-    }
-
-    BSONValidateModeEnum validateMode() {
+    BSONValidateModeEnum validateMode() const {
         return BSONValidateModeEnum::kExtended;
     }
 
 private:
-    struct Level {
-        DecimalCounter<uint32_t> counter;  // Counter used to check whether indexes are sequential.
-        bool isArr;                        // Indicates whether level is an array or other (object).
-    };
-
-    void addIndexLevel(bool isArr) {
-        if (isArr) {
-            indexCount.push_back(Level{DecimalCounter<uint32_t>(0), true /* isArr */});
-        } else {
-            indexCount.push_back(Level{DecimalCounter<uint32_t>(0), false /* isArr */});
-        }
-    }
-
-    bool inArr() {
-        return !indexCount.empty() && indexCount.back().isArr;
-    }
-
-    void checkArrIndex(const char* ptr) {
-        if (!inArr()) {
-            return;
-        }
-        // Checks the actual index, skipping the type byte.
-        auto actualIndex = StringData(ptr + sizeof(char));
-        uassert(NonConformantBSON,
-                fmt::format("Indices of BSON Array are invalid. Expected {}, but got {}.",
-                            (StringData)indexCount.back().counter,
-                            actualIndex),
-                indexCount.back().counter == actualIndex);
-        ++indexCount.back().counter;
-    }
-
-    void _checkRegexOptions(const BSONElementValue& regex) {
-        // Checks that the options are in ascending alphabetical order and that they're all valid.
-        const static std::string validRegexOptions("ilmsux");
-        std::string options = regex.RegexFlags();
-        for (size_t i = 0; i < options.size(); i++) {
-            char option = options.at(i);
-            uassert(
-                NonConformantBSON,
-                fmt::format("Valid regex options are [ i, l, m, s, u, x], but found '{}' instead.",
-                            option),
-                validRegexOptions.find(option) != std::string::npos);
-            if (i > 0) {
-                char previousOption = options.at(i - 1);
-                uassert(NonConformantBSON,
-                        fmt::format("Regex options should be in ascending alphabetical order. "
-                                    "Found {} instead.",
-                                    options),
-                        option > previousOption);
-            }
-        }
-    }
-
     void _checkEncryptedBSONValue(const BSONBinData& binData) {
         constexpr uint32_t UUIDLength = 16;
         constexpr int32_t minLength = sizeof(uint8_t) + UUIDLength + sizeof(uint8_t);
@@ -310,102 +207,157 @@ private:
             }
         }
     }
-
-protected:
-    // Behaves like a stack, used to validate array index count.
-    std::vector<Level> indexCount;
 };
 
 class FullValidator : private ExtendedValidator {
 public:
+    FullValidator() noexcept {
+        _objFrames.push_back({.type = BSONType::object, .indexCounter = 0});
+    }
+
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
-        registerFieldName(ptr + 1 /* fieldName */, offsetToValue - 1 /* length */);
+        // Validate that array indices are monotonically increasing base-10 strings, and field
+        // names are UTF8 strings.
+        _checkFieldName(ptr);
+
         ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
         // Increments the pointer to the actual element value.
-        BSONElementValue bsonElemVal(ptr + offsetToValue);
+        const BSONElementValue bsonElemVal(ptr + offsetToValue);
         switch (type) {
-            case stdx::to_underlying(BSONType::array): {
-                objFrames.push_back({std::vector<StringData>(), false});
+            case stdx::to_underlying(BSONType::array):
+            case stdx::to_underlying(BSONType::object):
+                _objFrames.push_back({.type = BSONType(type), .indexCounter = 0});
                 break;
-            }
-            case stdx::to_underlying(BSONType::object): {
-                objFrames.push_back({std::vector<StringData>(), true});
-                break;
-            };
             case stdx::to_underlying(BSONType::binData): {
-                auto subtype = bsonElemVal.BinData().type;
-                switch (subtype) {
-                    case BinDataType::Column: {
-                        // Check for exceptions when decompressing.
-                        // Calling size() decompresses the entire column.
-                        try {
-                            BSONColumn(BSONElement(ptr)).size();
-                        } catch (DBException& e) {
-                            uasserted(
-                                NonConformantBSON,
-                                str::stream()
-                                    << "Exception occurred while decompressing a BSON column: "
-                                    << e.toString());
-                        }
+                const auto binData = bsonElemVal.BinData();
+                switch (binData.type) {
+                    case BinDataType::newUUID: {
+                        constexpr int32_t UUIDLength = 16;
+                        auto l = binData.length;
+                        uassert(ErrorCodes::NonConformantBSON,
+                                fmt::format(
+                                    "BSON UUID length should be 16 bytes. Found {} instead.", l),
+                                l == UUIDLength);
                         break;
                     }
+                    case BinDataType::MD5Type: {
+                        constexpr int32_t md5Length = 16;
+                        auto l = binData.length;
+                        uassert(NonConformantBSON,
+                                fmt::format("MD5 must be 16 bytes, got {} instead.", l),
+                                l == md5Length);
+                        break;
+                    }
+                    case BinDataType::ByteArrayDeprecated:
+                    case BinDataType::bdtUUID:
+                        uasserted(NonConformantBSON,
+                                  fmt::format("Use of deprecated BSON binary data subtype {} ({})",
+                                              typeName(BinDataType(binData.type)),
+                                              binData.type));
+                        break;
                     default:
                         break;
                 }
                 break;
             }
-            case stdx::to_underlying(BSONType::string): {
+            case stdx::to_underlying(BSONType::string):
                 // Increment pointer to actual value and then four more to skip size.
-                checkUTF8Char(bsonElemVal.String());
-            }
+                _checkUTF8Char(bsonElemVal.String());
+                break;
+            case stdx::to_underlying(BSONType::regEx):
+                _checkRegexOptions(bsonElemVal);
+                break;
+            case stdx::to_underlying(BSONType::undefined):
+            case stdx::to_underlying(BSONType::dbRef):
+            case stdx::to_underlying(BSONType::symbol):
+            case stdx::to_underlying(BSONType::codeWScope):
+                uasserted(NonConformantBSON,
+                          fmt::format("Use of deprecated BSON type {} ({})",
+                                      typeName(BSONType(type)),
+                                      type));
+                break;
         }
-    }
-
-    void checkDuplicateFieldName() {
-        invariant(!objFrames.empty());
-        auto& curr = objFrames.back().first;
-        // If curr is not an object frame, it will always be empty, so no need to check.
-        if (curr.empty()) {
-            objFrames.pop_back();
-            return;
-        }
-        invariant(objFrames.back().second);
-        std::sort(curr.begin(), curr.end());
-        auto duplicate = std::adjacent_find(curr.begin(), curr.end());
-        uassert(NonConformantBSON,
-                fmt::format("A BSON document contains a duplicate field name : {}", *duplicate),
-                duplicate == curr.end());
-        objFrames.pop_back();
     }
 
     void popLevel() {
-        ExtendedValidator::popLevel();
-        checkDuplicateFieldName();
+        if (_objFrames.size() > 0) {
+            if (_inObj()) {
+                // This was benchmarked against the alternative of using set, unordered_set, and
+                // flat_hash_set, it was found to be significantly more performant. For the
+                // typical case, BSON documents are expected to be conformant and have unique
+                // keys, so the earlier detection permitted by using a set data structure is not
+                // expected to be beneficial.
+                auto& cur = _objFrames.back();
+                std::sort(cur.fieldNames.begin(), cur.fieldNames.end());
+                const auto dup = std::adjacent_find(cur.fieldNames.begin(), cur.fieldNames.end());
+                uassert(
+                    NonConformantBSON,
+                    fmt::format("Duplicate key found \"{}\", element names must be unique.", *dup),
+                    dup == cur.fieldNames.end());
+            }
+            _objFrames.pop_back();
+        }
     }
 
-    BSONValidateModeEnum validateMode() {
+    BSONValidateModeEnum validateMode() const {
         return BSONValidateModeEnum::kFull;
     }
 
 private:
-    // A given frame is an object if and only if frame.second == true.
-    std::vector<std::pair<std::vector<StringData>, bool>> objFrames = {
-        {std::vector<StringData>(), true}};
+    struct ObjectFrame {
+        BSONType type;
+        DecimalCounter<uint32_t> indexCounter;
+        std::vector<StringData> fieldNames;
+    };
 
-    void registerFieldName(const char* ptr, uint32_t length) {
-        // Check the field name is UTF-8 encoded.
-        StringData fieldName(ptr, length);
-        checkUTF8Char(fieldName);
-        if (objFrames.back().second) {
-            objFrames.back().first.emplace_back(fieldName);
-        };
-    }
-
-    void checkUTF8Char(StringData str) {
+    void _checkUTF8Char(StringData str) {
         uassert(NonConformantBSON,
                 "Found string that doesn't follow UTF-8 encoding.",
                 str::validUTF8(str));
     }
+
+    bool _inArr() const {
+        return _objFrames.size() > 0 && _objFrames.back().type == BSONType::array;
+    }
+
+    bool _inObj() const {
+        return _objFrames.size() > 0 && _objFrames.back().type == BSONType::object;
+    }
+
+    void _checkFieldName(const char* ptr) {
+        if (_inArr()) {
+            // Checks the actual index field value, starting after the type byte
+            const StringData actualIndex(ptr + sizeof(char));
+            uassert(NonConformantBSON,
+                    fmt::format("Indices of BSON Array are invalid. Expected {}, but got {}.",
+                                StringData(_objFrames.back().indexCounter),
+                                actualIndex),
+                    _objFrames.back().indexCounter == actualIndex);
+            ++_objFrames.back().indexCounter;
+        } else if (_inObj()) {
+            const StringData fieldName(ptr + sizeof(char));
+            _checkUTF8Char(fieldName);
+            _objFrames.back().fieldNames.push_back(fieldName);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
+
+    void _checkRegexOptions(const BSONElementValue& regex) {
+        // Checks that the options are in ascending alphabetical order and that they're all
+        // valid.
+        static constexpr StringData validRegexOptions("ilmsux");
+        const StringData opt = regex.RegexFlags();
+        uassert(NonConformantBSON,
+                fmt::format("Bad regex options {:?}: Only {:?} allowed", opt, validRegexOptions),
+                opt.find_first_not_of(validRegexOptions) == std::string::npos);
+        uassert(NonConformantBSON,
+                fmt::format("Bad regex options {:?}: Must be sorted", opt),
+                std::is_sorted(opt.begin(), opt.end()));
+    }
+
+    // Behaves like a stack, used to validate array index count.
+    std::vector<ObjectFrame> _objFrames;
 };
 
 template <bool precise>
@@ -514,8 +466,8 @@ private:
         typename std::conditional<precise, std::vector<Frame>, std::array<Frame, 32>>::type;
 
     struct Cursor {
-        /* Also requires remaining buf after the skip (both BSONColumn and BSONObj guarantee this
-           by having at minimum a trailing EOO) */
+        /* Also requires remaining buf after the skip (both BSONColumn and BSONObj guarantee
+           this by having at minimum a trailing EOO) */
         void skip(size_t len) {
             uassert(InvalidBSON, "BSON size is larger than buffer size", (ptr += len) < end);
         }
@@ -632,7 +584,8 @@ private:
 
     void _maybePopCodeWithScope(Cursor cursor) {
         if constexpr (precise) {
-            // When ending the scope of a CodeWScope, pop the extra dummy frame and check its size.
+            // When ending the scope of a CodeWScope, pop the extra dummy frame and check its
+            // size.
             if (_currFrame != _frames.begin() &&
                 (_currFrame - 1)->elem.type() == BSONType::codeWScope) {
                 invariant(_popFrame());
@@ -671,8 +624,9 @@ private:
 
     MONGO_COMPILER_NOINLINE void _validateIterative(Cursor cursor) {
         do {
-            // Use the fact that the EOO byte is 0, just like the end of string, so checking for EOO
-            // is same as finding len == 0. The cursor cannot point past EOO, so the strlen is safe.
+            // Use the fact that the EOO byte is 0, just like the end of string, so checking for
+            // EOO is same as finding len == 0. The cursor cannot point past EOO, so the strlen
+            // is safe.
             uassert(InvalidBSON, "BSON size is larger than buffer size", cursor.ptr < cursor.end);
             while (size_t len = cursor.strlen()) {
                 uint8_t type = *cursor.ptr;
@@ -687,7 +641,8 @@ private:
                 _validator.checkNonConformantElem(elemStart, len + 1, type);
 
                 if constexpr (precise) {
-                    // See if the _id field was just validated. If so, set the global scope element.
+                    // See if the _id field was just validated. If so, set the global scope
+                    // element.
                     if (_currFrame == _frames.begin() && StringData(_currElem + 1) == "_id"_sd)
                         _currFrame->elem = BSONElement(_currElem);  // This is fully validated now.
                 }
@@ -699,8 +654,7 @@ private:
             _maybePopCodeWithScope(cursor);
         } while (_popFrame());  // Finished when there are no frames left.
 
-        // Check the top level field names.
-        _validator.checkDuplicateFieldName();
+        _validator.popLevel();
     }
 
     /**
@@ -740,8 +694,8 @@ Status _doValidate(const char* originalBuffer,
                    BSONValidator validator,
                    ValidationVersion validationVersion) {
     // First try validating using the fast but less precise version. That version will return
-    // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases and
-    // actual failures will rerun the precise version that gives a detailed error context.
+    // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases
+    // and actual failures will rerun the precise version that gives a detailed error context.
     if (MONGO_likely((ValidateBuffer<false, BSONValidator>(
                           originalBuffer, maxLength, validator, validationVersion)
                           .validate()
@@ -811,13 +765,15 @@ public:
                     ptr += size;
                 } else if (bsoncolumn::isInterleavedStartControlByte(control)) {
                     // interleaved objects begin with a reference object, and then a series
-                    // of diff blocks for followup objects, ending with an EOO. Nesting interleaved
-                    // mode is not allowed.
-                    uassert(NonConformantBSON, "Nested interleaved mode", !interleavedMode);
-                    ptr++;
-                    uassert(NonConformantBSON,
-                            "Invalid reference object for interleaved mode",
-                            validateBSON(ptr, end - ptr, mode).isOK());
+                    // of diff blocks for followup objects, ending with an EOO. Nesting
+                    // interleaved mode is not allowed.
+                    uassert(InvalidBSONColumn, "Nested interleaved mode", !interleavedMode);
+                    ++ptr;
+                    const auto validateResult = validateBSON(ptr, end - ptr, mode);
+                    uassert(InvalidBSONColumn,
+                            fmt::format("Invalid reference object for interleaved mode, {}",
+                                        validateResult.reason()),
+                            validateResult.isOK());
                     // we now know due to validateBSON that it is safe to interpret *ptr
                     BSONObj reference(ptr);
                     ptr += reference.objsize();
@@ -826,7 +782,7 @@ public:
                     // Simple8b block sequence, just check for memory overflow of block count
                     uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
                     int size = sizeof(uint64_t) * numBlocks;
-                    uassert(NonConformantBSON,
+                    uassert(InvalidBSONColumn,
                             "BSONColumn blocks exceed buffer size",
                             ptr + size + 1 <= end);
                     ptr += 1 + size;
@@ -847,9 +803,10 @@ Status _doValidateColumn(const char* originalBuffer,
                          BSONValidateModeEnum mode,
                          ValidationVersion validationVersion) {
     if constexpr (precise) {
-        // First try validating using the fast but less precise version. That version will return
-        // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases
-        // and actual failures will rerun the precise version that gives a detailed error context.
+        // First try validating using the fast but less precise version. That version will
+        // return a not-OK status for objects with CodeWScope or nesting exceeding 32 levels.
+        // These cases and actual failures will rerun the precise version that gives a detailed
+        // error context.
         if (MONGO_likely(ColumnValidator<false>::doValidateBSONColumn(
                              originalBuffer, maxLength, mode, validationVersion)
                              .isOK()))

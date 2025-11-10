@@ -93,15 +93,24 @@ BSONObj buildSampleObj(uint64_t i) {
     // clang-format on
 }
 
-BSONObj buildWideObj(uint64_t i, int numFields) {
-    std::vector<std::variant<int, std::string>> possibleValues;
-    possibleValues.reserve(6);
+BSONObj buildDeepObj(uint64_t i, int numFields, int maxNesting, size_t possibleValueIndex = 0) {
+    std::vector<std::variant<int, std::string, BSONObj>> possibleValues;
+    possibleValues.reserve(8);
     possibleValues.emplace_back(pseudoRandomAge(i));
     possibleValues.emplace_back(static_cast<int>(i));
     possibleValues.emplace_back(pseudoRandomZipCode(i));
     possibleValues.emplace_back(pseudoRandom7Digits(i));
     possibleValues.emplace_back(pseudoRandomPhoneNo(i));
     possibleValues.emplace_back(pseudoRandomLongStr(i));
+    if (maxNesting > 0) {
+        possibleValues.emplace_back(buildDeepObj(i, numFields, maxNesting - 1, possibleValueIndex));
+
+        BSONArrayBuilder arrBuilder;
+        for (int i = 0; i < 5; ++i) {
+            arrBuilder.append(buildDeepObj(i, numFields, 0));
+        }
+        possibleValues.emplace_back(arrBuilder.arr());
+    }
 
     BSONObjBuilder builder;
     for (int j = 0; j < numFields; ++j) {
@@ -111,8 +120,8 @@ BSONObj buildWideObj(uint64_t i, int numFields) {
         std::string fieldName = fmt::format("{:08x}", hash);
 
         // Round robin through the list of possible values computed previously, dealing with the
-        // fact that they may be either int or string.
-        auto& value = possibleValues[j % possibleValues.size()];
+        // fact that they may be either int or string or nested object or array.
+        auto& value = possibleValues[possibleValueIndex++ % possibleValues.size()];
         std::visit(
             OverloadedVisitor{
                 [&builder, &fieldName](const auto& v) { builder.append(fieldName, v); },
@@ -308,14 +317,15 @@ void BM_validate_contents(benchmark::State& state) {
  * The template parameter 'M' specifies the validation mode (default, extended, or full).
  */
 template <BSONValidateModeEnum M>
-void BM_validateWideObj(benchmark::State& state) {
+void BM_validateObj(benchmark::State& state) {
     auto arrayLen = state.range(0);
     auto numFields = state.range(1);
+    auto nestingLimit = state.range(2);
 
     BSONArrayBuilder builder;
     size_t totalSize = 0;
-    for (auto i = 0; i < arrayLen; i++) {
-        builder.append(buildWideObj(i, numFields));
+    for (auto i = 0; i < arrayLen; ++i) {
+        builder.append(buildDeepObj(i, numFields, nestingLimit));
     }
     BSONObj array = builder.done();
 
@@ -327,6 +337,7 @@ void BM_validateWideObj(benchmark::State& state) {
 
     for (auto _ : state) {
         benchmark::ClobberMemory();
+
         benchmark::DoNotOptimize(validateBSON(array.objdata(), array.objsize(), M));
         totalSize += array.objsize();
     }
@@ -344,12 +355,24 @@ BENCHMARK(BM_bsonIteratorSortedConstruction)->Ranges({{{1}, {100'000}}});
 // BSON validation benchmarks.
 BENCHMARK(BM_validate)->Ranges({{{1}, {1'000}}});
 BENCHMARK(BM_validate_contents)->Ranges({{{1}, {1'000}}});
-BENCHMARK_TEMPLATE(BM_validateWideObj, BSONValidateModeEnum::kDefault)
-    ->Ranges({{64, 512}, {50, 1'000}});
-BENCHMARK_TEMPLATE(BM_validateWideObj, BSONValidateModeEnum::kExtended)
-    ->Ranges({{64, 512}, {50, 1'000}});
-BENCHMARK_TEMPLATE(BM_validateWideObj, BSONValidateModeEnum::kFull)
-    ->Ranges({{64, 512}, {50, 1'000}});
+BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kDefault)
+    ->Ranges({{64, 512}, {50, 1'000}, {0, 0}})
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kExtended)
+    ->Ranges({{64, 512}, {50, 1'000}, {0, 0}})
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kFull)
+    ->Ranges({{64, 512}, {50, 1'000}, {0, 0}})
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kDefault)
+    ->Ranges({{64, 512}, {10, 20}, {2, 5}})
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kExtended)
+    ->Ranges({{64, 512}, {10, 20}, {2, 5}})
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kFull)
+    ->Ranges({{64, 512}, {10, 20}, {2, 5}})
+    ->Unit(benchmark::kMicrosecond);
 
 void BM_objBuilderAppendInt(benchmark::State& state) {
     int n = state.range(0);

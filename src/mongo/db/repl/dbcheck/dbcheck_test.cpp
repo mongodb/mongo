@@ -163,7 +163,7 @@ TEST_F(DbCheckTest, DbCheckDocumentWithInvalidUuid) {
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
         "" /* secondaryIndex */,
         false /* skipLookupForExtraKeys */,
-        BSONValidateModeEnum::kExtended);
+        BSONValidateModeEnum::kFull);
     ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
     // Shut down the health log writer so that the writes get flushed to the health log collection.
