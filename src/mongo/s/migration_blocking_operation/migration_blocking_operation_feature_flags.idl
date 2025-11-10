@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo::migration_blocking_operation"
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

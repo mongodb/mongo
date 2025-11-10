@@ -46,6 +46,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -75,7 +76,7 @@ class ScopedSplitMergeChunk;
  *   - Move || Split/Merge (same collection): The second operation will block behind the first
  *   - Move/Split/Merge || Split/Merge (for different collections): Can proceed concurrently
  */
-class ActiveMigrationsRegistry {
+class MONGO_MOD_NEEDS_REPLACEMENT ActiveMigrationsRegistry {
     ActiveMigrationsRegistry(const ActiveMigrationsRegistry&) = delete;
     ActiveMigrationsRegistry& operator=(const ActiveMigrationsRegistry&) = delete;
 
@@ -349,7 +350,7 @@ private:
  * Object of this class is returned from the registerSplitOrMergeChunk call of the active migrations
  * registry.
  */
-class ScopedSplitMergeChunk {
+class MONGO_MOD_PUBLIC ScopedSplitMergeChunk {
 public:
     ScopedSplitMergeChunk(ActiveMigrationsRegistry* registry, const NamespaceString& nss);
     ~ScopedSplitMergeChunk();

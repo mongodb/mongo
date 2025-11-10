@@ -33,6 +33,9 @@
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 /**
