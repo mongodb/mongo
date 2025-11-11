@@ -558,7 +558,7 @@ public:
     }
 };
 
-// Test stages for static properties
+// Test stages for static properties (position)
 static constexpr std::string_view kNoneName = "$none";
 static constexpr std::string_view kFirstName = "$first";
 static constexpr std::string_view kLastName = "$last";

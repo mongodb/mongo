@@ -44,8 +44,42 @@ enums:
             kNone: "none"
             kFirst: "first"
             kLast: "last"
+    MongoExtensionPrivilegeResourcePattern:
+        description: What resource the privilege applies to.
+        type: string
+        values:
+            kNamespace: "namespace"
+    MongoExtensionPrivilegeAction:
+        description: >-
+            Allowed actions for this stage. Currently, these are constrained to read-only actions
+            on a specific namespace.
+        type: string
+        values:
+            kFind: "find"
+            kListIndexes: "listIndexes"
+            kListSearchIndexes: "listSearchIndexes"
+            kPlanCacheRead: "planCacheRead"
+            kCollStats: "collStats"
+            kIndexStats: "indexStats"
 
 structs:
+    MongoExtensionPrivilegeActionEntry:
+        description: >-
+            Represents one allowed action entry in the requiredPrivilege field.
+            Each entry wraps a MongoExtensionPrivilegeAction enum to satisfy the IDL restriction
+            that arrays cannot directly contain enums.
+        fields:
+            action:
+                type: MongoExtensionPrivilegeAction
+    MongoExtensionRequiredPrivilege:
+        description: A constrained privilege specification.
+        fields:
+            resourcePattern:
+                description: Kinds of resources targetable by the access control system.
+                type: MongoExtensionPrivilegeResourcePattern
+            actions:
+                description: Actions required on the target.
+                type: array<MongoExtensionPrivilegeActionEntry>
     MongoExtensionStaticProperties:
         description: >-
             Properties specified by the extension that remain static throughout its lifetime, such as
@@ -58,3 +92,6 @@ structs:
                 type: MongoExtensionPositionRequirement
                 optional: true
                 default: kNone
+            requiredPrivileges:
+                type: array<MongoExtensionRequiredPrivilege>
+                optional: true

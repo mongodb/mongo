@@ -126,7 +126,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
         },
         [&](AggStageAstNodeHandle handle) {
             outExpanded.emplace_back(std::make_unique<LiteParsedExpanded>(
-                std::string(handle.getName()), std::move(handle)));
+                std::string(handle.getName()), std::move(handle), nss));
         });
 
     return outExpanded;

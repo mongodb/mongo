@@ -694,6 +694,153 @@ public:
         return std::make_unique<ExpandToSearchAggStageParseNode>();
     }
 };
+
+class SingleActionRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    static constexpr std::string_view kName = "$singleAction";
+
+    SingleActionRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiredPrivileges" << BSON_ARRAY(BSON(
+                        "resourcePattern" << "namespace"
+                                          << "actions" << BSON_ARRAY(BSON("action" << "find")))));
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<SingleActionRequiredPrivilegesAggStageAstNode>();
+    }
+};
+
+class MultipleActionsRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    static constexpr std::string_view kName = "$multipleActions";
+
+    MultipleActionsRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiredPrivileges" << BSON_ARRAY(BSON(
+                        "resourcePattern" << "namespace"
+                                          << "actions"
+                                          << BSON_ARRAY(BSON("action" << "listIndexes")
+                                                        << BSON("action" << "planCacheRead")))));
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<MultipleActionsRequiredPrivilegesAggStageAstNode>();
+    }
+};
+
+class MultipleRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    static constexpr std::string_view kName = "$multiplePrivileges";
+
+    MultipleRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiredPrivileges" << BSON_ARRAY(
+                        BSON("resourcePattern" << "namespace"
+                                               << "actions" << BSON_ARRAY(BSON("action" << "find")))
+                        << BSON("resourcePattern" << "namespace"
+                                                  << "actions"
+                                                  << BSON_ARRAY(BSON("action" << "indexStats")))));
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<MultipleRequiredPrivilegesAggStageAstNode>();
+    }
+};
+
+class MultipleChildrenRequiredPrivilegesAggStageParseNode : public sdk::AggStageParseNode {
+public:
+    static constexpr std::string_view kName = "$multipleChildrenRequiredPrivileges";
+
+    MultipleChildrenRequiredPrivilegesAggStageParseNode() : sdk::AggStageParseNode(kName) {}
+
+    static constexpr size_t kExpansionSize = 6;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(new host::HostAggStageParseNode(
+            sdk::shared_test_stages::NoOpHostParseNode::make(kSearchSpec)));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
+            std::make_unique<SingleActionRequiredPrivilegesAggStageAstNode>()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
+            std::make_unique<sdk::shared_test_stages::NoOpAggStageAstNode>()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
+            std::make_unique<MultipleActionsRequiredPrivilegesAggStageAstNode>()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
+            std::make_unique<MultipleRequiredPrivilegesAggStageAstNode>()));
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
+            std::make_unique<sdk::shared_test_stages::NonePosAggStageAstNode>()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageParseNode> make() {
+        return std::make_unique<MultipleChildrenRequiredPrivilegesAggStageParseNode>();
+    }
+};
+
+class EmptyActionsArrayRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    static constexpr std::string_view kName = "$emptyActions";
+
+    EmptyActionsArrayRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiredPrivileges"
+                    << BSON_ARRAY(BSON("resourcePattern" << "namespace"
+                                                         << "actions" << BSONArray())));
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<EmptyActionsArrayRequiredPrivilegesAggStageAstNode>();
+    }
+};
+
+class EmptyRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    static constexpr std::string_view kName = "$emptyRequiredPrivileges";
+
+    EmptyRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiredPrivileges" << BSONArray());
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<EmptyRequiredPrivilegesAggStageAstNode>();
+    }
+};
 }  // namespace
 
 TEST_F(DocumentSourceExtensionTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds) {
@@ -702,8 +849,11 @@ TEST_F(DocumentSourceExtensionTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds)
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kNoOpName), std::move(handle));
+        std::string(sdk::shared_test_stages::kNoOpName), std::move(handle), _nss);
     ASSERT_FALSE(lp.isInitialSource());
+    ASSERT_FALSE(lp.requiresAuthzChecks());
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+                  PrivilegeVector{});
 }
 
 TEST_F(DocumentSourceExtensionTest, NoOpParseNodeInheritsDefaultGetPropertiesFromAstNode) {
@@ -717,6 +867,9 @@ TEST_F(DocumentSourceExtensionTest, NoOpParseNodeInheritsDefaultGetPropertiesFro
         _nss,
         LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
+    ASSERT_FALSE(lp.requiresAuthzChecks());
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+                  PrivilegeVector{});
 }
 
 TEST_F(DocumentSourceExtensionTest, NonePosAstNodeSucceeds) {
@@ -725,7 +878,7 @@ TEST_F(DocumentSourceExtensionTest, NonePosAstNodeSucceeds) {
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kNoneName), std::move(handle));
+        std::string(sdk::shared_test_stages::kNoneName), std::move(handle), _nss);
     ASSERT_FALSE(lp.isInitialSource());
 }
 
@@ -735,7 +888,7 @@ TEST_F(DocumentSourceExtensionTest, FirstPosAstNodeSucceeds) {
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kFirstName), std::move(handle));
+        std::string(sdk::shared_test_stages::kFirstName), std::move(handle), _nss);
     ASSERT_TRUE(lp.isInitialSource());
 }
 
@@ -757,7 +910,7 @@ TEST_F(DocumentSourceExtensionTest, LastPosAstNodeSucceeds) {
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kLastName), std::move(handle));
+        std::string(sdk::shared_test_stages::kLastName), std::move(handle), _nss);
     ASSERT_FALSE(lp.isInitialSource());
 }
 
@@ -773,7 +926,7 @@ TEST_F(DocumentSourceExtensionTest, LastPosParseNodeInheritsInitialSourceFromFir
     ASSERT_FALSE(lp.isInitialSource());
 }
 
-TEST_F(DocumentSourceExtensionTest, ExpandToMatchParseNodeInheritsInitialSourceFromMatch) {
+TEST_F(DocumentSourceExtensionTest, ExpandToMatchParseNodeInheritsPropertiesFromMatch) {
     auto parseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::ExpandToHostParseParseNode>());
     auto handle = AggStageParseNodeHandle{parseNode};
@@ -784,9 +937,12 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMatchParseNodeInheritsInitialSourceF
         _nss,
         LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
+    ASSERT_FALSE(lp.requiresAuthzChecks());
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+                  PrivilegeVector{});
 }
 
-TEST_F(DocumentSourceExtensionTest, ExpandToSearchParseNodeInheritsInitialSourceFromSearch) {
+TEST_F(DocumentSourceExtensionTest, ExpandToSearchParseNodeInheritsPropertiesFromSearch) {
     auto parseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToSearchAggStageParseNode>());
     auto handle = AggStageParseNodeHandle{parseNode};
@@ -794,5 +950,154 @@ TEST_F(DocumentSourceExtensionTest, ExpandToSearchParseNodeInheritsInitialSource
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         std::string(kExpandToSearchName), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_TRUE(lp.isInitialSource());
+
+    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(privileges.size(), 1);
+
+    const auto& privilege = privileges.front();
+    ASSERT_TRUE(privilege.getResourcePattern().isExactNamespacePattern());
+    ASSERT_EQ(privilege.getResourcePattern().ns(), _nss);
+
+    const auto& actions = privilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 1);
+    ASSERT_TRUE(actions.contains(ActionType::find));
+
+    ASSERT_TRUE(lp.requiresAuthzChecks());
+}
+
+TEST_F(DocumentSourceExtensionTest, EmptyRequiredPrivilegesAstNodeSucceeds) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(EmptyRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded lp(
+        std::string(EmptyRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
+
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+                  PrivilegeVector{});
+    ASSERT_FALSE(lp.requiresAuthzChecks());
+}
+
+TEST_F(DocumentSourceExtensionTest, SingleRequiredPrivilegesAstNodeProducesFindPrivilege) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(SingleActionRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded lp(
+        std::string(SingleActionRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
+
+    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(privileges.size(), 1);
+
+    const auto& privilege = privileges.front();
+    ASSERT_TRUE(privilege.getResourcePattern().isExactNamespacePattern());
+    ASSERT_EQ(privilege.getResourcePattern().ns(), _nss);
+
+    const auto& actions = privilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 1);
+    ASSERT_TRUE(actions.contains(ActionType::find));
+
+    ASSERT_TRUE(lp.requiresAuthzChecks());
+}
+
+TEST_F(DocumentSourceExtensionTest,
+       MultipleActionsRequiredPrivilegesAstNodeProducesUnionOfActions) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(MultipleActionsRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded lp(
+        std::string(MultipleActionsRequiredPrivilegesAggStageAstNode::kName),
+        std::move(handle),
+        _nss);
+
+    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(privileges.size(), 1);
+
+    const auto& privilege = privileges.front();
+    ASSERT_TRUE(privilege.getResourcePattern().isExactNamespacePattern());
+    ASSERT_EQ(privilege.getResourcePattern().ns(), _nss);
+
+    const auto& actions = privilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 2);
+    ASSERT_TRUE(actions.contains(ActionType::listIndexes));
+    ASSERT_TRUE(actions.contains(ActionType::planCacheRead));
+
+    ASSERT_TRUE(lp.requiresAuthzChecks());
+}
+
+TEST_F(DocumentSourceExtensionTest, MultipleRequiredPrivilegesAstNodeProducesUnionOfPrivileges) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(MultipleRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded lp(
+        std::string(MultipleRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
+
+    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(privileges.size(), 1);
+
+    const auto& privilege = privileges.front();
+    ASSERT_TRUE(privilege.getResourcePattern().isExactNamespacePattern());
+    ASSERT_EQ(privilege.getResourcePattern().ns(), _nss);
+
+    const auto& actions = privilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 2);
+    ASSERT_TRUE(actions.contains(ActionType::find));
+    ASSERT_TRUE(actions.contains(ActionType::indexStats));
+
+    ASSERT_TRUE(lp.requiresAuthzChecks());
+}
+
+TEST_F(DocumentSourceExtensionTest, ExpandableToMultipleMixedChildrenUnionsRequiredPrivileges) {
+    // Build the parse node that expands to:
+    //   1) Host node (e.g., $search via NoOpHostParseNode(kSearchSpec)) -> find
+    //   2) SingleActionRequiredPrivilegesAggStageAstNode -> find
+    //   3) NoOpAggStageAstNode -> no privileges
+    //   4) MultipleActionsRequiredPrivilegesAggStageAstNode -> find, listIndexes, planCacheRead
+    //   6) MultipleChildrenRequiredPrivilegesAggStageParseNode -> find, indexStats
+    //   6) NonePosAggStageAstNode -> no privileges
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        MultipleChildrenRequiredPrivilegesAggStageParseNode::make());
+    auto handle = AggStageParseNodeHandle{parseNode};
+
+    host::DocumentSourceExtension::LiteParsedExpandable lp(
+        std::string(MultipleChildrenRequiredPrivilegesAggStageParseNode::kName),
+        std::move(handle),
+        _nss,
+        LiteParserOptions{});
+
+    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+
+    ASSERT_EQ(privileges.size(), 1);
+
+    const auto& privilege = privileges.front();
+    ASSERT_TRUE(privilege.getResourcePattern().isExactNamespacePattern());
+    ASSERT_EQ(privilege.getResourcePattern().ns(), _nss);
+
+    const auto& actions = privilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 4);
+    ASSERT_TRUE(actions.contains(ActionType::find));
+    ASSERT_TRUE(actions.contains(ActionType::listIndexes));
+    ASSERT_TRUE(actions.contains(ActionType::planCacheRead));
+    ASSERT_TRUE(actions.contains(ActionType::indexStats));
+
+    ASSERT_TRUE(lp.requiresAuthzChecks());
+}
+
+DEATH_TEST_F(DocumentSourceExtensionTest,
+             EmptyActionsArrayRequiredPrivilegesAggStageAstNodeFails,
+             "11350600") {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        EmptyActionsArrayRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded lp(
+        std::string(EmptyActionsArrayRequiredPrivilegesAggStageAstNode::kName),
+        std::move(handle),
+        _nss);
+
+    [[maybe_unused]] auto privileges =
+        lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
 }
 }  // namespace mongo::extension

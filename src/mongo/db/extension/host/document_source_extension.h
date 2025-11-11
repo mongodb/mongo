@@ -99,19 +99,24 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            // TODO SERVER-113506 Support getting required privileges from extensions.
-            return {};
+            PrivilegeVector privileges;
+            for (const auto& lp : _expanded) {
+                Privilege::addPrivilegesToPrivilegeVector(
+                    &privileges, lp->requiredPrivileges(isMongos, bypassDocumentValidation));
+            }
+            return privileges;
         }
 
         bool isInitialSource() const override {
             return _expanded.front()->isInitialSource();
         }
 
-        /**
-         * requiresAuthzChecks() is overriden to false because requiredPrivileges() returns an empty
-         * vector and has no authz checks by default.
-         */
         bool requiresAuthzChecks() const override {
+            for (const auto& lp : _expanded) {
+                if (lp->requiresAuthzChecks()) {
+                    return true;
+                }
+            }
             return false;
         }
 
@@ -157,10 +162,13 @@ public:
      */
     class LiteParsedExpanded : public LiteParsedDocumentSource {
     public:
-        LiteParsedExpanded(std::string stageName, AggStageAstNodeHandle astNode)
+        LiteParsedExpanded(std::string stageName,
+                           AggStageAstNodeHandle astNode,
+                           const NamespaceString& nss)
             : LiteParsedDocumentSource(std::move(stageName)),
               _astNode(std::move(astNode)),
-              _properties(_astNode.getProperties()) {}
+              _properties(_astNode.getProperties()),
+              _nss(nss) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -168,25 +176,66 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            // TODO SERVER-113506 Support getting required privileges from extensions.
-            return {};
+            PrivilegeVector privileges;
+
+            if (const auto& requiredPrivileges = _properties.getRequiredPrivileges()) {
+                for (const auto& rp : *requiredPrivileges) {
+                    tassert(
+                        11350602,
+                        "Only 'namespace' resourcePattern is supported for extension privileges",
+                        rp.getResourcePattern() ==
+                            MongoExtensionPrivilegeResourcePatternEnum::kNamespace);
+
+                    ActionSet actions;
+                    for (const auto& entry : rp.getActions()) {
+                        actions.addAction(toActionType(entry.getAction()));
+                    }
+
+                    tassert(11350600,
+                            "requiredPrivileges.actions must not be empty.",
+                            !actions.empty());
+                    Privilege::addPrivilegeToPrivilegeVector(
+                        &privileges, Privilege{ResourcePattern::forExactNamespace(_nss), actions});
+                }
+            }
+
+            return privileges;
         }
 
         bool isInitialSource() const override {
             return _properties.getPosition() == MongoExtensionPositionRequirementEnum::kFirst;
         }
 
-        /**
-         * requiresAuthzChecks() is overriden to false because requiredPrivileges() returns an empty
-         * vector and has no authz checks by default.
-         */
         bool requiresAuthzChecks() const override {
-            return false;
+            // If the stage specifies a non-empty set of required privileges, mandatory auth checks
+            // are required. Otherwise, it is safe to opt out of auth checks.
+            const auto& properties = _properties.getRequiredPrivileges();
+            return properties.has_value() && !properties->empty();
         }
 
     private:
-        AggStageAstNodeHandle _astNode;
+        static ActionType toActionType(const MongoExtensionPrivilegeActionEnum& action) {
+            switch (action) {
+                case MongoExtensionPrivilegeActionEnum::kFind:
+                    return ActionType::find;
+                case MongoExtensionPrivilegeActionEnum::kListIndexes:
+                    return ActionType::listIndexes;
+                case MongoExtensionPrivilegeActionEnum::kListSearchIndexes:
+                    return ActionType::listSearchIndexes;
+                case MongoExtensionPrivilegeActionEnum::kPlanCacheRead:
+                    return ActionType::planCacheRead;
+                case MongoExtensionPrivilegeActionEnum::kCollStats:
+                    return ActionType::collStats;
+                case MongoExtensionPrivilegeActionEnum::kIndexStats:
+                    return ActionType::indexStats;
+                default:
+                    MONGO_UNREACHABLE_TASSERT(11350601);
+            }
+        }
+
+        const AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;
+        const NamespaceString _nss;
     };
 
     const char* getSourceName() const override;
