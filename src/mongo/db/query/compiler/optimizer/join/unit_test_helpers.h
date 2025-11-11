@@ -31,6 +31,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 
 namespace mongo::join_ordering {
@@ -60,6 +61,60 @@ public:
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator(const MultipleCollectionAccessor& mca,
                                                              NamespaceString nss,
                                                              double sampleProportion = 0.1);
+};
+
+using namespace cost_based_ranker;
+
+/**
+ * Estimator that allows to faking the result of NDV estimation. Asserts on calling any other
+ * function.
+ */
+class FakeNdvEstimator : public ce::SamplingEstimator {
+public:
+    CardinalityEstimate estimateCardinality(const MatchExpression* expr) const override {
+        MONGO_UNREACHABLE;
+    }
+    std::vector<CardinalityEstimate> estimateCardinality(
+        const std::vector<const MatchExpression*>& expr) const override {
+        MONGO_UNREACHABLE;
+    }
+    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override {
+        MONGO_UNREACHABLE;
+    }
+    std::vector<CardinalityEstimate> estimateKeysScanned(
+        const std::vector<const IndexBounds*>& bounds) const override {
+        MONGO_UNREACHABLE;
+    }
+    CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
+                                     const MatchExpression* expr) const override {
+        MONGO_UNREACHABLE;
+    }
+    std::vector<CardinalityEstimate> estimateRIDs(
+        const std::vector<const IndexBounds*>& bounds,
+        const std::vector<const MatchExpression*>& expressions) const override {
+        MONGO_UNREACHABLE;
+    }
+    void generateSample(ce::ProjectionParams projectionParams) override {
+        MONGO_UNREACHABLE;
+    }
+
+    /*
+     * Add a fake response to 'estimateNDV()' for the given 'fields'.
+     */
+    void addFakeNDVEstimate(std::vector<FieldPath> fields, CardinalityEstimate estimate) {
+        _fakeEstimates.insert_or_assign(fields, estimate);
+    }
+
+    /*
+     * Uses the results assigned from 'addFakeNDVEstimate()'. If an estimate for a particular
+     * 'fieldNames' is not set, this function will throw an exception.
+     */
+    CardinalityEstimate estimateNDV(const std::vector<FieldPath>& fieldNames) const override {
+        return _fakeEstimates.at(fieldNames);
+    }
+
+private:
+    stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;
 };
 
 }  // namespace mongo::join_ordering
