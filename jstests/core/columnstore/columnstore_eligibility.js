@@ -15,6 +15,10 @@
  *   # Columnstore indexes never shipped to the customers in older versions, so there is no need to
  *   # test multiversion suites.
  *   requires_fcv_73,
+ *   # This test calls setUpServerForColumnStoreIndexTest, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";

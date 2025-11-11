@@ -13,6 +13,10 @@
  *   does_not_support_stepdowns,
  *   not_allowed_with_signed_security_token,
  *   uses_full_validation,
+ *   # This test calls setUpServerForColumnStoreIndexTest, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {documentEq, resultsEq} from "jstests/aggregation/extras/utils.js";

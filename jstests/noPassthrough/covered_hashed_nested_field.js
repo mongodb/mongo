@@ -2,18 +2,22 @@
  * There is a bug in the sbe stage builders where $group issues a getField from a hashed field in a
  * hashed index. This leads to incorrectly returning null. To fix, we disable SBE in this case. This
  * test reproduces the failing case on standalone, replset, and sharded clusters.
+ * @tags: [
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
+ * ]
  */
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {TestCases} from "jstests/libs/index_with_hashed_path_prefix_of_nonhashed_path_tests.js";
 import {Thread} from "jstests/libs/parallelTester.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function setSbe(conn, test, val) {
     const testDb = conn.getDB("test");
     if (test instanceof ShardingTest) {
-        setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(testDb.getMongo()),
-                               "internalQueryFrameworkControl",
-                               val);
+        setParameterOnAllNonConfigNodes(testDb.getMongo(), "internalQueryFrameworkControl", val);
     } else {
         assert.commandWorked(
             testDb.adminCommand({setParameter: 1, "internalQueryFrameworkControl": val}));

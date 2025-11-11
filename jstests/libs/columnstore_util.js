@@ -9,7 +9,9 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**
  * Updates server parameters to disable column scan query planning heuristics so that column scan
@@ -20,11 +22,11 @@ import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_paramete
  * for the planning heuristics behavior is included in unit tests, no passthrough tests, and perf
  * tests.
  */
-export function fullyEnableColumnScan(nodes) {
+export function fullyEnableColumnScan(conn) {
     // Since the CSI query planning heuristics are OR-ed together, we can set any one of
     // [internalQueryColumnScanMinAvgDocSizeBytes, internalQueryColumnScanMinCollectionSizeBytes,
     // internalQueryColumnScanMinNumColumnFilters] to zero in order to fully enable column scan.
-    setParameterOnAllHosts(nodes, "internalQueryColumnScanMinNumColumnFilters", 0);
+    setParameterOnAllNonConfigNodes(conn, "internalQueryColumnScanMinNumColumnFilters", 0);
 }
 
 /**
@@ -99,7 +101,7 @@ export function setUpServerForColumnStoreIndexTest(db) {
     if ((TestData || {}).isParallelTest) {
         return false;
     } else {
-        fullyEnableColumnScan(nodes);
+        fullyEnableColumnScan(db.getMongo());
     }
 
     return true;

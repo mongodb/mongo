@@ -9,6 +9,10 @@
 //   not_allowed_with_signed_security_token,
 //   # In 8.0, we changed behavior for equality to null.
 //   requires_fcv_80,
+//   # This test calls setUpServerForColumnStoreIndexTest, which sets a server parameter via
+//   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+//   # operations should occur during the test.
+//   assumes_stable_shard_list,
 // ]
 //
 import {resultsEq} from "jstests/aggregation/extras/utils.js";

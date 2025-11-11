@@ -23,6 +23,10 @@
  *   assumes_no_implicit_index_creation,
  *   # This test looks for plan cache hits, which would change with repeated reads.
  *   does_not_support_repeated_reads,
+ *   # This test calls runWithParamsAllNodes, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

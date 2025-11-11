@@ -1,3 +1,4 @@
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 /**
  * Contains helper functions for testing server parameters on start up and via get/setParameter.
  */
@@ -23,10 +24,18 @@ export function setParameter(conn, field, value) {
     return conn.adminCommand(cmd);
 }
 
-export function setParameterOnAllHosts(hostList, field, value) {
+/**
+ * Helper for setting a server parameter on all non-config-server hosts.
+ */
+export function setParameterOnAllNonConfigNodes(conn, field, value) {
+    assert(
+        !(TestData.addRemoveShard || TestData.hasRandomShardsAddedRemoved),
+        "Cannot safely execute setParameterOnAllNonConfigNodes in a test suite where the cluster topology is unstable (e.g., shards are being added or removed). Please add the assumes_stable_shard_list tag to the test to exclude it from this specific suite.",
+    );
+    const hostList = DiscoverTopology.findNonConfigNodes(conn);
     for (let host of hostList) {
-        const conn = new Mongo(host);
-        assert.commandWorked(setParameter(conn, field, value));
+        const hostConn = new Mongo(host);
+        assert.commandWorked(setParameter(hostConn, field, value));
     }
 }
 

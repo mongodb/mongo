@@ -3,17 +3,14 @@
  * @tags: [
  *   # Column store indexes are still under a feature flag.
  *   featureFlagColumnstoreIndexes,
- *
  *   # Uses $indexStats which is not supported inside a transaction.
  *   does_not_support_transactions,
- *
  *   # The test relies on '$indexStats' seeing an earlier read
  *   # operation. So both the $indexStats and the read operation need to be
  *   # sent to the same node.
  *   does_not_support_repeated_reads,
  *   does_not_support_stepdowns,
  *   assumes_read_preference_unchanged,
- *
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
  *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
@@ -22,6 +19,10 @@
  *   does_not_support_stepdowns,
  *   not_allowed_with_signed_security_token,
  *   uses_full_validation,
+ *   # This test calls setUpServerForColumnStoreIndexTest, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {planHasStage} from "jstests/libs/analyze_plan.js";

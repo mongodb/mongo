@@ -16,6 +16,10 @@
  *   directly_against_shardsvrs_incompatible,
  *   # setParameter not permitted with security tokens
  *   not_allowed_with_signed_security_token,
+ *   # This test calls runWithParamsAllNodes, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 

@@ -1,7 +1,8 @@
 import {getAggPlanStage, getQueryPlanner, isAggregationPlan} from "jstests/libs/analyze_plan.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**
  * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
@@ -451,7 +452,7 @@ export function runWithParamsAllNodes(db, keyValPairs, fn) {
             const prevVal = db.adminCommand(getParamObj);
             prevVals.push(prevVal[flag]);
 
-            setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, val);
+            setParameterOnAllNonConfigNodes(db.getMongo(), flag, val);
         }
 
         return fn();
@@ -459,8 +460,7 @@ export function runWithParamsAllNodes(db, keyValPairs, fn) {
         for (let i = 0; i < keyValPairs.length; i++) {
             const flag = keyValPairs[i].key;
 
-            setParameterOnAllHosts(
-                DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, prevVals[i]);
+            setParameterOnAllNonConfigNodes(db.getMongo(), flag, prevVals[i]);
         }
     }
 }

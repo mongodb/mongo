@@ -4,10 +4,8 @@
  *   # The $collStats stage is not supported inside a transaction.
  *   does_not_support_transactions,
  *   requires_collstats,
- *
  *   # Column store indexes are still under a feature flag.
  *   featureFlagColumnstoreIndexes,
- *
  *   # In passthrough suites, this test makes direct connections to mongod instances that compose
  *   # the passthrough fixture in order to perform additional validation. Tenant migration,
  *   # alternate read concern values, and step downs can cause these connections to fail.
@@ -15,6 +13,10 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   does_not_support_stepdowns,
+ *   # This test calls setUpServerForColumnStoreIndexTest, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";

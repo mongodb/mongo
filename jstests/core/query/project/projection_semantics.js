@@ -13,6 +13,10 @@
  *   tenant_migration_incompatible,
  *   not_allowed_with_signed_security_token,
  *   featureFlagSbeFull,
+ *   # This test calls setUpServerForColumnStoreIndexTest, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";

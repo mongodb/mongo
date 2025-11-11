@@ -4,12 +4,14 @@
  *   # Needed as $densify is a 51 feature.
  *   requires_fcv_51,
  *   not_allowed_with_signed_security_token,
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // TODO SERVER-82462 remove creation of database once
 // $densify behavior will be equal in both standalone and sharded cluster
@@ -22,7 +24,7 @@ const paramName = "internalQueryMaxAllowedDensifyDocs";
 const origParamValue = assert.commandWorked(
     db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}))[paramName];
 function setMaxDocs(max) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), paramName, max);
+    setParameterOnAllNonConfigNodes(db.getMongo(), paramName, max);
 }
 const coll = db[jsTestName()];
 coll.drop();

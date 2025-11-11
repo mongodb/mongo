@@ -10,7 +10,11 @@
  *   requires_fcv_63,
  *   tenant_migration_incompatible,
  *   does_not_support_stepdowns,
- *   not_allowed_with_signed_security_token
+ *   not_allowed_with_signed_security_token,
+ *   # This test calls setUpServerForColumnStoreIndexTest, which sets a server parameter via
+ *   # setParameterOnAllNonConfigNodes. To keep the host list consistent, no add/remove shard
+ *   # operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 
