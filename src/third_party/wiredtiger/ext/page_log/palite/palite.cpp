@@ -26,6 +26,110 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/*-
+ * -= How PALite works =-
+ *
+ * PALite implements PALI (the "Page Log Interface") using SQLite as the
+ * underlying storage engine.
+ *
+ * PALite consists of the three main storage table types:
+ *  - Globals: stores global metadata (last LSN, known table IDs)
+ *  - Checkpoints: stores checkpoint information
+ *  - Pages: stores page data (full pages and deltas)
+ *
+ * Each storage table type (Globals, Checkpoints, Pages) is implemented as a
+ * separate SQLite database file:
+ *  - globals.db
+ *  - checkpoints.db
+ *  - pages_[N].db  - one per WT table (N is the table ID)
+ *
+ * -= Concurrency model =-
+ *
+ * SQLite supports multiple simultaneous read transactions coming from separate
+ * database connections, possibly in separate threads or processes, but only one
+ * simultaneous write transaction.
+ *
+ * As a result, PALite uses a readers-writer lock at the table level to ensure
+ * that read operations can occur concurrently while write operations are
+ * serialized.
+ *
+ * In addition, there is a storage-wide lock that is used for operations that
+ * require exclusive access to the entire storage. E.g., abandoning a checkpoint.
+ *
+ * -= Known Limitations =-
+ *
+ * PALite does not currently support multiple processes accessing the same
+ * database files. While SQLite supports this use case, it allows only one
+ * writer at a time. In absence of a proper locking mechanism between multiple
+ * processes at PALite level, multiple writers will conflict and fail.
+ * This limitation may be addressed in future releases.
+ *
+ * -= PALite structure =-
+ *
+ * The following diagram illustrates the overall structure of PALite:
+ *
+ * -----------------------------------------------------------------------------
+ *
+ * PALI implementation:
+ *
+ * PageLog
+ *   |
+ *   + <- PageHandle - an instance per WT table (created, but not owned by PageLog)
+ *   +- Config - shared by all components
+ *   +- Storage - shared by PageLog and PageHandles
+ *
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ *
+ * Storage public methods:
+ *
+ *   - make_next_lsn   - get/put_page         - discard_page   - abandon_checkpoint >--+
+ *   - get_last_lsn    - get/put_checkpoint   - get_page_ids   - ...                   |
+ *                                                                                     |
+ * Everything at this level calls public methods of the underlying tables.             |
+ * Internally these methods will use appropriate R/W lock for the call.                |
+ * The only exception is 'abandon_checkpoint' which bypasses the locks completely.     |
+ *                                                                                     |
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -       |
+ *                                                                                     |
+ *                                                                | bypasses per-table access;   |
+ *                                                                | uses storage-wide write lock |
+ *                                                                                     |
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -       |
+ *    Storage-level Readers-Writer Lock (every method above has to aquire it)   >------+
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -       |
+ *                                                                                     |
+ *       < - - - - - - - - - - - - - - - - - - - - - - - - - - - - - >                 |
+ * Table <   create DB tables / connection config / sql queries      > - common for all classes
+ *   |   < - - - - - - - - - - - - - - - - - - - - - - - - - - - - - >                 |
+ *   |   <   Globals          |   Checkpoints      |   Pages         > - classes for tables
+ *   |   <   - - - - -        |   - - - - - -      |   - - - -       >                 |
+ *   |   <   next_lsn         |   get/put          |   get/put       > - specific for each class
+ *   |   <   last_lsn         |   delete           |   discard       >                 |
+ *   |   <   ...              |   ...              |   ...           > <---------------+
+ *   |   < - - - - - - - - - - - - - - - - - - - - - - - - - - - - - >
+ *   |
+ * - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ *   +- Table-level Readers-Writer Lock (every method above has to aquire it)
+ * - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ *   |
+ *   +- {thread : Connection<sqlite3*>} - map: DB connections (per thread)
+ *                  |
+ *                  +- [sqlite3_stmt*] - list: precompiled SQL statements
+ *
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ *
+ *   SQLite3 helpers (used by connections):
+ *    - calls and call tracing
+ *    - error handling
+ *    - useful macros, etc
+ *
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ *       +----------------+    +----------------+    +----------------+
+ *       |   globals.db   |    | checkpoints.db |    |  pages_[N].db  |  - files on disk
+ *       +----------------+    +----------------+    +----------------+
+ * -----------------------------------------------------------------------------
+ */
+
 #include "wiredtiger.h"
 #include "wiredtiger_ext.h"
 
