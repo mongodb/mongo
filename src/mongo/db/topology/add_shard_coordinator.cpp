@@ -197,6 +197,10 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             [this, _ = shared_from_this()](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
 
+                // Make sure we are the primary before dropping sessions collection.
+                // Check SERVER-113077 for a detailed reasoning
+                sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
+
                 _dropSessionsCollection(opCtx);
 
                 _installShardIdentity(opCtx, _executorWithoutGossip);
