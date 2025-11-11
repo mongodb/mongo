@@ -394,6 +394,11 @@ void printStructuredStackTrace(StackTraceSink& sink);
 void printStructuredStackTrace(std::ostream& os);
 void printStructuredStackTrace();
 
+#ifdef MONGO_CONFIG_DEV_STACKTRACE
+void enableDevStackTrace();
+void disableDevStackTrace();
+#endif
+
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
 /**

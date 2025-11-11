@@ -206,9 +206,25 @@ void StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
     stack_trace_detail::logBacktraceObject(_stacktrace, sink, withHumanReadable);
 }
 
+#ifdef MONGO_CONFIG_DEV_STACKTRACE
+namespace {
+AtomicWord<bool> gDevStackTraceEnabled{true};
+}
+void enableDevStackTrace() {
+    gDevStackTraceEnabled.store(true);
+}
+void disableDevStackTrace() {
+    gDevStackTraceEnabled.store(false);
+}
+#endif
+
 void printStackTrace(StackTraceSink& sink) {
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
-    stack_trace_detail::printCppTrace(&sink);
+    if (gDevStackTraceEnabled.loadRelaxed()) {
+        stack_trace_detail::printCppTrace(&sink);
+    } else {
+        printStructuredStackTrace(sink);
+    }
 #else
     printStructuredStackTrace(sink);
 #endif
@@ -216,8 +232,12 @@ void printStackTrace(StackTraceSink& sink) {
 
 void printStackTrace(std::ostream& os) {
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
-    OstreamStackTraceSink sink{os};
-    stack_trace_detail::printCppTrace(&sink);
+    if (gDevStackTraceEnabled.loadRelaxed()) {
+        OstreamStackTraceSink sink{os};
+        stack_trace_detail::printCppTrace(&sink);
+    } else {
+        printStructuredStackTrace(os);
+    }
 #else
     printStructuredStackTrace(os);
 #endif
@@ -225,7 +245,11 @@ void printStackTrace(std::ostream& os) {
 
 void printStackTrace() {
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
-    stack_trace_detail::printCppTrace(nullptr);
+    if (gDevStackTraceEnabled.loadRelaxed()) {
+        stack_trace_detail::printCppTrace(nullptr);
+    } else {
+        printStructuredStackTrace();
+    }
 #else
     printStructuredStackTrace();
 #endif

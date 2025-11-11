@@ -34,6 +34,7 @@
 #include "mongo/unittest/test_info.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stacktrace.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -236,6 +237,9 @@ void stripOption(std::vector<std::string>& av, StringData opt) {
 
 void DeathTestBase::Subprocess::run() {
     if (!getSpawnInfo().internalRunDeathTest.empty()) {
+#ifdef MONGO_CONFIG_DEV_STACKTRACE
+        disableDevStackTrace();
+#endif
         invokeTest();  // We're in an execve child process.
         return;
     }
