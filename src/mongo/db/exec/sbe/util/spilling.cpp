@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -286,6 +287,11 @@ void SpillingStore::saveState() {
 }
 void SpillingStore::restoreState() {
     // We do not have to do anything.
+}
+
+void SpillingStore::updateSpillStorageStatsForOperation(OperationContext* opCtx) {
+    CurOp::get(opCtx)->updateSpillStorageStats(
+        _spillTable->computeOperationStatisticsSinceLastCall());
 }
 
 }  // namespace sbe

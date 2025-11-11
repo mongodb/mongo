@@ -21,14 +21,19 @@ function setServerParameter(knob, value) {
 
 function getSpillingAttrs(obj) {
     const spillingStats = {};
+    const spillStorageStats = {};
     for (let key of Object.keys(obj.attr).sort()) {
         if (key === "usedDisk" || key.endsWith("Spills") || key.endsWith("SpilledRecords")) {
             spillingStats[key] = obj.attr[key];
         } else if (key.endsWith("SpilledBytes") || key.endsWith("SpilledDataStorageSize")) {
             spillingStats[key] = "X";
+        } else if (key === "spillStorage") {
+            for (let statKey of Object.keys(obj.attr[key]).sort()) {
+                spillStorageStats[statKey] = "X";
+            }
         }
     }
-    return spillingStats;
+    return {spillingStats, spillStorageStats};
 }
 
 function outputPipelineAndSlowQueryLog(coll, pipeline, comment) {
@@ -38,11 +43,18 @@ function outputPipelineAndSlowQueryLog(coll, pipeline, comment) {
         findMatchingLogLine(globalLog.log, {msg: "Slow query", comment: comment});
     assert(slowQueryLogLine, "Failed to find a log line matching the comment: " + comment);
 
+    const {spillingStats, spillStorageStats} = getSpillingAttrs(JSON.parse(slowQueryLogLine));
+
     subSection("Pipeline");
     code(tojson(pipeline));
 
     subSection("Slow query spilling stats");
-    code(tojson(getSpillingAttrs(JSON.parse(slowQueryLogLine))));
+    code(tojson(spillingStats));
+
+    if (Object.keys(spillStorageStats).length > 0) {
+        subSection("Slow query spill storage stats");
+        code(tojson(spillStorageStats));
+    }
 
     linebreak();
 }

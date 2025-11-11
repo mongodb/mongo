@@ -1020,6 +1020,17 @@ long long CurOp::getPrepareReadConflicts() const {
         .getThisOpPrepareConflictCount();
 }
 
+void CurOp::updateSpillStorageStats(std::unique_ptr<StorageStats> operationStorageStats) {
+    if (!operationStorageStats) {
+        return;
+    }
+    if (!_debug.spillStorageStats) {
+        _debug.spillStorageStats = std::move(operationStorageStats);
+        return;
+    }
+    *_debug.spillStorageStats += *operationStorageStats;
+}
+
 void CurOp::AdditiveResourceStats::addForUnstash(const CurOp::AdditiveResourceStats& other) {
     lockStats.append(other.lockStats);
     cumulativeLockWaitTime += other.cumulativeLockWaitTime;

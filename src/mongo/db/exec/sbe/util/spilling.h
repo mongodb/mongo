@@ -142,6 +142,8 @@ public:
     void saveState();
     void restoreState();
 
+    void updateSpillStorageStatsForOperation(OperationContext* opCtx);
+
 private:
     void switchToSpilling(OperationContext* opCtx);
     void switchToOriginal(OperationContext* opCtx);

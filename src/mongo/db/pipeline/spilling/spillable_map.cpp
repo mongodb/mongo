@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/spilling/spillable_map.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
@@ -106,6 +107,8 @@ void SpillableDocumentMapImpl::spillToDisk() {
         writer.writtenRecords(),
         static_cast<uint64_t>(_diskMap->storageSize(
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+    CurOp::get(_expCtx->getOperationContext())
+        ->updateSpillStorageStats(_diskMap->computeOperationStatisticsSinceLastCall());
 }
 
 void SpillableDocumentMapImpl::initDiskMap() {

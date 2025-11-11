@@ -149,6 +149,8 @@ void SpillableDeque::spillToDisk() {
         writer.writtenRecords(),
         static_cast<uint64_t>(_diskCache->storageSize(
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+    CurOp::get(_expCtx->getOperationContext())
+        ->updateSpillStorageStats(_diskCache->computeOperationStatisticsSinceLastCall());
 }
 
 void SpillableDeque::updateStorageSizeStat() {
