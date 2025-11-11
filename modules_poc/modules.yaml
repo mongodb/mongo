@@ -848,6 +848,7 @@ storage_engine_api:
     - src/mongo/db/storage/sorted_data_interface*
     - src/mongo/db/startup_recovery*
     - src/mongo/db/modules/enterprise/src/inmemory
+    - src/mongo/db/modules/enterprise/src/queryable
 
 storage_engine_integration:
   meta:
@@ -923,7 +924,6 @@ server_backup_restore:
   files:
     - src/mongo/db/modules/enterprise/src/hot_backups
     - src/mongo/db/modules/enterprise/src/live_import
-    - src/mongo/db/modules/enterprise/src/queryable
     - src/mongo/db/modules/enterprise/src/util/document_source_visitor_registry_enterprise.h
     - src/mongo/db/storage/backup*
 
