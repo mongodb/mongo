@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/api_version_vector_to_span.h"
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/host_services.h"
@@ -140,7 +141,8 @@ private:
             const auto& versionedExtensionContainer =                                        \
                 mongo::extension::sdk::VersionedExtensionContainer::getInstance();           \
             static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>( \
-                versionedExtensionContainer.getVersionedExtension(hostVersions));            \
+                versionedExtensionContainer.getVersionedExtension(                           \
+                    mongo::extension::sdk::to_span(hostVersions)));                          \
             *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());           \
         });                                                                                  \
     }                                                                                        \

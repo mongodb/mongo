@@ -26,20 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/extension/sdk/extension_helper.h"
+#include "mongo/db/extension/public/api.h"
 
 #include <span>
-
 namespace mongo::extension::sdk {
-
-bool isVersionCompatible(std::span<const ::MongoExtensionAPIVersion> hostVersions,
-                         const ::MongoExtensionAPIVersion* version) {
-    for (const auto& hostVersion : hostVersions) {
-        if (hostVersion.major == version->major && hostVersion.minor >= version->minor) {
-            return true;
-        }
-    }
-    return false;
+/**
+ * Converts a MongoExtensionAPIVersionVector C struct to a std::span for easier usage.
+ */
+inline auto to_span(const ::MongoExtensionAPIVersionVector* vec) {
+    return std::span<const ::MongoExtensionAPIVersion>(vec->versions,
+                                                       static_cast<size_t>(vec->len));
 }
 }  // namespace mongo::extension::sdk

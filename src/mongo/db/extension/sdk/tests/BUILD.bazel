@@ -22,6 +22,7 @@ mongo_cc_unit_test(
     name = "extension_sdk_test",
     srcs = [
         "aggregation_stage_test.cpp",
+        "api_version_vector_to_span_test.cpp",
         "host_services_test.cpp",
         "operation_metrics_test.cpp",
         "query_execution_context_test.cpp",

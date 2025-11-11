@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/extension/sdk/api_version_vector_to_span.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/extension_helper.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -62,11 +63,11 @@ extern "C" {
                                               MONGODB_EXTENSION_API_MINOR_VERSION + 1,
                                               MONGODB_EXTENSION_API_PATCH_VERSION};
 
-        if (sdk::isVersionCompatible(hostVersions, &verA)) {
+        if (sdk::isVersionCompatible(sdk::to_span(hostVersions), &verA)) {
             static auto extA =
                 std::make_unique<sdk::ExtensionAdapter>(std::make_unique<ExtensionA>(), verA);
             *extension = reinterpret_cast<const ::MongoExtension*>(extA.get());
-        } else if (sdk::isVersionCompatible(hostVersions, &verB)) {
+        } else if (sdk::isVersionCompatible(sdk::to_span(hostVersions), &verB)) {
             static auto extB =
                 std::make_unique<sdk::ExtensionAdapter>(std::make_unique<ExtensionB>(), verB);
             *extension = reinterpret_cast<const ::MongoExtension*>(extB.get());

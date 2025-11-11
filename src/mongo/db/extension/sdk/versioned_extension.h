@@ -71,7 +71,7 @@ public:
     }
 
     VersionedExtension getVersionedExtension(
-        const ::MongoExtensionAPIVersionVector* hostVersions) const {
+        std::span<const ::MongoExtensionAPIVersion> hostVersions) const {
         sdk_uassert(10930201,
                     "Cannot register duplicate versions of the same extension",
                     !_hasDuplicateVersion);

@@ -32,11 +32,13 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/util/modules.h"
 
+#include <span>
+
 namespace mongo::extension::sdk {
 /**
- * Given a vector of current maximum Extension API versions for each major version and the version
- * of an extension, determine whether the extension is compatible with the server.
+ * Given a {container, set, etc.} of current maximum Extension API versions for each major version
+ * and the version of an extension, determine whether the extension is compatible with the server.
  */
-bool isVersionCompatible(const ::MongoExtensionAPIVersionVector* hostVersions,
+bool isVersionCompatible(std::span<const ::MongoExtensionAPIVersion> hostVersions,
                          const ::MongoExtensionAPIVersion* version);
 }  // namespace mongo::extension::sdk
