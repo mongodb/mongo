@@ -404,10 +404,52 @@ void _resetPlacementHistory(OperationContext* opCtx, const FCV requestedVersion)
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 
+void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
+    // No shards should be added until we have forwarded the clone command to all shards. We use the
+    // DDL lock here to serialize with all of add shard and to avoid deadlocks with the DDL blocking
+    // used by add/remove shard.
+    DDLLockManager::ScopedCollectionDDLLock ddlLock(opCtx,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    "CloneAuthoritativeDatabaseMetadata",
+                                                    LockMode::MODE_S);
+
+    // We do a direct read of the shards collection with local readConcern so no shards are missed,
+    // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
+    // back.
+    const auto opTimeWithShards =
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllShards(
+            opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+
+    for (const auto& shardType : opTimeWithShards.value) {
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+        if (!shardStatus.isOK()) {
+            continue;
+        }
+        const auto shard = shardStatus.getValue();
+
+        ShardsvrCloneAuthoritativeMetadata request;
+        request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
+        request.setDbName(DatabaseName::kAdmin);
+
+        auto response = shard->runCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          DatabaseName::kAdmin,
+                                          request.toBSON(),
+                                          Shard::RetryPolicy::kIdempotent);
+
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+    }
+}
+
 void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
-    // No shards should be added until we have forwarded the command to all shards.
-    Lock::SharedLock stableTopologyRegion =
-        ShardingCatalogManager::get(opCtx)->enterStableTopologyRegion(opCtx);
+    // No shards should be added until we have forwarded the command to all shards. We use the DDL
+    // lock here to serialize with all of add shard and to avoid deadlocks with the DDL blocking
+    // used by add/remove shard.
+    DDLLockManager::ScopedCollectionDDLLock ddlLock(opCtx,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    "DropAuthoritativeDatabaseMetadata",
+                                                    LockMode::MODE_S);
 
     const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
         opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
@@ -1302,9 +1344,7 @@ private:
             if (feature_flags::gShardAuthoritativeDbMetadataDDL
                     .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
-                uassertStatusOK(
-                    ShardingCatalogManager::get(opCtx)->runCloneAuthoritativeMetadataOnShards(
-                        opCtx));
+                cloneAuthoritativeDatabaseMetadataOnShards(opCtx);
             }
         }
 

@@ -624,48 +624,6 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     return Status::OK();
 }
 
-Status ShardingCatalogManager::runCloneAuthoritativeMetadataOnShards(OperationContext* opCtx) {
-    // No shards should be added until we have forwarded the clone command to all shards.
-    Lock::SharedLock lk(opCtx, _kShardMembershipLock);
-
-    // We do a direct read of the shards collection with local readConcern so no shards are missed,
-    // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
-    // back.
-    const auto opTimeWithShards =
-        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
-
-    for (const auto& shardType : opTimeWithShards.value) {
-        const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
-        if (!shardStatus.isOK()) {
-            continue;
-        }
-        const auto shard = shardStatus.getValue();
-
-        ShardsvrCloneAuthoritativeMetadata request;
-        request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
-        request.setDbName(DatabaseName::kAdmin);
-
-        auto response = shard->runCommand(opCtx,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          DatabaseName::kAdmin,
-                                          request.toBSON(),
-                                          Shard::RetryPolicy::kIdempotent);
-
-        if (!response.isOK()) {
-            return response.getStatus();
-        }
-        if (!response.getValue().commandStatus.isOK()) {
-            return response.getValue().commandStatus;
-        }
-        if (!response.getValue().writeConcernStatus.isOK()) {
-            return response.getValue().writeConcernStatus;
-        }
-    }
-
-    return Status::OK();
-}
-
 StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,

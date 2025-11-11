@@ -628,11 +628,6 @@ public:
      */
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
 
-    /**
-     * Runs _shardsvrCloneAuthoritativeMetadata on all shards.
-     */
-    Status runCloneAuthoritativeMetadataOnShards(OperationContext* opCtx);
-
     //
     // For Diagnostics
     //
