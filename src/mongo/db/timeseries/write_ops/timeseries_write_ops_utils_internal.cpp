@@ -477,7 +477,7 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
     // We use a PseudoRandom to test frequency of checks, this is not cryptographically
     // secure, but good enough for simple rate limiting on verifications.
     if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load() &&
-        (opCtx->getClient()->getPrng().nextInt32() % 100) <
+        static_cast<int>(opCtx->getClient()->getPrng().nextUInt32() % 100) <
             gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency.load()) {
         auto verifierFunction = makeVerifierFunction(batch, OperationSource::kTimeseriesInsert);
         verifierFunction(bucketToInsert, BSONObj());
@@ -573,7 +573,7 @@ mongo::write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     // secure, but good enough for simple rate limiting on verifications.
     doc_diff::VerifierFunc verifierFunction = nullptr;
     if ((gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load() &&
-         (opCtx->getClient()->getPrng().nextInt32() % 100) <
+         static_cast<int>(opCtx->getClient()->getPrng().nextUInt32() % 100) <
              gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsertFrequency.load()) ||
         (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening.load() &&
          batch->isReopened)) {
