@@ -64,6 +64,33 @@
 namespace mongo {
 
 namespace idl {
+
+struct FieldMetadata {
+    StringData name;
+    bool required;
+};
+
+template <const auto& fieldMeta>
+consteval std::array<StringData, fieldMeta.size()> extractNames() {
+    std::array<StringData, fieldMeta.size()> out;
+    for (size_t i = 0; i != fieldMeta.size(); ++i)
+        out[i] = fieldMeta[i].name;
+    return out;
+}
+
+/**
+ * Returns an array that maps each field to its position into a sequence containing only the
+ * required fields. Non-required fields are mapped to -1.
+ */
+template <const auto& fieldMeta>
+consteval auto extractRequiredFieldPositions() {
+    std::array<size_t, fieldMeta.size()> out;
+    size_t w = 0;
+    for (size_t i = 0; i < fieldMeta.size(); ++i)
+        out[i] = fieldMeta[i].required ? w++ : size_t(-1);
+    return out;
+}
+
 template <typename T>
 using HasBSONSerializeOp = decltype(std::declval<T>().serialize(std::declval<BSONObjBuilder*>()));
 
@@ -156,38 +183,68 @@ T preparsedValue(A&&... args) {
     return idlPreparsedValue(stdx::type_identity<T>{}, std::forward<A>(args)...);
 }
 
-enum DebugEnabled : bool {};
-
-constexpr inline DebugEnabled kIsDebug{kDebugBuild};
-
 /**
  * HasMembers tracks the presence of required fields in debug mode, and is a noop class in
  * production builds.
  */
-template <size_t N, DebugEnabled = kIsDebug>
-class HasMembers;
-
 template <size_t N>
-class HasMembers<N, DebugEnabled{false}> {
+class HasMembers {
 public:
-    void required() const {}
-    void markPresent(size_t pos) {}
-};
+    static constexpr size_t size() {
+        return N;
+    }
 
-template <size_t N>
-class HasMembers<N, DebugEnabled{true}> {
-public:
-    void required() const {
-        invariant(_hasField.all());
+    bool hasAllRequired() const {
+        if constexpr (kDebugBuild) {
+            return _hasField.all();
+        } else {
+            return true;
+        }
     }
 
     void markPresent(size_t pos) {
-        _hasField.set(pos, true);
+        if constexpr (kDebugBuild) {
+            _hasField.set(pos, true);
+        }
+    }
+
+    /**
+     * In debug builds, a field is ok if it's present.
+     * In non-debug builds, no field is present, and this shouldn't be called at all.
+     */
+    bool get(size_t pos) const {
+        if constexpr (kDebugBuild) {
+            return _hasField[pos];
+        } else {
+            MONGO_UNREACHABLE;
+        }
     }
 
 private:
-    std::bitset<N> _hasField;
+    struct Empty {};
+    MONGO_COMPILER_NO_UNIQUE_ADDRESS std::conditional_t<kDebugBuild, std::bitset<N>, Empty>
+        _hasField;
 };
+
+void handleMissingRequiredFields(const auto& hasMembers,
+                                 std::span<const FieldMetadata> meta,
+                                 std::span<const size_t> fieldToRequiredFieldPositions) {
+    if constexpr (kDebugBuild) {
+        if (hasMembers.hasAllRequired())
+            return;
+        std::string msg = "Missing required fields: ";
+        StringData sep;
+        size_t reqIdx = 0;
+        for (size_t i = 0; i < meta.size(); ++i) {
+            auto&& [name, required] = meta[i];
+            if (required && !hasMembers.get(reqIdx++)) {
+                msg += std::exchange(sep, ", "_sd);
+                msg += name;
+            }
+        }
+        invariant(false, msg);
+    }
+}
 
 /** Support routines for IDL-generated comparison operators */
 namespace relop {

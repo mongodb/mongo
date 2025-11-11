@@ -2094,7 +2094,9 @@ void attemptToSerializeIncompleteStruct() {
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST(IDLSerializeTests, TestUninitializedRequiredFieldsDiesDebug, "invariant") {
+DEATH_TEST(IDLSerializeTests,
+           TestUninitializedRequiredFieldsDiesDebug,
+           "Missing required fields: field3") {
     // This should invariant because the required field3 is uninitialized.
     attemptToSerializeIncompleteStruct();
 }
@@ -2115,15 +2117,19 @@ TEST(IDLArrayTests, TestSimpleArrays) {
     uint8_t array15[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
     uint8_t array16[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 
-    auto testDoc = BSON("field1" << BSON_ARRAY("Foo" << "Bar"
-                                                     << "???")
-                                 << "field2" << BSON_ARRAY(1 << 2 << 3) << "field3"
-                                 << BSON_ARRAY(1.2 << 3.4 << 5.6) << "field4"
-                                 << BSON_ARRAY(BSONBinData(array1, 3, BinDataGeneral)
-                                               << BSONBinData(array2, 3, BinDataGeneral))
-                                 << "field5"
-                                 << BSON_ARRAY(BSONBinData(array15, 16, newUUID)
-                                               << BSONBinData(array16, 16, newUUID)));
+    auto testDoc = [&] {
+        BSONObjBuilder bob;
+        BSONArrayBuilder{bob.subarrayStart("field1")}.append("Foo").append("Bar").append("???");
+        BSONArrayBuilder{bob.subarrayStart("field2")}.append(1).append(2).append(3);
+        BSONArrayBuilder{bob.subarrayStart("field3")}.append(1.2).append(3.4).append(5.6);
+        BSONArrayBuilder{bob.subarrayStart("field4")}
+            .append(BSONBinData(array1, 3, BinDataGeneral))
+            .append(BSONBinData(array2, 3, BinDataGeneral));
+        BSONArrayBuilder{bob.subarrayStart("field5")}
+            .append(BSONBinData(array15, 16, newUUID))
+            .append(BSONBinData(array16, 16, newUUID));
+        return bob.obj();
+    }();
     auto testStruct = Simple_array_fields::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getField1()), std::vector<StringData>>();

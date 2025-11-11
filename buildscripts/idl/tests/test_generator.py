@@ -177,7 +177,7 @@ class TestGenerator(testcase.IDLTestcase):
         """)
         expected = dedent("""
         void Pokedex::serialize(BSONObjBuilder* builder) const {
-            _hasMembers.required();
+            handleMissingRequiredFields(_hasMembers, fieldMetadata, fieldToRequiredFieldPositions);
         
             {
                 BSONArrayBuilder arrayBuilder(builder->subarrayStart(kKnownPokemonsFieldName));
@@ -218,7 +218,7 @@ class TestGenerator(testcase.IDLTestcase):
         """)
         expected = dedent("""
         void Pokedex::serialize(BSONObjBuilder* builder) const {
-            _hasMembers.required();
+            handleMissingRequiredFields(_hasMembers, fieldMetadata, fieldToRequiredFieldPositions);
         
             {
                 BSONArrayBuilder arrayBuilder(builder->subarrayStart(kKnownPokemonsFieldName));
@@ -264,7 +264,7 @@ class TestGenerator(testcase.IDLTestcase):
 
         expected = dedent("""
         void QueryShapeSpec::serialize(BSONObjBuilder* builder, const SerializationOptions& options) const {
-            _hasMembers.required();
+            handleMissingRequiredFields(_hasMembers, fieldMetadata, fieldToRequiredFieldPositions);
 
             {
                 const BSONObj localObject = _internalObject.toBSON(options);
@@ -309,7 +309,7 @@ class TestGenerator(testcase.IDLTestcase):
 
         expected = dedent("""
         void QueryShapeSpec::serialize(BSONObjBuilder* builder, const SerializationOptions& options) const {
-            _hasMembers.required();
+            handleMissingRequiredFields(_hasMembers, fieldMetadata, fieldToRequiredFieldPositions);
 
             {
                 BSONArrayBuilder arrayBuilder(builder->subarrayStart(kInternalObjectArrayFieldName));

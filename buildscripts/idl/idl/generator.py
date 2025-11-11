@@ -167,8 +167,8 @@ def _get_bson_type_check(bson_element, ctxt_name, ast_type):
         )
     else:
         return (
-            f'MONGO_likely({ctxt_name}.checkAndAssertTypes({bson_element}, '
-            f'{_std_array_expr("BSONType", [bson.cpp_bson_type_name(b) for b in bson_types])}))'
+            f"MONGO_likely({ctxt_name}.checkAndAssertTypes({bson_element}, "
+            f"{_std_array_expr('BSONType', [bson.cpp_bson_type_name(b) for b in bson_types])}))"
         )
 
 
@@ -229,9 +229,10 @@ def _gen_field_element_name(field):
     return "BSONElement_%s" % (common.title_case(field.cpp_name))
 
 
-def _gen_mark_present(field_name):
-    # type: (str) -> str
-    return f"_hasMembers.markPresent(static_cast<size_t>(RequiredFields::{field_name}));"
+def _gen_mark_present(field):
+    # type: (ast.Field) -> str
+    kname = _get_field_kname(field)
+    return f"_hasMembers.markPresent(fieldToRequiredFieldPositions[size_t(Field::{kname})]);"
 
 
 def _is_parse(field):
@@ -759,7 +760,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 body = f"{_get_field_member_getter_name(field.nested_chained_parent)}().{memfn}(std::move(value));"
             else:
                 body = cpp_type_info.get_setter_body(_get_field_member_name(field), validator)
-        set_has = _gen_mark_present(field.cpp_name) if is_serial else ""
+        set_has = _gen_mark_present(field) if is_serial else ""
 
         with self._block(f"void {memfn}({setter_type} value) {{", "}"):
             self._writer.write_line(body)
@@ -875,16 +876,25 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         with self._block("enum class Field {", "};"):
             for f in struct.fields:
                 self._writer.write_line(f"{_get_field_kname(f)},")
-        with self._block("static constexpr std::array fieldNames{", "};"):
+        with self._block(
+            f"static constexpr std::array<::mongo::idl::FieldMetadata, {len(struct.fields)}> fieldMetadata{{{{",
+            "}};",
+        ):
+            required_field_names = [f.cpp_name for f in _get_required_fields(struct)]
             for f in struct.fields:
-                self._writer.write_line(f'"{f.name}"_sd,')
-        self._writer.write_empty_line()
-
-    def gen_required_field_enum(self, struct):
+                name = f.name
+                req = "false"
+                for rf in required_field_names:
+                    if rf == f.cpp_name:
+                        req = "true"
+                self._writer.write_line(f'{{"{name}"_sd, {req}}},')
         self._writer.write_line(
-            "enum class RequiredFields : size_t { %s };"
-            % ", ".join([f.cpp_name for f in _get_required_fields(struct)])
+            "static constexpr std::array fieldNames = mongo::idl::extractNames<fieldMetadata>();"
         )
+        self._writer.write_line(
+            "static constexpr std::array fieldToRequiredFieldPositions = mongo::idl::extractRequiredFieldPositions<fieldMetadata>();"
+        )
+        self._writer.write_empty_line()
 
     def gen_authorization_contract_declaration(self, struct):
         # type: (ast.Struct) -> None
@@ -1420,7 +1430,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     self.write_unindented_line("private:")
                     self._writer.write_line("struct FieldInfo;")
 
-                    self.gen_required_field_enum(struct)
                     self.write_empty_line()
 
                     if struct.generate_comparison_operators:
@@ -1466,7 +1475,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                         scp.name, "Default", scp.default, scp.condition, scp.mod_visibility
                     )
                 self._writer.write_line(
-                    f"{make_mod_tag(scp.mod_visibility)}constexpr inline auto {_get_constant(scp.name + 'Name')} = \"{scp.name}\"_sd;"
+                    f'{make_mod_tag(scp.mod_visibility)}constexpr inline auto {_get_constant(scp.name + "Name")} = "{scp.name}"_sd;'
                 )
                 self._gen_extern_declaration(
                     scp.cpp_vartype, scp.cpp_varname, scp.condition, scp.mod_visibility
@@ -1753,7 +1762,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in array_types
                 ]
                 self._writer.write_line(
-                    f'ctxt.throwBadType({bson_element},  {_std_array_expr("BSONType", expected_types)});'
+                    f"ctxt.throwBadType({bson_element},  {_std_array_expr('BSONType', expected_types)});"
                 )
                 self._writer.write_line("break;")
                 self._writer.unindent()
@@ -1796,7 +1805,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in scalar_types
         ]
         self._writer.write_line(
-            f'ctxt.throwBadType({bson_element}, ' f'{_std_array_expr("BSONType", expected_types)});'
+            f"ctxt.throwBadType({bson_element}, {_std_array_expr('BSONType', expected_types)});"
         )
         self._writer.write_line("break;")
         self._writer.unindent()
@@ -1867,7 +1876,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add(field, bson_element)
 
             if _is_required_serializer_field(field):
-                self._writer.write_line(_gen_mark_present(field.cpp_name))
+                self._writer.write_line(_gen_mark_present(field))
 
     def gen_field_deserializer(
         self,
@@ -2156,11 +2165,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             initializers_str = ": " + ", ".join(initializers)
 
         with self._block("%s %s {" % (constructor.get_definition(), initializers_str), "}"):
+            db_field = None
             for field in _get_required_fields(struct):
+                if field.name == "$db":
+                    db_field = field
                 if not (field.name == "$db" and initializes_db_name) and not default_init:
-                    self._writer.write_line(_gen_mark_present(field.cpp_name))
+                    self._writer.write_line(_gen_mark_present(field))
             if initializes_db_name:
-                self._writer.write_line(_gen_mark_present("dbName"))
+                assert db_field is not None
+                self._writer.write_line(_gen_mark_present(db_field))
         self._writer.write_empty_line()
 
     def gen_constructors(self, struct):
@@ -2569,7 +2582,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             field_usage_check.add(field, "sequence.name")
 
                             if _is_required_serializer_field(field):
-                                self._writer.write_line(_gen_mark_present(field.cpp_name))
+                                self._writer.write_line(_gen_mark_present(field))
 
                             self.gen_doc_sequence_deserializer(
                                 field, "request.getValidatedTenantId()"
@@ -2911,7 +2924,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         ]
 
         if required_fields:
-            self._writer.write_line("_hasMembers.required();")
+            self._writer.write_line(
+                "handleMissingRequiredFields(_hasMembers, fieldMetadata, fieldToRequiredFieldPositions);"
+            )
             self._writer.write_empty_line()
 
         # Serialize the namespace as the first field
