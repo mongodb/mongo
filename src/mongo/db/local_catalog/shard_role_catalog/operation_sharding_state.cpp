@@ -90,7 +90,7 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
     auto& oss = OperationShardingState::get(opCtx);
 
-    if (shardVersion && shardVersion != ShardVersion::UNSHARDED()) {
+    if (shardVersion && shardVersion != ShardVersion::UNTRACKED()) {
         tassert(
             6300900, "Attaching a shard version requires a non db-only namespace", !nss.isDbOnly());
     }
@@ -258,7 +258,7 @@ ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,
         uassert(7331300,
                 "A 'fixed' dbVersion should only be used with an unsharded shard version or none "
                 "at all",
-                !_shardVersion || _shardVersion == ShardVersion::UNSHARDED());
+                !_shardVersion || _shardVersion == ShardVersion::UNTRACKED());
         _databaseVersion.reset();
         _shardVersion.reset();
     }

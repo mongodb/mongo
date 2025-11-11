@@ -142,7 +142,7 @@ public:
         const auto coll = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(kTestNamespace,
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);

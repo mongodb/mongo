@@ -1422,7 +1422,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(OperationCo
         auto coll = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(nss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kWrite),
             MODE_X);
@@ -1471,7 +1471,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
         const auto coll = acquireCollection(
             opCtx.get(),
             CollectionAcquisitionRequest(nss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kWrite),
             MODE_X);

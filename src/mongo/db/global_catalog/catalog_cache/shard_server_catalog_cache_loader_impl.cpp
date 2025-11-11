@@ -115,7 +115,7 @@ void dropChunksIfEpochChanged(OperationContext* opCtx,
                               const ChunkVersion& maxLoaderVersion,
                               const OID& currentEpoch,
                               const NamespaceString& nss) {
-    if (maxLoaderVersion == ChunkVersion::UNSHARDED() || maxLoaderVersion.epoch() == currentEpoch) {
+    if (maxLoaderVersion == ChunkVersion::UNTRACKED() || maxLoaderVersion.epoch() == currentEpoch) {
         return;
     }
 
@@ -211,7 +211,7 @@ Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
  *
  * Retrieves the persisted max chunk version for 'nss', if there are any persisted chunks. If there
  * are none -- meaning there's no persisted metadata for 'nss' --, returns a
- * ChunkVersion::UNSHARDED() version.
+ * ChunkVersion::UNTRACKED() version.
  *
  * It is unsafe to call this when a task for 'nss' is running concurrently because the collection
  * could be dropped and recreated or have its shard key refined between reading the collection epoch
@@ -223,7 +223,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
     auto statusWithCollection = readShardCollectionsEntry(opCtx, nss);
     if (statusWithCollection == ErrorCodes::NamespaceNotFound) {
         // There is no persisted metadata.
-        return ChunkVersion::UNSHARDED();
+        return ChunkVersion::UNTRACKED();
     }
 
     uassertStatusOKWithContext(statusWithCollection,
@@ -240,7 +240,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         // Therefore, we have no choice but to just throw away the cache and start from scratch.
         uassertStatusOK(dropChunksAndDeleteCollectionsEntry(opCtx, nss));
 
-        return ChunkVersion::UNSHARDED();
+        return ChunkVersion::UNTRACKED();
     }
 
     auto statusWithChunk = readShardChunks(opCtx,
@@ -255,7 +255,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         str::stream() << "Failed to read highest version persisted chunk for collection '"
                       << nss.toStringForErrorMsg() << "'.");
 
-    return statusWithChunk.getValue().empty() ? ChunkVersion::UNSHARDED()
+    return statusWithChunk.getValue().empty() ? ChunkVersion::UNTRACKED()
                                               : statusWithChunk.getValue().front().getVersion();
 }
 
@@ -807,7 +807,7 @@ ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetChunksSince(
                           "error"_attr = redact(parseError.toStatus()),
                           logAttrs(nss));
             uassertStatusOK(dropChunksAndDeleteCollectionsEntry(opCtx, nss));
-            return ChunkVersion::UNSHARDED();
+            return ChunkVersion::UNTRACKED();
         }
     }();
 
@@ -1469,7 +1469,7 @@ ShardServerCatalogCacheLoaderImpl::CollAndChunkTask::CollAndChunkTask(
                             statusWithCollectionAndChangedChunks.getStatus().toString()),
                 statusWithCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
         dropped = true;
-        maxQueryVersion = ChunkVersion::UNSHARDED();
+        maxQueryVersion = ChunkVersion::UNTRACKED();
     }
 }
 

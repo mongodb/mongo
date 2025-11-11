@@ -361,7 +361,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
         ASSERT_EQ(request.dbname, nss1.dbName());
         ASSERT_EQ(request.cmdObj.getField("_shardsvrCreateCollection").String(), nss1.coll());
         BSONObjBuilder shardVersionBuilder;
-        ShardVersion::UNSHARDED().serialize("", &shardVersionBuilder);
+        ShardVersion::UNTRACKED().serialize("", &shardVersionBuilder);
         return BSON("ok" << 1.0 << "collectionUUID" << UUID::gen() << "collectionVersion"
                          << shardVersionBuilder.obj().firstElement().Obj());
     });

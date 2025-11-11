@@ -6812,7 +6812,7 @@ boost::optional<CollectionAcquisition> acquireUserColl(OperationContext* opCtx) 
     return boost::make_optional<CollectionAcquisition>(acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(kNss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead),
         MODE_IX));
@@ -6965,7 +6965,7 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     auto configTransactions = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
@@ -7156,7 +7156,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
         auto configTransactions = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -7236,7 +7236,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     auto configTransactions = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);

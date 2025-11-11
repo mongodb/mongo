@@ -181,7 +181,7 @@ public:
         mongoDSessionCatalog->onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
-        setUnshardedFilteringMetadata(kNs);
+        setUntrackedFilteringMetadata(kNs);
     }
 
     void returnOplog(const std::vector<OplogEntry>& oplogList) {
@@ -445,7 +445,7 @@ public:
                     sessionMigration->getState());
     }
 
-    void setUnshardedFilteringMetadata(const NamespaceString& nss) {
+    void setUntrackedFilteringMetadata(const NamespaceString& nss) {
         AutoGetDb autoDb(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(operationContext(),

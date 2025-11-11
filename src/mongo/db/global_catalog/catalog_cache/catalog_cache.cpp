@@ -825,12 +825,12 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
     // This object will define the new time of the routing info obtained by this refresh
     auto newComparableVersion =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNTRACKED());
 
     Timer t{};
     try {
         auto lookupVersion =
-            isIncremental ? existingHistory->optRt->getVersion() : ChunkVersion::UNSHARDED();
+            isIncremental ? existingHistory->optRt->getVersion() : ChunkVersion::UNTRACKED();
 
         LOGV2_FOR_CATALOG_REFRESH(4619900,
                                   1,

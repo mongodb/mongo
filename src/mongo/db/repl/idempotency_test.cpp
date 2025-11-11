@@ -139,7 +139,7 @@ BSONObj RandomizedIdempotencyTest::getDoc() {
     auto coll = acquireCollection(
         _opCtx.get(),
         CollectionAcquisitionRequest(_nss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(_opCtx.get()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);

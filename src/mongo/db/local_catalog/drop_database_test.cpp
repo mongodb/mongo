@@ -211,7 +211,7 @@ void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
     ASSERT_TRUE(acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kRead),
                                   MODE_IS)

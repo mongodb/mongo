@@ -117,9 +117,9 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleIgnoresFixedDbVersion) {
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleAllowedShardVersionsWithFixedDbVersion) {
     {
-        // The UNSHARDED version can be passed with a fixed dbVersion.
+        // The UNTRACKED version can be passed with a fixed dbVersion.
         DatabaseVersion dbv{DatabaseVersion::makeFixed()};
-        ShardVersion sv{ShardVersion::UNSHARDED()};
+        ShardVersion sv{ShardVersion::UNTRACKED()};
         ScopedSetShardRole scopedSetShardRole0(operationContext(), kNss, sv, dbv);
     }
 

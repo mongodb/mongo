@@ -348,7 +348,7 @@ TEST_F(RecordIdDeduplicatorCatalogTest, canSpillWithAcquiredCollection) {
     auto acquisition = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(kNss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(operationContext()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);

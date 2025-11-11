@@ -104,7 +104,7 @@ public:
         const auto collection = acquireCollection(
             &_opCtx,
             CollectionAcquisitionRequest(NamespaceString::createNamespaceString_forTest(ns()),
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                          repl::ReadConcernArgs::get(&_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -143,7 +143,7 @@ public:
         const auto collection = acquireCollection(
             &_opCtx,
             CollectionAcquisitionRequest(NamespaceString::createNamespaceString_forTest(ns()),
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                          repl::ReadConcernArgs::get(&_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -158,7 +158,7 @@ public:
         const auto collection = acquireCollection(
             &_opCtx,
             CollectionAcquisitionRequest(NamespaceString::createNamespaceString_forTest(ns()),
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                          repl::ReadConcernArgs::get(&_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);

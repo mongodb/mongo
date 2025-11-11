@@ -43,7 +43,7 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
     const ShardId kShardId("SHARD_ID");
 
-    StaleConfigInfo info(kNss, ShardVersion::UNSHARDED(), ShardVersion::UNSHARDED(), kShardId);
+    StaleConfigInfo info(kNss, ShardVersion::UNTRACKED(), ShardVersion::UNTRACKED(), kShardId);
 
     // Serialize
     BSONObjBuilder bob;
@@ -54,13 +54,13 @@ TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
         std::static_pointer_cast<const StaleConfigInfo>(StaleConfigInfo::parse(bob.obj()));
 
     ASSERT_EQUALS(deserializedInfo->getNss(), kNss);
-    ASSERT_EQUALS(deserializedInfo->getVersionReceived(), ShardVersion::UNSHARDED());
-    ASSERT_EQUALS(*deserializedInfo->getVersionWanted(), ShardVersion::UNSHARDED());
+    ASSERT_EQUALS(deserializedInfo->getVersionReceived(), ShardVersion::UNTRACKED());
+    ASSERT_EQUALS(*deserializedInfo->getVersionWanted(), ShardVersion::UNTRACKED());
     ASSERT_EQUALS(deserializedInfo->getShardId(), kShardId);
 }
 
 TEST(StaleExceptionTest, StaleEpochInfoSerializationTest) {
-    StaleEpochInfo info(kNss, ShardVersion::UNSHARDED(), ShardVersion::UNSHARDED());
+    StaleEpochInfo info(kNss, ShardVersion::UNTRACKED(), ShardVersion::UNTRACKED());
 
     // Serialize
     BSONObjBuilder bob;
@@ -71,8 +71,8 @@ TEST(StaleExceptionTest, StaleEpochInfoSerializationTest) {
         std::static_pointer_cast<const StaleEpochInfo>(StaleEpochInfo::parse(bob.obj()));
 
     ASSERT_EQ(deserializedInfo->getNss(), kNss);
-    ASSERT_EQ(deserializedInfo->getVersionReceived(), ShardVersion::UNSHARDED());
-    ASSERT_EQ(deserializedInfo->getVersionWanted(), ShardVersion::UNSHARDED());
+    ASSERT_EQ(deserializedInfo->getVersionReceived(), ShardVersion::UNTRACKED());
+    ASSERT_EQ(deserializedInfo->getVersionWanted(), ShardVersion::UNTRACKED());
 }
 
 }  // namespace

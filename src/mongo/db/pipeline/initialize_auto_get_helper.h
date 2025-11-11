@@ -58,7 +58,7 @@ inline std::vector<ScopedSetShardRole> createScopedShardRoles(
         bool isTracked = nssCri->second.hasRoutingTable();
         auto shardVersion = [&] {
             auto sv =
-                isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNSHARDED();
+                isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNTRACKED();
 
             if (auto txnRouter = TransactionRouter::get(opCtx);
                 txnRouter && opCtx->inMultiDocumentTransaction()) {

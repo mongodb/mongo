@@ -244,17 +244,17 @@ void NamespaceString::serializeCollectionName(BSONObjBuilder* builder, StringDat
 }
 
 bool NamespaceString::isNamespaceAlwaysUntracked() const {
-    // Local and admin never have sharded collections
+    // Local and admin never have tracked collections
     if (isLocalDB() || isAdminDB())
         return true;
 
-    // Config can only have the system.sessions as sharded
+    // Config can only have the system.sessions as tracked
     if (isConfigDB())
         return *this != NamespaceString::kLogicalSessionsNamespace;
 
     if (isSystem()) {
-        // Only some system collections (<DB>.system.<COLL>) can be sharded,
-        // all the others are always unsharded.
+        // Only some system collections (<DB>.system.<COLL>) can be tracked,
+        // all the others are always untracked.
         // This list does not contain 'config.system.sessions' because we already check it above
         return !isTemporaryReshardingCollection() && !isTimeseriesBucketsCollection();
     }

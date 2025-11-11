@@ -185,7 +185,7 @@ TEST_F(
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);
     ASSERT_FALSE(optCurrMetadata->isSharded());
-    ASSERT_EQ(optCurrMetadata->getShardPlacementVersion(), ChunkVersion::UNSHARDED());
+    ASSERT_EQ(optCurrMetadata->getShardPlacementVersion(), ChunkVersion::UNTRACKED());
 }
 
 TEST_F(
@@ -507,12 +507,12 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanUnsharde
 
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
-    // Test that the trackers will be invalidated with version ChunkVersion::UNSHARDED().
-    // Test is prepared for the case when UNSHARDED metadata will be started to be tracked. In this
-    // case ownershipFilter::shardPlacementVersion = UNSHARDED. Currently it's not possible to test
+    // Test that the trackers will be invalidated with version ChunkVersion::UNTRACKED().
+    // Test is prepared for the case when UNTRACKED metadata will be started to be tracked. In this
+    // case ownershipFilter::shardPlacementVersion = UNTRACKED. Currently it's not possible to test
     // as in this case metadataManager is not created for unsharded collection. When it will be
     // changed it will be possible to test against a current version.
-    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, ChunkVersion::UNSHARDED());
+    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, ChunkVersion::UNTRACKED());
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 

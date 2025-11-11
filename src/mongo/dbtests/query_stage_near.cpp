@@ -85,7 +85,7 @@ public:
         _coll = acquireCollectionMaybeLockFree(
             _opCtx,
             CollectionAcquisitionRequest(kTestNamespace,
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kRead));
         const auto& collPtr = _coll->getCollectionPtr();
@@ -257,7 +257,7 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     auto coll = acquireCollectionMaybeLockFree(
         _opCtx,
         CollectionAcquisitionRequest(kTestNamespace,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(_opCtx),
                                      AcquisitionPrerequisites::kRead));
     ASSERT(coll.exists());

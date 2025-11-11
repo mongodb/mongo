@@ -203,7 +203,7 @@ public:
                 auto cmd = create_collection_util::makeCreateCommand(
                     opCtx, ns(), request().getShardsvrCreateCollectionRequest());
                 runCreateCommandDirectClient(opCtx, ns(), cmd);
-                return CreateCollectionResponse{ShardVersion::UNSHARDED()};
+                return CreateCollectionResponse{ShardVersion::UNTRACKED()};
             }
 
             tassert(ErrorCodes::InvalidOptions,
@@ -354,7 +354,7 @@ public:
             auto cmd = create_collection_util::makeCreateCommand(
                 opCtx, ns(), request().getShardsvrCreateCollectionRequest());
             runCreateCommandDirectClient(opCtx, ns(), cmd);
-            return CreateCollectionResponse{ShardVersion::UNSHARDED()};
+            return CreateCollectionResponse{ShardVersion::UNTRACKED()};
         }
 
         // TODO (SERVER-100309): remove once 9.0 becomes last LTS.

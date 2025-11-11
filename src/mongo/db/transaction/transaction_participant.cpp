@@ -465,7 +465,7 @@ void updateSessionEntry(OperationContext* opCtx,
     const auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
@@ -672,7 +672,7 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         auto collectionAcquisition = acquireCollectionMaybeLockFree(
             opCtx.get(),
             CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kRead,
                                          deadline));

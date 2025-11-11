@@ -179,7 +179,7 @@ boost::optional<std::pair<NamespaceString, ChunkType>> getRandomUntrackedCollect
         auto& collectionUUID = coll.second.getInfo()->getUuid().get();
         ChunkType dummyChunk{collectionUUID,
                              ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)),
-                             ChunkVersion::UNSHARDED(),
+                             ChunkVersion::UNTRACKED(),
                              shardId};
         return std::make_pair(std::move(coll.first), dummyChunk);
     }

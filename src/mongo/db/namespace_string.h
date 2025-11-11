@@ -60,9 +60,9 @@ public:
     constexpr static size_t MaxUserNsCollectionLen = 255;
     constexpr static size_t MaxInternalNsCollectionLen = 511;
 
-    // The maximum namespace length of sharded collections is less than that of unsharded ones since
+    // The maximum namespace length of tracked collections is less than that of untracked ones since
     // the namespace of the cached chunks metadata, local to each shard, is composed by the
-    // namespace of the related sharded collection (i.e., config.cache.chunks.<ns>).
+    // namespace of the related tracked collection (i.e., config.cache.chunks.<ns>).
     constexpr static size_t MaxUserNsShardedCollectionLen =
         235;  // 255 - len(ChunkType::ShardNSPrefix)
 

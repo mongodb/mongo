@@ -791,7 +791,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
 
             auto shardVersion = cri.hasRoutingTable()
                 ? boost::make_optional(cri.getShardVersion(*shardId))
-                : boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNSHARDED());
+                : boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNTRACKED());
             auto dbVersion =
                 cri.hasRoutingTable() ? boost::none : boost::make_optional(cri.getDbVersion());
 
@@ -1010,7 +1010,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
             _runCommand(
                 opCtx,
                 cri.getDbPrimaryShardId(),
-                boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNSHARDED()),
+                boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNTRACKED()),
                 cri.getDbVersion(),
                 nss,
                 applyReadWriteConcern(opCtx, this, cmdObjForShard),

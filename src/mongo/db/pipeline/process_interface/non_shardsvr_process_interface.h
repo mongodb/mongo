@@ -186,16 +186,16 @@ public:
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) override;
 
-    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+    std::unique_ptr<ScopedExpectUntrackedCollection> expectUntrackedCollectionInScope(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const boost::optional<DatabaseVersion>& dbVersion) override {
-        class ScopedExpectUnshardedCollectionNoop : public ScopedExpectUnshardedCollection {
+        class ScopedExpectUntrackedCollectionNoop : public ScopedExpectUntrackedCollection {
         public:
-            ScopedExpectUnshardedCollectionNoop() = default;
+            ScopedExpectUntrackedCollectionNoop() = default;
         };
 
-        return std::make_unique<ScopedExpectUnshardedCollectionNoop>();
+        return std::make_unique<ScopedExpectUntrackedCollectionNoop>();
     }
 
 protected:

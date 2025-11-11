@@ -174,7 +174,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                 acquireCollection(newCtx.get(),
                                   CollectionAcquisitionRequest(
                                       dbProfilingNS,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(newCtx.get()),
                                       AcquisitionPrerequisites::kUnreplicatedWrite),
                                   MODE_IX));

@@ -64,8 +64,8 @@ public:
 
     ShardVersion() : _chunkVersion(ChunkVersion()) {}
 
-    static ShardVersion UNSHARDED() {
-        return ShardVersion(ChunkVersion::UNSHARDED(), boost::none);
+    static ShardVersion UNTRACKED() {
+        return ShardVersion(ChunkVersion::UNTRACKED(), boost::none);
     }
 
     static bool isPlacementVersionIgnored(const ShardVersion& version) {

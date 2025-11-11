@@ -60,13 +60,13 @@ TEST(ChunkVersionTest, EqualityOperators) {
     ASSERT_NE(ChunkVersion({epoch, timestamp}, {1, 0}), ChunkVersion({OID(), Timestamp()}, {0, 0}));
 
     // Special versions
-    ASSERT_EQ(ChunkVersion::UNSHARDED(), ChunkVersion::UNSHARDED());
+    ASSERT_EQ(ChunkVersion::UNTRACKED(), ChunkVersion::UNTRACKED());
     ASSERT_EQ(ChunkVersion::IGNORED(), ChunkVersion::IGNORED());
-    ASSERT_NE(ChunkVersion::UNSHARDED(), ChunkVersion::IGNORED());
+    ASSERT_NE(ChunkVersion::UNTRACKED(), ChunkVersion::IGNORED());
 
-    // UNSHARDED vs normal versions
-    ASSERT_NE(ChunkVersion::UNSHARDED(), ChunkVersion({epoch, timestamp}, {1, 0}));
-    ASSERT_NE(ChunkVersion({epoch, timestamp}, {1, 0}), ChunkVersion::UNSHARDED());
+    // UNTRACKED vs normal versions
+    ASSERT_NE(ChunkVersion::UNTRACKED(), ChunkVersion({epoch, timestamp}, {1, 0}));
+    ASSERT_NE(ChunkVersion({epoch, timestamp}, {1, 0}), ChunkVersion::UNTRACKED());
 
     // IGNORED vs normal versions
     ASSERT_NE(ChunkVersion::IGNORED(), ChunkVersion({epoch, timestamp}, {1, 0}));
@@ -137,13 +137,13 @@ TEST(ChunkVersionTest, ThreeWayComparisonOperator) {
     Timestamp timestamp(1);
     Timestamp newerTimestamp(2);
 
-    // Test unordered cases - UNSHARDED versions
+    // Test unordered cases - UNTRACKED versions
     ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion::UNSHARDED() <=> ChunkVersion({epoch, timestamp}, {3, 1}));
+              ChunkVersion::UNTRACKED() <=> ChunkVersion({epoch, timestamp}, {3, 1}));
     ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion({epoch, timestamp}, {3, 1}) <=> ChunkVersion::UNSHARDED());
+              ChunkVersion({epoch, timestamp}, {3, 1}) <=> ChunkVersion::UNTRACKED());
     ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion::UNSHARDED() <=> ChunkVersion::UNSHARDED());
+              ChunkVersion::UNTRACKED() <=> ChunkVersion::UNTRACKED());
 
     // Test unordered cases - IGNORED versions
     ASSERT_EQ(std::partial_ordering::unordered,
@@ -153,11 +153,11 @@ TEST(ChunkVersionTest, ThreeWayComparisonOperator) {
     ASSERT_EQ(std::partial_ordering::unordered,
               ChunkVersion::IGNORED() <=> ChunkVersion::IGNORED());
 
-    // Test unordered cases - UNSHARDED vs IGNORED
+    // Test unordered cases - UNTRACKED vs IGNORED
     ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion::UNSHARDED() <=> ChunkVersion::IGNORED());
+              ChunkVersion::UNTRACKED() <=> ChunkVersion::IGNORED());
     ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion::IGNORED() <=> ChunkVersion::UNSHARDED());
+              ChunkVersion::IGNORED() <=> ChunkVersion::UNTRACKED());
 
     // Test unordered cases - unset placement versions from same collection generation
     ASSERT_EQ(std::partial_ordering::unordered,

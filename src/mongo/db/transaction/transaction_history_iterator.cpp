@@ -89,7 +89,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
     const auto oplogRead = acquireCollectionOrViewMaybeLockFree(
         opCtx,
         CollectionOrViewAcquisitionRequest(NamespaceString::kRsOplogNamespace,
-                                           PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                           PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                            repl::ReadConcernArgs::get(opCtx),
                                            AcquisitionPrerequisites::kRead));
 

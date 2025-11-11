@@ -96,7 +96,7 @@ namespace {
 // +---------+-------------------------+-------------+---------------+---------------+
 // | Db Name |          Coll Name      |   Sharded?  |   Db Version  | Shard Version |
 // +---------+-------------------------+-------------+---------------+---------------+
-// | testDB1 |   unsharded.radiohead   |     NO      |      dbV1     |   UNSHARDED() |
+// | testDB1 |   unsharded.radiohead   |     NO      |      dbV1     |   UNTRACKED() |
 // | testDB1 | sharded.porcupine.tree  |     YES     |      dbV1     |       sV1     |
 // | testDB2 |       sharded.oasis     |     YES     |      dbV2     |       sV2     |
 // +---------+-------------------------+-------------+---------------+---------------+
@@ -135,11 +135,11 @@ protected:
         CollectionGeneration{OID::gen(), Timestamp(12, 0)}, CollectionPlacement(10, 1)));
 };
 
-void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto unshardedCollectionMetadata = CollectionMetadata::UNTRACKED();
+void installUntrackedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+    const auto untrackedCollectionMetadata = CollectionMetadata::UNTRACKED();
     AutoGetCollection coll(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-        ->setFilteringMetadata(opCtx, unshardedCollectionMetadata);
+        ->setFilteringMetadata(opCtx, untrackedCollectionMetadata);
 }
 
 void installShardedCollectionMetadata(OperationContext* opCtx,
@@ -196,7 +196,7 @@ void BulkWriteShardTest::setUp() {
 
     // Create nssUnshardedCollection1
     createTestCollection(opCtx(), nssUnshardedCollection1);
-    installUnshardedCollectionMetadata(opCtx(), nssUnshardedCollection1);
+    installUntrackedCollectionMetadata(opCtx(), nssUnshardedCollection1);
 
     // Create nssShardedCollection1
     createTestCollection(opCtx(), nssShardedCollection1);
@@ -240,7 +240,7 @@ TEST_F(BulkWriteShardTest, ThreeSuccessfulInsertsOrdered) {
          BulkWriteInsertOp(2, BSON("x" << -1))},
         {
             nsInfoWithShardDatabaseVersions(
-                nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNSHARDED()),
+                nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNTRACKED()),
             nsInfoWithShardDatabaseVersions(
                 nssShardedCollection1, dbVersionTestDb1, shardVersionShardedCollection1),
             nsInfoWithShardDatabaseVersions(
@@ -267,7 +267,7 @@ TEST_F(BulkWriteShardTest, OneFailingShardedOneSkippedUnshardedSuccessInsertOrde
         {nsInfoWithShardDatabaseVersions(
              nssShardedCollection1, dbVersionTestDb1, incorrectShardVersion),
          nsInfoWithShardDatabaseVersions(
-             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNSHARDED())});
+             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNTRACKED())});
 
     const auto& [replyItems, retriedStmtIds, summaryFields] =
         bulk_write::performWrites(opCtx(), request);
@@ -372,7 +372,7 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesSuccessOrdered) {
          nsInfoWithShardDatabaseVersions(
              nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2),
          nsInfoWithShardDatabaseVersions(
-             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNSHARDED())});
+             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNTRACKED())});
 
     const auto& [replyItems, retriedStmtIds, summaryFields] =
         bulk_write::performWrites(opCtx(), request);
@@ -398,7 +398,7 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesSuccessUnordered) {
          nsInfoWithShardDatabaseVersions(
              nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2),
          nsInfoWithShardDatabaseVersions(
-             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNSHARDED())});
+             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNTRACKED())});
 
     request.setOrdered(false);
 
@@ -426,7 +426,7 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesFailUnordered) {
          nsInfoWithShardDatabaseVersions(
              nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2),
          nsInfoWithShardDatabaseVersions(
-             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNSHARDED())});
+             nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNTRACKED())});
 
     request.setOrdered(false);
 
@@ -534,7 +534,7 @@ TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionUnordered) {
          BulkWriteInsertOp(0, BSON("x" << -1)),
          BulkWriteInsertOp(1, BSON("x" << -2))},
         {nsInfoWithShardDatabaseVersions(
-             nssUnshardedCollection1, incorrectDatabaseVersion, ShardVersion::UNSHARDED()),
+             nssUnshardedCollection1, incorrectDatabaseVersion, ShardVersion::UNTRACKED()),
          nsInfoWithShardDatabaseVersions(
              nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2)});
 

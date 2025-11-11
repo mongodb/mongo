@@ -106,7 +106,7 @@ class ShardRoleTest : public ShardServerTestFixture {
 protected:
     void setUp() override;
 
-    void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss);
+    void installUntrackedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss);
     void installShardedCollectionMetadata(
         OperationContext* opCtx,
         const NamespaceString& nss,
@@ -168,7 +168,7 @@ void ShardRoleTest::setUp() {
 
     // Create nssUnshardedCollection1
     createTestCollection(operationContext(), nssUnshardedCollection1);
-    installUnshardedCollectionMetadata(operationContext(), nssUnshardedCollection1);
+    installUntrackedCollectionMetadata(operationContext(), nssUnshardedCollection1);
 
     // Create nssShardedCollection1
     createTestCollection(operationContext(), nssShardedCollection1);
@@ -185,10 +185,10 @@ void ShardRoleTest::setUp() {
 
     // Setup nssView
     createTestView(operationContext(), nssView, nssUnshardedCollection1, viewPipeline);
-    installUnshardedCollectionMetadata(operationContext(), nssView);
+    installUntrackedCollectionMetadata(operationContext(), nssView);
 }
 
-void ShardRoleTest::installUnshardedCollectionMetadata(OperationContext* opCtx,
+void ShardRoleTest::installUntrackedCollectionMetadata(OperationContext* opCtx,
                                                        const NamespaceString& nss) {
     AutoGetCollection coll(
         opCtx,
@@ -257,7 +257,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const NamespaceString anotherCollection =
             NamespaceString::createNamespaceString_forTest("test2.foo");
         ScopedSetShardRole setShardRole(
-            operationContext(), anotherCollection, ShardVersion::UNSHARDED(), dbVersionTestDb);
+            operationContext(), anotherCollection, ShardVersion::UNTRACKED(), dbVersionTestDb);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
             operationContext(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(boost::none, acquisition.placementConcern.getDbVersion());
@@ -276,7 +276,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
 
     {
         const auto dbVersion = dbVersionTestDb;
-        const auto shardVersion = ShardVersion::UNSHARDED();
+        const auto shardVersion = ShardVersion::UNTRACKED();
         ScopedSetShardRole setShardRole(operationContext(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
             operationContext(), nss, AcquisitionPrerequisites::kWrite);
@@ -356,7 +356,7 @@ TEST_F(ShardRoleTest, AcquisitionWithInvalidNamespaceFails) {
 // Placement checks when acquiring unsharded collections
 
 TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
 
     auto validateAcquisition = [&](auto& acquisition) {
         ASSERT_EQ(nssUnshardedCollection1, acquisition.nss());
@@ -404,7 +404,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
 
 TEST_F(ShardRoleTest, AcquireUnshardedCollWithIncorrectPlacementVersionThrows) {
     const auto incorrectDbVersion = DatabaseVersion(UUID::gen(), Timestamp(50, 0));
-    PlacementConcern placementConcern{incorrectDbVersion, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{incorrectDbVersion, ShardVersion::UNTRACKED()};
 
     {
         auto scopedDss = DatabaseShardingStateMock::acquire(operationContext(), dbNameTestDb);
@@ -462,7 +462,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
     };
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     ASSERT_THROWS_WITH_CHECK(acquireCollection(operationContext(),
                                                {nssUnshardedCollection1,
                                                 placementConcern,
@@ -492,7 +492,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
     }
 
     {
-        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
 
         auto validateException = [&](const DBException& ex) {
             const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
@@ -654,12 +654,12 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
 }
 
 TEST_F(ShardRoleTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
 
     auto validateException = [&](const DBException& ex) {
         const auto exInfo = ex.extraInfo<StaleConfigInfo>();
         ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
-        ASSERT_EQ(ShardVersion::UNSHARDED(), exInfo->getVersionReceived());
+        ASSERT_EQ(ShardVersion::UNTRACKED(), exInfo->getVersionReceived());
         ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionWanted());
         ASSERT_EQ(kMyShardName, exInfo->getShardId());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -788,11 +788,11 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
 
 
 TEST_F(ShardRoleTest, AcquireInMultiDocumentTransactionMustCheckForPlacementConflictTime_NoThrow) {
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     OperationContext* opCtx = operationContext();
     // Simulate a routed request, this necessary for the check to throw.
     ScopedSetShardRole setShardRole(
-        opCtx, nssUnshardedCollection1, ShardVersion::UNSHARDED(), dbVersionTestDb);
+        opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
 
     // Never throw if we are not a multi-document transaction.
     ASSERT_DOES_NOT_THROW(
@@ -810,7 +810,7 @@ TEST_F(ShardRoleTest, AcquireInMultiDocumentTransactionMustCheckForPlacementConf
     auto dbVersionDbWithPlacementConflictTime = dbVersionTestDb;
     dbVersionDbWithPlacementConflictTime.setPlacementConflictTime(LogicalTime(Timestamp{0, 0}));
     placementConcern =
-        PlacementConcern{dbVersionDbWithPlacementConflictTime, ShardVersion::UNSHARDED()};
+        PlacementConcern{dbVersionDbWithPlacementConflictTime, ShardVersion::UNTRACKED()};
 
     ASSERT_DOES_NOT_THROW(
         acquireCollection(opCtx,
@@ -821,7 +821,7 @@ TEST_F(ShardRoleTest, AcquireInMultiDocumentTransactionMustCheckForPlacementConf
                           MODE_IS));
 
     // The PlacementConflictTime can also be set on the shardVersion
-    auto shardVersionWithPlacementConflictTime = ShardVersion::UNSHARDED();
+    auto shardVersionWithPlacementConflictTime = ShardVersion::UNTRACKED();
     shardVersionWithPlacementConflictTime.setPlacementConflictTime(LogicalTime(Timestamp{0, 0}));
     placementConcern = PlacementConcern{dbVersionTestDb, shardVersionWithPlacementConflictTime};
     ASSERT_DOES_NOT_THROW(
@@ -840,7 +840,7 @@ TEST_F(ShardRoleTest,
 
     // Do not throw for unrouted operations
     {
-        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
         ScopedSetShardRole setShardRole(opCtx, nssUnshardedCollection1, boost::none, boost::none);
         ASSERT_DOES_NOT_THROW(
             acquireCollection(opCtx,
@@ -853,9 +853,9 @@ TEST_F(ShardRoleTest,
 
     // Do not throw for (boost::none, unsharded)
     {
-        PlacementConcern placementConcern{boost::none, ShardVersion::UNSHARDED()};
+        PlacementConcern placementConcern{boost::none, ShardVersion::UNTRACKED()};
         ScopedSetShardRole setShardRole(
-            opCtx, nssUnshardedCollection1, ShardVersion::UNSHARDED(), dbVersionTestDb);
+            opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
         ASSERT_DOES_NOT_THROW(
             acquireCollection(opCtx,
                               CollectionAcquisitionRequest(nssUnshardedCollection1,
@@ -869,7 +869,7 @@ TEST_F(ShardRoleTest,
     {
         PlacementConcern placementConcern{boost::none, shardVersionIgnore};
         ScopedSetShardRole setShardRole(
-            opCtx, nssUnshardedCollection1, ShardVersion::UNSHARDED(), dbVersionTestDb);
+            opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
         ASSERT_DOES_NOT_THROW(
             acquireCollection(opCtx,
                               CollectionAcquisitionRequest(nssUnshardedCollection1,
@@ -883,11 +883,11 @@ TEST_F(ShardRoleTest,
 DEATH_TEST_REGEX_F(ShardRoleTest,
                    AcquireInMultiDocumentTransactionMissingPlacementConflictTime_version_unsharded,
                    "Tripwire assertion.*10206300") {
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     OperationContext* opCtx = operationContext();
     // Simulate a routed request, this necessary for the check to throw.
     ScopedSetShardRole setShardRole(
-        opCtx, nssUnshardedCollection1, ShardVersion::UNSHARDED(), dbVersionTestDb);
+        opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
     // Setting the operation context in multi-document transaction requires the version to include
     // the PlacementConflictTime
     opCtx->setInMultiDocumentTransaction();
@@ -1072,10 +1072,10 @@ TEST_F(ShardRoleTest, ConflictIsThrownWhenShardVersionUnshardedButStashedCatalog
     }
 
     // Try to acquire the now-dropped collection, with declared placement concern
-    // ShardVersion::UNSHARDED. Expect a conflict to be detected.
+    // ShardVersion::UNTRACKED. Expect a conflict to be detected.
     {
         ScopedSetShardRole setShardRole(
-            operationContext(), nssUnshardedCollection1, ShardVersion::UNSHARDED(), boost::none);
+            operationContext(), nssUnshardedCollection1, ShardVersion::UNTRACKED(), boost::none);
         ASSERT_THROWS_CODE(
             acquireCollectionOrView(
                 operationContext(),
@@ -1101,7 +1101,7 @@ TEST_F(ShardRoleTest, NoExceptionIsThrownWhenShardVersionUnshardedButStashedIsEq
     // snapshot points to a different object than the one kept by the catalog.
     {
         ScopedSetShardRole setShardRole(
-            operationContext(), nssUnshardedCollection1, ShardVersion::UNSHARDED(), boost::none);
+            operationContext(), nssUnshardedCollection1, ShardVersion::UNTRACKED(), boost::none);
         auto acquisition = acquireCollectionOrView(
             operationContext(),
             CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -1121,7 +1121,7 @@ TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeTakesLocksWhenInMultiDocTran
     const auto acquisition = acquireCollectionMaybeLockFree(
         operationContext(),
         {nssUnshardedCollection1,
-         {dbVersionDbWithPlacementConflictTime, ShardVersion::UNSHARDED()},
+         {dbVersionDbWithPlacementConflictTime, ShardVersion::UNTRACKED()},
          repl::ReadConcernArgs(),
          AcquisitionPrerequisites::kRead});
     ASSERT_TRUE(shard_role_details::getLocker(operationContext())
@@ -1132,7 +1132,7 @@ TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeDoesNotTakeLocksWhenNotInMul
     const auto acquisition =
         acquireCollectionMaybeLockFree(operationContext(),
                                        {nssUnshardedCollection1,
-                                        {dbVersionTestDb, ShardVersion::UNSHARDED()},
+                                        {dbVersionTestDb, ShardVersion::UNTRACKED()},
                                         repl::ReadConcernArgs(),
                                         AcquisitionPrerequisites::kRead});
     ASSERT_FALSE(
@@ -1145,7 +1145,7 @@ DEATH_TEST_REGEX_F(ShardRoleTest,
                    "Tripwire assertion") {
     ASSERT_THROWS_CODE(acquireCollectionMaybeLockFree(operationContext(),
                                                       {nssUnshardedCollection1,
-                                                       {dbVersionTestDb, ShardVersion::UNSHARDED()},
+                                                       {dbVersionTestDb, ShardVersion::UNTRACKED()},
                                                        repl::ReadConcernArgs(),
                                                        AcquisitionPrerequisites::kWrite}),
                        DBException,
@@ -1159,7 +1159,7 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
     const auto acquisitions = makeAcquisitionMap(
         acquireCollections(operationContext(),
                            {{nssUnshardedCollection1,
-                             PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+                             PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
                              repl::ReadConcernArgs(),
                              AcquisitionPrerequisites::kWrite},
                             {nssShardedCollection1,
@@ -1193,11 +1193,11 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThr
     ASSERT_THROWS_WITH_CHECK(
         acquireCollections(operationContext(),
                            {{nssUnshardedCollection1,
-                             PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+                             PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
                              repl::ReadConcernArgs(),
                              AcquisitionPrerequisites::kWrite},
                             {nssShardedCollection1,
-                             PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+                             PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
                              repl::ReadConcernArgs(),
                              AcquisitionPrerequisites::kWrite}},
                            MODE_IX),
@@ -1205,7 +1205,7 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThr
         [&](const DBException& ex) {
             const auto exInfo = ex.extraInfo<StaleConfigInfo>();
             ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
-            ASSERT_EQ(ShardVersion::UNSHARDED(), exInfo->getVersionReceived());
+            ASSERT_EQ(ShardVersion::UNTRACKED(), exInfo->getVersionReceived());
             ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionWanted());
             ASSERT_EQ(kMyShardName, exInfo->getShardId());
             ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -1237,7 +1237,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUID) {
     const auto acquisition =
         acquireCollection(operationContext(),
                           {NamespaceStringOrUUID(dbNameTestDb, uuid),
-                           PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+                           PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
                            repl::ReadConcernArgs(),
                            AcquisitionPrerequisites::kWrite},
                           MODE_IX);
@@ -1435,7 +1435,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDWithShardVersionAttachedThrows) {
     const auto shardVersion = shardVersionShardedCollection1;
     ScopedSetShardRole setShardRole(
         operationContext(), nssShardedCollection1, shardVersion, dbVersion);
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     ASSERT_THROWS_CODE(acquireCollection(operationContext(),
                                          {NamespaceStringOrUUID(dbNameTestDb, uuid),
                                           placementConcern,
@@ -1567,7 +1567,7 @@ TEST_F(ShardRoleTest, AcquireCollectionOrView) {
 TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
     const auto nss = nssUnshardedCollection1;
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     const auto acquisition = acquireCollection(operationContext(),
                                                {
                                                    nss,
@@ -1604,7 +1604,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
 TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
     const auto nss = nssUnshardedCollection1;
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     const auto acquisitions = makeAcquisitionMap(
         acquireCollectionsOrViewsMaybeLockFree(operationContext(),
                                                {{
@@ -1645,7 +1645,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreViewAcquisitionWithLocks) {
     const auto opCtx = operationContext();
     const auto nss = nssView;
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     const auto acquisition = acquireCollectionOrView(opCtx,
                                                      {
                                                          nss,
@@ -1695,7 +1695,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreViewAcquisitionWithoutLocks) {
     const auto opCtx = operationContext();
     const auto nss = nssView;
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     const auto acquisition =
         acquireCollectionOrViewMaybeLockFree(opCtx,
                                              {
@@ -2120,7 +2120,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
     AcquisitionPrerequisites::OperationType operationType) {
     const auto nss = nssUnshardedCollection1;
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     const auto acquisition =
         acquireCollection(operationContext(),
                           {nss, placementConcern, repl::ReadConcernArgs(), operationType},
@@ -2165,7 +2165,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionDroppedAndRecreated(
     AcquisitionPrerequisites::OperationType operationType) {
     const auto nss = nssUnshardedCollection1;
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     const auto acquisition =
         acquireCollection(operationContext(),
                           {nss, placementConcern, repl::ReadConcernArgs(), operationType},
@@ -2260,7 +2260,7 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 
 void ShardRoleTest::testRestoreFailsIfCollectionIsNowAView(
     AcquisitionPrerequisites::OperationType operationType) {
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
 
     const auto acquisition = acquireCollection(
         operationContext(),
@@ -2310,7 +2310,7 @@ TEST_F(ShardRoleTest, ReadSourceDoesNotChangeOnSecondary) {
     const auto coll = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(nss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(operationContext()),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
@@ -2338,7 +2338,7 @@ TEST_F(ShardRoleTest, WriteAcquisitionsDontChangeReadSourceToLastApplied) {
         acquireCollection(operationContext(),
                           {
                               nssUnshardedCollection1,
-                              PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+                              PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
                               repl::ReadConcernArgs(),
                               AcquisitionPrerequisites::kUnreplicatedWrite,
                           },
@@ -2380,7 +2380,7 @@ TEST_F(ShardRoleTest, ReadAcquisitionsChangeReadSourceToLastApplied) {
             ? acquireCollection(operationContext(),
                                 {
                                     nssUnshardedCollection1,
-                                    PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+                                    PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
                                     repl::ReadConcernArgs(),
                                     AcquisitionPrerequisites::kRead,
                                 },
@@ -2389,7 +2389,7 @@ TEST_F(ShardRoleTest, ReadAcquisitionsChangeReadSourceToLastApplied) {
                   operationContext(),
                   {
                       nssUnshardedCollection1,
-                      PlacementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()},
+                      PlacementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()},
                       repl::ReadConcernArgs(),
                       AcquisitionPrerequisites::kRead,
                   });
@@ -2426,7 +2426,7 @@ TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
         RecoveryUnit::ReadSource::kNoTimestamp,
         shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
 
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     [[maybe_unused]] const auto acquisitions =
         acquireCollectionsOrViewsMaybeLockFree(operationContext(),
                                                {{
@@ -2525,7 +2525,7 @@ TEST_F(ShardRoleTest,
 TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
     const auto& nss = nssUnshardedCollection1;
     auto cursorId = [&] {
-        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
 
         const auto acquisition = acquireCollection(operationContext(),
                                                    {nssUnshardedCollection1,
@@ -3113,9 +3113,9 @@ TEST_F(ShardRoleTest, StashTransactionResourcesForMultiDocumentTransactionCompre
     operationContext()->setInMultiDocumentTransaction();
 
     // Acquire multiple collections
-    PlacementConcern unshardedConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern unshardedConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     PlacementConcern shardedConcern{{}, shardVersionShardedCollection1};
-    PlacementConcern viewConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern viewConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
 
     auto acquisition1 = acquireCollection(operationContext(),
                                           {nssUnshardedCollection1,
@@ -3171,7 +3171,7 @@ TEST_F(ShardRoleTest, StashTransactionResourcesForMultiDocumentTransactionRestor
     operationContext()->setInMultiDocumentTransaction();
 
     // Acquire a collection to have some transaction resources
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     auto acquisition = acquireCollection(
         operationContext(),
         {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead},
@@ -3217,7 +3217,7 @@ TEST_F(ShardRoleTest, StashTransactionResourcesForMultiDocumentTransactionDouble
     operationContext()->setInMultiDocumentTransaction();
 
     // Acquire a collection
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
     auto acquisition = acquireCollection(
         operationContext(),
         {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead},

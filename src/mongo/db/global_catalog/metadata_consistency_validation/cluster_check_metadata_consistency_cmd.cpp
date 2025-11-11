@@ -239,7 +239,7 @@ public:
                                                                  dbInfo->getVersion());
                     // Attach db and shard version;
                     if (!dbInfo->getVersion().isFixed())
-                        shardsvrRequest.setShardVersion(ShardVersion::UNSHARDED());
+                        shardsvrRequest.setShardVersion(ShardVersion::UNTRACKED());
                     return _establishCursors(
                         opCtx, nss, {{dbInfo->getPrimary(), shardsvrRequest.toBSON()}});
                 });

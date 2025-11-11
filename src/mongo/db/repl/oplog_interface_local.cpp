@@ -72,7 +72,7 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
     : _oplogRead(acquireCollectionMaybeLockFree(
           opCtx,
           CollectionAcquisitionRequest(NamespaceString::kRsOplogNamespace,
-                                       PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                       PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                        repl::ReadConcernArgs::get(opCtx),
                                        AcquisitionPrerequisites::kRead))),
       _tracker(opCtx,

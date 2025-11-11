@@ -658,7 +658,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       _oplogBufferNss,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_IX);
@@ -666,7 +666,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       NamespaceString::kReshardingFetcherProgressNamespace,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_IX);

@@ -372,8 +372,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
         checkCollectionUUIDMismatch(opCtx, *catalog, _resolvedNss, _coll, options._expectedUUID);
 
-        if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNSHARDED()) {
-            shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+        if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNTRACKED()) {
+            shard_role_details::checkLocalCatalogIsValidForUntrackedShardVersion(
                 opCtx, *catalog, _coll, _resolvedNss);
         }
 
@@ -385,8 +385,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         return;
     }
 
-    if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNSHARDED()) {
-        shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+    if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNTRACKED()) {
+        shard_role_details::checkLocalCatalogIsValidForUntrackedShardVersion(
             opCtx, *catalog, _coll, _resolvedNss);
     }
 
@@ -407,19 +407,19 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
             uassert(StaleConfigInfo(_resolvedNss,
                                     *receivedShardVersion,
-                                    ShardVersion::UNSHARDED() /* wantedVersion */,
+                                    ShardVersion::UNTRACKED() /* wantedVersion */,
                                     ShardingState::get(opCtx)->shardId()),
                     str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view therefore the shard "
-                                  << "version attached to the request must be unset or UNSHARDED",
-                    !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED());
+                                  << "version attached to the request must be unset or UNTRACKED",
+                    !receivedShardVersion || *receivedShardVersion == ShardVersion::UNTRACKED());
             return;
         }
     }
 
     // There is neither a collection nor a view for the namespace, so if we reached to this point
     // there are the following possibilities depending on the received shard version:
-    //   1. ShardVersion::UNSHARDED: The request comes from a router and the operation entails the
+    //   1. ShardVersion::UNTRACKED: The request comes from a router and the operation entails the
     //      implicit creation of an unsharded collection. We can continue.
     //   2. ChunkVersion::IGNORED: The request comes from a router that broadcasted the same to all
     //      shards, but this shard doesn't own any chunks for the collection. We can continue.
@@ -435,8 +435,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                             ShardingState::get(opCtx)->shardId()),
             str::stream() << "No metadata for namespace " << _resolvedNss.toStringForErrorMsg()
                           << " therefore the shard "
-                          << "version attached to the request must be unset, UNSHARDED or IGNORED",
-            !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED() ||
+                          << "version attached to the request must be unset, UNTRACKED or IGNORED",
+            !receivedShardVersion || *receivedShardVersion == ShardVersion::UNTRACKED() ||
                 ShardVersion::isPlacementVersionIgnored(*receivedShardVersion));
 
     checkCollectionUUIDMismatch(opCtx, *catalog, _resolvedNss, _coll, options._expectedUUID);

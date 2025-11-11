@@ -348,16 +348,16 @@ TEST_F(ShardRoleLoopTest, handleStaleConfigExceptionNonComparableVersions) {
     const auto shardVersionShardedNoChunks =
         ShardVersionFactory::make(ChunkVersion(collectionGeneration, {0, 0}));
 
-    // UNSHARDED vs ShardVersion(x, y). Router was right. Expect shard retry.
-    testFn(ShardVersion::UNSHARDED(), shardVersionSharded, shardVersionSharded, true);
+    // UNTRACKED vs ShardVersion(x, y). Router was right. Expect shard retry.
+    testFn(ShardVersion::UNTRACKED(), shardVersionSharded, shardVersionSharded, true);
 
-    // UNSHARDED vs ShardVersion(x, y). Shard was right. Expect no shard retry.
-    testFn(ShardVersion::UNSHARDED(), shardVersionSharded, ShardVersion::UNSHARDED(), false);
+    // UNTRACKED vs ShardVersion(x, y). Shard was right. Expect no shard retry.
+    testFn(ShardVersion::UNTRACKED(), shardVersionSharded, ShardVersion::UNTRACKED(), false);
 
     // ShardVersion(gen, 0, 0) vs ShardVersion(gen, x, y). Router was right. Expect shard retry.
     testFn(shardVersionShardedNoChunks, shardVersionSharded, shardVersionSharded, true);
 
-    // UNSHARDED vs ShardVersion(x, y). Shard was right. Expect no shard retry.
+    // UNTRACKED vs ShardVersion(x, y). Shard was right. Expect no shard retry.
     testFn(shardVersionShardedNoChunks, shardVersionSharded, shardVersionShardedNoChunks, false);
 }
 
@@ -586,7 +586,7 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigNonComparable_RouterActuallySta
 
     std::queue<Status> statuses;
     statuses.push(
-        {Status{StaleConfigInfo(kTestNss, ShardVersion::UNSHARDED(), shardedSV, kTestShardId),
+        {Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), shardedSV, kTestShardId),
                 "non comparable"}});
     _staleShardExceptionHandlerMock->_handleStaleShardVersionExceptionRet =
         shardedSV.placementVersion();
@@ -605,12 +605,12 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigNonComparable_ShardActuallyStal
 
     std::queue<Status> statuses;
     statuses.push(
-        {Status{StaleConfigInfo(kTestNss, ShardVersion::UNSHARDED(), shardedSV, kTestShardId),
+        {Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), shardedSV, kTestShardId),
                 "non comparable"}});
     statuses.push(
         Status::OK());  // After refresh, the shard is not stale anymore so the fn succeeds.
     _staleShardExceptionHandlerMock->_handleStaleShardVersionExceptionRet =
-        ShardVersion::UNSHARDED().placementVersion();
+        ShardVersion::UNTRACKED().placementVersion();
     MockFn fn(statuses);
     // The router was right, so retry. The shard must refresh and retry.
     ASSERT_DOES_NOT_THROW(withStaleShardRetry(_opCtx, fn));
@@ -663,7 +663,7 @@ TEST_F(ShardRoleLoopTest, LoopExhaustRetryAttempts) {
                                         boost::none),
                   "shard is stale"});
 
-    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNSHARDED(), boost::none, kTestShardId),
+    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, kTestShardId),
                   "shard is stale"});
 
     _catalogCacheMock->setCollectionReturnValue(
@@ -693,7 +693,7 @@ TEST_F(ShardRoleLoopTest, LoopFnDoesNotRetryWhenLocksHeldHigherUp) {
                                         DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                         boost::none),
                   "stale db reason"});
-    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNSHARDED(), boost::none, kTestShardId),
+    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, kTestShardId),
                   "unknown collection metadata"});
     testFn(
         Status{ShardCannotRefreshDueToLocksHeldInfo(kTestNss), "cannot refresh due to locks held"});
@@ -718,7 +718,7 @@ TEST_F(ShardRoleLoopTest, LoopFnDoesNotRetryWhenInDbDirectClient) {
                                         DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                         boost::none),
                   "stale db reason"});
-    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNSHARDED(), boost::none, kTestShardId),
+    testFn(Status{StaleConfigInfo(kTestNss, ShardVersion::UNTRACKED(), boost::none, kTestShardId),
                   "unknown collection metadata"});
     testFn(
         Status{ShardCannotRefreshDueToLocksHeldInfo(kTestNss), "cannot refresh due to locks held"});

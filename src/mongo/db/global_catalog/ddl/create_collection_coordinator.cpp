@@ -930,9 +930,9 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
                          BSON("_id" << NamespaceStringUtil::serialize(
                                   *optTargetNss, SerializationContext::stateDefault())));
         if (isTemporaryCollection) {
-            // Return UNSHARDED version for the coordinator to gracefully terminate without
+            // Return UNTRACKED version for the coordinator to gracefully terminate without
             // registering the collection
-            return CreateCollectionResponse{ShardVersion::UNSHARDED()};
+            return CreateCollectionResponse{ShardVersion::UNTRACKED()};
         }
     }
 

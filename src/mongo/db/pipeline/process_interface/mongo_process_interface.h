@@ -695,13 +695,13 @@ public:
                                                     bool addPrimaryShard = false) = 0;
 
     /**
-     * Used to enforce the constraint that the foreign collection must be unsharded.
+     * Used to enforce the constraint that the foreign collection must be untracked.
      */
-    class ScopedExpectUnshardedCollection {
+    class ScopedExpectUntrackedCollection {
     public:
-        virtual ~ScopedExpectUnshardedCollection() = default;
+        virtual ~ScopedExpectUntrackedCollection() = default;
     };
-    virtual std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+    virtual std::unique_ptr<ScopedExpectUntrackedCollection> expectUntrackedCollectionInScope(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const boost::optional<DatabaseVersion>& dbVersion) = 0;

@@ -120,7 +120,7 @@ private:
          * 'collectionAndChangedChunks' is only initialized if 'dropped' is false.
          * 'minimumQueryVersion' sets 'minQueryVersion'.
          * 'maxQueryVersion' is either set to the highest chunk version in
-         * 'collectionAndChangedChunks' or ChunkVersion::UNSHARDED().
+         * 'collectionAndChangedChunks' or ChunkVersion::UNTRACKED().
          */
         CollAndChunkTask(
             StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
@@ -173,7 +173,7 @@ private:
      *
      * or applying a complete update from the minumum version, where
      *
-     *     minQueryVersion == ChunkVersion::UNSHARDED().
+     *     minQueryVersion == ChunkVersion::UNTRACKED().
      */
     class CollAndChunkTaskList {
     public:

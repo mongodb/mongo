@@ -53,7 +53,7 @@ auto acquirePreImagesCollectionForRead(OperationContext* opCtx, const UUID& uuid
         opCtx,
         CollectionAcquisitionRequest(
             NamespaceStringOrUUID{NamespaceString::kChangeStreamPreImagesNamespace.dbName(), uuid},
-            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
             repl::ReadConcernArgs::get(opCtx),
             AcquisitionPrerequisites::kRead),
         MODE_IS);
@@ -63,7 +63,7 @@ auto acquirePreImagesCollectionForWrite(OperationContext* opCtx, const UUID& uui
         opCtx,
         CollectionAcquisitionRequest(
             NamespaceStringOrUUID{NamespaceString::kChangeStreamPreImagesNamespace.dbName(), uuid},
-            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
             repl::ReadConcernArgs::get(opCtx),
             AcquisitionPrerequisites::kUnreplicatedWrite),
         MODE_IX);

@@ -162,7 +162,7 @@ std::shared_ptr<PreImagesTenantMarkers> PreImagesTruncateManager::_createAndInst
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       NamespaceString::kChangeStreamPreImagesNamespace,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kRead),
                                   MODE_IS);

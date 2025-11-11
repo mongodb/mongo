@@ -244,7 +244,7 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
         if (cri.hasRoutingTable()) {
             appendShardVersion(cmdBuilder, cri.getShardVersion(shardId));
         } else if (!query.nss().isOnInternalDb()) {
-            appendShardVersion(cmdBuilder, ShardVersion::UNSHARDED());
+            appendShardVersion(cmdBuilder, ShardVersion::UNTRACKED());
             appendDbVersionIfPresent(cmdBuilder, cri.getDbVersion());
         }
     };

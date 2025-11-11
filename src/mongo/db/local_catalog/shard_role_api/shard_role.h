@@ -708,7 +708,7 @@ private:
  * Checks that, when in multi-document transaction, local catalog stashed by the transaction and the
  * CollectionPtr it obtained are valid to be used for a request that attached
  */
-void checkLocalCatalogIsValidForUnshardedShardVersion(OperationContext* opCtx,
+void checkLocalCatalogIsValidForUntrackedShardVersion(OperationContext* opCtx,
                                                       const CollectionCatalog& stashedCatalog,
                                                       const CollectionPtr& collectionPtr,
                                                       const NamespaceString& nss);

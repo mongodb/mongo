@@ -162,7 +162,7 @@ public:
             // collections are always unsharded (untracked) and therefore on the primary shard.
             {
                 auto dbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.dbName());
-                auto pc = PlacementConcern(dbVersion, ShardVersion::UNSHARDED());
+                auto pc = PlacementConcern(dbVersion, ShardVersion::UNTRACKED());
                 CollectionAcquisitionRequests requests = {
                     CollectionAcquisitionRequest(namespaces.ecocNss,
                                                  pc,

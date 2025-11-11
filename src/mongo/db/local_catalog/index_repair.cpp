@@ -74,7 +74,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
     auto localCollection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(lostAndFoundNss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);

@@ -155,7 +155,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
     const auto fcvColl = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(fcvNss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
@@ -459,7 +459,7 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx) {
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       NamespaceString::kChangeStreamPreImagesNamespace,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kUnreplicatedWrite),
                                   MODE_IX);

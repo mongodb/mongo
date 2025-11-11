@@ -180,7 +180,7 @@ public:
 
 TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
     const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
-    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNTRACKED(), nss1DbVersion);
     const ShardVersion nss2ShardVersion1 = ShardVersionFactory::make(
         ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(1, 0)));
     const ShardVersion nss2ShardVersion2 = ShardVersionFactory::make(
@@ -287,7 +287,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
 
 TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
     const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
-    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNTRACKED(), nss1DbVersion);
 
     // We create a bulkRequest with an insert op that runs against
     // the same namespace nss1 and targets shard1.
@@ -363,7 +363,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
 
 TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
     const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
-    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNTRACKED(), nss1DbVersion);
 
     // We create a bulkRequest with an update op specifying hint, sort, and arrayFilters
     // options. It runs against the same namespace nss1 and targets shard1.
@@ -432,7 +432,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
 
 TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
     const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
-    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNTRACKED(), nss1DbVersion);
 
     // We create a bulkRequest with two insert ops that have stmtIds.
     BulkWriteInsertOp insertOp = BulkWriteInsertOp(1, BSON("a" << 0));
@@ -500,7 +500,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
 
 TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) {
     const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
-    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNTRACKED(), nss1DbVersion);
 
     auto query = BSON("a" << 1);
     auto sort = BSON("s" << 1);

@@ -413,7 +413,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryS
     // Add at least 1 shard version to the opCtx to simulate a router request. This is necessary
     // to correctly set the isAnySecondaryNamespaceAViewOrNotFullyLocal.
     ScopedSetShardRole setShardRole(
-        operationContext(), mainNss, ShardVersion::UNSHARDED(), getDbVersion());
+        operationContext(), mainNss, ShardVersion::UNTRACKED(), getDbVersion());
     std::unique_ptr<AggExState> aggExState =
         createDefaultAggExStateWithSecondaryCollections(main, secondaryColl);
 

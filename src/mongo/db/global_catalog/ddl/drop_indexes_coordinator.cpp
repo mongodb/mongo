@@ -98,7 +98,7 @@ void DropIndexesCoordinator::_dropIndexes(OperationContext* opCtx,
                 }
             } else {
                 shardIdsToShardVersions[ShardingState::get(opCtx)->shardId()] =
-                    ShardVersion::UNSHARDED();
+                    ShardVersion::UNTRACKED();
             }
 
             const auto session = getNewSession(opCtx);

@@ -416,7 +416,7 @@ public:
         const auto donorColl = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest{NamespaceString::kDonorReshardingOperationsNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
@@ -916,7 +916,7 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
         const auto coll = acquireCollection(
             opCtx.get(),
             CollectionAcquisitionRequest{doc.getSourceNss(),
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
@@ -933,7 +933,7 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
         const auto coll = acquireCollection(
             opCtx.get(),
             CollectionAcquisitionRequest{doc.getSourceNss(),
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
@@ -959,7 +959,7 @@ TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone)
         const auto coll = acquireCollection(
             opCtx.get(),
             CollectionAcquisitionRequest{doc.getSourceNss(),
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
@@ -976,7 +976,7 @@ TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone)
         const auto coll = acquireCollection(
             opCtx.get(),
             CollectionAcquisitionRequest{doc.getSourceNss(),
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
@@ -1043,7 +1043,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest{
                                       doc.getSourceNss(),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead},
                                   MODE_IS);
@@ -1080,7 +1080,7 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest{
                                       doc.getSourceNss(),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead},
                                   MODE_IS);
@@ -1097,7 +1097,7 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest{
                                       doc.getSourceNss(),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead},
                                   MODE_IS);

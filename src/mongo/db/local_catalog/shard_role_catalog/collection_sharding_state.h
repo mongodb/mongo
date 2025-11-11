@@ -153,7 +153,7 @@ public:
      * If the shard currently doesn't know whether the collection is sharded or not, it will throw a
      * StaleConfig error.
      *
-     * If the request doesn't have a shard version all collections will be treated as UNSHARDED.
+     * If the request doesn't have a shard version all collections will be treated as UNTRACKED.
      */
     virtual ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const = 0;
 
@@ -181,7 +181,7 @@ public:
      * operations that don't have a shard version.
      * If the request doesn't have a shard version:
      *    - this function will invariant if !supportNonVersionedOperations (default value)
-     *    - the collection will be treated as UNSHARDED otherwise.
+     *    - the collection will be treated as UNTRACKED otherwise.
      *
      * Use 'getCollectionDescription' for other cases, like obtaining information about
      * sharding-related properties of the collection are necessary that won't change under
@@ -203,7 +203,7 @@ public:
      * version of the collection and if not, throws StaleConfig error populated with the received
      * and wanted versions.
      *
-     * If the request is not versioned all collections will be treated as UNSHARDED.
+     * If the request is not versioned all collections will be treated as UNTRACKED.
      */
     virtual void checkShardVersionOrThrow(OperationContext* opCtx) const = 0;
 

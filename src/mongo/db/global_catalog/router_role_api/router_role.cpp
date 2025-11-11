@@ -87,7 +87,7 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
         BSONObjBuilder dbvBuilder(builder->subobjStart(DatabaseVersion::kDatabaseVersionField));
         dbVersion.serialize(&dbvBuilder);
     }
-    appendShardVersion(*builder, ShardVersion::UNSHARDED());
+    appendShardVersion(*builder, ShardVersion::UNTRACKED());
 }
 
 CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {
@@ -278,7 +278,7 @@ CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* 
 void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                              const CollectionRoutingInfo& cri,
                                                              BSONObjBuilder* builder) {
-    if (cri.getShardVersion(shardId) == ShardVersion::UNSHARDED()) {
+    if (cri.getShardVersion(shardId) == ShardVersion::UNTRACKED()) {
         // Need to add the database version as well.
         const auto& dbVersion = cri.getDbVersion();
         if (!dbVersion.isFixed()) {

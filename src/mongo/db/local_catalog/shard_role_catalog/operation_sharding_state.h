@@ -130,7 +130,7 @@ public:
      * is allowed to create a collection with the specified namespace (or the equivalent bucket
      * namespace) in this context and that the caller will be responsible for notifying the shard
      * Sharding subsystem of the collection creation. Note that in most of cases the
-     * CollectionShardingRuntime associated to that nss will be set as UNSHARDED. However, there are
+     * CollectionShardingRuntime associated to that nss will be set as UNTRACKED. However, there are
      * some scenarios in which it is required to set is as UNKNOWN: that's the reason why the
      * constructor has the 'forceCSRAsUnknownAfterCollectionCreation' parameter. You can find more
      * information about how the CSR is modified in ShardServerOpObserver::onCreateCollection.

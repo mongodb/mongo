@@ -121,11 +121,11 @@ public:
     void throwIfReshardingInProgress(NamespaceString const& nss) const;
 
     /**
-     * Returns the current shard's placement version for the collection or UNSHARDED if it is not
-     * sharded.
+     * Returns the current shard's placement version for the collection or UNTRACKED if it does not
+     * have a routing table.
      */
     ChunkVersion getShardPlacementVersion() const {
-        return (hasRoutingTable() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNSHARDED());
+        return (hasRoutingTable() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -139,8 +139,8 @@ public:
     }
 
     /**
-     * Returns the current shard's placement version for the collection or UNSHARDED if it is not
-     * sharded.
+     * Returns the current shard's placement version for the collection or UNTRACKED if it does not
+     * have a routing table.
      *
      * Will not throw an exception if _thisShardId is marked as stale by the CollectionMetadata's
      * current chunk manager. Only use this function when logging the returned ChunkVersion. If the
@@ -149,14 +149,15 @@ public:
      */
     ChunkVersion getShardPlacementVersionForLogging() const {
         return (hasRoutingTable() ? _cm->getVersionForLogging(_thisShardId)
-                                  : ChunkVersion::UNSHARDED());
+                                  : ChunkVersion::UNTRACKED());
     }
 
     /**
-     * Returns the current collection placement version or UNSHARDED if it is not sharded.
+     * Returns the current collection placement version or UNTRACKED if it does not have a routing
+     * table.
      */
     ChunkVersion getCollPlacementVersion() const {
-        return (hasRoutingTable() ? _cm->getVersion() : ChunkVersion::UNSHARDED());
+        return (hasRoutingTable() ? _cm->getVersion() : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -319,11 +320,11 @@ public:
     }
 
 private:
-    // The full routing table for the collection or boost::none if the collection is not sharded
+    // The full routing table for the collection or boost::none if the collection is not tracked
     boost::optional<ChunkManager> _cm;
 
     // The identity of this shard, for the purpose of answering "key belongs to me" queries. If the
-    // collection is not sharded (_cm is boost::none), then this value will be empty.
+    // collection is not tracked (_cm is boost::none), then this value will be empty.
     ShardId _thisShardId;
 };
 

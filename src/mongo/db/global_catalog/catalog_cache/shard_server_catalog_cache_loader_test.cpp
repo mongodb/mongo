@@ -307,7 +307,7 @@ ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
     _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
 
     auto collAndChunksRes =
-        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
 
     ASSERT_EQUALS(collAndChunksRes.epoch, collectionType.getEpoch());
     ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
@@ -332,7 +332,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromUnshardedToUnsharded) {
     _remoteLoaderMock->setCollectionRefreshReturnValue(errorStatus);
 
     ASSERT_THROWS_CODE_AND_WHAT(
-        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED()),
+        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED()),
         DBException,
         errorStatus.code(),
         errorStatus.reason());
@@ -394,7 +394,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNoDiffReq
     _remoteLoaderMock->setChunkRefreshReturnValue(lastChunk);
 
     auto collAndChunksRes =
-        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
     ASSERT_EQUALS(collAndChunksRes.epoch, chunks.back().getVersion().epoch());
     ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
     for (unsigned int i = 0; i < collAndChunksRes.changedChunks.size(); ++i) {
@@ -458,7 +458,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDiffReque
         makeCombinedOriginalFiveChunksAndThreeNewChunksDiff(chunks, updatedChunksDiff);
 
     auto collAndChunksRes =
-        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
     ASSERT_EQUALS(collAndChunksRes.epoch,
                   completeRoutingTableWithDiffApplied.front().getVersion().epoch());
     ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
@@ -549,7 +549,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
     _remoteLoaderMock->setChunkRefreshReturnValue(lastChunkWithNewEpoch);
 
     auto collAndChunksRes =
-        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
     ASSERT_EQUALS(collAndChunksRes.epoch, collectionTypeWithNewEpoch.getEpoch());
     ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
     for (unsigned int i = 0; i < collAndChunksRes.changedChunks.size(); ++i) {
@@ -625,7 +625,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
         _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
 
         auto collAndChunksRes =
-            retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+            retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
         ASSERT(collAndChunksRes.timeseriesFields.has_value());
         ASSERT(collAndChunksRes.timeseriesFields->getGranularity() ==
                BucketGranularityEnum::Seconds);
@@ -663,7 +663,7 @@ void ShardServerCatalogCacheLoaderTest::refreshCollectionEpochOnRemoteLoader() {
 TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
     // Put some metadata in the persisted cache (config.cache.chunks.*)
     refreshCollectionEpochOnRemoteLoader();
-    retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+    retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
     _shardLoader->waitForCollectionFlush(operationContext(), kNss);
 
     // Pause the thread processing the pending updates on metadata
@@ -671,7 +671,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
 
     // Put a first task in the list of pending updates on metadata (in-memory)
     refreshCollectionEpochOnRemoteLoader();
-    retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+    retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
 
     // Bump the shard's term
     _shardLoader->onStepUp();
@@ -679,7 +679,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
     // Putting a second task causes a verification of the contiguous versions in the list pending
     // updates on metadata
     refreshCollectionEpochOnRemoteLoader();
-    retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+    retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
 }
 
 /**
@@ -766,7 +766,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, UnsplittableFieldIsPropagatedOnSSCCL) 
     _remoteLoaderMock->setChunkRefreshReturnValue(chunk);
 
     auto collAndChunksRes =
-        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
     ASSERT(collAndChunksRes.unsplittable);
 }
 }  // namespace

@@ -169,7 +169,7 @@ protected:
     const NamespaceString kViewNss = NamespaceString::createNamespaceString_forTest("test.foo");
 
     const Status kStaleConfigStatus = {
-        StaleConfigInfo(kViewNss, ShardVersion::UNSHARDED(), boost::none, shard1),
+        StaleConfigInfo(kViewNss, ShardVersion::UNTRACKED(), boost::none, shard1),
         "The metadata for the collection is not loaded"};
 
     TransactionRouterTest()
@@ -2818,7 +2818,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion
 TEST_F(TransactionRouterTest,
        AppendFieldsForContinueTransactionWithShardVersionWithConflictTimeForBulkWrite) {
     const auto test = [this](bool hasTxnCreatedAnyDatabase) {
-        const auto shardVersion = ShardVersion::UNSHARDED();
+        const auto shardVersion = ShardVersion::UNTRACKED();
         const auto databaseVersion = exampleDatabaseVersion();
 
         // Create a bulkWrite request object
@@ -2864,7 +2864,7 @@ TEST_F(TransactionRouterTest,
 TEST_F(TransactionRouterTest,
        AppendFieldsForStartTransactionWithShardVersionWithConflictTimeForBulkWrite) {
     const auto test = [this](bool hasTxnCreatedAnyDatabase) {
-        const auto shardVersion = ShardVersion::UNSHARDED();
+        const auto shardVersion = ShardVersion::UNTRACKED();
         const auto databaseVersion = exampleDatabaseVersion();
 
         // Create a bulkWrite request object

@@ -606,7 +606,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       nss,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kUnreplicatedWrite),
                                   MODE_IX);

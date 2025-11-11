@@ -61,7 +61,7 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo", "bar");
 const std::string kPattern = "_id";
 
-void setUnshardedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+void setUntrackedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
@@ -76,7 +76,7 @@ public:
         auto opCtx = operationContext();
 
         createTestCollection(opCtx, kNss);
-        setUnshardedFilteringMetadata(opCtx, kNss);
+        setUntrackedFilteringMetadata(opCtx, kNss);
         DBDirectClient client(opCtx);
         client.createIndex(kNss, BSON(kPattern << 1));
 
@@ -332,7 +332,7 @@ public:
         auto opCtx = operationContext();
 
         createTestCollection(opCtx, kJumboNss);
-        setUnshardedFilteringMetadata(opCtx, kJumboNss);
+        setUntrackedFilteringMetadata(opCtx, kJumboNss);
         DBDirectClient client(opCtx);
         client.createIndex(kJumboNss, BSON(kJumboPattern << 1));
 
@@ -392,7 +392,7 @@ public:
         auto opCtx = operationContext();
 
         createTestCollection(opCtx, kMaxResponseNss);
-        setUnshardedFilteringMetadata(opCtx, kMaxResponseNss);
+        setUntrackedFilteringMetadata(opCtx, kMaxResponseNss);
         DBDirectClient client(opCtx);
         client.createIndex(kMaxResponseNss, BSON("a" << 1));
 

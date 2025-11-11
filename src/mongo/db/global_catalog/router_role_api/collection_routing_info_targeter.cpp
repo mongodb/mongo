@@ -161,12 +161,12 @@ ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
         const auto shardId = cri.getChunkManager().getMinKeyShardIdWithSimpleCollation();
         return ShardEndpoint(shardId, cri.getShardVersion(shardId), boost::none);
     } else {
-        // Target the db-primary shard. Attach 'dbVersion: X, shardVersion: UNSHARDED'.
+        // Target the db-primary shard. Attach 'dbVersion: X, shardVersion: UNTRACKED'.
         // TODO (SERVER-51070): Remove the boost::none when the config server can support
         // shardVersion in commands
         return ShardEndpoint(
             cri.getDbPrimaryShardId(),
-            nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
+            nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNTRACKED(),
             nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : cri.getDbVersion());
     }
 }

@@ -1106,9 +1106,9 @@ ShardEndpoint::ShardEndpoint(const ShardId& shardName,
       shardVersion(std::move(shardVersionParam)),
       databaseVersion(std::move(dbVersionParam)) {
     if (databaseVersion)
-        invariant(shardVersion && *shardVersion == ShardVersion::UNSHARDED());
+        invariant(shardVersion && *shardVersion == ShardVersion::UNTRACKED());
     else if (shardVersion)
-        invariant(*shardVersion != ShardVersion::UNSHARDED());
+        invariant(*shardVersion != ShardVersion::UNTRACKED());
     else
         invariant(shardName == ShardId::kConfigServerId);
 }

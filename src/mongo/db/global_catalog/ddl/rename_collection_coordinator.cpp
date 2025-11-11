@@ -1217,7 +1217,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
                         opCtx, _request.getTo()));
                 auto placementVersion =
-                    cm.hasRoutingTable() ? cm.getVersion() : ChunkVersion::UNSHARDED();
+                    cm.hasRoutingTable() ? cm.getVersion() : ChunkVersion::UNTRACKED();
                 _response = RenameCollectionResponse(
                     ShardVersionFactory::make(std::move(placementVersion)));
 

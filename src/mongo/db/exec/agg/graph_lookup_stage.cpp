@@ -292,7 +292,7 @@ void GraphLookUpStage::performSearch() {
         // sharded, throw a custom exception.
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>(); staleInfo &&
             staleInfo->getVersionWanted() &&
-            staleInfo->getVersionWanted() != ShardVersion::UNSHARDED()) {
+            staleInfo->getVersionWanted() != ShardVersion::UNTRACKED()) {
             uassert(3904801,
                     "Cannot run $graphLookup with a sharded foreign collection in a transaction",
                     foreignShardedGraphLookupAllowed());
@@ -320,14 +320,14 @@ void GraphLookUpStage::spillDuringVisitedUnwinding() {
 
 void GraphLookUpStage::doBreadthFirstSearch() {
     while (!_queue.empty()) {
-        std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
-            expectUnshardedCollectionInScope;
+        std::unique_ptr<MongoProcessInterface::ScopedExpectUntrackedCollection>
+            expectUntrackedCollectionInScope;
 
         const auto allowForeignSharded = foreignShardedGraphLookupAllowed();
         if (!allowForeignSharded && !_fromExpCtx->getInRouter()) {
             // Enforce that the foreign collection must be unsharded for $graphLookup.
-            expectUnshardedCollectionInScope =
-                _fromExpCtx->getMongoProcessInterface()->expectUnshardedCollectionInScope(
+            expectUntrackedCollectionInScope =
+                _fromExpCtx->getMongoProcessInterface()->expectUntrackedCollectionInScope(
                     _fromExpCtx->getOperationContext(),
                     _fromExpCtx->getNamespaceString(),
                     boost::none);

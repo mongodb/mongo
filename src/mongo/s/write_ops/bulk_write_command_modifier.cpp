@@ -50,7 +50,7 @@ void BulkWriteCommandModifier::parseRequestFromOpMsg(const NamespaceString& nss,
     auto shardVersionField = request.body[ShardVersion::kShardVersionField];
     if (!shardVersionField.eoo()) {
         auto shardVersion = ShardVersion::parse(shardVersionField);
-        if (shardVersion == ShardVersion::UNSHARDED()) {
+        if (shardVersion == ShardVersion::UNTRACKED()) {
             setDbVersion(nss, DatabaseVersion(request.body));
         }
         setShardVersion(nss, shardVersion);

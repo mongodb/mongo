@@ -588,7 +588,7 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
         StaleConfigInfo(nss1, *shard1Endpoint.shardVersion, newShardVersion, shard1Name), "");
     const ShardEndpoint shard1EndpointUnsharded =
         ShardEndpoint(shard1Name,
-                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      ShardVersionFactory::make(ChunkVersion::UNTRACKED()),
                       DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
     DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
     Status staleDbStatus(StaleDbRoutingVersion(
@@ -1391,7 +1391,7 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenOK
     auto reply = makeReply();
     const ShardEndpoint shard1EndpointUnsharded =
         ShardEndpoint(shard1Name,
-                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      ShardVersionFactory::make(ChunkVersion::UNTRACKED()),
                       DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
     DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
     Status staleDbStatus(StaleDbRoutingVersion(
@@ -1458,7 +1458,7 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenNo
     auto reply = makeReply();
     const ShardEndpoint shard1EndpointUnsharded =
         ShardEndpoint(shard1Name,
-                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      ShardVersionFactory::make(ChunkVersion::UNTRACKED()),
                       DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
     DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
     Status staleDbStatus(StaleDbRoutingVersion(
@@ -1656,7 +1656,7 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteRetryableNonRetryableAndOK) {
     auto reply = makeReply();
     const ShardEndpoint shard1EndpointUnsharded =
         ShardEndpoint(shard1Name,
-                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      ShardVersionFactory::make(ChunkVersion::UNTRACKED()),
                       DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
     DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
     Status staleDbStatus(StaleDbRoutingVersion(

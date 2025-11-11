@@ -195,7 +195,7 @@ void BM_acquireCollectionLockFreeFunc(benchmark::State& state,
         // this in the benchmark.
         CollectionAcquisitionRequest request{
             nss,
-            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
             readConcern,
             AcquisitionPrerequisites::kRead};
         auto acquisition = acquireCollectionMaybeLockFree(opCtx, request);
@@ -216,7 +216,7 @@ void BM_acquireCollectionFunc(benchmark::State& state, CollectionAcquisitionBenc
         // this in the benchmark.
         CollectionAcquisitionRequest request{
             nss,
-            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
             readConcern,
             AcquisitionPrerequisites::kRead};
         auto acquisition = acquireCollection(opCtx, request, MODE_IS);
@@ -239,11 +239,11 @@ void BM_acquireMultiCollectionFunc(benchmark::State& state,
         // this in the benchmark.
         auto requests = {
             CollectionAcquisitionRequest{nss1,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          readConcern,
                                          AcquisitionPrerequisites::kRead},
             CollectionAcquisitionRequest{nss2,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          readConcern,
                                          AcquisitionPrerequisites::kRead}};
         auto acquisitions = acquireCollections(opCtx, requests, MODE_IX);

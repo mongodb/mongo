@@ -700,7 +700,7 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
         return ScopedSetShardRole(
             _opCtx, underlyingNss, sv /*shardVersion*/, boost::none /*databaseVersion*/);
     } else {
-        auto sv = ShardVersion::UNSHARDED();
+        auto sv = ShardVersion::UNTRACKED();
         if (optPlacementConflictTimestamp) {
             sv.setPlacementConflictTime(*optPlacementConflictTimestamp);
         }

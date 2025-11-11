@@ -247,7 +247,7 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
     AutoGetCollection autoColl(opCtx, kUnshardedNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     const bool fromMigrate = false;
-    auto shardVersion = ShardVersion::UNSHARDED();
+    auto shardVersion = ShardVersion::UNTRACKED();
 
     // Insert parameters
     std::vector<InsertStatement> toInsert;

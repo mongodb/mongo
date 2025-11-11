@@ -688,7 +688,7 @@ void ShardServerOpObserver::onCreateCollection(
     if (!opCtx->writesAreReplicated()) {
         // On secondaries node of sharded cluster we force the cleanup of the filtering metadata in
         // order to remove anything that was left from any previous collection instance. This could
-        // happen by first having an UNSHARDED version for a collection that didn't exist followed
+        // happen by first having an UNTRACKED version for a collection that didn't exist followed
         // by a movePrimary to the current shard.
         if (ShardingState::get(opCtx)->enabled()) {
             auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
@@ -699,13 +699,13 @@ void ShardServerOpObserver::onCreateCollection(
         return;
     }
 
-    // Collections which are always UNSHARDED have a fixed CSS, which never changes, so we don't
+    // Collections which are always UNTRACKED have a fixed CSS, which never changes, so we don't
     // need to do anything
     if (collectionName.isNamespaceAlwaysUntracked()) {
         return;
     }
 
-    // Temp collections are always UNSHARDED
+    // Temp collections are always UNTRACKED
     if (options.temp) {
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, collectionName)
             ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());

@@ -553,7 +553,7 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     try {
         auto shardVersion = [&] {
             auto sv = targetingCri.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
-                                                     : ShardVersion::UNSHARDED();
+                                                     : ShardVersion::UNTRACKED();
             if (auto txnRouter = TransactionRouter::get(opCtx);
                 txnRouter && opCtx->inMultiDocumentTransaction()) {
                 if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {

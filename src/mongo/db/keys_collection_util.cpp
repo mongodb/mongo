@@ -75,7 +75,7 @@ repl::OpTime storeExternalClusterTimeKeyDocs(OperationContext* opCtx,
         auto collection = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(nss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kWrite),
             MODE_IX);

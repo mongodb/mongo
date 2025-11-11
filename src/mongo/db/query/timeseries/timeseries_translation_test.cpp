@@ -73,7 +73,7 @@ protected:
         return acquireCollectionOrView(_opCtx,
                                        CollectionOrViewAcquisitionRequest(
                                            nss,
-                                           PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                           PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                            repl::ReadConcernArgs::get(_opCtx),
                                            AcquisitionPrerequisites::kRead),
                                        MODE_IS);

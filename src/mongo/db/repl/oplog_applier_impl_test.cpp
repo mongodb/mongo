@@ -137,7 +137,7 @@ CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const Namespac
     return acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(nss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
@@ -870,7 +870,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
         auto sideCollection = acquireCollection(
             _opCtx.get(),
             CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx.get()),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -898,7 +898,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
     auto sideCollection = acquireCollection(
         _opCtx.get(),
         CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(_opCtx.get()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
@@ -939,7 +939,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
         auto sideCollection = acquireCollection(
             _opCtx.get(),
             CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx.get()),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -974,7 +974,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
     auto sideCollection = acquireCollection(
         _opCtx.get(),
         CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(_opCtx.get()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
@@ -1019,7 +1019,7 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
         auto sideCollection = acquireCollection(
             _opCtx.get(),
             CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx.get()),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -1050,7 +1050,7 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
         auto sideCollection = acquireCollection(
             _opCtx.get(),
             CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx.get()),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -1083,7 +1083,7 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
     auto sideCollection = acquireCollection(
         _opCtx.get(),
         CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(_opCtx.get()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);

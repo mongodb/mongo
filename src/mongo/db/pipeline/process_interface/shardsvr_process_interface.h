@@ -193,7 +193,7 @@ public:
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final;
 
-    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+    std::unique_ptr<ScopedExpectUntrackedCollection> expectUntrackedCollectionInScope(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const boost::optional<DatabaseVersion>& dbVersion) override;

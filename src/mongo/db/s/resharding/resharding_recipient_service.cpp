@@ -1823,7 +1823,7 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
         const auto coll = acquireCollection(
             opCtx.get(),
             CollectionAcquisitionRequest(nss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kWrite),
             MODE_IX);
@@ -1927,7 +1927,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest(
                                       NamespaceString::kReshardingFetcherProgressNamespace,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead),
                                   MODE_IS);
@@ -1953,7 +1953,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                                   CollectionAcquisitionRequest(
                                       resharding::getLocalOplogBufferNamespace(
                                           _metadata.getSourceUUID(), donor.getShardId()),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead),
                                   MODE_IS);
@@ -1968,7 +1968,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest(
                                       NamespaceString::kReshardingApplierProgressNamespace,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead),
                                   MODE_IS);

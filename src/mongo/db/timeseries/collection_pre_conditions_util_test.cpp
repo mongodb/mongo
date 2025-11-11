@@ -113,7 +113,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreCondi
     const auto collectionAcquisition = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest(viewlessTsNss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(_opCtx),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
@@ -146,7 +146,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, DetectWhenCollectionIsDroppedA
     const auto collectionAcquisition = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest(viewlessTsNss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(_opCtx),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);

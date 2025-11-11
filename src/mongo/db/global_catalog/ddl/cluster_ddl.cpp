@@ -74,10 +74,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(createUnshardedCollectionRandomizeDataShard);
 MONGO_FAIL_POINT_DEFINE(hangCreateUnshardedCollection);
 
-std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
+std::vector<AsyncRequestsSender::Request> buildUntrackedRequestsForAllShards(
     OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
     auto cmdToSend = cmdObj;
-    appendShardVersion(cmdToSend, ShardVersion::UNSHARDED());
+    appendShardVersion(cmdToSend, ShardVersion::UNTRACKED());
 
     std::vector<AsyncRequestsSender::Request> requests;
     requests.reserve(shardIds.size());
@@ -106,7 +106,7 @@ AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* 
                         nss,
                         readPref,
                         retryPolicy,
-                        buildUnshardedRequestsForAllShards(
+                        buildUntrackedRequestsForAllShards(
                             opCtx, {shardId}, appendDbVersionIfPresent(cmdObj, dbInfo)));
     return std::move(responses.front());
 }

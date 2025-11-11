@@ -275,7 +275,7 @@ AsyncRequestsSender::Request buildDatabaseVersionedRequest(
                     nss.toStringForErrorMsg()),
         shardId == cri.getDbPrimaryShardId());
 
-    BSONObj versionedCmd = appendShardVersion(cmdObj, ShardVersion::UNSHARDED());
+    BSONObj versionedCmd = appendShardVersion(cmdObj, ShardVersion::UNTRACKED());
     versionedCmd = appendDbVersionIfPresent(versionedCmd, cri.getDbVersion());
 
     const auto targetedSampleId = eligibleForSampling
@@ -1129,9 +1129,9 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
                 appendShardVersion(cmdNoVersion, cri.getShardVersion(minKeyShardId))};
         } else {
             // For a collection without routing table, the primary shard will have correct indexes.
-            // Attach dbVersion + shardVersion: UNSHARDED.
+            // Attach dbVersion + shardVersion: UNTRACKED.
             const auto cmdObjWithShardVersion = !cri.getDbVersion().isFixed()
-                ? appendShardVersion(cmdNoVersion, ShardVersion::UNSHARDED())
+                ? appendShardVersion(cmdNoVersion, ShardVersion::UNTRACKED())
                 : cmdNoVersion;
             return {uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
                         opCtx, cri.getDbPrimaryShardId())),

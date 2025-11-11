@@ -769,7 +769,7 @@ CollectionAcquisition getCollectionForRead(OperationContext* opCtx, const Namesp
     return acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(nss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(opCtx),
                                      mongo::AcquisitionPrerequisites::kRead),
         MODE_IS);

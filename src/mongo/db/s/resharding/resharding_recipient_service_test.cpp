@@ -905,7 +905,7 @@ public:
         auto recipientColl = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kRecipientReshardingOperationsNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -1811,7 +1811,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest(
                                       doc.getSourceNss(),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead),
                                   MODE_IS);
@@ -1825,7 +1825,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
                 acquireCollection(opCtx.get(),
                                   CollectionAcquisitionRequest(
                                       doc.getTempReshardingNss(),
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx.get()),
                                       AcquisitionPrerequisites::kRead),
                                   MODE_IS);
@@ -1866,7 +1866,7 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
                     acquireCollection(opCtx.get(),
                                       CollectionAcquisitionRequest(
                                           doc.getTempReshardingNss(),
-                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                           repl::ReadConcernArgs::get(opCtx.get()),
                                           AcquisitionPrerequisites::kRead),
                                       MODE_IS);
@@ -1891,7 +1891,7 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
                     acquireCollection(opCtx.get(),
                                       CollectionAcquisitionRequest(
                                           doc.getSourceNss(),
-                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                           repl::ReadConcernArgs::get(opCtx.get()),
                                           AcquisitionPrerequisites::kRead),
                                       MODE_IS);

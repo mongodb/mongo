@@ -139,7 +139,7 @@ TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanNoChun
 TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanUnsharded) {
     const ComparableChunkVersion defaultVersion{};
     const auto version1 =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNTRACKED());
     ASSERT(defaultVersion != version1);
     ASSERT(defaultVersion < version1);
     ASSERT_FALSE(defaultVersion > version1);
@@ -174,7 +174,7 @@ TEST(ComparableChunkVersionTest, NoChunksComparedBySequenceNum) {
 TEST(ComparableChunkVersionTest, NoChunksGreaterThanUnshardedBySequenceNum) {
     const ChunkVersion chunkVersion({OID::gen(), Timestamp(1)}, {0, 0});
     const auto unsharded =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNTRACKED());
     const auto noChunkSV = ComparableChunkVersion::makeComparableChunkVersion(chunkVersion);
     ASSERT(noChunkSV != unsharded);
     ASSERT(noChunkSV > unsharded);
@@ -184,7 +184,7 @@ TEST(ComparableChunkVersionTest, UnshardedGreaterThanNoChunksBySequenceNum) {
     const ChunkVersion chunkVersion({OID::gen(), Timestamp(1)}, {0, 0});
     const auto noChunkSV = ComparableChunkVersion::makeComparableChunkVersion(chunkVersion);
     const auto unsharded =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNTRACKED());
     ASSERT(noChunkSV != unsharded);
     ASSERT(unsharded > noChunkSV);
 }

@@ -239,9 +239,9 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
 
             uassertStatusOK(
                 FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    innerOpCtx, escNss, ChunkVersion::UNSHARDED()));
+                    innerOpCtx, escNss, ChunkVersion::UNTRACKED()));
             ScopedSetShardRole escShardRole(
-                innerOpCtx, escNss, ShardVersion::UNSHARDED(), innerCri.getDbVersion());
+                innerOpCtx, escNss, ShardVersion::UNTRACKED(), innerCri.getDbVersion());
 
             cleanupESCAnchors(innerOpCtx, escNss, pq, tagsPerDelete, escStats);
         });

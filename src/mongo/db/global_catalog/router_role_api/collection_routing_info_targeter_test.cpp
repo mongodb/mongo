@@ -667,7 +667,7 @@ TEST_F(CollectionRoutingInfoTargeterUntrackedTest, InsertIsTargetedToDbPrimarySh
     const auto shardEndpoint = targeter.targetInsert(operationContext(), BSON("x" << 10));
     ASSERT_EQ(primaryShard, shardEndpoint.shardName);
     ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
-    ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+    ASSERT_EQ(ChunkVersion::UNTRACKED(), shardEndpoint.shardVersion->placementVersion());
 }
 
 TEST_F(CollectionRoutingInfoTargeterUntrackedTest, UpdateIsTargetedToDbPrimaryShard) {
@@ -680,7 +680,7 @@ TEST_F(CollectionRoutingInfoTargeterUntrackedTest, UpdateIsTargetedToDbPrimarySh
     const auto& shardEndpoint = shardEndpoints.front();
     ASSERT_EQ(primaryShard, shardEndpoint.shardName);
     ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
-    ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+    ASSERT_EQ(ChunkVersion::UNTRACKED(), shardEndpoint.shardVersion->placementVersion());
 }
 
 TEST_F(CollectionRoutingInfoTargeterUntrackedTest, DeleteIsTargetedToDbPrimaryShard) {
@@ -693,7 +693,7 @@ TEST_F(CollectionRoutingInfoTargeterUntrackedTest, DeleteIsTargetedToDbPrimarySh
     const auto& shardEndpoint = shardEndpoints.front();
     ASSERT_EQ(primaryShard, shardEndpoint.shardName);
     ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
-    ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+    ASSERT_EQ(ChunkVersion::UNTRACKED(), shardEndpoint.shardVersion->placementVersion());
 }
 
 /**
@@ -847,11 +847,11 @@ protected:
 
 TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToUntrackedTimeseries) {
     // Expect all operations to be targeted to the db-primary shard, with 'databaseVersion' attached
-    // and 'shardVersion=UNSHARDED.
+    // and 'shardVersion=UNTRACKED.
     auto checkEndpoint = [&](const ShardEndpoint& shardEndpoint) {
         ASSERT_EQ(_dbPrimaryShard, shardEndpoint.shardName);
         ASSERT_EQ(_dbVersion, shardEndpoint.databaseVersion);
-        ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+        ASSERT_EQ(ChunkVersion::UNTRACKED(), shardEndpoint.shardVersion->placementVersion());
     };
 
     CollectionRoutingInfoTargeter cri(operationContext(), _untrackedTimeseriesNss);
@@ -1028,7 +1028,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, RefreshOnStaleResponse) {
     ASSERT_EQ(false, cri.isTrackedTimeSeriesBucketsNamespace());
     ASSERT_FALSE(cri.timeseriesNamespaceNeedsRewrite(nss));
 
-    auto sci = StaleConfigInfo(bucketsNss, ShardVersion::UNSHARDED(), boost::none, _shard0);
+    auto sci = StaleConfigInfo(bucketsNss, ShardVersion::UNTRACKED(), boost::none, _shard0);
 
     // No need to refresh when no stale info or targeting error is present.
     ASSERT_FALSE(cri.refreshIfNeeded(operationContext()));
@@ -1087,7 +1087,7 @@ TEST_F(ShardingTestFixtureWithMockCatalogCache, TestRefreshIfNeededAgainstUntrac
     getCatalogCacheMock()->setDatabaseReturnValue(
         dbName, CatalogCacheMock::makeDatabaseInfo(dbName, primaryShard, dbVersion));
 
-    const StaleConfigInfo dummyStaleConfigInfo(nss, ShardVersion::UNSHARDED(), boost::none, shard0);
+    const StaleConfigInfo dummyStaleConfigInfo(nss, ShardVersion::UNTRACKED(), boost::none, shard0);
 
     // Install metadata for an untracked collection - then verify against:
     const auto initialCollVersion =
@@ -1138,7 +1138,7 @@ TEST_F(ShardingTestFixtureWithMockCatalogCache, TestRefreshIfNeededAgainstTracke
     getCatalogCacheMock()->setDatabaseReturnValue(
         dbName, CatalogCacheMock::makeDatabaseInfo(dbName, primaryShard, dbVersion));
 
-    const StaleConfigInfo dummyStaleConfigInfo(nss, ShardVersion::UNSHARDED(), boost::none, shard0);
+    const StaleConfigInfo dummyStaleConfigInfo(nss, ShardVersion::UNTRACKED(), boost::none, shard0);
 
     // Install metadata for a tracked collection - then verify against:
     const auto initialCollVersion = CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(

@@ -550,7 +550,7 @@ TEST_F(ApplyOpsTest, ApplyOpsCmdStaleConfigSetsShardingOperationFailedStatus) {
                        OpStateAccumulator* opAccumulator = nullptr) override {
             // Throw a staleConfig error.
             uasserted(StaleConfigInfo(
-                          coll->ns(), ShardVersion::UNSHARDED(), boost::none, ShardId{"shardId"}),
+                          coll->ns(), ShardVersion::UNTRACKED(), boost::none, ShardId{"shardId"}),
                       "stale shard");
         }
     };

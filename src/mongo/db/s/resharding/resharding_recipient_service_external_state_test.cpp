@@ -338,7 +338,7 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
         const auto coll = acquireCollection(
             operationContext(),
             CollectionAcquisitionRequest{kReshardingNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(operationContext()),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
@@ -402,7 +402,7 @@ TEST_F(RecipientServiceExternalStateTest,
         const auto coll = acquireCollection(
             operationContext(),
             CollectionAcquisitionRequest{kReshardingNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(operationContext()),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
@@ -473,7 +473,7 @@ TEST_F(RecipientServiceExternalStateTest,
         const auto coll = acquireCollection(
             operationContext(),
             CollectionAcquisitionRequest{kReshardingNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(operationContext()),
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);

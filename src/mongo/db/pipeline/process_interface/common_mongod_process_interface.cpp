@@ -534,7 +534,7 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
                        [opCtx](const NamespaceStringOrUUID& nsOrUuid) {
                            return CollectionAcquisitionRequest(
                                nsOrUuid,
-                               PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                               PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                repl::ReadConcernArgs::get(opCtx),
                                AcquisitionPrerequisites::kRead);
                        });

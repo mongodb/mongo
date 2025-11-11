@@ -534,7 +534,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                    opCtx,
                                    CollectionAcquisitionRequest(
                                        NamespaceString::kSystemReplSetNamespace,
-                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                        repl::ReadConcernArgs::get(opCtx),
                                        AcquisitionPrerequisites::kWrite),
                                    MODE_X);
@@ -739,7 +739,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                         opCtx,
                         CollectionAcquisitionRequest(
                             NamespaceString::kSystemReplSetNamespace,
-                            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                             repl::ReadConcernArgs::get(opCtx),
                             AcquisitionPrerequisites::kWrite),
                         MODE_X);
@@ -775,7 +775,7 @@ Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
                                       NamespaceString::kSystemReplSetNamespace,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_X);
@@ -809,7 +809,7 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
                                    opCtx,
                                    CollectionAcquisitionRequest(
                                        NamespaceString::kLastVoteNamespace,
-                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                        repl::ReadConcernArgs::get(opCtx),
                                        AcquisitionPrerequisites::kWrite),
                                    MODE_X);
@@ -878,7 +878,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                     acquireCollection(opCtx,
                                       CollectionAcquisitionRequest(
                                           NamespaceString::kLastVoteNamespace,
-                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                           repl::ReadConcernArgs::get(opCtx),
                                           AcquisitionPrerequisites::kWrite),
                                       MODE_IX);

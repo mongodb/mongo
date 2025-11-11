@@ -1393,7 +1393,7 @@ private:
                         opCtx,
                         CollectionAcquisitionRequest(
                             NamespaceString::kServerConfigurationNamespace,
-                            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                             repl::ReadConcernArgs::get(opCtx),
                             AcquisitionPrerequisites::kRead),
                         LockMode::MODE_IS);
@@ -1600,7 +1600,7 @@ private:
                 opCtx,
                 CollectionAcquisitionRequest{
                     NamespaceString::kAdminUsersNamespace,
-                    PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                    PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                     repl::ReadConcernArgs::get(opCtx),
                     AcquisitionPrerequisites::kRead});
             hasUserDocs = Helpers::findOne(opCtx, userColl, BSONObj(), userDoc);
@@ -1611,7 +1611,7 @@ private:
                 opCtx,
                 CollectionAcquisitionRequest{
                     NamespaceString::kAdminRolesNamespace,
-                    PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                    PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                     repl::ReadConcernArgs::get(opCtx),
                     AcquisitionPrerequisites::kRead});
             hasRoleDocs = Helpers::findOne(opCtx, rolesColl, BSONObj(), roleDoc);

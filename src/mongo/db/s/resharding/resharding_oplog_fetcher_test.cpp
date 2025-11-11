@@ -295,7 +295,7 @@ public:
         const auto coll = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest(nss,
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -450,7 +450,7 @@ public:
                 acquireCollection(_opCtx,
                                   CollectionAcquisitionRequest{
                                       dataCollectionNss,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(_opCtx),
                                       AcquisitionPrerequisites::kWrite},
                                   MODE_IX);
@@ -623,7 +623,7 @@ protected:
         const auto dataColl = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest{dataCollectionNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);
@@ -894,7 +894,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
     const auto dataColl = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest{dataCollectionNss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(_opCtx),
                                      AcquisitionPrerequisites::kWrite},
         MODE_IX);
@@ -941,7 +941,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
     const auto dataColl = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest{dataCollectionNss,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(_opCtx),
                                      AcquisitionPrerequisites::kWrite},
         MODE_IX);
@@ -994,7 +994,7 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
         const auto dataColl = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest{dataCollectionNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);
@@ -1040,7 +1040,7 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
                 acquireCollection(_opCtx,
                                   CollectionAcquisitionRequest{
                                       dataCollectionNss,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(_opCtx),
                                       AcquisitionPrerequisites::kWrite},
                                   MODE_IX);
@@ -1093,7 +1093,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
                 acquireCollection(_opCtx,
                                   CollectionAcquisitionRequest{
                                       dataCollectionNss,
-                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                       repl::ReadConcernArgs::get(_opCtx),
                                       AcquisitionPrerequisites::kWrite},
                                   MODE_IX);
@@ -1121,7 +1121,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
                     acquireCollection(_opCtx,
                                       CollectionAcquisitionRequest{
                                           dataCollectionNss,
-                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                           repl::ReadConcernArgs::get(_opCtx),
                                           AcquisitionPrerequisites::kWrite},
                                       MODE_IX);
@@ -1159,7 +1159,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
                     acquireCollection(_opCtx,
                                       CollectionAcquisitionRequest{
                                           otherCollection,
-                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                           repl::ReadConcernArgs::get(_opCtx),
                                           AcquisitionPrerequisites::kWrite},
                                       MODE_IX);
@@ -1221,7 +1221,7 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
         const auto dataColl = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest{dataCollectionNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);
@@ -1270,7 +1270,7 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnNetworkTimeoutError) {
         const auto dataColl = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest{dataCollectionNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);
@@ -1317,7 +1317,7 @@ TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetch
         const auto dataColl = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest{dataCollectionNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);
@@ -1355,7 +1355,7 @@ DEATH_TEST_REGEX_F(ReshardingOplogFetcherTest,
         const auto dataColl = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest{dataCollectionNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);

@@ -86,11 +86,11 @@ protected:
         return _expCtx;
     }
 
-    void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-        const auto unshardedCollectionMetadata = CollectionMetadata::UNTRACKED();
+    void installUntrackedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+        const auto untrackedCollectionMetadata = CollectionMetadata::UNTRACKED();
         AutoGetCollection coll(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-            ->setFilteringMetadata(opCtx, unshardedCollectionMetadata);
+            ->setFilteringMetadata(opCtx, untrackedCollectionMetadata);
     }
 
     void setUp() override {
@@ -110,7 +110,7 @@ protected:
             underlyingNss = viewDefinition->viewOn();
         }
 
-        installUnshardedCollectionMetadata(opCtx(), underlyingNss);
+        installUntrackedCollectionMetadata(opCtx(), underlyingNss);
     }
 
     auto makeProcessInterface() {

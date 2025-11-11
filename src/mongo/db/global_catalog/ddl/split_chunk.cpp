@@ -113,7 +113,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
             metadataAfterSplit);
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
-                            ShardVersion::UNSHARDED() /* wantedVersion */,
+                            ShardVersion::UNTRACKED() /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
             metadataAfterSplit->isSharded());

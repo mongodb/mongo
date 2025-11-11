@@ -140,7 +140,7 @@ void validateResolvedCollectionByUUID(OperationContext* opCtx,
             str::stream() << "Collection " << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
                           << ar.nssOrUUID.uuid()
                           << " acquired by UUID has a ShardVersion attached.",
-            !shardVersion || shardVersion == ShardVersion::UNSHARDED());
+            !shardVersion || shardVersion == ShardVersion::UNTRACKED());
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Database name mismatch for "
                           << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
@@ -327,10 +327,10 @@ void assertPlacementConflictTimePresentWhenRequired(
     const boost::optional<ShardVersion>& receivedShardVersion) {
     bool isShardVersionIgnored =
         receivedShardVersion && ShardVersion::isPlacementVersionIgnored(*receivedShardVersion);
-    bool isShardVersionUnsharded =
-        receivedShardVersion && *receivedShardVersion == ShardVersion::UNSHARDED();
-    bool isRoutedVersion = (receivedDbVersion && isShardVersionUnsharded) ||
-        (receivedShardVersion && !isShardVersionIgnored && !isShardVersionUnsharded);
+    bool isShardVersionUntracked =
+        receivedShardVersion && *receivedShardVersion == ShardVersion::UNTRACKED();
+    bool isRoutedVersion = (receivedDbVersion && isShardVersionUntracked) ||
+        (receivedShardVersion && !isShardVersionIgnored && !isShardVersionUntracked);
 
     if (isRoutedVersion && opCtx->inMultiDocumentTransaction() &&
         OperationShardingState::isComingFromRouter(opCtx) &&
@@ -517,8 +517,8 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
             holds_alternative<PlacementConcern>(prerequisites.placementConcern)
             ? get<PlacementConcern>(prerequisites.placementConcern).getDbVersion()
             : boost::none;
-        if (placementConcernShardVersion == ShardVersion::UNSHARDED()) {
-            shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+        if (placementConcernShardVersion == ShardVersion::UNTRACKED()) {
+            shard_role_details::checkLocalCatalogIsValidForUntrackedShardVersion(
                 opCtx,
                 catalog,
                 isCollection ? get<CollectionPtr>(snapshotedServices.collectionPtrOrView)
@@ -2350,7 +2350,7 @@ void HandleTransactionResourcesFromStasher::dismissRestoredResources() {
     _stasher = nullptr;
 }
 
-void shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+void shard_role_details::checkLocalCatalogIsValidForUntrackedShardVersion(
     OperationContext* opCtx,
     const CollectionCatalog& stashedCatalog,
     const CollectionPtr& collectionPtr,
@@ -2403,7 +2403,7 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
     // corresponds to this shard not own any chunk. Also skip the check if the router attached
     // ShardVersion::IGNORED, since in this case the router broadcasts request to shards that may
     // not even own the collection at all (so they won't have any uuid on their local catalog).
-    if (requestedShardVersion == ShardVersion::UNSHARDED() ||
+    if (requestedShardVersion == ShardVersion::UNTRACKED() ||
         !requestedShardVersion.placementVersion().isSet() ||
         ShardVersion::isPlacementVersionIgnored(requestedShardVersion)) {
         return;

@@ -426,7 +426,7 @@ void writeToImageCollection(OperationContext* opCtx,
     auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
@@ -1217,7 +1217,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   acquireCollection(opCtx,
                                     CollectionAcquisitionRequest(
                                         ns,
-                                        PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                        PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                         repl::ReadConcernArgs::get(opCtx),
                                         AcquisitionPrerequisites::kWrite),
                                     MODE_IX);

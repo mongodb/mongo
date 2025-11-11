@@ -71,7 +71,7 @@ void StatsCacheLoaderTest::createStatsCollection(NamespaceString nss) {
     auto coll = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(nss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(operationContext()),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
@@ -124,7 +124,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
     auto coll = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(statsNss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(operationContext()),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
@@ -199,7 +199,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
     auto coll = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(statsNss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                      repl::ReadConcernArgs::get(operationContext()),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);

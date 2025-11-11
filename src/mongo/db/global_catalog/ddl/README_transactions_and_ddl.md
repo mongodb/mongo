@@ -47,7 +47,7 @@ in itself cannot forbid the following anomalies:
   that is newer than the one in the shard's snapshot. This could occur, for instance, when the
   collection's namespace is recreated on the shard after the transaction has established a snapshot.
 - **Collection incarnation anomaly:** Similar to the collection generation anomaly, but concerning
-  the local catalog. The router forwards a request with ShardVersion::UNSHARDED, bypassing collection
+  the local catalog. The router forwards a request with ShardVersion::UNTRACKED, bypassing collection
   generation checks. The request might be for a namespace that was sharded when the transaction
   established the snapshot. Processing this request would incorrectly return partial data for the
   collection as the router only targeted the primary shard.
@@ -84,13 +84,13 @@ Notes:
 For **untracked** collections, the protocol is as follows:
 
 1. The router forwards statements using the latest database version, and targets its primary shard.
-   ShardVersion::UNSHARDED is attached in addition to the DatabaseVersion.
+   ShardVersion::UNTRACKED is attached in addition to the DatabaseVersion.
 1. The targeted shard checks the attached metadata. All the following conditions must be
    met for the request to be considered valid:
    1. The received database version must match the current (latest) database version.
    1. The received `atClusterTime` must not be earlier than the latest database version's [timestamp field](https://github.com/mongodb/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version) known by the shard.
       This field represents the commit timestamp of the latest reincarnation (drop/create) or movePrimary operation for this database.
-   1. The received placement version is UNSHARDED, and the shard checks the latest version matches.
+   1. The received placement version is UNTRACKED, and the shard checks the latest version matches.
    1. The collection in the snapshot must be the same incarnation (same UUID) as in the latest CollectionCatalog.
 
 Notes:
@@ -102,10 +102,10 @@ Notes:
   database primary shard knowledge, but this decision might not be valid at the specified cluster time.
   E.g. if the shard was not the primary shard for the database at that point in time.
 - (2.iii) ensures that the collection generation anomaly is detected for cases where an untracked
-  collection becomes tracked. There will be a mismatch between the attached ShardVersion::UNSHARDED
+  collection becomes tracked. There will be a mismatch between the attached ShardVersion::UNTRACKED
   and the actual placement version on the shard.
 - (2.iv) ensures that the collection incarnation anomaly is detected by the primary shard after a
-  sharded collection is reincarnated as unsharded (by definition, ShardVersion::UNSHARDED always conforms with 2.ii).
+  sharded collection is reincarnated as unsharded (by definition, ShardVersion::UNTRACKED always conforms with 2.ii).
 
 ## Transactions with readConcern="local" or "majority"
 
@@ -162,14 +162,14 @@ For **untracked** collections, the protocol is as follows:
 1. For each statement, the router uses the latest database version.
 1. For each statement, the router sends the command to the database primary shard. It attaches the database
    version as usual, and additionally attaches the selected `placementConflictTime`. It also
-   attaches an `afterClusterTime` = `placementConflictTime`, and ShardVersion::UNSHARDED.
+   attaches an `afterClusterTime` = `placementConflictTime`, and ShardVersion::UNTRACKED.
 1. The targeted shard will open its storage snapshot with a timestamp at least `afterClusterTime`.
 1. The targeted shard checks the attached metadata. All the following conditions must be
    met for the request to be considered valid:
    1. The received database version must match the current (latest) database version.
    1. `placementConflictTime` must not be earlier than the database version's [timestamp field](https://github.com/mongodb/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version).
       This field represents the commit timestamp of the latest reincarnation (drop/create) or movePrimary operation for this database.
-   1. The received placement version is UNSHARDED, and the shard checks the latest version matches.
+   1. The received placement version is UNTRACKED, and the shard checks the latest version matches.
    1. The collection in the snapshot must be the same incarnation (same UUID) as in the latest CollectionCatalog.
 
 Notes:
@@ -181,7 +181,7 @@ Notes:
   database primary shard knowledge, but this decision might not be valid at for snapshots opened at
   a timestamp before the reincarnation.
 - (4.iii) ensures that the collection generation anomaly is detected for cases where an untracked
-  collection becomes tracked. There will be a mismatch between the attached ShardVersion::UNSHARDED
+  collection becomes tracked. There will be a mismatch between the attached ShardVersion::UNTRACKED
   and the actual placement version on the shard.
 - (4.iv) ensures that the collection incarnation anomaly is detected by the primary shard after a
   sharded collection is reincarnated unsharded.

@@ -649,7 +649,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         auto collection = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kServerConfigurationNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kWrite),
             MODE_IX);
@@ -1048,7 +1048,7 @@ boost::optional<ShardIdentity> ShardingInitializationMongoD::getShardIdentityDoc
         auto coll = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kServerConfigurationNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             LockMode::MODE_IS);

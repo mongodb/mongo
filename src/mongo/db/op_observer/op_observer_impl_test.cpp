@@ -366,7 +366,7 @@ protected:
         auto coll = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -382,7 +382,7 @@ protected:
         auto sideCollection = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -400,7 +400,7 @@ protected:
         auto configTransactions = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -427,7 +427,7 @@ protected:
         auto preImagesCollection = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);

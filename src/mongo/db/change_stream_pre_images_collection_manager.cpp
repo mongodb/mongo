@@ -132,7 +132,7 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
     const auto changeStreamPreImagesCollection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(preImagesCollectionNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kUnreplicatedWrite),
         MODE_IX);

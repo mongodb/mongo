@@ -387,7 +387,7 @@ TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
         const auto oplogBufferColl = acquireCollection(
             opCtx.get(),
             CollectionAcquisitionRequest{oplogBufferNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);

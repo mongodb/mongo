@@ -48,8 +48,8 @@ s1.getDB(dbName).MyColl.find({x: 0}).readPref("secondary").toArray();
 
 // router0: Empty
 // router1: Empty
-// shard0: primary=UNSHARDED, secondary=UNSHARDED
-// shard1: primary=UNSHARDED, secondary=UNSHARDED
+// shard0: primary=UNTRACKED, secondary=UNTRACKED
+// shard1: primary=UNTRACKED, secondary=UNTRACKED
 
 assert.commandWorked(s0.adminCommand({shardCollection: collNs, key: {y: 1}}));
 assert.commandWorked(s0.getDB(dbName).MyColl.insert({y: 42}));
@@ -57,7 +57,7 @@ assert.commandWorked(s0.getDB(dbName).MyColl.insert({y: 42}));
 // router0: SV1
 // router1: Empty
 // shard0: primary=SV1, secondary=UNKNOWN
-// shard1: primary=UNSHARDED, secondary=UNSHARDED
+// shard1: primary=UNTRACKED, secondary=UNTRACKED
 
 // This should reset shard1's shard version to be UNKNOWN on all nodes.
 assert.commandWorked(s0.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
@@ -67,7 +67,7 @@ assert.commandWorked(s0.adminCommand({movePrimary: dbName, to: st.shard1.shardNa
 // shard0: primary=SV1, secondary=UNKNOWN
 // shard1: primary=UNKNOWN, secondary=UNKNOWN
 
-// If this were to equal 0 it would mean that s1 sent an UNSHARDED version to a stale secondary on
+// If this were to equal 0 it would mean that s1 sent an UNTRACKED version to a stale secondary on
 // the new dbPrimary shard1. Being 1 means we're doing the correct thing here.
 assert.eq(s1.getDB(dbName).MyColl.find({}).readPref("secondary").itcount(), 1);
 assert.eq(s0.getDB(dbName).MyColl.find({}).itcount(), 1);

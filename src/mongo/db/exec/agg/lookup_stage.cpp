@@ -263,7 +263,7 @@ GetNextResult LookUpStage::doGetNext() {
         // throw a custom exception.
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>(); staleInfo &&
             staleInfo->getVersionWanted() &&
-            staleInfo->getVersionWanted() != ShardVersion::UNSHARDED()) {
+            staleInfo->getVersionWanted() != ShardVersion::UNTRACKED()) {
             uassert(3904800,
                     "Cannot run $lookup with a sharded foreign collection in a transaction",
                     foreignShardedLookupAllowed());
@@ -399,7 +399,7 @@ void LookUpStage::prepareStateToBuildPipeline(
 
     if (!foreignShardedLookupAllowed() && !fromExpCtx->getInRouter()) {
         // Enforce that the foreign collection must be unsharded for lookup.
-        fromExpCtx->getMongoProcessInterface()->expectUnshardedCollectionInScope(
+        fromExpCtx->getMongoProcessInterface()->expectUntrackedCollectionInScope(
             fromExpCtx->getOperationContext(), fromExpCtx->getNamespaceString(), boost::none);
     }
 }

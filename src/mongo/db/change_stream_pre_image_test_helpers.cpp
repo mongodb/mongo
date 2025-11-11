@@ -59,7 +59,7 @@ void insertDirectlyToPreImagesCollection(OperationContext* opCtx,
     const auto preImagesAcq = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
@@ -204,7 +204,7 @@ CollectionAcquisition acquirePreImagesCollectionForRead(OperationContext* opCtx)
     return acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
