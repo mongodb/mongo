@@ -415,6 +415,12 @@ void MozJSProxyScope::implThread(MozJSProxyScope* proxy) {
         Status capturedStatus = Status::OK();
         bool hadException = false;
         try {
+            // Safe without _mutex: runOnImplThread transfers ownership under the lock
+            // and blocks callers until _state == ImplResponse, so only this thread
+            // can observe or mutate _function during execution. Holding _mutex while
+            // running the closure would deadlock re-entrant callbacks, since the closure
+            // may call back into run(), which first grabs _mutex before queueing work.
+            // coverity[missing_lock]
             proxy->_function();
         } catch (...) {
             capturedStatus = exceptionToStatus();
