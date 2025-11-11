@@ -48,6 +48,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/uuid.h"
 
@@ -670,8 +671,10 @@ struct OptionalRoutingTableHistory {
     std::shared_ptr<RoutingTableHistory> optRt;
 };
 
-using RoutingTableHistoryCache =
-    ReadThroughCache<NamespaceString, OptionalRoutingTableHistory, ComparableChunkVersion>;
+using RoutingTableHistoryCache = ReadThroughCache<NamespaceString,
+                                                  OptionalRoutingTableHistory,
+                                                  ComparableChunkVersion,
+                                                  ObservableMutex<stdx::mutex>>;
 using RoutingTableHistoryValueHandle = RoutingTableHistoryCache::ValueHandle;
 
 /**

@@ -114,7 +114,7 @@ protected:
     LogicalTime _advanceComponentTimeByTicks(Component component, uint64_t nTicks);
 
     /**
-     * Called by sublclasses in order to actually tickTo a Component time, once they have determined
+     * Called by subclasses in order to actually tickTo a Component time, once they have determined
      * that doing so is permissible.
      */
     void _advanceComponentTimeTo(Component component, LogicalTime&& newTime);

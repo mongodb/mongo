@@ -89,7 +89,7 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
 
             cancelStatusAtTaskBegin = [&] {
                 // Taking mutex in order to be mutually exclusive with
-                // any callers of `::tryCance()`
+                // any callers of `::tryCancel()`
                 stdx::lock_guard lg(taskInfo->cancelTokenMutex);
                 taskInfo->opCtxToCancel = opCtxHolder.get();
                 return taskInfo->cancelStatus;

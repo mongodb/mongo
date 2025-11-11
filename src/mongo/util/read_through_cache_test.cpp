@@ -110,7 +110,7 @@ private:
 };
 
 class CausallyConsistentCacheWithLookupArgs
-    : public ReadThroughCache<std::string, CachedValue, Timestamp, std::string, int> {
+    : public ReadThroughCache<std::string, CachedValue, Timestamp, stdx::mutex, std::string, int> {
 public:
     CausallyConsistentCacheWithLookupArgs(Service* service,
                                           ThreadPoolInterface& threadPool,

@@ -29,20 +29,14 @@
 
 #pragma once
 
-
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock/vector_clock.h"
-#include "mongo/db/vector_clock/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/decorable.h"
-
 
 namespace mongo {
 
@@ -126,7 +120,7 @@ private:
     ExecutorFuture<void> _createPersisterTask();
 
     // Protects the shared state below
-    stdx::mutex _mutex;
+    stdx::mutex _durableTimeMutex;
 
     // If boost::none, means the durable time needs to be recovered from disk, otherwise contains
     // the latest-known durable time
@@ -138,7 +132,7 @@ private:
 
     /**
      * This is a shared state between threads so any change on this boolean must be guarded by the
-     * _mutex. The value of true means there is an async persister task running.
+     * _durableTimeMutex. The value of true means there is an async persister task running.
      *
      * After onShutdown the false -> true transition is prohibited (no new persister task after
      * shutdown initiated). The destructor will wait for this flag to be true in order to not to

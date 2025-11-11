@@ -51,7 +51,6 @@
 #include <iterator>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -150,6 +149,7 @@ struct ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent, Lo
 template <typename Key,
           typename Value,
           typename Time = CacheNotCausallyConsistent,
+          typename MutexType = stdx::mutex,
           typename... LookupArgs>
 class MONGO_MOD_OPEN ReadThroughCache : public ReadThroughCacheBase {
     /**
@@ -535,7 +535,7 @@ public:
      * invocation of `lookup`. Specifically, several concurrent invocations of `acquire` for the
      * same key may group together for a single `lookup`.
      */
-    ReadThroughCache(stdx::mutex& mutex,
+    ReadThroughCache(MutexType& mutex,
                      Service* service,
                      ThreadPoolInterface& threadPool,
                      LookupFn lookupFn,
@@ -672,7 +672,7 @@ private:
     // Used to protect the shared below. Has a lock level of 3, meaning that while held, any code is
     // only allowed to take '_cancelTokensMutex' (which in turn is allowed to be followed by the
     // Client lock).
-    stdx::mutex& _mutex;
+    MutexType& _mutex;
 
     // Blocking function which will be invoked to retrieve entries from the backing store. It will
     // be supplied with the arguments specified by the LookupArgs parameter pack.
@@ -719,8 +719,8 @@ private:
  *      inProgress.signalWaiters(result);
  * }
  */
-template <typename Key, typename Value, typename Time, typename... LookupArgs>
-class ReadThroughCache<Key, Value, Time, LookupArgs...>::InProgressLookup {
+template <typename Key, typename Value, typename Time, typename MutexType, typename... LookupArgs>
+class ReadThroughCache<Key, Value, Time, MutexType, LookupArgs...>::InProgressLookup {
 public:
     InProgressLookup(ReadThroughCache& cache,
                      Key key,

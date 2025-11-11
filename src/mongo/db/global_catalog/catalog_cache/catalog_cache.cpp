@@ -34,26 +34,17 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
-#include "mongo/db/global_catalog/type_collection.h"
-#include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
-#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
-#include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
@@ -62,12 +53,12 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/invalidating_lru_cache.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
 #include <cstddef>
 #include <cstdint>
-#include <list>
 #include <memory>
 #include <set>
 #include <vector>
@@ -702,7 +693,9 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
               return _lookupDatabase(opCtx, dbName, db, previousDbVersion);
           },
           gCatalogCacheDatabaseMaxEntries),
-      _catalogCacheLoader(catalogCacheLoader) {}
+      _catalogCacheLoader(catalogCacheLoader) {
+    ObservableMutexRegistry::get().add("Router Cache Mutexes", _mutex);
+}
 
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
     OperationContext* opCtx,
@@ -767,7 +760,9 @@ CatalogCache::CollectionCache::CollectionCache(
               return _lookupCollection(opCtx, nss, collectionHistory, previousChunkVersion);
           },
           gCatalogCacheCollectionMaxEntries),
-      _catalogCacheLoader(catalogCacheLoader) {}
+      _catalogCacheLoader(catalogCacheLoader) {
+    ObservableMutexRegistry::get().add("Router Cache Mutexes", _mutex);
+}
 
 void CatalogCache::CollectionCache::reportStats(BSONObjBuilder* builder) const {
     _stats.report(builder);

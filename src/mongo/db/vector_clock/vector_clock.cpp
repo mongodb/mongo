@@ -30,7 +30,6 @@
 #include "mongo/db/vector_clock/vector_clock.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -53,11 +52,10 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
-
-#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -102,8 +100,14 @@ void VectorClock::registerVectorClockOnServiceContext(ServiceContext* service,
     clock = std::move(vectorClock);
 }
 
+VectorClock::VectorClock() {
+    ObservableMutexRegistry::get().add("VectorClock::_mutex", _mutex);
+}
+
+VectorClock::~VectorClock() = default;
+
 VectorClock::VectorTime VectorClock::getTime() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     return VectorTime(_vectorTime);
 }
 
@@ -139,8 +143,7 @@ void VectorClock::_ensurePassesRateLimiter(ServiceContext* service,
 void VectorClock::_advanceTime(LogicalTimeArray&& newTime) {
     _ensurePassesRateLimiter(_service, newTime);
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-
+    stdx::lock_guard lock(_mutex);
     auto it = _vectorTime.begin();
     auto newIt = newTime.begin();
     for (; it != _vectorTime.end() && newIt != newTime.end(); ++it, ++newIt) {
@@ -440,7 +443,7 @@ void VectorClock::_disable() {
 }
 
 void VectorClock::resetVectorClock_forTest() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     auto it = _vectorTime.begin();
     for (; it != _vectorTime.end(); ++it) {
         *it = VectorClock::kInitialComponentTime;

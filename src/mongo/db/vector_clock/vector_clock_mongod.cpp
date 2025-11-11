@@ -31,9 +31,7 @@
 #include "mongo/db/vector_clock/vector_clock_mongod.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
@@ -58,7 +56,6 @@
 #include "mongo/db/vector_clock/topology_time_ticker.h"
 #include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/db/vector_clock/vector_clock_document_gen.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -67,12 +64,9 @@
 #include "mongo/util/future_impl.h"
 
 #include <cstdint>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -83,7 +77,6 @@
 #include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace {
@@ -111,17 +104,17 @@ VectorClockMongoD::~VectorClockMongoD() {
 }
 
 void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
-    stdx::lock_guard lg(_mutex);
+    stdx::lock_guard lg(_durableTimeMutex);
     _durableTime.reset();
 }
 
 void VectorClockMongoD::onStepDown() {
-    stdx::lock_guard lg(_mutex);
+    stdx::lock_guard lg(_durableTimeMutex);
     _durableTime.reset();
 }
 
 void VectorClockMongoD::onShutdown() {
-    stdx::lock_guard lg(_mutex);
+    stdx::lock_guard lg(_durableTimeMutex);
     _shutdownInitiated.store(true);
 }
 
@@ -181,7 +174,7 @@ void VectorClockMongoD::onBecomeArbiter() {
 SharedSemiFuture<void> VectorClockMongoD::waitForDurableConfigTime() {
     auto time = getTime();
 
-    stdx::unique_lock ul(_mutex);
+    stdx::unique_lock ul(_durableTimeMutex);
     if (_durableTime && _durableTime->configTime() >= time.configTime())
         return SharedSemiFuture<void>();
 
@@ -191,7 +184,7 @@ SharedSemiFuture<void> VectorClockMongoD::waitForDurableConfigTime() {
 SharedSemiFuture<void> VectorClockMongoD::waitForDurableTopologyTime() {
     auto time = getTime();
 
-    stdx::unique_lock ul(_mutex);
+    stdx::unique_lock ul(_durableTimeMutex);
     if (_durableTime && _durableTime->topologyTime() >= time.topologyTime())
         return SharedSemiFuture<void>();
 
@@ -201,7 +194,7 @@ SharedSemiFuture<void> VectorClockMongoD::waitForDurableTopologyTime() {
 SharedSemiFuture<void> VectorClockMongoD::waitForDurable() {
     auto time = getTime();
 
-    stdx::unique_lock ul(_mutex);
+    stdx::unique_lock ul(_durableTimeMutex);
     if (_durableTime && _durableTime->configTime() >= time.configTime() &&
         _durableTime->topologyTime() >= time.topologyTime())
         return SharedSemiFuture<void>();
@@ -282,7 +275,7 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
 
                 auto vectorTime = std::invoke([&]() {
                     if (std::invoke([&] {
-                            stdx::lock_guard lg(_mutex);
+                            stdx::lock_guard lg(_durableTimeMutex);
                             return !_durableTime;
                         })) {
                         return recoverDirect(opCtx);
@@ -304,7 +297,7 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
                 });
 
                 {
-                    stdx::lock_guard lg(_mutex);
+                    stdx::lock_guard lg(_durableTimeMutex);
                     _durableTime = vectorTime;
                     ComparableVectorTime comparableDurableTime{*_durableTime};
 
@@ -323,7 +316,7 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
             }
         })
         .onError([this](Status status) {
-            stdx::lock_guard lg(_mutex);
+            stdx::lock_guard lg(_durableTimeMutex);
 
             for (const auto& element : _queue) {
                 element._promise->setError(status);

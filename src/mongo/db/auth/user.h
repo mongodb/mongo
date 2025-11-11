@@ -499,6 +499,7 @@ private:
 using UserCache = ReadThroughCache<UserRequest::UserRequestCacheKey,
                                    User,
                                    CacheNotCausallyConsistent,
+                                   stdx::mutex,
                                    std::shared_ptr<UserRequest>,
                                    SharedUserAcquisitionStats>;
 using UserHandle = UserCache::ValueHandle;

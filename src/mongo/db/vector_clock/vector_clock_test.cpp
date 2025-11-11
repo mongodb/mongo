@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/vector_clock/vector_clock.h"
 
 #include "mongo/base/error_codes.h"
@@ -40,7 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/vector_clock/vector_clock_gen.h"
+#include "mongo/db/vector_clock/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/vector_clock/vector_clock_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -49,11 +48,8 @@
 #include "mongo/util/time_support.h"
 
 #include <limits>
-#include <memory>
-#include <ratio>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {

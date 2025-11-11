@@ -34,18 +34,16 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/vector_clock/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock/vector_clock_gen.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <set>
 #include <string>
 #include <utility>
 
@@ -196,8 +194,8 @@ public:
         LogicalTimeArray _time;
     };
 
-    VectorClock() = default;
-    virtual ~VectorClock() = default;
+    VectorClock();
+    virtual ~VectorClock();
 
     // There is a special logic in the storage engine which fixes up Timestamp(0, 0) to the latest
     // available time on the node. Because of this, we should never gossip or have a VectorClock
@@ -369,9 +367,9 @@ protected:
     // Protects the fields below
     //
     // Note that ConfigTime is advanced under the ReplicationCoordinator mutex, so to avoid
-    // potential deadlocks the ReplicationCoordator mutex should never be acquired whilst the
+    // potential deadlocks the ReplicationCoordinator mutex should never be acquired while the
     // VectorClock mutex is held.
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     AtomicWord<bool> _isEnabled{true};
 

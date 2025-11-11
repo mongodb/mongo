@@ -35,7 +35,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/client/shard_factory.h"
@@ -44,11 +43,11 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/read_through_cache.h"
 
@@ -490,7 +489,8 @@ private:
     enum class Singleton { Only };
     static constexpr auto _kSingleton = Singleton::Only;
 
-    using Cache = ReadThroughCache<Singleton, ShardRegistryData, Time>;
+    using Cache =
+        ReadThroughCache<Singleton, ShardRegistryData, Time, ObservableMutex<stdx::mutex>>;
 
     Cache::LookupResult _lookup(OperationContext* opCtx,
                                 const Singleton& key,
@@ -573,19 +573,25 @@ private:
     // Executor for periodically reloading the registry (ie. in which _periodicReload() runs).
     std::shared_ptr<executor::TaskExecutor> _executor{};
 
-    mutable stdx::mutex _cacheMutex;
+    // Mutex for the exclusive use by Cache. Must not be used for any other purpose.
+    ObservableMutex<stdx::mutex> _cacheMutex;
     std::unique_ptr<Cache> _cache;
 
-    // Protects _configShardData, and _latestNewConnStrings.
-    mutable stdx::mutex _mutex;
+    // Protects the mutable state below
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
-    // Store a reference to the configShard.
+    // Set to true once one of the init methods have been called.
+    AtomicWord<bool> _isInitialized{false};
+
+    // Stores a reference to the configShard.
     ShardRegistryData _configShardData;
 
-    // The key is replset name (the type is ShardId just to take advantage of its hasher).
+    // Stores a cache of each shard replica set's connection string so that they can be carried-over
+    // when shards are refreshed from the Config server (the connection string of each shard
+    // document on the Config server is updated asynchronously may lag behind what the RSM on each
+    // node has discovered). The key is replset name (the type is ShardId just to take advantage of
+    // its hasher).
     LatestConnStrings _latestConnStrings;
-
-    AtomicWord<bool> _isInitialized{false};
 
     // Set to true in shutdown call to prevent calling it twice.
     AtomicWord<bool> _isShutdown{false};

@@ -58,7 +58,6 @@
 #include "mongo/db/local_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -69,23 +68,20 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
 #include <cstddef>
-#include <exception>
-#include <list>
-#include <mutex>
 #include <shared_mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 
@@ -229,6 +225,10 @@ constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissin
 
 class LatestCollectionCatalog {
 public:
+    LatestCollectionCatalog() {
+        ObservableMutexRegistry::get().add("Shard Local Catalog Mutexes", _writeMutex);
+    }
+
     std::shared_ptr<CollectionCatalog> load() const {
         std::shared_lock lk(_readMutex);  // NOLINT
         return _catalog;
@@ -248,10 +248,11 @@ public:
     }
 
 private:
-    // TODO SERVER-56428: Replace _readMutex std::atomic<std::shared_ptr> when supported in our
-    // toolchain. _writeMutex should remain a mutex.
+    // TODO (SERVER-56428): Replace _readMutex with std::atomic<std::shared_ptr> when it is
+    // supported in our toolchain. The writer/writer synchronization (_writeMutex) needs to remain a
+    // mutex.
     mutable RWMutex _readMutex;
-    mutable stdx::mutex _writeMutex;
+    mutable ObservableMutex<stdx::mutex> _writeMutex;
     std::shared_ptr<CollectionCatalog> _catalog = std::make_shared<CollectionCatalog>();
 };
 const ServiceContext::Decoration<LatestCollectionCatalog> getCatalogStore =

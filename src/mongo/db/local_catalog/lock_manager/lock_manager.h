@@ -36,6 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <map>
 #include <vector>
@@ -145,7 +146,9 @@ private:
     struct LockBucket {
         LockHead* findOrInsert(ResourceId resId);
 
-        stdx::mutex mutex;
+        LockBucket();
+
+        ObservableMutex<stdx::mutex> mutex;
         using Map = stdx::unordered_map<ResourceId, LockHead*>;
         Map data;
     };
@@ -157,7 +160,9 @@ private:
         PartitionedLockHead* find(ResourceId resId);
         PartitionedLockHead* findOrInsert(ResourceId resId);
 
-        stdx::mutex mutex;
+        Partition();
+
+        ObservableMutex<stdx::mutex> mutex;
         using Map = stdx::unordered_map<ResourceId, PartitionedLockHead*>;
         Map data;
     };

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
 
 #include "mongo/bson/timestamp.h"
@@ -42,11 +41,9 @@
 #include "mongo/util/time_support.h"
 
 #include <mutex>
-#include <string>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace {
@@ -78,7 +75,7 @@ void VectorClockMutable::registerVectorClockOnServiceContext(
 LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component, uint64_t nTicks) {
     invariant(nTicks > 0 && nTicks <= kMaxValue);
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
 
     LogicalTime time = _vectorTime[component];
 
@@ -124,7 +121,7 @@ LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component
 }
 
 void VectorClockMutable::_advanceComponentTimeTo(Component component, LogicalTime&& newTime) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
 
     // Rate limit checks are skipped here so a server with no activity for longer than
     // maxAcceptableLogicalClockDriftSecs seconds can still have its cluster time initialized.

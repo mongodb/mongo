@@ -35,7 +35,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache_loader.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -45,9 +44,9 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/read_through_cache.h"
 
 #include <cstdint>
@@ -63,7 +62,10 @@ namespace mongo {
 
 class ComparableDatabaseVersion;
 
-using DatabaseTypeCache = ReadThroughCache<DatabaseName, DatabaseType, ComparableDatabaseVersion>;
+using DatabaseTypeCache = ReadThroughCache<DatabaseName,
+                                           DatabaseType,
+                                           ComparableDatabaseVersion,
+                                           ObservableMutex<stdx::mutex>>;
 using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
 using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
@@ -360,7 +362,7 @@ private:
                                      const ComparableDatabaseVersion& previousDbVersion);
 
         std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
-        stdx::mutex _mutex;
+        ObservableMutex<stdx::mutex> _mutex;
     };
 
     class CollectionCache : public RoutingTableHistoryCache {
@@ -382,7 +384,7 @@ private:
                                        const ComparableChunkVersion& previousChunkVersion);
 
         std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
-        stdx::mutex _mutex;
+        ObservableMutex<stdx::mutex> _mutex;
 
         struct Stats {
             // Tracks how many incremental refreshes are waiting to complete currently
