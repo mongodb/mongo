@@ -272,7 +272,6 @@ common:fastbuild --enable_platform_specific_config=true
 --config=dbg
 common:dbg -c dbg
 common:dbg --fission=yes
-common:dbg --copt=-gpubnames # for lldb
 common:dbg --//bazel/config:dwarf_version=5
 common:dbg --//bazel/config:compress_debug_compile=True
 common:dbg --//bazel/config:opt=off
