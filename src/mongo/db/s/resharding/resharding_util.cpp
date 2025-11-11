@@ -720,6 +720,11 @@ Milliseconds getMajorityReplicationLag(OperationContext* opCtx) {
     const auto& replCoord = repl::ReplicationCoordinator::get(opCtx);
     const auto lastAppliedWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime().wallTime;
     const auto lastCommittedWallTime = replCoord->getLastCommittedOpTimeAndWallTime().wallTime;
+    // TODO SERVER-113571 Remove this if block and adjust the replication lag calculation (if
+    // needed).
+    if (lastCommittedWallTime == Date_t()) {
+        return Milliseconds(0);
+    }
 
     if (!lastAppliedWallTime.isFormattable() || !lastCommittedWallTime.isFormattable()) {
         return Milliseconds(0);

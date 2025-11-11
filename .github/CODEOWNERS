@@ -2156,6 +2156,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/atlas/jstests/disagg_storage/OWNERS.yml
 /src/mongo/db/modules/atlas/jstests/disagg_storage/**/* @10gen/server-disagg-storage @svc-auto-approve-bot
+/src/mongo/db/modules/atlas/jstests/disagg_storage/**/sharding_basic.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/atlas/jstests/disagg_storage/encryption/OWNERS.yml
 /src/mongo/db/modules/atlas/jstests/disagg_storage/encryption/**/* @10gen/server-security @svc-auto-approve-bot

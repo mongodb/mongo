@@ -8,9 +8,14 @@ function getOplog(node) {
 export function getSortedCatalogEntries(node, sortField = "ident") {
     const adminDB = node.getDB("admin");
     const isSystemProfile = {"name": "system.profile"};
+    // The collections supporting the query analysis are asynchronously created upon onStepUpComplete() and may not be immediately available.
+    const isQueryAnalysisCollection = {
+        "db": "config",
+        "name": {$in: ["sampledQueries", "sampledQueriesDiff", "analyzeShardKeySplitPoints"]},
+    };
     const isLocal = {"db": "local"};
-    const match = {$nor: [isSystemProfile, isLocal]};
-    return adminDB.aggregate([{$listCatalog: {}}, {$match: match}, {$sort: {sortField: 1}}]).toArray();
+    const match = {$nor: [isSystemProfile, isLocal, isQueryAnalysisCollection]};
+    return adminDB.aggregate([{$listCatalog: {}}, {$match: match}, {$sort: {[sortField]: 1}}]).toArray();
 }
 /**
  * Given catalog entries for 2 nodes, where catalog entries for both nodes must be sorted by the
@@ -25,7 +30,7 @@ export function assertMatchingCatalogIdents(node0CatalogIdents, node1CatalogIden
         node1CatalogIdents.length,
         `Expected nodes to have same number of entries. Entries for node0 ${tojson(
             node0CatalogIdents,
-        )}, entries for node1 ${node1CatalogIdents}`,
+        )}, entries for node1 ${tojson(node1CatalogIdents)}`,
     );
 
     const numCatalogEntries = node0CatalogIdents.length;

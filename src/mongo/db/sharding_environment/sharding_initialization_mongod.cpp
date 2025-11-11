@@ -834,6 +834,7 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
 }
 
 void ShardingInitializationMongoD::onStepDown() {
+    // TODO (SERVER-113612): remove cc() usage.
     auto opCtx = cc().getOperationContext();
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
