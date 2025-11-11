@@ -42,6 +42,7 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>

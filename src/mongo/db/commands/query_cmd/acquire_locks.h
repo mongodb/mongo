@@ -33,6 +33,7 @@
 #include "mongo/db/local_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

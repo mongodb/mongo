@@ -33,6 +33,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <variant>

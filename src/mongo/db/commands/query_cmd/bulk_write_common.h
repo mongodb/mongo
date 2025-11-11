@@ -34,6 +34,7 @@
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -70,7 +71,7 @@ int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx);
  * From a serialized BulkWriteCommandRequest containing a single NamespaceInfoEntry,
  * extract that NamespaceInfoEntry. For bulkWrite with queryable encryption.
  */
-NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite);
+MONGO_MOD_NEEDS_REPLACEMENT NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite);
 
 
 /**

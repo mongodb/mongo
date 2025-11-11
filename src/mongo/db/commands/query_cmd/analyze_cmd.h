@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 static constexpr StringData kStatisticsPath = "statistics"_sd;

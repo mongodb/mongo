@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <string>
@@ -55,7 +56,7 @@ inline Status validateUpdateReturn(const std::string& value) {
 /**
  * A single item in a batch of results in a 'bulkWrite' command response.
  */
-class BulkWriteReplyItem {
+class MONGO_MOD_NEEDS_REPLACEMENT BulkWriteReplyItem {
 public:
     static constexpr auto kCodeFieldName = "code"_sd;
     static constexpr auto kErrmsgFieldName = "errmsg"_sd;
@@ -166,7 +167,7 @@ public:
      * The status associated with the reply potentially containing error data for why the
      * operation failed.
      */
-    const Status& getStatus() const {
+    MONGO_MOD_NEEDS_REPLACEMENT const Status& getStatus() const {
         return _status;
     }
 

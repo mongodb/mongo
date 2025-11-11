@@ -33,6 +33,7 @@
 #include "mongo/db/commands/query_cmd/update_metrics.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/util/modules.h"
 
 /**
  * Contains common functionality shared between the batch write commands in mongos and mongod.

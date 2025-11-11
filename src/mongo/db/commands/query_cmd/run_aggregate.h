@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
