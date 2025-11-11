@@ -27,8 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 
 namespace mongo::join_ordering {
@@ -38,5 +40,26 @@ namespace mongo::join_ordering {
  */
 MultipleCollectionAccessor multipleCollectionAccessor(OperationContext* opCtx,
                                                       std::vector<NamespaceString> namespaces);
+
+/**
+ * Text fixture with helpful functions for manipulating the catalog, constructing samples and
+ * queries/QSNs.
+ */
+class JoinOrderingTestFixture : public CatalogTestFixture {
+public:
+    std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss,
+                                                       BSONObj filter = BSONObj::kEmptyObject);
+
+    std::unique_ptr<QuerySolution> makeCollScanPlan(
+        NamespaceString nss, std::unique_ptr<MatchExpression> filter = nullptr);
+
+    void createCollection(NamespaceString nss);
+
+    void createIndex(UUID collUUID, BSONObj spec, std::string name);
+
+    std::unique_ptr<ce::SamplingEstimator> samplingEstimator(const MultipleCollectionAccessor& mca,
+                                                             NamespaceString nss,
+                                                             double sampleProportion = 0.1);
+};
 
 }  // namespace mongo::join_ordering

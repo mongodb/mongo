@@ -39,56 +39,7 @@ namespace mongo::join_ordering {
 
 using namespace mongo::cost_based_ranker;
 
-class SingleTableAccessTestFixture : public CatalogTestFixture {
-public:
-    std::unique_ptr<ce::SamplingEstimator> samplingEstimator(const MultipleCollectionAccessor& mca,
-                                                             NamespaceString nss) {
-        auto collPtr = mca.lookupCollection(nss);
-        auto size = collPtr->getRecordStore()->numRecords();
-        // Sample 10% of the collection
-        auto sampleSize = static_cast<long>(size * 0.1);
-        auto samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
-            operationContext(),
-            mca,
-            PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
-            sampleSize,
-            ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
-            boost::none,
-            CardinalityEstimate{CardinalityType{static_cast<double>(size)},
-                                EstimationSource::Code});
-        samplingEstimator->generateSample(ce::NoProjection{});
-        return samplingEstimator;
-    }
-
-    std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss, BSONObj filter) {
-        auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
-
-        auto swFindCmd = ParsedFindCommand::withExistingFilter(
-            expCtx,
-            nullptr,
-            std::move(MatchExpressionParser::parse(filter, expCtx).getValue()),
-            std::make_unique<FindCommandRequest>(nss),
-            ProjectionPolicies::aggregateProjectionPolicies());
-
-        auto swCq = CanonicalQuery::make(CanonicalQueryParams{
-            .expCtx = expCtx,
-            .parsedFind = std::move(swFindCmd.getValue()),
-        });
-        ASSERT_OK(swCq);
-        return std::move(swCq.getValue());
-    }
-
-    void createIndex(UUID collUUID, BSONObj spec, std::string name) {
-        auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
-        auto indexConstraints = IndexBuildsManager::IndexConstraints::kRelax;
-        ASSERT_DOES_NOT_THROW(indexBuildsCoord->createIndex(
-            operationContext(),
-            collUUID,
-            BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << spec << "name" << name),
-            indexConstraints,
-            false));
-    }
-};
+using SingleTableAccessTestFixture = JoinOrderingTestFixture;
 
 void assertQuerySolutionHasEstimate(const QuerySolutionNode* qsn, const EstimateMap& estimates) {
     auto it = estimates.find(qsn);

@@ -30,7 +30,6 @@
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/local_catalog/index_catalog_entry_mock.h"
 #include "mongo/db/local_catalog/index_catalog_mock.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -43,42 +42,7 @@ namespace mongo::join_ordering {
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join"};
 
-class ReorderGraphTest : public CatalogTestFixture {
-protected:
-    std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss,
-                                                       BSONObj filter = BSONObj::kEmptyObject) {
-        auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
-        if (!filter.isEmpty()) {
-            auto swFindCmd = ParsedFindCommand::withExistingFilter(
-                expCtx,
-                nullptr,
-                std::move(MatchExpressionParser::parse(filter, expCtx).getValue()),
-                std::make_unique<FindCommandRequest>(nss),
-                ProjectionPolicies::aggregateProjectionPolicies());
-            ASSERT_OK(swFindCmd.getStatus());
-            return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = expCtx, .parsedFind = std::move(swFindCmd.getValue())});
-        }
-        auto findCommand = std::make_unique<FindCommandRequest>(nss);
-        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    }
-
-    std::unique_ptr<QuerySolution> makeCollScanPlan(
-        NamespaceString nss, std::unique_ptr<MatchExpression> filter = nullptr) {
-        auto scan = std::make_unique<CollectionScanNode>();
-        scan->nss = nss;
-        scan->filter = std::move(filter);
-        auto soln = std::make_unique<QuerySolution>();
-        soln->setRoot(std::move(scan));
-        return soln;
-    }
-
-    void createCollection(NamespaceString nss) {
-        ASSERT_OK(
-            storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
-    }
-};
+using ReorderGraphTest = JoinOrderingTestFixture;
 
 QuerySolutionMap cloneSolnMap(const QuerySolutionMap& qsm) {
     QuerySolutionMap ret;

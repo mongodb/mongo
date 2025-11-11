@@ -69,7 +69,6 @@ mongo_cc_unit_test(
         ":reorder_joins",
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
-        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/local_catalog:index_catalog_mock",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
     ],
@@ -156,6 +155,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/pipeline",
     ],
 )
