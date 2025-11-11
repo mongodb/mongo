@@ -362,8 +362,9 @@ public:
      * execution has started.
      */
     void markShouldCollectTimingInfo() {
-        invariant(durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) ==
-                  0);
+        tassert(11051636,
+                "Calling markShouldCollectTimingInfo after execution has started",
+                durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) == 0);
 
         if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;

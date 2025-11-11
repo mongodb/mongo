@@ -83,7 +83,9 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
                 if (res == ShardFilterer::DocumentBelongsResult::kNoShardKey) {
                     // We can't find a shard key for this working set member - this should never
                     // happen with a non-fetched result unless our query planning is screwed up
-                    invariant(member->hasObj());
+                    tassert(11051631,
+                            "Expecting working set member to have an object",
+                            member->hasObj());
 
                     // Skip this working set member with a warning - no shard key should not be
                     // possible unless manually inserting data into a shard
@@ -93,8 +95,6 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
                         "into shard",
                         "document"_attr = redact(member->doc.value().toBson()),
                         "keyPattern"_attr = _shardFilterer.getKeyPattern());
-                } else {
-                    invariant(res == ShardFilterer::DocumentBelongsResult::kDoesNotBelong);
                 }
 
                 // If the document had no shard key, or doesn't belong to us, skip it.

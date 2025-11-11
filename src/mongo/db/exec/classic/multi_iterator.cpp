@@ -74,7 +74,9 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
         [&] {
             // yieldHandler
             // If _advance throws a WCE we shouldn't have moved.
-            invariant(!_iterators.empty());
+            tassert(11051638,
+                    "Expecting iterators not to advance in case of write conflict",
+                    !_iterators.empty());
             *out = WorkingSet::INVALID_ID;
         });
 

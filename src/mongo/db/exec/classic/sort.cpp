@@ -164,9 +164,12 @@ SortStageSimple::SortStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 void SortStageSimple::spool(WorkingSetID wsid) {
     auto member = _ws->get(wsid);
-    invariant(!member->metadata());
-    invariant(!member->doc.value().metadata());
-    invariant(member->hasObj());
+    tassert(
+        11051630, "Expecting working set member to not store metadata fields", !member->metadata());
+    tassert(11051629,
+            "Expecting underlying document to store no metadata",
+            !member->doc.value().metadata());
+    tassert(11051628, "Expecting working set member to have an object", member->hasObj());
 
     auto sortKey = _sortKeyGen.computeSortKeyFromDocument(member->doc.value());
 

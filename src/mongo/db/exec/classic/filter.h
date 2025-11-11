@@ -70,7 +70,10 @@ public:
 
             while (keyPatternIt.more()) {
                 BSONElement keyPatternElt = keyPatternIt.next();
-                invariant(keyDataIt.more());
+                tassert(11051641,
+                        "Expecting indexKeyPattern and keyData objects to store the same number of "
+                        "elements",
+                        keyDataIt.more());
                 BSONElement keyDataElt = keyDataIt.next();
 
                 if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
@@ -115,7 +118,9 @@ public:
 
         while (keyPatternIt.more()) {
             BSONElement keyPatternElt = keyPatternIt.next();
-            invariant(keyDataIt.more());
+            tassert(11051640,
+                    "Expecting keyPattern and key objects to store the same number of elements",
+                    keyDataIt.more());
             BSONElement keyDataElt = keyDataIt.next();
 
             if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {

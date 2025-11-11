@@ -71,10 +71,13 @@ SubplanStage::SubplanStage(ExpressionContext* expCtx,
       _ws(ws),
       _query(cq),
       _planSelectionCallbacks(std::move(planSelectionCallbacks)) {
-    invariant(cq);
-    invariant(_query->getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
-    invariant(_query->getPrimaryMatchExpression()->numChildren(),
-              "Cannot use a SUBPLAN stage for an $or with no children");
+    tassert(11051627, "Missing Canonical Query", cq);
+    tassert(11051626,
+            "Expecting the primary match expression to be $or expression",
+            _query->getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
+    tassert(11051625,
+            "Cannot use a SUBPLAN stage for an $or with no children",
+            _query->getPrimaryMatchExpression()->numChildren());
 }
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
@@ -132,7 +135,7 @@ Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParam
         if (shouldConstructClassicExecutableTree) {
             auto&& root = stage_builder::buildClassicExecutableTree(
                 expCtx()->getOperationContext(), collection(), *_query, *solutions[0], _ws);
-            invariant(_children.empty());
+            tassert(11051624, "Expecting subplan stage to have no child nodes", _children.empty());
             _children.emplace_back(std::move(root));
         }
         // This SubplanStage takes ownership of the query solution.
@@ -143,7 +146,7 @@ Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParam
     } else {
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
-        invariant(_children.empty());
+        tassert(11051623, "Expecting subplan stage to have no child nodes", _children.empty());
 
         _usesMultiplanning = true;
 
@@ -300,7 +303,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
 
         // We temporarily add the MPS to _children to ensure that we pass down all save/restore
         // messages that can be generated if pickBestPlan yields.
-        invariant(_children.empty());
+        tassert(11051622, "Expecting subplan stage to have no child nodes", _children.empty());
         _children.emplace_back(std::make_unique<MultiPlanStage>(
             expCtx(),
             collection(),
@@ -350,7 +353,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     _compositeSolution = std::move(subplanSelectStat.getValue());
 
     if (shouldConstructClassicExecutableTree) {
-        invariant(_children.empty());
+        tassert(11051621, "Expecting subplan stage to have no child nodes", _children.empty());
         auto&& root = stage_builder::buildClassicExecutableTree(
             expCtx()->getOperationContext(), collection(), *_query, *_compositeSolution, _ws);
         _children.emplace_back(std::move(root));

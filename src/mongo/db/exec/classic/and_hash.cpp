@@ -100,7 +100,7 @@ bool AndHashStage::isEOF() const {
     }
 
     // Otherwise, we're done when the last child is done.
-    invariant(_children.size() >= 2);
+    tassert(11051667, "Expecting to have at least 2 children", _children.size() >= 2);
     return (WorkingSet::INVALID_ID == _lookAheadResults[_children.size() - 1]) &&
         _children[_children.size() - 1]->isEOF();
 }
@@ -198,7 +198,7 @@ PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
     // The child must give us a WorkingSetMember with a record id, since we intersect index keys
     // based on the record id. The planner ensures that the child stage can never produce an WSM
     // with no record id.
-    invariant(member->hasRecordId());
+    tassert(11051666, "Expect WorkingSetMember to have RecordId", member->hasRecordId());
 
     DataMap::iterator it = _dataMap.find(member->recordId);
     if (_dataMap.end() == it) {
@@ -241,7 +241,7 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         // The child must give us a WorkingSetMember with a record id, since we intersect index keys
         // based on the record id. The planner ensures that the child stage can never produce an WSM
         // with no record id.
-        invariant(member->hasRecordId());
+        tassert(11051665, "Expect WorkingSetMember to have RecordId", member->hasRecordId());
 
         if (!_dataMap.insert(std::make_pair(member->recordId, id)).second) {
             // Didn't insert because we already had this RecordId inside the map. This should only
@@ -292,7 +292,7 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
         // The child must give us a WorkingSetMember with a record id, since we intersect index keys
         // based on the record id. The planner ensures that the child stage can never produce an
         // WSM with no record id.
-        invariant(member->hasRecordId());
+        tassert(11051664, "Expect WorkingSetMember to have RecordId", member->hasRecordId());
 
         if (_dataMap.end() == _dataMap.find(member->recordId)) {
             // Ignore.  It's not in any previous child.

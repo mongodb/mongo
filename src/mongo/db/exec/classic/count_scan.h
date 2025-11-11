@@ -67,7 +67,7 @@ struct CountScanParams {
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
           isMultiKey(multikey) {
-        invariant(descriptor);
+        tassert(11051649, "Expecting non-null index descriptor", descriptor);
     }
 
     CountScanParams(OperationContext* opCtx,

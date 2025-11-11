@@ -49,11 +49,11 @@ TrialStage::TrialStage(ExpressionContext* expCtx,
                        size_t maxTrialWorks,
                        double minWorkAdvancedRatio)
     : PlanStage(kStageType, expCtx), _ws(ws) {
-    invariant(minWorkAdvancedRatio > 0);
-    invariant(minWorkAdvancedRatio <= 1);
-    invariant(maxTrialWorks > 0);
-    invariant(trialPlan);
-    invariant(backupPlan);
+    tassert(11051613, "Expecting minWorkAdvancedRatio > 0", minWorkAdvancedRatio > 0);
+    tassert(11051612, "Expecting minWorkAdvancedRatio <= 1", minWorkAdvancedRatio <= 1);
+    tassert(11051611, "Expecting maxTrialWorks > 0", maxTrialWorks > 0);
+    tassert(11051610, "Missing trial plan", trialPlan);
+    tassert(11051609, "Missing backup plan", backupPlan);
 
     // Set the trial plan as our only child, and keep the backup plan in reserve.
     _children.push_back(std::move(trialPlan));
@@ -94,8 +94,9 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
 PlanStage::StageState TrialStage::doWork(WorkingSetID* out) {
     // Whether or not we have completed the trial phase, we should have exactly one active child.
-    invariant(_children.size() == 1);
-    invariant(_children.front());
+    tassert(11051608,
+            "Expecting TrialStage to have 1 child node",
+            _children.size() == 1 && _children.front());
 
     // If the trial period isn't complete, run through a single step of the trial.
     if (!_specificStats.trialCompleted) {
@@ -108,7 +109,7 @@ PlanStage::StageState TrialStage::doWork(WorkingSetID* out) {
 
 PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
     // We should never call this method after the trial phase has completed.
-    invariant(!_specificStats.trialCompleted);
+    tassert(11051607, "Expecting trial phase to be completed", !_specificStats.trialCompleted);
 
     PlanStage::StageState state = child()->work(out);
 
@@ -155,8 +156,10 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
 
 void TrialStage::_assessTrialAndBuildFinalPlan() {
     // We should only ever reach here when the trial period ran to completion.
-    invariant(_specificStats.trialWorks == _specificStats.trialPeriodMaxWorks);
-    invariant(_specificStats.trialCompleted);
+    tassert(11051606,
+            "Expect trial period completed",
+            _specificStats.trialWorks == _specificStats.trialPeriodMaxWorks &&
+                _specificStats.trialCompleted);
 
     // If we ADVANCED a sufficient number of times over the trial, then the trial succeeded.
     _specificStats.trialSucceeded = _specificStats.trialAdvanced >=
@@ -177,7 +180,7 @@ void TrialStage::_assessTrialAndBuildFinalPlan() {
 }
 
 void TrialStage::_replaceCurrentPlan(std::unique_ptr<PlanStage>& newPlan) {
-    invariant(_children.size() == 1);
+    tassert(11051605, "Expecting TrialStage to have 1 child node", _children.size() == 1);
     _children.front().swap(newPlan);
 }
 

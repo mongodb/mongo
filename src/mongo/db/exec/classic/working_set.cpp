@@ -98,7 +98,10 @@ void WorkingSet::transitionToOwnedObj(WorkingSetID id) {
 }
 
 WorkingSetMember WorkingSet::extract(WorkingSetID wsid) {
-    invariant(wsid < _data.size());
+    tassert(11051604,
+            str::stream() << "Working set ID " << wsid << " points beyond data array of size "
+                          << _data.size(),
+            wsid < _data.size());
     WorkingSetMember ret = std::move(_data[wsid].member);
     free(wsid);
     return ret;
@@ -130,7 +133,7 @@ void WorkingSetMember::clear() {
 }
 
 void WorkingSetMember::transitionToOwnedObj() {
-    invariant(doc.value().isOwned());
+    tassert(11051603, "Expecting document's underlying BSON to be owned", doc.value().isOwned());
     _state = OWNED_OBJ;
 }
 
@@ -150,7 +153,7 @@ bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) con
         // The document must not be modified. Otherwise toBson() call would create a temporary BSON
         // that would get destroyed at the end of this function. *out would then point to dangling
         // memory.
-        invariant(!doc.value().isModified());
+        tassert(11051602, "Expecting document not to be modified.", !doc.value().isModified());
         *out = ::mongo::bson::extractElementAtDottedPath(doc.value().toBson(), field);
         return true;
     }
@@ -193,7 +196,7 @@ void WorkingSetMember::resetDocument(SnapshotId snapshot, const BSONObj& obj) {
 void WorkingSetMember::serialize(BufBuilder& buf) const {
     // It is not legal to serialize a Document which has metadata attached to it. Any metadata must
     // reside directly in the WorkingSetMember.
-    invariant(!doc.value().metadata());
+    tassert(11051601, "Expect document to have no metadata attached", !doc.value().metadata());
 
     buf.appendChar(static_cast<char>(_state));
 
@@ -264,8 +267,7 @@ WorkingSetMember WorkingSetMember::deserialize(BufReader& buf) {
         RecordIdFormat recordIdFormat = static_cast<RecordIdFormat>(buf.read<char>());
         if (recordIdFormat == RecordIdFormat::Long) {
             wsm.recordId = RecordId{buf.read<LittleEndian<int64_t>>()};
-        } else {
-            invariant(recordIdFormat == RecordIdFormat::String);
+        } else {  // recordIdFormat == RecordIdFormat::String
             auto size = buf.read<LittleEndian<int32_t>>();
             wsm.recordId = RecordId{buf.readBytes(size)};
         }

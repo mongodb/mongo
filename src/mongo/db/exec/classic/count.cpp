@@ -44,9 +44,9 @@ const char* CountStage::kStageType = "COUNT";
 CountStage::CountStage(
     ExpressionContext* expCtx, long long limit, long long skip, WorkingSet* ws, PlanStage* child)
     : PlanStage(kStageType, expCtx), _limit(limit), _skip(skip), _leftToSkip(_skip), _ws(ws) {
-    invariant(_skip >= 0);
-    invariant(_limit >= 0);
-    invariant(child);
+    tassert(11051653, "Expecting non-negative skip parameter", _skip >= 0);
+    tassert(11051652, "Expecting non-negative limit parameter", _limit >= 0);
+    tassert(11051651, "Expecting child stage", child);
     _children.emplace_back(child);
 }
 
@@ -69,7 +69,6 @@ PlanStage::StageState CountStage::doWork(WorkingSetID* out) {
 
     // For cases where we can't ask the record store directly, we should always have a child stage
     // from which we can retrieve results.
-    invariant(child());
     WorkingSetID id = WorkingSet::INVALID_ID;
     PlanStage::StageState state = child()->work(&id);
 

@@ -97,7 +97,7 @@ PlanStage::StageState AndSortedStage::getTargetRecordId(WorkingSetID* out) {
         // The child must give us a WorkingSetMember with a record id, since we intersect index keys
         // based on the record id. The planner ensures that the child stage can never produce an WSM
         // with no record id.
-        invariant(member->hasRecordId());
+        tassert(11051663, "Expect WorkingSetMember to have RecordId", member->hasRecordId());
 
         // We have a value from one child to AND with.
         _targetNode = 0;
@@ -142,7 +142,7 @@ PlanStage::StageState AndSortedStage::moveTowardTargetRecordId(WorkingSetID* out
         // The child must give us a WorkingSetMember with a record id, since we intersect index keys
         // based on the record id. The planner ensures that the child stage can never produce an WSM
         // with no record id.
-        invariant(member->hasRecordId());
+        tassert(11051662, "Expect WorkingSetMember to have RecordId", member->hasRecordId());
 
         if (member->recordId == _targetRecordId) {
             // The front element has hit _targetRecordId.  Don't move it forward anymore/work on

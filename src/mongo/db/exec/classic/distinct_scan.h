@@ -71,7 +71,7 @@ struct DistinctParams {
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
           isMultiKey(multikey) {
-        invariant(indexDescriptor);
+        tassert(11051642, "Expecting Index Descriptor.", indexDescriptor);
     }
 
     DistinctParams(OperationContext* opCtx,

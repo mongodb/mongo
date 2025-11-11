@@ -187,7 +187,9 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
         _internalState = State::kDone;
         return PlanStage::IS_EOF;
     }
-    invariant(_currentChild < _children.size());
+    tassert(11051619,
+            "currentChild points past the last child in array",
+            _currentChild < _children.size());
 
     // Either retry the last WSM we worked on or get a new one from our current child.
     WorkingSetID id;
@@ -252,7 +254,9 @@ PlanStage::StageState TextOrStage::returnResultsInMemory(WorkingSetID* out) {
 
     // Ignore non-matched documents.
     if (textRecordData.score == kRejectedDocumentScore) {
-        invariant(textRecordData.wsid == WorkingSet::INVALID_ID);
+        tassert(11051618,
+                "Expecting text record with rejected document score to store no Working Set Id",
+                textRecordData.wsid == WorkingSet::INVALID_ID);
         return PlanStage::NEED_TIME;
     }
 
@@ -292,8 +296,11 @@ PlanStage::StageState TextOrStage::returnResultsSpilled(WorkingSetID* out) {
 
 PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out) {
     WorkingSetMember* wsm = _ws->get(wsid);
-    invariant(wsm->getState() == WorkingSetMember::RID_AND_IDX);
-    invariant(1 == wsm->keyData.size());
+    tassert(11051617,
+            "Expecting working set member to store data from 1 or more indices",
+            wsm->getState() == WorkingSetMember::RID_AND_IDX);
+    tassert(
+        11051616, "Expecting working set member to have 1 IndexKeyDatum", 1 == wsm->keyData.size());
     const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
 
     auto [it, inserted] = _scores.try_emplace(wsm->recordId, TextRecordData{});
@@ -305,14 +312,16 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
     if (textRecordData->score == kRejectedDocumentScore) {
         // We have already rejected this document for not matching the filter.
-        invariant(WorkingSet::INVALID_ID == textRecordData->wsid);
+        tassert(11051615,
+                "Expecting text record with rejected document score to store no Working Set Id",
+                WorkingSet::INVALID_ID == textRecordData->wsid);
         _ws->free(wsid);
         return NEED_TIME;
     }
 
     if (WorkingSet::INVALID_ID == textRecordData->wsid) {
         // We haven't seen this RecordId before.
-        invariant(textRecordData->score == 0);
+        tassert(11051614, "Expecting text record to have no score", textRecordData->score == 0);
 
         if (!Filter::passes(newKeyData.keyData, newKeyData.indexKeyPattern, _filter)) {
             _ws->free(wsid);

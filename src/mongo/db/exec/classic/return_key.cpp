@@ -69,7 +69,9 @@ std::unique_ptr<PlanStageStats> ReturnKeyStage::getStats() {
 
 void ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
     if (!_sortKeyMetaFields.empty()) {
-        invariant(member->metadata().hasSortKey());
+        tassert(11051632,
+                "Expecting working set member metadata to have sort key",
+                member->metadata().hasSortKey());
     }
 
     auto indexKey = member->metadata().hasIndexKey() ? member->metadata().getIndexKey() : BSONObj();

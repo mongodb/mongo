@@ -86,6 +86,5 @@ void BatchedDeleteStageBuffer::clear() {
     }
 
     _buffer.clear();
-    invariant(empty());
 }
 }  // namespace mongo

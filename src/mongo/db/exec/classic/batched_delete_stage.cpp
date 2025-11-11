@@ -249,7 +249,6 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
     }
 
     if (isEOF()) {
-        invariant(planStageState != PlanStage::NEED_YIELD);
         return PlanStage::IS_EOF;
     }
 
@@ -491,11 +490,11 @@ void BatchedDeleteStage::_stageNewDelete(WorkingSetID* workingSetMemberID) {
     WorkingSetMember* member = _ws->get(*workingSetMemberID);
 
     ScopeGuard memberFreer([&] { _ws->free(*workingSetMemberID); });
-    invariant(member->hasRecordId());
+    tassert(11051661, "Expect WorkingSetMember to have RecordId", member->hasRecordId());
 
     // Deletes can't have projections. This means that covering analysis will always add
     // a fetch. We should always get fetched data, and never just key data.
-    invariant(member->hasObj());
+    tassert(11051660, "Expect WorkingSetMember to have object", member->hasObj());
 
     if (_params->isExplain) {
         // Populate 'nWouldDelete' for 'executionStats'.

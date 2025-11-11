@@ -246,7 +246,7 @@ ProjectionStageCovered::ProjectionStageCovered(ExpressionContext* expCtx,
     // in the key that we pull data from and avoid looking up the field name each time.
 
     // Sanity-check.
-    invariant(_coveredKeyObj.isOwned());
+    tassert(11051635, "Expecting coveredKeyObj to own its BSON", _coveredKeyObj.isOwned());
 
     _includedFields = {projection->getRequiredFields().begin(),
                        projection->getRequiredFields().end()};

@@ -59,7 +59,9 @@ namespace {
  *         { 'a' : 'foo' }, { 'b' : 'bar' }
  */
 BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames) {
-    invariant(replace.nFields() == fieldNames.nFields());
+    tassert(11051650,
+            "Expecting the same number of keys in 'replace' and 'fieldNames' documents",
+            replace.nFields() == fieldNames.nFields());
 
     BSONObjBuilder bob;
     auto iter = fieldNames.begin();

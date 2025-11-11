@@ -145,7 +145,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
 PlanStage::StageState IDHackStage::advance(WorkingSetID id,
                                            WorkingSetMember* member,
                                            WorkingSetID* out) {
-    invariant(member->hasObj());
+    tassert(11051639, "Expecting working set member to store an object", member->hasObj());
 
     if (_addKeyMetadata) {
         BSONObj ownedKeyObj = member->doc.value().toBson()["_id"].wrap().getOwned();

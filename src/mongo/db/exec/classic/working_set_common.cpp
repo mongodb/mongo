@@ -108,7 +108,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
 
     // We should have a RecordId but need to retrieve the obj. Get the obj now and reset all WSM
     // state appropriately.
-    invariant(member->hasRecordId());
+    tassert(11051600, "Expecting working set member to have recordId", member->hasRecordId());
 
     auto record = cursor->seekExact(member->recordId);
     if (!record) {

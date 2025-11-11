@@ -97,7 +97,8 @@ PlanStage::StageState NearStage::doWork(WorkingSetID* out) {
     } else if (SearchState::Advancing == _searchState) {
         nextState = advanceNext(&toReturn);
     } else {
-        invariant(SearchState::Finished == _searchState);
+        tassert(
+            11051669, "Unknown search state of NearStage", SearchState::Finished == _searchState);
         nextState = PlanStage::IS_EOF;
     }
 

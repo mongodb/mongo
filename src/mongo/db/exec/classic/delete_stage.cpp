@@ -118,10 +118,12 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // and prevented us from returning ADVANCED with the old version of the document.
     if (_idReturning != WorkingSet::INVALID_ID) {
         // We should only get here if we were trying to return something before.
-        invariant(_params->returnDeleted);
+        tassert(11051648, "Expecting returnDeleter parameter set", _params->returnDeleted);
 
         WorkingSetMember* member = _ws->get(_idReturning);
-        invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+        tassert(11051647,
+                "Expecting to return owned object",
+                member->getState() == WorkingSetMember::OWNED_OBJ);
 
         *out = _idReturning;
         _idReturning = WorkingSet::INVALID_ID;
@@ -161,14 +163,14 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // We want to free this member when we return, unless we need to retry deleting or returning it.
     ScopeGuard memberFreer([&] { _ws->free(id); });
 
-    invariant(member->hasRecordId());
+    tassert(11051646, "Expecting working set member to have a RecordId", member->hasRecordId());
     // It's safe to have a reference instead of a copy here due to the member pointer only being
     // invalidated if the memberFreer ScopeGuard activates. This will only be the case if the
     // document is deleted successfully and thus the existing RecordId becomes invalid.
     const auto& recordId = member->recordId;
     // Deletes can't have projections. This means that covering analysis will always add
     // a fetch. We should always get fetched data, and never just key data.
-    invariant(member->hasObj());
+    tassert(11051645, "Expecting working set member to have an Object", member->hasObj());
 
     // Ensure the document still exists and matches the predicate.
     bool docStillMatches;
@@ -325,7 +327,9 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             // requested).
             if (_params->returnDeleted) {
                 // member->obj should refer to the deleted document.
-                invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+                tassert(11051644,
+                        "Expecting working set member to store an owned object.",
+                        member->getState() == WorkingSetMember::OWNED_OBJ);
 
                 _idReturning = id;
                 // Keep this member around so that we can return it on the next work() call.
@@ -355,7 +359,9 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 
     if (_params->returnDeleted) {
         // member->obj should refer to the deleted document.
-        invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+        tassert(11051643,
+                "Expecting working set member to store an owned object",
+                member->getState() == WorkingSetMember::OWNED_OBJ);
 
         memberFreer.dismiss();  // Keep this member around so we can return it.
         *out = id;
@@ -378,7 +384,7 @@ void DeleteStage::doRestoreStateRequiresCollection() {
     // already deleted documents.
     const bool singleDeleteAndAlreadyDeleted = !_params->isMulti && _specificStats.docsDeleted > 0;
     tassert(7711600,
-            "Single delete should never restore after having already deleted one document.",
+            "Single delete should never restore after having already deleted one document",
             !singleDeleteAndAlreadyDeleted || _params->isExplain);
 
     _preWriteFilter.restoreState();

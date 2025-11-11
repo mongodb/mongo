@@ -342,7 +342,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     auto ranking = std::move(statusWithRanking.getValue());
     // Since the status was ok there should be a ranking containing at least one successfully ranked
     // plan.
-    invariant(ranking);
+    tassert(11051637, "Expecting plan ranking decision to be made", ranking);
     _bestPlanIdx = ranking->candidateOrder[0];
 
     MONGO_verify(_bestPlanIdx >= 0 && _bestPlanIdx < static_cast<int>(_candidates.size()));
@@ -435,7 +435,6 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             doneWorking = true;
             multiPlannerHitEofTotal.incrementRelaxed();
         } else if (PlanStage::NEED_YIELD == state) {
-            invariant(id == WorkingSet::INVALID_ID);
             // Run-time plan selection occurs before a WriteUnitOfWork is opened and it's not
             // subject to TemporarilyUnavailableException's.
             invariant(!expCtx()->getTemporarilyUnavailableException());
