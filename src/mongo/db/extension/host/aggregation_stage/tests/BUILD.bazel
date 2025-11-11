@@ -22,6 +22,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host_connector:extensions_host_connector",
         "//src/mongo/db/extension/host_connector:host_services_adapter",
+        "//src/mongo/db/extension/sdk/tests:shared_test_stages",
         "//src/mongo/db/extension/shared/handle/aggregation_stage",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:document_source_mock",

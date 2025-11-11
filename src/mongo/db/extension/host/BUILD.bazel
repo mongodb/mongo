@@ -22,7 +22,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/extension/host_connector/handle:host_handles",
+        "//src/mongo/db/extension/shared/handle/aggregation_stage",
     ],
 )
 

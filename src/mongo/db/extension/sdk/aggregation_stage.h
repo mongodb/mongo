@@ -51,12 +51,15 @@ namespace mongo::extension::sdk {
  * An extension must provide a specialization of this base class, and
  * expose it to the host as a ExtensionLogicalAggStage.
  */
+class ExecAggStage;
 class LogicalAggStage {
 public:
     LogicalAggStage() = default;
+    virtual ~LogicalAggStage() = default;
+
     virtual BSONObj serialize() const = 0;
     virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
-    virtual ~LogicalAggStage() = default;
+    virtual std::unique_ptr<ExecAggStage> compile() const = 0;
 };
 
 /**
@@ -114,8 +117,15 @@ private:
         });
     };
 
-    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
-        .destroy = &_extDestroy, .serialize = &_extSerialize, .explain = &_extExplain};
+    static ::MongoExtensionStatus* _extCompile(
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionExecAggStage* input,
+        ::MongoExtensionExecAggStage** output) noexcept;
+
+    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {.destroy = &_extDestroy,
+                                                                     .serialize = &_extSerialize,
+                                                                     .explain = &_extExplain,
+                                                                     .compile = &_extCompile};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 
@@ -469,8 +479,8 @@ private:
 };
 
 /**
- * ExecAggStage is the base class for implementing the
- * ::MongoExtensionExecAggStage interface by an extension.
+ * ExecAggStage is the base class for implementing the ::MongoExtensionExecAggStage interface by an
+ * extension.
  *
  * An extension executable agg stage must provide a specialization of this base class, and
  * expose it to the host as an ExtensionExecAggStage.
@@ -623,4 +633,19 @@ private:
     };
     std::unique_ptr<ExecAggStage> _execAggStage;
 };
+
+inline ::MongoExtensionStatus* ExtensionLogicalAggStage::_extCompile(
+    const ::MongoExtensionLogicalAggStage* extLogicalStage,
+    ::MongoExtensionExecAggStage* input,
+    ::MongoExtensionExecAggStage** output) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        *output = nullptr;
+
+        const auto& impl = static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
+
+        // TODO (SERVER-109572): Add parameter called input to hold the input stage.
+        *output = new ExtensionExecAggStage(impl.compile());
+    });
+};
+
 }  // namespace mongo::extension::sdk

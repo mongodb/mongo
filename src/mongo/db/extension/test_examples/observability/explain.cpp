@@ -33,10 +33,23 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
 
+#include <memory>
+
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
 static constexpr std::string kExplainStageName = "$explain";
+
+class ExplainExecAggStage : public sdk::ExecAggStage {
+public:
+    ExplainExecAggStage() : sdk::ExecAggStage(kExplainStageName) {}
+
+    mongo::extension::ExtensionGetNextResult getNext(
+        const sdk::QueryExecutionContextHandle& execCtx,
+        const MongoExtensionExecAggStage* execStage) override {
+        return mongo::extension::ExtensionGetNextResult::pauseExecution();
+    }
+};
 
 class ExplainLogicalStage : public sdk::LogicalAggStage {
 public:
@@ -73,6 +86,10 @@ public:
         }
 
         return builder.obj();
+    }
+
+    std::unique_ptr<extension::sdk::ExecAggStage> compile() const override {
+        return std::make_unique<ExplainExecAggStage>();
     }
 
 private:

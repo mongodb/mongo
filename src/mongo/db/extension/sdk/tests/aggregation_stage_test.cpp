@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/query_execution_context.h"
-#include "mongo/db/extension/host_connector/handle/executable_agg_stage.h"
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
@@ -80,7 +79,10 @@ public:
         // functions, e.g. to run assertions.
         extension::sdk::HostServicesHandle::setHostServices(
             extension::host_connector::HostServicesAdapter::get());
+        _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(nullptr);
     }
+
+    std::unique_ptr<host_connector::QueryExecutionContextAdapter> _execCtx;
 };
 
 class ExpandToIdLookupNode : public extension::sdk::AggStageParseNode {
@@ -327,6 +329,11 @@ public:
 
     BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON(kStageName << verbosity);
+    }
+
+    // TODO (SERVER-112395): Implement this function for testing.
+    std::unique_ptr<ExecAggStage> compile() const override {
+        return nullptr;
     }
 
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
@@ -728,19 +735,19 @@ public:
 
 private:
     std::deque<BSONObj> _results = {
-        BSON("$meow" << "adithi"), BSON("$meow" << "josh"), BSON("$meow" << "cedric")};
+        BSON("meow" << "adithi"), BSON("meow" << "josh"), BSON("meow" << "cedric")};
 };
 
 TEST(AggregationStageTest, ValidExecAggStageVTableGetNextSucceeds) {
-    auto validExecAggStage =
-        new extension::sdk::ExtensionExecAggStage(ValidExtensionExecAggStage::make());
-    auto handle = extension::host_connector::ExecAggStageHandle{validExecAggStage};
+    auto validExecAggStage = new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::ValidExtensionExecAggStage::make());
+    auto handle = extension::ExecAggStageHandle{validExecAggStage};
 
     auto nullExecCtx = host_connector::QueryExecutionContextAdapter(nullptr);
 
     auto getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-    ASSERT_BSONOBJ_EQ(BSON("$meow" << "adithi"), getNext.res.get());
+    ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.res.get());
 
     getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
@@ -748,7 +755,7 @@ TEST(AggregationStageTest, ValidExecAggStageVTableGetNextSucceeds) {
 
     getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-    ASSERT_BSONOBJ_EQ(BSON("$meow" << "cedric"), getNext.res.get());
+    ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.res.get());
 
     getNext = handle.getNext(&nullExecCtx);
     ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
@@ -760,8 +767,7 @@ TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
         .code = static_cast<::MongoExtensionGetNextResultCode>(10), .result = nullptr};
     ASSERT_THROWS_WITH_CHECK(
         [&] {
-            [[maybe_unused]] auto converted =
-                extension::host_connector::convertCRepresentationToGetNextResult(&result);
+            [[maybe_unused]] auto converted = convertCRepresentationToGetNextResult(&result);
         }(),
         AssertionException,
         [](const AssertionException& ex) {
@@ -828,7 +834,7 @@ TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
 
     auto getMetricsExecAggStage =
         new extension::sdk::ExtensionExecAggStage(GetMetricsExtensionExecAggStage::make());
-    auto handle = extension::host_connector::ExecAggStageHandle{getMetricsExecAggStage};
+    auto handle = ExecAggStageHandle{getMetricsExecAggStage};
 
     // Create a test expression context that can be wrapped by QueryExecutionContextAdapter.
     auto expCtx = make_intrusive<ExpressionContextForTest>(
@@ -858,6 +864,93 @@ TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
     getNext = handle.getNext(&adapter);
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced,
                   getNext.code);  // should return Advanced, since the metrics counter should be 1.
+}
+
+TEST_F(AggStageTest, TestValidExecAggStageFromCompiledLogicalAggStage) {
+    auto logicalStage = new extension::sdk::ExtensionLogicalAggStage(
+        shared_test_stages::TestLogicalStageCompile::make());
+    auto handle = extension::LogicalAggStageHandle{logicalStage};
+
+    auto compiledExecAggStageHandle = handle.compile();
+
+    // Test getNext() on compiled ExecAggStage from LogicalStage.
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+        ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.res.get());
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
+        ASSERT_EQ(boost::none, getNext.res);
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+        ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.res.get());
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
+        ASSERT_EQ(boost::none, getNext.res);
+    }
+}
+
+class TestSourceLogicalAggStage : public shared_test_stages::SourceLogicalAggStage {
+public:
+    static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
+        return std::make_unique<TestSourceLogicalAggStage>();
+    }
+};
+
+TEST_F(AggStageTest, TestValidExecAggStageFromCompiledSourceLogicalAggStage) {
+    auto logicalStage =
+        new extension::sdk::ExtensionLogicalAggStage(TestSourceLogicalAggStage::make());
+    auto handle = extension::LogicalAggStageHandle{logicalStage};
+
+    auto compiledExecAggStageHandle = handle.compile();
+
+    // Test getNext() on compiled ExecAggStage from LogicalStage.
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "apples" << "red"), getNext.res.get());
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "oranges" << 5), getNext.res.get());
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 3 << "bananas" << false), getNext.res.get());
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+        ASSERT_BSONOBJ_EQ(
+            BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee")),
+            getNext.res.get());
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 5 << "pie" << 3.14159), getNext.res.get());
+    }
+
+    {
+        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
+        ASSERT_EQ(boost::none, getNext.res);
+    }
 }
 
 }  // namespace

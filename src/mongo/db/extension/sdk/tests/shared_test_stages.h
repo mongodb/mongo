@@ -29,10 +29,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/shared/get_next_result.h"
 
 namespace mongo::extension::sdk {
 inline StringData stringViewToStringData(std::string_view sv) {
@@ -53,6 +53,16 @@ namespace mongo::extension::sdk::shared_test_stages {
 static constexpr std::string_view kNoOpName = "$noOp";
 static constexpr std::string_view kSourceName = "$sourceStage";
 
+class NoOpExecAggStage : public sdk::ExecAggStage {
+public:
+    NoOpExecAggStage() : sdk::ExecAggStage(kNoOpName) {}
+
+    ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
+                                   const MongoExtensionExecAggStage* execStage) override {
+        return ExtensionGetNextResult::pauseExecution();
+    }
+};
+
 class NoOpLogicalAggStage : public sdk::LogicalAggStage {
 public:
     NoOpLogicalAggStage() {}
@@ -63,6 +73,10 @@ public:
 
     BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::ExecAggStage> compile() const override {
+        return std::make_unique<NoOpExecAggStage>();
     }
 };
 
@@ -128,16 +142,41 @@ public:
     }
 };
 
+class SourceExecAggStage : public sdk::ExecAggStage {
+public:
+    SourceExecAggStage() : sdk::ExecAggStage(kSourceName) {}
+
+    ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
+                                   const MongoExtensionExecAggStage* execStage) override {
+        if (_currentIndex >= _documents.size()) {
+            return ExtensionGetNextResult::eof();
+        }
+        return ExtensionGetNextResult::advanced(_documents[_currentIndex++]);
+    }
+
+private:
+    // Every SourceExecAggStage object will have access to the same test document suite.
+    static inline const std::vector<BSONObj> _documents = {
+        BSON("_id" << 1 << "apples" << "red"),
+        BSON("_id" << 2 << "oranges" << 5),
+        BSON("_id" << 3 << "bananas" << false),
+        BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee")),
+        BSON("_id" << 5 << "pie" << 3.14159)};
+    size_t _currentIndex = 0;
+};
+
 class SourceLogicalAggStage : public sdk::LogicalAggStage {
 public:
-    SourceLogicalAggStage() {}
-
     BSONObj serialize() const override {
         return BSON(std::string(kSourceName) << "serializedForExecution");
     }
 
     BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::ExecAggStage> compile() const override {
+        return std::make_unique<SourceExecAggStage>();
     }
 };
 
@@ -865,6 +904,76 @@ public:
     static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
         return std::make_unique<NameMismatchStageDescriptor>();
     }
+};
+
+class ValidExtensionExecAggStage : public extension::sdk::ExecAggStage {
+public:
+    ValidExtensionExecAggStage() : sdk::ExecAggStage("$validExtension") {}
+
+    extension::ExtensionGetNextResult getNext(
+        const sdk::QueryExecutionContextHandle& execCtx,
+        const MongoExtensionExecAggStage* execStage) override {
+        if (_results.empty()) {
+            return extension::ExtensionGetNextResult::eof();
+        }
+        if (_results.size() == 2) {
+            // The result at the front of the queue is removed so that the size doesn't stay at 2.
+            // This needs to be done so that the EOF case can be tested. Note that the behavior of
+            // removing from the results queue for a "pause execution" state does not accurately
+            // represent a "paused execution" state in a getNext() function.
+            _results.pop_front();
+            return extension::ExtensionGetNextResult::pauseExecution();
+        } else {
+            auto result = extension::ExtensionGetNextResult::advanced(_results.front());
+            _results.pop_front();
+            return result;
+        }
+    }
+
+    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+        return std::make_unique<ValidExtensionExecAggStage>();
+    }
+
+private:
+    std::deque<BSONObj> _results = {
+        BSON("meow" << "adithi"), BSON("meow" << "josh"), BSON("meow" << "cedric")};
+};
+
+class TestLogicalStageCompile : public LogicalAggStage {
+public:
+    static constexpr StringData kStageName = "$testCompile";
+    static constexpr StringData kStageSpec = "mongodb";
+
+    BSONObj serialize() const override {
+        return BSON(kStageName << kStageSpec);
+    }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON(kStageName << verbosity);
+    }
+
+    std::unique_ptr<ExecAggStage> compile() const override {
+        return std::make_unique<ValidExtensionExecAggStage>();
+    }
+
+    static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
+        return std::make_unique<TestLogicalStageCompile>();
+    }
+};
+
+class NoOpExtensionExecAggStage : public sdk::ExecAggStage {
+public:
+    ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& expCtx,
+                                   const MongoExtensionExecAggStage* execStage) override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    static inline std::unique_ptr<sdk::ExecAggStage> make() {
+        return std::unique_ptr<sdk::ExecAggStage>(new NoOpExtensionExecAggStage());
+    }
+
+protected:
+    NoOpExtensionExecAggStage() : sdk::ExecAggStage("$noOpExt") {}
 };
 
 }  // namespace mongo::extension::sdk::shared_test_stages

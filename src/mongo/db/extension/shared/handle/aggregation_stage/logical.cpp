@@ -29,8 +29,8 @@
 
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
-#include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
 namespace {
@@ -79,6 +79,14 @@ BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosit
     // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
     ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+}
+
+ExecAggStageHandle LogicalAggStageHandle::compile() const {
+    ::MongoExtensionExecAggStage* execAggStage;
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().compile(get(), nullptr, &execAggStage); });
+
+    return ExecAggStageHandle(execAggStage);
 }
 
 }  // namespace mongo::extension

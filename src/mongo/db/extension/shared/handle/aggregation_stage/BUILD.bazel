@@ -12,12 +12,14 @@ mongo_cc_library(
     name = "aggregation_stage",
     srcs = [
         "ast_node.cpp",
+        "executable_agg_stage.cpp",
         "logical.cpp",
         "parse_node.cpp",
         "stage_descriptor.cpp",
     ],
     hdrs = [
         "ast_node.h",
+        "executable_agg_stage.h",
         "logical.h",
         "parse_node.h",
         "stage_descriptor.h",
@@ -25,6 +27,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/extension/host_connector/handle:host_handles",
         "//src/mongo/db/extension/public:api",
         # Needed for the IDL generated code.
         "//src/mongo/db/extension/public:extensions_api_public",

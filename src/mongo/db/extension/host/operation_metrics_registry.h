@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/extension/host_connector/handle/executable_agg_stage.h"
 #include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 
 #include <map>
 #include <string>
@@ -75,7 +75,7 @@ public:
     }
 
     extension::host_connector::HostOperationMetricsHandle* getOrCreateMetrics(
-        const std::string& stageName, host_connector::UnownedExecAggStageHandle execStage) {
+        const std::string& stageName, UnownedExecAggStageHandle execStage) {
         auto it = _metrics.find(std::string(stageName));
         if (it == _metrics.end()) {
             auto metricsHandle = execStage.createMetrics();

@@ -34,7 +34,7 @@
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
 /**
  * Takes a MongoExtensionGetNextResult C struct and sets the code and result field of the
@@ -78,7 +78,7 @@ public:
 
     std::string_view getName() const;
 
-    HostOperationMetricsHandle createMetrics() const;
+    host_connector::HostOperationMetricsHandle createMetrics() const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
@@ -103,7 +103,7 @@ public:
 
     std::string_view getName() const;
 
-    HostOperationMetricsHandle createMetrics() const;
+    host_connector::HostOperationMetricsHandle createMetrics() const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
@@ -113,4 +113,4 @@ protected:
     }
 };
 
-}  // namespace mongo::extension::host_connector
+}  // namespace mongo::extension

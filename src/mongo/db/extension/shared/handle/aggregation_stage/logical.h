@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
@@ -53,6 +54,11 @@ public:
      * Collects explain output at the specified verbosity from this logical stage.
      */
     BSONObj explain(ExplainOptions::Verbosity verbosity) const;
+
+    /**
+     * Compiles a logical stage into an execution stage.
+     */
+    ExecAggStageHandle compile() const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {

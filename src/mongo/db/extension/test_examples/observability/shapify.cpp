@@ -59,6 +59,17 @@ static constexpr std::string kShapifyStageName = "$shapify";
  */
 static constexpr std::string kShapifyDesugarStageName = "$shapifyDesugar";
 
+class ShapifyExecAggStage : public sdk::ExecAggStage {
+public:
+    ShapifyExecAggStage() : sdk::ExecAggStage(kShapifyDesugarStageName) {}
+
+    mongo::extension::ExtensionGetNextResult getNext(
+        const sdk::QueryExecutionContextHandle& execCtx,
+        const MongoExtensionExecAggStage* execStage) override {
+        return mongo::extension::ExtensionGetNextResult::pauseExecution();
+    }
+};
+
 class ShapifyLogicalStage : public sdk::LogicalAggStage {
 public:
     ShapifyLogicalStage(BSONObj input) : _input(input) {}
@@ -69,6 +80,10 @@ public:
 
     BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON(kShapifyStageName << _input);
+    }
+
+    std::unique_ptr<extension::sdk::ExecAggStage> compile() const override {
+        return std::make_unique<ShapifyExecAggStage>();
     }
 
 private:

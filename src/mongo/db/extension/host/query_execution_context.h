@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/curop.h"
-#include "mongo/db/extension/host_connector/handle/executable_agg_stage.h"
 #include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
@@ -57,8 +56,7 @@ public:
     }
 
     host_connector::HostOperationMetricsHandle* getMetrics(
-        const std::string& stageName,
-        const host_connector::UnownedExecAggStageHandle& execStage) const override {
+        const std::string& stageName, const UnownedExecAggStageHandle& execStage) const override {
         auto& opDebug = CurOp::get(_ctx->getOperationContext())->debug();
         auto& opDebugMetrics = opDebug.extensionMetrics;
         return opDebugMetrics.getOrCreateMetrics(stageName, execStage);

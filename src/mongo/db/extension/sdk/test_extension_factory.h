@@ -29,6 +29,15 @@
 
 #define DEFAULT_LOGICAL_AST_PARSE(ExtensionName, StageNameStringView)                           \
     inline constexpr std::string_view ExtensionName##StageName = StageNameStringView;           \
+    class ExtensionName##ExecAggStage : public sdk::ExecAggStage {                              \
+    public:                                                                                     \
+        ExtensionName##ExecAggStage() : sdk::ExecAggStage(ExtensionName##StageName) {}          \
+        ::mongo::extension::ExtensionGetNextResult getNext(                                     \
+            const ::mongo::extension::sdk::QueryExecutionContextHandle& execCtx,                \
+            const ::MongoExtensionExecAggStage* execStage) override {                           \
+            return ::mongo::extension::ExtensionGetNextResult::pauseExecution();                \
+        }                                                                                       \
+    };                                                                                          \
     class ExtensionName##LogicalStage : public sdk::LogicalAggStage {                           \
     public:                                                                                     \
         ExtensionName##LogicalStage(const ::mongo::BSONObj& rawSpec)                            \
@@ -39,6 +48,9 @@
         }                                                                                       \
         ::mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {   \
             return _rawSpec;                                                                    \
+        }                                                                                       \
+        std::unique_ptr<sdk::ExecAggStage> compile() const override {                           \
+            return std::make_unique<ExtensionName##ExecAggStage>();                             \
         }                                                                                       \
                                                                                                 \
     private:                                                                                    \
