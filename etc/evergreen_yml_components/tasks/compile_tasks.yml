@@ -1302,6 +1302,9 @@ tasks:
       - command: subprocess.exec
         params:
           binary: bash
+          include_expansions_in_env:
+            - MONGO_PR_BOT_APP_ID
+            - MONGO_PR_BOT_PRIVATE_KEY
           args:
             - "src/evergreen/run_python_script.sh"
             - "buildscripts/profile_data_pr.py"
@@ -1310,8 +1313,6 @@ tasks:
             - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_${revision}_${build_arch}_gcc_lto_pgo_${version}.tgz"
             - "${branch_name}"
             - "SERVER-110427-${revision}"
-            - "${MONGO_PR_BOT_APP_ID}"
-            - "${MONGO_PR_BOT_PRIVATE_KEY}"
   - name: publish_crypt_packages
     run_on: rhel8.7-small
     tags:

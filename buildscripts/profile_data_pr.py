@@ -190,8 +190,22 @@ if __name__ == "__main__":
     parser.add_argument("gcc_pgo_url", help="URL that gcc pgo data was uploaded to.")
     parser.add_argument("target_branch", help="The branch you want to create a PR into.")
     parser.add_argument("new_branch", help="The new branch to create a PR from.")
-    parser.add_argument("app_id", help="App ID used for authentication.")
-    parser.add_argument("private_key", help="Key to use for authentication.")
+    parser.add_argument(
+        "--app_id", help="App ID used for authentication.", default=os.getenv("MONGO_PR_BOT_APP_ID")
+    )
+    parser.add_argument(
+        "--private_key",
+        help="Key to use for authentication.",
+        default=os.getenv("MONGO_PR_BOT_PRIVATE_KEY"),
+    )
     args = parser.parse_args()
-    repo = get_mongo_repository(args.app_id, args.private_key)
+    if not args.app_id or not args.private_key:
+        parser.error(
+            "Must define --app-id or env MONGO_PR_BOT_APP_ID and --private-key or env MONGO_PR_BOT_PRIVATE_KEY."
+        )
+    # Replace spaces with newline, if applicable
+    private_key = (
+        args.private_key[:31] + args.private_key[31:-29].replace(" ", "\n") + args.private_key[-29:]
+    )
+    repo = get_mongo_repository(args.app_id, private_key)
     create_profile_data_pr(repo, args, args.target_branch, args.new_branch)
