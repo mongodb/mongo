@@ -274,6 +274,10 @@ void ProjectionNode::reportProjectedPaths(OrderedPathSet* projectedPaths) const 
     }
 }
 
+bool ProjectionNode::isAdditionSetEmpty() const {
+    return _orderToProcessAdditionsAndChildren.empty();
+}
+
 void ProjectionNode::reportComputedPaths(OrderedPathSet* computedPaths,
                                          StringMap<std::string>* renamedPaths,
                                          StringMap<std::string>* complexRenamedPaths) const {

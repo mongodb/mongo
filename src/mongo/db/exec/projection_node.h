@@ -135,6 +135,11 @@ public:
     }
 
     /**
+     * Checks if a ProjectionNode will add any fields.
+     */
+    bool isAdditionSetEmpty() const;
+
+    /**
      * Recursively reports all computed paths in this projection, adding them into 'computedPaths'.
      *
      * A "computed path" is any path that's the left-hand side of a projection, where the right-hand
