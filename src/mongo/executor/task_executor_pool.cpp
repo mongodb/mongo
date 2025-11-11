@@ -44,7 +44,6 @@ namespace executor {
 size_t TaskExecutorPool::getSuggestedPoolSize() {
     // The default task executor pool size is 1, which should be fine in almost all cases.
     // The default value can still be overriden via startup parameter if absolutely required.
-    // TODO SERVER-113360: Consider fixing the task executor pool size to 1.
     size_t numPools = []() -> size_t {
         if (gTaskExecutorPoolSize > 0) {
             return gTaskExecutorPoolSize;
