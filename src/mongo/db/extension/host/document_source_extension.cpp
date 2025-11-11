@@ -30,8 +30,6 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
-#include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension_expandable.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 
@@ -110,51 +108,26 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
     LiteParsedList outExpanded;
     auto expanded = parseNodeHandle.expand();
 
-    for (auto& variantNodeHandle : expanded) {
-        std::visit(
-            [&](auto&& handle) {
-                using H = std::decay_t<decltype(handle)>;
-
-                // Case 1: Parse node handle
-                //   a) Host-allocated parse node: convert directly to a host
-                //      LiteParsedDocumentSource using the host-provided BSON spec. No recursion in
-                //      this branch.
-                //   b) Extension-allocated parse node: Enter a validation frame for expansion
-                //      constraint enforcement (depth and cycles) and recurse on the parse node
-                //      handle, splicing the results of its expansion.
-                if constexpr (std::is_same_v<H, AggStageParseNodeHandle>) {
-                    if (host::HostAggStageParseNode::isHostAllocated(*handle.get())) {
-                        const auto& spec =
-                            static_cast<host::HostAggStageParseNode*>(handle.get())->getBsonSpec();
-                        outExpanded.emplace_back(
-                            LiteParsedDocumentSource::parse(nss, spec, options));
-                    } else {
-                        const auto stageName = std::string(handle.getName());
-                        ExpansionValidationFrame frame{state, stageName};
-                        auto children = expandImpl(handle, state, nss, options);
-                        outExpanded.splice(outExpanded.end(), children);
-                    }
-                }
-                // Case 2: AST node handle.
-                //   a) Host-allocated AST node: convert directly to a host LiteParsedDocumentSource
-                //      using the host-provided BSON spec.
-                //   b) Extension-allocated AST node: Wrap in a LiteParsedExpanded and append
-                //      directly to the expanded result.
-                else if constexpr (std::is_same_v<H, AggStageAstNodeHandle>) {
-                    if (host::HostAggStageAstNode::isHostAllocated(*handle.get())) {
-                        const auto& spec = static_cast<host::HostAggStageAstNode*>(handle.get())
-                                               ->getIdLookupSpec();
-                        outExpanded.emplace_back(
-                            LiteParsedDocumentSource::parse(nss, spec, options));
-                    } else {
-                        outExpanded.emplace_back(
-                            std::make_unique<DocumentSourceExtension::LiteParsedExpanded>(
-                                std::string(handle.getName()), std::move(handle)));
-                    }
-                }
-            },
-            variantNodeHandle);
-    }
+    helper::visitExpandedNodes(
+        expanded,
+        [&](const HostAggStageParseNode& hostParse) {
+            const auto& spec = hostParse.getBsonSpec();
+            outExpanded.emplace_back(LiteParsedDocumentSource::parse(nss, spec, options));
+        },
+        [&](const AggStageParseNodeHandle& handle) {
+            const auto stageName = std::string(handle.getName());
+            ExpansionValidationFrame frame{state, stageName};
+            auto children = expandImpl(handle, state, nss, options);
+            outExpanded.splice(outExpanded.end(), children);
+        },
+        [&](const HostAggStageAstNode& hostAst) {
+            const auto& spec = hostAst.getIdLookupSpec();
+            outExpanded.emplace_back(LiteParsedDocumentSource::parse(nss, spec, options));
+        },
+        [&](AggStageAstNodeHandle handle) {
+            outExpanded.emplace_back(std::make_unique<LiteParsedExpanded>(
+                std::string(handle.getName()), std::move(handle)));
+        });
 
     return outExpanded;
 }

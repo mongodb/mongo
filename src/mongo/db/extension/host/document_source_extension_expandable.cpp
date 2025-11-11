@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host/document_source_extension.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
@@ -46,49 +47,24 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandabl
     std::list<boost::intrusive_ptr<DocumentSource>> outExpanded;
     std::vector<VariantNodeHandle> expanded = parseNodeHandle.expand();
 
-    for (auto& variantNodeHandle : expanded) {
-        std::visit(
-            [&](auto&& handle) {
-                using H = std::decay_t<decltype(handle)>;
-
-                // Case 1: Parse node handle.
-                //   a) Host-allocated parse node: convert directly to a host
-                //      DocumentSource using the host-provided BSON spec. No recursion
-                //      in this branch.
-                //   b) Extension-allocated parse node: Recurse on the parse node
-                //      handle, splicing the results of its expansion.
-                if constexpr (std::is_same_v<H, AggStageParseNodeHandle>) {
-                    if (HostAggStageParseNode::isHostAllocated(*handle.get())) {
-                        const BSONObj& bsonSpec =
-                            static_cast<host::HostAggStageParseNode*>(handle.get())->getBsonSpec();
-                        outExpanded.splice(outExpanded.end(),
-                                           DocumentSource::parse(expCtx, bsonSpec));
-                    } else {
-                        std::list<boost::intrusive_ptr<DocumentSource>> children =
-                            expandImpl(expCtx, handle);
-                        outExpanded.splice(outExpanded.end(), children);
-                    }
-                }
-                // Case 2: AST node handle.
-                //   a) Host-allocated AST node: convert directly to a host DocumentSource using
-                //      the host-provided BSON spec.
-                //   b) Extension-allocated AST node: Construct a
-                //      DocumentSourceExtensionOptimizable and release the AST node handle.
-                else if constexpr (std::is_same_v<H, AggStageAstNodeHandle>) {
-                    if (HostAggStageAstNode::isHostAllocated(*handle.get())) {
-                        const BSONObj& bsonSpec =
-                            static_cast<host::HostAggStageAstNode*>(handle.get())
-                                ->getIdLookupSpec();
-                        outExpanded.splice(outExpanded.end(),
-                                           DocumentSource::parse(expCtx, bsonSpec));
-                    } else {
-                        outExpanded.emplace_back(
-                            DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle)));
-                    }
-                }
-            },
-            variantNodeHandle);
-    }
+    helper::visitExpandedNodes(
+        expanded,
+        [&](const HostAggStageParseNode& host) {
+            const BSONObj& bsonSpec = host.getBsonSpec();
+            outExpanded.splice(outExpanded.end(), DocumentSource::parse(expCtx, bsonSpec));
+        },
+        [&](const AggStageParseNodeHandle& handle) {
+            std::list<boost::intrusive_ptr<DocumentSource>> children = expandImpl(expCtx, handle);
+            outExpanded.splice(outExpanded.end(), children);
+        },
+        [&](const HostAggStageAstNode& hostAst) {
+            const BSONObj& bsonSpec = hostAst.getIdLookupSpec();
+            outExpanded.splice(outExpanded.end(), DocumentSource::parse(expCtx, bsonSpec));
+        },
+        [&](AggStageAstNodeHandle handle) {
+            outExpanded.emplace_back(
+                DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle)));
+        });
 
     return outExpanded;
 }

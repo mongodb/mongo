@@ -29,12 +29,15 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/desugarer.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
+
 namespace mongo::extension {
 
 class DocumentSourceExtensionTest;
@@ -233,6 +236,50 @@ private:
     DocumentSourceExtension& operator=(const DocumentSourceExtension&) = delete;
     DocumentSourceExtension& operator=(DocumentSourceExtension&&) = delete;
 };
+
+namespace helper {
+
+template <typename OnParseHost, typename OnParseExt, typename OnAstHost, typename OnAstExt>
+inline void visitExpandedNodes(std::vector<VariantNodeHandle>& expanded,
+                               OnParseHost&& onParseHost,
+                               OnParseExt&& onParseExt,
+                               OnAstHost&& onAstHost,
+                               OnAstExt&& onAstExt) {
+    for (auto& node : expanded) {
+        std::visit(
+            [&](auto&& handle) {
+                using H = std::decay_t<decltype(handle)>;
+                // Case 1: Parse node handle.
+                //   a) Host-allocated parse node: convert directly to a host
+                //      DocumentSource using the host-provided BSON spec. No recursion
+                //      in this branch.
+                //   b) Extension-allocated parse node: Recurse on the parse node
+                //      handle, splicing the results of its expansion.
+                if constexpr (std::is_same_v<H, AggStageParseNodeHandle>) {
+                    if (host::HostAggStageParseNode::isHostAllocated(*handle.get())) {
+                        onParseHost(*static_cast<host::HostAggStageParseNode*>(handle.get()));
+                    } else {
+                        onParseExt(handle);
+                    }
+                }
+                // Case 2: AST node handle.
+                //   a) Host-allocated AST node: convert directly to a host DocumentSource using
+                //      the host-provided BSON spec.
+                //   b) Extension-allocated AST node: Construct a
+                //      DocumentSourceExtensionOptimizable and release the AST node handle.
+                else if constexpr (std::is_same_v<H, AggStageAstNodeHandle>) {
+                    if (host::HostAggStageAstNode::isHostAllocated(*handle.get())) {
+                        onAstHost(*static_cast<host::HostAggStageAstNode*>(handle.get()));
+                    } else {
+                        onAstExt(std::move(handle));
+                    }
+                }
+            },
+            node);
+    }
+}
+
+}  // namespace helper
 
 }  // namespace host
 
