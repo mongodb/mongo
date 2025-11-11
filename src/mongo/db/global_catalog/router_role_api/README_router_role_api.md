@@ -47,17 +47,17 @@ You can also find below two real usage examples for each case:
 
 These classes handle the following processes internally:
 
-1. Fetch the routing information for the specified collection or DBPrimary shard, and pass it to the lambda function as either a [RoutingContext](../s/query/README_aggregation.md) or a `CachedDatabaseInfo` object.
+1. Fetch the routing information for the specified collection or DBPrimary shard, and pass it to the lambda function as either a [RoutingContext](./README_routing_context.md) or a `CachedDatabaseInfo` object.
 2. Detect and handle stale routing errors coming from shard responses. If the routing data is outdated, it is automatically refreshed and the operation is retried.
-3. Once the operation succeeds, the `RoutingContext` gets validated ([here](../s/query/README_routing_context.md#invariants) you'll find a more clear understanding of what's checked under a `RoutingContext` validation).
+3. Once the operation succeeds, the `RoutingContext` gets validated ([here](./README_routing_context.md#invariants) you'll find a more clear understanding of what's checked under a `RoutingContext` validation).
 
 When using `CollectionRouter` or `DBPrimaryRouter`, keep the following in mind:
 
-- The lambda function passed to `CollectionRouter::routeWithRoutingContext()` or `DBPrimaryRouter::route()` must use the provided [RoutingContext](../s/query/README_aggregation.md) or `CachedDatabaseInfo` objects to dispatch a shard-versioned command to the shards.
+- The lambda function passed to `CollectionRouter::routeWithRoutingContext()` or `DBPrimaryRouter::route()` must use the provided [RoutingContext](./README_routing_context.md) or `CachedDatabaseInfo` objects to dispatch a shard-versioned command to the shards.
 - Any stale routing error returned by a shard must be thrown so that it can be properly handled by the router logic.
 - During a single routing operation, it is crucial to consult only one version of the routing table.
 
-For more details on routing internals, see the [Versioning Protocols](../versioning_protocol/README_versioning_protocols.md) architecture guide.
+For more details on routing internals, see the [Versioning Protocols](../../versioning_protocol/README_versioning_protocols.md) architecture guide.
 
 ## MultiCollectionRouter
 

@@ -12,7 +12,7 @@ Other operations are to be targeted to whichever shard(s) own data (or relevant 
 
 When a shard receives the request, it will check this token to make sure that it matches the shard's local information. If it matches, then the request will proceed. If the version does not match, the shard will throw [an exception](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/stale_exception.h).
 
-When the router receives this exception, it knows that the routing information must have changed, and so it will [perform a refresh](#routing-information-refreshes) to get more recent information before sending the request again.
+When the router receives this exception, it knows that the routing information must have changed, and so it will [perform a refresh](#routing-aka-placement-information-refreshes) to get more recent information before sending the request again.
 
 The following diagram depicts a simple example of the shard versioning protocol in action. It assumes that the router is a shard server primary, thus the refresh is simply fetching newer information from the config server.
 

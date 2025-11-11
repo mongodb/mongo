@@ -50,7 +50,7 @@ size will be treated separately from the example which does not specify a batch 
 #### Engineering Considerations
 
 The dimensions considered will depend on the command, but can generally be found in the
-[`KeyGenerator`](key_generator.h) interface, which will generate the query stats store keys by which
+[`Key`](key.h) interface, which will generate the query stats store keys by which
 we accumulate statistics. As one example, you can find the
 [`FindKey`](find_key.h) which will include all the things tracked in the
 `FindCmdQueryStatsStoreKeyComponents` (including `batchSize` shown in this example).

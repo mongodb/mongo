@@ -34,16 +34,16 @@ the data files.
 To avoid taking unnecessary checkpoints on an idle server, WiredTiger will only take checkpoints for
 the following scenarios:
 
-- When the [stable timestamp](../../repl/README.md#replication-timestamp-glossary) is greater than or
-  equal to the [initial data timestamp](../../repl/README.md#replication-timestamp-glossary), we take a
+- When the [stable timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary) is greater than or
+  equal to the [initial data timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary), we take a
   stable checkpoint, which is a durable view of the data at a particular timestamp. This is for
   steady-state replication.
-- The [initial data timestamp](../../repl/README.md#replication-timestamp-glossary) is not set, so we
+- The [initial data timestamp](/src/mongo/db/repl/README.md#replication-timestamp-glossary) is not set, so we
   must take a full checkpoint. This is when there is no consistent view of the data, such as during
   initial sync.
 
 Not only does checkpointing provide us with durability for the database, but it also enables us to
-take [backups of the data](../../storage/README.md#file-system-backups).
+take [backups of the data](/src/mongo/db/storage/README.md#file-system-backups).
 
 When WiredTiger takes a checkpoint, it uses the
 [`stable_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L2011 "Github") (effectively a `read_timestamp`) for what data should be persisted in the checkpoint.
@@ -99,7 +99,7 @@ threads are restarted, and two-phase index builds are resumed.
 See [here](https://source.wiredtiger.com/develop/arch-rts.html) for WiredTiger's architecture guide
 on rollback-to-stable.
 
-See [here](../../repl/README.md#rollback-recover-to-a-timestamp-rtt) for more information on what
+See [here](/src/mongo/db/repl/README.md#rollback-recover-to-a-timestamp-rtt) for more information on what
 happens in the replication layer during rollback-to-stable.
 
 ## Repair
@@ -120,7 +120,7 @@ MongoDB repair attempts to address the following forms of corruption:
 - Missing WiredTiger data files
   - Includes all collections, `_mdb_catalog`, and `sizeStorer`
 - Index inconsistencies
-  - Validate [repair mode](../../validate/README.md#repair-mode) attempts to fix index inconsistencies to avoid a full index
+  - Validate [repair mode](/src/mongo/db/validate/README.md#repair-mode) attempts to fix index inconsistencies to avoid a full index
     rebuild.
   - Indexes are rebuilt on collections after they have been salvaged or if they fail validation and
     validate repair mode is unable to fix all errors.
@@ -143,7 +143,7 @@ MongoDB repair attempts to address the following forms of corruption:
 2. Initialize the StorageEngine and [salvage the `_mdb_catalog` table, if
    needed](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L95).
 3. Recover orphaned collections.
-   - If an [ident](#glossary) is known to WiredTiger but is not present in the `_mdb_catalog`,
+   - If an [ident](/src/mongo/db/storage/README.md#glossary) is known to WiredTiger but is not present in the `_mdb_catalog`,
      [create a new
      collection](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L145-L189)
      with the prefix `local.orphan.<ident-name>` that references this ident.
@@ -175,7 +175,7 @@ MongoDB repair attempts to address the following forms of corruption:
      rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L134-L149)
      for that collection.
 5. Validate collection and index consistency
-   - [Collection validation](#collection-validation) checks for consistency between the collection
+   - [Collection validation](/src/mongo/db/validate/README.md) checks for consistency between the collection
      and indexes. Validate repair mode attempts to fix any inconsistencies it finds.
 6. Rebuild indexes
    - If a collection's data has been salvaged or any index inconsistencies are not repairable by
@@ -208,7 +208,7 @@ The oplog collection can be truncated both at the front end (most recent entries
 be deleted when new writes increase the collection size past the cap. MongoDB using the WiredTiger
 storage engine with `--replSet` handles oplog collection deletion specially via
 OplogTruncateMarkers, an oplog specific implementation of the
-[CollectionTruncateMarkers](../README.md#collectionTruncateMarkers) mechanism, ignoring the generic capped
+[CollectionTruncateMarkers](/src/mongo/db/storage/README.md#collectionTruncateMarkers) mechanism, ignoring the generic capped
 collection deletion mechanism. The front of the oplog may be truncated back to a particular
 timestamp during replication startup recovery or replication rollback.
 

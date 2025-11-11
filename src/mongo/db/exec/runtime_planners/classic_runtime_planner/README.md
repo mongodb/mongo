@@ -8,7 +8,7 @@ The classic engine makes this determination using a process called **multiplanni
 
 By the nature of this strategy, we do not have a complete guarantee that the selected plan will be the most optimal. It is possible that by the nature of the data, a suboptimal plan appears optimal during the multiplanning trial period. Therefore, our goal is to pick a generally efficient plan, which is not necessarily the _most_ efficient plan.
 
-The Query Optimization team is currently developing a cost-based plan ranker as an alternative to multiplanning. This initiative is documented [here](TODO: SERVER-100250).
+The Query Optimization team is currently developing a cost-based plan ranker as an alternative to multiplanning. This initiative is documented here (link TODO: SERVER-100250).
 
 > ### Aside: Classic Runtime Planner for SBE
 >
@@ -22,7 +22,7 @@ Note that if execution of a cached plan fails because the cached plan is less ef
 
 ## [`MultiPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L182)
 
-If we have [more than one](#singlesolutionpassthroughplanner) `QuerySolution`, multiplanning begins in [`buildMultiPlan()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/get_executor.cpp#L586). This function initializes a `MultiPlanner` that manages the multiplanning process. For each `QuerySolution`, [`buildExecutableTree()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L46) is called which constructs a tree of `PlanStage`s, where each stage corresponds to the tree in the `QuerySolution`. The `MultiPlanner` initiates planning within [`MultiPlanStage::pickBestPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/exec/multi_plan.cpp#L246-L253).
+If we have [more than one](../classic_runtime_planner_for_sbe/README.md#singlesolutionpassthroughplanner) `QuerySolution`, multiplanning begins in [`buildMultiPlan()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/get_executor.cpp#L586). This function initializes a `MultiPlanner` that manages the multiplanning process. For each `QuerySolution`, [`buildExecutableTree()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L46) is called which constructs a tree of `PlanStage`s, where each stage corresponds to the tree in the `QuerySolution`. The `MultiPlanner` initiates planning within [`MultiPlanStage::pickBestPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/exec/multi_plan.cpp#L246-L253).
 
 During multiplanning, each `QuerySolution` is evaluated by running each candidate for a trial period in a round-robin fashion. This round-robin execution successively calls `PlanStage::work()` on each query, performing one unit of work for each.
 
@@ -194,7 +194,7 @@ flowchart TD
 
 ## Alternative Planners
 
-Although `MultiPlanner` is our "standard" case, not all queries utilize a `MultiPlanner`. Under certain conditions, we may use a different planner that is a subclass of the abstract class [`ClassicPlannerInterface`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L59); [`CachedPlanner`](#plan-cache-consultation) is one such example. Each subclass of `ClassicPlannerInterface` overrides [`doPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L117). `MultiPlanner`'s override, for example, calls [`MultiPlanStage::pickBestPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L55).
+Although `MultiPlanner` is our "standard" case, not all queries utilize a `MultiPlanner`. Under certain conditions, we may use a different planner that is a subclass of the abstract class [`ClassicPlannerInterface`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L59); [`CachedPlanner`](../../../query/plan_cache/README.md) is one such example. Each subclass of `ClassicPlannerInterface` overrides [`doPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L117). `MultiPlanner`'s override, for example, calls [`MultiPlanStage::pickBestPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L55).
 
 Each subclass is detailed below:
 

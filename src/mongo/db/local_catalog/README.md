@@ -401,7 +401,7 @@ In addition `Collection` objects have shared ownership of:
 - A `RecordStore` - an interface to access and manipulate the documents in the collection as stored
   by the storage engine.
 
-A writable `Collection` may only be requested in an active [WriteUnitOfWork](#WriteUnitOfWork). The
+A writable `Collection` may only be requested in an active [WriteUnitOfWork](../storage/README.md#WriteUnitOfWork). The
 new `Collection` instance is installed in the catalog when the storage transaction commits as the
 first `onCommit` [Changes](../storage/README.md#changes) that run. This means that it is not allowed
 to perform any modification to catalog, collection or index instances in `onCommit` handlers. Such

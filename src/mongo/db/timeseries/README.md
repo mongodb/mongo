@@ -1,6 +1,6 @@
 # Time-Series Collections
 
-MongoDB supports a new collection type for storing time-series data with the [timeseries](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/commands/create.idl#L152-L156)
+MongoDB supports a new collection type for storing time-series data with the [timeseries](../local_catalog/ddl/create.idl)
 collection option. A time-series collection presents a simple interface for inserting and querying
 measurements while organizing the actual data in buckets.
 

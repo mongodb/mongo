@@ -296,7 +296,7 @@ The `OplogWriter` runs in an endless loop doing the followings:
 
 1. Get a batch from the writer batcher, which is encapsulated in the [`OplogWriterBatcher`](https://github.com/mongodb/mongo/blob/r8.0.1/src/mongo/db/repl/oplog_writer_batcher.cpp#L60).
 2. Write the batch of oplog entries into the oplog.
-3. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
+3. Update [**oplog visibility**](../storage/README.md#oplog-visibility) by notifying the storage
    engine of the new oplog entries.
 4. Advance the node's `lastWritten` optime to the last optime in the batch.
 5. Tell the storage engine to flush the journal.
@@ -690,16 +690,14 @@ section.
 
 **Available** read concern behaves identically to local read concern in most cases. The exception is
 reads for sharded collections from secondary shard nodes. Local read concern will wait to refresh
-the routing table cache when the node realizes its
-[metadata is stale](../s/README.md#when-the-routing-table-cache-will-refresh), which requires
+the routing table cache when the node realizes its metadata is stale, which requires
 contacting the shard's primary or config servers before being able to serve the read. Available read
 concern does not provide consistency guarantees because it does not wait for routing table cache
 refreshes. As a result, available read concern potentially serves reads faster and is more tolerant
 to network partitions than any other read concern, since the node does not need to communicate with
 another node in the cluster to serve the read. However, this also means that if the node's metadata
-was stale, available read concern could potentially return
-[orphan documents](../s/README.md#orphan-filtering) or even a stale view of a chunk that has been
-moved a long time ago and modified on another shard.
+was stale, available read concern could potentially return orphan documents or even a stale view of
+a chunk that has been moved a long time ago and modified on another shard.
 
 Available read concern is not allowed to be used with causally consistent sessions or transactions.
 
@@ -1029,7 +1027,7 @@ The prepare state _must_ endure any state transition or failover, so they must b
 reconstructed in all situations. If the in-memory state of a prepared transaction is lost, it can be
 reconstructed using the information in the prepare oplog entry(s).
 
-[Startup recovery](#startup-recovery), [rollback](#rollback), and [initial sync](#initial-sync) all
+[Startup recovery](#startup-recovery), [rollback](../storage/wiredtiger/README.md#rollback-to-stable), and [initial sync](#initial-sync) all
 use the same algorithm to reconstruct prepared transactions. In all situations, the node will go
 through a period of applying oplog entries to get the data caught up with the rest of the replica
 set.
@@ -1696,7 +1694,7 @@ and transition to the `SECONDARY` state. This transition must succeed if we ever
 
 Initial sync is the process that we use to add a new node to a replica set. Initial sync is
 initiated by the `ReplicationCoordinator` and done in a registered subclass of
-[**`InitialSyncerInterface`**](./initial_syncer_interface.h). The method used is specified by the server parameter `initialSyncMethod`.
+[**`InitialSyncerInterface`**](initial_sync/initial_syncer_interface.h). The method used is specified by the server parameter `initialSyncMethod`.
 
 There are currently two initial sync methods implemented, [**Logical Initial Sync**](#logical-initial-sync) (the default)
 and File Copy Based Initial Sync, which is available only in MongoDB Enterprise Server.
@@ -1730,7 +1728,7 @@ disk.
 # Logical Initial Sync
 
 Logical initial sync is the default initial sync method, implemented by
-[**`InitialSyncer`**](./initial_syncer.h).
+[**`InitialSyncer`**](initial_sync/initial_syncer.h).
 
 At a high level, there are two phases to initial sync: the [**data clone phase**](#data-clone-phase)
 and the [**oplog application phase**](#oplog-application-phase). During the data clone phase, the
@@ -2239,7 +2237,7 @@ replication consistently [maintains that](https://github.com/mongodb/mongo/blob/
 
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
 serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. This
-is currently [set to the stable optime](hhttps://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5085).
+is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5085).
 Since it is reset every time we recalculate the stable optime, it will also be up to date.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.

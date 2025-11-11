@@ -41,7 +41,7 @@ MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all 
 ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
 with respect to other accesses.
 
-See the [Catalog](../local_catalog/README) and [Concurrency Control](../local_catalog/lock_manager/README.md) for more information.
+See the [Catalog](../local_catalog/README.md) and [Concurrency Control](../local_catalog/lock_manager/README.md) for more information.
 
 ## Transactions
 

@@ -1,5 +1,6 @@
 load("@poetry//:dependencies.bzl", "dependency")
 load("@npm//:eslint/package_json.bzl", "bin")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
 exports_files([
     "candle_wrapper.py",
@@ -398,4 +399,13 @@ py_binary(
     deps = [
         "local_rbe_container_url",
     ],
+)
+
+# Markdown link linter
+py_binary(
+    name = "markdown_link_linter",
+    srcs = ["lint_markdown_links.py"],
+    main = "lint_markdown_links.py",
+    visibility = ["//visibility:public"],
+    deps = [],  # 'requests' optional (external link checks skipped if absent)
 )

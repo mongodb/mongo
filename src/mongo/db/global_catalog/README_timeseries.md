@@ -131,7 +131,7 @@ is set (see `timeseries::isTimeseriesViewRequest`). If it is set, the shards cal
 like unsharded time-series collections. For example, for inserts, measurements will try to be inserted into an open bucket
 in the bucket catalog, then a reopened bucket, and finally a new bucket will be opened if necessary. Updates
 and deletes occur one bucket at a time, and the buckets will be unpacked if necessary. See
-[db/timeseries/README.md](../../../db/timeseries/README.md) for more details about the specific implementations
+[db/timeseries/README.md](../timeseries/README.md) for more details about the specific implementations
 of each CRUD operation.
 
 ## Query routing for aggregation

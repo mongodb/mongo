@@ -187,7 +187,7 @@ Notes:
   sharded collection is reincarnated unsharded.
 
 A formal specification of the placement versioning protocol and the protocol avoiding the data
-placement anomaly is available [here](/src/mongo/tla_plus/TxnsMoveRange).
+placement anomaly is available [here](/src/mongo/tla_plus/Sharding/TxnsMoveRange).
 
 A formal specification of the protocol avoiding the collection generation and collection incarnation
-anomalies is available [here](/src/mongo/tla_plus/TxnsCollectionIncarnation).
+anomalies is available [here](/src/mongo/tla_plus/Sharding/TxnsCollectionIncarnation).

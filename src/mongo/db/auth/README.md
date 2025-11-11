@@ -75,7 +75,7 @@ user credentials and roles. The authorization session is then used to check perm
 On a server with authentication enabled, all but a small handful of commands require clients to
 authenticate before performing any action. This typically occurs with a 1 to 3 round trip
 conversation using the `saslStart` and `saslContinue` commands, or though a single call to the
-`authenticate` command. See [SASL](#SASL) and [X.509](#X509) below for the details of these
+`authenticate` command. See [SASL](#SASL) and [X.509](../../util/net/README.md#X509) below for the details of these
 exchanges.
 
 ### SASL
@@ -119,7 +119,7 @@ encountered.
 
 To reduce connection overhead time, clients may begin and possibly complete their authentication
 exchange as part of the
-[`CmdHello`](<(https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/repl/replication_info.cpp#L234)>)
+[`CmdHello`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/repl/replication_info.cpp#L234)
 exchange. In this mode, the body of the `saslStart` or `authenticate` command used for
 authentication may be embedded into the `hello` command under the field `{speculativeAuthenticate:
 $bodyOfAuthCmd}`.
@@ -298,7 +298,7 @@ The only purpose of an arbiter is to participate in elections for replica set pr
 does not have a copy of data set, including system tables which contain user and role definitions,
 and therefore can not authenticate local users. It is possible to authenticate to arbiter using
 external authentication methods such as cluster authentication or
-[x.509 authentication](#x509atn) and acquire a role using [x.509 authorization](#x509azn).
+x.509 authentication and acquire a role using [x.509 authorization](#x509azn).
 
 It is also possible to connect to an arbiter with limited access using the
 [localhost auth bypass](#lhabp). If the localhost auth bypass is disabled using the
@@ -608,8 +608,8 @@ A resource pattern is a combination of a [MatchType](action_type.idl) with a `Na
 | `kMatchNever`                          | _Unexpressable_                              | A base type only used internally to indicate that the privilege specified by the ResourcePattern can not match any real resource                              |
 | `kMatchClusterResource`                | `{ cluster : true }`                         | Commonly used with host and cluster management actions such as `ActionType::addShard`, `ActionType::setParameter`, or `ActionType::shutdown`.                 |
 | `kMatchAnyResource`                    | `{ anyResource: true }`                      | Matches all storage resources, even [non-normal namespaces](#normal-namespace) such as `db.system.views`.                                                     |
-| `kMatchAnyNormalResource`              | `{ db: '', collection: '' }`                 | Matches all [normal](#normal-namespace) storage resources. Used with [builtin role](builtin_roles.cpp) `readWriteAnyDatabase`.                                |
-| `kMatchDatabaseName`                   | `{ db: 'dbname', collection: '' }`           | Matches all [normal](#normal-namespace) storage resources for a specific named database. Used with [builtin role](builtin_roles.cpp) `readWrite`.             |
+| `kMatchAnyNormalResource`              | `{ db: '', collection: '' }`                 | Matches all [normal](#normal-namespace) storage resources. Used with [builtin role](builtin_roles.tpl.cpp) `readWriteAnyDatabase`.                            |
+| `kMatchDatabaseName`                   | `{ db: 'dbname', collection: '' }`           | Matches all [normal](#normal-namespace) storage resources for a specific named database. Used with [builtin role](builtin_roles.tpl.cpp) `readWrite`.         |
 | `kMatchCollectionName`                 | `{ db: '', collection: 'collname' }`         | Matches all storage resources, normal or not, which have the exact collection suffix '`collname`'. For example, to provide read-only access to `*.system.js`. |
 | `kMatchExactNamespace`                 | `{ db: 'dbname', collection: 'collname' }`   | Matches the exact namespace '`dbname`.`collname`'.                                                                                                            |
 | `kMatchAnySystemBucketResource`        | `{ db: '', system_buckets: '' }`             | Matches the namespace pattern `*.system.buckets.*`.                                                                                                           |

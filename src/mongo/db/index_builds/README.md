@@ -202,7 +202,7 @@ resuming the index builds when the server starts up. The persisted information i
   - The internal state of the external sorter.
   - Idents for side writes, duplicate keys, and skipped records.
 
-During [startup recovery](../storgae/README.md#startup-recovery), the persisted information is used
+During [startup recovery](../storage/README.md#startup-recovery), the persisted information is used
 to reconstruct the in-memory state for the index build and resume from the phase that we left off
 in. If we fail to resume the index build for whatever reason, the index build will restart from the
 beginning.

@@ -473,7 +473,7 @@ that matches the read concern of the command. If the command uses `"snapshot"` r
 the historical routing table at the selected read timestamp. If the command uses any other read concern,
 it must use the latest cached routing table.
 
-The [routing table cache](#the-routing-table-cache) provides an interface for obtaining the routing table
+The routing table cache provides an interface for obtaining the routing table
 at a particular timestamp and collection version, namely the `ChunkManager`. The `ChunkManager` has an
 optional clusterTime associated with it and a `RoutingTableHistory` that contains historical routing
 information for all chunks in the collection. That information is stored in an ordered map from the max

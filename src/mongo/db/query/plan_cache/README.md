@@ -42,7 +42,7 @@ Each collection has its own instance of the Classic plan cache. The plan cache o
 
 ### [`PlanCacheKey`](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/plan_cache/classic_plan_cache.h#L54)
 
-A `PlanCacheKey` is a hash value that encodes the [query shape](#aside-query-shapes).
+A `PlanCacheKey` is a hash value that encodes the [query shape](../query_shape/README.md).
 
 [`encodeClassic()`](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/canonical_query_encoder.cpp#L1287) is used to convert a `CanonicalQuery` into a hexadecimal string representation of the query shape: the `PlanCacheKey`.
 
@@ -199,7 +199,7 @@ There is a long-standing request ([SERVER-13341](https://jira.mongodb.org/browse
 
 ## Subplanning
 
-Rooted `$or` queries (queries that include a `$or` at the top level) interact differently with the [plan cache](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L188-L203). For an introduction to subplanning, refer to [Classic Runtime Planning](../../exec/runtime_planners/classic_runtime_planner/README.md#subplanner).
+Rooted `$or` queries (queries that include a `$or` at the top level) interact differently with the [plan cache](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L188-L203). For an introduction to subplanning, refer to [Classic Runtime Planning](../../exec/runtime_planners/classic_runtime_planner_for_sbe/README.md#subplanner).
 
 Rooted `$or` queries interact with the plan cache on a [_per-clause basis_](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L247-L249); each branch of the `$or` uses the plan cache separately.
 

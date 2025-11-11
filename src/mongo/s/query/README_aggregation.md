@@ -15,7 +15,7 @@ Stage implementations specify their splitting requirements by implementing the [
 
 ## Routing of aggregations that involve multiple collections
 
-**Note**: For information about routing aggregations and other query operations safely with the `RoutingContext`, refer to the [RoutingContext README](/src/mongo/s/query/README_routing_context.md).
+**Note**: For information about routing aggregations and other query operations safely with the `RoutingContext`, refer to the [RoutingContext README](../../db/global_catalog/router_role_api/README_routing_context.md).
 
 Some aggregation stages reference a second (or more) collections. Some examples of this are the following stages: $lookup, $graphLookup, $out, $merge, $unionWith.
 
