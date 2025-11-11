@@ -45,8 +45,7 @@ const runTest = function(ordered, insertBeforeDrop, dropBucketsColl) {
 
     assert.commandFailedWithCode(
         coll.insert({_id: 1, [timeFieldName]: ISODate()}, {ordered: ordered}),
-        [ErrorCodes.NamespaceNotFound, 8555700]);  // TODO (SERVER-85548): revisit error codes
-
+        [9748800, 9748801, 9748802]);  // TODO (SERVER-85548): revisit error codes
     awaitDrop();
 };
 

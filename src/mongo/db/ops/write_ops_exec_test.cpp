@@ -390,6 +390,7 @@ TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
 
         op.setWriteCommandRequestBase(std::move(base));
+        op.setCollectionUUID(bucketsColl->uuid());
 
         ASSERT_OK(write_ops_exec::performAtomicTimeseriesWrites(opCtx, {}, {op}));
     }
@@ -402,6 +403,52 @@ TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(retrievedBucket.value(), bucketDoc));
     }
+}
+
+TEST_F(WriteOpsExecTest, TimeseriesWritesMismatchedUUID) {
+    // Ordered
+    auto opCtx = operationContext();
+    auto ns = NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "ts");
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    auto insertCommandReq = write_ops::InsertCommandRequest(ns.makeTimeseriesBucketsNamespace());
+    insertCommandReq.setCollectionUUID(UUID::gen());
+    ASSERT_THROWS_CODE(
+        write_ops_exec::performAtomicTimeseriesWrites(
+            opCtx, std::vector<write_ops::InsertCommandRequest>{insertCommandReq}, {}),
+        DBException,
+        9748800);
+
+    // Unordered
+    auto insertStatements = std::vector<InsertStatement>{InsertStatement{fromjson("{_id: 0}")}};
+    auto fixer = write_ops_exec::LastOpFixer(opCtx);
+    write_ops_exec::WriteResult result;
+    ASSERT_THROWS_CODE(
+        write_ops_exec::insertBatchAndHandleErrors(opCtx,
+                                                   ns,
+                                                   UUID::gen(),
+                                                   false,
+                                                   insertStatements,
+                                                   OperationSource::kTimeseriesInsert,
+                                                   &fixer,
+                                                   &result),
+        DBException,
+        9748801);
+
+    // Update
+    auto updateCommandRequest =
+        write_ops::UpdateCommandRequest(ns.makeTimeseriesBucketsNamespace());
+    updateCommandRequest.setUpdates(
+        {write_ops::UpdateOpEntry(BSON("_id" << 0), write_ops::UpdateModification())});
+    updateCommandRequest.setCollectionUUID(UUID::gen());
+    result = write_ops_exec::performUpdates(
+        opCtx, updateCommandRequest, OperationSource::kTimeseriesInsert);
+    ASSERT_EQ(1, result.results.size());
+    ASSERT_EQ(9748802, result.results[0].getStatus().code());
 }
 
 class OpObserverMock : public OpObserverNoop {

@@ -680,6 +680,14 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         if (ex.code() == ErrorCodes::Unauthorized) {
             throw;
         }
+        // In a time-series context, this particular CollectionUUIDMismatch is re-thrown differently
+        // because there is already a check for this error higher up, which means this error must
+        // come from the guards installed to enforce that time-series operations are prepared
+        // and committed on the same collection.
+        if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
+            source == OperationSource::kTimeseriesInsert) {
+            uasserted(9748801, "Collection was changed during insert");
+        }
     }
 
     if (shouldProceedWithBatchInsert) {
@@ -1566,6 +1574,16 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                           retryAttempts,
                           "Caught DuplicateKey exception during upsert",
                           logAttrs(ns));
+        } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
+            // In a time-series context, this particular CollectionUUIDMismatch is re-thrown
+            // differently because there is already a check for this error higher up, which means
+            // this error must come from the guards installed to enforce that time-series operations
+            // are prepared and committed on the same collection.
+            if (source == OperationSource::kTimeseriesInsert) {
+                uasserted(9748802, "Collection was changed during insert");
+            }
+
+            throw;
         }
     }
 
@@ -2082,6 +2100,9 @@ Status performAtomicTimeseriesWrites(
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(!insertOps.empty() || !updateOps.empty());
+    auto expectedUUID = !insertOps.empty() ? insertOps.front().getCollectionUUID()
+                                           : updateOps.front().getCollectionUUID();
+    invariant(expectedUUID.has_value());
 
     auto ns =
         !insertOps.empty() ? insertOps.front().getNamespace() : updateOps.front().getNamespace();
@@ -2091,14 +2112,14 @@ Status performAtomicTimeseriesWrites(
     LastOpFixer lastOpFixer(opCtx);
     lastOpFixer.startingOp(ns);
 
-    const auto coll = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
-        MODE_IX);
+    const auto coll =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, ns, AcquisitionPrerequisites::kWrite, expectedUUID),
+                          MODE_IX);
     if (!coll.exists()) {
         assertTimeseriesBucketsCollectionNotFound(ns);
     }
-
     auto curOp = CurOp::get(opCtx);
     curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
 
@@ -2272,6 +2293,11 @@ Status performAtomicTimeseriesWrites(
     // If we encounter a TimeseriesBucketCompressionFailure, we should throw to
     // a higher level (write_ops_exec::performUpdates) so that we can freeze the corrupt bucket.
     throw;
+} catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
+    // This particular CollectionUUIDMismatch is re-thrown differently because there is already a
+    // check for this error higher up, which means this error must come from the guards installed to
+    // enforce that time-series operations are prepared and committed on the same collection.
+    uasserted(9748800, "Collection was changed during insert");
 } catch (const DBException& ex) {
     return ex.toStatus();
 }

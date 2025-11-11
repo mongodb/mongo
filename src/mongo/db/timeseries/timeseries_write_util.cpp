@@ -1049,6 +1049,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
 
     write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+    op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
 
@@ -1063,6 +1064,7 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     write_ops::UpdateCommandRequest op(bucketsNs,
                                        {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+    op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
 
@@ -1103,6 +1105,7 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
         makeTimeseriesCompressedDiffEntry(opCtx, batch, changedToUnsorted, sortedMeasurements);
     write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+    op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
 
