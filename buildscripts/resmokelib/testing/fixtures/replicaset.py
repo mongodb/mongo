@@ -1157,6 +1157,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         """
         self.logger.info("Waiting for all nodes to be caught up")
         primary_client = interface.build_client(self.get_primary(), self.auth_options)
+
+        # Disable the TTL monitor to avoid inconsistent results from TTL deletes occurring between validate calls.
+        previous_value = primary_client.admin.command({"getParameter": 1, "ttlMonitorEnabled": 1})
+        primary_client.admin.command({"setParameter": 1, "ttlMonitorEnabled": False})
+
         coll = primary_client["test"]["validate.hook"].with_options(
             write_concern=pymongo.write_concern.WriteConcern(w=len(self.nodes))
         )
@@ -1259,6 +1264,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                                 f"metadata hash difference on {db_name}.{coll_name}. {base_hash['metadata']} vs {comp_hash['metadata']}"
                             )
 
+        # Reset the TTL monitor to its original value.
+        primary_client.admin.command({"setParameter": 1, "ttlMonitorEnabled": previous_value})
         self.logger.info("Internode Validation Successful")
 
 
