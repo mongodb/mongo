@@ -42,6 +42,7 @@
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::classic_runtime_planner_for_sbe {
 
@@ -350,8 +351,8 @@ public:
      * Test-only helper for swapping in a mock SBE plan for the one that was built from the cache
      * entry.
      */
-    void setSbePlan_forTest(std::unique_ptr<sbe::PlanStage> sbePlan,
-                            stage_builder::PlanStageData data) {
+    MONGO_MOD_NEEDS_REPLACEMENT void setSbePlan_forTest(std::unique_ptr<sbe::PlanStage> sbePlan,
+                                                        stage_builder::PlanStageData data) {
         _sbePlan = std::move(sbePlan);
         _planStageData = std::move(data);
     }

@@ -33,6 +33,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

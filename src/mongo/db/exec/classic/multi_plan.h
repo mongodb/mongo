@@ -44,6 +44,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

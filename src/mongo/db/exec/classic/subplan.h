@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

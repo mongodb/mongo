@@ -46,6 +46,7 @@
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::classic_runtime_planner {
 

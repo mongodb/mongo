@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 template <class CachedPlanType, class DebugInfo>

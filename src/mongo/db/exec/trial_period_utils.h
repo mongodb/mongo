@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
