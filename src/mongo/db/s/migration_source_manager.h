@@ -239,6 +239,16 @@ private:
      */
     void _cleanupOnError();
 
+    /**
+     * Sets _errMsg to the provided string before running the given callable. If the callable
+     * throws, _errMsg remains set so that _cleanupOnError() can log it in the moveChunk.error
+     * changelog entry. If it completes successfully, _errMsg is reset to empty. Only intended for
+     * short asserts or status checks within migration steps where a failure should trigger
+     * _cleanupOnError().
+     */
+    template <typename F>
+    void withChangelogErrMsg(std::string errMsg, F&& functionCall);
+
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.
     OperationContext* const _opCtx;
@@ -319,6 +329,9 @@ private:
     // on this node. The future is set when the range deletion completes. Used if the moveChunk was
     // sent with waitForDelete.
     boost::optional<SharedSemiFuture<void>> _cleanupCompleteFuture;
+
+    // Error message to be logged in changelog event if a failure occurs.
+    std::string _errMsg;
 };
 
 }  // namespace mongo
