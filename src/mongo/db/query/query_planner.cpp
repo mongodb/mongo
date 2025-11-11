@@ -1363,6 +1363,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 ErrorCodes::NoQueryExecutionPlans,
                 "$hint: refusing to build whole-index solution, because it's a wildcard index");
         }
+        if (QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(),
+                                        MatchExpression::GEO_NEAR)) {
+            tassert(11306900,
+                    "invalid non-compound index should be prohibited before planning for $geoNear",
+                    relevantIndices.front().keyPattern.nFields() > 1);
+            return Status(
+                ErrorCodes::NoQueryExecutionPlans,
+                "$hint: refusing to build whole-index solution, because it's a $geoNear query");
+        }
 
         LOGV2_WARNING(
             2658100,

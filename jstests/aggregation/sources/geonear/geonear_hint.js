@@ -12,21 +12,52 @@ coll.drop();
 // Save the names of each hinted index to use when examining the output of $indexStats.
 const simpleGeoNearIndexName = "simpleGeoNearIndex";
 const compoundGeoNearIndexName = "compoundGeoNearIndex";
+const compoundGeoNearIndexNameLocationLast = "compoundGeoNearIndexLocationLast";
+const nonGeoNearIndexName = "nonGeoNearIndex";
 
 assert.commandWorked(coll.insert({_id: "1", state: "ACTIVE", location: [106, 10], name: "TEST"}));
 assert.commandWorked(coll.createIndex({_id: 1, location: "2dsphere", state: 1}, {name: compoundGeoNearIndexName}));
+assert.commandWorked(
+    coll.createIndex({_id: 1, state: 1, location: "2dsphere"}, {name: compoundGeoNearIndexNameLocationLast}),
+);
 assert.commandWorked(coll.createIndex({location: "2dsphere"}, {name: simpleGeoNearIndexName}));
+assert.commandWorked(coll.createIndex({location: 1}, {name: nonGeoNearIndexName}));
 
-const pipeline = [
-    {
+function makeGeoNearStage(query = {}) {
+    return {
         $geoNear: {
-            query: {_id: {$in: ["1", "2", "3"]}, state: "ACTIVE"},
+            query: query,
             spherical: true,
             near: {coordinates: [106.65589, 10.787627], type: "Point"},
             distanceField: "distance",
             key: "location",
         },
-    },
+    };
+}
+
+function checkInvalidHint(geoNearStage, hintIndexName) {
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: collName,
+            pipeline: [geoNearStage],
+            cursor: {},
+            hint: hintIndexName,
+        }),
+        ErrorCodes.NoQueryExecutionPlans,
+    );
+}
+
+// A compound index cannot be hinted when $geoNear doesn't filter on the first element.
+checkInvalidHint(makeGeoNearStage(), compoundGeoNearIndexName);
+checkInvalidHint(makeGeoNearStage({state: "ACTIVE"}), compoundGeoNearIndexName);
+checkInvalidHint(makeGeoNearStage(), compoundGeoNearIndexNameLocationLast);
+checkInvalidHint(makeGeoNearStage({state: "ACTIVE"}), compoundGeoNearIndexNameLocationLast);
+
+// A non-geo index cannot be hinted for a $geoNear stage.
+checkInvalidHint(makeGeoNearStage(), nonGeoNearIndexName);
+
+const pipeline = [
+    makeGeoNearStage({_id: {$in: ["1", "2", "3"]}, state: "ACTIVE"}),
     {$project: {id: 1, name: 1, distance: 1}},
 ];
 
