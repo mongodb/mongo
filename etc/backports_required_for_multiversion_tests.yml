@@ -406,6 +406,8 @@ last-continuous:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
       ticket: SERVER-99618
+    - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
+      ticket: SERVER-107819
     - test_file: jstests/sharding/check_metadata_consistency.js
       ticket: SERVER-98664
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_limit.js
@@ -943,6 +945,8 @@ last-lts:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
       ticket: SERVER-99618
+    - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
+      ticket: SERVER-107819
     - test_file: jstests/sharding/check_metadata_consistency.js
       ticket: SERVER-98664
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_limit.js

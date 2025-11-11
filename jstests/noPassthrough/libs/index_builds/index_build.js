@@ -1,6 +1,6 @@
 // Helper functions for testing index builds.
 
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
@@ -1123,9 +1123,8 @@ export const ResumableIndexBuildTest = class {
  * TODO(SERVER-101609): Remove this function and use `coll` directly
  */
 function getTargetCollForIndexBuilds(coll) {
-    if (coll.getMetadata()?.type === 'timeseries') {
-        return getTimeseriesCollForDDLOps(coll.getDB(), coll);
-    }
-
-    return coll;
+    // For sharded legacy timeseries collections, the `coll` view only exists on the primary shard,
+    // so we won't find it when directly targeting a shard. Check for `system.buckets.coll` instead.
+    const bucketsColl = getTimeseriesBucketsColl(coll);
+    return bucketsColl.exists() ? bucketsColl : coll;
 }
