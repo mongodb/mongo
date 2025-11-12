@@ -35,7 +35,6 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
@@ -267,16 +266,12 @@ void IndexScanStageBase::openImpl(bool reOpen) {
     _scanState = ScanState::kNeedSeek;
 }
 
-void IndexScanStageBase::trackIndexRead() {
-    ++_specificStats.numReads;
-    trackRead();
-}
-
 void IndexScanStageBase::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
     _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_collUuid));
 }
 
-PlanState IndexScanStageBase::getNext() {
+template <typename Derived>
+PlanState IndexScanStageBaseImpl<Derived>::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
     // We are about to get next record from a storage cursor so do not bother saving our internal
@@ -292,7 +287,7 @@ PlanState IndexScanStageBase::getNext() {
                 ++_specificStats.seeks;
                 trackIndexRead();
                 // Seek for key and establish the cursor position.
-                _nextKeyString = seek(ru);
+                _nextKeyString = self()->seek(ru);
                 break;
             case ScanState::kScanning:
                 trackIndexRead();
@@ -301,7 +296,7 @@ PlanState IndexScanStageBase::getNext() {
             case ScanState::kFinished:
                 return trackPlanState(PlanState::IS_EOF);
         }
-    } while (!validateKey(_nextKeyString));
+    } while (!self()->validateKey(_nextKeyString));
 
     if (_indexKeySlot) {
         _key = value::KeyStringEntry{_nextKeyString};
@@ -440,6 +435,37 @@ std::string IndexScanStageBase::getIndexName() const {
     return _indexName;
 }
 
+template <typename Derived>
+IndexScanStageBaseImpl<Derived>::IndexScanStageBaseImpl(
+    StringData stageType,
+    UUID collUuid,
+    DatabaseName dbName,
+    StringData indexName,
+    bool forward,
+    boost::optional<value::SlotId> indexKeySlot,
+    boost::optional<value::SlotId> recordIdSlot,
+    boost::optional<value::SlotId> snapshotIdSlot,
+    boost::optional<value::SlotId> indexIdentSlot,
+    IndexKeysInclusionSet indexKeysToInclude,
+    value::SlotVector vars,
+    PlanYieldPolicy* yieldPolicy,
+    PlanNodeId nodeId,
+    bool participateInTrialRunTracking)
+    : IndexScanStageBase(stageType,
+                         collUuid,
+                         dbName,
+                         indexName,
+                         forward,
+                         indexKeySlot,
+                         recordIdSlot,
+                         snapshotIdSlot,
+                         indexIdentSlot,
+                         indexKeysToInclude,
+                         vars,
+                         yieldPolicy,
+                         nodeId,
+                         participateInTrialRunTracking){};
+
 SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            DatabaseName dbName,
                                            StringData indexName,
@@ -455,20 +481,20 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            PlanYieldPolicy* yieldPolicy,
                                            PlanNodeId nodeId,
                                            bool participateInTrialRunTracking)
-    : IndexScanStageBase(seekKeyLow ? "ixseek"_sd : "ixscan"_sd,
-                         collUuid,
-                         dbName,
-                         indexName,
-                         forward,
-                         indexKeySlot,
-                         recordIdSlot,
-                         snapshotIdSlot,
-                         indexIdentSlot,
-                         indexKeysToInclude,
-                         std::move(vars),
-                         yieldPolicy,
-                         nodeId,
-                         participateInTrialRunTracking),
+    : IndexScanStageBaseImpl(seekKeyLow ? "ixseek"_sd : "ixscan"_sd,
+                             collUuid,
+                             dbName,
+                             indexName,
+                             forward,
+                             indexKeySlot,
+                             recordIdSlot,
+                             snapshotIdSlot,
+                             indexIdentSlot,
+                             indexKeysToInclude,
+                             std::move(vars),
+                             yieldPolicy,
+                             nodeId,
+                             participateInTrialRunTracking),
       _seekKeyLow(std::move(seekKeyLow)),
       _seekKeyHigh(std::move(seekKeyHigh)) {
     // The valid state is when both boundaries, or none is set, or only low key is set.
@@ -534,20 +560,8 @@ void SimpleIndexScanStage::open(bool reOpen) {
     IndexScanStageBase::openImpl(reOpen);
 
     if (_seekKeyLow && _seekKeyHigh) {
-        auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCode.get());
-        const auto msgTagLow = tagLow;
-        uassert(4822851,
-                str::stream() << "seek key is wrong type: " << msgTagLow,
-                tagLow == value::TypeTags::keyString);
-        _seekKeyLowHolder.reset(ownedLow, tagLow, valLow);
-
-        auto [ownedHi, tagHi, valHi] = _bytecode.run(_seekKeyHighCode.get());
-        const auto msgTagHi = tagHi;
-        uassert(4822852,
-                str::stream() << "seek key is wrong type: " << msgTagHi,
-                tagHi == value::TypeTags::keyString);
-
-        _seekKeyHighHolder.reset(ownedHi, tagHi, valHi);
+        initializeSeekKeyLow();
+        initializeSeekKeyHigh();
 
         // It is a point bound if the lowKey and highKey are same except discriminator.
         auto& highKey = getSeekKeyHigh();
@@ -556,21 +570,9 @@ void SimpleIndexScanStage::open(bool reOpen) {
 
         _cursor->setEndPosition(highKey);
     } else if (_seekKeyLow) {
-        auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCode.get());
-        const auto msgTagLow = tagLow;
-        uassert(4822853,
-                str::stream() << "seek key is wrong type: " << msgTagLow,
-                tagLow == value::TypeTags::keyString);
-        _seekKeyLowHolder.reset(ownedLow, tagLow, valLow);
+        initializeSeekKeyLow();
     } else {
-        auto sdi = _entry->accessMethod()->asSortedData()->getSortedDataInterface();
-        key_string::Builder kb(sdi->getKeyStringVersion(),
-                               sdi->getOrdering(),
-                               key_string::Discriminator::kExclusiveBefore);
-        kb.appendDiscriminator(key_string::Discriminator::kExclusiveBefore);
-
-        auto [copyTag, copyVal] = value::makeKeyString(kb.getValueCopy());
-        _seekKeyLowHolder.reset(true, copyTag, copyVal);
+        initializeSeekKeyDefault();
     }
 }
 
@@ -629,26 +631,6 @@ size_t SimpleIndexScanStage::estimateCompileTimeSize() const {
     return size;
 }
 
-SortedDataKeyValueView SimpleIndexScanStage::seek(RecoveryUnit& ru) {
-    auto& query = getSeekKeyLow();
-    return _cursor->seekForKeyValueView(ru, query.getView());
-}
-
-bool SimpleIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
-    if (key.isEmpty()) {
-        _scanState = ScanState::kFinished;
-        return false;
-    }
-
-    // Note: we may in the future want to bump 'keysExamined' for comparisons to a key that result
-    // in the stage returning EOF.
-    ++_specificStats.keysExamined;
-
-    // For point bound on unique index, there's only one possible key.
-    _scanState = _pointBound && _uniqueIndex ? ScanState::kFinished : ScanState::kScanning;
-    return true;
-}
-
 GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                                              DatabaseName dbName,
                                              StringData indexName,
@@ -662,20 +644,20 @@ GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                                              PlanYieldPolicy* yieldPolicy,
                                              PlanNodeId planNodeId,
                                              bool participateInTrialRunTracking)
-    : IndexScanStageBase("ixscan_generic"_sd,
-                         collUuid,
-                         dbName,
-                         indexName,
-                         params.direction == 1,
-                         indexKeySlot,
-                         recordIdSlot,
-                         snapshotIdSlot,
-                         indexIdentSlot,
-                         indexKeysToInclude,
-                         std::move(vars),
-                         yieldPolicy,
-                         planNodeId,
-                         participateInTrialRunTracking),
+    : IndexScanStageBaseImpl("ixscan_generic"_sd,
+                             collUuid,
+                             dbName,
+                             indexName,
+                             params.direction == 1,
+                             indexKeySlot,
+                             recordIdSlot,
+                             snapshotIdSlot,
+                             indexIdentSlot,
+                             indexKeysToInclude,
+                             std::move(vars),
+                             yieldPolicy,
+                             planNodeId,
+                             participateInTrialRunTracking),
       _params{std::move(params)},
       _endKey{_params.version} {}
 
@@ -747,12 +729,6 @@ size_t GenericIndexScanStage::estimateCompileTimeSize() const {
     return size;
 }
 
-SortedDataKeyValueView GenericIndexScanStage::seek(RecoveryUnit& ru) {
-    key_string::Builder builder(_params.version, _params.ord);
-    return _cursor->seekForKeyValueView(
-        ru, IndexEntryComparison::makeKeyStringFromSeekPointForSeek(_seekPoint, _forward, builder));
-}
-
 bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
     if (key.isEmpty()) {
         _scanState = ScanState::kFinished;
@@ -800,4 +776,8 @@ bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
     _scanState = ScanState::kFinished;
     return false;
 }
+// Explicit template instantiations for the template classes
+template class IndexScanStageBaseImpl<SimpleIndexScanStage>;
+template class IndexScanStageBaseImpl<GenericIndexScanStage>;
+
 }  // namespace mongo::sbe
