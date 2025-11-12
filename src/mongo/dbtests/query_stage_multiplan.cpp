@@ -27,19 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/container/small_vector.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -55,8 +47,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
@@ -88,7 +80,6 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot.h"
@@ -99,14 +90,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
 
 #include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -144,7 +137,7 @@ public:
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(_opCtx.get(), nss.ns_forTest(), obj));
+        ASSERT_OK(createIndex(_opCtx.get(), nss.ns_forTest(), obj));
     }
 
     void insert(const BSONObj& obj) {

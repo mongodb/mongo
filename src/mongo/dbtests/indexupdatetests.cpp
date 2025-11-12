@@ -31,7 +31,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_constants.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
@@ -59,7 +59,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -67,8 +66,6 @@
 #include <cstdint>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -124,7 +121,7 @@ protected:
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
-            uassertStatusOK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, key));
+            uassertStatusOK(initializeMultiIndexBlock(_opCtx, collection(), indexer, key));
             uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection()->ns()));
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(indexer.commit(_opCtx,
@@ -191,7 +188,7 @@ public:
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
-        ASSERT_OK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, spec));
+        ASSERT_OK(initializeMultiIndexBlock(_opCtx, collection(), indexer, spec));
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, _nss));
         ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
@@ -247,7 +244,7 @@ public:
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
-            ASSERT_OK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, spec));
+            ASSERT_OK(initializeMultiIndexBlock(_opCtx, collection(), indexer, spec));
 
             auto& coll = collection();
             auto desc = coll->getIndexCatalog()->findIndexByName(
@@ -369,7 +366,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     MultiIndexBlock indexer;
     ScopeGuard abortOnExit(
         [&] { indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn); });
-    auto status = dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, indexSpec);
+    auto status = initializeMultiIndexBlock(_opCtx, collection(), indexer, indexSpec);
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }

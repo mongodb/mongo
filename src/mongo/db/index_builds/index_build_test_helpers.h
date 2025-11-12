@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,46 +29,41 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/database.h"
-#include "mongo/db/local_catalog/db_raii.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
 
-#include <boost/optional/optional.hpp>
-
-MONGO_MOD_PUBLIC;
-namespace mongo::dbtests {
+namespace mongo {
+/**
+ * Creates an index if it does not already exist.
+ */
+Status createIndex(OperationContext* opCtx,
+                   StringData ns,
+                   const BSONObj& keys,
+                   bool unique = false);
 
 /**
- * Combines AutoGetDb and AutoStatsTracker. If the requested 'ns' exists, the constructed
- * object will have both the database and the collection locked in MODE_IX. Otherwise, the database
- * will be locked in MODE_IX and will be created, while the collection will be locked in MODE_X, but
- * not created.
+ * Creates an index from a BSON spec, if it does not already exist.
  */
-class WriteContextForTests {
-    WriteContextForTests(const WriteContextForTests&) = delete;
-    WriteContextForTests& operator=(const WriteContextForTests&) = delete;
+Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec);
 
-public:
-    WriteContextForTests(OperationContext* opCtx, StringData ns);
+/**
+ * Creates an index from a BSON spec, if it does not already exist. If `clock` is non-null, writes
+ * will be timestamped using the given clock. If it is null, they will be written with a fixed
+ * timestamp.
+ */
+Status createIndexFromSpec(OperationContext* opCtx,
+                           VectorClockMutable* clock,
+                           StringData ns,
+                           const BSONObj& spec);
 
-    Database* db() const {
-        return _autoDb->getDb();
-    }
-
-    CollectionAcquisition getOrCreateCollection(LockMode mode = MODE_IX);
-    CollectionAcquisition getCollection(LockMode mode = MODE_IX) const;
-
-private:
-    OperationContext* const _opCtx;
-    const NamespaceString _nss;
-
-    boost::optional<AutoGetDb> _autoDb;
-    boost::optional<AutoStatsTracker> _tracker;
-};
-
-}  // namespace mongo::dbtests
+Status initializeMultiIndexBlock(OperationContext* opCtx,
+                                 CollectionWriter& collection,
+                                 MultiIndexBlock& indexer,
+                                 const BSONObj& spec,
+                                 MultiIndexBlock::OnInitFn onInit = MultiIndexBlock::kNoopOnInitFn);
+}  // namespace mongo

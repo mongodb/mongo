@@ -145,8 +145,6 @@ mongo_cc_binary(
         "wildcard_multikey_persistence_test.cpp",
         "//src/mongo/db/local_catalog:catalogtests.cpp",
         "//src/mongo/db/local_catalog:indexcatalogtests.cpp",
-        "//src/mongo/dbtests/index_builds:index_access_method_test.cpp",
-        "//src/mongo/dbtests/index_builds:multikey_paths_test.cpp",
     ] + select({
         "//bazel/config:js_engine_mozjs": [
             "jstests.cpp",
@@ -185,6 +183,7 @@ mongo_cc_binary(
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/exec/mutable_bson:mutable_bson_test_utils",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index_builds:index_build_test_helpers",
         "//src/mongo/db/index_builds:multi_index_block",
         "//src/mongo/db/local_catalog:catalog_helpers",
         "//src/mongo/db/local_catalog:collection_options",

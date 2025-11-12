@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -36,6 +35,7 @@
 #include "mongo/db/exec/classic/count_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/database.h"
@@ -45,13 +45,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -70,7 +67,7 @@ public:
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns().ns_forTest(), obj));
+        ASSERT_OK(createIndex(&_opCtx, ns().ns_forTest(), obj));
     }
 
     void insert(const BSONObj& obj) {

@@ -32,7 +32,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -51,6 +50,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_build_entry_helpers.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/index_builds/skipped_record_tracker.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
@@ -76,7 +76,6 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -105,7 +104,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -155,13 +153,9 @@
 #include <set>
 #include <string>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
@@ -169,87 +163,6 @@
 
 namespace mongo {
 namespace {
-
-Status createIndexFromSpec(OperationContext* opCtx,
-                           VectorClockMutable* clock,
-                           StringData ns,
-                           const BSONObj& spec) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-
-    // Make sure we haven't already locked this namespace. An AutoGetCollection already instantiated
-    // on this namespace would have a dangling Collection pointer after this function has run.
-    invariant(!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
-
-    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-    {
-        WriteUnitOfWork wunit(opCtx);
-        CollectionWriter writer{opCtx, nss};
-        auto coll = writer.getWritableCollection(opCtx);
-        if (!coll) {
-            auto db = autoDb.ensureDbExists(opCtx);
-            invariant(db);
-            coll = db->createCollection(opCtx, NamespaceString::createNamespaceString_forTest(ns));
-        }
-        invariant(coll);
-        wunit.commit();
-    }
-
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexBuildInfo =
-        IndexBuildInfo(spec, *storageEngine, nss.dbName(), VersionContext::getDecoration(opCtx));
-    MultiIndexBlock indexer;
-    CollectionWriter collection(opCtx, nss);
-    ScopeGuard abortOnExit(
-        [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
-    Status status =
-        indexer
-            .init(
-                opCtx,
-                collection,
-                {indexBuildInfo},
-                [opCtx, clock] {
-                    if (opCtx->writesAreReplicated() &&
-                        shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
-                        uassertStatusOK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
-                            clock->tickClusterTime(1).asTimestamp()));
-                    }
-                },
-                MultiIndexBlock::InitMode::SteadyState,
-                boost::none,
-                /*generateTableWrites=*/true)
-            .getStatus();
-    if (status == ErrorCodes::IndexAlreadyExists) {
-        return Status::OK();
-    }
-    if (!status.isOK()) {
-        return status;
-    }
-    status = indexer.insertAllDocumentsInCollection(opCtx, nss);
-    if (!status.isOK()) {
-        return status;
-    }
-    status = indexer.retrySkippedRecords(opCtx, collection.get());
-    if (!status.isOK()) {
-        return status;
-    }
-    status = indexer.checkConstraints(opCtx, collection.get());
-    if (!status.isOK()) {
-        return status;
-    }
-    WriteUnitOfWork wunit(opCtx);
-    ASSERT_OK(indexer.commit(opCtx,
-                             collection.getWritableCollection(opCtx),
-                             MultiIndexBlock::kNoopOnCreateEachFn,
-                             MultiIndexBlock::kNoopOnCommitFn));
-    if (opCtx->writesAreReplicated()) {
-        LogicalTime indexTs = clock->tickClusterTime(1);
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(indexTs.asTimestamp()));
-    }
-    wunit.commit();
-    abortOnExit.dismiss();
-    return Status::OK();
-}
-
 CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
     return acquireCollection(
         opCtx,

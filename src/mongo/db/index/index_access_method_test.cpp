@@ -27,47 +27,38 @@
  *    it in the license file.
  */
 
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 #include "mongo/db/index/index_access_method.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/client.h"
-#include "mongo/db/feature_flag.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
-#include <initializer_list>
-#include <memory>
 #include <utility>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
 
 namespace mongo {
 
 namespace {
-
 KeyStringSet makeKeyStringSet(std::initializer_list<BSONObj> objs) {
     KeyStringSet keyStrings;
     for (auto& obj : objs) {
@@ -241,7 +232,9 @@ TEST(IndexAccessMethodSetDifference, ShouldNotReportOverlapsFromNonDisjointSets)
     }
 }
 
-TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
+class IndexAccessMethodInsertKeys : public ServiceContextMongoDTest {};
+
+TEST_F(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
     ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
@@ -249,7 +242,7 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "unique" << true << "v"
                                  << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
     const auto& coll = *autoColl;
@@ -285,7 +278,7 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
               initDuplicateKeyErrors + 1);
 }
 
-TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
+TEST_F(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
     ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     NamespaceString nss =
@@ -293,7 +286,7 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "prepareUnique" << true
                                  << "v" << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
     const auto& coll = *autoColl;
@@ -321,7 +314,8 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
               initDuplicateKeyErrors + 1);
 }
 
-TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
+class IndexAccessMethodUpdateKeys : public ServiceContextMongoDTest {};
+TEST_F(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
     ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     NamespaceString nss =
@@ -329,7 +323,7 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "prepareUnique" << true
                                  << "v" << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
+    ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
     const auto& coll = *autoColl;

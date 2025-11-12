@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -39,6 +37,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
@@ -64,7 +63,6 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -77,7 +75,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -263,7 +260,7 @@ protected:
             [&] { indexer.abortIndexBuild(opCtx(), coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
         // Initialize the index builder and add all documents currently in the collection.
-        ASSERT_OK(dbtests::initializeMultiIndexBlock(opCtx(), coll, indexer, indexSpec));
+        ASSERT_OK(initializeMultiIndexBlock(opCtx(), coll, indexer, indexSpec));
         ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), nss));
         ASSERT_OK(indexer.checkConstraints(opCtx(), coll.get()));
 

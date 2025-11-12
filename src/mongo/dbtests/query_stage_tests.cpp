@@ -27,16 +27,8 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -44,6 +36,7 @@
 #include "mongo/db/exec/classic/index_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/matcher/expression.h"
@@ -51,7 +44,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
@@ -62,9 +54,12 @@
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <boost/move/utility_core.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 /**
@@ -97,7 +92,7 @@ public:
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
+        ASSERT_OK(createIndex(&_opCtx, ns(), obj));
     }
 
     int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {

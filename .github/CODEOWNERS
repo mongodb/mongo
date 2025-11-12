@@ -2921,9 +2921,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/rollbacktests.cpp @10gen/server-recovery @svc-auto-approve-bot
 /src/mongo/dbtests/**/dbtests* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/dbtests/index_builds/OWNERS.yml
-/src/mongo/dbtests/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/dbtests/mock/OWNERS.yml
 /src/mongo/dbtests/mock/**/mock_conn_registry.* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/dbtests/mock/**/mock_dbclient_connection.* @10gen/server-networking-and-observability @svc-auto-approve-bot

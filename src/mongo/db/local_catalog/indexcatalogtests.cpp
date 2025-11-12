@@ -30,19 +30,17 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/database.h"
-#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -104,8 +102,8 @@ public:
 
         int numFinishedIndexesStart = indexCatalog(&opCtx)->numIndexesReady();
 
-        dbtests::createIndex(&opCtx, _nss.ns_forTest(), BSON("x" << 1)).transitional_ignore();
-        dbtests::createIndex(&opCtx, _nss.ns_forTest(), BSON("y" << 1)).transitional_ignore();
+        createIndex(&opCtx, _nss.ns_forTest(), BSON("x" << 1)).transitional_ignore();
+        createIndex(&opCtx, _nss.ns_forTest(), BSON("y" << 1)).transitional_ignore();
 
         ASSERT_TRUE(indexCatalog(&opCtx)->numIndexesReady() == numFinishedIndexesStart + 2);
 
@@ -161,11 +159,11 @@ public:
         dbtests::WriteContextForTests ctx(&opCtx, _nss.ns_forTest());
         const std::string indexName = "x_1";
 
-        ASSERT_OK(dbtests::createIndexFromSpec(&opCtx,
-                                               _nss.ns_forTest(),
-                                               BSON("name" << indexName << "key" << BSON("x" << 1)
-                                                           << "v" << static_cast<int>(kIndexVersion)
-                                                           << "expireAfterSeconds" << 5)));
+        ASSERT_OK(createIndexFromSpec(&opCtx,
+                                      _nss.ns_forTest(),
+                                      BSON("name" << indexName << "key" << BSON("x" << 1) << "v"
+                                                  << static_cast<int>(kIndexVersion)
+                                                  << "expireAfterSeconds" << 5)));
 
         const IndexDescriptor* desc = indexCatalog(&opCtx)->findIndexByName(&opCtx, indexName);
         ASSERT(desc);
@@ -216,7 +214,7 @@ public:
         auto opCtx = cc().makeOperationContext();
         dbtests::WriteContextForTests ctx{opCtx.get(), _nss.ns_forTest()};
 
-        ASSERT_OK(dbtests::createIndexFromSpec(
+        ASSERT_OK(createIndexFromSpec(
             opCtx.get(),
             _nss.ns_forTest(),
             BSON(IndexDescriptor::kIndexVersionFieldName
@@ -267,7 +265,7 @@ public:
         auto opCtx = cc().makeOperationContext();
         dbtests::WriteContextForTests ctx{opCtx.get(), _nss.ns_forTest()};
 
-        ASSERT_OK(dbtests::createIndexFromSpec(
+        ASSERT_OK(createIndexFromSpec(
             opCtx.get(),
             _nss.ns_forTest(),
             BSON(IndexDescriptor::kIndexVersionFieldName

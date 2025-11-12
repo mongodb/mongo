@@ -28,10 +28,7 @@
  */
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -40,9 +37,7 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/classic/working_set.h"
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/db_raii.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -50,10 +45,8 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -64,14 +57,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
@@ -92,7 +83,7 @@ public:
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(opCtx(), nss.ns_forTest(), obj));
+        ASSERT_OK(createIndex(opCtx(), nss.ns_forTest(), obj));
     }
 
     void addIndexWithWildcardProjection(BSONObj keys, BSONObj wildcardProjection) {
@@ -102,7 +93,7 @@ public:
             << IndexDescriptor::kUniqueFieldName << false << IndexDescriptor::kIndexVersionFieldName
             << static_cast<int>(IndexDescriptor::IndexVersion::kV2)
             << IndexDescriptor::kWildcardProjectionFieldName << wildcardProjection);
-        ASSERT_OK(dbtests::createIndexFromSpec(opCtx(), nss.ns_forTest(), indexSpec));
+        ASSERT_OK(createIndexFromSpec(opCtx(), nss.ns_forTest(), indexSpec));
     }
 
     void dropIndex(DBDirectClient& client, BSONObj keyPattern) {

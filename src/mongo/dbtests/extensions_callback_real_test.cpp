@@ -30,14 +30,13 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
 #include "mongo/db/fts/fts_query.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/database.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
@@ -48,7 +47,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -56,7 +54,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <memory>
 
@@ -117,10 +114,8 @@ TEST_F(ExtensionsCallbackRealTest, TextNoIndex) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextBasic) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"english\"}}");
     auto expr =
@@ -138,10 +133,8 @@ TEST_F(ExtensionsCallbackRealTest, TextBasic) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"spanglish\"}}");
     ASSERT_THROWS_CODE(StatusWithMatchExpression(
@@ -151,10 +144,8 @@ TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $caseSensitive: true}}");
     auto expr =
@@ -167,10 +158,8 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveFalse) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $caseSensitive: false}}");
     auto expr =
@@ -183,10 +172,8 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveFalse) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveError) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text:{$search:\"awesome\", $caseSensitive: 0}}");
     StatusWithMatchExpression result =
@@ -196,10 +183,8 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveError) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveTrue) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $diacriticSensitive: true}}");
     auto expr =
@@ -212,10 +197,8 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveTrue) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveFalse) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $diacriticSensitive: false}}");
     auto expr =
@@ -228,10 +211,8 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveFalse) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveError) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query = fromjson("{$text:{$search:\"awesome\", $diacriticSensitive: 0}}");
     StatusWithMatchExpression result =
@@ -241,10 +222,8 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveError) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
-    ASSERT_OK(dbtests::createIndex(&_opCtx,
-                                   _nss.ns_forTest(),
-                                   BSON("a" << "text"),
-                                   false));  // isUnique
+    ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << "text"),
+                          false));  // isUnique
 
     BSONObj query =
         fromjson("{$text: {$search:\"awesome\", $diacriticSensitive: true, $caseSensitive: true}}");

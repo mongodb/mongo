@@ -386,3 +386,18 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:storage_interface_impl",
     ],
 )
+
+mongo_cc_library(
+    name = "index_build_test_helpers",
+    srcs = [
+        "index_build_test_helpers.cpp",
+    ],
+    hdrs = [
+        "index_build_test_helpers.h",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index_builds:multi_index_block",
+    ],
+)

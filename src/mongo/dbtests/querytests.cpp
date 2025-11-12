@@ -29,11 +29,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -50,6 +48,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
@@ -57,14 +56,12 @@
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/database.h"
 #include "mongo/db/local_catalog/database_holder.h"
-#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
-#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
@@ -98,9 +95,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -202,7 +196,7 @@ protected:
         });
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(dbtests::initializeMultiIndexBlock(&_opCtx, collection, indexer, specObj));
+            ASSERT_OK(initializeMultiIndexBlock(&_opCtx, collection, indexer, specObj));
             wunit.commit();
         }
         uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, _collection->nss()));
@@ -349,7 +343,7 @@ public:
         a.appendMaxKey("$lt");
         BSONObj limit = a.done();
         ASSERT(!_client.findOne(_nss, BSON("a" << limit)).isEmpty());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         FindCommandRequest findCmd{_nss};
         findCmd.setFilter(BSON("a" << limit));
         findCmd.setHint(BSON("a" << 1));
@@ -834,7 +828,7 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         count(0);
         insert(_nss, BSON("a" << 3));
         count(0);
@@ -861,7 +855,7 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("_id" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("_id" << 1)));
 
         auto response = _client.insertAcknowledged(_nss, {fromjson("{'_id':[1,2]}")});
         ASSERT_NOT_OK(getStatusFromWriteCommandReply(response));
@@ -948,7 +942,7 @@ public:
     void run() {
         _client.insert(_nss, BSON("a" << BSON("b" << 1)));
         ASSERT(!_client.findOne(_nss, BSON("a" << BSON("b" << 1.0))).isEmpty());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         ASSERT(!_client.findOne(_nss, BSON("a" << BSON("b" << 1.0))).isEmpty());
     }
 
@@ -974,7 +968,7 @@ public:
         ASSERT_EQUALS(0u, _client.getIndexSpecs(_nss, includeBuildUUIDs, options).size());
     }
     void checkIndex() {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         index();
     }
     void run() {
@@ -1000,12 +994,12 @@ public:
         _client.dropCollection(_nss);
     }
     void run() {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1), true));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1), true));
         _client.insert(_nss, BSON("a" << 4 << "b" << 2));
         _client.insert(_nss, BSON("a" << 4 << "b" << 3));
         ASSERT_EQUALS(1U, _client.count(_nss, BSONObj()));
         _client.dropCollection(_nss);
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("b" << 1), true));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("b" << 1), true));
         _client.insert(_nss, BSON("a" << 4 << "b" << 2));
         _client.insert(_nss, BSON("a" << 4 << "b" << 3));
         ASSERT_EQUALS(2U, _client.count(_nss, BSONObj()));
@@ -1025,7 +1019,7 @@ public:
         _client.insert(_nss, BSON("a" << 4 << "b" << 2));
         _client.insert(_nss, BSON("a" << 4 << "b" << 3));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
-                      dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1), true));
+                      createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1), true));
     }
 
 private:
@@ -1056,7 +1050,7 @@ public:
     }
     void run() {
         _client.insert(_nss, fromjson("{a:[1,2,3]}"));
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         FindCommandRequest findRequest{_nss};
         findRequest.setFilter(BSON("a" << mongo::BSIZE << 3));
         findRequest.setHint(BSON("a" << 1));
@@ -1078,7 +1072,7 @@ public:
         FindCommandRequest findRequest{_nss};
         findRequest.setFilter(fromjson("{a:[1,2,3]}"));
         ASSERT(_client.find(findRequest)->more());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         findRequest.setFilter(fromjson("{a:{$in:[1,[1,2,3]]}}"));
         findRequest.setHint(BSON("a" << 1));
         ASSERT(_client.find(findRequest)->more());
@@ -1099,7 +1093,7 @@ public:
     void run() {
         _client.insert(_nss, fromjson("{a:[[1],2]}"));
         check("$natural");
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         check("a");
     }
 
@@ -1129,7 +1123,7 @@ public:
     void run() {
         _client.insert(_nss, fromjson("{'_id':1,a:[1]}"));
         _client.insert(_nss, fromjson("{'_id':2,a:[[1]]}"));
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         FindCommandRequest findRequest{_nss};
         findRequest.setFilter(fromjson("{a:[1]}"));
         findRequest.setHint(BSON("a" << 1));
@@ -1149,7 +1143,7 @@ public:
     void run() {
         _client.insert(_nss, fromjson("{a:[{b:[1]}]}"));
         check("$natural");
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         check("a");
     }
 
@@ -1175,7 +1169,7 @@ public:
     }
     void run() {
         checkMatch();
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         checkMatch();
     }
 
@@ -1221,7 +1215,7 @@ public:
     }
     void run() {
         checkMatch();
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("a" << 1)));
         checkMatch();
     }
 
@@ -1264,7 +1258,7 @@ public:
     }
     void run() {
         _client.insert(_nss, BSON("i" << "a"));
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("i" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("i" << 1)));
         ASSERT_EQUALS(1U, _client.count(_nss, fromjson("{i:{$in:['a']}}")));
     }
 
@@ -1339,7 +1333,7 @@ public:
         }
 
         t(_nss);
-        ASSERT_OK(dbtests::createIndex(&_opCtx, _nss.ns_forTest(), BSON("7" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, _nss.ns_forTest(), BSON("7" << 1)));
         t(_nss);
     }
 
@@ -1396,7 +1390,7 @@ public:
             ASSERT_EQUALS(17, _client.findOne(nss(), b.obj())["z"].number());
         }
         ASSERT_EQUALS(17, _client.findOne(nss(), BSON("x" << "eliot"))["z"].number());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("x" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(17, _client.findOne(nss(), BSON("x" << "eliot"))["z"].number());
     }
 };
@@ -1835,7 +1829,7 @@ public:
             NamespaceStringOrUUID(nss().dbName(), *coll_opts.uuid), includeBuildUUIDs, options);
         ASSERT_EQUALS(1U, specsWithIdIndexOnly.size());
 
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1), true));
+        ASSERT_OK(createIndex(&_opCtx, ns(), BSON("a" << 1), true));
 
         auto specsWithBothIndexes = _client.getIndexSpecs(
             NamespaceStringOrUUID(nss().dbName(), *coll_opts.uuid), includeBuildUUIDs, options);

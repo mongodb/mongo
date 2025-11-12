@@ -31,10 +31,8 @@
  * unit tests relating to update requests
  */
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -44,13 +42,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -1692,7 +1690,7 @@ public:
 class IndexParentOfMod : public SetBase {
 public:
     void run() {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1)));
+        ASSERT_OK(createIndex(&_opCtx, ns(), BSON("a" << 1)));
         _client.insert(nss(), fromjson("{'_id':0}"));
         _client.update(nss(), BSONObj{} /*filter*/, fromjson("{$set:{'a.b':4}}"));
         ASSERT_BSONOBJ_EQ(fromjson("{'_id':0,a:{b:4}}"),

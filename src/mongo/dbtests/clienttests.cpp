@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -39,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/namespace_string.h"
@@ -57,9 +56,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 namespace mongo {
 namespace ClientTests {
@@ -111,13 +107,13 @@ public:
         db.insert(nss(), BSON("x" << 2));
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
+        ASSERT_OK(createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         db.dropIndex(nss(), BSON("x" << 1));
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
+        ASSERT_OK(createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         db.dropIndexes(nss());
@@ -156,13 +152,12 @@ public:
         // _id index
         ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey,
-                      dbtests::createIndex(&opCtx, ns(), BSON("y" << 1), true));
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey, createIndex(&opCtx, ns(), BSON("y" << 1), true));
 
         ASSERT_EQUALS(1, indexCatalog()->numIndexesReady());
         ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1), true));
+        ASSERT_OK(createIndex(&opCtx, ns(), BSON("x" << 1), true));
 
         ASSERT_EQUALS(2, indexCatalog()->numIndexesReady());
         ASSERT_EQUALS(2U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
@@ -182,7 +177,7 @@ public:
             db.insert(nss(), BSON("a" << i << "b" << longs));
         }
 
-        ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("a" << 1 << "b" << 1)));
+        ASSERT_OK(createIndex(&opCtx, ns(), BSON("a" << 1 << "b" << 1)));
 
         FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("a" << 1 << "b" << 1));
