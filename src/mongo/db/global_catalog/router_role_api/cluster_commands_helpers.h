@@ -137,13 +137,12 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
  * the collection has query sampling enabled and the rate-limited sampler successfully generates a
  * sample id for it.
  */
-std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
-    const std::set<ShardId>& shardIds,
-    const BSONObj& cmdObj,
-    bool eligibleForSampling = false);
+std::vector<AsyncRequestsSender::Request> buildVersionedRequests(OperationContext* opCtx,
+                                                                 const NamespaceString& nss,
+                                                                 const CollectionRoutingInfo& cri,
+                                                                 const std::set<ShardId>& shardIds,
+                                                                 const BSONObj& cmdObj,
+                                                                 bool eligibleForSampling = false);
 
 /**
  * Dispatches all the specified requests in parallel and waits until all complete, returning a
@@ -369,6 +368,28 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const BSONObj& collation,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
+
+/**
+ * Utility for dispatching versioned commands on a namespace to a specific set of shards.
+ * Unlike scatterGatherVersionedTargetByRoutingTable, this function targets only the
+ * explicitly provided shards rather than determining targets through routing table analysis.
+ *
+ * If the command is eligible for sampling, attaches a unique sample id to one of the requests if
+ * the collection has query sampling enabled and the rate-limited sampler successfully generates a
+ * sample id for it.
+ *
+ * Does not retry on StaleConfig errors.
+ */
+[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetToShards(
+    OperationContext* opCtx,
+    RoutingContext& routingCtx,
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const std::set<ShardId>& shards,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    bool eligibleForSampling = false);
 
 /**
  * Utility for dispatching commands against the primary of a database and attaching

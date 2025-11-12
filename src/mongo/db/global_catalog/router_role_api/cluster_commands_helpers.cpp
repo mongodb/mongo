@@ -214,7 +214,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
 namespace {
 
 std::vector<AsyncRequestsSender::Request> buildShardVersionedRequests(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
+    OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardIds,
@@ -227,10 +227,8 @@ std::vector<AsyncRequestsSender::Request> buildShardVersionedRequests(
     requests.reserve(shardIds.size());
 
     const auto targetedSampleId = eligibleForSampling
-        ? analyze_shard_key::tryGenerateTargetedSampleId(expCtx->getOperationContext(),
-                                                         nss,
-                                                         cmdObj.firstElementFieldNameStringData(),
-                                                         shardIds)
+        ? analyze_shard_key::tryGenerateTargetedSampleId(
+              opCtx, nss, cmdObj.firstElementFieldNameStringData(), shardIds)
         : boost::none;
 
     auto appendSampleId = [&](const BSONObj& command, const ShardId& shardId) -> BSONObj {
@@ -251,13 +249,12 @@ std::vector<AsyncRequestsSender::Request> buildShardVersionedRequests(
     return requests;
 }
 
-AsyncRequestsSender::Request buildDatabaseVersionedRequest(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
-    const ShardId& shardId,
-    const BSONObj& cmdObj,
-    bool eligibleForSampling) {
+AsyncRequestsSender::Request buildDatabaseVersionedRequest(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const CollectionRoutingInfo& cri,
+                                                           const ShardId& shardId,
+                                                           const BSONObj& cmdObj,
+                                                           bool eligibleForSampling) {
     tassert(10162101, "Expected to not find a routing table", !cri.hasRoutingTable());
 
     if (cri.getDbVersion().isFixed()) {
@@ -279,10 +276,8 @@ AsyncRequestsSender::Request buildDatabaseVersionedRequest(
     versionedCmd = appendDbVersionIfPresent(versionedCmd, cri.getDbVersion());
 
     const auto targetedSampleId = eligibleForSampling
-        ? analyze_shard_key::tryGenerateTargetedSampleId(expCtx->getOperationContext(),
-                                                         nss,
-                                                         cmdObj.firstElementFieldNameStringData(),
-                                                         {shardId})
+        ? analyze_shard_key::tryGenerateTargetedSampleId(
+              opCtx, nss, cmdObj.firstElementFieldNameStringData(), {shardId})
         : boost::none;
 
     if (targetedSampleId && targetedSampleId->isFor(shardId)) {
@@ -294,15 +289,14 @@ AsyncRequestsSender::Request buildDatabaseVersionedRequest(
 
 }  // namespace
 
-std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
-    const std::set<ShardId>& shardIds,
-    const BSONObj& cmdObj,
-    bool eligibleForSampling) {
+std::vector<AsyncRequestsSender::Request> buildVersionedRequests(OperationContext* opCtx,
+                                                                 const NamespaceString& nss,
+                                                                 const CollectionRoutingInfo& cri,
+                                                                 const std::set<ShardId>& shardIds,
+                                                                 const BSONObj& cmdObj,
+                                                                 bool eligibleForSampling) {
     if (cri.hasRoutingTable()) {
-        return buildShardVersionedRequests(expCtx, nss, cri, shardIds, cmdObj, eligibleForSampling);
+        return buildShardVersionedRequests(opCtx, nss, cri, shardIds, cmdObj, eligibleForSampling);
     }
     tassert(
         10162103,
@@ -321,7 +315,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
         shardIds.size() == 1);
 
     auto request = buildDatabaseVersionedRequest(
-        expCtx, nss, cri, *shardIds.begin(), cmdObj, eligibleForSampling);
+        opCtx, nss, cri, *shardIds.begin(), cmdObj, eligibleForSampling);
     return {std::move(request)};
 }
 
@@ -356,7 +350,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     for (const auto& shardToSkip : shardsToSkip) {
         shardIds.erase(shardToSkip);
     }
-    return buildVersionedRequests(expCtx, nss, cri, shardIds, cmdObj, eligibleForSampling);
+    return buildVersionedRequests(
+        expCtx->getOperationContext(), nss, cri, shardIds, cmdObj, eligibleForSampling);
 }
 
 std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
@@ -686,6 +681,32 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
 
     return gatherResponsesImpl(opCtx,
                                nss.dbName(),
+                               nss,
+                               readPref,
+                               retryPolicy,
+                               requests,
+                               false /* throwOnStaleShardVersionErrors */,
+                               &routingCtx);
+}
+
+[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetToShards(
+    OperationContext* opCtx,
+    RoutingContext& routingCtx,
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const std::set<ShardId>& shards,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    bool eligibleForSampling) {
+    auto cri = routingCtx.getCollectionRoutingInfo(nss);
+    const auto requests =
+        buildVersionedRequests(opCtx, nss, cri, shards, cmdObj, eligibleForSampling);
+    // Ensure we have exactly one request per target shard
+    invariant(requests.size() == shards.size());
+
+    return gatherResponsesImpl(opCtx,
+                               dbName,
                                nss,
                                readPref,
                                retryPolicy,

@@ -680,7 +680,7 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
         opCtx, {nss}, [&](RoutingContext& routingCtx) {
             const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-            auto requests = buildVersionedRequests(expCtx, nss, cri, {shardId}, request.toBSON());
+            auto requests = buildVersionedRequests(opCtx, nss, cri, {shardId}, request.toBSON());
             auto cursors = establishCursors(opCtx,
                                             expCtx->getMongoProcessInterface()->taskExecutor,
                                             nss,
@@ -1010,7 +1010,7 @@ std::vector<AsyncRequestsSender::Request> buildShardRequests(
                 "Aggregations on a real namespace should use the routing table to target "
                 "shards, and should participate in the shard version protocol",
                 cri);
-        requests = buildVersionedRequests(expCtx,
+        requests = buildVersionedRequests(expCtx->getOperationContext(),
                                           expCtx->getNamespaceString(),
                                           *cri,
                                           shardIds,

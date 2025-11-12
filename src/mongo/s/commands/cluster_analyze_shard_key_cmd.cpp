@@ -87,10 +87,15 @@ public:
             uassertStatusOK(validateNamespace(nss));
 
             sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
-            return router.route(
+            return router.routeWithRoutingContext(
                 opCtx,
                 Request::kCommandName,
-                [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                    auto cri = routingCtx.getCollectionRoutingInfo(nss);
+                    uassert(ErrorCodes::IllegalOperation,
+                            "Cannot analyze a shard key for a collection in a fixed database",
+                            !cri.getDbVersion().isFixed());
+
                     auto primaryShardId = cri.getDbPrimaryShardId();
 
                     std::set<ShardId> candidateShardIds;
@@ -138,28 +143,21 @@ public:
                         }();
                         candidateShardIds.erase(shardId);
 
-                        uassert(ErrorCodes::IllegalOperation,
-                                "Cannot analyze a shard key for a collection in a fixed database",
-                                !cri.getDbVersion().isFixed());
-
-                        auto expCtx = makeExpressionContextWithDefaultsForTargeter(
-                            opCtx, nss, cri, BSONObj(), boost::none, boost::none, boost::none);
-                        // Execute the command against the shard.
-                        auto requests =
-                            buildVersionedRequests(expCtx, nss, cri, {shardId}, unversionedCmdObj);
-                        invariant(requests.size() == 1);
-
                         ReadPreferenceSetting readPref = request().getReadPreference().value_or(
                             ReadPreferenceSetting(ReadPreference::SecondaryPreferred));
 
                         try {
-                            auto response = gatherResponses(opCtx,
-                                                            DatabaseName::kAdmin,
-                                                            nss,
-                                                            std::move(readPref),
-                                                            Shard::RetryPolicy::kIdempotent,
-                                                            requests)
+                            auto response = scatterGatherVersionedTargetToShards(
+                                                opCtx,
+                                                routingCtx,
+                                                DatabaseName::kAdmin,
+                                                nss,
+                                                {shardId},
+                                                unversionedCmdObj,
+                                                readPref,
+                                                Shard::RetryPolicy::kIdempotent)
                                                 .front();
+
                             uassertStatusOK(
                                 AsyncRequestsSender::Response::getEffectiveStatus(response));
                             return AnalyzeShardKeyResponse::parse(
