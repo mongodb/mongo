@@ -29,8 +29,14 @@ assert.commandWorked(primaryDb().createCollection(collName, {timeseries: {timeFi
 assert.commandWorked(
     primaryDb().runCommand({
         collMod: collName,
-        timeseriesBucketsMayHaveMixedSchemaData: true,
         timeseries: {bucketMaxSpanSeconds: 5400, bucketRoundingSeconds: 5400},
+    }),
+);
+
+assert.commandWorked(
+    primaryDb().runCommand({
+        collMod: collName,
+        timeseriesBucketsMayHaveMixedSchemaData: true,
     }),
 );
 
