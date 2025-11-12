@@ -130,15 +130,28 @@ def is_submodule_usage(decl_mod: str, *, usage_mod: str) -> bool:
 
 
 def get_paths(timer: Timer):
-    proc = subprocess.run(
-        ["bazel", "build", "--config=mod-scanner", "//src/mongo/..."],
-        text=True,  # unnecessary since we don't use stdout, but makes the types match
-        cwd=REPO_ROOT,
-        check=False,
-    )
+    # Retry the bazel build up to 3 times to handle transient failures
+    max_retries = 3
+
+    for attempt in range(1, max_retries + 1):
+        print(f"Bazel build attempt {attempt}/{max_retries}...")
+        proc = subprocess.run(
+            ["bazel", "build", "--config=mod-scanner", "//src/mongo/..."],
+            text=True,  # unnecessary since we don't use stdout, but makes the types match
+            cwd=REPO_ROOT,
+            check=False,
+        )
+
+        if proc.returncode == 0:
+            break
+
+        if attempt < max_retries:
+            print(f"Bazel build failed with exit code {proc.returncode}, " f"retrying...")
+        else:
+            print(f"Bazel build failed after {max_retries} attempts")
+            sys.exit(proc.returncode)
+
     timer.mark("scanned sources")
-    if proc.returncode != 0:
-        sys.exit(proc.returncode)
 
     proc = subprocess.run(
         [
