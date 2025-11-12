@@ -146,14 +146,9 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
     if (evict->eviction_updates_trigger < DBL_EPSILON) {
         WT_CONFIG_DEBUG(session,
           "config eviction_updates_trigger (%f) cannot be zero. Setting "
-          "to 50%% (attached) or 100%% (disagg) of eviction_dirty_trigger (%f).",
-          evict->eviction_updates_trigger, evict->eviction_dirty_trigger);
-
-        if (__wt_conn_is_disagg(session)) {
-            evict->eviction_updates_trigger = evict->eviction_dirty_trigger;
-        } else {
-            evict->eviction_updates_trigger = evict->eviction_dirty_trigger / 2;
-        }
+          "to 50%% of eviction_dirty_trigger (%f).",
+          evict->eviction_updates_trigger, evict->eviction_dirty_trigger / 2);
+        evict->eviction_updates_trigger = evict->eviction_dirty_trigger / 2;
     }
 
     /* Don't allow the trigger to be larger than the overall trigger. */

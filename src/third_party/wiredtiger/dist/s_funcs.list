@@ -40,6 +40,7 @@ __wt_decode_positive_as_signed
 __wt_encode_signed_as_positive
 __wt_futex_wait
 __wt_futex_wake
+__wt_get_verbose_categories
 __wt_lex_compare
 __wt_lex_compare_skip
 __wt_log_scan
@@ -51,6 +52,7 @@ __wt_session_breakpoint
 __wt_strcat
 __wt_stream_set_no_buffer
 __wt_try_readlock
+__wt_verbose_category_string
 populate_thread
 wiredtiger_calc_modify
 wiredtiger_config_parser_open

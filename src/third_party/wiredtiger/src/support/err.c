@@ -985,3 +985,15 @@ __wt_error_log_to_handler(WT_SESSION_IMPL *session)
 
     __wt_error_log_clear(); /* Avoid double reporting the same errors. */
 }
+
+/*
+ * __wt_verbose_category_string --
+ *     Return a string representation for a verbose category.
+ */
+const char *
+__wt_verbose_category_string(WT_VERBOSE_CATEGORY category)
+{
+    WT_ASSERT(NULL, category < WT_VERB_NUM_CATEGORIES);
+
+    return (category < WT_VERB_NUM_CATEGORIES) ? verbose_category_strings[category] : "unknown";
+}

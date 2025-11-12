@@ -812,10 +812,9 @@ connection_runtime_config = [
         trigger application threads to perform eviction when the cache contains at least this
         many bytes of updates. It is a percentage of the cache size if the value is within
         the range of 1 to 100 or an absolute size when greater than 100\. Calculated as half
-        of \c eviction_dirty_trigger by default in attached storage or equal in disaggregated
-        storage. The value is not allowed to exceed the \c cache_size and has to be greater than
-        its counterpart \c eviction_updates_target. This setting only alters behavior if it is
-        lower than \c eviction_trigger''',
+        of \c eviction_dirty_trigger by default. The value is not allowed to exceed the \c
+        cache_size and has to be greater than its counterpart \c eviction_updates_target. This
+        setting only alters behavior if it is lower than \c eviction_trigger''',
         min=0, max='10TB'),
     Config('extra_diagnostics', '[]', r'''
         enable additional diagnostics in WiredTiger. These additional diagnostics include
@@ -968,7 +967,7 @@ connection_runtime_config = [
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'commit_transaction_slow',
         'compact_slow', 'conn_close_stress_log_printf', 'evict_reposition',
         'failpoint_eviction_split', 'failpoint_history_store_delete_key_from_ts',
-        'failpoint_rec_before_wrapup', 'failpoint_rec_split_write', 
+        'failpoint_rec_before_wrapup', 'failpoint_rec_split_write',
         'history_store_checkpoint_delay', 'history_store_search',
         'history_store_sweep_race', 'live_restore_clean_up', 'open_index_slow', 'prefetch_1',
         'prefetch_2', 'prefetch_3', 'prefix_compare', 'prepare_checkpoint_delay',
@@ -998,6 +997,7 @@ connection_runtime_config = [
             'disaggregated_storage',
             'error_returns',
             'eviction',
+            'extension',
             'fileops',
             'generation',
             'handleops',

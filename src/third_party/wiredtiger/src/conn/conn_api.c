@@ -2342,11 +2342,11 @@ __wti_json_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 }
 
 /*
- * __wt_verbose_config --
- *     Set verbose configuration.
+ * __wt_get_verbose_categories --
+ *     Get predefined verbose categories and their names.
  */
-int
-__wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+void
+__wt_get_verbose_categories(const WT_NAME_FLAG **catp, size_t *countp)
 {
     static const WT_NAME_FLAG verbtypes[] = {{"all", WT_VERB_ALL}, {"api", WT_VERB_API},
       {"backup", WT_VERB_BACKUP}, {"block", WT_VERB_BLOCK}, {"block_cache", WT_VERB_BLKCACHE},
@@ -2356,10 +2356,10 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
       {"configuration", WT_VERB_CONFIGURATION},
       {"disaggregated_storage", WT_VERB_DISAGGREGATED_STORAGE},
       {"error_returns", WT_VERB_ERROR_RETURNS}, {"eviction", WT_VERB_EVICTION},
-      {"fileops", WT_VERB_FILEOPS}, {"generation", WT_VERB_GENERATION},
-      {"handleops", WT_VERB_HANDLEOPS}, {"history_store", WT_VERB_HS},
-      {"history_store_activity", WT_VERB_HS_ACTIVITY}, {"layered", WT_VERB_LAYERED},
-      {"live_restore", WT_VERB_LIVE_RESTORE},
+      {"extension", WT_VERB_EXTENSION}, {"fileops", WT_VERB_FILEOPS},
+      {"generation", WT_VERB_GENERATION}, {"handleops", WT_VERB_HANDLEOPS},
+      {"history_store", WT_VERB_HS}, {"history_store_activity", WT_VERB_HS_ACTIVITY},
+      {"layered", WT_VERB_LAYERED}, {"live_restore", WT_VERB_LIVE_RESTORE},
       {"live_restore_progress", WT_VERB_LIVE_RESTORE_PROGRESS}, {"log", WT_VERB_LOG},
       {"metadata", WT_VERB_METADATA}, {"mutex", WT_VERB_MUTEX}, {"prefetch", WT_VERB_PREFETCH},
       {"out_of_order", WT_VERB_OUT_OF_ORDER}, {"overflow", WT_VERB_OVERFLOW},
@@ -2371,10 +2371,25 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
       {"tiered", WT_VERB_TIERED}, {"transaction", WT_VERB_TRANSACTION}, {"verify", WT_VERB_VERIFY},
       {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE}, {NULL, 0}};
 
+    WT_ASSERT(NULL, catp != NULL);
+    *catp = verbtypes;
+
+    if (countp != NULL)
+        *countp = (sizeof(verbtypes) / sizeof(verbtypes[0])) - 1;
+}
+
+/*
+ * __wt_verbose_config --
+ *     Set verbose configuration.
+ */
+int
+__wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+{
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
+    const WT_NAME_FLAG *verbtypes;
     WT_VERBOSE_LEVEL verbosity_all;
 
     conn = S2C(session);
@@ -2388,6 +2403,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     WT_RET(ret);
 
     WT_RET(__wt_config_gets(session, cfg, "verbose", &cval));
+    __wt_get_verbose_categories(&verbtypes, NULL);
 
     /*
      * Special handling for "all". This determines the verbosity for any categories not explicitly

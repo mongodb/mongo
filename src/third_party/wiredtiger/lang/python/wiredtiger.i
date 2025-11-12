@@ -429,6 +429,32 @@ from packing import pack, unpack
 	$result = PyLong_FromUnsignedLongLong($1);
 }
 
+/*
+ * Typemaps for __wt_get_verbose_categories
+ */
+%typemap(in, numinputs=0) (const WT_NAME_FLAG **catp, size_t *countp) (const WT_NAME_FLAG *temp_cats, size_t temp_count) {
+    $1 = &temp_cats;
+    $2 = &temp_count;
+}
+
+%typemap(argout) (const WT_NAME_FLAG **catp, size_t *countp) {
+	/*
+	 * $1 refers to the temp_cats
+	 * $2 refers to the temp_count
+	 */
+	$result = PyList_New(*$2);
+	for (size_t i = 0; i < *$2; i++) {
+		PyObject *tuple = PyTuple_New(2);
+		PyTuple_SetItem(tuple, 0, PyUnicode_FromString((*$1)[i].name));
+		PyTuple_SetItem(tuple, 1, PyUnicode_FromString(__wt_verbose_category_string((*$1)[i].flag)));
+		PyList_SetItem($result, i, tuple);
+	}
+}
+
+%rename(wiredtiger_get_verbose_categories) __wt_get_verbose_categories;
+void
+__wt_get_verbose_categories(const WT_NAME_FLAG **catp, size_t *countp);
+
 /* Internal _set_key, _set_value methods take a 'bytes' object as parameter. */
 %pybuffer_binary(unsigned char *data, int);
 
@@ -586,7 +612,6 @@ def wiredtiger_calc_modify_string(session, oldv, newv, maxdiff, nmod):
 
 def wiredtiger_dump_error_log(callback=None):
 	return _wiredtiger_dump_error_log(callback)
-
 %}
 
 /* Bail out if arg or arg.this is None, else set res to the C pointer. */

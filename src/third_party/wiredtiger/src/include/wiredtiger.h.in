@@ -2346,10 +2346,10 @@ struct __wt_connection {
      * @config{eviction_updates_trigger, trigger application threads to perform eviction when the
      * cache contains at least this many bytes of updates.  It is a percentage of the cache size if
      * the value is within the range of 1 to 100 or an absolute size when greater than 100\.
-     * Calculated as half of \c eviction_dirty_trigger by default in attached storage or equal in
-     * disaggregated storage.  The value is not allowed to exceed the \c cache_size and has to be
-     * greater than its counterpart \c eviction_updates_target.  This setting only alters behavior
-     * if it is lower than \c eviction_trigger., an integer between \c 0 and \c 10TB; default \c 0.}
+     * Calculated as half of \c eviction_dirty_trigger by default.  The value is not allowed to
+     * exceed the \c cache_size and has to be greater than its counterpart \c
+     * eviction_updates_target.  This setting only alters behavior if it is lower than \c
+     * eviction_trigger., an integer between \c 0 and \c 10TB; default \c 0.}
      * @config{extra_diagnostics, enable additional diagnostics in WiredTiger.  These additional
      * diagnostics include diagnostic assertions that can cause WiredTiger to abort when an invalid
      * state is detected.  Options are given as a list\, such as
@@ -2516,13 +2516,13 @@ struct __wt_connection {
      * following options: \c "all"\, \c "api"\, \c "backup"\, \c "block"\, \c "block_cache"\, \c
      * "checkpoint"\, \c "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "chunkcache"\, \c
      * "compact"\, \c "compact_progress"\, \c "configuration"\, \c "disaggregated_storage"\, \c
-     * "error_returns"\, \c "eviction"\, \c "fileops"\, \c "generation"\, \c "handleops"\, \c
-     * "history_store"\, \c "history_store_activity"\, \c "layered"\, \c "live_restore"\, \c
-     * "live_restore_progress"\, \c "log"\, \c "metadata"\, \c "mutex"\, \c "out_of_order"\, \c
-     * "overflow"\, \c "page_delta"\, \c "prefetch"\, \c "read"\, \c "reconcile"\, \c "recovery"\,
-     * \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
-     * "sweep"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c
-     * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
+     * "error_returns"\, \c "eviction"\, \c "extension"\, \c "fileops"\, \c "generation"\, \c
+     * "handleops"\, \c "history_store"\, \c "history_store_activity"\, \c "layered"\, \c
+     * "live_restore"\, \c "live_restore_progress"\, \c "log"\, \c "metadata"\, \c "mutex"\, \c
+     * "out_of_order"\, \c "overflow"\, \c "page_delta"\, \c "prefetch"\, \c "read"\, \c
+     * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c
+     * "shared_cache"\, \c "split"\, \c "sweep"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\,
+     * \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
      * @configend
      * @errors
      */
@@ -3264,10 +3264,10 @@ struct __wt_connection {
  * @config{eviction_updates_trigger, trigger application threads to perform eviction when the cache
  * contains at least this many bytes of updates.  It is a percentage of the cache size if the value
  * is within the range of 1 to 100 or an absolute size when greater than 100\. Calculated as half of
- * \c eviction_dirty_trigger by default in attached storage or equal in disaggregated storage.  The
- * value is not allowed to exceed the \c cache_size and has to be greater than its counterpart \c
- * eviction_updates_target.  This setting only alters behavior if it is lower than \c
- * eviction_trigger., an integer between \c 0 and \c 10TB; default \c 0.}
+ * \c eviction_dirty_trigger by default.  The value is not allowed to exceed the \c cache_size and
+ * has to be greater than its counterpart \c eviction_updates_target.  This setting only alters
+ * behavior if it is lower than \c eviction_trigger., an integer between \c 0 and \c 10TB; default
+ * \c 0.}
  * @config{exclusive, fail if the database already exists\, generally used with the \c create
  * option., a boolean flag; default \c false.}
  * @config{extensions, list of shared library extensions to load (using dlopen). Any values
@@ -3533,13 +3533,13 @@ struct __wt_connection {
  * "all"\, \c "api"\, \c "backup"\, \c "block"\, \c "block_cache"\, \c "checkpoint"\, \c
  * "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "chunkcache"\, \c "compact"\, \c
  * "compact_progress"\, \c "configuration"\, \c "disaggregated_storage"\, \c "error_returns"\, \c
- * "eviction"\, \c "fileops"\, \c "generation"\, \c "handleops"\, \c "history_store"\, \c
- * "history_store_activity"\, \c "layered"\, \c "live_restore"\, \c "live_restore_progress"\, \c
- * "log"\, \c "metadata"\, \c "mutex"\, \c "out_of_order"\, \c "overflow"\, \c "page_delta"\, \c
- * "prefetch"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c
- * "salvage"\, \c "shared_cache"\, \c "split"\, \c "sweep"\, \c "temporary"\, \c "thread_group"\, \c
- * "tiered"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
- * \c [].}
+ * "eviction"\, \c "extension"\, \c "fileops"\, \c "generation"\, \c "handleops"\, \c
+ * "history_store"\, \c "history_store_activity"\, \c "layered"\, \c "live_restore"\, \c
+ * "live_restore_progress"\, \c "log"\, \c "metadata"\, \c "mutex"\, \c "out_of_order"\, \c
+ * "overflow"\, \c "page_delta"\, \c "prefetch"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c
+ * "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "sweep"\, \c
+ * "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c "verify"\,
+ * \c "version"\, \c "write"; default \c [].}
  * @config{verify_metadata, open connection and verify any WiredTiger metadata.  Not supported when
  * opening a connection from a backup.  This API allows verification and detection of corruption in
  * WiredTiger metadata., a boolean flag; default \c false.}

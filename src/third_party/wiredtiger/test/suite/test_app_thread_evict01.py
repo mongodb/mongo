@@ -69,8 +69,8 @@ class test_app_thread_evict01(wttest.WiredTigerTestCase):
             # and on the second insert the app thread is pulled into eviction since
             # trigger levels are exceeded.
             self.session.begin_transaction()
-            cursor[100001] = 'a' * 40 * 1024 * 1024
-            cursor[100002] = 'a' * 40 * 1024 * 1024
+            cursor[100001] = 'a' * 20 * 1024 * 1024
+            cursor[100002] = 'a' * 20 * 1024 * 1024
             self.session.commit_transaction()
 
             num_app_evict_snapshot_refreshed = self.get_stat(wiredtiger.stat.conn.application_evict_snapshot_refreshed)

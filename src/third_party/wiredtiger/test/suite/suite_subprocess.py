@@ -236,6 +236,19 @@ class suite_subprocess:
         if 'timestamp' in self.hook_names and args[0] == 'load':
             self.skipTest("the load utility cannot be run when timestamps are already set")
 
+        # If disagg and verify, change table and file URIs to layered
+        if 'disagg' in self.hook_names and 'verify' in args:
+            args = [
+                re.sub(r'''             # Raw string with extended regex
+                       ^                # Line beginning
+                       (?:table|file):  # "table:" or "file:" prefix, non-capturing
+                       (.*?)            # Non-greedy capture of the name
+                       (?:\.wt)?        # Optional ".wt" suffix, non-capturing. Must be stripped out when using layered URI
+                       $                # Line end
+                       ''', r'layered:\1', a, flags=re.X)
+                for a in args
+            ]
+
         # Close the connection to guarantee everything is flushed, and that
         # we can open it from another process.
         if closeconn:

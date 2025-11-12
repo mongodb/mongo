@@ -50,50 +50,21 @@ class test_verbose04(test_verbose_base):
     collection_cfg = 'key_format=S,value_format=S'
 
     # Define all the verbose flags.
-    all_verbose_categories = [
-      'WT_VERB_API',
-      'WT_VERB_BACKUP',
-      'WT_VERB_BLOCK',
-      'WT_VERB_BLKCACHE',
-      'WT_VERB_CHECKPOINT',
-      'WT_VERB_CHECKPOINT_CLEANUP',
-      'WT_VERB_CHECKPOINT_PROGRESS',
-      'WT_VERB_CHUNKCACHE',
-      'WT_VERB_COMPACT',
-      'WT_VERB_COMPACT_PROGRESS',
-      'WT_VERB_CONFIGURATION',
-      'WT_VERB_ERROR_RETURNS',
-      'WT_VERB_EVICTION',
-      'WT_VERB_FILEOPS',
-      'WT_VERB_GENERATION',
-      'WT_VERB_HANDLEOPS',
-      'WT_VERB_LOG',
-      'WT_VERB_HS',
-      'WT_VERB_HS_ACTIVITY',
-      'WT_VERB_METADATA',
-      'WT_VERB_MUTEX',
-      'WT_VERB_PAGE_DELTA',
-      'WT_VERB_PREFETCH',
-      'WT_VERB_OUT_OF_ORDER',
-      'WT_VERB_OVERFLOW',
-      'WT_VERB_READ',
-      'WT_VERB_RECONCILE',
-      'WT_VERB_RECOVERY',
-      'WT_VERB_RECOVERY_PROGRESS',
-      'WT_VERB_RTS',
-      'WT_VERB_SALVAGE',
-      'WT_VERB_SHARED_CACHE',
-      'WT_VERB_SPLIT',
-      'WT_VERB_SWEEP',
-      'WT_VERB_TEMPORARY',
-      'WT_VERB_THREAD_GROUP',
-      'WT_VERB_TIMESTAMP',
-      'WT_VERB_TIERED',
-      'WT_VERB_TRANSACTION',
-      'WT_VERB_VERIFY',
-      'WT_VERB_VERSION',
-      'WT_VERB_WRITE',
-    ]
+    all_verbose_categories = [category[1] for category in
+                              wiredtiger.wiredtiger_get_verbose_categories()]
+
+    def test_verbose_categories(self):
+        # Verify that all categories are correctly retrieved.
+        categories = wiredtiger.wiredtiger_get_verbose_categories()
+        # WT_VERB_DEFAULT is not returned as a category, therefore we subtract 1 from the total count.
+        self.assertEqual(len(categories), wiredtiger.WT_VERB_NUM_CATEGORIES - 1)
+
+        # Verify that the category names match the WT_VERB_... attributes in the wiredtiger module.
+        wt_verb_attrs = {attr for attr in dir(wiredtiger)
+                         if attr.startswith('WT_VERB_') and
+                            attr not in {'WT_VERB_DEFAULT', 'WT_VERB_NUM_CATEGORIES'}}
+        category_names = {category[1] for category in categories}
+        self.assertEqual(category_names, wt_verb_attrs)
 
     # Enable all categories at once.
     def test_verbose_all(self):

@@ -15,8 +15,6 @@ runs.type=row-store
 runs.tables=3
 import=0
 ops.alter=0
-# FIXME-WT-14467 should fix cursor->modify for layered tables.
-ops.pct.modify=0
 ops.compaction=0
 ops.salvage=0
 ops.throttle=0
