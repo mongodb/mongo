@@ -41,6 +41,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/test_harness_helper.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <initializer_list>

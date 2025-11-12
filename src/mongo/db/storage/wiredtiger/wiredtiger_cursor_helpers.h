@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/modules.h"
 
 #include <wiredtiger.h>
 

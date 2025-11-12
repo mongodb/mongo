@@ -38,6 +38,7 @@
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>

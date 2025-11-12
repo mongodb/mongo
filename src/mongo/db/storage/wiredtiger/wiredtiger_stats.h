@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/storage_stats.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

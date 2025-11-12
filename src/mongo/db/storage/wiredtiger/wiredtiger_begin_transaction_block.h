@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/modules.h"
 
 #include <wiredtiger.h>
 

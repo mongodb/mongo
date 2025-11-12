@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>

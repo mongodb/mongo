@@ -33,6 +33,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/test_harness_helper.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>

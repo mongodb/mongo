@@ -31,6 +31,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

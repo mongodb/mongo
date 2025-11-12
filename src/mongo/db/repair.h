@@ -34,6 +34,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <string>
