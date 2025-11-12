@@ -241,7 +241,9 @@ std::vector<Interval> getMultikeyPathIndexIntervalsForField(FieldRef field) {
 
     if (hasNumericPathComponent) {
         pointIntervalPrefixParts = *numericPathComponents.begin();
-        invariant(pointIntervalPrefixParts > 0);
+        tassert(11321104,
+                "pointIntervalPrefixParts must be greater than 0",
+                pointIntervalPrefixParts > 0);
     }
 
     constexpr bool inclusive = true;

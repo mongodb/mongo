@@ -212,9 +212,15 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const MultikeyComponents
     // We iterate over the power set of array index positions to generate all necessary paths.
     // The algorithm is unavoidably O(n2^n), but we enforce that 'n' is never more than single
     // digits during the planner's index selection phase.
+    constexpr auto kMaxPotentialArrayIndicesSize =
+        std::min(kWildcardMaxArrayIndexTraversalDepth + 1, sizeof(size_t) * 8u);
     const auto potentialArrayIndices = findArrayIndexPathComponents(multikeyPaths, queryPath);
-    invariant(potentialArrayIndices.size() <= kWildcardMaxArrayIndexTraversalDepth);
-    invariant(potentialArrayIndices.size() < sizeof(size_t) * 8u);
+    tassert(
+        11321100,
+        fmt::format("The size of 'potentialArrayIndices' must not exceed {}, but found {} elements",
+                    kMaxPotentialArrayIndicesSize,
+                    potentialArrayIndices.size()),
+        potentialArrayIndices.size() < kMaxPotentialArrayIndicesSize);
     // We iterate over every value [0..2^n), where 'n' is the size of 'potentialArrayIndices',
     // treating each value as a 'bitMask' of 'n' bits. Each bit in 'bitMask' represents the
     // entry at the equivalent position in the 'potentialArrayIndices' vector. When a given bit
@@ -351,7 +357,11 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
         includedPaths.begin(), includedPaths.end(), [&queryPath](const auto& includedPath) {
             return includedPath.isPrefixOfOrEqualTo(queryPath);
         });
-    invariant(std::next(includePath) == includedPaths.end() || *std::next(includePath) > queryPath);
+    tassert(11321101,
+            fmt::format("Expected includePath='{}' to be greater than queryPath='{}'",
+                        includePath->dottedField(),
+                        queryPath.dottedField()),
+            std::next(includePath) == includedPaths.end() || *std::next(includePath) > queryPath);
 
     // If the projectedPath responsible for including this queryPath prefixes it up to and including
     // the numerical array index field, then the queryPath lies along a projection through the array
@@ -558,7 +568,12 @@ void finalizeWildcardIndexScanConfiguration(
     IndexBounds* bounds = &scan->bounds;
 
     // We should only ever reach this point when processing a $** index. Sanity check the arguments.
-    invariant(index && index->type == IndexType::INDEX_WILDCARD);
+    tassert(11321102, "index must not be null", index);
+    tassert(11052103,
+            fmt::format("Expected the index type to be INDEX_WILDCARD for {} but found {}",
+                        index->identifier.toString(),
+                        static_cast<int>(index->type)),
+            index->type == IndexType::INDEX_WILDCARD);
 
     // For $** indexes, the IndexEntry key pattern is {..., 'path.to.field': 1, ...} but the actual
     // keys in the index are of the form {..., '$_path': 1, 'path.to.field': 1, ...}, where the
