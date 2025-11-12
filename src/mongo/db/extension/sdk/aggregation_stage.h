@@ -439,6 +439,16 @@ public:
         return nullptr;
     }
 
+    virtual void open() = 0;
+
+    virtual void reopen() = 0;
+
+    virtual void close() = 0;
+
+    virtual void attach(::MongoExtensionOpCtx* ctx) = 0;
+
+    virtual void detach() = 0;
+
 protected:
     ExecAggStage(std::string_view name) : _name(name) {}
 
@@ -563,12 +573,42 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {
-        .destroy = &_extDestroy,
-        .get_next = &_extGetNext,
-        .get_name = &_extGetName,
-        .create_metrics = &_extCreateMetrics,
-    };
+    static ::MongoExtensionStatus* _extOpen(::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().open(); });
+    }
+
+    static ::MongoExtensionStatus* _extReopen(::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().reopen(); });
+    }
+
+    static ::MongoExtensionStatus* _extClose(::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().close(); });
+    }
+
+    static ::MongoExtensionStatus* _extAttach(::MongoExtensionExecAggStage* execAggStage,
+                                              ::MongoExtensionOpCtx* ctx) noexcept {
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().attach(ctx); });
+    }
+
+    static ::MongoExtensionStatus* _extDetach(::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().detach(); });
+    }
+
+    static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {.destroy = &_extDestroy,
+                                                                  .get_next = &_extGetNext,
+                                                                  .get_name = &_extGetName,
+                                                                  .create_metrics =
+                                                                      &_extCreateMetrics,
+                                                                  .open = &_extOpen,
+                                                                  .reopen = &_extReopen,
+                                                                  .close = &_extClose,
+                                                                  .attach = &_extAttach,
+                                                                  .detach = &_extDetach};
     std::unique_ptr<ExecAggStage> _execAggStage;
 };
 

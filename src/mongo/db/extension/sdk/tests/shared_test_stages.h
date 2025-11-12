@@ -61,6 +61,16 @@ public:
                                    const MongoExtensionExecAggStage* execStage) override {
         return ExtensionGetNextResult::pauseExecution();
     }
+
+    void open() override {}
+
+    void reopen() override {}
+
+    void close() override {}
+
+    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
+
+    void detach() override {}
 };
 
 class NoOpLogicalAggStage : public sdk::LogicalAggStage {
@@ -153,6 +163,16 @@ public:
         }
         return ExtensionGetNextResult::advanced(_documents[_currentIndex++]);
     }
+
+    void open() override {}
+
+    void reopen() override {}
+
+    void close() override {}
+
+    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
+
+    void detach() override {}
 
 private:
     // Every SourceExecAggStage object will have access to the same test document suite.
@@ -930,6 +950,16 @@ public:
         }
     }
 
+    void open() override {}
+
+    void reopen() override {}
+
+    void close() override {}
+
+    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
+
+    void detach() override {}
+
     static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
         return std::make_unique<ValidExtensionExecAggStage>();
     }
@@ -967,6 +997,16 @@ public:
                                    const MongoExtensionExecAggStage* execStage) override {
         MONGO_UNIMPLEMENTED;
     }
+
+    void open() override {}
+
+    void reopen() override {}
+
+    void close() override {}
+
+    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
+
+    void detach() override {}
 
     static inline std::unique_ptr<sdk::ExecAggStage> make() {
         return std::unique_ptr<sdk::ExecAggStage>(new NoOpExtensionExecAggStage());

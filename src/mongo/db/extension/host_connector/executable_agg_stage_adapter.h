@@ -103,11 +103,66 @@ private:
         });
     }
 
+    /**
+     * The following lifecycle functions are unreachable because HostExecAggStageAdapter only wraps
+     * host stages to forward getNext() results to extension stages. These functions are currently
+     * only implemented for SBE stages, but in the near term, we may implement this functionality in
+     * agg::Stage. In the long term, HostExecAggStageAdapter will need to be adapted to accommodate
+     * these changes.
+     */
+    static ::MongoExtensionStatus* _hostOpen(::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(11216700,
+                      "_hostOpen should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    }
+
+    static ::MongoExtensionStatus* _hostReopen(
+        ::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(11216701,
+                      "_hostReopen should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    }
+
+    static ::MongoExtensionStatus* _hostClose(::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(11216702,
+                      "_hostClose should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    }
+
+    static ::MongoExtensionStatus* _hostAttach(::MongoExtensionExecAggStage* execAggStage,
+                                               ::MongoExtensionOpCtx* ctx) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(11216703,
+                      "_hostAttach should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    }
+
+    static ::MongoExtensionStatus* _hostDetach(
+        ::MongoExtensionExecAggStage* execAggStage) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(11216704,
+                      "_hostDetach should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    }
+
     static constexpr ::MongoExtensionExecAggStageVTable VTABLE{.destroy = &_hostDestroy,
                                                                .get_next = &_hostGetNext,
                                                                .get_name = &_hostGetName,
                                                                .create_metrics =
-                                                                   &_hostCreateMetrics};
+                                                                   &_hostCreateMetrics,
+                                                               .open = &_hostOpen,
+                                                               .reopen = &_hostReopen,
+                                                               .close = &_hostClose,
+                                                               .attach = &_hostAttach,
+                                                               .detach = &_hostDetach};
 
     std::unique_ptr<host::ExecAggStage> _execAggStage;
 };

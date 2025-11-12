@@ -543,6 +543,14 @@ typedef struct MongoExtensionGetNextResult {
 } MongoExtensionGetNextResult;
 
 /**
+ * MongoExtensionOpCtx represents an OperationContext that can be attached to an execution stage.
+ * The vtable is a placeholder for now but will be properly implemented in the future.
+ */
+typedef struct MongoExtensionOpCtx {
+    void* const vtable;
+} MongoExtensionOpCtx;
+
+/**
  * MongoExtensionExecAggStage is the abstraction representing the executable phase of
  * a stage by the extension.
  */
@@ -585,6 +593,41 @@ typedef struct MongoExtensionExecAggStageVTable {
     MongoExtensionStatus* (*create_metrics)(const MongoExtensionExecAggStage* execAggStage,
                                             MongoExtensionOperationMetrics** metrics);
 
+    /**
+     * Initializes the stage and positions it before the first result.
+     * Resources should be acquired during open() and avoided in getNext() for better
+     * performance.
+     */
+    MongoExtensionStatus* (*open)(MongoExtensionExecAggStage* execAggStage);
+
+    /**
+     * Reinitializes acquired resources. Semantically equivalent to close() + open(), but more
+     * efficient.
+     */
+    MongoExtensionStatus* (*reopen)(MongoExtensionExecAggStage* execAggStage);
+
+    /**
+     * Frees all acquired resources.
+     */
+    MongoExtensionStatus* (*close)(MongoExtensionExecAggStage* execAggStage);
+
+    /**
+     * Attaches an OperationContext to the execution stage. The OperationContext is guaranteed to be
+     * valid until detach() is called.
+     *
+     * This function is added here to future-proof the API. A no-op implementation must be provided
+     * for the time being.
+     */
+    MongoExtensionStatus* (*attach)(MongoExtensionExecAggStage* execAggStage,
+                                    MongoExtensionOpCtx* ctx);
+
+    /**
+     * Detaches an OperationContext from the execution stage.
+     *
+     * This function is added here to future-proof the API. A no-op implementation must be provided
+     * for the time being.
+     */
+    MongoExtensionStatus* (*detach)(MongoExtensionExecAggStage* execAggStage);
 } MongoExtensionExecAggStageVTable;
 
 /**
