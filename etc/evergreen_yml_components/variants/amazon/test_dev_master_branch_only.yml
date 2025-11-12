@@ -446,8 +446,8 @@ buildvariants:
     # here should be duplicated to
     # enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only.
     tasks: &query-alias-task-list
-      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
-      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags !.uwe
+      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags !.uwe
         distros:
           - amazon2023-arm64-atlas-latest-m8g-4xlarge
       - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
@@ -534,8 +534,8 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive
     # This set of tasks is duplicated from amazon_linux2023_arm64_static-classic-engine-query-patch-only.
     tasks:
-      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
-      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.uwe
+      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.uwe
         distros:
           - amazon2023-arm64-atlas-latest-m8g-4xlarge
       - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
@@ -612,34 +612,7 @@ buildvariants:
       - name: run_unit_tests_TG
         distros:
           - amazon2023-arm64-latest-large
-      - name: unified_write_executor
-      - name: unified_write_executor_sharding
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_gen
-      - name: unified_write_executor_sharded_jscore_txns
-      - name: unified_write_executor_sharded_jscore_txns_sharded_collections
-      - name: unified_write_executor_sharded_jscore_txns_without_snapshot
-      - name: unified_write_executor_multi_shard_multi_stmt_txn_jscore_passthrough_gen
-      - name: unified_write_executor_multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-      - name: unified_write_executor_concurrency_sharded_causal_consistency_gen
-      - name: unified_write_executor_concurrency_sharded_causal_consistency_and_balancer_gen
-      - name: unified_write_executor_sharded_causally_consistent_jscore_passthrough_gen
-      - name: unified_write_executor_sharded_causally_consistent_jscore_txns_passthrough_gen
-      - name: unified_write_executor_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
-      - name: unified_write_executor_sharded_multi_stmt_txn_jscore_passthrough
-      - name: unified_write_executor_bulk_write_multi_op_sharded_collections_jscore_passthrough
-      - name: unified_write_executor_bulk_write_sharded_causally_consistent_jscore_passthrough
-      - name: unified_write_executor_bulk_write_sharded_collections_jscore_passthrough
-      - name: unified_write_executor_bulk_write_sharded_multi_stmt_txn_jscore_passthrough
-      - name: unified_write_executor_concurrency_sharded_replication_gen
-      - name: unified_write_executor_concurrency_sharded_replication_with_balancer_gen
-      - name: unified_write_executor_sharded_collections_jscore_passthrough_gen
-      - name: unified_write_executor_sharding_jscore_passthrough_gen
-      - name: unified_write_executor_sharding_jscore_passthrough_with_balancer_gen
-      - name: unified_write_executor_fle2_sharding
-      - name: unified_write_executor_fle2_sharding_high_cardinality
-      - name: burn_in_tests_gen
+      - name: .uwe
         depends_on:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version

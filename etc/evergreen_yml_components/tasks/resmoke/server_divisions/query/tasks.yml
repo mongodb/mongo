@@ -1659,6 +1659,7 @@ tasks:
         "assigned_to_jira_team_server_query_execution",
         "experimental",
         requires_large_host,
+        "uwe",
       ]
     commands:
       - func: "do setup"
@@ -1671,6 +1672,7 @@ tasks:
         "assigned_to_jira_team_server_query_execution",
         "experimental",
         requires_large_host,
+        "uwe",
       ]
     commands:
       - func: "do setup"
@@ -1678,21 +1680,24 @@ tasks:
 
   - <<: *task_template
     name: unified_write_executor_sharded_jscore_txns
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_sharded_jscore_txns_sharded_collections
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_sharded_jscore_txns_without_snapshot
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -1702,7 +1707,8 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_multi_shard_multi_stmt_txn_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1711,7 +1717,8 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1720,7 +1727,8 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1729,7 +1737,8 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1738,7 +1747,8 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1747,7 +1757,8 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_concurrency_sharded_causal_consistency_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1756,7 +1767,8 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_concurrency_sharded_causal_consistency_and_balancer_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1765,97 +1777,112 @@ tasks:
 
   - <<: *gen_task_template
     name: unified_write_executor_sharded_causally_consistent_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: unified_write_executor_sharded_causally_consistent_jscore_txns_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: unified_write_executor_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: unified_write_executor_concurrency_sharded_replication_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: unified_write_executor_concurrency_sharded_replication_with_balancer_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: unified_write_executor_sharded_collections_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: unified_write_executor_sharding_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: unified_write_executor_sharding_jscore_passthrough_with_balancer_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *task_template
     name: unified_write_executor_fle2_sharding
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_fle2_sharding_high_cardinality
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_bulk_write_multi_op_sharded_collections_jscore_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_sharded_multi_stmt_txn_jscore_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_bulk_write_sharded_causally_consistent_jscore_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_bulk_write_sharded_collections_jscore_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: unified_write_executor_bulk_write_sharded_multi_stmt_txn_jscore_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
     commands:
       - func: "do setup"
       - func: "run tests"
