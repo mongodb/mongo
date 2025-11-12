@@ -793,8 +793,6 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                 return IndexBuildInterceptor::Op::kInsert;
             case 'd':
                 return IndexBuildInterceptor::Op::kDelete;
-            case 'u':
-                return IndexBuildInterceptor::Op::kUpdate;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -831,7 +829,6 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
         ru.onRollback(
             [keysInserted, numInserted](OperationContext*) { *keysInserted -= numInserted; });
     } else {
-        invariant(opType == IndexBuildInterceptor::Op::kDelete);
         int64_t numDeleted;
         Status s =
             removeKeys(opCtx, ru, entry, {keySet.begin(), keySet.end()}, options, &numDeleted);

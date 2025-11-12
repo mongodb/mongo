@@ -66,7 +66,7 @@ public:
      */
     enum class DrainYieldPolicy { kNoYield, kYield };
 
-    enum class Op { kInsert, kDelete, kUpdate };
+    enum class Op { kInsert, kDelete };
 
     /**
      * Indicates whether to record duplicate keys that have been inserted into the index. When set

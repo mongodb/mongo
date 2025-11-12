@@ -503,7 +503,6 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         Op op,
                                         int64_t* const numKeysOut) {
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    invariant(op != IndexBuildInterceptor::Op::kUpdate);
 
     // Maintain parity with IndexAccessMethods handling of key counting. Only include
     // `multikeyMetadataKeys` when inserting.
