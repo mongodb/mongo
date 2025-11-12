@@ -2317,7 +2317,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/util/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/util/**/* @10gen/server-security @svc-auto-approve-bot
-/src/mongo/db/modules/enterprise/src/util/**/document_source_visitor_registry_enterprise.h @10gen/server-backup-restore @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/op_observer/OWNERS.yml
 /src/mongo/db/op_observer/**/batched_write* @10gen/server-collection-write-path @svc-auto-approve-bot

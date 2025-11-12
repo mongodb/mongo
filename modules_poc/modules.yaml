@@ -921,10 +921,10 @@ server_backup_restore:
   meta:
     slack: storage-engines-server-integration
     jira: Server Integration
+    fully_marked: true
   files:
     - src/mongo/db/modules/enterprise/src/hot_backups
     - src/mongo/db/modules/enterprise/src/live_import
-    - src/mongo/db/modules/enterprise/src/util/document_source_visitor_registry_enterprise.h
     - src/mongo/db/storage/backup*
 
 cache_pressure:

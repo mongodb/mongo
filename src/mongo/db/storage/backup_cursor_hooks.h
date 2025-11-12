@@ -34,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <functional>
@@ -44,7 +45,7 @@ class OperationContext;
 class ServiceContext;
 class StorageEngine;
 
-class BackupCursorHooks {
+class MONGO_MOD_PUBLIC BackupCursorHooks {
 public:
     using InitializerFunction = std::function<std::unique_ptr<BackupCursorHooks>()>;
 
