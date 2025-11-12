@@ -101,8 +101,8 @@ TEST(AddFieldsProjectionExecutorSpec, ThrowsOnCreationWithInvalidFieldPath) {
                   AssertionException);
 }
 
-// Verify that AddFieldsProjectionExecutor rejects specifications that contain invalid
-// expressions.
+// Verify that AddFieldsProjectionExecutor rejects specifications that contain empty objects or
+// invalid expressions.
 TEST(AddFieldsProjectionExecutorSpec, ThrowsOnCreationWithInvalidObjectsOrExpressions) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Invalid expressions should be rejected.
@@ -320,19 +320,6 @@ TEST(AddFieldsProjectionExecutorOptimize, ShouldOptimizeNestedExpressions) {
     ASSERT_DOCUMENT_EQ(expectedSerialization,
                        addition.serializeTransformation(SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
-}
-
-TEST(AddFieldsProjectionExecutor, NonEmptySpecIsNeverNoop) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_FALSE(AddFieldsProjectionExecutor::create(expCtx, BSON("a" << true))->isNoop());
-    ASSERT_FALSE(
-        AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSON("$const" << 1)))->isNoop());
-    ASSERT_FALSE(AddFieldsProjectionExecutor::create(expCtx, BSON("a.b" << true))->isNoop());
-}
-
-TEST(AddFieldsProjectionExecutor, EmptySpecResultsInNoopExecutor) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_TRUE(AddFieldsProjectionExecutor::create(expCtx, BSONObj())->isNoop());
 }
 
 //

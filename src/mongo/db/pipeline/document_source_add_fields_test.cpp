@@ -119,11 +119,6 @@ TEST_F(AddFieldsTest, ShouldOptimizeInnerExpressions) {
                       fromjson("{$addFields: {a: {$const: true}}}"));
 }
 
-TEST_F(AddFieldsTest, ShouldOptimizeAwayEmptyAddition) {
-    ASSERT_TRUE(DocumentSourceAddFields::create(BSON("a" << true), getExpCtx())->optimize());
-    ASSERT_FALSE(DocumentSourceAddFields::create(BSONObj(), getExpCtx())->optimize());
-}
-
 TEST_F(AddFieldsTest, ShouldErrorOnNonObjectSpec) {
     BSONObj spec = BSON("$addFields" << "foo");
     BSONElement specElement = spec.firstElement();
