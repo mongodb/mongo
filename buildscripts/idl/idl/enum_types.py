@@ -101,7 +101,7 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_deserializer_declaration(self):
+    def get_deserializer_declaration(self, mod_tag):
         # type: () -> str
         """Get the deserializer function declaration minus trailing semicolon."""
         pass
@@ -113,7 +113,7 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_serializer_declaration(self):
+    def get_serializer_declaration(self, mod_tag):
         # type: () -> str
         """Get the serializer function declaration minus trailing semicolon."""
         pass
@@ -129,13 +129,15 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         """Filter the enum values to just those containing extra_data."""
         return [val for val in self._enum.values if val.extra_data is not None]
 
-    def get_extra_data_declaration(self):
+    def get_extra_data_declaration(self, mod_tag):
         # type: () -> Optional[str]
         """Get the get_extra_data function declaration minus trailing semicolon."""
         if len(self._get_populated_extra_values()) == 0:
             return None
 
-        return f"BSONObj {self._get_enum_extra_data_name()}({self.get_cpp_type_name()} value)"
+        return (
+            f"{mod_tag}BSONObj {self._get_enum_extra_data_name()}({self.get_cpp_type_name()} value)"
+        )
 
     def gen_extra_data_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -163,7 +165,8 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         # Generate implementation of get_extra_data function.
         #
         enum_name = self.get_cpp_type_name()
-        function_name = self.get_extra_data_declaration()
+        # Empty mod_tag in the definition is fine, we declare modularity in the header.
+        function_name = self.get_extra_data_declaration("")
 
         with writer.IndentedScopedBlock(indented_writer, f"{function_name} {{", "}"):
             with writer.IndentedScopedBlock(indented_writer, "switch (value) {", "}"):
@@ -196,11 +199,11 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: (ast.EnumValue) -> str
         return " = %s" % (enum_value.value)
 
-    def get_deserializer_declaration(self):
+    def get_deserializer_declaration(self, mod_tag):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
         deserializer = self._get_enum_deserializer_name()
-        return f'{cpp_type} {deserializer}(std::int32_t value, const IDLParserContext& ctxt = IDLParserContext("{self.get_cpp_type_name()}"))'
+        return f'{mod_tag}{cpp_type} {deserializer}(std::int32_t value, const IDLParserContext& ctxt = IDLParserContext("{self.get_cpp_type_name()}"))'
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -224,17 +227,17 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
     }}
 }}""")
 
-    def get_serializer_declaration(self):
+    def get_serializer_declaration(self, mod_tag):
         # type: () -> str
         """Get the serializer function declaration minus trailing semicolon."""
-        return f"std::int32_t {self._get_enum_serializer_name()}({self.get_cpp_type_name()} value)"
+        return f"{mod_tag}std::int32_t {self._get_enum_serializer_name()}({self.get_cpp_type_name()} value)"
 
     def gen_serializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         """Generate the serializer function definition."""
 
         indented_writer._stream.write(f"""
-{self.get_serializer_declaration()} {{
+{self.get_serializer_declaration('')} {{
     return static_cast<std::int32_t>(value);
 }}""")
 
@@ -260,11 +263,11 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: (ast.EnumValue) -> str
         return ""
 
-    def get_deserializer_declaration(self):
+    def get_deserializer_declaration(self, mod_tag):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
         func = self._get_enum_deserializer_name()
-        return f'{cpp_type} {func}(StringData value, const IDLParserContext& ctxt = IDLParserContext("{cpp_type}"))'
+        return f'{mod_tag}{cpp_type} {func}(StringData value, const IDLParserContext& ctxt = IDLParserContext("{cpp_type}"))'
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -302,12 +305,12 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
                 [e.value for e in self._enum.values],
             )
 
-    def get_serializer_declaration(self):
+    def get_serializer_declaration(self, mod_tag):
         # type: () -> str
         """Get the serializer function declaration minus trailing semicolon."""
         cpp_type = self.get_cpp_type_name()
         func = self._get_enum_serializer_name()
-        return f"StringData {func}({cpp_type} value)"
+        return f"{mod_tag}StringData {func}({cpp_type} value)"
 
     def gen_serializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None

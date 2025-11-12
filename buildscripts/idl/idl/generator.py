@@ -913,12 +913,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Enum) -> None
         """Generate the declaration for an enum's supporting functions."""
         enum_type_info = enum_types.get_type_info(idl_enum)
+        mod_tag = make_mod_tag(idl_enum.mod_visibility)
 
-        self._writer.write_line("%s;" % (enum_type_info.get_deserializer_declaration()))
+        self._writer.write_line("%s;" % (enum_type_info.get_deserializer_declaration(mod_tag)))
 
-        self._writer.write_line("%s;" % (enum_type_info.get_serializer_declaration()))
+        self._writer.write_line("%s;" % (enum_type_info.get_serializer_declaration(mod_tag)))
 
-        extra_data_decl = enum_type_info.get_extra_data_declaration()
+        extra_data_decl = enum_type_info.get_extra_data_declaration(mod_tag)
         if extra_data_decl is not None:
             self._writer.write_line("%s;" % (extra_data_decl))
 
