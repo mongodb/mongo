@@ -72,6 +72,14 @@ feature_flags:
       version: $ver_str(last_lts)
       fcv_gated: true
 
+    featureFlagOperationFCVOnly:
+      description: "A feature flag that can be checked against an Operation FCV only"
+      cpp_varname: gFeatureFlagOperationFCVOnly
+      default: true
+      version: $ver_str(latest)
+      fcv_gated: true
+      check_against_fcv: operation_fcv_only
+
     featureFlagInDevelopmentForTest:
       description: "Incremental feature rollout flag"
       cpp_varname: gFeatureFlagInDevelopmentForTest

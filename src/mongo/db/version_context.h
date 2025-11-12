@@ -133,7 +133,7 @@ public:
     class Passkey {
     private:
         friend class VersionContextTest;
-        friend class FCVGatedFeatureFlag;
+        friend class FCVGatedFeatureFlagBase;
         friend class ShardingDDLCoordinator;
         Passkey() = default;
         ~Passkey() = default;

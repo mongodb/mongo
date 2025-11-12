@@ -33,6 +33,7 @@
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
+#include "mongo/db/version_context_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/static_immortal.h"
@@ -55,9 +56,9 @@ void BinaryCompatibleFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& fla
 }
 
 // (Generic FCV reference): Feature flag support.
-FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled,
-                                         StringData versionString,
-                                         bool enableOnTransitionalFCV)
+FCVGatedFeatureFlagBase::FCVGatedFeatureFlagBase(bool enabled,
+                                                 StringData versionString,
+                                                 bool enableOnTransitionalFCV)
     : _enabled(enabled),
       _enableOnTransitionalFCV(enableOnTransitionalFCV),
       _version(multiversion::GenericFCV::kLatest) {
@@ -82,14 +83,14 @@ FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled,
 
 // If the functionality of this function changes, make sure that the isEnabled/isPresentAndEnabled
 // functions in feature_flag_util.js also incorporate the change.
-bool FCVGatedFeatureFlag::isEnabled(const VersionContext& vCtx,
-                                    const ServerGlobalParams::FCVSnapshot fcv) const {
+bool FCVGatedFeatureFlagBase::isEnabled(const VersionContext& vCtx,
+                                        const ServerGlobalParams::FCVSnapshot fcv) const {
     const auto currentFcv = vCtx.getOperationFCV(VersionContext::Passkey()).value_or(fcv);
 
     return isEnabledOnVersion(currentFcv.getVersion());
 }
 
-bool FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
+bool FCVGatedFeatureFlagBase::isEnabledUseLastLTSFCVWhenUninitialized(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot fcv) const {
     const auto currentFcv = vCtx.getOperationFCV(VersionContext::Passkey()).value_or(fcv);
     // (Generic FCV reference): This reference is needed for the feature flag check API.
@@ -100,7 +101,7 @@ bool FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
     return isEnabledOnVersion(applicableFcv.getVersion());
 }
 
-bool FCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
+bool FCVGatedFeatureFlagBase::isEnabledUseLatestFCVWhenUninitialized(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot fcv) const {
     const auto currentFcv = vCtx.getOperationFCV(VersionContext::Passkey()).value_or(fcv);
     // (Generic FCV reference): This reference is needed for the feature flag check API.
@@ -122,11 +123,11 @@ bool FCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
 // is uninitialized during initial sync.
 // Note that if the feature flag does not have any upgrade/downgrade concerns, then fcv_gated
 // should be set to false and BinaryCompatibleFeatureFlag should be used instead of this function.
-bool FCVGatedFeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
+bool FCVGatedFeatureFlagBase::isEnabledAndIgnoreFCVUnsafe() const {
     return _enabled;
 }
 
-bool FCVGatedFeatureFlag::isEnabledOnVersion(
+bool FCVGatedFeatureFlagBase::isEnabledOnVersion(
     multiversion::FeatureCompatibilityVersion targetFCV) const {
     if (!_enabled) {
         return false;
@@ -149,7 +150,7 @@ bool FCVGatedFeatureFlag::isEnabledOnVersion(
     return false;
 }
 
-bool FCVGatedFeatureFlag::isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+bool FCVGatedFeatureFlagBase::isDisabledOnTargetFCVButEnabledOnOriginalFCV(
     multiversion::FeatureCompatibilityVersion targetFCV,
     multiversion::FeatureCompatibilityVersion originalFCV) const {
     if (!_enabled) {
@@ -159,7 +160,7 @@ bool FCVGatedFeatureFlag::isDisabledOnTargetFCVButEnabledOnOriginalFCV(
     return originalFCV >= _version && targetFCV < _version;
 }
 
-bool FCVGatedFeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+bool FCVGatedFeatureFlagBase::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
     multiversion::FeatureCompatibilityVersion targetFCV,
     multiversion::FeatureCompatibilityVersion originalFCV) const {
     if (!_enabled) {
@@ -169,7 +170,7 @@ bool FCVGatedFeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
     return targetFCV >= _version && originalFCV < _version;
 }
 
-void FCVGatedFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {
+void FCVGatedFeatureFlagBase::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {
     flagBuilder.append("value", _enabled);
     if (_enabled) {
         flagBuilder.append(
@@ -187,20 +188,61 @@ void FCVGatedFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder
     }
 }
 
-void FCVGatedFeatureFlag::setForServerParameter(bool enabled) {
+void FCVGatedFeatureFlagBase::setForServerParameter(bool enabled) {
     _enabled = enabled;
 }
 
-bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabled(ServerGlobalParams::FCVSnapshot fcv) const {
+bool OperationFCVOnlyFCVGatedFeatureFlag::isEnabled(const VersionContext& vCtx) const {
+    auto globalFcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    assertCheckingAgainstOFCV(vCtx, globalFcv);
+    return FCVGatedFeatureFlagBase::isEnabled(vCtx, globalFcv);
+}
+
+bool OperationFCVOnlyFCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
+    const VersionContext& vCtx) const {
+    auto globalFcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    assertCheckingAgainstOFCV(vCtx, globalFcv);
+    return FCVGatedFeatureFlagBase::isEnabledUseLastLTSFCVWhenUninitialized(vCtx, globalFcv);
+}
+
+bool OperationFCVOnlyFCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
+    const VersionContext& vCtx) const {
+    auto globalFcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    assertCheckingAgainstOFCV(vCtx, globalFcv);
+    return FCVGatedFeatureFlagBase::isEnabledUseLatestFCVWhenUninitialized(vCtx, globalFcv);
+}
+
+void OperationFCVOnlyFCVGatedFeatureFlag::assertCheckingAgainstOFCV(
+    const VersionContext& vCtx, ServerGlobalParams::FCVSnapshot globalFcv) const {
+    if (vCtx.hasOperationFCV()) {
+        return;
+    }
+
+    // This operation could be part of a ShardingDDLCoordinator started on FCV 8.0, which do not
+    // have an OFCV. In this case, tolerate checking it against the global server FCV.
+    if (!feature_flags::gStrictlyEnforceOperationFCVOnlyFCVGatedFeatureFlags
+             .isEnabledUseLatestFCVWhenUninitialized(vCtx, globalFcv)) {
+        // Ensure that this only happens in a sharded cluster, as we expect.
+        tassert(11144901,
+                "Expected relaxed OFCV-only feature flag checks to only happen on sharded clusters",
+                !serverGlobalParams.clusterRole.has(ClusterRole::None));
+        return;
+    }
+
+    tasserted(11144900, "Expected the feature flag to have been checked with an OFCV");
+}
+
+bool LegacyFCVSnapshotOnlyFCVGatedFeatureFlag::isEnabled(
+    ServerGlobalParams::FCVSnapshot fcv) const {
     return isEnabled(kVersionContextIgnored_UNSAFE, fcv);
 }
 
-bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
+bool LegacyFCVSnapshotOnlyFCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
     ServerGlobalParams::FCVSnapshot fcv) const {
     return isEnabledUseLastLTSFCVWhenUninitialized(kVersionContextIgnored_UNSAFE, fcv);
 }
 
-bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
+bool LegacyFCVSnapshotOnlyFCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
     ServerGlobalParams::FCVSnapshot fcv) const {
     return isEnabledUseLatestFCVWhenUninitialized(kVersionContextIgnored_UNSAFE, fcv);
 }

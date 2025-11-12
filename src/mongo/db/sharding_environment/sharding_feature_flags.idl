@@ -60,7 +60,7 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     # TODO (SERVER-81037): enable this feature flag once it's possible to detect prepare conflicts on the catalog
     featureFlagCreateCollectionInPreparedTransactions:
         description: "Feature flag protecting the codepath allowing to create collections in prepared transactions "
@@ -74,7 +74,7 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
     featureFlag80CollectionCreationPath:
         description:
@@ -85,7 +85,7 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagReplicaSetEndpoint:
         description:
             When enabled, allows users to connect to a single-shard cluster with no dedicated config

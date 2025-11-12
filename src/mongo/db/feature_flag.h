@@ -182,42 +182,24 @@ private:
 };
 
 /**
- * FCVGatedFeatureFlag is a boolean feature flag which is be enabled or disabled depending on FCV.
- * The feature flag is enabled if the current FCV is greater than or equal than the specified
+ * Represents a boolean feature flag which is be enabled or disabled depending on FCV.
+ * The feature flag is enabled if the current FCV is greater than or equal to the specified
  * threshold version and it is defined as enabled by default. It is not implicitly convertible to
  * bool to force all call sites to make a decision about what check to use.
+ *
+ * Due to the ongoing migration of FCV-gated feature flags from server FCV snapshots (`FCVSnapshot`)
+ * to Operation FCV (`VersionContext`), this class is abstract, and its derived classes expose
+ * different method signatures for feature flag checks.
  */
-class FCVGatedFeatureFlag : public ParameterGatingFeatureFlag {
+class FCVGatedFeatureFlagBase : public ParameterGatingFeatureFlag {
 public:
-    FCVGatedFeatureFlag(bool enabled,
-                        StringData versionString,
-                        bool enableOnTransitionalFCV = false);
+    FCVGatedFeatureFlagBase(bool enabled,
+                            StringData versionString,
+                            bool enableOnTransitionalFCV = false);
 
     // Non-copyable, non-movable
-    FCVGatedFeatureFlag(const FCVGatedFeatureFlag&) = delete;
-    FCVGatedFeatureFlag& operator=(const FCVGatedFeatureFlag&) = delete;
-
-    /**
-     * Returns true if the flag is set to true and enabled for this FCV version.
-     * If the functionality of this function changes, make sure that the
-     * isEnabled/isPresentAndEnabled functions in feature_flag_util.js also incorporate the change.
-     */
-    bool isEnabled(const VersionContext& vCtx, ServerGlobalParams::FCVSnapshot fcv) const;
-
-    /**
-     * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
-     * is unset, instead checks against the default last LTS FCV version.
-     */
-    bool isEnabledUseLastLTSFCVWhenUninitialized(const VersionContext& vCtx,
-                                                 ServerGlobalParams::FCVSnapshot fcv) const;
-
-
-    /**
-     * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
-     * is unset, instead checks against the latest FCV version.
-     */
-    bool isEnabledUseLatestFCVWhenUninitialized(const VersionContext& vCtx,
-                                                ServerGlobalParams::FCVSnapshot fcv) const;
+    FCVGatedFeatureFlagBase(const FCVGatedFeatureFlagBase&) = delete;
+    FCVGatedFeatureFlagBase& operator=(const FCVGatedFeatureFlagBase&) = delete;
 
     /**
      * Returns true if this flag is enabled regardless of the current FCV version. When using this
@@ -255,12 +237,6 @@ public:
 
     void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const override;
 
-    bool checkWithContext(const VersionContext& vCtx,
-                          IncrementalFeatureRolloutContext& ifrContext,
-                          ServerGlobalParams::FCVSnapshot fcv) override {
-        return isEnabled(vCtx, fcv);
-    }
-
     bool canBeEnabled() const override {
         return _enabled;
     }
@@ -271,6 +247,29 @@ public:
 
     void setForServerParameter(bool enabled) override;
 
+protected:
+    /**
+     * Returns true if the flag is set to true and enabled for this FCV version.
+     * If the functionality of this function changes, make sure that the
+     * isEnabled/isPresentAndEnabled functions in feature_flag_util.js also incorporate the change.
+     */
+    bool isEnabled(const VersionContext& vCtx, ServerGlobalParams::FCVSnapshot fcv) const;
+
+    /**
+     * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
+     * is unset, instead checks against the default last LTS FCV version.
+     */
+    bool isEnabledUseLastLTSFCVWhenUninitialized(const VersionContext& vCtx,
+                                                 ServerGlobalParams::FCVSnapshot fcv) const;
+
+
+    /**
+     * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
+     * is unset, instead checks against the latest FCV version.
+     */
+    bool isEnabledUseLatestFCVWhenUninitialized(const VersionContext& vCtx,
+                                                ServerGlobalParams::FCVSnapshot fcv) const;
+
 private:
     bool _enabled;
     bool _enableOnTransitionalFCV;
@@ -278,13 +277,55 @@ private:
 };
 
 /**
- * Like FCVGatedFeatureFlag, but contains overloads that allow checking if an FCV-gated feature flag
- * is enabled, ignoring the context's operation FCV.
+ * A FCV-gated feature flag which can be checked against either an Operation FCV (`VersionContext`)
+ * or a server FCV snapshot (`FCVSnapshot`).
+ */
+class FCVGatedFeatureFlag : public FCVGatedFeatureFlagBase {
+public:
+    using FCVGatedFeatureFlagBase::FCVGatedFeatureFlagBase;
+
+    // Make the protected isEnabled* methods from the base class public
+    using FCVGatedFeatureFlagBase::isEnabled;
+    using FCVGatedFeatureFlagBase::isEnabledUseLastLTSFCVWhenUninitialized;
+    using FCVGatedFeatureFlagBase::isEnabledUseLatestFCVWhenUninitialized;
+
+    bool checkWithContext(const VersionContext& vCtx,
+                          IncrementalFeatureRolloutContext& ifrContext,
+                          ServerGlobalParams::FCVSnapshot fcv) override {
+        return isEnabled(vCtx, fcv);
+    }
+};
+
+/**
+ * A FCV-gated feature flag which can be checked only against an Operation FCV (`VersionContext`).
+ */
+class OperationFCVOnlyFCVGatedFeatureFlag : public FCVGatedFeatureFlagBase {
+public:
+    using FCVGatedFeatureFlagBase::FCVGatedFeatureFlagBase;
+
+    bool isEnabled(const VersionContext& vCtx) const;
+    bool isEnabledUseLastLTSFCVWhenUninitialized(const VersionContext& vCtx) const;
+    bool isEnabledUseLatestFCVWhenUninitialized(const VersionContext& vCtx) const;
+
+    bool checkWithContext(const VersionContext& vCtx,
+                          IncrementalFeatureRolloutContext& ifrContext,
+                          ServerGlobalParams::FCVSnapshot fcv) override {
+        return isEnabled(vCtx);
+    }
+
+private:
+    void assertCheckingAgainstOFCV(const VersionContext& vCtx,
+                                   ServerGlobalParams::FCVSnapshot globalFcv) const;
+};
+
+/**
+ * A FCV-gated feature flag which can only be checked against a server FCV snapshot (`FCVSnapshot`),
+ * ignoring the context's operation FCV.
  *
  * This is a transitional solution to allow old FCV-gated feature flag checks to work until they
  * are adapted to the operation FCV aware API.
  */
-class LegacyContextUnawareFCVGatedFeatureFlag : public FCVGatedFeatureFlag {
+class LegacyFCVSnapshotOnlyFCVGatedFeatureFlag : public FCVGatedFeatureFlag {
 public:
     using FCVGatedFeatureFlag::FCVGatedFeatureFlag;
 
@@ -294,9 +335,9 @@ public:
     bool isEnabledUseLatestFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
 
     // Avoid shadowing the original overloads with the compatibility stubs above
-    using FCVGatedFeatureFlag::isEnabled;
-    using FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized;
-    using FCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized;
+    using FCVGatedFeatureFlagBase::isEnabled;
+    using FCVGatedFeatureFlagBase::isEnabledUseLastLTSFCVWhenUninitialized;
+    using FCVGatedFeatureFlagBase::isEnabledUseLatestFCVWhenUninitialized;
 };
 
 /**

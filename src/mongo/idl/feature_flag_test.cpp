@@ -428,6 +428,12 @@ TEST_F(FeatureFlagTest, TestFCVGatedWithTransitionOnTransitionalFCV) {
                                                     kDowngradingFromLatestToLastLTSFCVSnapshot));
 }
 
+TEST(IDLFeatureFlag, OperationFCVOnlyFCVGatedFeatureFlag) {
+    // Only the VersionContext (Operation FCV) is required to check if the feature flag is enabled
+    ASSERT_FALSE(feature_flags::gFeatureFlagOperationFCVOnly.isEnabled(kLastLTSVersionContext));
+    ASSERT_TRUE(feature_flags::gFeatureFlagOperationFCVOnly.isEnabled(kLatestVersionContext));
+}
+
 BSONObj readStatsFromFlag(const IncrementalRolloutFeatureFlag& flag) {
     BSONArrayBuilder flagStatsBuilder;
     flag.appendFlagStats(flagStatsBuilder);

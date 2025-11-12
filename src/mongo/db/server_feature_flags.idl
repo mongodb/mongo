@@ -35,14 +35,14 @@ feature_flags:
         cpp_varname: gFeatureFlagSecurityToken
         default: false
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagAllowAdditionalParticipants:
         description: "Enable adding additional participants to active transaction"
         cpp_varname: gFeatureFlagAllowAdditionalParticipants
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagBulkWriteCommand:
         description: "Support for bulkWrite command and one-shot transactions"
         cpp_varname: gFeatureFlagBulkWriteCommand
@@ -70,7 +70,7 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
         default: false
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagAllMongodsAreSharded:
         description: "Feature flag to enable and autobootstrap sharding for all mongods"
         cpp_varname: gFeatureFlagAllMongodsAreSharded
@@ -84,7 +84,7 @@ feature_flags:
         default: true
         version: 7.2
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagRearchitectUserAcquisition:
         description: "Enable new flow for authentication and authorization"
         cpp_varname: gFeatureFlagRearchitectUserAcquisition
@@ -136,7 +136,7 @@ feature_flags:
         default: true
         version: 8.1
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagCreateViewlessTimeseriesCollections:
         description: >-
             Enables the creation of viewless timeseries collections.

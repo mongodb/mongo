@@ -1657,8 +1657,14 @@ def _bind_feature_flag_cpp_vartype(ctxt, param, feature_flag_phase):
             ctxt.add_illegally_fcv_gated_feature_flag(param)
             return None
 
-        if param.fcv_context_unaware:
-            return "::mongo::LegacyContextUnawareFCVGatedFeatureFlag"
+        if param.check_against_fcv == "legacy_fcv_snapshot_only":
+            return "::mongo::LegacyFCVSnapshotOnlyFCVGatedFeatureFlag"
+        elif param.check_against_fcv == "operation_fcv_only":
+            return "::mongo::OperationFCVOnlyFCVGatedFeatureFlag"
+        assert param.check_against_fcv in (
+            "operation_fcv_or_fcv_snapshot",
+            None,
+        ), f"Invalid check_against_fcv value for {param.name}"
         return "::mongo::FCVGatedFeatureFlag"
     elif feature_flag_phase == ast.FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT:
         # Non-FCV gated, non IFR flag.
@@ -1727,7 +1733,7 @@ def _bind_feature_flags(ctxt, param):
             for option_name in (
                 "version",
                 "enable_on_transitional_fcv_UNSAFE",
-                "fcv_context_unaware",
+                "check_against_fcv",
             ):
                 if getattr(param, option_name):
                     ctxt.add_feature_flag_fcv_gated_false_has_unsupported_option(param, option_name)

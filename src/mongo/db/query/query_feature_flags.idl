@@ -57,7 +57,7 @@ feature_flags:
         default: true
         version: 7.2
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
 
     featureFlagAggOutTimeseries:
         description: "Feature flag for enabling support for $out to write to time-series collections"
@@ -95,7 +95,7 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
 
     featureFlagSearchBatchSizeTuning:
         description: "Feature flag to enable batchSize tuning for search queries."
@@ -195,7 +195,7 @@ feature_flags:
         default: true
         version: 8.1
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
 
     featureFlagSearchHybridScoringFull:
         description:

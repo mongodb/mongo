@@ -46,3 +46,14 @@ feature_flags:
         version: 8.2
         fcv_gated: true
         enable_on_transitional_fcv_UNSAFE: true
+
+    # TODO (SERVER-110309): remove this feature flag
+    featureFlagStrictlyEnforceOperationFCVOnlyFCVGatedFeatureFlags:
+        description: >
+            Enforce feature flags tagged with `check_against_fcv: operation_fcv_only` are checked with an OFCV.
+            This can not be done until FCV 8.2 since ShardingDDLCoordinators (or their sub-commands)
+            do not have an OFCV in FCV 8.0 (see featureFlagSnapshotFCVInDDLCoordinators).
+        cpp_varname: feature_flags::gStrictlyEnforceOperationFCVOnlyFCVGatedFeatureFlags
+        default: true
+        version: 8.2
+        fcv_gated: true

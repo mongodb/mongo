@@ -871,11 +871,29 @@ A feature flag has the following properties:
       [SERVER-102169](https://jira.mongodb.org/browse/SERVER-102169) for further discussion.
   - If you enable this property, the feature flag description must contain the text
     '(Enable on transitional FCV): ' followed by a justification for why the use of the property is safe.
-- fcv_context_unaware: boolean
-  - Optional. Can only be specified for FCV-gated feature flags (`fcv_gated: true`). Default value is `false`.
-  - `true` for feature flags that have not yet been adapted to the new feature flag API introduced in SERVER-99351.
-    Those feature flags are compiled to a C++ type that allows checking them without considering Operation FCV.
-    Do not set this property on new flags.
+- check_against_fcv: (`operation_fcv_or_fcv_snapshot`|`operation_fcv_only`|`legacy_fcv_snapshot_only`)
+
+  - Optional. Can only be specified for FCV-gated feature flags (`fcv_gated: true`).
+
+    Specifies whether an [Operation FCV](#operation-fcv) (`VersionContext`), a snapshot of the
+    server FCV (`FCVSnapshot`), or either, can be used to check if the feature flag is enabled.
+    This supports gradual migration of feature flag checks to Operation FCV.
+
+    Each value generates a C++ type with a different signature for feature flag checks.
+    Default value is `operation_fcv_or_fcv_snapshot`.
+
+  - `operation_fcv_or_fcv_snapshot`: Allow checking the feature flag either against an Operation
+    FCV or an snapshot of the server FCV. The Operation FCV is used if present, but otherwise
+    it falls back to the server FCV.
+    - Checked as: `gFeatureFlagToaster.isEnabled(VersionContext, FCVSnapshot)`.
+  - `operation_fcv_only`: Only allow checking the feature flag only against Operation FCV.
+    If all users of this feature flag support Operation FCV, this can be used to enforce it,
+    as well as not having to manually acquire and pass in snapshots of the server FCV.
+    - Checked as: `gFeatureFlagToaster.isEnabled(VersionContext)`.
+  - `legacy_fcv_snapshot_only` for feature flags that have not yet been adapted to the new
+    feature flag API introduced in [SERVER-99351](https://jira.mongodb.org/browse/SERVER-99351).
+    Those feature flags can be checked without considering Operation FCV. Do not set on new flags.
+    - Checked as: `gFeatureFlagToaster.isEnabled(FCVSnapshot)`.
 
 To turn on a feature flag for testing when starting up a server, we would use the following command
 line (for the Toaster feature):
@@ -1026,10 +1044,28 @@ enabled/disabled during that time, which would result in only part of the operat
 For more details see [SERVER-88965](https://jira.mongodb.org/browse/SERVER-88965) and its linked
 issues.
 
-This rule also applies to sharded operations, which span multiple `OperationContext` instances across different nodes.
-There is an ongoing effort to streamline this scenario through _operation FCV_, where, upon operation start,
-the FCV is snapshotted into a `VersionContext` decoration and used for all feature flag checks through its runtime.
-Currently, _operation FCV_ is only used by DDLs on a sharded cluster.
+### Operation FCV
+
+There is an ongoing effort to provide operations a stable view of FCV and FCV-gated feature flags.
+Instead of acquiring short-lived snapshots of the in-memory FCV (`FCVSnapshot`), a single snapshot
+(_Operation FCV_) is acquired and held in the `VersionContext` decoration of the `OperationContext`.
+
+Under this model, the rules for feature flag checks are simplified as follows:
+
+- Operations can check feature flags multiple times, obtaining the same result.
+- Operations can check feature flags during oplog application.
+  - The Operation FCV is replicated in the oplog, so secondaries apply the op using the same FCV
+    snapshot as the primary did ([SERVER-102965](https://jira.mongodb.org/browse/SERVER-102965)).
+- Local operations can check feature flags without holding the global lock, and reuse the result of
+  that check across multiple global lock acquisitions.
+  - setFCV waits for `OperationContext`s with an old Operation FCV to complete before cleaning up Server metadata
+    ([SERVER-111447](https://jira.mongodb.org/browse/SERVER-111447)).
+- For distributed operations, the result can be reused across multiple `OperationContext`s.
+  - setFCV waits for `ShardingDDLCoordinator`s with an old Operation FCV to complete before
+    the config server coordinates Server metadata cleanup ([SERVER-101537](https://jira.mongodb.org/browse/SERVER-101537)).
+
+Operation FCV is currently only used by DDLs on a sharded cluster (`ShardingDDLCoordinator`) and
+by some replica set DDLs (e.g. `create`), but it's intended to eventually extend to all operations.
 
 ### Feature Flag Gating in Tests
 

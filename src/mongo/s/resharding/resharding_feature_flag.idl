@@ -42,7 +42,7 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagUnshardCollection:
         mod_visibility: public
         description: "Feature flag for implementing unshard collection."
@@ -50,7 +50,7 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagReshardingForTimeseries:
         mod_visibility: public
         description: "Feature flag for enabling resharding a timeseries collection."
@@ -58,7 +58,7 @@ feature_flags:
         default: true
         version: 8.0
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagRelaxedMode:
         mod_visibility: public
         description: "Feature flag for implmenting relaxed resharding mode."
@@ -118,7 +118,7 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingCloneNoRefresh
         default: false
         fcv_gated: true
-        fcv_context_unaware: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage:
         mod_visibility: public
         description:

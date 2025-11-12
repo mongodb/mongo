@@ -2899,7 +2899,7 @@ class TestBinder(testcase.IDLTestcase):
             idl.errors.ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION,
         )
 
-        # if fcv_gated is false, fcv_context_unaware is not allowed
+        # if fcv_gated is false, check_against_fcv is not allowed
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2908,12 +2908,12 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     fcv_gated: false
-                    fcv_context_unaware: true
+                    check_against_fcv: operation_fcv_only
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if fcv_gated: true, fcv_context_unaware is allowed
+        # if fcv_gated: true, check_against_fcv is allowed
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2922,7 +2922,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: false
                     fcv_gated: true
-                    fcv_context_unaware: true
+                    check_against_fcv: operation_fcv_only
             """)
         )
 
