@@ -238,8 +238,7 @@ public:
         return std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx,
-                                               const NamespaceString& sourceNss) override {
+    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
         if (resharding::gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
                 .isEnabled(VersionContext::getDecoration(opCtx),
                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
@@ -256,11 +255,8 @@ public:
 
             SessionKiller::Matcher matcherAllSessions(
                 KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-            killSessionsAbortUnpreparedTransactionsWithinNamespace(
-                opCtx,
-                matcherAllSessions,
-                sourceNss,
-                ErrorCodes::InterruptedDueToReshardingCriticalSection);
+            killSessionsAbortUnpreparedTransactions(
+                opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToReshardingCriticalSection);
         }
     }
 };
@@ -946,8 +942,7 @@ void ReshardingDonorService::DonorStateMachine::
 
     {
         auto opCtx = factory.makeOperationContext(&cc());
-        _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get(),
-                                                              _metadata.getSourceNss());
+        _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get());
 
         ShardingRecoveryService::get(opCtx.get())
             ->acquireRecoverableCriticalSectionBlockWrites(

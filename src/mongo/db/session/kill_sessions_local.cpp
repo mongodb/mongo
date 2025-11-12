@@ -105,17 +105,18 @@ void killSessionsAction(
     }
 }
 
+}  // namespace
 
-void killSessionsAbortUnpreparedTransactionsFilter(
-    OperationContext* opCtx,
-    const SessionKiller::Matcher& matcher,
-    const std::function<bool(const ObservableSession&)>& filterFn,
-    ErrorCodes::Error reason) {
-
+void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
+                                             const SessionKiller::Matcher& matcher,
+                                             ErrorCodes::Error reason) {
     killSessionsAction(
         opCtx,
         matcher,
-        filterFn,
+        [](const ObservableSession& session) {
+            auto participant = TransactionParticipant::get(session);
+            return participant.transactionIsInProgress();
+        },
         [reason](OperationContext* opCtx, const SessionToKill& session) {
             auto participant = TransactionParticipant::get(session);
             // This is the same test as in the filter, but we must check again now
@@ -129,39 +130,6 @@ void killSessionsAbortUnpreparedTransactionsFilter(
                       "reason"_attr = reason);
                 participant.abortTransaction(opCtx);
             }
-        },
-        reason);
-}
-
-bool matchNamespace(const ObservableSession& session, const NamespaceString& nss) {
-    auto participant = TransactionParticipant::get(session);
-    return participant.transactionIsInProgress() && participant.affectedNamespaces().count(nss) > 0;
-}
-
-}  // namespace
-
-
-void killSessionsAbortUnpreparedTransactionsWithinNamespace(OperationContext* opCtx,
-                                                            const SessionKiller::Matcher& matcher,
-                                                            const NamespaceString& nss,
-                                                            ErrorCodes::Error reason) {
-    killSessionsAbortUnpreparedTransactionsFilter(
-        opCtx,
-        matcher,
-        [&nss](const ObservableSession& session) { return matchNamespace(session, nss); },
-        reason);
-}
-
-void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
-                                             const SessionKiller::Matcher& matcher,
-                                             ErrorCodes::Error reason) {
-
-    killSessionsAbortUnpreparedTransactionsFilter(
-        opCtx,
-        matcher,
-        [](const ObservableSession& session) {
-            auto participant = TransactionParticipant::get(session);
-            return participant.transactionIsInProgress();
         },
         reason);
 }
