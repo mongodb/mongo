@@ -120,7 +120,7 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamSplitLargeEvent::get
     return {GetModPathsReturn::Type::kAllPaths, {}, {}};
 }
 
-DocumentSourceContainer::iterator DocumentSourceChangeStreamSplitLargeEvent::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceChangeStreamSplitLargeEvent::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // Helper to determine whether the iterator has reached its final position in the pipeline.
     // Checks whether $changeStreamSplitLargeEvent should move ahead of the given stage.

@@ -102,7 +102,7 @@ void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
     }
 }
 
-DocumentSourceContainer::iterator DocumentSourcePlanCacheStats::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourcePlanCacheStats::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto itrToNext = std::next(itr);
     if (itrToNext == container->end()) {

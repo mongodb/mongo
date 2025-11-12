@@ -232,7 +232,7 @@ DocumentSourceVectorSearch::_attemptSortAfterVectorSearchOptimization(
     return {itr, false};
 }
 
-DocumentSourceContainer::iterator DocumentSourceVectorSearch::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceVectorSearch::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // Attempt to remove a $sort on metadata after this $vectorSearch stage.
     {

@@ -152,7 +152,7 @@ DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::ma
     return std::next(itr);
 }
 
-DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

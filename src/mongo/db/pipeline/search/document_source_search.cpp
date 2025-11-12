@@ -180,7 +180,7 @@ bool checkRequiresSearchSequenceToken(DocumentSourceContainer::iterator itr,
     return deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
 }
 
-DocumentSourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceSearch::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // In the case where the query has an extractable limit, we send that limit to mongot as a guide
     // for the number of documents mongot should return (rather than the default batchsize).

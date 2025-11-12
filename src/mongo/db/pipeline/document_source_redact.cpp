@@ -76,7 +76,7 @@ static const Value descendVal = Value("descend"_sd);
 static const Value pruneVal = Value("prune"_sd);
 static const Value keepVal = Value("keep"_sd);
 
-DocumentSourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceRedact::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

@@ -169,8 +169,8 @@ public:
         }
     }
 
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         // Force to run on the merging half for now.

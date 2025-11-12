@@ -192,7 +192,7 @@ StageConstraints DocumentSourceGraphLookUp::constraints(PipelineSplitState pipeS
     return constraints;
 }
 
-DocumentSourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

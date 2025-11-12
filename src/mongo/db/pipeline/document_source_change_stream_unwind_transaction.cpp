@@ -204,7 +204,7 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamUnwindTransaction::g
     return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
 }
 
-DocumentSourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(5687205, "Iterator mismatch during optimization", *itr == this);
 

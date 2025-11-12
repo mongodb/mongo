@@ -66,7 +66,7 @@ DocumentSourceSequentialDocumentCache::DocumentSourceSequentialDocumentCache(
 }
 
 
-DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // The DocumentSourceSequentialDocumentCache relies on all other stages in the pipeline being at
     // the final positions which they would have occupied if no cache stage was present. This should

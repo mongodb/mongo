@@ -368,7 +368,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         expCtx, std::move(unionNss), std::move(pipeline), hasForeignDB);
 }
 
-DocumentSourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceUnionWith::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto duplicateAcrossUnion = [&](auto&& nextStage) {
         _sharedState->_pipeline->addFinalSource(

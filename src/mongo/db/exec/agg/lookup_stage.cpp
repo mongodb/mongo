@@ -83,7 +83,7 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
     // optimizeContainer on the pipeline to ensure the rest of the pipeline is in its correct
     // order before optimizing the cache.
     // TODO SERVER-84113: We will no longer have separate logic based on if a cache is present
-    // in doOptimizeAt(), so we can instead only add and optimize the cache after
+    // in optimizeAt(), so we can instead only add and optimize the cache after
     // optimizeContainer is called.
     pipeline.addFinalSource(std::move(source));
 

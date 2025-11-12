@@ -58,7 +58,8 @@ TEST_F(DocumentSourceRedactTest, ShouldCopyRedactSafePartOfMatchBeforeItself) {
     pipeline.push_back(redact);
     pipeline.push_back(match);
 
-    pipeline.front()->optimizeAt(pipeline.begin(), &pipeline);
+    checked_cast<DocumentSourceRedact&>(*pipeline.front().get())
+        .optimizeAt(pipeline.begin(), &pipeline);
 
     ASSERT_EQUALS(pipeline.size(), 3U);
     ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline.front().get()));

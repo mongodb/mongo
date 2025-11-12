@@ -324,17 +324,17 @@ public:
         return hasPipeline() ? BSONObj() : _additionalFilter.value_or(BSONObj());
     }
 
-protected:
-    boost::optional<ShardId> computeMergeShardId() const final;
-
     /**
      * Attempts to combine with an immediately following $unwind stage that unwinds the $lookup's
      * "as" field, setting the '_unwindSrc' member to the absorbed $unwind stage. If
      * this is done it may also absorb one or more $match stages that immediately followed the
      * $unwind, setting the resulting combined $match in the '_matchSrc' member.
      */
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
+
+protected:
+    boost::optional<ShardId> computeMergeShardId() const final;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceLookUpToStageFn(

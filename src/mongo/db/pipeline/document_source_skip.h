@@ -94,8 +94,8 @@ public:
      * Attempts to move a subsequent $limit before the skip, potentially allowing for forther
      * optimizations earlier in the pipeline.
      */
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 

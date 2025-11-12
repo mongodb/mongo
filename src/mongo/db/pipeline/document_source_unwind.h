@@ -128,12 +128,11 @@ public:
         return _sbeCompatibility;
     }
 
-protected:
     /**
      * Attempts to swap with a subsequent $sort stage if the $sort is on a different field.
      */
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
 private:
     friend std::unique_ptr<exec::agg::UnwindProcessor> createUnwindProcessorFromDocumentSource(

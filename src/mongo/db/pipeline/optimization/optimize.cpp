@@ -89,8 +89,10 @@ void optimizeEachStage(DocumentSourceContainer* container) {
  * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting
  * stages.
  */
-void optimizeContainer(const ExpressionContext& expCtx, DocumentSourceContainer* container) {
-    applyRuleBasedRewrites(rbr::PipelineRewriteContext(expCtx, *container));
+void optimizeContainer(const ExpressionContext& expCtx,
+                       DocumentSourceContainer* container,
+                       boost::optional<DocumentSourceContainer::iterator> itr) {
+    applyRuleBasedRewrites(rbr::PipelineRewriteContext(expCtx, *container, itr));
 }
 
 /**

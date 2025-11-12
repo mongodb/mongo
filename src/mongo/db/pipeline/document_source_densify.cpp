@@ -364,7 +364,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalDensify::combineSorts(
     return std::prev(itr);
 }
 
-DocumentSourceContainer::iterator DocumentSourceInternalDensify::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceInternalDensify::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(6059800, "Expected to optimize $densify stage", *itr == this);
 

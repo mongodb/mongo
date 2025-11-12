@@ -69,7 +69,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalListCollections::createFromB
     return make_intrusive<DocumentSourceInternalListCollections>(pExpCtx);
 }
 
-DocumentSourceContainer::iterator DocumentSourceInternalListCollections::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceInternalListCollections::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(9741503, "The given iterator must be this object.", *itr == this);
 

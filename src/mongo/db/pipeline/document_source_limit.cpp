@@ -61,7 +61,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id)
 
 constexpr StringData DocumentSourceLimit::kStageName;
 
-DocumentSourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceLimit::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

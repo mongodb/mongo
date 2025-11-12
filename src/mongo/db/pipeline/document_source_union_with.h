@@ -178,7 +178,7 @@ public:
                 _sharedState->_pipeline->getSources(), unionConstraints);
         }
         // DocumentSourceUnionWith cannot directly swap with match but it contains custom logic in
-        // the doOptimizeAt() member function to allow itself to duplicate any match ahead in the
+        // the optimizeAt() member function to allow itself to duplicate any match ahead in the
         // current pipeline and place one copy inside its sub-pipeline and one copy behind in the
         // current pipeline.
         unionConstraints.canSwapWithMatch = false;
@@ -236,10 +236,10 @@ public:
         std::vector<BSONObj> currentPipeline,
         const NamespaceString& userNss);
 
-protected:
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
+protected:
     boost::intrusive_ptr<DocumentSource> optimize() final {
         pipeline_optimization::optimizePipeline(*_sharedState->_pipeline);
         return this;

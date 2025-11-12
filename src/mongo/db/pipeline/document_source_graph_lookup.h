@@ -240,14 +240,14 @@ public:
         return _params.maxDepth;
     }
 
-protected:
-    boost::optional<ShardId> computeMergeShardId() const final;
-
     /**
      * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.
      */
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
+
+protected:
+    boost::optional<ShardId> computeMergeShardId() const final;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceGraphLookUpToStageFn(

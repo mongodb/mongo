@@ -279,7 +279,7 @@ boost::optional<long long> DocumentSourceSort::getLimit() const {
                                      : boost::none;
 }
 
-DocumentSourceContainer::iterator DocumentSourceSort::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceSort::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

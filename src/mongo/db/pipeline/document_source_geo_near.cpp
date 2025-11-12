@@ -138,7 +138,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGeoNear::optimize() {
     return this;
 }
 
-DocumentSourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceGeoNear::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
 
     // Currently this is the only rewrite.

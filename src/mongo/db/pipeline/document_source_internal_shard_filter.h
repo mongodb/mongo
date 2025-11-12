@@ -102,8 +102,8 @@ public:
         return boost::none;
     }
 
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) override;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         // This stage doesn't use any variables.

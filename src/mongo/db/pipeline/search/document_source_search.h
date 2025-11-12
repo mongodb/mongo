@@ -177,11 +177,11 @@ public:
         _spec.setDocsNeededBounds(bounds);
     }
 
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
+
 private:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) override;
 
     // Holds all the planning information for the command's eventual mongot request.
     InternalSearchMongotRemoteSpec _spec;

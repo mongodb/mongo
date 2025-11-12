@@ -93,7 +93,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     return createFromBsonWithMaxMemoryUsage(std::move(elem), expCtx, boost::none);
 }
 
-DocumentSourceContainer::iterator DocumentSourceGroup::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceGroup::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

@@ -61,7 +61,7 @@ namespace mongo::rule_based_rewrites::pipeline {
     }
 
 /**
- * Helper for defining a rule that calls doOptimizeAt() for a given document source.
+ * Helper for defining a rule that calls optimizeAt() for a given document source.
  */
 #define OPTIMIZE_AT_RULE(DS)                  \
     {"OPTIMIZE_AT_" #DS,                      \
@@ -85,14 +85,20 @@ public:
     PipelineRewriteContext(Pipeline& pipeline)
         : PipelineRewriteContext(*pipeline.getContext(), pipeline.getSources()) {}
 
-    PipelineRewriteContext(const ExpressionContext& expCtx, DocumentSourceContainer& container)
+    PipelineRewriteContext(const ExpressionContext& expCtx,
+                           DocumentSourceContainer& container,
+                           boost::optional<DocumentSourceContainer::iterator> startingPos = {})
         : PipelineRewriteContext(
               getDocumentSourceVisitorRegistry(expCtx.getOperationContext()->getServiceContext()),
-              container) {}
+              container,
+              startingPos) {}
 
     PipelineRewriteContext(const DocumentSourceVisitorRegistry& registry,
-                           DocumentSourceContainer& container)
-        : _container(container), _itr(_container.begin()), _registry(registry) {}
+                           DocumentSourceContainer& container,
+                           boost::optional<DocumentSourceContainer::iterator> startingPos = {})
+        : _container(container),
+          _itr(startingPos.value_or(_container.begin())),
+          _registry(registry) {}
 
     bool hasMore() const final {
         return _itr != _container.end();
@@ -192,7 +198,7 @@ struct CommonTransforms {
         };
 
         auto stagesBefore = getAdjacentStages(ctx._itr);
-        auto resultItr = ctx.current().doOptimizeAt(ctx._itr, &ctx._container);
+        auto resultItr = ctx.currentAs<DS>().optimizeAt(ctx._itr, &ctx._container);
         // If nothing changed, resultItr points to the next position.
         auto stagesAfter = getAdjacentStages(
             resultItr == ctx._container.begin() ? resultItr : std::prev(resultItr));
@@ -218,7 +224,7 @@ inline bool alwaysTrue(PipelineRewriteContext&) {
     return true;
 }
 
-// TODO(SERVER-110107): Remove maybe_unused once these have real usages.
+// TODO(SERVER-113603): Get rid of these
 [[maybe_unused]] static auto swapStageWithPrev = CommonTransforms::swapStageWithPrev;
 [[maybe_unused]] static auto swapStageWithNext = CommonTransforms::swapStageWithNext;
 [[maybe_unused]] static auto insertBefore = CommonTransforms::insertBefore;

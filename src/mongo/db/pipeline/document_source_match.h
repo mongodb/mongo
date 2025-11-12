@@ -141,8 +141,8 @@ public:
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
      * $and and flattening top-level $and's in the process.
      */
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) override;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 

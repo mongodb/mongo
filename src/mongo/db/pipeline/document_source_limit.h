@@ -90,8 +90,8 @@ public:
     /**
      * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
      */
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {

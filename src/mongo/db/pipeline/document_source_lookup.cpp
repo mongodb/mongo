@@ -625,7 +625,7 @@ DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
 }
 
-DocumentSourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

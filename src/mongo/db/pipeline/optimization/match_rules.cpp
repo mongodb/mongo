@@ -232,7 +232,7 @@ REGISTER_RULES(DocumentSourceInternalChangeStreamMatch,
                 kDefaultPushdownPriority});
 
 // Timeseries rewrites require $match pushdown to be attempted before the other optimizations
-// implemented in 'doOptimizeAt()'.
+// implemented in 'optimizeAt()'.
 REGISTER_RULES(DocumentSourceInternalUnpackBucket,
                OPTIMIZE_AT_RULE(DocumentSourceInternalUnpackBucket),
                {"PUSH_MATCH_BEFORE_UNPACK_BUCKET",

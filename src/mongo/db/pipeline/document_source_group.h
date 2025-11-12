@@ -84,8 +84,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<int64_t> maxMemoryUsageBytes);
 
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) override;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
     // The $sort/$group with $first/$last is rewritten to use $top/$bottom in $group so that $sort
     // is absorbed into $group. Currently this rewrite is only invoked from time-series.

@@ -37,7 +37,7 @@ const char* DocumentSourceInternalReplaceRoot::getSourceName() const {
     return kStageNameInternal.data();
 }
 
-DocumentSourceContainer::iterator DocumentSourceInternalReplaceRoot::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceInternalReplaceRoot::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
     return itr;

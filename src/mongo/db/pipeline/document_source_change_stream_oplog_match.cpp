@@ -178,7 +178,7 @@ StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
     return constraints;
 }
 
-DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(5687203, "Iterator mismatch during optimization", *itr == this);
 

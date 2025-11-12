@@ -107,7 +107,8 @@ TEST_F(DocumentSourceInternalShardFilterTest, ShouldOptimizeAwayIfUnshardedColle
     ++it;
 
     // The shard filter should remove itself.
-    container.back()->optimizeAt(it, &container);
+    checked_cast<DocumentSourceInternalShardFilter&>(*container.back().get())
+        .optimizeAt(it, &container);
     ASSERT_EQUALS(1U, container.size());
 }
 
@@ -122,7 +123,8 @@ TEST_F(DocumentSourceInternalShardFilterTest,
     auto it = container.begin();
 
     // The shard filter should remove itself.
-    container.back()->optimizeAt(it, &container);
+    dynamic_cast<DocumentSourceInternalShardFilter*>(container.back().get())
+        ->optimizeAt(it, &container);
     ASSERT_EQUALS(0U, container.size());
 }
 

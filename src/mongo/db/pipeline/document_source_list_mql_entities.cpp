@@ -101,7 +101,7 @@ const char* DocumentSourceListMqlEntities::getSourceName() const {
     return kStageName.data();
 }
 
-DocumentSourceContainer::iterator DocumentSourceListMqlEntities::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceListMqlEntities::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     return std::next(itr);
 }

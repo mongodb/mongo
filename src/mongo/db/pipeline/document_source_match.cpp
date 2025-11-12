@@ -141,7 +141,7 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
     return this;
 }
 
-DocumentSourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceMatch::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

@@ -406,7 +406,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         expCtx, partitionBy, sortBy, outputFields, sbeCompatibility);
 }
 
-DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

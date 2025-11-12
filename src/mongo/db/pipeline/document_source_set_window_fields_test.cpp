@@ -338,7 +338,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, OptimizationRemovesRedundantSortStage)
 
     // We only care about optimizing the setWindowFields stage.
     itr = std::next(itr);
-    itr = (*itr).get()->optimizeAt(itr, &pipeline);
+    itr = checked_cast<DocumentSourceInternalSetWindowFields&>(**itr).optimizeAt(itr, &pipeline);
 
     // We should have removed the redundant sort. This optimization works because the preceding and
     // succeeding sorts are the same, and setWindowFields does not change document order.

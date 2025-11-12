@@ -244,12 +244,11 @@ public:
         return _sortExecutor->hasLimit();
     }
 
-protected:
     /**
      * Attempts to absorb a subsequent $limit stage so that it can perform a top-k sort.
      */
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSortToStageFn(

@@ -168,11 +168,11 @@ public:
         return constraints;
     }
 
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
+
 protected:
     Value serialize(const SerializationOptions& opts) const override;
-
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) override;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceVectorSearchToStageFn(

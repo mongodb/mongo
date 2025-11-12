@@ -105,13 +105,13 @@ public:
         return id;
     }
 
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
+
 private:
     friend boost::intrusive_ptr<exec::agg::Stage>
     documentSourceChangeStreamUnwindTransactionToStageFn(
         const boost::intrusive_ptr<DocumentSource>& documentSource);
-
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
 
     /**
      * Resets the transaction entry filter saved in the '_filter' and '_expression' fields.

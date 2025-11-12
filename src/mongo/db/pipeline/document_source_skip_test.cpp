@@ -84,7 +84,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     DocumentSourceContainer overflowContainer;
     overflowContainer.push_back(skipShort);
     overflowContainer.push_back(skipLong);
-    skipShort->doOptimizeAt(overflowContainer.begin(), &overflowContainer);
+    skipShort->optimizeAt(overflowContainer.begin(), &overflowContainer);
     ASSERT_EQUALS(overflowContainer.size(), 2U);
     ASSERT_EQUALS(skipShort->getSkip(), 1U);
     ASSERT_EQUALS(skipLong->getSkip(), std::numeric_limits<long long>::max());
@@ -97,7 +97,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     DocumentSourceContainer doubleMaxContainer;
     doubleMaxContainer.push_back(firstMaxSkip);
     doubleMaxContainer.push_back(secondMaxSkip);
-    firstMaxSkip->doOptimizeAt(doubleMaxContainer.begin(), &doubleMaxContainer);
+    firstMaxSkip->optimizeAt(doubleMaxContainer.begin(), &doubleMaxContainer);
     ASSERT_EQUALS(doubleMaxContainer.size(), 2U);
     ASSERT_EQUALS(firstMaxSkip->getSkip(), std::numeric_limits<long long>::max());
     ASSERT_EQUALS(secondMaxSkip->getSkip(), std::numeric_limits<long long>::max());
@@ -108,7 +108,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     DocumentSourceContainer containerOptimized;
     containerOptimized.push_back(skipFirst);
     containerOptimized.push_back(skipSecond);
-    skipFirst->doOptimizeAt(containerOptimized.begin(), &containerOptimized);
+    skipFirst->optimizeAt(containerOptimized.begin(), &containerOptimized);
     ASSERT_EQUALS(containerOptimized.size(), 1U);
     ASSERT_EQUALS(skipFirst->getSkip(), 2);
 }

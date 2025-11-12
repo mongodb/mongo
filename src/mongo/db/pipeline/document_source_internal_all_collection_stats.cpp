@@ -58,7 +58,7 @@ REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalAllCollectionStats,
                             DocumentSourceInternalAllCollectionStats::id)
 
-DocumentSourceContainer::iterator DocumentSourceInternalAllCollectionStats::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceInternalAllCollectionStats::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 

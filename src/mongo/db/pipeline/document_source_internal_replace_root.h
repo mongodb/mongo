@@ -75,8 +75,8 @@ public:
         return boost::none;
     }
 
-    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
-                                                   DocumentSourceContainer* container) final;
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

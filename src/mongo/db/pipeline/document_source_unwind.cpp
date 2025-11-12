@@ -124,7 +124,7 @@ bool DocumentSourceUnwind::canPushLimitBack(const DocumentSourceLimit* limit) co
     return !_smallestLimitPushedDown || limit->getLimit() < _smallestLimitPushedDown.value();
 }
 
-DocumentSourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceUnwind::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(5482200, "DocumentSourceUnwind: itr must point to this object", *itr == this);
 

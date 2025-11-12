@@ -74,7 +74,7 @@ DocumentSourceInternalShardFilter::DocumentSourceInternalShardFilter(
     std::unique_ptr<ShardFilterer> shardFilterer)
     : DocumentSource(kStageName, pExpCtx), _shardFilterer(std::move(shardFilterer)) {}
 
-DocumentSourceContainer::iterator DocumentSourceInternalShardFilter::doOptimizeAt(
+DocumentSourceContainer::iterator DocumentSourceInternalShardFilter::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
