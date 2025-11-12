@@ -486,8 +486,7 @@ void MigrationDestinationManager::_setState(State newState) {
     _stateChangedCV.notify_all();
 }
 
-void MigrationDestinationManager::_setStateFail(StringData msg) {
-    LOGV2(21998, "Error during migration", "error"_attr = redact(msg));
+void MigrationDestinationManager::_setStateFailNoLog(StringData msg) {
     {
         stdx::lock_guard<stdx::mutex> sl(_mutex);
         _errmsg = std::string{msg};
@@ -500,18 +499,14 @@ void MigrationDestinationManager::_setStateFail(StringData msg) {
     }
 }
 
+void MigrationDestinationManager::_setStateFail(StringData msg) {
+    LOGV2(21998, "Error during migration", "error"_attr = redact(msg));
+    _setStateFailNoLog(msg);
+}
+
 void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
     LOGV2_WARNING(22010, "Error during migration", "error"_attr = redact(msg));
-    {
-        stdx::lock_guard<stdx::mutex> sl(_mutex);
-        _errmsg = std::string{msg};
-        _state = kFail;
-        _stateChangedCV.notify_all();
-    }
-
-    if (_sessionMigration) {
-        _sessionMigration->forceFail(msg);
-    }
+    _setStateFailNoLog(msg);
 }
 
 bool MigrationDestinationManager::isActive() const {
@@ -1576,13 +1571,16 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                                  range.getMax());
 
             if (existingDocShardKey) {
-                _setStateFail(
-                    str::stream()
+                std::string msg = str::stream()
                     << "Migration aborted: found existing document in range being migrated. "
                     << "Document with shard key " << *existingDocShardKey
                     << " already exists in range [" << range.getMin() << ", " << range.getMax()
                     << ") on recipient shard. Please investigate and remove "
-                    << "spurious documents before retrying migration.");
+                    << "spurious documents before retrying migration.";
+                LOGV2(11365900,
+                      "Migration aborted: found existing document",
+                      "error"_attr = redact(msg));
+                _setStateFailNoLog(msg);
                 return;
             }
 
