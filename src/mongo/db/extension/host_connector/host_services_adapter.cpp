@@ -63,11 +63,6 @@ logv2::DynamicAttributes createLogAttributes(const ::MongoExtensionLogMessage* l
 MongoExtensionStatus* HostServicesAdapter::_extLog(
     const ::MongoExtensionLogMessage* logMessage) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
-        // Validate that the message type is kLog.
-        uassert(11288500,
-                "MongoExtensionLogMessage type must be kLog for log() function",
-                logMessage->type == ::MongoExtensionLogType::kLog);
-
         // For now we always log extension messages under the EXTENSION-MONGOT component. Someday
         // we'd like to dynamically create EXTENSION sub-components per extension.
         logv2::LogOptions options(logv2::LogComponent::kExtensionMongot);
@@ -79,8 +74,21 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(
         // Extract code.
         std::int32_t code = static_cast<std::int32_t>(logMessage->code);
 
-        // Convert C enum to logv2 severity.
-        logv2::LogSeverity severity = convertSeverity(logMessage->severityOrLevel.severity);
+        logv2::LogSeverity severity = logv2::LogSeverity::Error();  // Dummy initialization
+        switch (logMessage->type) {
+            case ::MongoExtensionLogType::kDebug: {
+                // Extract level from union and trim to the range [1, 5] since we want to make sure
+                // that the log line is using one of the server's logv2 debug severities.
+                std::int32_t level = logMessage->severityOrLevel.level;
+                severity = logv2::LogSeverity::Debug(std::min(5, std::max(1, level)));
+                break;
+            }
+            case ::MongoExtensionLogType::kLog: {
+                // Convert C enum to logv2 severity.
+                severity = convertSeverity(logMessage->severityOrLevel.severity);
+                break;
+            }
+        };
 
         logv2::DynamicAttributes dynamicAttrs = createLogAttributes(logMessage);
         logv2::TypeErasedAttributeStorage attrs(dynamicAttrs);
@@ -89,37 +97,6 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(
         // literal for the message, but we have to log the message received at runtime from the
         // extension.
         logv2::detail::doLogImpl(code, severity, options, message, attrs);
-    });
-}
-
-MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
-    const ::MongoExtensionLogMessage* logMessage) noexcept {
-    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
-        // Validate that the message type is kDebug.
-        uassert(11288501,
-                "MongoExtensionLogMessage type must be kDebug for log_debug() function",
-                logMessage->type == ::MongoExtensionLogType::kDebug);
-
-        // For now we always log extension messages under the EXTENSION-MONGOT component. Someday
-        // we'd like to dynamically create EXTENSION sub-components per extension.
-        logv2::LogOptions options(logv2::LogComponent::kExtensionMongot);
-
-        // Extract message from byte view.
-        auto messageView = byteViewAsStringView(logMessage->message);
-        StringData message(messageView.data(), messageView.size());
-
-        // Extract code.
-        std::int32_t code = static_cast<std::int32_t>(logMessage->code);
-
-        // Extract level from union and trim to the range [1, 5] since we want to make sure that the
-        // log line is using one of the server's logv2 debug severities.
-        std::int32_t level = logMessage->severityOrLevel.level;
-        logv2::LogSeverity logSeverity = logv2::LogSeverity::Debug(std::min(5, std::max(1, level)));
-
-        logv2::DynamicAttributes dynamicAttrs = createLogAttributes(logMessage);
-        logv2::TypeErasedAttributeStorage attrs(dynamicAttrs);
-
-        logv2::detail::doLogImpl(code, logSeverity, options, message, attrs);
     });
 }
 

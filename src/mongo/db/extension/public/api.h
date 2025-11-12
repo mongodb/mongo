@@ -693,15 +693,10 @@ typedef struct MongoExtensionHostServices {
  */
 typedef struct MongoExtensionHostServicesVTable {
     /**
-     * Logs a message from the extension with severity INFO, WARNING, or ERROR.
+     * Logs a message from the extension. The log may be a severity log with severity INFO, WARNING,
+     * or ERROR. It may also be a debug log w/ a numeric debug log level.
      */
     MongoExtensionStatus* (*log)(const MongoExtensionLogMessage* rawLog);
-
-    /**
-     * Sends a debug log message to the server, and logs it as long as the 'Extension' log component
-     * in the server has a level greater or equal to the debug log's level.
-     */
-    MongoExtensionStatus* (*log_debug)(const MongoExtensionLogMessage* rawLog);
 
     /**
      * Throws a non-fatal exception to end the current operation with an error. This should be

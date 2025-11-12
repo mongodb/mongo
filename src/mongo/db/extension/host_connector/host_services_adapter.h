@@ -56,8 +56,6 @@ private:
 
     static MongoExtensionStatus* _extLog(const ::MongoExtensionLogMessage* logMessage) noexcept;
 
-    static MongoExtensionStatus* _extLogDebug(const ::MongoExtensionLogMessage* rawLog) noexcept;
-
     static ::MongoExtensionStatus* _extUserAsserted(
         ::MongoExtensionByteView structuredErrorMessage);
 
@@ -88,7 +86,6 @@ private:
 
     static constexpr ::MongoExtensionHostServicesVTable VTABLE{
         .log = &_extLog,
-        .log_debug = &_extLogDebug,
         .user_asserted = &_extUserAsserted,
         .tripwire_asserted = &_extTripwireAsserted,
         .create_host_agg_stage_parse_node = &_extCreateHostAggStageParseNode,

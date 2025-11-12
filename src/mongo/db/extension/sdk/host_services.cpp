@@ -55,6 +55,17 @@ void populateLogAttributes(MongoExtensionLogMessage& logMessage,
         logMessage.attributes.elements = logAttributes;
     }
 }
+
+void populateLogMessageCommon(MongoExtensionLogMessage& logMessage,
+                              const std::string& message,
+                              std::int32_t code,
+                              const std::vector<ExtensionLogAttribute>& attrs) {
+    // Convert message string to byte view.
+    auto messageBytes = stringViewAsByteView(std::string_view(message));
+    logMessage.code = static_cast<uint32_t>(code);
+    logMessage.message = messageBytes;
+    populateLogAttributes(logMessage, attrs);
+}
 }  // namespace
 
 LogMessageGuard HostServicesHandle::createLogMessageStruct(
@@ -62,15 +73,14 @@ LogMessageGuard HostServicesHandle::createLogMessageStruct(
     std::int32_t code,
     MongoExtensionLogSeverity severity,
     const std::vector<ExtensionLogAttribute>& attrs) {
-    // Convert message string to byte view.
-    auto messageBytes = stringViewAsByteView(std::string_view(message));
+    ::MongoExtensionLogMessage logMessage;
 
-    ::MongoExtensionLogMessage logMessage{
-        static_cast<uint32_t>(code), messageBytes, ::MongoExtensionLogType::kLog};
+    // Populate common fields for the log struct.
+    populateLogMessageCommon(logMessage, message, code, attrs);
+
     // Set union field for severity.
+    logMessage.type = ::MongoExtensionLogType::kLog;
     logMessage.severityOrLevel.severity = severity;
-
-    populateLogAttributes(logMessage, attrs);
 
     return LogMessageGuard(logMessage);
 }
@@ -80,15 +90,14 @@ LogMessageGuard HostServicesHandle::createDebugLogMessageStruct(
     std::int32_t code,
     std::int32_t level,
     const std::vector<ExtensionLogAttribute>& attrs) {
-    // Convert message string to byte view.
-    auto messageBytes = stringViewAsByteView(std::string_view(message));
+    ::MongoExtensionLogMessage logMessage;
 
-    ::MongoExtensionLogMessage logMessage{
-        static_cast<uint32_t>(code), messageBytes, ::MongoExtensionLogType::kDebug};
+    // Populate common fields for the log struct.
+    populateLogMessageCommon(logMessage, message, code, attrs);
+
     // Set union field for level.
+    logMessage.type = ::MongoExtensionLogType::kDebug;
     logMessage.severityOrLevel.level = level;
-
-    populateLogAttributes(logMessage, attrs);
 
     return LogMessageGuard(logMessage);
 }
@@ -97,7 +106,6 @@ void HostServicesHandle::_assertVTableConstraints(const VTable_t& vtable) const 
     sdk_tassert(
         11097801, "Host services' 'user_asserted' is null", vtable.user_asserted != nullptr);
     sdk_tassert(11188200, "Host services' 'log' is null", vtable.log != nullptr);
-    sdk_tassert(11188201, "Host services' 'log_debug' is null", vtable.log_debug != nullptr);
     // Note that we intentionally do not validate tripwire_asserted here. If it wasn't valid, the
     // tripwire assert would fire and we would dereference the nullptr anyway.
     sdk_tassert(11149304,

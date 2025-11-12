@@ -170,7 +170,7 @@ public:
         }
 
         auto logMessage = createDebugLogMessageStruct(message, code, level, attrs);
-        invokeCAndConvertStatusToException([&]() { return vtable().log_debug(logMessage.get()); });
+        invokeCAndConvertStatusToException([&]() { return vtable().log(logMessage.get()); });
     }
 
     /**
