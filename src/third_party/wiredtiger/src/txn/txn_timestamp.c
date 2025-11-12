@@ -9,48 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * __txn_parse_hex_raw --
- *     Decodes and sets a hex value. Don't do any checking.
- */
-WT_INLINE static int
-__txn_parse_hex_raw(
-  WT_SESSION_IMPL *session, const char *name, uint64_t *valuep, WT_CONFIG_ITEM *cval)
-{
-    static const int8_t hextable[] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, -1, -1, -1, -1, -1,
-      -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 10, 11, 12, 13, 14, 15, -1};
-    uint64_t value;
-    size_t len;
-    int hex_val;
-    const char *hex_itr;
-
-    *valuep = 0;
-
-    if (cval->len == 0)
-        return (0);
-
-    /* Protect against unexpectedly long hex strings. */
-    if (cval->len > 2 * sizeof(uint64_t))
-        WT_RET_MSG(session, EINVAL, "%s too long '%.*s'", name, (int)cval->len, cval->str);
-
-    for (value = 0, hex_itr = cval->str, len = cval->len; len > 0; --len) {
-        if ((size_t)*hex_itr < WT_ELEMENTS(hextable))
-            hex_val = hextable[(size_t)*hex_itr++];
-        else
-            hex_val = -1;
-        if (hex_val < 0)
-            WT_RET_MSG(
-              session, EINVAL, "Failed to parse %s '%.*s'", name, (int)cval->len, cval->str);
-        value = (value << 4) | (uint64_t)hex_val;
-    }
-    *valuep = value;
-
-    return (0);
-}
-
-/*
  * __wt_txn_parse_timestamp_raw --
  *     Decodes and sets a timestamp. Don't do any checking.
  */
@@ -58,7 +16,7 @@ int
 __wt_txn_parse_timestamp_raw(
   WT_SESSION_IMPL *session, const char *name, wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval)
 {
-    return (__txn_parse_hex_raw(session, name, timestamp, cval));
+    return (__wt_conf_parse_hex(session, name, timestamp, cval));
 }
 
 /*
@@ -84,7 +42,7 @@ __wt_txn_parse_timestamp(
 int
 __wt_txn_parse_prepared_id(WT_SESSION_IMPL *session, uint64_t *prepared_id, WT_CONFIG_ITEM *cval)
 {
-    WT_RET(__txn_parse_hex_raw(session, "prepare id", prepared_id, cval));
+    WT_RET(__wt_conf_parse_hex(session, "prepare id", prepared_id, cval));
     if (cval->len != 0 && *prepared_id == WT_PREPARED_ID_NONE)
         WT_RET_MSG(session, EINVAL, "illegal prepared id '%.*s': zero not permitted",
           (int)cval->len, cval->str);

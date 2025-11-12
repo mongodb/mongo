@@ -105,14 +105,19 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             break;
         case WT_SYNC_DISCARD:
             /*
-             * Discard the page whether it is dirty or not. The check if the page can be evicted is
-             * not exhaustive, but provides basic checking on the page's status.
+             * Discard the page regardless of whether it is dirty or clean. The check to determine
+             * if the page can be evicted is not comprehensive but performs basic validation of the
+             * page's status. In the disaggregated architecture, there may be situations where a
+             * file needs to be closed even if its pages have not been fully materialized. In such
+             * cases, return an error to ensure the pages remain readable later. Otherwise, you risk
+             * losing access to those pages upon attempting retrieval.
              */
-            WT_ASSERT(session,
-              F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
-                F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) ||
-                __wt_page_can_evict(session, ref, NULL));
-            __wt_ref_out(session, ref);
+            if (F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
+              F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) ||
+              __wt_page_can_evict(session, ref, NULL))
+                __wt_ref_out(session, ref);
+            else
+                WT_ERR(__wt_set_return(session, EBUSY));
             break;
         case WT_SYNC_CHECKPOINT:
         case WT_SYNC_WRITE_LEAVES:

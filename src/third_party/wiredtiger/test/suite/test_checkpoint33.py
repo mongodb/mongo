@@ -93,6 +93,7 @@ class test_checkpoint33(test_cc_base, suite_subprocess):
         # Create and populate a table at timestamp 2.
         self.session.create(self.uri, self.create_params)
         self.session.checkpoint()
+        self.prout(f'populate(2)')
         self.populate(timestamp=2)
 
         # Make everything stable at timestamp 3.
@@ -102,35 +103,36 @@ class test_checkpoint33(test_cc_base, suite_subprocess):
         self.session.checkpoint()
 
         # Delete everything at timestamp 4.
+        self.prout(f'delete(4)')
         self.delete(timestamp=4)
 
         # Make the deletions stable at timestamp 5.
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(5)}')
 
         # Write to disk.
+        self.prout(f'checkpoint')
         self.session.checkpoint()
 
         # Evict all pages to ensure they all have disk blocks associated with them.
+        self.prout(f'evict')
         self.evict_all()
 
         # Make everything globally visible.
         self.conn.set_timestamp(f'oldest_timestamp={self.timestamp_str(5)}')
-        self.prout(f'File size: {self.get_size()}')
-
-        # Wait for checkpoint cleanup to clean up all the deleted pages.
-        self.wait_for_cc_to_run()
+        self.prout(f'            Initial file size: {self.get_size()}')
 
         # Checkpoint should recover the space by truncating the space made available by
         # checkpoint cleanup. Multiple checkpoints are required to move the blocks around and
         # eventually reach the minimum file size of 12KB.
         checkpoints = 0
         max_checkpoints = 10
-        file_size = self.get_size()
-        while file_size > self.min_file_size and checkpoints < max_checkpoints:
+        while True:
+            self.wait_for_cc_to_run() # Wait for checkpoint cleanup to clean up all the deleted pages.
             self.session.checkpoint()
             file_size = self.get_size()
             checkpoints = checkpoints + 1
-            self.prout(f'File size: {file_size}')
-            self.prout(f'Checkpoints: {checkpoints}')
+            self.prout(f'checkpoint {checkpoints} of {max_checkpoints}: File size: {file_size}')
+            if file_size <= self.min_file_size or checkpoints >= max_checkpoints:
+                break
 
         self.assertLessEqual(self.get_size(), self.min_file_size)

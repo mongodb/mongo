@@ -128,3 +128,45 @@ __wt_conf_gets_def_func(
     }
     return (__wt_conf_gets_func(session, conf, keys, def, true, false, value));
 }
+
+/*
+ * __wt_conf_parse_hex --
+ *     Decodes and sets a hex value. Don't do any checking.
+ */
+static WT_INLINE int
+__wt_conf_parse_hex(
+  WT_SESSION_IMPL *session, const char *name, uint64_t *valuep, WT_CONFIG_ITEM *cval)
+{
+    static const int8_t hextable[] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, -1, -1, -1, -1, -1,
+      -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 10, 11, 12, 13, 14, 15, -1};
+    uint64_t value;
+    size_t len;
+    int hex_val;
+    const char *hex_itr;
+
+    *valuep = 0;
+
+    if (cval->len == 0)
+        return (0);
+
+    /* Protect against unexpectedly long hex strings. */
+    if (cval->len > 2 * sizeof(uint64_t))
+        WT_RET_MSG(session, EINVAL, "%s too long '%.*s'", name, (int)cval->len, cval->str);
+
+    for (value = 0, hex_itr = cval->str, len = cval->len; len > 0; --len) {
+        if ((size_t)*hex_itr < WT_ELEMENTS(hextable))
+            hex_val = hextable[(size_t)*hex_itr++];
+        else
+            hex_val = -1;
+        if (hex_val < 0)
+            WT_RET_MSG(
+              session, EINVAL, "Failed to parse %s '%.*s'", name, (int)cval->len, cval->str);
+        value = (value << 4) | (uint64_t)hex_val;
+    }
+    *valuep = value;
+
+    return (0);
+}

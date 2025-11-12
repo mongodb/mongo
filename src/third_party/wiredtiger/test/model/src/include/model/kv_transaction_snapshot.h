@@ -47,6 +47,12 @@ class kv_transaction_snapshot {
 
 public:
     /*
+     * kv_transaction_snapshot::~kv_transaction_snapshot --
+     *     Destroy the snapshot.
+     */
+    virtual ~kv_transaction_snapshot() = default;
+
+    /*
      * kv_transaction_snapshot::contains --
      *     Check whether the given update belongs to the snapshot.
      */

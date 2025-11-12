@@ -917,8 +917,9 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                      * commit/rollback. But it is enough to help us catch some issues.
                      */
                     WT_ASSERT_ALWAYS(session,
-                      !F_ISSET(r, WT_REC_EVICT) || prepare_rollback_tombstone != NULL ||
-                        upd->next != NULL ||
+                      !F_ISSET(r, WT_REC_EVICT) || F_ISSET(conn, WT_CONN_IN_MEMORY) ||
+                        F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY) ||
+                        prepare_rollback_tombstone != NULL || upd->next != NULL ||
                         (vpack != NULL && vpack->type != WT_CELL_DEL &&
                           !WT_TIME_WINDOW_HAS_PREPARE(&vpack->tw)),
                       "leaked prepared update.");

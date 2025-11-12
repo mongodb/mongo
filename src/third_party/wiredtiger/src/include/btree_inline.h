@@ -2062,8 +2062,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * We cannot evict the page in the prefetch queue. Eviction may split the page and free the ref.
      * The prefetch thread would crash if it sees a freed ref.
      */
-    if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH))
+    if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH)) {
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_prefetched);
         return (false);
+    }
 
     if (F_ISSET(btree, WT_BTREE_READONLY))
         return (true);

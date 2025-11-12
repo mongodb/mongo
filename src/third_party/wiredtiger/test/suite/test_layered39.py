@@ -110,11 +110,3 @@ class test_layered39(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError,
             lambda: self.conn.set_context_uint(wiredtiger.WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN,
                                                last_lsn + 5))
-
-        # FIXME-WT-15807: layered39 aborts when closing dhandle as part of verify.
-        # Delete all code below this point as part of this ticket.
-        self.close_conn()
-
-        # Ignore "Removing local file due to disagg mode" messages printed by
-        # __wti_ensure_clean_startup_dir during disagg mode restarts.
-        self.ignoreStdoutPattern('local file')

@@ -193,9 +193,11 @@ struct __wt_disaggregated_storage {
     char *page_log;
 
     /* Updates are protected by the checkpoint lock. */
+    char *last_checkpoint_root;             /* The root config of the last checkpoint. */
+    uint32_t last_checkpoint_meta_checksum; /* The checksum of the last checkpoint metadata page. */
+
     wt_shared uint64_t last_checkpoint_meta_lsn; /* The LSN of the last checkpoint metadata. */
     wt_shared uint64_t last_materialized_lsn;    /* The LSN of the last materialized page. */
-    char *last_checkpoint_root;                  /* The root config of the last checkpoint. */
 
     wt_timestamp_t cur_checkpoint_timestamp; /* The timestamp of the in-progress checkpoint. */
     wt_shared wt_timestamp_t last_checkpoint_timestamp; /* The timestamp of the last checkpoint. */

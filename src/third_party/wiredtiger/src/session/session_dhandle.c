@@ -264,8 +264,12 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
         /* Give other threads a chance to make progress. */
         WT_STAT_CONN_INCR(session, dhandle_lock_blocked);
 
+#ifdef _WIN32
         /* FIXME-WT-12037 Use a sleep to work around a Windows-specific scheduling issue. */
         __wt_sleep(0, 1);
+#else
+        __wt_yield();
+#endif
     }
 }
 

@@ -2701,10 +2701,11 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
         /*
          * If we need to restore the page to memory, copy the disk image.
          *
-         * We need to write the disk image for btrees with delta enabled as a later reconciliation
-         * may build a delta that is based on a page image that was never written to disk.
+         * In disagg mode, we need to write the disk image for btrees with delta enabled as a later
+         * reconciliation may build a delta that is based on a page image that was never written to
+         * disk. In local mode, if restoring saved update chains, we can skip the disk written.
          */
-        if (WT_DELTA_ENABLED_FOR_PAGE(session, r->page->type)) {
+        if (r->page->disagg_info != NULL) {
             if (chunk->entries == 0)
                 goto copy_image;
         } else if (multi->supd_restore)

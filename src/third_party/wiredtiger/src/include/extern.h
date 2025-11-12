@@ -2042,6 +2042,8 @@ static WT_INLINE int __wt_conf_check_one(WT_SESSION_IMPL *session, const WT_CONF
   WT_CONFIG_ITEM *value) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_conf_gets_def_func(WT_SESSION_IMPL *session, const WT_CONF *conf,
   uint64_t keys, int def, WT_CONFIG_ITEM *value) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE int __wt_conf_parse_hex(WT_SESSION_IMPL *session, const char *name,
+  uint64_t *valuep, WT_CONFIG_ITEM *cval) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_curindex_get_valuev(WT_CURSOR *cursor, va_list ap)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)

@@ -75,6 +75,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: eviction gave up due to needing to remove a record from the history store but checkpoint "
   "is running",
   "cache: eviction gave up due to no progress being made",
+  "cache: eviction server skipped the pages when prefetching",
   "cache: eviction walk pages queued that had updates",
   "cache: eviction walk pages queued that were clean",
   "cache: eviction walk pages queued that were dirty",
@@ -518,6 +519,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_eviction_blocked_no_ts_checkpoint_race_4 = 0;
     stats->cache_eviction_blocked_remove_hs_race_with_checkpoint = 0;
     stats->cache_eviction_blocked_no_progress = 0;
+    stats->cache_eviction_blocked_prefetched = 0;
     stats->cache_eviction_pages_queued_updates = 0;
     stats->cache_eviction_pages_queued_clean = 0;
     stats->cache_eviction_pages_queued_dirty = 0;
@@ -938,6 +940,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_eviction_blocked_remove_hs_race_with_checkpoint +=
       from->cache_eviction_blocked_remove_hs_race_with_checkpoint;
     to->cache_eviction_blocked_no_progress += from->cache_eviction_blocked_no_progress;
+    to->cache_eviction_blocked_prefetched += from->cache_eviction_blocked_prefetched;
     to->cache_eviction_pages_queued_updates += from->cache_eviction_pages_queued_updates;
     to->cache_eviction_pages_queued_clean += from->cache_eviction_pages_queued_clean;
     to->cache_eviction_pages_queued_dirty += from->cache_eviction_pages_queued_dirty;
@@ -1373,6 +1376,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_DSRC_READ(from, cache_eviction_blocked_remove_hs_race_with_checkpoint);
     to->cache_eviction_blocked_no_progress +=
       WT_STAT_DSRC_READ(from, cache_eviction_blocked_no_progress);
+    to->cache_eviction_blocked_prefetched +=
+      WT_STAT_DSRC_READ(from, cache_eviction_blocked_prefetched);
     to->cache_eviction_pages_queued_updates +=
       WT_STAT_DSRC_READ(from, cache_eviction_pages_queued_updates);
     to->cache_eviction_pages_queued_clean +=
@@ -1906,7 +1911,12 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction passes of a file",
   "cache: eviction server candidate queue empty when topping up",
   "cache: eviction server candidate queue not empty when topping up",
+  "cache: eviction server push pages to queue failed because of racing with setting flag",
   "cache: eviction server races with the reconfigure API call in disagg",
+  "cache: eviction server skipped the internal pages if eviction is not in aggressive mode.",
+  "cache: eviction server skipped the pages already in the urgent queue",
+  "cache: eviction server skipped the pages when prefetching",
+  "cache: eviction server skipped the root pages",
   "cache: eviction server skips dirty pages during a running checkpoint",
   "cache: eviction server skips ingest btrees in disagg",
   "cache: eviction server skips internal pages as it has an active child.",
@@ -2907,7 +2917,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_walk_passes = 0;
     stats->eviction_queue_empty = 0;
     stats->eviction_queue_not_empty = 0;
+    stats->eviction_server_push_pages_failed_when_flaging = 0;
     stats->eviction_server_race_reconfigure_disagg = 0;
+    stats->eviction_server_skip_intl_page_non_aggressive = 0;
+    stats->eviction_server_skip_pages_already_in_urgent_queue = 0;
+    stats->cache_eviction_blocked_prefetched = 0;
+    stats->eviction_root_pages_skipped = 0;
     stats->eviction_server_skip_dirty_pages_during_checkpoint = 0;
     stats->eviction_server_skip_ingest_trees = 0;
     stats->eviction_server_skip_intl_page_with_active_child = 0;
@@ -3889,8 +3904,17 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_walk_passes += WT_STAT_CONN_READ(from, eviction_walk_passes);
     to->eviction_queue_empty += WT_STAT_CONN_READ(from, eviction_queue_empty);
     to->eviction_queue_not_empty += WT_STAT_CONN_READ(from, eviction_queue_not_empty);
+    to->eviction_server_push_pages_failed_when_flaging +=
+      WT_STAT_CONN_READ(from, eviction_server_push_pages_failed_when_flaging);
     to->eviction_server_race_reconfigure_disagg +=
       WT_STAT_CONN_READ(from, eviction_server_race_reconfigure_disagg);
+    to->eviction_server_skip_intl_page_non_aggressive +=
+      WT_STAT_CONN_READ(from, eviction_server_skip_intl_page_non_aggressive);
+    to->eviction_server_skip_pages_already_in_urgent_queue +=
+      WT_STAT_CONN_READ(from, eviction_server_skip_pages_already_in_urgent_queue);
+    to->cache_eviction_blocked_prefetched +=
+      WT_STAT_CONN_READ(from, cache_eviction_blocked_prefetched);
+    to->eviction_root_pages_skipped += WT_STAT_CONN_READ(from, eviction_root_pages_skipped);
     to->eviction_server_skip_dirty_pages_during_checkpoint +=
       WT_STAT_CONN_READ(from, eviction_server_skip_dirty_pages_during_checkpoint);
     to->eviction_server_skip_ingest_trees +=

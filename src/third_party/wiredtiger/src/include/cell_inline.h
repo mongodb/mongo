@@ -39,11 +39,12 @@ __cell_assert_tw_has_ts_for_garbage_collection_table(WT_SESSION_IMPL *session, W
     WT_UNUSED(session);
     WT_UNUSED(tw);
 
-    WT_ASSERT(
-      session, tw->start_ts != WT_TS_NONE || !F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT));
+    WT_ASSERT(session,
+      tw->start_ts != WT_TS_NONE || tw->start_prepare_ts != WT_TS_NONE ||
+        !F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT));
     WT_ASSERT(session,
       !WT_TIME_WINDOW_HAS_STOP(tw) || tw->stop_ts != WT_TS_NONE ||
-        !F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT));
+        tw->stop_prepare_ts != WT_TS_NONE || !F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT));
 }
 
 /*

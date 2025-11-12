@@ -2501,7 +2501,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi, bool 
 
     /* If there's an address, copy it. */
     if (multi->addr.block_cookie != NULL) {
-        WT_ASSERT(session, WT_DELTA_LEAF_ENABLED(session));
+        WT_ASSERT(session, page->disagg_info != NULL);
         WT_ERR(__wt_calloc_one(session, &addr));
         WT_TIME_AGGREGATE_COPY(&addr->ta, &multi->addr.ta);
         WT_ERR(__wt_memdup(
