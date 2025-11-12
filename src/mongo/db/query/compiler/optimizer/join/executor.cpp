@@ -72,6 +72,18 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
         return false;
     }
 
+    // Fallback on cross-DB lookups.
+    auto& mainDb = mca.getMainCollection()->ns().dbName();
+    bool foundCrossDbLookup = false;
+    mca.forEach([&mainDb, &foundCrossDbLookup](const CollectionPtr& collPtr) {
+        if (collPtr->ns().dbName() != mainDb) {
+            foundCrossDbLookup = true;
+        }
+    });
+    if (foundCrossDbLookup) {
+        return false;
+    }
+
     return AggJoinModel::pipelineEligibleForJoinReordering(pipeline);
 }
 }  // namespace
