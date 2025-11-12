@@ -64,6 +64,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "load_extension.h",
+        "load_extension_test_util.h",
         "load_stub_parsers.h",
     ],
     deps = [
@@ -79,6 +80,7 @@ mongo_cc_unit_test(
     name = "extensions_api_test",
     srcs = [
         "load_extension_test.cpp",
+        "load_native_vector_search_test.cpp",
     ],
     # Data lists the targets that must be built to generate extension shared libraries, which are
     # loaded in the unit tests.
@@ -98,7 +100,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:major_version_max_int_bad_extension",
         "//src/mongo/db/extension/test_examples:major_version_too_high_bad_extension",
         "//src/mongo/db/extension/test_examples:major_version_too_low_bad_extension",
+        "//src/mongo/db/extension/test_examples:match_topN_mongo_extension",
         "//src/mongo/db/extension/test_examples:minor_version_too_high_bad_extension",
+        "//src/mongo/db/extension/test_examples:native_vector_search_mongo_extension",
         "//src/mongo/db/extension/test_examples:no_compatible_version_bad_extension",
         "//src/mongo/db/extension/test_examples:no_symbol_bad_extension",
         "//src/mongo/db/extension/test_examples:null_initialize_function_bad_extension",

@@ -46,6 +46,7 @@ namespace host {
 using LiteParsedList = std::list<std::unique_ptr<LiteParsedDocumentSource>>;
 
 class LoadExtensionsTest;
+class LoadNativeVectorSearchTest;
 
 /**
  * A DocumentSource implementation for an extension aggregation stage. DocumentSourceExtension is a
@@ -263,6 +264,7 @@ private:
      */
     friend class mongo::extension::DocumentSourceExtensionTest;
     friend class mongo::extension::host::LoadExtensionsTest;
+    friend class mongo::extension::host::LoadNativeVectorSearchTest;
     static void unregisterParser_forTest(const std::string& name);
 
 protected:
