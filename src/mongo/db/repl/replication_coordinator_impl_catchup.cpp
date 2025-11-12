@@ -34,6 +34,7 @@
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 
@@ -300,6 +301,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
             }
         }
         _oplogSyncState = OplogSyncState::Running;
+        _oplogSyncStateCached.store(lk, _oplogSyncState);
         _externalState->startProducerIfStopped();
     }
 
@@ -358,6 +360,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     }
 
     _memberState = newState;
+    _memberStateCached.store(lk, _memberState);
 
     _cancelAndRescheduleElectionTimeout(lk);
 
@@ -411,6 +414,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
 
     _topCoord->setMyLastAppliedOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
+    _myLastAppliedOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
 
     // No need to wake up replication waiters because there should not be any replication waiters
     // waiting on our own lastApplied.

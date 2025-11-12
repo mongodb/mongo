@@ -99,6 +99,13 @@ public:
     }
 
     /**
+     * Gets the current value of this Atomic using acquire memory order.
+     */
+    MONGO_MOD_PUB WordType loadAcquire() const {
+        return _value.load(std::memory_order_acquire);
+    }
+
+    /**
      * Sets the value of this Atomic to "newValue".
      */
     MONGO_MOD_PUB void store(WordType newValue) {
@@ -110,6 +117,13 @@ public:
      */
     MONGO_MOD_PUB void storeRelaxed(WordType newValue) {
         _value.store(newValue, std::memory_order_relaxed);
+    }
+
+    /**
+     * Sets the value of this Atomic to "newValue" using release memory order.
+     */
+    MONGO_MOD_PUB void storeRelease(WordType newValue) {
+        _value.store(newValue, std::memory_order_release);
     }
 
     /**
