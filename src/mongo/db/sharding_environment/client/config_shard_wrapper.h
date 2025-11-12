@@ -81,7 +81,7 @@ public:
 
     std::string toString() const override;
 
-    bool isRetriableError(ErrorCodes::Error code,
+    bool isRetriableError(const Status& status,
                           std::span<const std::string> errorLabels,
                           RetryPolicy options) const final;
 

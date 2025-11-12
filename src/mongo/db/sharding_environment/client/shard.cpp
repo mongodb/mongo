@@ -56,7 +56,7 @@ namespace {
 auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolicy)
     -> AdaptiveRetryStrategy::RetryCriteria {
     return [retryPolicy, shard = &shard](Status s, std::span<const std::string> errorLabels) {
-        return shard->isRetriableError(s.code(), errorLabels, retryPolicy);
+        return shard->isRetriableError(s, errorLabels, retryPolicy);
     };
 }
 
@@ -72,11 +72,11 @@ auto makeRetryCriteriaForConnectionType(ConnectionString::ConnectionType connect
     switch (connectionType) {
         case ConnectionString::ConnectionType::kLocal:
             return [retryPolicy](Status s, std::span<const std::string> errorLabels) {
-                return Shard::localIsRetriableError(s.code(), errorLabels, retryPolicy);
+                return Shard::localIsRetriableError(s, errorLabels, retryPolicy);
             };
         case ConnectionString::ConnectionType::kReplicaSet:
             return [retryPolicy](Status s, std::span<const std::string> errorLabels) {
-                return Shard::remoteIsRetriableError(s.code(), errorLabels, retryPolicy);
+                return Shard::remoteIsRetriableError(s, errorLabels, retryPolicy);
             };
         default:
             MONGO_UNREACHABLE;
@@ -176,7 +176,7 @@ bool Shard::RetryStrategy::recordFailureAndEvaluateShouldRetry(
 
     _recordOperationAttempted();
 
-    if (containsSystemOverloadedLabels(errorLabels)) {
+    if (containsSystemOverloadedErrorLabel(errorLabels)) {
         _stats->numOverloadErrorsReceived.addAndFetch(1);
 
         if (willRetry) {
@@ -313,41 +313,45 @@ bool Shard::isConfig() const {
     return _id == ShardId::kConfigServerId;
 }
 
-bool Shard::localIsRetriableError(ErrorCodes::Error code,
+bool Shard::localIsRetriableError(const Status& status,
                                   std::span<const std::string> errorLabels,
                                   RetryPolicy options) {
+    const auto code = status.code();
     switch (options) {
-        case Shard::RetryPolicy::kNoRetry: {
+        case RetryPolicy::kNoRetry: {
             return false;
         } break;
 
-        case Shard::RetryPolicy::kIdempotent: {
-            return code == ErrorCodes::WriteConcernTimeout || containsRetryableLabels(errorLabels);
+        case RetryPolicy::kIdempotent: {
+            return code == ErrorCodes::WriteConcernTimeout ||
+                DefaultRetryStrategy::defaultRetryCriteria(status, errorLabels);
         } break;
 
-        case Shard::RetryPolicy::kIdempotentOrCursorInvalidated: {
-            return localIsRetriableError(code, errorLabels, Shard::RetryPolicy::kIdempotent) ||
+        case RetryPolicy::kIdempotentOrCursorInvalidated: {
+            return localIsRetriableError(status, errorLabels, Shard::RetryPolicy::kIdempotent) ||
                 ErrorCodes::isCursorInvalidatedError(code);
         } break;
 
-        case Shard::RetryPolicy::kNotIdempotent: {
-            return false;
+        case RetryPolicy::kNotIdempotent: {
+            return DefaultRetryStrategy::unconditionallyRetryableCriteria(status, errorLabels);
         } break;
 
         case RetryPolicy::kStrictlyNotIdempotent: {
-            return containsRetryableLabels(errorLabels);
+            return DefaultRetryStrategy::unconditionallyRetryableCriteria(status, errorLabels);
         } break;
     }
 
     MONGO_UNREACHABLE;
 }
 
-bool Shard::remoteIsRetriableError(ErrorCodes::Error code,
+bool Shard::remoteIsRetriableError(const Status& status,
                                    std::span<const std::string> errorLabels,
                                    RetryPolicy options) {
     if (gInternalProhibitShardOperationRetry.loadRelaxed()) {
         return false;
     }
+
+    const auto code = status.code();
 
     switch (options) {
         case RetryPolicy::kNoRetry: {
@@ -355,20 +359,22 @@ bool Shard::remoteIsRetriableError(ErrorCodes::Error code,
         } break;
 
         case RetryPolicy::kIdempotent: {
-            return isMongosRetriableError(code) || containsRetryableLabels(errorLabels);
+            return isMongosRetriableError(code) ||
+                DefaultRetryStrategy::defaultRetryCriteria(status, errorLabels);
         } break;
 
         case RetryPolicy::kIdempotentOrCursorInvalidated: {
-            return remoteIsRetriableError(code, errorLabels, Shard::RetryPolicy::kIdempotent) ||
+            return remoteIsRetriableError(status, errorLabels, Shard::RetryPolicy::kIdempotent) ||
                 ErrorCodes::isCursorInvalidatedError(code);
         } break;
 
         case RetryPolicy::kNotIdempotent: {
-            return ErrorCodes::isNotPrimaryError(code);
+            return ErrorCodes::isNotPrimaryError(code) ||
+                DefaultRetryStrategy::unconditionallyRetryableCriteria(status, errorLabels);
         } break;
 
         case RetryPolicy::kStrictlyNotIdempotent: {
-            return containsRetryableLabels(errorLabels);
+            return DefaultRetryStrategy::unconditionallyRetryableCriteria(status, errorLabels);
         } break;
     }
 

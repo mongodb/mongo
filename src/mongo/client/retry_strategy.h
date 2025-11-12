@@ -346,8 +346,10 @@ public:
     };
 };
 
-bool containsRetryableLabels(std::span<const std::string> errorLabels);
-bool containsSystemOverloadedLabels(std::span<const std::string> errorLabels);
+/**
+ * Determines whether the error labels indicate that an error is caused by an overloaded system.
+ */
+bool containsSystemOverloadedErrorLabel(std::span<const std::string> errorLabels);
 
 /**
  * Implements the basic behavior for retryability of failed requests.
@@ -363,6 +365,8 @@ public:
     using RetryCriteria = std::function<bool(Status s, std::span<const std::string> errorLabels)>;
 
     static bool defaultRetryCriteria(Status s, std::span<const std::string> errorLabels);
+    static bool unconditionallyRetryableCriteria(Status s,
+                                                 std::span<const std::string> errorLabels);
 
     struct RetryParameters {
         // Maximum number of retries after initial retriable error.

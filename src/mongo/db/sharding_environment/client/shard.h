@@ -321,15 +321,15 @@ public:
      *
      * isRetriableError() routes to either of the static functions depending on object type.
      */
-    static bool localIsRetriableError(ErrorCodes::Error code,
+    static bool localIsRetriableError(const Status& code,
                                       std::span<const std::string> errorLabels,
                                       RetryPolicy options);
 
-    static bool remoteIsRetriableError(ErrorCodes::Error code,
+    static bool remoteIsRetriableError(const Status& status,
                                        std::span<const std::string> errorLabels,
                                        RetryPolicy options);
 
-    virtual bool isRetriableError(ErrorCodes::Error code,
+    virtual bool isRetriableError(const Status& status,
                                   std::span<const std::string> errorLabels,
                                   RetryPolicy options) const = 0;
 

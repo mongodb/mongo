@@ -36,8 +36,9 @@
 #include <algorithm>
 
 namespace mongo {
+namespace {
 
-bool containsRetryableLabels(std::span<const std::string> errorLabels) {
+bool isRetryableError(std::span<const std::string> errorLabels) {
     constexpr auto isRetryableErrorLabel = [](StringData label) {
         return label == ErrorLabel::kRetryableWrite || label == ErrorLabel::kRetryableError;
     };
@@ -45,13 +46,20 @@ bool containsRetryableLabels(std::span<const std::string> errorLabels) {
     return std::ranges::find_if(errorLabels, isRetryableErrorLabel) != errorLabels.end();
 }
 
-bool containsSystemOverloadedLabels(std::span<const std::string> errorLabels) {
+}  // namespace
+
+bool containsSystemOverloadedErrorLabel(std::span<const std::string> errorLabels) {
     return std::ranges::find(errorLabels, ErrorLabel::kSystemOverloadedError) != errorLabels.end();
 }
 
 bool DefaultRetryStrategy::defaultRetryCriteria(Status s,
                                                 std::span<const std::string> errorLabels) {
-    return s.isA<ErrorCategory::RetriableError>() || containsRetryableLabels(errorLabels);
+    return s.isA<ErrorCategory::RetriableError>() || isRetryableError(errorLabels);
+}
+
+bool DefaultRetryStrategy::unconditionallyRetryableCriteria(
+    Status s, std::span<const std::string> errorLabels) {
+    return std::ranges::find(errorLabels, ErrorLabel::kRetryableError) != errorLabels.end();
 }
 
 bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
@@ -63,7 +71,7 @@ bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
         return false;
     }
 
-    if (containsSystemOverloadedLabels(errorLabels)) {
+    if (containsSystemOverloadedErrorLabel(errorLabels)) {
         if (target) {
             _targetingMetadata.deprioritizedServers.emplace(*target);
         }
@@ -86,7 +94,7 @@ bool AdaptiveRetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& target,
     std::span<const std::string> errorLabels) {
-    const bool targetOverloaded = containsSystemOverloadedLabels(errorLabels);
+    const bool targetOverloaded = containsSystemOverloadedErrorLabel(errorLabels);
 
     const auto evaluateShouldRetry = [&] {
         if (targetOverloaded) {

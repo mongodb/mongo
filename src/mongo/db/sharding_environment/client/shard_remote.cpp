@@ -120,10 +120,10 @@ ShardRemote::ShardRemote(const ShardId& id,
 
 ShardRemote::~ShardRemote() = default;
 
-bool ShardRemote::isRetriableError(ErrorCodes::Error code,
+bool ShardRemote::isRetriableError(const Status& status,
                                    std::span<const std::string> errorLabels,
                                    RetryPolicy options) const {
-    return remoteIsRetriableError(code, errorLabels, options);
+    return remoteIsRetriableError(status, errorLabels, options);
 }
 
 // Any error code changes should possibly also be made to Shard::shouldErrorBePropagated!

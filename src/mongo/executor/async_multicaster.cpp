@@ -66,10 +66,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     if (!_options.strategyFactory) {
         _options.strategyFactory = []() {
             return std::make_unique<DefaultRetryStrategy>(
-                DefaultRetryStrategy::RetryCriteria{
-                    [](Status s, std::span<const std::string> labels) {
-                        return containsRetryableLabels(labels);
-                    }},
+                DefaultRetryStrategy::unconditionallyRetryableCriteria,
                 DefaultRetryStrategy::getRetryParametersFromServerParameters());
         };
     }

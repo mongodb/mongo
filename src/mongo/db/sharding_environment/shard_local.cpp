@@ -71,10 +71,10 @@ std::string ShardLocal::toString() const {
     return getId().toString() + ":<local>";
 }
 
-bool ShardLocal::isRetriableError(ErrorCodes::Error code,
+bool ShardLocal::isRetriableError(const Status& status,
                                   std::span<const std::string> errorLabels,
                                   RetryPolicy options) const {
-    return localIsRetriableError(code, errorLabels, options);
+    return localIsRetriableError(status, errorLabels, options);
 }
 
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(

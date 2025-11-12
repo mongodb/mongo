@@ -1239,7 +1239,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
         if (retry < kMaxWriteRetry &&
             configShard->isRetriableError(
-                status.code(), response.getErrorLabels(), Shard::RetryPolicy::kIdempotent)) {
+                status, response.getErrorLabels(), Shard::RetryPolicy::kIdempotent)) {
             // Pretend like the operation is idempotent because we're handling DuplicateKey errors
             // specially
             continue;

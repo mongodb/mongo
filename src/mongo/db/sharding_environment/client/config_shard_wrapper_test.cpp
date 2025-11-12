@@ -85,7 +85,7 @@ public:
         return getId().toString();
     }
 
-    bool isRetriableError(ErrorCodes::Error code,
+    bool isRetriableError(const Status& code,
                           std::span<const std::string> errorLabels,
                           RetryPolicy options) const final {
         return false;
