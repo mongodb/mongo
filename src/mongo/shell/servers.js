@@ -693,19 +693,6 @@ MongoRunner.mongodOptions = function (opts = {}) {
 
     opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
 
-    opts.setParameter ||= {};
-    if (jsTestOptions().enableTestCommands && typeof opts.setParameter !== "string") {
-        if (
-            jsTestOptions().setParameters &&
-            jsTestOptions().setParameters.disableTransitionFromLatestToLastContinuous
-        ) {
-            opts.setParameter["disableTransitionFromLatestToLastContinuous"] =
-                jsTestOptions().setParameters.disableTransitionFromLatestToLastContinuous;
-        } else {
-            opts.setParameter["disableTransitionFromLatestToLastContinuous"] = false;
-        }
-    }
-
     if (jsTestOptions().mongodTlsCertificateKeyFile && !opts.tlsCertificateKeyFile) {
         opts.tlsCertificateKeyFile = jsTestOptions().mongodTlsCertificateKeyFile;
     }
@@ -720,7 +707,6 @@ MongoRunner.mongodOptions = function (opts = {}) {
     _removeSetParameterIfBeforeVersion(opts, "enableReconfigRollbackCommittedWritesCheck", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "allowMultipleArbiters", "5.3.0");
     _removeSetParameterIfBeforeVersion(opts, "internalQueryDisableExclusionProjectionFastPath", "6.2.0");
-    _removeSetParameterIfBeforeVersion(opts, "disableTransitionFromLatestToLastContinuous", "7.0.0");
     _removeSetParameterIfBeforeVersion(opts, "defaultConfigCommandTimeoutMS", "7.3.0");
     _removeSetParameterIfBeforeVersion(opts, "enableAutoCompaction", "7.3.0");
     _removeSetParameterIfBeforeVersion(opts, "opentelemetryTraceDirectory", "8.3.0");

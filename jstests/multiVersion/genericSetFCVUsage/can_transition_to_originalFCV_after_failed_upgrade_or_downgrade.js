@@ -1,6 +1,7 @@
 /**
- * Tests for the following fcv paths where an upgrade or downgrade fails an can be rolled back:
+ * Tests for the following fcv paths where an upgrade or downgrade fails and can be rolled back:
  * - Failed downgrading from latestFCV to lastLTSFCV, then upgrading back to latestFCV
+ * - Failed downgrading from latestFCV to lastContinuousFCV, then upgrading back to latestFCV
  * - Failed upgrading from lastLTSFCV to latestFCV, then downgrading back to lastLTSFCV
  * - Failed upgrading from lastContinuousFCV to latestFCV, then downgrading back to
  * lastContinuousFCV
@@ -50,6 +51,7 @@ function revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, originalFCV, targe
 }
 function runTests(conn, adminDB) {
     revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, latestFCV, lastLTSFCV);
+    revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, latestFCV, lastContinuousFCV);
     revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, lastLTSFCV, latestFCV);
     revertUpgradeOrDowngradeToOriginalFCV(conn, adminDB, lastContinuousFCV, latestFCV);
 }
@@ -231,7 +233,10 @@ function runShardingTests() {
         shard1: st.rs1.getPrimary().getDB("admin"),
     };
 
-    const testCases = [{originalFCV: latestFCV, targetFCV: lastLTSFCV}];
+    const testCases = [
+        {originalFCV: latestFCV, targetFCV: lastLTSFCV},
+        {originalFCV: latestFCV, targetFCV: lastContinuousFCV},
+    ];
     if (FeatureFlagUtil.isPresentAndEnabled(adminDBs.mongos, "UpgradingToDowngrading")) {
         testCases.push(
             {originalFCV: lastLTSFCV, targetFCV: latestFCV},

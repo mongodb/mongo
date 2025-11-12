@@ -2933,8 +2933,6 @@ export class ReplSetTest {
         // spinning up. We will re-enable this check after the replica set has finished initiating.
         if (jsTestOptions().enableTestCommands) {
             options.setParameter.enableReconfigRollbackCommittedWritesCheck = false;
-            options.setParameter.disableTransitionFromLatestToLastContinuous =
-                options.setParameter.disableTransitionFromLatestToLastContinuous || false;
         }
 
         if (jsTestOptions().performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert) {

@@ -152,23 +152,26 @@ public:
                 GenericFCV::kLastLTS /* effective */, GenericFCV::kLastContinuous /* target */);
         }
 
-        for (auto&& isFromConfigServer : {false, true}) {
-            _transitions[{GenericFCV::kLatest, GenericFCV::kLastLTS, isFromConfigServer}] =
-                GenericFCV::kDowngradingFromLatestToLastLTS;
-            _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
-                          GenericFCV::kLastLTS,
-                          isFromConfigServer}] = GenericFCV::kLastLTS;
+        for (auto [downgrading, upgrading, to] :
+             std::vector{std::make_tuple(GenericFCV::kDowngradingFromLatestToLastContinuous,
+                                         GenericFCV::kUpgradingFromLastContinuousToLatest,
+                                         GenericFCV::kLastContinuous),
+                         std::make_tuple(GenericFCV::kDowngradingFromLatestToLastLTS,
+                                         GenericFCV::kUpgradingFromLastLTSToLatest,
+                                         GenericFCV::kLastLTS)}) {
+            for (auto&& isFromConfigServer : {false, true}) {
+                // Start or complete downgrade from latest.  If this release's lastContinuous ==
+                // lastLTS then the second loop iteration just overwrites the first.
+                _transitions[{GenericFCV::kLatest, to, isFromConfigServer}] = downgrading;
+                _transitions[{downgrading, to, isFromConfigServer}] = to;
 
-            // Add transition from downgrading -> upgrading.
-            _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
-                          GenericFCV::kLatest,
-                          isFromConfigServer}] = GenericFCV::kUpgradingFromLastLTSToLatest;
+                // Add transition from downgrading -> upgrading.
+                _transitions[{downgrading, GenericFCV::kLatest, isFromConfigServer}] = upgrading;
+            }
+            _fcvDocuments[downgrading] =
+                makeFCVDoc(to /* effective */, to /* target */, GenericFCV::kLatest /* previous */
+                );
         }
-        _fcvDocuments[GenericFCV::kDowngradingFromLatestToLastLTS] =
-            makeFCVDoc(GenericFCV::kLastLTS /* effective */,
-                       GenericFCV::kLastLTS /* target */,
-                       GenericFCV::kLatest /* previous */
-            );
     }
 
     void addTransitionsUpgradingToDowngrading() {
@@ -183,23 +186,6 @@ public:
                     GenericFCV::kDowngradingFromLatestToLastContinuous;
             }
         }
-    }
-
-    void addTransitionFromLatestToLastContinuous() {
-        for (auto&& isFromConfigServer : {false, true}) {
-            _transitions[{GenericFCV::kLatest, GenericFCV::kLastContinuous, isFromConfigServer}] =
-                GenericFCV::kDowngradingFromLatestToLastContinuous;
-            _transitions[{GenericFCV::kDowngradingFromLatestToLastContinuous,
-                          GenericFCV::kLastContinuous,
-                          isFromConfigServer}] = GenericFCV::kLastContinuous;
-        }
-
-        FeatureCompatibilityVersionDocument fcvDoc;
-        fcvDoc.setVersion(GenericFCV::kLastContinuous);
-        fcvDoc.setTargetVersion(GenericFCV::kLastContinuous);
-        fcvDoc.setPreviousVersion(GenericFCV::kLatest);
-
-        _fcvDocuments[GenericFCV::kDowngradingFromLatestToLastContinuous] = fcvDoc;
     }
 
     /**
@@ -423,22 +409,14 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     // We may have just stepped down, in which case we should not proceed.
     opCtx->checkForInterrupt();
 
-    bool isUpgradingOrDowngrading =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isUpgradingOrDowngrading(
-            fromVersion);
-    bool isUpgradingToDowngradingPath = (fromVersion == GenericFCV::kUpgradingFromLastLTSToLatest &&
-                                         newVersion == GenericFCV::kLastLTS) ||
-        (fromVersion == GenericFCV::kUpgradingFromLastContinuousToLatest &&
-         newVersion == GenericFCV::kLastContinuous);
-    bool isDowngradingToUpgradingPath =
-        fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
-        newVersion == GenericFCV::kLatest;
-
     // Only transition to fully upgraded or downgraded states when we have completed all required
     // upgrade/downgrade behavior, unless it is the downgrading to upgrading path or the upgrading
     // to downgrading path.
-    auto transitioningVersion = setTargetVersion && isUpgradingOrDowngrading &&
-            !isDowngradingToUpgradingPath && !isUpgradingToDowngradingPath
+    bool isContinuingSameUpgradeOrDowngrade =
+        ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(fromVersion) &&
+        getTransitionFCVInfo(fromVersion).to == newVersion;
+
+    auto transitioningVersion = setTargetVersion && isContinuingSameUpgradeOrDowngrade
         ? fromVersion
         : fcvTransitions.getTransitionalVersion(fromVersion, newVersion, isFromConfigServer);
 
@@ -720,19 +698,12 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     }
 }
 
-void FeatureCompatibilityVersion::addTransitionFromLatestToLastContinuous() {
-    fcvTransitions.addTransitionFromLatestToLastContinuous();
-}
-
 void FeatureCompatibilityVersion::addTransitionsUpgradingToDowngrading() {
     fcvTransitions.addTransitionsUpgradingToDowngrading();
 }
 
 void FeatureCompatibilityVersion::afterStartupActions(OperationContext* opCtx) {
     fassertInitializedAfterStartup(opCtx);
-    if (!mongo::repl::disableTransitionFromLatestToLastContinuous) {
-        addTransitionFromLatestToLastContinuous();
-    }
     addTransitionsUpgradingToDowngrading();
 }
 

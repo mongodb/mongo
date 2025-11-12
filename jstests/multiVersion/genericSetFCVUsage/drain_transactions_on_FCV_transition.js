@@ -120,8 +120,6 @@ function runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) 
     assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
     jsTestLog("Restore the featureCompatibilityVersion to latest.");
-    // Complete the transition because we can't e.g. upgrade from "downgrading to lastContinuous" -> latest.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     session.endSession();
@@ -166,8 +164,6 @@ function runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) {
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     jsTestLog("Restore the featureCompatibilityVersion to latest.");
-    // Complete the transition because we can't e.g. upgrade from "downgrading to lastContinuous" -> latest.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     session.endSession();

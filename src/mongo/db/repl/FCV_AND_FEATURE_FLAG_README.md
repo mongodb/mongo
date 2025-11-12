@@ -115,8 +115,7 @@ The FCV can be set using the `setFeatureCompatibilityVersion` admin command to o
 
 Each `mongod` release will support the following upgrade/downgrade paths:
 
-- Last-Continuous → Latest
-  - Note that we do not support downgrading to or from Last-Continuous.
+- Last-Continuous ←→ Latest
 - Last-LTS ←→ Latest
 - Last-LTS → Last-Continuous
   - This upgrade-only transition is only possible when requested by the [config server](https://docs.mongodb.com/manual/core/sharded-cluster-config-servers/).

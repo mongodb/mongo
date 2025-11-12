@@ -130,5 +130,4 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        disableTransitionFromLatestToLastContinuous: False
     num_nodes: 2

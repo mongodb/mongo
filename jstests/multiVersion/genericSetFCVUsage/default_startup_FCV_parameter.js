@@ -5,9 +5,6 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-TestData.setParameters = TestData.setParameters || {};
-TestData.setParameters.disableTransitionFromLatestToLastContinuous = true;
-
 const latest = "latest";
 const testName = "default_startup_FCV_parameter";
 const dbpath = MongoRunner.dataPath + testName;

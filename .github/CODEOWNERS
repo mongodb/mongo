@@ -1107,7 +1107,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/1_test_launching_replset.js @10gen/server-replication-reviewers @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/3_upgrade_replset.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/arbiter_always_has_latest_fcv.js @10gen/server-fcv @svc-auto-approve-bot
-/jstests/multiVersion/genericSetFCVUsage/**/cannot_downgrade_from_latest_to_last_continuous.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/create_coll_validator_new_feature_no_applyops_check.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/default_startup_FCV_parameter.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericSetFCVUsage/**/do_upgrade_downgrade.js @10gen/server-fcv @svc-auto-approve-bot

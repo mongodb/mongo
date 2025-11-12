@@ -11,7 +11,7 @@ function testCombination(tlsMode, sslShell, shouldSucceed) {
             (sslShell ? "true" : "false" + " (should " + (shouldSucceed ? "" : "not ") + "succeed)"),
     );
 
-    let serverOptionOverrides = {tlsMode: tlsMode, setParameter: {enableTestCommands: 1}};
+    let serverOptionOverrides = {tlsMode: tlsMode};
 
     let clientOptions = sslShell ? TLSTest.prototype.defaultTLSClientOptions : TLSTest.prototype.noTLSClientOptions;
 

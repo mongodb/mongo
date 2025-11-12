@@ -644,17 +644,6 @@ server_parameters:
             gte: 0
         redact: false
 
-    disableTransitionFromLatestToLastContinuous:
-        description: >-
-            Prohibits downgrading from latest FCV to last continuous FCV. Disabled by default.
-            Test-only.
-        test_only: true
-        set_at: startup
-        cpp_vartype: bool
-        cpp_varname: disableTransitionFromLatestToLastContinuous
-        default: true
-        redact: false
-
     unsupportedSyncSource:
         description: >-
             **Not a supported feature**. Specifies the host/port for a node to use as a sync source.

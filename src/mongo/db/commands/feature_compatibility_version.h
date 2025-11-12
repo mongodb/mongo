@@ -63,13 +63,6 @@ public:
     static void fassertInitializedAfterStartup(OperationContext* opCtx);
 
     /**
-     * Adds a transition that allows users to downgrade from latest FCV to last continuous FCV.
-     * This function should only be called if the 'disableTransitionFromLatestToLastContinuous'
-     * server parameter is set to 'false'. That parameter is test-only and defaulted to 'true'.
-     */
-    static void addTransitionFromLatestToLastContinuous();
-
-    /**
      * Adds transitions that allow users to downgrade back to the originalFCV after a failed
      * upgrade.
      */

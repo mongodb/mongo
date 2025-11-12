@@ -24,9 +24,6 @@ filters:
   - "arbiter_always_has_latest_fcv.js":
     approvers:
       - 10gen/server-fcv
-  - "cannot_downgrade_from_latest_to_last_continuous.js":
-    approvers:
-      - 10gen/server-fcv
   - "create_coll_validator_new_feature_no_applyops_check.js":
     approvers:
       - 10gen/query-optimization
