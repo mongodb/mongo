@@ -1,32 +1,33 @@
-// @tags: [
-//     # Cannot implicitly shard accessed collections because of extra shard key index in sharded
-//     # collection.
-//     assumes_no_implicit_index_creation,
+// Test partial index creation and drops.
 //
+// @tags: [
 //     # Builds index in the background
 //     requires_background_index,
-//
 //     uses_full_validation,
-//     requires_fcv_51,
 //     requires_getmore,
-//
 // ]
 
-// Test partial index creation and drops.
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let coll = db.index_partial_create_drop;
 
 let getNumKeys = function (idxName) {
-    let res = assert.commandWorked(coll.validate({full: true}));
-    let kpi;
+    const res = assert.commandWorked(coll.validate({full: true}));
 
-    let isShardedNS = res.hasOwnProperty("raw");
-    if (isShardedNS) {
-        kpi = res.raw[Object.getOwnPropertyNames(res.raw)[0]].keysPerIndex;
-    } else {
-        kpi = res.keysPerIndex;
+    // If collection is sharded, accumulate number of keys from all shards.
+    const isShardedColl = res.hasOwnProperty("raw");
+    if (isShardedColl) {
+        let totalKpi = 0;
+        for (let shardId in res.raw) {
+            const kpi = res.raw[shardId].keysPerIndex[idxName];
+            if (kpi) {
+                totalKpi += kpi;
+            }
+        }
+        return totalKpi;
     }
-    return kpi[idxName];
+
+    return res.keysPerIndex[idxName];
 };
 
 coll.drop();
@@ -60,47 +61,71 @@ for (let i = 0; i < 10; i++) {
 // Create partial index.
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(5, getNumKeys("x_1"));
+assert(IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+
 assert.commandWorked(coll.dropIndex({x: 1}));
-assert.eq(1, coll.getIndexes().length);
+assert(!IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
 // Create partial index in background.
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(5, getNumKeys("x_1"));
+assert(IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+
 assert.commandWorked(coll.dropIndex({x: 1}));
-assert.eq(1, coll.getIndexes().length);
+assert(!IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: {$lt: 5}}}), coll.getIndexes());
+IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
 // Create complete index, same key as previous indexes.
 assert.commandWorked(coll.createIndex({x: 1}));
 assert.eq(10, getNumKeys("x_1"));
+IndexUtils.assertIndexes(coll, [{_id: 1}, {x: 1}]);
+
 assert.commandWorked(coll.dropIndex({x: 1}));
-assert.eq(1, coll.getIndexes().length);
+IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
 // Partial indexes can't also be sparse indexes.
 assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: true}));
 assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: 1}));
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: false}));
-assert.eq(2, coll.getIndexes().length);
+assert(IndexUtils.indexExists(coll, {x: 1}, {partialFilterExpression: {a: 1}, sparse: false}), coll.getIndexes());
+
 assert.commandWorked(coll.dropIndex({x: 1}));
-assert.eq(1, coll.getIndexes().length);
+IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
 // SERVER-18858: Verify that query compatible w/ partial index succeeds after index drop.
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.commandWorked(coll.dropIndex({x: 1}));
-assert.eq(1, coll.find({x: 0, a: 0}).itcount());
+IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
 // Can create multiple partial indexes on the same key pattern as long as the filter is different.
 assert.commandWorked(coll.dropIndexes());
+IndexUtils.assertIndexes(coll, [{_id: 1}]);
 
-let numIndexesBefore = coll.getIndexes().length;
 assert.commandWorked(coll.createIndex({x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}));
-assert.eq(coll.getIndexes().length, numIndexesBefore + 1);
+assert(
+    IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}),
+    coll.getIndexes(),
+);
+IndexUtils.assertIndexes(coll, [{_id: 1}, {x: 1}]);
 
-numIndexesBefore = coll.getIndexes().length;
 assert.commandWorked(coll.createIndex({x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}));
-assert.eq(coll.getIndexes().length, numIndexesBefore + 1);
+assert(
+    IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}),
+    coll.getIndexes(),
+);
+IndexUtils.assertIndexes(coll, [{_id: 1}, {x: 1}, {x: 1}]);
 
 // Index drop by key pattern fails when more than one index exists with the given key.
-numIndexesBefore = coll.getIndexes().length;
 assert.commandFailedWithCode(coll.dropIndex({x: 1}), ErrorCodes.AmbiguousIndexKeyPattern);
+IndexUtils.assertIndexes(coll, [{_id: 1}, {x: 1}, {x: 1}]);
+
 assert.commandWorked(coll.dropIndex("partialIndex2"));
-assert.eq(coll.getIndexes().length, numIndexesBefore - 1);
+assert(
+    !IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}),
+    coll.getIndexes(),
+);
+assert(
+    IndexUtils.indexExists(coll, {x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}),
+    coll.getIndexes(),
+);

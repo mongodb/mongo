@@ -1,9 +1,11 @@
 // stats will return ok:1 for non-existant colls
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
+
 /**
  * Tests for the db collection
  *
  * @tags: [
- *   requires_capped,
  *   requires_collstats,
  *   requires_fastcount,
  *   # In-memory data structures are not causally consistent.
@@ -51,10 +53,10 @@ for (var i = 0; i < 100; i++) {
 }
 
 (function () {
-    let validateResult = assert.commandWorked(coll.validate());
-    // Extract validation results from mongos output if running in a sharded context.
-    let isShardedNS = validateResult.hasOwnProperty("raw");
+    const validateResult = assert.commandWorked(coll.validate());
 
+    // Extract validation results from mongos output if running in a sharded context.
+    const isShardedNS = validateResult.hasOwnProperty("raw");
     if (isShardedNS) {
         // Sample mongos format:
         // {
@@ -72,25 +74,30 @@ for (var i = 0; i < 100; i++) {
         //   "ok": 1
         // }
 
-        let numFields = 0;
-        let result = null;
+        let nrecords = 0;
         for (let field in validateResult.raw) {
-            result = validateResult.raw[field];
-            numFields++;
-        }
+            const rawValidateResult = validateResult.raw[field];
+            assert.neq(null, rawValidateResult);
 
-        assert.eq(1, numFields);
-        assert.neq(null, result);
-        validateResult = result;
+            assert.eq(
+                "test." + collName,
+                rawValidateResult.ns,
+                "incorrect namespace in testDb.collection.validate() result: " + tojson(rawValidateResult),
+            );
+            assert(rawValidateResult.valid, "collection validation failed");
+            nrecords += rawValidateResult.nrecords;
+        }
+        assert.eq(100, nrecords, "11");
+    } else {
+        assert.eq(
+            "test." + collName,
+            validateResult.ns,
+            "incorrect namespace in testDb.collection.validate() result: " + tojson(validateResult),
+        );
+        assert.eq(100, validateResult.nrecords, "11");
     }
 
-    assert.eq(
-        "test." + collName,
-        validateResult.ns,
-        "incorrect namespace in testDb.collection.validate() result: " + tojson(validateResult),
-    );
     assert(validateResult.valid, "collection validation failed");
-    assert.eq(100, validateResult.nrecords, "11");
 })();
 
 /*
@@ -98,63 +105,69 @@ for (var i = 0; i < 100; i++) {
  */
 
 coll.drop();
-assert.eq(0, coll.count(), "12");
+IndexUtils.assertIndexes(coll, [], "12");
+
 coll.dropIndexes();
-assert.eq(0, coll.getIndexes().length, "13");
+IndexUtils.assertIndexes(coll, [], "13");
 
 coll.save({a: 10});
-assert.eq(1, coll.getIndexes().length, "14");
+IndexUtils.assertIndexes(coll, [{_id: 1}], "14");
 
 coll.createIndex({a: 1});
 coll.save({a: 10});
 
 print(tojson(coll.getIndexes()));
-assert.eq(2, coll.getIndexes().length, "15");
+IndexUtils.assertIndexes(coll, [{_id: 1}, {a: 1}], "15");
 
 coll.dropIndex({a: 1});
-assert.eq(1, coll.getIndexes().length, "16");
+IndexUtils.assertIndexes(coll, [{_id: 1}], "16");
 
 coll.save({a: 10});
 coll.createIndex({a: 1});
 coll.save({a: 10});
 
-assert.eq(2, coll.getIndexes().length, "17");
+IndexUtils.assertIndexes(coll, [{_id: 1}, {a: 1}], "17");
 
 coll.dropIndex("a_1");
-assert.eq(1, coll.getIndexes().length, "18");
+IndexUtils.assertIndexes(coll, [{_id: 1}], "18");
 
 coll.save({a: 10, b: 11});
 coll.createIndex({a: 1});
 coll.createIndex({b: 1});
 coll.save({a: 10, b: 12});
 
-assert.eq(3, coll.getIndexes().length, "19");
+IndexUtils.assertIndexes(coll, [{_id: 1}, {a: 1}, {b: 1}], "19");
 
 coll.dropIndex({b: 1});
-assert.eq(2, coll.getIndexes().length, "20");
+IndexUtils.assertIndexes(coll, [{_id: 1}, {a: 1}], "20");
 coll.dropIndex({a: 1});
-assert.eq(1, coll.getIndexes().length, "21");
+IndexUtils.assertIndexes(coll, [{_id: 1}], "21");
 
 coll.save({a: 10, b: 11});
 coll.createIndex({a: 1});
 coll.createIndex({b: 1});
 coll.save({a: 10, b: 12});
 
-assert.eq(3, coll.getIndexes().length, "22");
+IndexUtils.assertIndexes(coll, [{_id: 1}, {a: 1}, {b: 1}], "22");
 
 coll.dropIndexes();
-assert.eq(1, coll.getIndexes().length, "23");
+IndexUtils.assertIndexes(coll, [{_id: 1}], "23");
 
 coll.find();
 
 coll.drop();
-assert.eq(0, coll.getIndexes().length, "24");
+IndexUtils.assertIndexes(coll, [], "24");
 
 /*
  * stats()
  */
 
 (function () {
+    if (typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined") {
+        print("Skipping this test because collections are implicitly sharded and sharded collections can't be capped.");
+        return;
+    }
+
     let t = testDb.apttest_dbcollection;
 
     // Non-existent collection.
@@ -290,6 +303,11 @@ assert.eq(0, coll.getIndexes().length, "24");
  */
 (function () {
     let t = testDb.apitest_dbcollection;
+
+    if (typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined") {
+        print("Skipping this test for sharded collections.");
+        return;
+    }
 
     t.drop();
     let emptyStats = assert.commandWorked(t.stats());

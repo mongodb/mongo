@@ -8,6 +8,8 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
+//   # mapReduce cannot replace a sharded collection as output.
+//   assumes_unsharded_collection,
 // ]
 const coll = db.mr_preserve_indexes;
 coll.drop();

@@ -1,10 +1,6 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
-// @tags: [
-//   assumes_no_implicit_index_creation,
-// ]
+// Testing indexes in nested fields.
 
-// index4.js
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let t = db.index4;
 t.drop();
@@ -14,10 +10,11 @@ t.save({name: "alleyinsider", instances: [{pool: "prod1"}, {pool: "dev1"}]});
 t.save({name: "clusterstock", instances: [{pool: "dev1"}]});
 
 // this should fail, not allowed -- we confirm that.
-t.createIndex({instances: {pool: 1}});
-assert.eq(1, t.getIndexes().length, "no indexes other than _id should be here yet");
+assert.commandFailed(t.createIndex({instances: {pool: 1}}));
+IndexUtils.assertIndexes(t, [{_id: 1}], "no indexes other than _id should be here yet");
 
-t.createIndex({"instances.pool": 1});
+assert.commandWorked(t.createIndex({"instances.pool": 1}));
+IndexUtils.assertIndexes(t, [{_id: 1}, {"instances.pool": 1}]);
 
 sleep(10);
 

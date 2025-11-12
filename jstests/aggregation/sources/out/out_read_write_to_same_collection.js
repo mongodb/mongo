@@ -4,9 +4,10 @@
 // output collection is sharded.
 // @tags: [
 //   assumes_unsharded_collection,
-//   # Asserts on the number of indexes.
-//   assumes_no_implicit_index_creation,
 // ]
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
+
 const coll = db.out_read_write_to_same_collection;
 coll.drop();
 assert.commandWorked(
@@ -57,6 +58,6 @@ assert.eq(
 const indexMetadata = coll
     .aggregate([{$indexStats: {}}, {$project: {key: 1}}, {$sort: {key: 1}}, {$replaceWith: "$key"}])
     .toArray();
-assert.eq(indexMetadata, [{_id: 1}, {total: 1}]);
+IndexUtils.assertIndexesMatch(coll, [{_id: 1}, {total: 1}], indexMetadata);
 
 coll.drop();

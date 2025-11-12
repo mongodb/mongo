@@ -9,6 +9,9 @@ const isHiddenWildcardIndex = {
     $regexMatch: {input: "$name", regex: prefix},
 };
 
+TestData.implicitWildcardIndexesEnabled = true;
+TestData.hideImplicitlyCreatedIndexesFromListIndexes = true;
+
 /**
  * Error codes we ignore when trying to create implicit indexes because they depend on the test
  * structure itself.
@@ -143,7 +146,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
     } else if (cmdName == "listIndexes" && res.ok) {
         // If we're listing indexes, we need to make sure we eliminate any of the
         // implicitly created indexes from consideration.
-        if (res.cursor.firstBatch) {
+        if (TestData.hideImplicitlyCreatedIndexesFromListIndexes && res.cursor.firstBatch) {
             res.cursor.firstBatch = res.cursor.firstBatch.filter((idx) => !idx.name.startsWith(prefix));
         }
     } else if (cmdName == "insert" && res.ok) {
@@ -169,32 +172,6 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
 
     return res;
 }
-
-/**
- * Hides any implicitly created wildcard indexes. Note that tests using {$indexStats} directly have
- * to be manually excluded from the suite, since they won't pass through this override.
- */
-DBCollection.prototype.getIndexes = function (params) {
-    const res = this.aggregate(
-        [
-            {$indexStats: {}},
-            // Hide the implicitly created index(es) from tests that look
-            // for indexes.
-            {$addFields: {isHidden: isHiddenWildcardIndex}},
-            {$match: {isHidden: false}},
-            // The information listed in 'spec' is usually returned inline
-            // at the root level.
-            {$replaceWith: {$mergeObjects: ["$$ROOT", "$spec"]}},
-            // This info isn't shown in 'getIndexes'.
-            {$project: {host: 0, accesses: 0, spec: 0, isHidden: 0}},
-        ],
-        params,
-    ).toArray();
-    return res;
-};
-
-DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
-DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
 
 OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicit_wildcard_indexes.js");
 OverrideHelpers.overrideRunCommand(runCommandOverride);

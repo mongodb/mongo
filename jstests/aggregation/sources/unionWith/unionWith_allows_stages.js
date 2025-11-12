@@ -2,9 +2,9 @@
  * Test that $unionWith works with $geoNear, $text, and $indexStats
  * Some of these stages cannot be used in facets.
  * @tags: [
- *   # Asserts on the output of $indexStats.
- *   assumes_no_implicit_index_creation,
  *   do_not_wrap_aggregations_in_facets,
+ *   # TODO (SERVER-113608) Enable the test for sharded collections once this ticket is addressed.
+ *   assumes_unsharded_collection,
  * ]
  */
 
@@ -60,43 +60,42 @@ checkResults(
 
 // Test that $unionWith works with $indexStats
 // $match removes all real documents from the pipeline, so we can just check the index documents.
-let resObj = testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [
+let docArray = collA
+    .aggregate([
         {$match: {val: {$exists: false}}},
         {$unionWith: {coll: textColl.getName(), pipeline: [{$indexStats: {}}]}},
         {$sort: {name: 1}},
-    ],
-    cursor: {},
-});
-let docArray = resObj.cursor.firstBatch;
+    ])
+    .toArray();
 if (FixtureHelpers.isMongos(testDB) && FixtureHelpers.isSharded(collA)) {
     // We expect each shard to have an _id_, _id_hashed, and str_text index
     const numShards = FixtureHelpers.numberOfShardsForCollection(collA);
-    assert.eq(docArray.length, 3 * numShards);
+    assert.eq(docArray.length, 3 * numShards, tojson(docArray));
     for (let i = 0; i < numShards; i++) {
-        assert.eq(docArray[i].name, "_id_");
-        assert.eq(docArray[i + numShards].name, "_id_hashed");
-        assert.eq(docArray[i + numShards * 2].name, "str_text");
+        assert.eq(docArray[i].name, "_id_", tojson(docArray));
+        assert.eq(docArray[i + numShards].name, "_id_hashed", tojson(docArray));
+        assert.eq(docArray[i + numShards * 2].name, "str_text", tojson(docArray));
     }
 } else {
-    assert.eq(docArray.length, 2);
-    assert.eq(docArray[0].name, "_id_");
-    assert.eq(docArray[1].name, "str_text");
+    assert.eq(docArray.length, 2, tojson(docArray));
+    assert.eq(docArray[0].name, "_id_", tojson(docArray));
+    assert.eq(docArray[1].name, "str_text", tojson(docArray));
 }
 
 // Test that $unionWith fails if $indexStats is not first stage in the sub-pipeline.
-resObj = testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [
-        {$match: {val: {$exists: false}}},
-        {
-            $unionWith: {coll: textColl.getName(), pipeline: [{$match: {val: "foo"}}, {$indexStats: {}}]},
-        },
-    ],
-    cursor: {},
-});
-assert.eq(resObj.code, 40602, resObj);
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: collA.getName(),
+        pipeline: [
+            {$match: {val: {$exists: false}}},
+            {
+                $unionWith: {coll: textColl.getName(), pipeline: [{$match: {val: "foo"}}, {$indexStats: {}}]},
+            },
+        ],
+        cursor: {},
+    }),
+    40602,
+);
 
 // Test that $unionWith works with $geoNear
 const geoColl = testDB.geoColl;
@@ -133,7 +132,7 @@ const geoNearResults = testDB.runCommand({
 });
 assert.commandWorked(geoNearResults);
 const geoNearArray = geoNearResults.cursor.firstBatch;
-assert.eq(geoNearArray.length, resSet.length);
+assert.eq(geoNearArray.length, resSet.length, tojson(geoNearArray));
 
 // First check the geo object.
 const geoObj = geoNearArray[0];
@@ -150,25 +149,27 @@ for (let i = 1; i < geoNearArray.length; i++) {
 }
 
 // Test that $unionWith fails if $geoNear is not first stage in the sub-pipeline.
-resObj = testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [
-        {
-            $unionWith: {
-                coll: geoColl.getName(),
-                pipeline: [
-                    {$match: {val: "foo"}},
-                    {
-                        $geoNear: {
-                            near: {type: "Point", coordinates: [10, 10]},
-                            distanceField: "dist",
-                            maxDistance: 2,
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: collA.getName(),
+        pipeline: [
+            {
+                $unionWith: {
+                    coll: geoColl.getName(),
+                    pipeline: [
+                        {$match: {val: "foo"}},
+                        {
+                            $geoNear: {
+                                near: {type: "Point", coordinates: [10, 10]},
+                                distanceField: "dist",
+                                maxDistance: 2,
+                            },
                         },
-                    },
-                ],
+                    ],
+                },
             },
-        },
-    ],
-    cursor: {},
-});
-assert.eq(resObj.code, 40603, resObj);
+        ],
+        cursor: {},
+    }),
+    40603,
+);

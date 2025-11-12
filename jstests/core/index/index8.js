@@ -3,14 +3,14 @@
 // @tags: [
 //     # The test runs commands that are not allowed with security token: reIndex.
 //     not_allowed_with_signed_security_token,
-//     # Asserts on the output of listIndexes.
-//     assumes_no_implicit_index_creation,
 //     # Cannot implicitly shard accessed collections because of not being able to create unique
 //     # index using hashed shard key pattern.
 //     cannot_create_unique_index_when_using_hashed_shard_key,
 //     requires_fastcount,
 //     requires_getmore,
 // ]
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let t = db.jstests_index8;
 t.drop();
@@ -21,13 +21,10 @@ t.drop();
     t.createIndex({c: 1}, [false, "cIndex"]);
 
     const checkIndexUniqueness = () => {
-        let indexes = t.getIndexes();
-        assert.eq(4, indexes.length);
-        indexes = Object.fromEntries(indexes.map((idx) => [idx.name, idx]));
-        assert.sameMembers(Object.keys(indexes), ["_id_", "a_1", "b_1", "cIndex"], tojson(indexes));
-        assert(!indexes["a_1"].unique);
-        assert(indexes["b_1"].unique);
-        assert(!indexes["cIndex"].unique);
+        IndexUtils.assertIndexes(t, [{_id: 1}, {a: 1}, {b: 1}, {c: 1}]);
+        assert(IndexUtils.indexExists(t, {a: 1}, {unique: undefined}), t.getIndexes());
+        assert(IndexUtils.indexExists(t, {b: 1}, {unique: true}), t.getIndexes());
+        assert(IndexUtils.indexExists(t, {c: 1}, {unique: undefined, name: "cIndex"}), t.getIndexes());
     };
 
     checkIndexUniqueness();

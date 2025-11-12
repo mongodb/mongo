@@ -1,9 +1,9 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
 // @tags: [
-//  assumes_no_implicit_index_creation,
 //  requires_fastcount,
 //  requires_getmore,
+//  # Cannot implicitly shard accessed collections because of not being able to create unique
+//  # index using hashed shard key pattern.
+//  cannot_create_unique_index_when_using_hashed_shard_key,
 //]
 
 // unique index constraint test for updates

@@ -3,9 +3,6 @@
  * It is equivalent to creating a normal sparse index, and the value persists in the catalog.
  *
  * @tags: [
- *   # Cannot implicitly shard accessed collections because of extra shard key index in sharded
- *   # collection.
- *   assumes_no_implicit_index_creation,
  *   # $listCatalog not supported inside of a multi-document transaction.
  *   does_not_support_transactions,
  *   # $listCatalog does not include the tenant prefix in its results.
@@ -14,6 +11,8 @@
  *   requires_getmore,
  * ]
  */
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let t = db.index_sparse_create_index_non_boolean_value;
 t.drop();
@@ -27,7 +26,7 @@ t.insert({_id: 4});
 t.insert({_id: 5});
 
 t.createIndex({x: 1}, {sparse: nonBooleanValue});
-assert.eq(2, t.getIndexes().length);
+IndexUtils.assertIndexes(t, [{_id: 1}, {x: 1}]);
 assert.eq(5, t.find().sort({x: 1}).itcount());
 
 // Verify that the original value has been persisted in the catalog.

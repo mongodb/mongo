@@ -36,13 +36,6 @@ selector:
     # The following tests fail because explain expect a different plan query when collections live on separate shards
     # This test expects sharded collections to be sharded across multiple shards.
     - jstests/core/administrative/current_op/currentop_shell.js
-    # The following tests fail because they count indexes. These counts do not take into account the
-    # additional hashed shard key indexes that are automatically added by this passthrough.
-    - jstests/core/**/apitest_dbcollection.js
-    - jstests/core/**/bad_index_plugin.js
-    - jstests/core/**/create_indexes.js
-    - jstests/core/**/list_indexes_non_existent_ns.js
-    - jstests/core/**/mr_preserve_indexes.js
     # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
     - jstests/core/**/distinct_index1.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.

@@ -2,11 +2,9 @@
  * Tests that clustered collections respect collation for the _id field and any other fields
  *
  * @tags: [
- *   assumes_against_mongod_not_mongos,
- *   assumes_no_implicit_collection_creation_after_drop,
- *   assumes_no_implicit_index_creation,
+ *   # Clustered collections cannot be sharded.
+ *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
- *   requires_fcv_53,
  * ]
  */
 

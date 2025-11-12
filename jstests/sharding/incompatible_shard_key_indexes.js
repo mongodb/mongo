@@ -169,6 +169,12 @@ describe("testing incompatible shard key indexes", function () {
                     ErrorCodes.CannotDropShardKeyIndex,
                 );
                 assert.commandFailedWithCode(this.coll.hideIndex(compatibleShardKeyIndex), ErrorCodes.InvalidOptions);
+
+                // Attempt to drop all indexes and check that the compatible shard key index still exist.
+                this.coll.dropIndexes();
+
+                const shardKeyIndex = this.coll.getIndexByKey(compatibleShardKeyIndex);
+                assert.neq(shardKeyIndex, null, "shard key index is missing");
             });
 
             it("reshardCollection will attempt to create a shard key index", () => {

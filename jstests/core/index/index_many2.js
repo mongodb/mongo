@@ -1,6 +1,9 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
-// @tags: [assumes_no_implicit_index_creation]
+// @tags: [
+//   # Sharded collections can't be clustered.
+//   assumes_unsharded_collection,
+//   # This test tests kMaxNumIndexesAllowed.
+//   assumes_no_implicit_index_creation
+// ]
 
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
@@ -32,13 +35,13 @@ assert.soon(() => {
     // Index creation May fail due to stepdowns and shutdowns. Keep trying until we reach the
     // server limit for indexes in a collection.
     try {
-        const numCurrentIndexes = t.getIndexKeys().length;
+        const numCurrentIndexes = t.getIndexes().length;
         for (let i = numCurrentIndexes + 1; i <= maxNumIndexesAllowed; i++) {
             const key = make(i);
             const res = assert.commandWorked(t.createIndex(key));
             jsTestLog("createIndex: " + tojson(key) + ": " + tojson(res));
         }
-        assert.eq(t.getIndexKeys().length, maxNumIndexesAllowed);
+        assert.eq(t.getIndexes().length, maxNumIndexesAllowed);
         return true;
     } catch (e) {
         jsTest.log("Failed to create indexes: " + e);

@@ -1,11 +1,10 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
 // @tags: [
-//   assumes_no_implicit_index_creation,
 //   requires_getmore,
 // ]
 
 // Make sure nesting of location arrays also works.
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let t = db.geonest;
 t.drop();
@@ -34,7 +33,7 @@ let res = t.insert({
 assert.commandWorked(res);
 
 assert.commandWorked(t.createIndex({"data.loc": "2d", zip: 1}));
-assert.eq(2, t.getIndexKeys().length);
+IndexUtils.assertIndexes(t, [{_id: 1}, {"data.loc": "2d", zip: 1}]);
 
 res = t.insert({
     zip: "10004",
@@ -111,7 +110,7 @@ res = t.insert({zip: "10003", data: [{loc: [{x: 30, y: 30}, [50, 50]], type: "ho
 assert(!res.hasWriteError());
 
 assert.commandWorked(t.createIndex({"data.loc": "2d", zip: 1}));
-assert.eq(2, t.getIndexKeys().length);
+IndexUtils.assertIndexes(t, [{_id: 1}, {"data.loc": "2d", zip: 1}]);
 
 res = t.insert({
     zip: "10004",

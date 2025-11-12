@@ -122,6 +122,7 @@ createIndexAndCheckConsistency(db.collection_simple, {fHidden: 1}, {hidden: true
 createIndexAndCheckConsistency(db.collection_simple, {fNamed: 1}, {name: "namedindex"});
 createIndexAndCheckConsistency(db.collection_simple, {fCollation: 1}, {collation: {locale: "es"}});
 createIndexAndCheckConsistency(db.collection_simple, {"$**": 1});
+createIndexAndCheckConsistency(db.collection_simple, {fCompoundWildcard: 1, "b.$**": 1});
 createIndexAndCheckConsistency(db.collection_simple, {fText: "text"});
 createIndexAndCheckConsistency(db.collection_simple, {fHashed: "hashed"});
 createIndexAndCheckConsistency(db.collection_simple, {f2d: "2d"});

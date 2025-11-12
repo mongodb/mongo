@@ -4,6 +4,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+import {IndexUtils} from "jstests/libs/index_utils.js";
+
 // Case 1: Big string as key
 export var bigStringKeys = (() => {
     let keys = [];
@@ -78,15 +80,15 @@ export function deleteIndexKeysByUpdateDocs(testDB, collName, keys) {
 }
 
 export function createIndex(testColl, unique) {
-    let numIndexesBefore = testColl.getIndexes().length;
+    assert(!IndexUtils.indexExists(testColl, {k: 1}), testColl.getIndexes());
     assert.commandWorked(testColl.createIndex({k: 1}, {unique: unique}));
-    assert.eq(numIndexesBefore + 1, testColl.getIndexes().length);
+    assert(IndexUtils.indexExists(testColl, {k: 1}), testColl.getIndexes());
 }
 
 export function dropIndex(testColl) {
-    let numIndexesBefore = testColl.getIndexes().length;
+    assert(IndexUtils.indexExists(testColl, {k: 1}));
     assert.commandWorked(testColl.dropIndex({k: 1}));
-    assert.eq(numIndexesBefore - 1, testColl.getIndexes().length);
+    assert(!IndexUtils.indexExists(testColl, {k: 1}));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

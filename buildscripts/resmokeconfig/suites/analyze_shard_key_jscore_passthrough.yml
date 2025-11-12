@@ -45,8 +45,9 @@ selector:
     - jstests/core/txns/create_collection_parallel.js
     - jstests/core/txns/create_indexes.js
     - jstests/core/txns/create_indexes_parallel.js
-    # The following tests fail because they count indexes. These counts do not take into account the
-    # additional hashed shard key indexes that are automatically added by this passthrough.
+    # The following tests fail because they count indexes without accounting for the fact that
+    # a collection may be implicitly recreated after a drop(), causing the default index {_id: 1}
+    # to exist unexpectedly.
     - jstests/core/**/apitest_dbcollection.js
     - jstests/core/**/bad_index_plugin.js
     - jstests/core/**/create_indexes.js

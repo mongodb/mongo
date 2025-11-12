@@ -111,3 +111,9 @@ filters:
   - "*.pfx":
     approvers:
       - 10gen/server-security
+  - "fixture_helpers.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "index_utils.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

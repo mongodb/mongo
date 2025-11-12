@@ -32,7 +32,6 @@ selector:
 
     # Expect certain responses, but retries of successfully completed commands may return
     # different values:
-    - jstests/core/**/create_indexes.js
     - jstests/core/**/objid5.js
 
     # Expect results to return in a certain order, secondaries may apply ops out of order.

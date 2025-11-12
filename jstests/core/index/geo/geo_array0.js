@@ -1,11 +1,11 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
 // @tags: [
-//   assumes_no_implicit_index_creation,
 //   requires_getmore,
 // ]
 
 // Make sure the very basics of geo arrays are sane by creating a few multi location docs
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
+
 let t = db.geoarray;
 
 function test(index) {
@@ -35,7 +35,7 @@ function test(index) {
 
     if (index) {
         assert.commandWorked(t.createIndex({loc: "2d", zip: 1}));
-        assert.eq(2, t.getIndexKeys().length);
+        IndexUtils.assertIndexes(t, [{_id: 1}, {loc: "2d", zip: 1}]);
     }
 
     res = t.insert({

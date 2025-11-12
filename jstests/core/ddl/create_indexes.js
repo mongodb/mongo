@@ -1,133 +1,20 @@
 /**
  * @tags: [
  *   assumes_superuser_permissions,
- *   # TODO SERVER-88069: this test can be run in upgrade downgrade once
- *   # createdCollectionAutomatically is removed.
- *   cannot_run_during_upgrade_downgrade,
  *   # simulate_atlas_proxy.js can't simulate req on config.transaction as tested
  *   simulate_atlas_proxy_incompatible,
  * ]
- * fcv49 for the change to error code in createIndexes invalid field reply.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-
-const runningOnMongos = FixtureHelpers.isMongos(db);
-
-const extractResult = function (obj) {
-    if (!runningOnMongos) return obj;
-
-    // Sample mongos format:
-    // {
-    //   raw: {
-    //     "localhost:30000": {
-    //       createdCollectionAutomatically: false,
-    //       numIndexesBefore: 3,
-    //       numIndexesAfter: 5,
-    //       ok: 1
-    //     }
-    //   },
-    //   ok: 1
-    // }
-
-    let numFields = 0;
-    let result = null;
-    for (let field in obj.raw) {
-        result = obj.raw[field];
-        numFields++;
-    }
-
-    assert.neq(null, result);
-    assert.eq(1, numFields);
-    return result;
-};
-
-// TODO SERVER-88069: remove check once createdCollectionAutomatically is removed.
-const checkImplicitCreate = function (admin, createIndexResult) {
-    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-    if (!isMultiversion && !FeatureFlagUtil.isPresentAndEnabled(admin, "80CollectionCreationPath")) {
-        assert.eq(true, createIndexResult.createdCollectionAutomatically);
-    }
-};
-
-const assertIndexes = function (coll, expectedIndexNames) {
-    const indexSpecs = coll.getIndexes();
-    const indexNames = indexSpecs.map((spec) => spec.name);
-    assert.sameMembers(indexNames, expectedIndexNames, tojson(indexSpecs));
-};
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 const dbTest = db.getSiblingDB("create_indexes_db");
 dbTest.dropDatabase();
 
-// Database does not exist
-const collDbNotExist = dbTest.create_indexes_no_db;
-let res = assert.commandWorked(collDbNotExist.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}]}));
-res = extractResult(res);
-checkImplicitCreate(dbTest.getSiblingDB("config"), res);
-assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
-assert.isnull(res.note, "createIndexes.note should not be present in results when adding a new index: " + tojson(res));
-
-// Collection does not exist, but database does
 const t = dbTest.create_indexes;
-res = assert.commandWorked(t.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}]}));
-res = extractResult(res);
-checkImplicitCreate(dbTest.getSiblingDB("config"), res);
-assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
-assert.isnull(res.note, "createIndexes.note should not be present in results when adding a new index: " + tojson(res));
-
-// Both database and collection exist
-res = assert.commandWorked(t.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}]}));
-res = extractResult(res);
-assert(!res.createdCollectionAutomatically);
-assert.eq(
-    res.numIndexesBefore,
-    res.numIndexesAfter,
-    "numIndexesAfter missing from createIndexes result when adding a duplicate index: " + tojson(res),
-);
-assert(res.note, "createIndexes.note should be present in results when adding a duplicate index: " + tojson(res));
-
-res = t.runCommand("createIndexes", {
-    indexes: [
-        {key: {"x": 1}, name: "x_1"},
-        {key: {"y": 1}, name: "y_1"},
-    ],
-});
-res = extractResult(res);
-assert(!res.createdCollectionAutomatically);
-assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
-
-res = assert.commandWorked(
-    t.runCommand("createIndexes", {
-        indexes: [
-            {key: {a: 1}, name: "a_1"},
-            {key: {b: 1}, name: "b_1"},
-        ],
-    }),
-);
-res = extractResult(res);
-assert(!res.createdCollectionAutomatically);
-assert.eq(res.numIndexesAfter, res.numIndexesBefore + 2);
-assert.isnull(res.note, "createIndexes.note should not be present in results when adding new indexes: " + tojson(res));
-
-res = assert.commandWorked(
-    t.runCommand("createIndexes", {
-        indexes: [
-            {key: {a: 1}, name: "a_1"},
-            {key: {b: 1}, name: "b_1"},
-        ],
-    }),
-);
-
-res = extractResult(res);
-assert.eq(
-    res.numIndexesBefore,
-    res.numIndexesAfter,
-    "numIndexesAfter missing from createIndexes result when adding duplicate indexes: " + tojson(res),
-);
-assert(res.note, "createIndexes.note should be present in results when adding a duplicate index: " + tojson(res));
+dbTest.createCollection(t.getName());
 
 // Test that index creation fails with an empty list of specs.
-res = t.runCommand("createIndexes", {indexes: []});
+let res = t.runCommand("createIndexes", {indexes: []});
 assert.commandFailedWithCode(res, ErrorCodes.BadValue);
 
 // Test that index creation fails on specs that are missing required fields such as 'key'.
@@ -138,10 +25,11 @@ assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
 // will not result in new indexes in the catalog.
 res = t.runCommand("createIndexes", {indexes: [{}, {key: {m: 1}, name: "asd"}]});
 assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
-assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1"]);
+
+IndexUtils.assertIndexes(t, [{_id: 1}]);
 
 res = t.runCommand("createIndexes", {indexes: [{key: {"c": 1}, sparse: true, name: "c_1"}]});
-assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1", "c_1"]);
+IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
 assert.eq(
     1,
     t.getIndexes().filter(function (z) {
@@ -153,21 +41,25 @@ assert.eq(
 res = t.runCommand("createIndexes", {indexes: [{key: {"x": "invalid_index_type"}, name: "x_1"}]});
 assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
 
-assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1", "c_1"]);
+IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
 
 // Test that an index name, if provided by the user, cannot be empty.
 res = t.runCommand("createIndexes", {indexes: [{key: {"x": 1}, name: ""}]});
 assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
 
-assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1", "c_1"]);
+IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
 
 // Test that v0 indexes cannot be created.
 res = t.runCommand("createIndexes", {indexes: [{key: {d: 1}, name: "d_1", v: 0}]});
 assert.commandFailed(res, "v0 index creation should fail");
 
+IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
+
 // Test that v1 indexes can be created explicitly.
 res = t.runCommand("createIndexes", {indexes: [{key: {d: 1}, name: "d_1", v: 1}]});
 assert.commandWorked(res, "v1 index creation should succeed");
+
+IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}, {d: 1}]);
 
 // Test that index creation fails with an invalid top-level field.
 res = t.runCommand("createIndexes", {indexes: [{key: {e: 1}, name: "e_1"}], "invalidField": 1});
@@ -180,6 +72,8 @@ assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
 // Test that index creation fails with an invalid field in the index spec for index version V1.
 res = t.runCommand("createIndexes", {indexes: [{key: {e: 1}, name: "e_1", "v": 1, "invalidField": 1}]});
 assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
+
+IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}, {d: 1}]);
 
 // Test that index creation fails with an index named '*'.
 res = t.runCommand("createIndexes", {indexes: [{key: {star: 1}, name: "*"}]});
@@ -197,6 +91,8 @@ res = t.runCommand("createIndexes", {
     ],
 });
 assert.commandFailedWithCode(res, ErrorCodes.IndexKeySpecsConflict);
+
+IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}, {d: 1}]);
 
 // Test that creating an index on a view fails with CollectionUUIDMismatch if a collection UUID is
 // provided. CollectionUUIDMismatch has to prevail over CommandNotSupportedOnView for mongosync.

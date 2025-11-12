@@ -6,9 +6,9 @@
 // for retrying on interrupt is not prepared to handle aggregation explain.
 // @tags: [
 //   assumes_unsharded_collection,
+//   # Aggregation commands with explain can't run on stepdown suites because them may return
+//   # incomplete results if interrupted by a stepdown.
 //   does_not_support_stepdowns,
-//   # Test may fail with "index already exists".
-//   assumes_no_implicit_index_creation,
 //   # Explain for the aggregate command cannot run within a multi-document transaction.
 //   does_not_support_transactions,
 // ]

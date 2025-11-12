@@ -1,8 +1,3 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
-// @tags: [
-//   assumes_no_implicit_index_creation,
-// ]
 import {queryIDS} from "jstests/libs/fts.js";
 
 const coll = db.text1;

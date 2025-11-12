@@ -1,11 +1,10 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
 // @tags: [
-//   assumes_no_implicit_index_creation,
 //   requires_getmore,
 // ]
 
 // Test distance queries with interleaved distances
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let t = db.multinest;
 t.drop();
@@ -34,7 +33,7 @@ let res = t.insert({
 assert.commandWorked(res);
 
 assert.commandWorked(t.createIndex({"data.loc": "2d", zip: 1}));
-assert.eq(2, t.getIndexKeys().length);
+IndexUtils.assertIndexes(t, [{_id: 1}, {"data.loc": "2d", zip: 1}]);
 
 res = t.insert({
     zip: "10004",

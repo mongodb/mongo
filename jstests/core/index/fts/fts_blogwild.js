@@ -1,8 +1,4 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
-// @tags: [
-//   assumes_no_implicit_index_creation,
-// ]
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let t = db.text_blogwild;
 t.drop();
@@ -19,7 +15,7 @@ t.save({
 // specify weights if you want a field to be more meaningful
 t.createIndex({dummy: "text"}, {weights: "$**"});
 // ensure listIndexes can handle a string-valued "weights"
-assert.eq(2, t.getIndexes().length);
+IndexUtils.assertIndexes(t, [{_id: 1}, {_fts: "text", _ftsx: 1}]);
 
 let res = t.find({"$text": {"$search": "blog"}});
 assert.eq(3, res.length(), "A1");
@@ -29,7 +25,8 @@ assert.eq(3, res.length(), "B1");
 
 // mixing
 t.dropIndex("dummy_text");
-assert.eq(1, t.getIndexKeys().length, "C1");
+
+IndexUtils.assertIndexes(t, [{_id: 1}]);
 t.createIndex({dummy: "text"}, {weights: {"$**": 1, title: 2}});
 
 res = t.find({"$text": {"$search": "write"}}, {score: {"$meta": "textScore"}}).sort({

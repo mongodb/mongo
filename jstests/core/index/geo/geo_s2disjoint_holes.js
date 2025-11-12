@@ -1,9 +1,3 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
-// @tags: [
-//   assumes_no_implicit_index_creation,
-// ]
-
 //
 // We should prohibit polygons with holes not bounded by their exterior shells.
 //
@@ -13,6 +7,10 @@
 // any others must be interior rings or holes."
 // http://geojson.org/geojson-spec.html#polygon
 //
+// @tags: [
+//    # TODO (SERVER-113531) enable once the ticket is addressed.
+//    assumes_balancer_off,
+// ]
 
 const coordinates = [
     // One square.

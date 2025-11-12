@@ -1,9 +1,8 @@
-// Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
 // @tags: [
-//   assumes_no_implicit_index_creation,
 //   requires_fastcount,
 // ]
+
+import {IndexUtils} from "jstests/libs/index_utils.js";
 
 let t = db.geo1;
 t.drop();
@@ -15,12 +14,13 @@ t.insert({zip: "10024", loc: [40.786387, 73.97709]});
 assert.commandWorked(t.insert({zip: "94061", loc: [37.463911, 122.23396]}));
 
 // test "2d" has to be first
-assert.eq(1, t.getIndexKeys().length, "S1");
-t.createIndex({zip: 1, loc: "2d"});
-assert.eq(1, t.getIndexKeys().length, "S2");
 
-t.createIndex(idx);
-assert.eq(2, t.getIndexKeys().length, "S3");
+IndexUtils.assertIndexes(t, [{_id: 1}]);
+assert.commandFailed(t.createIndex({zip: 1, loc: "2d"}));
+IndexUtils.assertIndexes(t, [{_id: 1}]);
+
+assert.commandWorked(t.createIndex(idx));
+IndexUtils.assertIndexes(t, [{_id: 1}, idx]);
 
 assert.eq(3, t.count(), "B1");
 assert.writeError(t.insert({loc: [200, 200]}));
@@ -39,5 +39,5 @@ assert.eq("06525", t.find({loc: wb.loc})[0].zip, "C3");
 
 t.drop();
 
-t.createIndex({loc: "2d"}, {min: -500, max: 500, bits: 4});
+assert.commandWorked(t.createIndex({loc: "2d"}, {min: -500, max: 500, bits: 4}));
 assert.commandWorked(t.insert({loc: [200, 200]}));
