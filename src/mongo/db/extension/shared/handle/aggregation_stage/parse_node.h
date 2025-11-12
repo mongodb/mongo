@@ -61,7 +61,7 @@ using VariantNodeHandle = std::variant<AggStageParseNodeHandle, AggStageAstNodeH
  */
 class AggStageParseNodeHandle : public OwnedHandle<::MongoExtensionAggStageParseNode> {
 public:
-    AggStageParseNodeHandle(absl::Nonnull<::MongoExtensionAggStageParseNode*> parseNode)
+    AggStageParseNodeHandle(::MongoExtensionAggStageParseNode* parseNode)
         : OwnedHandle<::MongoExtensionAggStageParseNode>(parseNode) {
         _assertValidVTable();
     }

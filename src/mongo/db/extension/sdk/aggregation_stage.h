@@ -315,67 +315,6 @@ private:
     }
 
     /**
-     * Converts an SDK VariantNode into a tagged union of ABI objects and writes the raw pointers
-     * into the host-allocated ExpandedArray element.
-     */
-    struct ConsumeVariantNodeToAbi {
-        ::MongoExtensionExpandedArrayElement& dst;
-
-        void operator()(AggStageParseNodeHandle&& parseNode) const {
-            dst.type = kParseNode;
-            dst.parse = parseNode.release();
-        }
-
-        void operator()(AggStageAstNodeHandle&& astNode) const {
-            dst.type = kAstNode;
-            dst.ast = astNode.release();
-        }
-    };
-
-    /*
-     * Invokes the destructor for a ::MongoExtensionAggStageParseNode and sets the element
-     * to null.
-     */
-    static void destroyAbiNode(::MongoExtensionAggStageParseNode*& node) noexcept {
-        if (node && node->vtable && node->vtable->destroy) {
-            node->vtable->destroy(node);
-        }
-        node = nullptr;
-    }
-
-    /*
-     * Invokes the destructor for a ::MongoExtensionAggStageAstNode and sets the element
-     * to null.
-     */
-    static void destroyAbiNode(::MongoExtensionAggStageAstNode*& node) noexcept {
-        if (node && node->vtable && node->vtable->destroy) {
-            node->vtable->destroy(node);
-        }
-        node = nullptr;
-    }
-
-    /*
-     * Invokes the destructor for a MongoExtensionExpandedArrayElement and sets the element to null.
-     */
-    static void destroyArrayElement(MongoExtensionExpandedArrayElement& node) noexcept {
-        switch (node.type) {
-            case kParseNode: {
-                destroyAbiNode(node.parse);
-                break;
-            }
-            case kAstNode: {
-                destroyAbiNode(node.ast);
-                break;
-            }
-            default: {
-                // Memory is leaked if the type tag is invalid, but this only happens if the
-                // extension violates the API contract.
-                break;
-            }
-        }
-    }
-
-    /**
      * Expands the provided parse node into one or more AST or parse nodes.
      *
      * The resultant expanded array is allocated by the caller and populated by this function. If

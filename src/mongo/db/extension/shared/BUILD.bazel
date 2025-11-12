@@ -23,6 +23,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",
+        "//src/mongo/db/extension/shared/array",
         "//src/mongo/db/extension/shared/handle",
     ],
 )

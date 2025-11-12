@@ -28,6 +28,7 @@ mongo_cc_library(
         "operation_metrics_adapter.h",
         "query_execution_context_handle.h",
         "query_shape_opts_handle.h",
+        "raii_vector_to_abi_array.h",
         "test_extension_factory.h",
         "test_extension_util.h",
         "versioned_extension.h",
