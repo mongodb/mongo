@@ -36,6 +36,9 @@ sbom.json @10gen/server-security @svc-auto-approve-bot
 MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
+# The following patterns are parsed from ./.cursor/rules/OWNERS.yml
+/.cursor/rules/**/cs-* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./.devcontainer/OWNERS.yml
 /.devcontainer/ @10gen/devprod-correctness @svc-auto-approve-bot
 

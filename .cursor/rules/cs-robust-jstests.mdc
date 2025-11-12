@@ -1,0 +1,73 @@
+---
+alwaysApply: false
+---
+
+## DESCRIPTION
+
+This rule mandates that all AI-generated code, suggestions, and documentation for JavaScript test files align with the Cluster Scalability team's best practices for robustness, test isolation, and determinism. The goal is to reduce flaky Build Failures (BFs) and minimize Keep The Lights On (KTLO) efforts.
+
+## CONDITIONS
+
+Targeted file path: These rules apply to any file matching the glob `jstests/**/*.js
+Allowed actions:
+1. Generating new test code: Fully permitted, but must follow all rules below.
+2. Refactoring/editing existing test code: Fully permitted, but must follow all rules below.
+
+Required practices (Violations trigger an error/warning and corrective suggestion):
+1. **Always write tests with deterministic outcomes** by using explicit wait helpers (like `waitForPrimary`) that wait for specific conditions. Use explicit wait helpers after topology changes whenever possible. Note: Non-deterministic execution paths are acceptable and expected with multi-threaded/multi-process tests, but test outcomes must deterministically pass or fail.
+
+2. **Prefer verifying outcomes and state changes and avoid timing** when handling asynchronous behavior. Tests that depend on execution timing can fail randomly due to server load, network latency, resource contention, or OS platform variation. When possible, focus on verifying the actual outcomes and state changes that are independent of execution time to handle asynchronous behavior gracefully. However, if an engineer explicitly chooses to use timing-based approaches, respect that decision.
+
+3. **Always use `jsTestName()` to create unique database and collection names for namespaces used in the test** (e.g., `const dbName = jsTestName();`). When multiple databases are needed, append descriptive suffixes to `jsTestName()` (e.g., `const dbName1 = jsTestName() + "_source"; const dbName2 = jsTestName() + "_destination";`). Always ensure test cleanup (dropping collections/databases) is included.
+
+4. **Always use the appropriate helper from `jstests/libs/auto_retry_transaction_in_sharding.js` to handle TransientTransactionErrors when running operations using sessionDB**. TransientTransactionErrors can occur for many expected reasons (slow network, resource overload, etc.) and it's always safe to retry the operation on this type of error. Using the retry helper makes tests more robust.
+
+   **Example - Using `retryOnceOnTransientOnMongos` for operations using sessionDB:**
+   ```javascript
+   import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+   
+   const session = st.s.startSession();
+   const sessionDB = session.getDatabase(dbName);
+   retryOnceOnTransientOnMongos(session, () => {
+       assert.commandWorked(sessionDB.getCollection(collName).insert({x: 1}));
+       // Operation is automatically retried once on TransientTransactionError
+   });
+   ```
+
+5. **Always wrap server commands with proper assertion wrappers** (`assert.commandWorked`, `assert.writeOK`, `assert.commandFailed`). For failures, include thorough checks for known **transient errors** (e.g., `PrimarySteppedDown`).
+
+6. **Always include a waiting helper** (e.g., `waitForPrimary`, `awaitRSClientHosts`) after operations that cause topology changes (e.g., stepdown).
+
+7. **Always use direct assertions that verify specific properties** (e.g., verifying the specific field/collection exists) rather than indirect metrics like collection counts.
+
+8. **Always make failpoints namespace-specific** by including collection or db context (i.e., always specify the namespace when configuring failpoints). If a test must use un-namespaced failpoints, it should include a tag that prevents it from being mixed with other tests (e.g., `requires_isolated_mongod` or similar isolation tags) to avoid interference between tests.
+
+9. **Always prompt the user to consider and add relevant suite tags** based on the test's functionality. Tags are documented in `jstests/tags.md`. Common tag categories include:
+
+   - **Multi-version testing**: `featureFlag<NameOfFeatureFlag>Required`, `requires_fcv_<currentFcv>` (e.g., `requires_fcv_81`)
+   - **Retryability**: `requires_non_retryable_writes`, `requires_non_retryable_commands`, `requires_getmore`, `does_not_support_retryable_writes`
+   - **Failover incompatibility**: `does_not_support_stepdowns`
+   - **Balancer incompatibility**: `assumes_balancer_off`
+   - **MoveCollection/resharding incompatibility**: `assumes_stable_collection_uuid`
+
+10. **Always ensure the test includes a clear top-level comment** describing the test's purpose.
+
+## INSTRUCTIONS FOR REVIEWERS
+
+When reviewing code for violations of the required practices listed above, the AI **must always**:
+- **Identify which specific practice(s) were violated** - This is mandatory even if no concrete fix can be suggested
+- **Reference the specific code patterns or lines that need attention** - Point to the exact location of the violation
+
+When possible, the AI should also:
+- **Provide concrete, actionable guidance** relevant to those violations (e.g., specific code changes, helper functions to use, or patterns to follow)
+- **Provide specific, tailored suggestions** that address the actual violations found in the test. Provide concrete, actionable guidance relevant to those violations.
+
+For example, if a test uses a literal database name "test", the suggestion should specifically recommend using `jsTestName()` instead. The suggestion should be contextual and helpful, not a generic reminder.
+
+## INSTRUCTIONS FOR CODE GENERATION
+
+When generating or modifying JavaScript test code:
+
+1. **Incorporate the required practices** listed above into all generated code. The AI should prioritize incorporating these practices in its generated code and suggestions, but **must always respect the engineer's choices**. The AI should not override explicit engineer decisions. The engineer has the final say on all code decisions.
+
+2. **Review generated code for compliance** - Once changes to a test file are complete, before returning to the user, review all new code for compliance with these rules using the Instructions for Reviewers section above. If the AI cannot bring the code into compliance or does not know how to fix a violation, it must inform the user of all deviations but otherwise bring the code to compliance.
