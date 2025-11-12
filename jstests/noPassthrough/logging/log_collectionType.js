@@ -1,14 +1,13 @@
 /**
  * This test verifies the correctness of the "collectionType" value in the slow query logs.
  * @tags: [
- *   # TODO SERVER-107538 re-enable this test in viewless timeseries suites
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 
 import {
     areViewlessTimeseriesEnabled,
     getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
@@ -74,12 +73,106 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
             "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
         }),
     );
+
     getTimeseriesCollForRawOps(db, db.test.timeseries_coll_rawops).aggregate(pipeline, getRawOperationSpec(db));
-    if (areViewlessTimeseriesEnabled(db)) {
-        checkLogForCollectionType("test.timeseries_coll", "timeseries");
-    } else {
-        checkLogForCollectionType("test." + getTimeseriesBucketsColl("timeseries_coll"), "timeseriesBuckets");
-    }
+    let tsCollNs = "test." + getTimeseriesCollForDDLOps(db, "timeseries_coll_rawops");
+    checkLogForCollectionType(tsCollNs, "timeseriesBuckets");
+
+    // Check for view defined on a timeseries collection.
+    assert.commandWorked(db.createView("viewOnTsColl", "timeseries_coll", [{$match: {a: 1}}]));
+    ns = "test.viewOnTsColl";
+    db.viewOnTsColl.aggregate(pipeline);
+    checkLogForCollectionType(ns, "view");
+
+    // Checking queries with sub-pipelines (additional namespaces) don't interfere with returning
+    // the correct main collection type.
+
+    // main namespace is "normal"
+    db.coll.aggregate(
+        pipeline.concat([
+            {
+                $unionWith: {
+                    coll: "viewOnColl",
+                    pipeline: pipeline,
+                },
+            },
+        ]),
+    );
+    checkLogForCollectionType("test.coll", "normal");
+
+    db.coll.aggregate(
+        pipeline.concat([
+            {
+                $unionWith: {
+                    coll: "timeseries_coll",
+                    pipeline: pipeline,
+                },
+            },
+        ]),
+    );
+    checkLogForCollectionType("test.coll", "normal");
+
+    // main namespace is "timeseries"
+    db.timeseries_coll.aggregate(
+        pipeline.concat([
+            {
+                $unionWith: {
+                    coll: "coll",
+                    pipeline: pipeline,
+                },
+            },
+        ]),
+    );
+    checkLogForCollectionType("test.timeseries_coll", "timeseries");
+
+    db.timeseries_coll.aggregate(
+        pipeline.concat([
+            {
+                $unionWith: {
+                    coll: "viewOnColl",
+                    pipeline: pipeline,
+                },
+            },
+        ]),
+    );
+    checkLogForCollectionType("test.timeseries_coll", "timeseries");
+
+    // main namespace is "view"
+    db.viewOnColl.aggregate(
+        pipeline.concat([
+            {
+                $unionWith: {
+                    coll: "coll",
+                    pipeline: pipeline,
+                },
+            },
+        ]),
+    );
+    checkLogForCollectionType("test.viewOnColl", "view");
+
+    db.viewOnColl.aggregate(
+        pipeline.concat([
+            {
+                $unionWith: {
+                    coll: "viewOnColl",
+                    pipeline: pipeline,
+                },
+            },
+        ]),
+    );
+    checkLogForCollectionType("test.viewOnColl", "view");
+
+    db.viewOnColl.aggregate(
+        pipeline.concat([
+            {
+                $unionWith: {
+                    coll: "timeseries_coll",
+                    pipeline: pipeline,
+                },
+            },
+        ]),
+    );
+    checkLogForCollectionType("test.viewOnColl", "view");
 
     // Check for system collectionType.
     db.system.profile.aggregate(pipeline);

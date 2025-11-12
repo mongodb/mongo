@@ -297,7 +297,8 @@ public:
     /**
      * Gets the type of the namespace on which the current operation operates.
      */
-    MONGO_MOD_PRIVATE std::string getCollectionType(const NamespaceString& nss) const;
+    MONGO_MOD_PRIVATE std::string getCollectionType(OperationContext* opCtx,
+                                                    const NamespaceString& nss) const;
 
     /**
      * Accumulate resolved views.
@@ -560,6 +561,11 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
+
+    // Holds which namespaces seen across the operation are known to be timeseries.
+    // TODO SERVER-113634: Add timeseries namespace to all operations that apply,
+    // not just read commands.
+    std::set<NamespaceString> knownTimeseriesNamespaces;
 
     // Stores metrics handles for extensions to properly manage their lifetimes. The contents of
     // these stats are opaque to the MongoDB host - this object allows extensions to implement their

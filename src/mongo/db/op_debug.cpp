@@ -39,6 +39,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -196,7 +197,7 @@ void OpDebug::report(OperationContext* opCtx,
 
     pAttrs->add("isFromUserConnection", client && client->isFromUserConnection());
     pAttrs->addDeepCopy("ns", toStringForLogging(curop.getNSS()));
-    pAttrs->addDeepCopy("collectionType", getCollectionType(curop.getNSS()));
+    pAttrs->addDeepCopy("collectionType", getCollectionType(opCtx, curop.getNSS()));
 
     if (client) {
         if (auto clientMetadata = ClientMetadata::get(client)) {
@@ -1361,33 +1362,48 @@ void OpDebug::appendResolvedViewsInfo(BSONObjBuilder& builder) const {
     resolvedViewsArr.doneFast();
 }
 
-std::string OpDebug::getCollectionType(const NamespaceString& nss) const {
+std::string OpDebug::getCollectionType(OperationContext* opCtx, const NamespaceString& nss) const {
     if (nss.isEmpty()) {
         return "none";
-    } else if (!resolvedViews.empty()) {
+    }
+
+    if (!resolvedViews.empty()) {
         auto dependencyItr = resolvedViews.find(nss);
         // 'resolvedViews' might be populated if any other collection as a part of the query is on a
         // view. However, it will not have associated dependencies.
-        if (dependencyItr == resolvedViews.end()) {
-            return "normal";
-        }
-        const std::vector<NamespaceString>& dependencies = dependencyItr->second.first;
+        if (dependencyItr != resolvedViews.end()) {
+            const std::vector<NamespaceString>& dependencies = dependencyItr->second.first;
 
-        auto nssIterInDeps = std::find(dependencies.begin(), dependencies.end(), nss);
-        tassert(7589000,
-                str::stream() << "The view with ns: " << nss.toStringForErrorMsg()
-                              << ", should have a valid dependency.",
-                nssIterInDeps != (dependencies.end() - 1) && nssIterInDeps != dependencies.end());
+            auto nssIterInDeps = std::find(dependencies.begin(), dependencies.end(), nss);
+            tassert(7589000,
+                    str::stream() << "The view with ns: " << nss.toStringForErrorMsg()
+                                  << ", should have a valid dependency.",
+                    nssIterInDeps != (dependencies.end() - 1) &&
+                        nssIterInDeps != dependencies.end());
 
-        // The underlying namespace for the view/timeseries collection is the next namespace in the
-        // dependency chain. If the view depends on a timeseries buckets collection, then it is a
-        // timeseries collection, otherwise it is a regular view.
-        const NamespaceString& underlyingNss = *std::next(nssIterInDeps);
-        if (underlyingNss.isTimeseriesBucketsCollection()) {
-            return "timeseries";
+            // The underlying namespace for the view/timeseries collection is the next namespace in
+            // the dependency chain. If the view depends on a timeseries buckets collection, then it
+            // is a timeseries collection, otherwise it is a regular view.
+            const NamespaceString& underlyingNss = *std::next(nssIterInDeps);
+            if (underlyingNss.isTimeseriesBucketsCollection()) {
+                return "timeseries";
+            }
+            return "view";
         }
-        return "view";
-    } else if (nss.isTimeseriesBucketsCollection()) {
+    }
+
+    if (!knownTimeseriesNamespaces.empty()) {
+        auto itr = knownTimeseriesNamespaces.find(nss);
+        if (itr != knownTimeseriesNamespaces.end()) {
+            if (isRawDataOperation(opCtx)) {
+                return "timeseriesBuckets";
+            } else {
+                return "timeseries";
+            }
+        }
+    }
+
+    if (nss.isTimeseriesBucketsCollection()) {
         return "timeseriesBuckets";
     } else if (nss.isSystem()) {
         return "system";
