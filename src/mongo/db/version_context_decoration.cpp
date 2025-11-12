@@ -31,6 +31,7 @@
 #include "mongo/db/version_context.h"
 
 // Override waitForOperationsNotMatchingVersionContextToComplete's internal re-check interval
+MONGO_FAIL_POINT_DEFINE(waitBeforeFixedOperationFCVRegionRaceCheck);
 MONGO_FAIL_POINT_DEFINE(reduceWaitForOfcvInternalIntervalTo10Ms);
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -71,6 +72,55 @@ VersionContext::ScopedSetDecoration::ScopedSetDecoration(OperationContext* opCtx
 }
 
 VersionContext::ScopedSetDecoration::~ScopedSetDecoration() {
+    ClientLock lk(_opCtx->getClient());
+    getVersionContext(_opCtx).resetToOperationWithoutOFCV();
+}
+
+VersionContext::FixedOperationFCVRegion::FixedOperationFCVRegion(OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    if (getVersionContext(_opCtx).hasOperationFCV()) {
+        // Already has a VersionContext (re-entrancy)
+        _opCtx = nullptr;
+        return;
+    }
+
+    auto getFCV = []() -> auto {
+        auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        return fcvSnapshot.isVersionInitialized()
+            ? fcvSnapshot.getVersion()
+            : multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior;
+    };
+
+    ClientLock lk(_opCtx->getClient());
+
+    // Prevent operations acquiring the OFCV to outlive FCV transitions: without this, an operation
+    // that starts on a primary node may continue after stepping down and up again (the OFCV
+    // draining happens only on primary nodes during setFCV).
+    _opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+    while (true) {
+        auto fcv = getFCV();
+        VersionContext::setDecoration(lk, _opCtx, VersionContext(fcv));
+
+        waitBeforeFixedOperationFCVRegionRaceCheck.pauseWhileSet();
+
+        if (fcv == getFCV()) {
+            // Snapshot acquisition did not race with FCV transition, it is then ensured
+            // that the operation will be properly drained upon setFCV if needed.
+            break;
+        }
+
+        // Iterate again to install the current OFCV because the snapshot acquisition raced with a
+        // FCV transition
+        getVersionContext(_opCtx).resetToOperationWithoutOFCV();
+    }
+}
+
+VersionContext::FixedOperationFCVRegion::~FixedOperationFCVRegion() {
+    if (_opCtx == nullptr) {
+        return;
+    }
+
     ClientLock lk(_opCtx->getClient());
     getVersionContext(_opCtx).resetToOperationWithoutOFCV();
 }

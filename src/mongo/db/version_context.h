@@ -89,6 +89,23 @@ public:
         OperationContext* _opCtx;
     };
 
+    /**
+     * Sets the current FCV as the VersionContext decoration over the passed in operation context
+     * (unless an OFCV is already set, in that case the scoped object has no effect). While the
+     * object is in scope, the operation context will have a stable view of feature flags. The
+     * Client lock over the opCtx's client is automatically taken on creation and destruction.
+     */
+    class FixedOperationFCVRegion {
+    public:
+        FixedOperationFCVRegion(OperationContext* opCtx);
+        FixedOperationFCVRegion(const FixedOperationFCVRegion&) = delete;
+        FixedOperationFCVRegion(FixedOperationFCVRegion&&) = delete;
+        ~FixedOperationFCVRegion();
+
+    private:
+        OperationContext* _opCtx;
+    };
+
     constexpr VersionContext() : _metadataOrTag(OperationWithoutOFCVTag{}) {}
     explicit constexpr VersionContext(OutsideOperationTag tag) : _metadataOrTag(tag) {}
     explicit constexpr VersionContext(IgnoreOFCVTag tag) : _metadataOrTag(tag) {}

@@ -72,6 +72,68 @@ DEATH_TEST_F(VersionContextDecorationTest,
     VersionContext::ScopedSetDecoration(opCtx, kLastLTSVersionContext);
 }
 
+TEST_F(VersionContextDecorationTest, FixedOperationFCVRegion) {
+    ASSERT_EQ(VersionContext{}, VersionContext::getDecoration(opCtx));
+
+    {
+        // OFCV set while `FixedOperationFCVRegion` is in scope
+        VersionContext expectedVc{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()};
+        VersionContext::FixedOperationFCVRegion fixedOperationFcvRegion(opCtx);
+        ASSERT_EQ(expectedVc, VersionContext::getDecoration(opCtx));
+    }
+
+    // No OFCV after `FixedOperationFCVRegion` gets out of scope
+    ASSERT_EQ(VersionContext{}, VersionContext::getDecoration(opCtx));
+}
+
+TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionReentrancy) {
+    ASSERT_EQ(VersionContext{}, VersionContext::getDecoration(opCtx));
+
+    {
+        // (Generic FCV reference): used for testing
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+        VersionContext expectedVc{multiversion::GenericFCV::kLatest};
+
+        // Set latest OFCV on the operation context
+        VersionContext::FixedOperationFCVRegion fixedOperationFcvRegion0(opCtx);
+        ASSERT_EQ(expectedVc, VersionContext::getDecoration(opCtx));
+
+        {
+            // The original OFCV is preserved even though the FCV snapshot changed
+            serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+            VersionContext::FixedOperationFCVRegion fixedOperationFcvRegion1(opCtx);
+            ASSERT_EQ(expectedVc, VersionContext::getDecoration(opCtx));
+        }
+
+        // The OFCV is not unset when the second scoped object gets out of scope
+        ASSERT_EQ(expectedVc, VersionContext::getDecoration(opCtx));
+    }
+
+    // No OFCV after all `FixedOperationFCVRegion` objects got out of scope
+    ASSERT_EQ(VersionContext{}, VersionContext::getDecoration(opCtx));
+}
+
+TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionSetDuringFcvTransition) {
+    auto failPoint = globalFailPointRegistry().find("waitBeforeFixedOperationFCVRegionRaceCheck");
+    failPoint->setMode(FailPoint::alwaysOn);
+
+    // (Generic FCV reference): used for testing
+    // Set FCV to last-lts
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+
+    // Make the FixedOperationFCVRegion constructor race with a FCV transition (last-lts to latest),
+    // then check that the target FCV version has been set
+    unittest::JoinThread setFcvToLatestThread([&] {
+        failPoint->waitForTimesEntered(1);
+
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+        failPoint->setMode(FailPoint::off);
+    });
+
+    VersionContext expectedVc = kLatestVersionContext;
+    VersionContext::FixedOperationFCVRegion fixedOperationFcvRegion(opCtx);
+    ASSERT_EQ(expectedVc, VersionContext::getDecoration(opCtx));
+}
 
 class VersionContextDrainTest : public ServiceContextTest {
 public:
