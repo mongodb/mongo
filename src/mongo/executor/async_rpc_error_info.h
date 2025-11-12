@@ -42,6 +42,7 @@
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -50,7 +51,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 using executor::RemoteCommandResponse;
 
 enum class CommandErrorProvenance { kLocal, kRemote };
@@ -243,4 +244,4 @@ Status unpackRPCStatusIgnoringWriteErrors(Status status);
  */
 Status unpackRPCStatusIgnoringWriteConcernAndWriteErrors(Status status);
 };  // namespace async_rpc
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

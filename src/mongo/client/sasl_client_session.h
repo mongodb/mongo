@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -52,7 +53,7 @@ namespace mongo {
  * parameters must be UTF-8 encoded strings with no embedded NUL characters.  The
  * parameterPassword parameter is not constrained.
  */
-class SaslClientSession {
+class MONGO_MOD_UNFORTUNATELY_OPEN SaslClientSession {
     SaslClientSession(const SaslClientSession&) = delete;
     SaslClientSession& operator=(const SaslClientSession&) = delete;
 

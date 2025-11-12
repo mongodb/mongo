@@ -51,6 +51,7 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/unique_message.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_types.h"
 
@@ -79,7 +80,7 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
    On a failover situation, expect at least one operation to return an error (throw
    an exception) before the failover is complete.  Operations are not retried.
 */
-class DBClientReplicaSet : public DBClientBase {
+class MONGO_MOD_PUBLIC DBClientReplicaSet : public DBClientBase {
 public:
     using DBClientBase::find;
 

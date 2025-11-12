@@ -36,6 +36,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::executor {
 
@@ -44,7 +45,7 @@ namespace mongo::executor {
  * The factory dictates which transport protocol the TransportLayer provided to startup() should
  * communicate over.
  */
-class AsyncClientFactory : public EgressConnectionCloser {
+class MONGO_MOD_PUBLIC AsyncClientFactory : public EgressConnectionCloser {
 public:
     /**
      * A handle to a client produced from this factory.

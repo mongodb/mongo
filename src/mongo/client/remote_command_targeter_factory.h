@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
  * Constructs RemoteCommandTargeters based on the specific type of the target (standalone,
  * replica set, etc).
  */
-class RemoteCommandTargeterFactory {
+class MONGO_MOD_PUBLIC RemoteCommandTargeterFactory {
     RemoteCommandTargeterFactory(const RemoteCommandTargeterFactory&) = delete;
     RemoteCommandTargeterFactory& operator=(const RemoteCommandTargeterFactory&) = delete;
 

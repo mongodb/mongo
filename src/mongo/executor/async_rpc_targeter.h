@@ -38,12 +38,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <vector>
 
 namespace mongo {
-namespace async_rpc {
+namespace MONGO_MOD_PUBLIC async_rpc {
 
 class Targeter {
 public:
@@ -102,5 +103,5 @@ private:
     HostAndPort _host;
 };
 
-}  // namespace async_rpc
+}  // namespace MONGO_MOD_PUBLIC async_rpc
 }  // namespace mongo

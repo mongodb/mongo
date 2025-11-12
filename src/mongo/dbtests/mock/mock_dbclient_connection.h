@@ -49,6 +49,7 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 
@@ -68,7 +69,7 @@ namespace mongo {
  *
  * Also check out sample usage in dbtests/mock_dbclient_conn_test.cpp
  */
-class MockDBClientConnection : public mongo::DBClientConnection {
+class MONGO_MOD_PUBLIC MockDBClientConnection : public mongo::DBClientConnection {
 public:
     /**
      * An OP_MSG response to a 'find' command.

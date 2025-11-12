@@ -62,6 +62,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
@@ -83,7 +84,8 @@
  * arguments. Each function returns a future containing the response to the command, parsed into the
  * response-type provided. See the function comments below for details.
  */
-namespace mongo::async_rpc {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC async_rpc {
 using executor::TaskExecutor;
 
 /**
@@ -151,7 +153,7 @@ struct AsyncRPCInternalResponse {
  * async_rpc::sendCommand free-function/public API below instead, which contains
  * additional functionality and type checking.
  */
-class AsyncRPCRunner {
+class MONGO_MOD_USE_REPLACEMENT(async_rpc::sendCommand()) AsyncRPCRunner {
 public:
     virtual ~AsyncRPCRunner() = default;
     virtual ExecutorFuture<AsyncRPCInternalResponse> _sendCommand(
@@ -452,4 +454,5 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     return sendCommand(options, opCtx, cstr);
 }
 
-}  // namespace mongo::async_rpc
+}  // namespace MONGO_MOD_PUBLIC async_rpc
+}  // namespace mongo

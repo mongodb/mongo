@@ -37,6 +37,7 @@ imports:
 structs:
     MongoShellOptions:
         description: "The third argument to `new Mongo(...)`"
+        mod_visibility: public
         fields:
             api:
                 description: "API strict version parameter"

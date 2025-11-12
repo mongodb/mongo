@@ -37,6 +37,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <compare>
@@ -51,7 +52,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class ClientAPIVersionParameters;
 
@@ -368,4 +369,4 @@ inline std::ostream& operator<<(std::ostream& ss, const MongoURI& uri) {
 inline StringBuilder& operator<<(StringBuilder& sb, const MongoURI& uri) {
     return sb << uri._connectString;
 }
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

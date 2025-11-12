@@ -45,6 +45,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -68,7 +69,7 @@ extern FailPoint networkInterfaceShouldNotKillPendingRequests;
 /**
  * Interface to networking for use by TaskExecutor implementations.
  */
-class NetworkInterface {
+class MONGO_MOD_PUBLIC NetworkInterface {
     NetworkInterface(const NetworkInterface&) = delete;
     NetworkInterface& operator=(const NetworkInterface&) = delete;
 

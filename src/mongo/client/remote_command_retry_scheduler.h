@@ -38,6 +38,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdlib>
@@ -159,6 +160,6 @@ private:
     CancellationSource _cancellationSource;
 };
 
-bool isMongosRetriableError(const ErrorCodes::Error& code);
+MONGO_MOD_PUBLIC bool isMongosRetriableError(const ErrorCodes::Error& code);
 
 }  // namespace mongo

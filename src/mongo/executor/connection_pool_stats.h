@@ -34,6 +34,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/histogram.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
@@ -45,7 +46,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace executor {
+namespace MONGO_MOD_PUBLIC executor {
 namespace details {
 constexpr inline auto kStartSize = 0;
 constexpr inline auto kPartitionStepSize = 50;
@@ -139,5 +140,5 @@ struct ConnectionPoolStats {
     StatsByPool statsByPool;
 };
 
-}  // namespace executor
+}  // namespace MONGO_MOD_PUBLIC executor
 }  // namespace mongo

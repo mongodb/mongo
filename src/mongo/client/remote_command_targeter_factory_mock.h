@@ -33,6 +33,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
@@ -43,7 +44,8 @@ namespace mongo {
  * Factory which instantiates mock remote command targeters. This class is not thread-safe and is
  * only used for unit-testing.
  */
-class RemoteCommandTargeterFactoryMock final : public RemoteCommandTargeterFactory {
+class MONGO_MOD_PUBLIC RemoteCommandTargeterFactoryMock final
+    : public RemoteCommandTargeterFactory {
 public:
     RemoteCommandTargeterFactoryMock();
     ~RemoteCommandTargeterFactoryMock() override;

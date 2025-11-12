@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
@@ -49,7 +50,7 @@ struct RemoteCommandResponse;
  * An hooking interface for augmenting an implementation of NetworkInterface with domain-specific
  * host validation and post-connection logic.
  */
-class NetworkConnectionHook {
+class MONGO_MOD_OPEN NetworkConnectionHook {
 public:
     virtual ~NetworkConnectionHook() = default;
 

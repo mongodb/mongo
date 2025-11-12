@@ -37,6 +37,7 @@
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -46,7 +47,7 @@ namespace mongo {
  * Registry for storing mock servers and can create mock connections to these
  * servers.
  */
-class MockConnRegistry {
+class MONGO_MOD_PUBLIC MockConnRegistry {
 public:
     /**
      * Initializes the static instance.

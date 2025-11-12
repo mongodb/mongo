@@ -40,6 +40,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -53,7 +54,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class BSONObjBuilder;
 
@@ -285,9 +286,9 @@ private:
     AtomicWord<bool> _inShutdown;
 };
 
-class DBConnectionHook {
+class MONGO_MOD_OPEN DBConnectionHook {
 public:
-    virtual ~DBConnectionHook() {}
+    virtual ~DBConnectionHook() = default;
     virtual void onCreate(DBClientBase* conn) {}
     virtual void onHandedOut(DBClientBase* conn) {}
     virtual void onRelease(DBClientBase* conn) {}
@@ -377,7 +378,8 @@ public:
      * Gets the time it took for the last connection to be established from the PoolMap given a host
      * and timeout.
      */
-    Milliseconds getPoolHostConnTime_forTest(const std::string& host, double timeout) const;
+    MONGO_MOD_PUBLIC Milliseconds getPoolHostConnTime_forTest(const std::string& host,
+                                                              double timeout) const;
 
     /**
      * Gets the number of connections available in the pool.
@@ -573,4 +575,4 @@ private:
     const double _socketTimeoutSecs;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

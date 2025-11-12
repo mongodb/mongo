@@ -36,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -46,7 +47,7 @@
 #include <boost/smart_ptr.hpp>
 
 namespace mongo {
-namespace async_rpc {
+namespace MONGO_MOD_PUBLIC async_rpc {
 
 /**
  * This class serves as an adaptor that allows a mongo::RemoteCommandTargeter
@@ -75,5 +76,5 @@ private:
     std::shared_ptr<RemoteCommandTargeter> _targeter;
 };
 
-}  // namespace async_rpc
+}  // namespace MONGO_MOD_PUBLIC async_rpc
 }  // namespace mongo

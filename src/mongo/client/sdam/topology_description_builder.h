@@ -30,6 +30,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -42,7 +43,7 @@ namespace mongo::sdam {
  * This class is used in the unit tests to construct TopologyDescription instances. For production
  * code, TopologyDescription instances should be constructed using its constructors.
  */
-class TopologyDescriptionBuilder {
+class MONGO_MOD_PUBLIC TopologyDescriptionBuilder {
 public:
     TopologyDescriptionBuilder() = default;
 

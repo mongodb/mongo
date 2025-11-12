@@ -50,6 +50,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/string_map.h"
 
@@ -63,7 +64,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class BSONObjBuilder;
 class ConnectionString;
@@ -248,4 +249,4 @@ private:
         std::make_shared<ReplicaSetMonitorManagerStats>();
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

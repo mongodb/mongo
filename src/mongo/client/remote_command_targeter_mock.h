@@ -38,6 +38,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -48,7 +49,7 @@
 
 namespace mongo {
 
-class RemoteCommandTargeterMock final : public RemoteCommandTargeter {
+class MONGO_MOD_PUBLIC RemoteCommandTargeterMock final : public RemoteCommandTargeter {
 public:
     RemoteCommandTargeterMock();
     ~RemoteCommandTargeterMock() override;

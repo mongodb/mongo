@@ -49,6 +49,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -62,7 +63,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class Fetcher {
     Fetcher(const Fetcher&) = delete;
@@ -311,4 +312,4 @@ private:
  */
 std::ostream& operator<<(std::ostream& os, const Fetcher::State& state);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

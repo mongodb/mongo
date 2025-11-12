@@ -35,6 +35,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstdint>
@@ -52,7 +53,7 @@ namespace mongo {
 /**
  * A stateful notifier for events from a set of ReplicaSetMonitors
  */
-class ReplicaSetChangeNotifier {
+class MONGO_MOD_PUBLIC ReplicaSetChangeNotifier {
 public:
     using Key = std::string;
     class Listener;
@@ -122,7 +123,7 @@ private:
  * if your implementation would block or seriously delay execution,
  * please schedule the majority of the work to complete asynchronously.
  */
-class ReplicaSetChangeNotifier::Listener {
+class MONGO_MOD_OPEN ReplicaSetChangeNotifier::Listener {
 public:
     using Notifier = ReplicaSetChangeNotifier;
     using Key = typename Notifier::Key;

@@ -59,6 +59,7 @@ server_parameters:
         description: >-
             The maximum amount of retries the server will attempt when encountering retryable
             errors.
+        mod_visibility: public
         set_at: [startup, runtime]
         cpp_varname: gDefaultClientMaxRetryAttempts
         cpp_vartype: Atomic<int32_t>

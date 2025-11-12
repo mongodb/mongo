@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_oidc_client_params.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <string>
@@ -39,7 +40,7 @@
 
 namespace mongo {
 
-class SaslOIDCClientConversation : public SaslClientConversation {
+class MONGO_MOD_PUBLIC SaslOIDCClientConversation : public SaslClientConversation {
     SaslOIDCClientConversation(const SaslOIDCClientConversation&) = delete;
     SaslOIDCClientConversation& operator=(const SaslOIDCClientConversation&) = delete;
 

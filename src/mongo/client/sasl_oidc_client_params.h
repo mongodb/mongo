@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 using oidcIdPAuthCallbackT = void(StringData, StringData, StringData);
 
 /**
@@ -67,4 +68,4 @@ struct OIDCClientGlobalParams {
 };
 
 extern OIDCClientGlobalParams oidcClientGlobalParams;
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

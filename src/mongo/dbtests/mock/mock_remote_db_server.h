@@ -40,6 +40,7 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
@@ -50,7 +51,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 namespace projection_executor {
 class ProjectionExecutor;
 }  // namespace projection_executor
@@ -277,4 +278,4 @@ private:
     mutable SpinLock _lock;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <utility>
@@ -42,7 +43,7 @@ namespace mongo {
 
 class StringData;
 
-class IndexSpec {
+class MONGO_MOD_PUBLIC IndexSpec {
 public:
     // An enumeration of symbolic names for index types.
     enum IndexType {

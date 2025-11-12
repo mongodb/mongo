@@ -33,6 +33,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <cstdint>
@@ -54,7 +55,7 @@ class NetworkInterface;
  * from on the network interface thread, and queueing them up to be drained by
  * a setAlarm if not.
  */
-class NetworkInterfaceThreadPool final : public ThreadPoolInterface {
+class MONGO_MOD_NEEDS_REPLACEMENT NetworkInterfaceThreadPool final : public ThreadPoolInterface {
 public:
     NetworkInterfaceThreadPool(NetworkInterface* net);
     ~NetworkInterfaceThreadPool() override;

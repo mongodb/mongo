@@ -49,6 +49,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -82,7 +83,7 @@ inline TaskExecutor::CallbackHandle makeCallbackHandle() {
 
 using StartCommandCB = std::function<void(const RemoteCommandResponse&)>;
 
-class NetworkInterfaceIntegrationFixture : public ExecutorIntegrationTestFixture {
+class MONGO_MOD_OPEN NetworkInterfaceIntegrationFixture : public ExecutorIntegrationTestFixture {
 public:
     void createNet();
     void startNet();

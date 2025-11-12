@@ -34,6 +34,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/retry_strategy.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -42,7 +43,7 @@ namespace mongo {
 /**
  * Interface encapsulating the targeting logic for a given replica set or a standalone host.
  */
-class RemoteCommandTargeter {
+class MONGO_MOD_PUBLIC RemoteCommandTargeter {
     RemoteCommandTargeter(const RemoteCommandTargeter&) = delete;
     RemoteCommandTargeter& operator=(const RemoteCommandTargeter&) = delete;
 

@@ -35,12 +35,13 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 
 namespace mongo {
-namespace executor {
+namespace MONGO_MOD_PUBLIC executor {
 
 /**
  * Returns a new NetworkInterface that uses a connection pool with the default options.
@@ -75,5 +76,5 @@ std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
     std::shared_ptr<AsyncClientFactory> clientFactory,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook = nullptr);
 
-}  // namespace executor
+}  // namespace MONGO_MOD_PUBLIC executor
 }  // namespace mongo

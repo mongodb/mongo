@@ -30,11 +30,12 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 
 namespace mongo {
 
-Status validateMaxStalenessSecondsExternal(std::int64_t maxStalenessSeconds,
-                                           const boost::optional<TenantId>& tenantId = boost::none);
+MONGO_MOD_PUBLIC Status validateMaxStalenessSecondsExternal(
+    std::int64_t maxStalenessSeconds, const boost::optional<TenantId>& tenantId = boost::none);
 
 }  // namespace mongo

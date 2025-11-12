@@ -52,6 +52,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -109,7 +110,7 @@ class NetworkConnectionHook;
  * be waiting for a response to become available, or for the network thread to move forward and
  * process that response.
  */
-class NetworkInterfaceMock : public NetworkInterface {
+class MONGO_MOD_PUBLIC NetworkInterfaceMock : public NetworkInterface {
 public:
     class NetworkOperation;
     using NetworkOperationList = std::list<NetworkOperation>;

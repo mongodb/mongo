@@ -37,6 +37,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <concepts>
@@ -47,7 +48,7 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 struct TargetingMetadata {
     stdx::unordered_set<HostAndPort> deprioritizedServers;
@@ -77,7 +78,7 @@ struct TargetingMetadata {
  *
  *  See 'runWithRetryStrategy' for a reference usage of retry strategies.
  */
-class RetryStrategy {
+class MONGO_MOD_OPEN RetryStrategy {
 public:
     virtual ~RetryStrategy() = default;
 
@@ -486,7 +487,7 @@ public:
          */
         void updateRateParameters(double returnRate, double capacity);
 
-        double getBalance_forTest() const;
+        MONGO_MOD_PUBLIC double getBalance_forTest() const;
 
         /**
          * Appends the stats for the retry budget metrics.
@@ -700,4 +701,4 @@ StatusWith<T> runWithRetryStrategy(Interruptible* interruptible,
     return result;
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

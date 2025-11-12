@@ -40,6 +40,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <chrono>
@@ -81,7 +82,7 @@ namespace executor {
  *
  * checkResult(future.timed_get(...));
  */
-class NetworkTestEnv {
+class MONGO_MOD_PUBLIC NetworkTestEnv {
 public:
     // Common timeout for tests to use for any work scheduled through launchAsync to complete.
     static constexpr Minutes kDefaultLaunchAsyncFutureTimeout{5};

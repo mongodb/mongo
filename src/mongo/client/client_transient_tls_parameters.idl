@@ -36,6 +36,7 @@ structs:
     ClientTLSParameters:
         description: "Parser for TLS parameters passed to 'new Mongo()' in jstests"
         strict: true
+        mod_visibility: public
         fields:
             certificateKeyFile:
                 description: "PEM certificate/key file for TLS"

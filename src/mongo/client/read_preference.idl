@@ -39,6 +39,8 @@ enums:
     ReadPreference:
         description: Enumeration representing Read Preference Modes
         type: string
+        # TODO SERVER-113765: uncomment the following line.
+        # mod_visibility: public
         values:
             # Read from primary only. All operations produce an error (throw an exception where
             # applicable) if primary is unavailable. Cannot be combined with tags.

@@ -41,6 +41,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
@@ -55,7 +56,7 @@ namespace mongo {
 
 class BSONObj;
 
-namespace auth {
+namespace MONGO_MOD_PUBLIC auth {
 
 using RunCommandHook = std::function<Future<BSONObj>(OpMsgRequest request)>;
 
@@ -211,5 +212,5 @@ SpeculativeAuthType speculateInternalAuth(const HostAndPort& remoteHost,
                                           BSONObjBuilder* helloRequestBuilder,
                                           std::shared_ptr<SaslClientSession>* saslClientSession);
 
-}  // namespace auth
+}  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

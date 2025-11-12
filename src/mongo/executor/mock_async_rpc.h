@@ -60,6 +60,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/string_map.h"
@@ -77,7 +78,8 @@
 #include <utility>
 #include <vector>
 
-namespace mongo::async_rpc {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC async_rpc {
 
 /**
  * This header provides two mock implementations of the async_rpc::sendCommand API. In
@@ -423,4 +425,5 @@ public:
     }
 };
 
-}  // namespace mongo::async_rpc
+}  // namespace MONGO_MOD_PUBLIC async_rpc
+}  // namespace mongo

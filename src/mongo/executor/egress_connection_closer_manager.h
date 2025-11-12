@@ -35,6 +35,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -52,7 +53,7 @@ namespace executor {
  * EgressConnectionClosers (which register themselves with it) and then interact exclusively with
  * the manager.
  */
-class EgressConnectionCloserManager {
+class MONGO_MOD_PUBLIC EgressConnectionCloserManager {
 public:
     EgressConnectionCloserManager() = default;
 

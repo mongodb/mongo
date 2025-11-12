@@ -59,6 +59,7 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 
@@ -75,7 +76,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 namespace executor {
 struct RemoteCommandResponse;
@@ -103,7 +104,7 @@ enum class ExhaustMode { kOn, kOff };
 /**
  * Abstract class that implements the core db operations.
  */
-class DBClientBase {
+class MONGO_MOD_OPEN DBClientBase {
     DBClientBase(const DBClientBase&) = delete;
     DBClientBase& operator=(const DBClientBase&) = delete;
 
@@ -797,4 +798,4 @@ private:
     rpc::ReplyMetadataReader _oldReader;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -33,6 +33,7 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -45,7 +46,7 @@ namespace mongo {
 
 struct ReadPreferenceSetting;
 
-class ReplicaSetMonitorInterface {
+class MONGO_MOD_OPEN ReplicaSetMonitorInterface {
 public:
     virtual ~ReplicaSetMonitorInterface() = default;
 

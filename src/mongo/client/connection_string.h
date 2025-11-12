@@ -35,6 +35,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <compare>
@@ -64,7 +65,7 @@ class TransientSSLParams;
  * std::string errmsg;
  * DBClientBase * conn = cs.connect( errmsg );
  */
-class ConnectionString {
+class MONGO_MOD_PUBLIC ConnectionString {
 public:
     enum class ConnectionType { kInvalid = 0, kStandalone, kReplicaSet, kCustom, kLocal };
 

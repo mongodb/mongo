@@ -35,6 +35,7 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -53,7 +54,7 @@
 namespace mongo {
 namespace executor {
 
-struct RemoteCommandRequest {
+struct MONGO_MOD_PUBLIC RemoteCommandRequest {
 
     // Indicates that there is no timeout for the request to complete
     static constexpr Milliseconds kNoTimeout{-1};
@@ -120,7 +121,8 @@ struct RemoteCommandRequest {
     bool operator==(const RemoteCommandRequest& rhs) const;
     bool operator!=(const RemoteCommandRequest& rhs) const;
 
-    friend std::ostream& operator<<(std::ostream& os, const RemoteCommandRequest& response) {
+    MONGO_MOD_PUBLIC friend std::ostream& operator<<(std::ostream& os,
+                                                     const RemoteCommandRequest& response) {
         return (os << response.toString());
     }
 

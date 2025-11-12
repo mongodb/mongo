@@ -49,6 +49,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/observable_mutex.h"
@@ -73,7 +74,7 @@ namespace mongo {
 
 class BSONObjBuilder;
 
-namespace executor {
+namespace MONGO_MOD_PUBLIC executor {
 
 /**
  * The actual user visible connection pool.
@@ -396,7 +397,7 @@ private:
  *
  * Minimal interface sets a timer with a callback and cancels the timer.
  */
-class ConnectionPool::TimerInterface {
+class MONGO_MOD_UNFORTUNATELY_OPEN ConnectionPool::TimerInterface {
     TimerInterface(const TimerInterface&) = delete;
     TimerInterface& operator=(const TimerInterface&) = delete;
 
@@ -431,7 +432,7 @@ public:
  * specifically callbacks to set them up (connect + auth + whatever else),
  * refresh them (issue some kind of ping) and manage a timer.
  */
-class ConnectionPool::ConnectionInterface : public TimerInterface {
+class MONGO_MOD_UNFORTUNATELY_OPEN ConnectionPool::ConnectionInterface : public TimerInterface {
     ConnectionInterface(const ConnectionInterface&) = delete;
     ConnectionInterface& operator=(const ConnectionInterface&) = delete;
 
@@ -640,7 +641,7 @@ protected:
  * This factory provides generators for connections, timers and a clock for the
  * connection pool.
  */
-class ConnectionPool::DependentTypeFactoryInterface {
+class MONGO_MOD_UNFORTUNATELY_OPEN ConnectionPool::DependentTypeFactoryInterface {
     DependentTypeFactoryInterface(const DependentTypeFactoryInterface&) = delete;
     DependentTypeFactoryInterface& operator=(const DependentTypeFactoryInterface&) = delete;
 
@@ -694,5 +695,5 @@ inline ClockSource* ConnectionPool::_getFastClockSource() const {
     return _fastClockSource;
 }
 
-}  // namespace executor
+}  // namespace MONGO_MOD_PUBLIC executor
 }  // namespace mongo

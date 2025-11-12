@@ -41,6 +41,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -70,7 +71,7 @@ class AggregateCommandRequest;
  * - The last command (find, aggregate or getMore) returned an error that indicated the cursor is no
  *   longer open on the server side.
  */
-class DBClientCursor {
+class MONGO_MOD_PUBLIC DBClientCursor {
     DBClientCursor(const DBClientCursor&) = delete;
     DBClientCursor& operator=(const DBClientCursor&) = delete;
 

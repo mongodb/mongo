@@ -35,6 +35,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
@@ -60,7 +61,7 @@ namespace mongo::executor {
  * simply taken from the Optoins the relevant ConnectionPool was started with. However, this
  * type is intended to be easily extensible to add these features in the future if needed.
  */
-class DynamicLimitController final : public ConnectionPool::ControllerInterface {
+class MONGO_MOD_PUBLIC DynamicLimitController final : public ConnectionPool::ControllerInterface {
 public:
     DynamicLimitController(std::function<size_t()> minLoader,
                            std::function<size_t()> maxLoader,

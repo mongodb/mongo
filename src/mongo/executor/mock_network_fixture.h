@@ -39,6 +39,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -123,7 +124,7 @@ namespace mock {
  * In this example, we only require that A comes before B. We have no requirements for when C
  * is executed. Therefore, all of {ABC, ACB, CAB} are valid, but {BAC, BCA, CBA} are not valid.
  */
-class MockNetwork {
+class MONGO_MOD_PUBLIC MockNetwork {
 public:
     using MatcherFunc = std::function<bool(const BSONObj&)>;
     using ActionFunc = std::function<RemoteCommandResponse(const BSONObj&)>;

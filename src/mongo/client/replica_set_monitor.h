@@ -36,6 +36,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -51,7 +52,7 @@ namespace mongo {
  * A ReplicaSetMonitor holds a state about the replica set and provides a means to refresh the local
  * view. All methods perform the required synchronization to allow callers from multiple threads.
  */
-class ReplicaSetMonitor : public ReplicaSetMonitorInterface {
+class MONGO_MOD_PUBLIC ReplicaSetMonitor : public ReplicaSetMonitorInterface {
 public:
     ~ReplicaSetMonitor() override;
 

@@ -36,6 +36,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <chrono>
@@ -57,7 +58,8 @@
  * https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst
  * for more information.
  */
-namespace mongo::sdam {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC sdam {
 enum class TopologyType {
     kSingle,
     kReplicaSetNoPrimary,
@@ -147,4 +149,5 @@ using TopologyManagerPtr = std::unique_ptr<TopologyManager>;
 
 class TopologyListener;
 using TopologyListenerPtr = std::weak_ptr<TopologyListener>;
-};  // namespace mongo::sdam
+}  // namespace MONGO_MOD_PUBLIC sdam
+}  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -45,7 +46,7 @@ namespace mongo {
 
 class BSONObj;
 
-namespace auth {
+namespace MONGO_MOD_PUBLIC auth {
 
 /**
  * Sets the keys used by authenticateInternalClient - these should be a vector of raw passwords,
@@ -85,5 +86,5 @@ BSONObj getInternalAuthParams(size_t idx, StringData mechanism);
  */
 BSONObj createInternalX509AuthDocument(boost::optional<StringData> userName = boost::none);
 
-}  // namespace auth
+}  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

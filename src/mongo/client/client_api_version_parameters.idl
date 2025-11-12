@@ -38,6 +38,7 @@ structs:
     ClientAPIVersionParameters:
         description: "Parser for Stable API parameters passed to 'new Mongo()' in the mongo shell"
         strict: true
+        mod_visibility: public
         fields:
             version:
                 description: "The requested API version"

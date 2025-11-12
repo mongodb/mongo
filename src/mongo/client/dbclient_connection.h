@@ -47,6 +47,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -73,7 +74,7 @@ class DBClientCursor;
  *  A basic connection to the database.
  *  This is the main entry point for talking to a simple Mongo setup
  */
-class DBClientConnection : public DBClientSession {
+class MONGO_MOD_OPEN DBClientConnection : public DBClientSession {
 public:
     DBClientConnection(bool autoReconnect = false,
                        double soTimeout = 0,

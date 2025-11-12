@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -43,7 +44,7 @@ class StatusWith;
  * Abstract class for implementing the clent-side
  * of a SASL mechanism conversation.
  */
-class SaslClientConversation {
+class MONGO_MOD_OPEN SaslClientConversation {
     SaslClientConversation(const SaslClientConversation&) = delete;
     SaslClientConversation& operator=(const SaslClientConversation&) = delete;
 

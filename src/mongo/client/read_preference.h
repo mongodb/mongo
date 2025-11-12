@@ -41,6 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -48,7 +49,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 template <typename T>
 class StatusWith;
 
@@ -283,4 +284,4 @@ private:
     bool _usedDefaultReadPrefValue = false;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

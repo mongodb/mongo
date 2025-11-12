@@ -31,13 +31,14 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/util/modules.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-class DBClientMockCursor : public DBClientCursor {
+class MONGO_MOD_PUBLIC DBClientMockCursor : public DBClientCursor {
 public:
     DBClientMockCursor(mongo::DBClientBase* client,
                        const BSONArray& mockCollection,
