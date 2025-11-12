@@ -44,9 +44,13 @@ mongo_cc_library(
     hdrs = [
         "plan_enumerator.h",
         "plan_enumerator_helpers.h",
+        "single_table_access.h",
     ],
     deps = [
         ":join_ordering",
+        ":solution_storage",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
     ],
 )
 

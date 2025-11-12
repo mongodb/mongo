@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
+
 #include <cstdint>
 
 namespace mongo::join_ordering {
@@ -63,5 +67,30 @@ private:
  * subsets of size k that can be chosen from a set of size n.
  */
 uint64_t combinations(int n, int k);
+
+using BaseTableCardinalityMap =
+    stdx::unordered_map<NamespaceString, cost_based_ranker::CardinalityEstimate>;
+
+/**
+ * Container for all objects necessary to estimate the selectivity of join predicates.
+ */
+class JoinPredicateEstimator {
+public:
+    JoinPredicateEstimator(const JoinGraph& graph,
+                           const std::vector<ResolvedPath>& resolvedPaths,
+                           const SamplingEstimatorMap& samplingEstimators,
+                           const BaseTableCardinalityMap& tableCards);
+
+    /**
+     * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling.
+     */
+    cost_based_ranker::SelectivityEstimate joinPredicateSel(const JoinEdge& edge);
+
+private:
+    const JoinGraph& _graph;
+    const std::vector<ResolvedPath>& _resolvedPaths;
+    const SamplingEstimatorMap& _samplingEstimators;
+    const BaseTableCardinalityMap& _tableCards;
+};
 
 }  // namespace mongo::join_ordering

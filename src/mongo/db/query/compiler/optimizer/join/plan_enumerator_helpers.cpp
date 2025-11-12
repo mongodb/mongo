@@ -32,6 +32,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
+
 namespace mongo::join_ordering {
 
 CombinationSequence::CombinationSequence(int n) : _n(n), _k(0), _accum(1) {
@@ -70,6 +72,118 @@ uint64_t combinations(int n, int k) {
     for (int i = 0; i <= k; ++i) {
         res = cs.next();
     }
+    return res;
+}
+
+JoinPredicateEstimator::JoinPredicateEstimator(const JoinGraph& graph,
+                                               const std::vector<ResolvedPath>& resolvedPaths,
+                                               const SamplingEstimatorMap& samplingEstimators,
+                                               const BaseTableCardinalityMap& tableCards)
+    : _graph(graph),
+      _resolvedPaths(resolvedPaths),
+      _samplingEstimators(samplingEstimators),
+      _tableCards(tableCards) {}
+
+namespace {
+
+// Given a NodeSet with a single bit set, return the index of that bit.
+std::size_t getIndexOfBit(const NodeSet& ns) {
+    return std::countr_zero(ns.to_ullong());
+}
+
+}  // namespace
+
+// This function makes a number of assumptions:
+// * Join predicate are independent from single table predicates. This allows us to estimate them
+// separately, which can be seen by our use of NDV(join key) over the entire collection, as opposed
+// to considering values after selections.
+// * While MongoDB does not implement referential data integrity constraints like typical relational
+// systems, we assume that joins are logically either primary key - foreign key (PK-FK) joins or
+// foreign key - foreign key (FK-FK) joins. These types of joins satisfy the "Principle of
+// Inclusion" which states that every foreign key value must exist as a primary key value in the
+// primary table. We also assume that there is a uniform distribution of foreign key values within
+// foreign tables over the set of primary key values in the primary table.
+//
+// The algorithm this function performs is rather simple, we look at the node which has a smaller
+// CE (before single-table selections), calculate the NDV of the join key of that node and return
+// 1/NDV(PK). To explain why this works, we should examine the two possible cases we assumed we are
+// in.
+//
+// Case 1: This join represents a PK-FK join. Recall that a primary key must be unique and due to
+// the principle of inclusion, we know that the cardinality of the join is card(F). The selectivity
+// of the join is defined as the cardinality of the join over the cardinality of the cross product.
+// Join sel = Card(F) / (Card(F) * Card(P)). Therefore, the selectivity is 1 / Card(P).
+
+// Case 2: This join represents a FK-FK join. Here, we make an additional assumption that the two
+// join keys are foreign keys to the same underlying primary table, P. In this case, the join
+// cardinality is a little more complex. We can estimate it as:
+// (Card(F1) / Card(P)) * (Card(F2) / Card(P)) * Card(P) = (Card(F1) * Card(F2)) / Card(P)
+// Here we make use of the uniform distribution of foreign keys assumption: Every row in F1 has a
+// foreign key value chosen uniformly from the (|P|) possible PK values. So for any particular row
+// in P, the number of rows in F1 that reference it is Card(F1) / Card(P). The same logic applies to
+// F2. We multiply by Card(P) at the end since that is the number of distinct PK values that can be
+// referenced. Simplifying the above equation, we get:
+// Join card = (Card(F1) * Card(F2)) / Card(P)
+// We divide this by the cross product cardinality to get the selectivity:
+// Join sel = (Card(F1) * Card(F2)) / (Card(F1) * Card(F2) * Card(P)) = 1 / Card(P)
+//
+// Regardless of whether we are in case (1) or (2), our estimate of join selectivity is 1 / Card(P).
+// If we are in case (1), for simplicity we assume that the node with the smaller CE is the primary
+// key side. We estimate Card(P) by estimating NDV(PK), though we easily could have done NDV(FK) as
+// based on our assumptions, we'd get a similar result.
+//
+// If we are in case (2), we again can estimate Card(P) via NDV(FK) on either side, since we assume
+// both sides reference the primary key. Again, we use the side with the smaller CE for simplicity.
+cost_based_ranker::SelectivityEstimate JoinPredicateEstimator::joinPredicateSel(
+    const JoinEdge& edge) {
+    tassert(11352501,
+            "join predicate selectivity estimation only supports single collection on both sides",
+            edge.left.count() == 1 && edge.right.count() == 1);
+
+    auto& leftNode = _graph.getNode(getIndexOfBit(edge.left));
+    auto& rightNode = _graph.getNode(getIndexOfBit(edge.right));
+
+    // Extract the cardinality estimates for left and right nodes before single table predicates are
+    // applied.
+    auto leftCard = _tableCards.at(leftNode.collectionName);
+    auto rightCard = _tableCards.at(rightNode.collectionName);
+
+    // For the purposes of estimation, we assume that this edge represents a "primary key" to
+    // "foreign key" join, despite these concepts not existing in MongoDB. We also assume that the
+    // node with the small CE is the primary key side.
+    bool smallerCardIsLeft = leftCard <= rightCard;
+    auto& primaryKeyNode = smallerCardIsLeft ? leftNode : rightNode;
+
+    // Accumulate the field names of the "primary key" of the join edge.
+    std::vector<FieldPath> fields;
+    for (auto&& joinPred : edge.predicates) {
+        tassert(11352502,
+                "join predicate selectivity estimatation only supported for equality",
+                joinPred.op == JoinPredicate::Eq);
+        auto pathId = smallerCardIsLeft ? joinPred.left : joinPred.right;
+        fields.push_back(_resolvedPaths[pathId].fieldName);
+    }
+
+    // Get sampling estimator for the "primary key" collection
+    auto& samplingEstimator = _samplingEstimators.at(primaryKeyNode.collectionName);
+    // Invoke NDV estimation for the "primary key"
+    auto ndv = samplingEstimator->estimateNDV(fields);
+
+    cost_based_ranker::SelectivityEstimate res{cost_based_ranker::oneSel};
+    // Ensure we don't accidentally produce a selectivity > 1
+    if (ndv.toDouble() > 1) {
+        res = cost_based_ranker::oneCE / ndv;
+    }
+    LOGV2_DEBUG(11352504,
+                5,
+                "Performed estimation of selectivity of join edge",
+                "leftNss"_attr = leftNode.collectionName,
+                "rightNs"_attr = rightNode.collectionName,
+                "smallerColl"_attr =
+                    smallerCardIsLeft ? leftNode.collectionName : rightNode.collectionName,
+                "fields"_attr = fields,
+                "ndvEstimate"_attr = ndv,
+                "selectivityEstimate"_attr = res);
     return res;
 }
 

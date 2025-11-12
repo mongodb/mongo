@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -143,6 +144,133 @@ TEST(JoinPlanEnumerator, InitialzeLargeSubsets) {
             ASSERT_EQ(k + 1, s.subset.count());
         }
     }
+}
+
+using JoinPredicateEstimatorFixture = JoinOrderingTestFixture;
+using namespace cost_based_ranker;
+
+// Join graph: A -- B with edge A.foo = B.foo and 'A' being the main collection
+// The cardinality estimate for 'A' is smaller, so we assert that we use NDV(A.foo) for the join
+// predicate selectivity estimate.
+TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
+    JoinGraph graph;
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aCQ = makeCanonicalQuery(aNss);
+    auto bCQ = makeCanonicalQuery(bNss);
+    auto aNodeId = graph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+
+    std::vector<ResolvedPath> paths;
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
+
+    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+
+    SamplingEstimatorMap samplingEstimators;
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>();
+    aSamplingEstimator->addFakeNDVEstimate(
+        {FieldPath("foo")}, CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
+    samplingEstimators[aNss] = std::move(aSamplingEstimator);
+    samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>();
+
+    BaseTableCardinalityMap tableCards;
+    tableCards.emplace(aNss, CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+    tableCards.emplace(bNss, CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
+
+    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators, tableCards};
+
+    auto selEst = predEstimator.joinPredicateSel(graph.getEdge(0));
+    // The selectivity estimate comes from 1 / NDV(A.foo) = 1 / 5 = 0.2
+    auto expectedSel = SelectivityEstimate{SelectivityType{0.2}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst);
+}
+
+// Join graph: A -- B with edge A.foo = B.foo and 'A' being the main collection
+// The cardinality estimate for 'B' is smaller, so we assert that we use NDV(B.foo) for the join
+// predicate selectivity estimate. This verifies that an embedded node can still be used for join
+// predicate estimatation.
+TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
+    JoinGraph graph;
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aCQ = makeCanonicalQuery(aNss);
+    auto bCQ = makeCanonicalQuery(bNss);
+    auto aNodeId = graph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+
+    std::vector<ResolvedPath> paths;
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
+
+    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+
+    SamplingEstimatorMap samplingEstimators;
+    samplingEstimators[aNss] = std::make_unique<FakeNdvEstimator>();
+    // Only add fake estimates for "b" estimator
+    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>();
+    bSamplingEstimator->addFakeNDVEstimate(
+        {FieldPath("foo")}, CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
+    samplingEstimators[bNss] = std::move(bSamplingEstimator);
+
+    BaseTableCardinalityMap tableCards;
+    tableCards.emplace(aNss, CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
+    // Ensure "b" collection has smaller CE
+    tableCards.emplace(bNss, CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+
+    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators, tableCards};
+
+    auto selEst = predEstimator.joinPredicateSel(graph.getEdge(0));
+    // The selectivity estimate comes from 1 / NDV(B.foo) = 1 / 5 = 0.2
+    auto expectedSel = SelectivityEstimate{SelectivityType{0.2}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst);
+}
+
+// Join graph: A -- B with compound edge A.foo = B.foo && A.bar = B.bar and 'A' being the main
+// collection. The cardinality estimate for 'A' is smaller, so we assert that we use the tuple
+// NDV(A.foo, A.bar) for the join predicate selectivity estimate.
+TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
+    JoinGraph graph;
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aCQ = makeCanonicalQuery(aNss);
+    auto bCQ = makeCanonicalQuery(bNss);
+    auto aNodeId = graph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+
+    std::vector<ResolvedPath> paths;
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "bar"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "bar"});
+
+    // a.foo = b.foo && a.bar = b.bar
+    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 2, 3);
+
+    SamplingEstimatorMap samplingEstimators;
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>();
+    // We shoudl end up using the NDV from (foo, bar) and not from foo or bar.
+    aSamplingEstimator->addFakeNDVEstimate(
+        {FieldPath("foo"), FieldPath("bar")},
+        CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
+    aSamplingEstimator->addFakeNDVEstimate(
+        {FieldPath("foo")}, CardinalityEstimate{CardinalityType{2}, EstimationSource::Sampling});
+    aSamplingEstimator->addFakeNDVEstimate(
+        {FieldPath("bar")}, CardinalityEstimate{CardinalityType{3}, EstimationSource::Sampling});
+    samplingEstimators[aNss] = std::move(aSamplingEstimator);
+    samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>();
+
+    BaseTableCardinalityMap tableCards;
+    tableCards.emplace(aNss, CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+    tableCards.emplace(bNss, CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
+
+    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators, tableCards};
+
+    auto selEst = predEstimator.joinPredicateSel(graph.getEdge(0));
+    // The selectivity estimate comes from 1 / NDV(A.foo, A.bar) = 1 / 5 = 0.2
+    auto expectedSel = SelectivityEstimate{SelectivityType{0.2}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst);
 }
 
 }  // namespace mongo::join_ordering
