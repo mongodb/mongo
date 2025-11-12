@@ -37,6 +37,37 @@
 namespace mongo::extension::sdk {
 
 /**
+ * A simple named struct that allows an extension to specify the name/value of a desired log
+ * attribute.
+ */
+struct ExtensionLogAttribute {
+    std::string name;
+    std::string value;
+};
+
+/**
+ * RAII guard for MongoExtensionLogMessage that manages the lifetime of
+ * dynamically allocated log attributes.
+ *
+ * Automatically deletes the attributes array when the guard is destroyed,
+ * preventing memory leaks from newly allocated MongoExtensionLogAttribute arrays.
+ */
+class LogMessageGuard {
+    ::MongoExtensionLogMessage _msg;
+
+public:
+    LogMessageGuard(const ::MongoExtensionLogMessage& msg) : _msg(msg) {}
+    ~LogMessageGuard() {
+        if (_msg.attributes.size > 0) {
+            delete[] _msg.attributes.elements;
+        }
+    }
+    ::MongoExtensionLogMessage* get() {
+        return &_msg;
+    }
+};
+
+/**
  * Wrapper for ::MongoExtensionHostServices, providing safe access to its public API through the
  * underlying vtable.
  *
@@ -55,17 +86,20 @@ public:
      * Creates a MongoExtensionLogMessage struct for regular log messages.
      * The returned struct should be passed to log() and is valid only during the call.
      */
-    static ::MongoExtensionLogMessage createLogMessageStruct(const std::string& message,
-                                                             std::int32_t code,
-                                                             MongoExtensionLogSeverity severity);
+    static LogMessageGuard createLogMessageStruct(const std::string& message,
+                                                  std::int32_t code,
+                                                  MongoExtensionLogSeverity severity,
+                                                  const std::vector<ExtensionLogAttribute>& attrs);
 
     /**
      * Creates a MongoExtensionLogMessage struct for debug log messages.
      * The returned struct should be passed to logDebug() and is valid only during the call.
      */
-    static ::MongoExtensionLogMessage createDebugLogMessageStruct(const std::string& message,
-                                                                  std::int32_t code,
-                                                                  std::int32_t level);
+    static LogMessageGuard createDebugLogMessageStruct(
+        const std::string& message,
+        std::int32_t code,
+        std::int32_t level,
+        const std::vector<ExtensionLogAttribute>& attrs);
 
     ::MongoExtensionStatus* userAsserted(::MongoExtensionByteView structuredErrorMessage) {
         assertValid();
@@ -81,9 +115,24 @@ public:
         return &_hostServices;
     }
 
+    void log(const std::string& message, std::int32_t code) {
+        log(message, code, MongoExtensionLogSeverity::kInfo, {});
+    }
+
+    void log(const std::string& message, std::int32_t code, MongoExtensionLogSeverity severity) {
+        log(message, code, severity, {});
+    }
+
     void log(const std::string& message,
              std::int32_t code,
-             MongoExtensionLogSeverity severity = MongoExtensionLogSeverity::kInfo) const {
+             const std::vector<ExtensionLogAttribute>& attrs) {
+        log(message, code, MongoExtensionLogSeverity::kInfo, attrs);
+    }
+
+    void log(const std::string& message,
+             std::int32_t code,
+             MongoExtensionLogSeverity severity,
+             const std::vector<ExtensionLogAttribute>& attrs) const {
         assertValid();
 
         // Prevent materializing log messages that would not be logged.
@@ -91,13 +140,28 @@ public:
             return;
         }
 
-        // TODO SERVER-111339 Add attributes.
-        ::MongoExtensionLogMessage logMessage = createLogMessageStruct(message, code, severity);
-
-        invokeCAndConvertStatusToException([&]() { return vtable().log(&logMessage); });
+        auto logMessage = createLogMessageStruct(message, code, severity, attrs);
+        invokeCAndConvertStatusToException([&]() { return vtable().log(logMessage.get()); });
     }
 
-    void logDebug(const std::string& message, std::int32_t code, std::int32_t level = 1) const {
+    void logDebug(const std::string& message, std::int32_t code) {
+        logDebug(message, code, 1, {});
+    }
+
+    void logDebug(const std::string& message, std::int32_t code, std::int32_t level) {
+        logDebug(message, code, level, {});
+    }
+
+    void logDebug(const std::string& message,
+                  std::int32_t code,
+                  const std::vector<ExtensionLogAttribute>& attrs) {
+        logDebug(message, code, 1, attrs);
+    }
+
+    void logDebug(const std::string& message,
+                  std::int32_t code,
+                  std::int32_t level,
+                  const std::vector<ExtensionLogAttribute>& attrs) const {
         assertValid();
 
         // Prevent materializing log messages that would not be logged.
@@ -105,10 +169,8 @@ public:
             return;
         }
 
-        // TODO SERVER-111339 Add attributes.
-        ::MongoExtensionLogMessage logMessage = createDebugLogMessageStruct(message, code, level);
-
-        invokeCAndConvertStatusToException([&]() { return vtable().log_debug(&logMessage); });
+        auto logMessage = createDebugLogMessageStruct(message, code, level, attrs);
+        invokeCAndConvertStatusToException([&]() { return vtable().log_debug(logMessage.get()); });
     }
 
     /**

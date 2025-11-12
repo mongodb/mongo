@@ -9,36 +9,43 @@ import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 const coll = db[jsTestName()];
 
-function checkLogs(db, debugLogLevel, shouldLog) {
-    const globalLogs = db.adminCommand({getLog: "global"});
+function checkLogs(db, debugLogLevel, shouldLog, extensionAttrs) {
+    // The log code defined in debug_logging.cpp is 11134100.
+    // The severity is "D<logLevel>", for example "D3" for a debug log with level 3.
+    const matchingDebugLogLines = checkLog.getFilteredLogMessages(db, 11134100, {}, "D" + String(debugLogLevel));
+
+    // Validate that log lines contain the correct information.
+    for (var log of matchingDebugLogLines) {
+        if (extensionAttrs) {
+            assert.eq(log["attr"]["attr"], extensionAttrs, log);
+        }
+    }
+
     // Parse() is called twice - once when the LiteParsed stage is created, and once when the full
     // DocumentSource stage is created. Log lines are printed in both cases.
     const parseCallCount = 2;
-
-    // The log code defined in debug_logging.cpp is 11134100.
-    // The component is "EXTENSION-MONGOT".
-    // The severity is "D<logLevel>", for example "D3" for a debug log with level 3.
-    const debugLog = {s: "D" + String(debugLogLevel), c: "EXTENSION-MONGOT", id: 11134100};
-    const matchingDebugLogLines = [...iterateMatchingLogLines(globalLogs.log, debugLog)];
     // Make sure there is at most one matching log line per parse call.
     assert.lte(matchingDebugLogLines.length, parseCallCount);
 
     // After adding the 'shouldLog' optimization, $debugLog also prints a warning log indicating
     // whether the debug log should be printed or not.
-    const warningLogShouldLog = {s: "W", c: "EXTENSION-MONGOT", id: shouldLog ? 11134101 : 11134102};
-    const matchingWarningLogLines = [...iterateMatchingLogLines(globalLogs.log, warningLogShouldLog)];
+    const matchingWarningLogLines = checkLog.getFilteredLogMessages(db, shouldLog ? 11134101 : 11134102, {}, "W");
     // Since the warning line always gets printed, we expect one warning log line per parse call.
     assert.eq(matchingWarningLogLines.length, parseCallCount);
 
     return matchingDebugLogLines.length == parseCallCount;
 }
 
-function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog}) {
+function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog, extensionAttrs}) {
     assert.commandWorked(db.adminCommand({clearLog: "global"}));
     assert.commandWorked(db.setLogLevel(serverLogLevel, "extension"));
-    coll.aggregate([{$debugLog: {level: debugLogLevel}}]);
+    var debugSpec = {level: debugLogLevel};
+    if (extensionAttrs) {
+        debugSpec.attrs = extensionAttrs;
+    }
+    coll.aggregate([{$debugLog: debugSpec}]);
     const realLogLevel = Math.max(1, Math.min(5, debugLogLevel));
-    const wasLogged = checkLogs(db, realLogLevel, commandShouldLog);
+    const wasLogged = checkLogs(db, realLogLevel, commandShouldLog, extensionAttrs);
     assert.eq(wasLogged, commandShouldLog, {serverLogLevel, debugLogLevel});
 }
 
@@ -65,4 +72,8 @@ function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog}) {
     testDebugLog({serverLogLevel: 5, debugLogLevel: 5, commandShouldLog: true});
     testDebugLog({serverLogLevel: 4, debugLogLevel: 6, commandShouldLog: false});
     testDebugLog({serverLogLevel: 5, debugLogLevel: 6, commandShouldLog: true});
+})();
+
+(function checkAttributes() {
+    testDebugLog({serverLogLevel: 1, debugLogLevel: 0, commandShouldLog: true, extensionAttrs: {a: "hi", b: "bye"}});
 })();

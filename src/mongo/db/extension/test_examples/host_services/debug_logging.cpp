@@ -47,6 +47,7 @@ class DebugLogStageDescriptor : public sdk::AggStageDescriptor {
 public:
     static inline const std::string kStageName = std::string(DebugLogStageName);
     static inline const std::string kDebugLogLevelField = "level";
+    static inline const std::string kAttributesField = "attrs";
 
     DebugLogStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
@@ -75,7 +76,17 @@ public:
                 "Log level is not enough", 11134102, ::MongoExtensionLogSeverity::kWarning);
         }
 
-        sdk::HostServicesHandle::getHostServices()->logDebug("Test log message", 11134100, level);
+        std::vector<mongo::extension::sdk::ExtensionLogAttribute> attrs;
+        if (bsonSpec.hasElement(kAttributesField)) {
+            auto attrsSpec = bsonSpec.getObjectField(kAttributesField);
+            for (const auto& field : attrsSpec.getFieldNames<std::set<std::string>>()) {
+                attrs.emplace_back(mongo::extension::sdk::ExtensionLogAttribute{
+                    field, std::string(attrsSpec.getStringField(field))});
+            }
+        }
+
+        sdk::HostServicesHandle::getHostServices()->logDebug(
+            "Test log message", 11134100, level, attrs);
 
         return std::make_unique<DebugLogParseNode>(stageBson);
     }

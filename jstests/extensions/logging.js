@@ -16,6 +16,7 @@ assert.commandWorked(coll.insertMany(testData));
 function testLogStage({
     pipeline,
     expectedInfoLogCount,
+    expectedAttrs,
     expectedOtherLog: {expectedLogCode, expectedLogMessage, severity} = {},
 }) {
     // Clear the logs before running the aggregation.
@@ -30,6 +31,10 @@ function testLogStage({
     for (let log of infoLogs) {
         assert.eq(log.msg, "Logging info line for $log");
         assert.eq(log.c, "EXTENSION-MONGOT");
+
+        if (expectedAttrs) {
+            assert.eq(log.attr, expectedAttrs, log);
+        }
     }
 
     // Then check any expected non-info log message appear as expected.
@@ -58,6 +63,11 @@ testLogStage({
 testLogStage({
     pipeline: [{$log: {numInfoLogLines: 5}}],
     expectedInfoLogCount: 5 * parseCallCount,
+});
+testLogStage({
+    pipeline: [{$log: {numInfoLogLines: 1, attrs: {a: "hi", b: "12345"}}}],
+    expectedInfoLogCount: 1 * parseCallCount,
+    expectedAttrs: {attr: {a: "hi", b: "12345"}},
 });
 
 // Test that the $log stage with an empty spec or non-object spec logs an error but no info log.

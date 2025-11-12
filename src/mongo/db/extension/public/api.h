@@ -628,6 +628,30 @@ typedef struct MongoExtensionHostPortalVTable {
 } MongoExtensionHostPortalVTable;
 
 /**
+ * Represents a single key-value pair attribute for a structured log message. Both `name` and
+ * `value` are expected to be strings serialized to ByteViews.
+ *
+ * These attributes provide additional context and metadata for extension log messages,
+ * allowing structured logging with arbitrary metadata beyond the base message text.
+ */
+typedef struct MongoExtensionLogAttribute {
+    MongoExtensionByteView name;
+    MongoExtensionByteView value;
+} MongoExtensionLogAttribute;
+
+/**
+ * A fixed-size array of log attributes that accompany a structured log message.
+ *
+ * The array is allocated by the caller and populated with attributes to be logged
+ * alongside a structured log message. The `elements` pointer references an array of
+ * `size` MongoExtensionLogAttribute entries.
+ */
+typedef struct MongoExtensionLogAttributesArray {
+    uint64_t size;
+    struct MongoExtensionLogAttribute* elements;
+} MongoExtensionLogAttributesArray;
+
+/**
  * Log severity levels for extension log messages.
  */
 typedef enum MongoExtensionLogSeverity : uint32_t {
@@ -649,7 +673,7 @@ typedef struct MongoExtensionLogMessage {
     uint32_t code;
     MongoExtensionByteView message;
     MongoExtensionLogType type;
-    // TODO SERVER-111339 Add attributes.
+    MongoExtensionLogAttributesArray attributes;
     union {
         MongoExtensionLogSeverity severity;
         int level;

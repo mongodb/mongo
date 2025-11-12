@@ -41,6 +41,25 @@ namespace mongo::extension::host_connector {
 // Initialize the static instance of HostServicesAdapter.
 HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
 
+namespace {
+logv2::DynamicAttributes createLogAttributes(const ::MongoExtensionLogMessage* logMessage) {
+    logv2::DynamicAttributes attrs;
+    if (logMessage->attributes.size == 0) {
+        return attrs;
+    }
+
+    BSONObjBuilder builder;
+    for (size_t i = 0; i < logMessage->attributes.size; i++) {
+        auto nameView = byteViewAsStringView(logMessage->attributes.elements[i].name);
+        auto valueView = byteViewAsStringView(logMessage->attributes.elements[i].value);
+        builder.append(std::string(nameView), std::string(valueView));
+    }
+
+    attrs.add("attr", builder.obj());
+    return attrs;
+}
+}  // namespace
+
 MongoExtensionStatus* HostServicesAdapter::_extLog(
     const ::MongoExtensionLogMessage* logMessage) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -50,10 +69,7 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(
                 logMessage->type == ::MongoExtensionLogType::kLog);
 
         // For now we always log extension messages under the EXTENSION-MONGOT component. Someday
-
-        // For now we always log extension messages under the EXTENSION-MONGOT component. Someday
         // we'd like to dynamically create EXTENSION sub-components per extension.
-
         logv2::LogOptions options(logv2::LogComponent::kExtensionMongot);
 
         // Extract message from byte view.
@@ -66,8 +82,8 @@ MongoExtensionStatus* HostServicesAdapter::_extLog(
         // Convert C enum to logv2 severity.
         logv2::LogSeverity severity = convertSeverity(logMessage->severityOrLevel.severity);
 
-        // TODO SERVER-111339 Populate attributes from logMessage->attributes.
-        logv2::TypeErasedAttributeStorage attrs;
+        logv2::DynamicAttributes dynamicAttrs = createLogAttributes(logMessage);
+        logv2::TypeErasedAttributeStorage attrs(dynamicAttrs);
 
         // We must go through logv2::detail::doLogImpl since the LOGV2 macros expect a static string
         // literal for the message, but we have to log the message received at runtime from the
@@ -100,8 +116,8 @@ MongoExtensionStatus* HostServicesAdapter::_extLogDebug(
         std::int32_t level = logMessage->severityOrLevel.level;
         logv2::LogSeverity logSeverity = logv2::LogSeverity::Debug(std::min(5, std::max(1, level)));
 
-        // TODO SERVER-111339 Populate attributes from logMessage->attributes.
-        logv2::TypeErasedAttributeStorage attrs;
+        logv2::DynamicAttributes dynamicAttrs = createLogAttributes(logMessage);
+        logv2::TypeErasedAttributeStorage attrs(dynamicAttrs);
 
         logv2::detail::doLogImpl(code, logSeverity, options, message, attrs);
     });

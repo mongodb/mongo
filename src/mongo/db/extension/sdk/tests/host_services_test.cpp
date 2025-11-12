@@ -50,39 +50,88 @@ public:
  * Tests that the MongoExtensionLogMessage created by HostServicesHandle::createLogMessageStruct
  * has the correct fields populated.
  */
-TEST_F(HostServicesTest, CreateLogMessageStruct) {
+TEST_F(HostServicesTest, CreateLogMessageStructEmptyAttrs) {
     std::string logMessage = "Test log message";
     std::int32_t logCode = 12345;
     ::MongoExtensionLogSeverity logSeverity = ::MongoExtensionLogSeverity::kInfo;
 
-    ::MongoExtensionLogMessage structuredLog =
-        sdk::HostServicesHandle::createLogMessageStruct(logMessage, logCode, logSeverity);
-
+    auto structuredLogGuard =
+        sdk::HostServicesHandle::createLogMessageStruct(logMessage, logCode, logSeverity, {});
+    auto structuredLog = *structuredLogGuard.get();
     ASSERT_EQUALS(structuredLog.code, static_cast<uint32_t>(logCode));
     ASSERT_EQUALS(structuredLog.type, ::MongoExtensionLogType::kLog);
     ASSERT_EQUALS(structuredLog.severityOrLevel.severity, logSeverity);
+    ASSERT_EQUALS(structuredLog.attributes.size, 0);
+    ASSERT_EQUALS(structuredLog.attributes.elements, nullptr);
 
     auto messageView = byteViewAsStringView(structuredLog.message);
     ASSERT_EQUALS(std::string(messageView), logMessage);
-    // TODO SERVER-111339 Test attributes.
+}
+
+TEST_F(HostServicesTest, CreateLogMessageStructWithAttrs) {
+    std::string logMessage = "Test log message";
+    std::int32_t logCode = 12345;
+    ::MongoExtensionLogSeverity logSeverity = ::MongoExtensionLogSeverity::kInfo;
+
+    std::vector<sdk::ExtensionLogAttribute> attrs = {{"hi", "finley"}};
+
+    auto structuredLogGuard =
+        sdk::HostServicesHandle::createLogMessageStruct(logMessage, logCode, logSeverity, attrs);
+    auto structuredLog = *structuredLogGuard.get();
+    ASSERT_EQUALS(structuredLog.code, static_cast<uint32_t>(logCode));
+    ASSERT_EQUALS(structuredLog.type, ::MongoExtensionLogType::kLog);
+    ASSERT_EQUALS(structuredLog.severityOrLevel.severity, logSeverity);
+    ASSERT_EQUALS(structuredLog.attributes.size, 1);
+    ASSERT_EQUALS(std::string(byteViewAsStringView(structuredLog.attributes.elements[0].name)),
+                  "hi");
+    ASSERT_EQUALS(std::string(byteViewAsStringView(structuredLog.attributes.elements[0].value)),
+                  "finley");
+
+    auto messageView = byteViewAsStringView(structuredLog.message);
+    ASSERT_EQUALS(std::string(messageView), logMessage);
 }
 
 /**
  * Tests that the MongoExtensionLogMessage created by
  * HostServicesHandle::createDebugLogMessageStruct has the correct fields populated.
  */
-TEST_F(HostServicesTest, CreateDebugLogMessageStruct) {
+TEST_F(HostServicesTest, CreateDebugLogMessageStructWithAttrs) {
     std::string logMessage = "Test debug log message";
     std::int32_t logCode = 12345;
     std::int32_t logLevel = 1;
 
-    ::MongoExtensionLogMessage structuredDebugLog =
-        sdk::HostServicesHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel);
+    std::vector<sdk::ExtensionLogAttribute> attrs = {{"hi", "mongodb"}};
+
+    auto structuredDebugLogGuard =
+        sdk::HostServicesHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel, attrs);
+    auto structuredDebugLog = *structuredDebugLogGuard.get();
 
     ASSERT_EQUALS(structuredDebugLog.code, static_cast<uint32_t>(logCode));
     ASSERT_EQUALS(structuredDebugLog.type, ::MongoExtensionLogType::kDebug);
     ASSERT_EQUALS(structuredDebugLog.severityOrLevel.level, logLevel);
-    // TODO SERVER-111339 Test attributes.
+    ASSERT_EQUALS(structuredDebugLog.attributes.size, 1);
+    ASSERT_EQUALS(std::string(byteViewAsStringView(structuredDebugLog.attributes.elements[0].name)),
+                  "hi");
+    ASSERT_EQUALS(
+        std::string(byteViewAsStringView(structuredDebugLog.attributes.elements[0].value)),
+        "mongodb");
+
+    auto messageView = byteViewAsStringView(structuredDebugLog.message);
+    ASSERT_EQUALS(std::string(messageView), logMessage);
+}
+
+TEST_F(HostServicesTest, CreateDebugLogMessageStructEmptyAttrs) {
+    std::string logMessage = "Test debug log message";
+    std::int32_t logCode = 12345;
+    std::int32_t logLevel = 1;
+
+    auto structuredDebugLogGuard =
+        sdk::HostServicesHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel, {});
+    auto structuredDebugLog = *structuredDebugLogGuard.get();
+
+    ASSERT_EQUALS(structuredDebugLog.code, static_cast<uint32_t>(logCode));
+    ASSERT_EQUALS(structuredDebugLog.type, ::MongoExtensionLogType::kDebug);
+    ASSERT_EQUALS(structuredDebugLog.severityOrLevel.level, logLevel);
 
     auto messageView = byteViewAsStringView(structuredDebugLog.message);
     ASSERT_EQUALS(std::string(messageView), logMessage);

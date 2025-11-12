@@ -38,32 +38,59 @@ namespace mongo::extension::sdk {
 // at the very start of extension initialization, before any extension should attempt to access it.
 HostServicesHandle HostServicesHandle::_hostServices(nullptr);
 
-::MongoExtensionLogMessage HostServicesHandle::createLogMessageStruct(
-    const std::string& message, std::int32_t code, MongoExtensionLogSeverity severity) {
+namespace {
+void populateLogAttributes(MongoExtensionLogMessage& logMessage,
+                           const std::vector<ExtensionLogAttribute>& attrs) {
+    // Allocate an array on the heap for log attributes. Note that this array must be manually freed
+    // after logging. Consider wrapping the MongoExtensionLogMessage struct in a RAII class, such as
+    // LogMessageGuard, that frees the array upon destruction.
+    logMessage.attributes.size = attrs.size();
+    logMessage.attributes.elements = nullptr;
+    if (!attrs.empty()) {
+        auto* logAttributes = new ::MongoExtensionLogAttribute[attrs.size()];
+        for (size_t i = 0; i < attrs.size(); ++i) {
+            logAttributes[i] = {stringViewAsByteView(std::string_view(attrs[i].name)),
+                                stringViewAsByteView(std::string_view(attrs[i].value))};
+        }
+        logMessage.attributes.elements = logAttributes;
+    }
+}
+}  // namespace
+
+LogMessageGuard HostServicesHandle::createLogMessageStruct(
+    const std::string& message,
+    std::int32_t code,
+    MongoExtensionLogSeverity severity,
+    const std::vector<ExtensionLogAttribute>& attrs) {
     // Convert message string to byte view.
     auto messageBytes = stringViewAsByteView(std::string_view(message));
 
-    // TODO SERVER-111339 Handle attributes.
     ::MongoExtensionLogMessage logMessage{
         static_cast<uint32_t>(code), messageBytes, ::MongoExtensionLogType::kLog};
     // Set union field for severity.
     logMessage.severityOrLevel.severity = severity;
 
-    return logMessage;
+    populateLogAttributes(logMessage, attrs);
+
+    return LogMessageGuard(logMessage);
 }
 
-::MongoExtensionLogMessage HostServicesHandle::createDebugLogMessageStruct(
-    const std::string& message, std::int32_t code, std::int32_t level) {
+LogMessageGuard HostServicesHandle::createDebugLogMessageStruct(
+    const std::string& message,
+    std::int32_t code,
+    std::int32_t level,
+    const std::vector<ExtensionLogAttribute>& attrs) {
     // Convert message string to byte view.
     auto messageBytes = stringViewAsByteView(std::string_view(message));
 
-    // TODO SERVER-111339 Handle attributes.
     ::MongoExtensionLogMessage logMessage{
         static_cast<uint32_t>(code), messageBytes, ::MongoExtensionLogType::kDebug};
     // Set union field for level.
     logMessage.severityOrLevel.level = level;
 
-    return logMessage;
+    populateLogAttributes(logMessage, attrs);
+
+    return LogMessageGuard(logMessage);
 }
 
 void HostServicesHandle::_assertVTableConstraints(const VTable_t& vtable) const {
