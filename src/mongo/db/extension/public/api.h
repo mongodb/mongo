@@ -382,7 +382,6 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      * provide a nullptr for the input.
      */
     MongoExtensionStatus* (*compile)(const MongoExtensionLogicalAggStage* logicalStage,
-                                     struct MongoExtensionExecAggStage* input,
                                      struct MongoExtensionExecAggStage** output);
 
 } MongoExtensionLogicalAggStageVTable;

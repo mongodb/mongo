@@ -33,9 +33,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/host_connector/host_services_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
@@ -98,7 +98,7 @@ protected:
         BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSONObj());
 };
 
-TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
+TEST_F(DocumentSourceExtensionTest, ParseNoOpSuccess) {
     // Try to parse pipeline with custom extension stage before registering the extension,
     // should fail.
     std::vector<BSONObj> testPipeline{kValidSpec};
@@ -121,7 +121,7 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
     auto serializedPipeline =
         parsedPipeline->serializeToBson(SerializationOptions::kDebugQueryShapeSerializeOptions);
     ASSERT_EQUALS(serializedPipeline.size(), 1u);
-    // The extensions is in the form of DocumentSourceExtensionExpandable at this point, which
+    // The extension is in the form of DocumentSourceExtensionExpandable at this point, which
     // serializes to its query shape. There is no query shape for the no-op extension.
     ASSERT_BSONOBJ_EQ(serializedPipeline[0], BSONObj());
 }
@@ -1100,4 +1100,49 @@ DEATH_TEST_F(DocumentSourceExtensionTest,
     [[maybe_unused]] auto privileges =
         lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
 }
+
+TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForSourceExtensionStage) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::SourceAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    auto extensionStage = exec::agg::buildStage(optimizable);
+
+    // See sdk::shared_test_stages::SourceExecAggStage for the full test document suite.
+    {
+        auto next = extensionStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                           (Document{BSON("_id" << 1 << "apples" << "red")}));
+    }
+    {
+        auto next = extensionStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{BSON("_id" << 2 << "oranges" << 5)}));
+    }
+    {
+        auto next = extensionStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                           (Document{BSON("_id" << 3 << "bananas" << false)}));
+    }
+    {
+        auto next = extensionStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(
+            next.releaseDocument(),
+            (Document{BSON("_id" << 4 << "tropical fruits"
+                                 << BSON_ARRAY("rambutan" << "durian" << "lychee"))}));
+    }
+    {
+        auto next = extensionStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                           (Document{BSON("_id" << 5 << "pie" << 3.14159)}));
+    }
+}
+
 }  // namespace mongo::extension

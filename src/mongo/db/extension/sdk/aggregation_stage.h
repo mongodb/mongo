@@ -119,7 +119,6 @@ private:
 
     static ::MongoExtensionStatus* _extCompile(
         const ::MongoExtensionLogicalAggStage* extLogicalStage,
-        ::MongoExtensionExecAggStage* input,
         ::MongoExtensionExecAggStage** output) noexcept;
 
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {.destroy = &_extDestroy,
@@ -575,7 +574,6 @@ private:
 
 inline ::MongoExtensionStatus* ExtensionLogicalAggStage::_extCompile(
     const ::MongoExtensionLogicalAggStage* extLogicalStage,
-    ::MongoExtensionExecAggStage* input,
     ::MongoExtensionExecAggStage** output) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         *output = nullptr;

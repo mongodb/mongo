@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
@@ -43,9 +44,12 @@ namespace agg {
  */
 class ExtensionStage final : public Stage {
 public:
-    ExtensionStage(StringData name, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    ExtensionStage(StringData name,
+                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                   extension::ExecAggStageHandle execAggStageHandle);
 
 private:
+    extension::ExecAggStageHandle _execAggStageHandle;
     GetNextResult doGetNext() final;
 };
 }  // namespace agg

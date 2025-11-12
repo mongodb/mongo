@@ -58,9 +58,9 @@ static ExtensionGetNextResult convertCRepresentationToGetNextResult(
             return ExtensionGetNextResult{.code = GetNextCode::kEOF, .res = boost::none};
         }
         default:
-            tasserted(
-                10956803,
-                (str::stream() << "Invalid MongoExtensionGetNextResultCode: " << apiResult->code));
+            tasserted(10956803,
+                      str::stream()
+                          << "Invalid MongoExtensionGetNextResultCode: " << apiResult->code);
     }
 }
 

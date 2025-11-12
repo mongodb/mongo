@@ -51,6 +51,11 @@ public:
 
     Id getId() const override;
 
+    // Wrapper around the LogicalAggStageHandle::compile() method. Returns an ExecAggStageHandle.
+    ExecAggStageHandle compile() {
+        return _logicalStage.compile();
+    }
+
 protected:
     const LogicalAggStageHandle _logicalStage;
 

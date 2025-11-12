@@ -82,9 +82,8 @@ BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosit
 }
 
 ExecAggStageHandle LogicalAggStageHandle::compile() const {
-    ::MongoExtensionExecAggStage* execAggStage;
-    invokeCAndConvertStatusToException(
-        [&]() { return vtable().compile(get(), nullptr, &execAggStage); });
+    ::MongoExtensionExecAggStage* execAggStage{nullptr};
+    invokeCAndConvertStatusToException([&]() { return vtable().compile(get(), &execAggStage); });
 
     return ExecAggStageHandle(execAggStage);
 }
