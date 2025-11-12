@@ -97,6 +97,7 @@ selector:
     - jstests/core/query/or/or3.js
     - jstests/core/query/or/or_to_in.js
     - jstests/core/query/or/orf.js
+    - jstests/core/query/or/or_memory_limit.js
     - jstests/core/query/plan_cache/plan_cache_clear.js
     - jstests/core/query/plan_cache/plan_cache_list_plans.js
 
@@ -115,6 +116,7 @@ selector:
     - jstests/core/query/regex/regex_distinct.js
     - jstests/core/query/sort/sort_array.js
     - jstests/core/query/sort/sort_merge_collation.js
+    - jstests/core/query/sort/sort_merge_memory_limit.js
     - jstests/core/query/record_store_count.js
     - jstests/core/query/delete/batched_multi_deletes_a.js
     - jstests/core/query/delete/batched_multi_deletes_id.js
@@ -216,6 +218,7 @@ selector:
     - jstests/core/query/batch_write/batch_write_command_delete.js
     # Multikey indexes and array measurement field.
     - jstests/core/query/match_numeric_components.js
+    - jstests/core/query/array/array_index_scan_memory_limit.js
     - jstests/core/query/array/array1.js
     - jstests/core/query/array/arrayfind10.js
     - jstests/core/query/array/arrayfind8.js

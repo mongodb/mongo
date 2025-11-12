@@ -48,6 +48,9 @@ enum class StageMemoryLimit {
     QueryMaxBlockingSortMemoryUsageBytes,
     OrStageMaxMemoryBytes,
     NearStageMaxMemoryBytes,
+    MergeSortStageMaxMemoryBytes,
+    IndexScanStageMaxMemoryBytes,
+    SBEUniqueStageMaxMemoryBytes,
 };
 
 /**

@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <iterator>
 #include <memory>
@@ -56,8 +57,8 @@ OrStage::OrStage(ExpressionContext* expCtx,
       _currentChild(0),
       _dedup(dedup),
       _recordIdDeduplicator(expCtx),
-      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {
-}
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+          *expCtx, loadMemoryLimit(StageMemoryLimit::OrStageMaxMemoryBytes))) {}
 
 void OrStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
@@ -100,6 +101,9 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
                 uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
                 _memoryTracker.add(dedupBytes - dedupBytesPrev);
                 _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+                uassert(11130302,
+                        "Exceeded memory limit in record id deduplicator for OR stage",
+                        _memoryTracker.withinMemoryLimit());
             }
         }
 

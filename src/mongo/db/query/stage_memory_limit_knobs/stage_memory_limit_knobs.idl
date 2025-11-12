@@ -191,13 +191,13 @@ server_parameters:
 
     internalOrStageMaxMemoryBytes:
         description: >-
-            Maximum size of the data that the OrStage stage will cache in-memory before
-            spilling to disk.
+            Maximum size of the data that the classic OrStage stage will cache in-memory before
+            failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalOrStageMaxMemoryBytes"
         cpp_vartype: AtomicWord<long long>
         default:
-            expr: 100 * 1024 * 1024
+            expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
@@ -211,6 +211,45 @@ server_parameters:
         cpp_vartype: AtomicWord<long long>
         default:
             expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalMergeSortStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the classic MergeSortStage stage will cache in-memory
+            before failing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalMergeSortStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: std::numeric_limits<long long>::max()
+        validator:
+            gt: 0
+        redact: false
+
+    internalIndexScanStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the classic IndexScan stage will cache in-memory before
+            failing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalIndexScanStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: std::numeric_limits<long long>::max()
+        validator:
+            gt: 0
+        redact: false
+
+    internalSlotBasedExecutionUniqueStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the SBE Unique and UniqueRoaring stages will cache
+            in-memory before failing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalSBEUniqueStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false

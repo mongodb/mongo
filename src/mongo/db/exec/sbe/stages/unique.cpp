@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <utility>
 
@@ -82,8 +83,8 @@ void UniqueStage::prepare(CompileCtx& ctx) {
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, keySlot));
     }
 
-    _memoryTracker =
-        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(_opCtx);
+    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+        _opCtx, loadMemoryLimit(StageMemoryLimit::SBEUniqueStageMaxMemoryBytes));
 }
 
 value::SlotAccessor* UniqueStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -121,6 +122,9 @@ PlanState UniqueStage::getNext() {
             _memoryTracker->add((newSeenSizeBytes - _prevSeenSizeBytes) +
                                 estimateRowSizeBytes(*it));
             _prevSeenSizeBytes = newSeenSizeBytes;
+            uassert(11130301,
+                    "Exceeded memory limit in record id deduplicator for unique stage",
+                    _memoryTracker->withinMemoryLimit());
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.
@@ -217,8 +221,8 @@ std::unique_ptr<PlanStage> UniqueRoaringStage::clone() const {
 void UniqueRoaringStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _inKeyAccessor = _children[0]->getAccessor(ctx, _keySlot);
-    _memoryTracker =
-        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(_opCtx);
+    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+        _opCtx, loadMemoryLimit(StageMemoryLimit::SBEUniqueStageMaxMemoryBytes));
 }
 
 value::SlotAccessor* UniqueRoaringStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -277,6 +281,9 @@ PlanState UniqueRoaringStage::getNext() {
             size_t newSeenSizeBytes = _seen.getApproximateSize();
             _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
             _prevSeenSizeBytes = newSeenSizeBytes;
+            uassert(11130300,
+                    "Exceeded memory limit in record id deduplicator for unique_roaring stage",
+                    _memoryTracker->withinMemoryLimit());
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.

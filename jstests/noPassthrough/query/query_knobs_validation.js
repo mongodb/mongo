@@ -69,7 +69,6 @@ const expectedParamDefaults = {
     internalQueryFindCommandBatchSize: 101,
     internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "inDebug",
     internalQueryUnifiedWriteExecutor: false,
-    internalOrStageMaxMemoryBytes: 100 * 1024 * 1024,
 };
 
 function assertDefaultParameterValues() {

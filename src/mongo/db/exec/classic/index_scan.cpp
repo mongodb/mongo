@@ -36,6 +36,7 @@
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
@@ -79,8 +80,8 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
       _recordIdDeduplicator(expCtx),
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_bounds.boundInclusion)),
       _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)),
-      // TODO SERVER-97747 Add internalIndexScanMaxMemoryBytes when it exists.
-      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+          *expCtx, loadMemoryLimit(StageMemoryLimit::IndexScanStageMaxMemoryBytes))) {
     _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
@@ -250,6 +251,9 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
         _memoryTracker.add(dedupBytes - dedupBytesPrev);
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+        uassert(11130305,
+                "Exceeded memory limit in record id deduplicator for IXSCAN stage",
+                _memoryTracker.withinMemoryLimit());
 
         // If we've seen the RecordId before
         if (duplicate) {
@@ -271,6 +275,9 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
         _memoryTracker.add(dedupBytes - dedupBytesPrev);
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+        uassert(11130304,
+                "Exceeded memory limit in record id deduplicator for IXSCAN stage",
+                _memoryTracker.withinMemoryLimit());
     }
 
     if (!kv->key.isOwned())
