@@ -110,7 +110,9 @@ public:
     static Status isValidNormalized(const MatchExpression* root);
 
     const NamespaceString& nss() const {
-        invariant(_findCommand->getNamespaceOrUUID().isNamespaceString());
+        tassert(11320903,
+                "cannot call nss() on a UUID NamespaceStringOrUUID",
+                _findCommand->getNamespaceOrUUID().isNamespaceString());
         return _findCommand->getNamespaceOrUUID().nss();
     }
 
@@ -224,7 +226,7 @@ public:
     }
 
     boost::optional<ExplainOptions::Verbosity> getExplain() const {
-        invariant(_expCtx);
+        tassert(11320904, "_expCtx must not be null", _expCtx);
         return _expCtx->getExplain();
     }
 

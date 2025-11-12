@@ -419,9 +419,11 @@ void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree, StringBuil
 
 template <class T>
 char encodeEnum(T val) {
-    // Ensure val can be encoded as a digit between '0' and '9' inclusive.
-    invariant(static_cast<int>(val) < 10);
-    return static_cast<char>(val) + '0';
+    const int i = static_cast<int>(val);
+    tassert(11320905,
+            fmt::format("Expected val to be in the [0, 9] range, but found {}", i),
+            0 <= i && i <= 9);
+    return static_cast<char>(i) + '0';
 }
 
 void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuilder) {
@@ -467,7 +469,9 @@ void encodeRegexFlagsForMatch(RegexIterator first, RegexIterator last, StringBui
     if (!flags.empty()) {
         *keyBuilder << kEncodeRegexFlagsSeparator;
         for (const auto& flag : flags) {
-            invariant(RegexMatchExpression::kValidRegexFlags.count(flag));
+            tassert(11320906,
+                    fmt::format("Invalid regex flag {}", flag),
+                    RegexMatchExpression::kValidRegexFlags.count(flag));
             encodeUserString(StringData(&flag, 1), keyBuilder);
         }
         *keyBuilder << kEncodeRegexFlagsSeparator;
@@ -496,7 +500,7 @@ void encodeRegexFlagsForMatch(const std::vector<const RegexMatchExpression*>& re
  * to the output stream.
  */
 void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
-    invariant(keyBuilder);
+    tassert(11320907, "keyBuilder must not be null", keyBuilder);
 
     // Encode match type and path.
     *keyBuilder << encodeMatchType(tree->matchType());
@@ -684,7 +688,7 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
     // Encode the fields required by the projection in order.
     bool isFirst = true;
     for (auto&& requiredField : requiredFields) {
-        invariant(!requiredField.empty());
+        tassert(11320908, "requiredField must not be empty", !requiredField.empty());
 
         // Internal callers (e.g, from mongos) may add "$sortKey" to the projection. This is not
         // part of the user query, and therefore are not considered part of the cache key.
@@ -1200,7 +1204,7 @@ public:
     explicit MatchExpressionSbePlanCacheKeySerializationWalker(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, BufBuilder* builder, bool hasSort)
         : _builder{builder}, _visitor{expCtx, _builder, hasSort} {
-        invariant(_builder);
+        tassert(11320909, "builder must not be null", _builder);
     }
 
     void preVisit(const MatchExpression* expr) {

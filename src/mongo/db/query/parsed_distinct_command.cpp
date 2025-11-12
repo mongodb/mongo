@@ -151,8 +151,10 @@ std::unique_ptr<ParsedDistinctCommand> parse(
     // Collator.
     parsedDistinct->collator = resolveCollator(expCtx->getOperationContext(), *distinctCommand);
     if (parsedDistinct->collator.get() && expCtx->getCollator()) {
-        invariant(CollatorInterface::collatorsMatch(parsedDistinct->collator.get(),
-                                                    expCtx->getCollator()));
+        tassert(11320919,
+                "'parsedDistinct' and 'expCtx' collators do not match",
+                CollatorInterface::collatorsMatch(parsedDistinct->collator.get(),
+                                                  expCtx->getCollator()));
     }
 
     // Rest of the command.

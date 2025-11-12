@@ -348,7 +348,7 @@ class MatchExpressionParameterBindingWalker {
 public:
     MatchExpressionParameterBindingWalker(MatchExpressionParameterBindingVisitor* visitor)
         : _visitor{visitor} {
-        invariant(_visitor);
+        tassert(11320900, "visitor must not be null", _visitor);
     }
 
     void preVisit(const MatchExpression* expr) {
@@ -494,7 +494,7 @@ private:
 class WhereMatchExpressionWalker {
 public:
     explicit WhereMatchExpressionWalker(WhereMatchExpressionVisitor* visitor) : _visitor{visitor} {
-        invariant(_visitor);
+        tassert(11320901, "visitor must not be null", _visitor);
     }
 
     void preVisit(MatchExpression* expr) {

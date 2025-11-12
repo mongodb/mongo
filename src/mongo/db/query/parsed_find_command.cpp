@@ -332,7 +332,9 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parse(
     auto collator =
         resolveCollator(expCtx->getOperationContext(), params.findCommand->getCollation());
     if (collator.get() && expCtx->getCollator()) {
-        invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
+        tassert(11320920,
+                "'findCommand' and 'expCtx' collators do not match",
+                CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
     return parseWithValidatedCollator(expCtx,
                                       std::move(params.findCommand),
@@ -349,7 +351,9 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parseFromCount(
     auto collator = resolveCollator(expCtx->getOperationContext(),
                                     countCommand.getCollation().get_value_or({}));
     if (collator.get() && expCtx->getCollator()) {
-        invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
+        tassert(11320921,
+                "'countCommand' and 'expCtx' collators do not match",
+                CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
 
     // Copy necessary count command fields to find command. Notably, the skip and limit fields are

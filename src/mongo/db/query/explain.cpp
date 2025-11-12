@@ -181,7 +181,7 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
                                      BSONObjBuilder* out,
                                      bool isTrialPeriodInfo) {
     auto&& [stats, summary] = details;
-    invariant(summary);
+    tassert(11320910, "summary must not be null", summary);
 
     out->appendNumber("nReturned", static_cast<long long>(summary->nReturned));
 
@@ -237,13 +237,18 @@ void generateExecutionInfo(PlanExecutor* exec,
                            Status executePlanStatus,
                            boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
                            BSONObjBuilder* out) {
-    invariant(verbosity >= ExplainOptions::Verbosity::kExecStats);
+    tassert(11320911,
+            fmt::format("The explain verbosity must be at least 'kExecStats' when generating "
+                        "execution info, but found {}",
+                        explain::Verbosity_serializer(verbosity)),
+            verbosity >= ExplainOptions::Verbosity::kExecStats);
 
     auto&& explainer = exec->getPlanExplainer();
 
     if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans && explainer.isMultiPlan()) {
-        invariant(winningPlanTrialStats,
-                  "winningPlanTrialStats must be present when requesting all execution stats");
+        tassert(11320912,
+                "winningPlanTrialStats must be present when requesting all execution stats",
+                winningPlanTrialStats);
     }
     BSONObjBuilder execBob(out->subobjStart("executionStats"));
 
@@ -388,11 +393,11 @@ void Explain::explainPipeline(PlanExecutor* exec,
                               ExplainOptions::Verbosity verbosity,
                               const BSONObj& command,
                               BSONObjBuilder* out) {
-    invariant(exec);
-    invariant(out);
+    tassert(11320913, "exec must not be null", exec);
+    tassert(11320914, "out must not be null", out);
 
     auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(exec);
-    invariant(pipelineExec);
+    tassert(11320915, "expected 'exec' to be a PlanExecutorPipeline", pipelineExec);
 
     // If we need execution stats, this runs the plan in order to gather the stats.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats && executePipeline) {
@@ -486,7 +491,7 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
 
     if (entry.debugInfo) {
         const auto& debugInfo = *entry.debugInfo;
-        invariant(debugInfo.decision);
+        tassert(11320916, "decision must not be null", debugInfo.decision);
 
         // Add the 'createdFromQuery' object.
         {
@@ -506,7 +511,7 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         auto plannerStats = getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);
         auto execStats = getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kExecStats);
 
-        invariant(plannerStats.size() > 0);
+        tassert(11320917, "plannerStats must not be empty", plannerStats.size() > 0);
         out->append("cachedPlan", plannerStats[0].first);
 
         BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));

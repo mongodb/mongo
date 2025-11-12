@@ -59,10 +59,10 @@ namespace {
  * See comments in CanonicalDistinct::asAggregationCommand() for more detailed explanation.
  */
 void addMatchRemovingNestedArrays(BSONArrayBuilder* pipelineBuilder, const FieldPath& unwindPath) {
+    tassert(11320902, "unwindPath length cannot be 0", unwindPath.getPathLength() != 0);
     if (unwindPath.getPathLength() == 1) {
         return;
     }
-    invariant(unwindPath.getPathLength() > 1);
 
     BSONObjBuilder matchBuilder(pipelineBuilder->subobjStart());
     BSONObjBuilder predicateBuilder(matchBuilder.subobjStart("$match"));

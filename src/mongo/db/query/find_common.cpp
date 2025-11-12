@@ -81,7 +81,8 @@ bool FindCommon::enoughForFirstBatch(const FindCommandRequest& findCommand, long
 }
 
 bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, size_t bytesBuffered) {
-    invariant(numDocs >= 0);
+    tassert(
+        11320918, fmt::format("'numDocs' cannot be negative, but found {}", numDocs), numDocs >= 0);
     if (!numDocs) {
         // Allow the first output document to exceed the limit to ensure we can always make
         // progress.
