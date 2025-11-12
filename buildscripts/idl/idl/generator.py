@@ -1461,7 +1461,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     # non-debug builds, and is marked MONGO_COMPILER_NO_UNIQUE_ADDRESS so that the
                     # compiler knows that it should be optimized to take up no space when possible.
                     self._writer.write_line(
-                        "MONGO_COMPILER_NO_UNIQUE_ADDRESS mongo::idl::HasMembers<%s> _hasMembers;"
+                        "MONGO_COMPILER_NO_UNIQUE_ADDRESS mongo::idl::HasMembers<%s> _hasMembers{};"
                         % len(_get_required_fields(struct))
                     )
                     # Write constexpr struct data
