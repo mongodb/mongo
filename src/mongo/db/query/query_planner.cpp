@@ -764,9 +764,15 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     std::map<IndexEntry::Identifier, size_t> indexMap;
     for (size_t i = 0; i < expandedIndexes.size(); ++i) {
         const IndexEntry& ie = expandedIndexes[i];
-        const auto insertionRes = indexMap.insert(std::make_pair(ie.identifier, i));
+        const auto [it, success] = indexMap.insert(std::make_pair(ie.identifier, i));
         // Be sure the key was not already in the map.
-        invariant(insertionRes.second);
+        tassert(11321035,
+                fmt::format("Failed to map index identifier {} to indexNumber {} because a mapping "
+                            "to {} already existed",
+                            ie.identifier.toString(),
+                            i,
+                            it->second),
+                success);
         LOGV2_DEBUG(20964,
                     5,
                     "Index mapping: number and identifier",
@@ -1058,7 +1064,11 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         // $** index.
         if (relevantIndices.size() > 1) {
             for (auto&& entry : relevantIndices) {
-                invariant(entry.type == IndexType::INDEX_WILDCARD);
+                tassert(11321036,
+                        fmt::format("Expected all 'relevantIndices' to be of type INDEX_WILDCARD, "
+                                    "but found type {}",
+                                    toString(entry.type)),
+                        entry.type == IndexType::INDEX_WILDCARD);
             }
         }
     }
@@ -1085,8 +1095,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
         // Be sure that index expansion didn't do anything. As wildcard indexes are banned for
         // min/max, we expect to find a single hinted index entry.
-        invariant(fullIndexList.size() == 1);
-        invariant(*hintedIndexEntry == fullIndexList.front());
+        tassert(11321037,
+                fmt::format("Expected a single element in fullIndexList, but found size={}",
+                            fullIndexList.size()),
+                fullIndexList.size() == 1);
+        tassert(11321038,
+                fmt::format("Expected 'fullIndexList' to be equal to [{}], but found [{}]",
+                            hintedIndexEntry->toString(),
+                            fullIndexList.front().toString()),
+                *hintedIndexEntry == fullIndexList.front());
 
         // In order to be fully compatible, the min has to be less than the max according to the
         // index key pattern ordering. The first step in verifying this is "finish" the min and
@@ -1104,7 +1121,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
         std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeIndexScan(
             *hintedIndexEntry, query, params, finishedMinObj, finishedMaxObj));
-        invariant(solnRoot);
+        tassert(11321039, "solnRoot must not be null", solnRoot);
 
         auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
         if (!soln) {
@@ -1214,7 +1231,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
         // At this point, we know that there is only one text index and that the TEXT node is
         // assigned to it.
-        invariant(1 == tag->first.size() + tag->notFirst.size());
+        tassert(11321040,
+                "Expected only one text index with TEXT node assigned to it",
+                1 == tag->first.size() + tag->notFirst.size());
 
         LOGV2_DEBUG(20975,
                     5,
@@ -1954,8 +1973,9 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
             }
         } else {
             // N solutions, rank them.
-
-            invariant(!branchResult->solutions.empty());
+            tassert(11321041,
+                    "branchResult->solutions must not be empty",
+                    !branchResult->solutions.empty());
 
             auto multiPlanStatus = multiplanCallback(branchResult->canonicalQuery.get(),
                                                      std::move(branchResult->solutions));
@@ -2053,16 +2073,26 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
     ce::SamplingEstimator* samplingEstimator,
     const ce::ExactCardinalityEstimator* exactCardinality,
     boost::optional<StringSet&> topLevelSampleFieldNames) {
-    invariant(query.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
-    invariant(query.getPrimaryMatchExpression()->numChildren(),
-              "Cannot plan subqueries for an $or with no children");
+    tassert(11321042,
+            fmt::format("Expected the primary match expression to be an OR, but found type {}",
+                        static_cast<int>(query.getPrimaryMatchExpression()->matchType())),
+            query.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
+    tassert(11321043,
+            "Cannot plan subqueries for an $or with no children",
+            query.getPrimaryMatchExpression()->numChildren() > 0);
 
     SubqueriesPlanningResult planningResult{query.getPrimaryMatchExpression()->clone()};
     for (size_t i = 0; i < params.mainCollectionInfo.indexes.size(); ++i) {
         const IndexEntry& ie = params.mainCollectionInfo.indexes[i];
-        const auto insertionRes = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));
+        const auto [it, success] = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));
         // Be sure the key was not already in the map.
-        invariant(insertionRes.second);
+        tassert(11321044,
+                fmt::format(
+                    "Failed mapping index identifier {} to {} because a {} mapping already existed",
+                    ie.identifier.toString(),
+                    i,
+                    it->second),
+                success);
         LOGV2_DEBUG(20598,
                     5,
                     "Subplanner: index number and entry",
@@ -2114,7 +2144,8 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
 
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
-            invariant(branchResult->solutions.empty());
+            tassert(
+                11321045, "branchResult->solutions must be empty", branchResult->solutions.empty());
 
             auto statusWithMultiPlanSolns = samplingEstimator
                 ? QueryPlanner::plan(

@@ -61,10 +61,13 @@ void AllIndicesRequiredChecker::saveIndicesForCollection(const CollectionPtr& co
 
 void AllIndicesRequiredChecker::checkIndicesForCollection(OperationContext* opCtx,
                                                           const CollectionPtr& collection) const {
-    invariant(collection);
+    tassert(11321000, "collection must not be null", collection);
 
     auto it = _identEntries.find(collection->uuid());
-    invariant(it != _identEntries.end());
+    tassert(11321001,
+            fmt::format("cannot find index idents for collection uuid {}",
+                        collection->uuid().toString()),
+            it != _identEntries.end());
 
     for (const auto& [name, ident] : it->second) {
         // Structured bindings cannot be captured by closures (the uassert below).

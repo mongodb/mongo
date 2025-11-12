@@ -119,7 +119,10 @@ const IndexScanNode* getIndexScanNode(const QuerySolutionNode* node) {
     if (STAGE_IXSCAN == node->getType()) {
         return static_cast<const IndexScanNode*>(node);
     } else if (STAGE_FETCH == node->getType()) {
-        invariant(1U == node->children.size());
+        tassert(11321005,
+                fmt::format("STAGE_FETCH nodes must have exactly one child, but found {}",
+                            node->children.size()),
+                1U == node->children.size());
         const QuerySolutionNode* child = node->children[0].get();
         if (STAGE_IXSCAN == child->getType()) {
             return static_cast<const IndexScanNode*>(child);
@@ -151,7 +154,7 @@ bool scansAreEquivalent(const QuerySolutionNode* lhs, const QuerySolutionNode* r
  */
 std::vector<bool> canProvideSortWithMergeSort(
     const std::vector<std::unique_ptr<QuerySolutionNode>>& nodes, const BSONObj& requestedSort) {
-    invariant(!nodes.empty());
+    tassert(11321006, "nodes must not be empty", !nodes.empty());
     std::vector<bool> shouldReverseScan;
     const auto reverseSort = QueryPlannerCommon::reverseSortObj(requestedSort);
     for (auto&& node : nodes) {
@@ -815,14 +818,19 @@ bool QueryPlannerAccess::shouldMergeWithLeaf(const MatchExpression* expr,
     // must be a regular index scan.
     //
 
-    invariant(type == STAGE_IXSCAN);
+    tassert(
+        11321007,
+        fmt::format("Expected type to be STAGE_IXSCAN, but found {}", nodeStageTypeToString(node)),
+        type == STAGE_IXSCAN);
     const IndexScanNode* scan = static_cast<const IndexScanNode*>(node);
     const IndexBounds* boundsToFillOut = &scan->bounds;
 
     if (boundsToFillOut->fields[pos].name.empty()) {
         // Bounds have yet to be assigned for the 'pos' position in the index. The plan enumerator
         // should have told us that it is safe to compound bounds in this case.
-        invariant(scanState.ixtag->canCombineBounds);
+        tassert(11321008,
+                "Expected scanState to allow compound bounds",
+                scanState.ixtag->canCombineBounds);
         return true;
     } else {
         // Bounds have already been assigned for the 'pos' position in the index.
@@ -844,7 +852,7 @@ bool QueryPlannerAccess::shouldMergeWithLeaf(const MatchExpression* expr,
 
 void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingState* scanState) {
     QuerySolutionNode* node = scanState->currentScan.get();
-    invariant(nullptr != node);
+    tassert(11321009, "scanState->currentScan must not be null", nullptr != node);
 
     const MatchExpression::MatchType mergeType = scanState->root->matchType();
     const size_t pos = scanState->ixtag->pos;
@@ -876,7 +884,10 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     IndexBounds* boundsToFillOut = nullptr;
 
     if (STAGE_GEO_NEAR_2D == type) {
-        invariant(INDEX_2D == index.type);
+        tassert(
+            11321010,
+            fmt::format("Expected index.type to be INDEX_2D, but found {}", toString(index.type)),
+            INDEX_2D == index.type);
 
         // 2D indexes have a special format - the "2d" field stores a normally-indexed BinData
         // field, but additional array fields are *not* exploded into multi-keys - they are stored
@@ -1147,7 +1158,10 @@ bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
     } else if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_FETCH) {
         return true;
     } else {
-        invariant(scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED);
+        tassert(11321011,
+                fmt::format("Expected scanState->loosestBounds to be INEXACT_COVERED, but found {}",
+                            static_cast<int>(scanState->loosestBounds)),
+                scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED);
         const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
         return index.multikey;
     }
@@ -1296,7 +1310,7 @@ void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
 
 std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEquivalentScans(
     std::vector<std::unique_ptr<QuerySolutionNode>> scans) {
-    invariant(scans.size() > 0);
+    tassert(11321012, "scans must not be empty", !scans.empty());
 
     // Scans that need to be collapsed will be adjacent to each other in the list due to how we
     // sort the query predicate. We step through the list, either merging the current scan into
@@ -1343,7 +1357,7 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
         }
     }
 
-    invariant(collapsedScans.size() > 0);
+    tassert(11321013, "collapsedScans must not be empty", !collapsedScans.empty());
     return collapsedScans;
 }
 
@@ -1451,7 +1465,9 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
         // child node.
         if (MatchExpression::NOT == child->matchType()) {
             scanState.ixtag = checked_cast<IndexTag*>(child->getChild(0)->getTag());
-            invariant(IndexTag::kNoIndex != scanState.ixtag->index);
+            tassert(11321014,
+                    "Expected the NOT child to have an index tag",
+                    IndexTag::kNoIndex != scanState.ixtag->index);
         }
 
         // If the child we're looking at uses a different index than the current index scan, add
@@ -1607,15 +1623,20 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
     // the complete $elemMatch expression will be affixed as a filter later on.
     for (size_t i = 0; i < emChildren.size(); ++i) {
         MatchExpression* emChild = emChildren[i];
-        invariant(nullptr != emChild->getTag());
+        tassert(
+            11321015, "emChild->getTag() must not return nullptr", nullptr != emChild->getTag());
         scanState->ixtag = checked_cast<IndexTag*>(emChild->getTag());
 
         // If 'emChild' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
         if (MatchExpression::NOT == emChild->matchType()) {
-            invariant(nullptr != emChild->getChild(0)->getTag());
+            tassert(11321016,
+                    "emChild->getChild(0)->getTag() must not return nullptr",
+                    nullptr != emChild->getChild(0)->getTag());
             scanState->ixtag = checked_cast<IndexTag*>(emChild->getChild(0)->getTag());
-            invariant(IndexTag::kNoIndex != scanState->ixtag->index);
+            tassert(11321017,
+                    "expected scanState->ixtag->index to not be kNoIndex",
+                    IndexTag::kNoIndex != scanState->ixtag->index);
         }
 
         if (shouldMergeWithLeaf(emChild, *scanState)) {
@@ -1807,7 +1828,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         // each index's predicate, but the document isn't guaranteed to be in a state where it
         // matches all indexed predicates simultaneously. Therefore, it is necessary to add a fetch
         // stage which will explicitly evaluate the entire predicate (see SERVER-16750).
-        invariant(clonedRoot);
+        tassert(11321018, "clonedRoot must not be null", clonedRoot);
         auto fetch = std::make_unique<FetchNode>();
         fetch->filter = std::move(clonedRoot);
         fetch->children.push_back(std::move(andResult));
@@ -1936,7 +1957,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
             }
             // Each node can provide either the requested sort, or the reverse of the requested
             // sort.
-            invariant(scanNodes.size() == shouldReverseScan.size());
+            tassert(11321019,
+                    fmt::format("Expected scanNodes.size() to be equal to "
+                                "shouldReverseScan.size(), but {} != {}",
+                                scanNodes.size(),
+                                shouldReverseScan.size()),
+                    scanNodes.size() == shouldReverseScan.size());
             for (size_t i = 0; i < scanNodes.size(); ++i) {
                 if (shouldReverseScan[i]) {
                     QueryPlannerCommon::reverseScans(scanNodes[i].get());

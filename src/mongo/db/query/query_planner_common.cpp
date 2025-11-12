@@ -65,7 +65,9 @@ bool QueryPlannerCommon::scanDirectionsEqual(QuerySolutionNode* node, int direct
         scanDir = collScan->direction;
     } else {
         // We shouldn't encounter a sort stage.
-        invariant(!isSortStageType(type));
+        tassert(11321046,
+                fmt::format("Encountered unexpected sort stage {}", nodeStageTypeToString(node)),
+                !isSortStageType(type));
     }
 
     // If we found something with a direction, and the direction doesn't match, we return false.
@@ -119,7 +121,9 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node, bool reverseCollS
     } else {
         // Reversing scans is done in order to determine whether or not we need to add an explicit
         // SORT stage. There shouldn't already be one present in the plan.
-        invariant(!isSortStageType(type));
+        tassert(11321047,
+                fmt::format("Encountered unexpected sort stage {}", nodeStageTypeToString(node)),
+                !isSortStageType(type));
     }
 
     for (size_t i = 0; i < node->children.size(); ++i) {

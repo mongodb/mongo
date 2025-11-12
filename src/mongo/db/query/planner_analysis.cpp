@@ -253,12 +253,12 @@ void makeCartesianProduct(const IndexBounds& bounds,
 
     // We dump the Cartesian product of bounds into prefixForScans, starting w/the first
     // field's points.
-    invariant(fieldsToExplode >= 1);
+    tassert(11321020, "fieldsToExplode must be greater than 0", fieldsToExplode > 0);
     const OrderedIntervalList& firstOil = bounds.fields[0];
-    invariant(firstOil.intervals.size() >= 1);
+    tassert(11321021, "firstOil.intervals must not be empty", !firstOil.intervals.empty());
     for (size_t i = 0; i < firstOil.intervals.size(); ++i) {
         const Interval& ival = firstOil.intervals[i];
-        invariant(ival.isPoint());
+        tassert(11321022, "all ivals must be points", ival.isPoint());
         PointPrefix pfix;
         pfix.push_back(ival);
         PrefixIndices pfixIndices;
@@ -270,11 +270,11 @@ void makeCartesianProduct(const IndexBounds& bounds,
     for (size_t i = 1; i < fieldsToExplode; ++i) {
         vector<pair<PointPrefix, PrefixIndices>> newPrefixForScans;
         const OrderedIntervalList& oil = bounds.fields[i];
-        invariant(oil.intervals.size() >= 1);
+        tassert(11321023, "oil.intervals must not be empty", !oil.intervals.empty());
         // For each point interval in that field (all ivals must be points)...
         for (size_t j = 0; j < oil.intervals.size(); ++j) {
             const Interval& ival = oil.intervals[j];
-            invariant(ival.isPoint());
+            tassert(11321024, "all ivals must be points", ival.isPoint());
             // Make a new scan by appending it to all scans in prefixForScans.
             for (size_t k = 0; k < prefixForScans.size(); ++k) {
                 auto pfix = prefixForScans[k].first;
@@ -329,8 +329,17 @@ bool explodeNode(const QuerySolutionNode* node,
     for (size_t i = 0; i < prefixForScans.size(); ++i) {
         const PointPrefix& prefix = prefixForScans[i].first;
         const PrefixIndices& prefixIndices = prefixForScans[i].second;
-        invariant(prefix.size() == fieldsToExplode);
-        invariant(prefixIndices.size() == fieldsToExplode);
+        tassert(11321025,
+                fmt::format("'prefix.size()' must be equal to 'fieldsToExplode', but {} != {}",
+                            prefix.size(),
+                            fieldsToExplode),
+                prefix.size() == fieldsToExplode);
+        tassert(
+            11321026,
+            fmt::format("'prefixIndices.size()' must be equal to 'fieldsToExplode', but {} != {}",
+                        prefixIndices.size(),
+                        fieldsToExplode),
+            prefixIndices.size() == fieldsToExplode);
 
         // Copy boring fields into new child.
         auto child = std::make_unique<IndexScanNode>(isn->index);
@@ -345,7 +354,10 @@ bool explodeNode(const QuerySolutionNode* node,
             // the IETs are the correct shape (i.e. derived from an $in or $eq predicate) so that
             // they are safe to explode.
             for (size_t pidx = 0; pidx < prefixIndices.size(); pidx++) {
-                invariant(pidx < isn->iets.size());
+                tassert(11321027,
+                        fmt::format(
+                            "pidx={} is outside the iets bounds (size={})", pidx, isn->iets.size()),
+                        pidx < isn->iets.size());
                 const auto& iet = isn->iets[pidx];
                 auto needsExplodeNode = [&]() {
                     if (const auto* ietEval = iet.cast<interval_evaluation_tree::EvalNode>();
@@ -682,7 +694,10 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     //
     // First, detach the bottom of the tree. This part is CHILD in the comment above.
     std::unique_ptr<QuerySolutionNode> restOfTree = std::move(sortNode->children[0]);
-    invariant(sortNode->children.size() == 1u);
+    tassert(11321028,
+            fmt::format("Expected sortNode to have exactly one child, but found {}",
+                        sortNode->children.size()),
+            sortNode->children.size() == 1u);
     sortNode->children.clear();
 
     // Next, detach the input from the projection and assume ownership of it.
@@ -690,10 +705,13 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     //   SORT
     // Or this if we have SKIP:
     //   SKIP => SORT
+    tassert(11321029,
+            fmt::format("Expected projectNode to have exactly one child, but found {}",
+                        projectNode->children.size()),
+            projectNode->children.size() == 1u);
     std::unique_ptr<QuerySolutionNode> ownedProjectionInput = std::move(projectNode->children[0]);
-    sortNode = nullptr;
-    invariant(projectNode->children.size() == 1u);
     projectNode->children.clear();
+    sortNode = nullptr;
 
     // Attach the lower part of the tree as the child of the projection.
     // We want to get the following structure:
@@ -1083,7 +1101,11 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             const auto& oil = bounds.fields[boundsIdx];
             boost::optional<interval_evaluation_tree::IET> iet;
             if (!isn->iets.empty()) {
-                invariant(boundsIdx < isn->iets.size());
+                tassert(11321030,
+                        fmt::format("boundsIdx={} falls outside the iets bounds (size={})",
+                                    boundsIdx,
+                                    isn->iets.size()),
+                        boundsIdx < isn->iets.size());
                 iet = isn->iets[boundsIdx];
             }
             if (!isOilExplodable(oil, iet)) {

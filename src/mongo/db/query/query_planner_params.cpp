@@ -69,7 +69,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                            const IndexCatalogEntry& ice,
                                            const CanonicalQuery& canonicalQuery) {
     auto desc = ice.descriptor();
-    invariant(desc);
+    tassert(11321048, "Index catalog entry descriptor must not be null", desc);
 
     if (desc->isIdIndex()) {
         // _id indexes are guaranteed to be non-multikey. Determining whether the index is multikey
@@ -90,7 +90,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     }
 
     auto accessMethod = ice.accessMethod();
-    invariant(accessMethod);
+    tassert(11321049, "Index catalog entry access method must not be null", accessMethod);
 
     const bool isMultikey = ice.isMultikey(opCtx, collection);
 

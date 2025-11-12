@@ -179,7 +179,7 @@ stdx::unordered_map<size_t, std::vector<OrPushdownTag::Destination>> partitionCh
     std::vector<OrPushdownTag::Destination> destinations) {
     stdx::unordered_map<size_t, std::vector<OrPushdownTag::Destination>> childDestinations;
     for (auto&& dest : destinations) {
-        invariant(!dest.route.empty());
+        tassert(11321002, "'dest.route' must not be empty", !dest.route.empty());
         auto index = dest.route.front();
         dest.route.pop_front();
         childDestinations[index].push_back(std::move(dest));
@@ -255,7 +255,7 @@ bool pushdownNode(MatchExpression* node,
 
     if (MatchExpression::AND == target->matchType()) {
         auto [indexedOr, fieldRef_unused] = getIndexedOr({} /*fieldRef*/, target);
-        invariant(indexedOr);
+        tassert(11321003, "indexedOr must not be null", indexedOr);
         return pushdownNode(node, indexedOr, std::move(destinations), pathsToUpdate);
     }
 
@@ -336,7 +336,7 @@ bool processOrPushdownNode(MatchExpression* node,
     if (!predNode->getTag() || predNode->getTag()->getType() != TagType::OrPushdownTag) {
         return false;
     }
-    invariant(indexedOr);
+    tassert(11321004, "indexedOr must not be null", indexedOr);
 
     // Predicate node is tagged for pushdown. Extract its route through the $or and its index tag.
     auto* orPushdownTag = static_cast<OrPushdownTag*>(predNode->getTag());

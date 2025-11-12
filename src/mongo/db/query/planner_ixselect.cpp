@@ -204,10 +204,11 @@ static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
 // arrays are not checked recursively. We assume 'node' is bounds-generating or is a recursive child
 // of a bounds-generating node, i.e. it does not contain AND, OR, ELEM_MATCH_OBJECT, or NOR.
 static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, BSONType type) {
-    invariant(node->matchType() != MatchExpression::AND &&
-              node->matchType() != MatchExpression::OR &&
-              node->matchType() != MatchExpression::NOR &&
-              node->matchType() != MatchExpression::ELEM_MATCH_OBJECT);
+    tassert(11321031,
+            fmt::format("node->matchType() must not be {}", static_cast<int>(node->matchType())),
+            node->matchType() != MatchExpression::AND && node->matchType() != MatchExpression::OR &&
+                node->matchType() != MatchExpression::NOR &&
+                node->matchType() != MatchExpression::ELEM_MATCH_OBJECT);
 
     if (const auto* comparisonExpr = dynamic_cast<const ComparisonMatchExpressionBase*>(node)) {
         return comparisonExpr->getData().type() == type;
@@ -224,7 +225,10 @@ static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, 
     }
 
     if (node->matchType() == MatchExpression::NOT) {
-        invariant(node->numChildren() == 1U);
+        tassert(11321032,
+                fmt::format("Expected NOT node to have exactly one child, but found {}",
+                            node->numChildren()),
+                node->numChildren() == 1U);
         return boundsGeneratingNodeContainsComparisonToType(node->getChild(0), type);
     }
 
@@ -463,7 +467,10 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             }
 
             // The type being INDEX_WILDCARD implies that the index is sparse.
-            invariant(index.sparse || index.type != INDEX_WILDCARD);
+            tassert(11321033,
+                    fmt::format("Wildcard index with identifier {} is not sparse",
+                                index.identifier.toString()),
+                    index.sparse || index.type != INDEX_WILDCARD);
 
             auto* child = node->getChild(0);
 
@@ -1267,7 +1274,10 @@ static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
 
     // If we're here, we're an AND.  Determine whether the children satisfy the index prefix for
     // the text index.
-    invariant(node->matchType() == MatchExpression::AND);
+    tassert(11321034,
+            fmt::format("Expected node to be an AND, but found {}",
+                        static_cast<int>(node->matchType())),
+            node->matchType() == MatchExpression::AND);
 
     bool hasText = false;
 
