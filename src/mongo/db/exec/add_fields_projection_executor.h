@@ -126,6 +126,14 @@ public:
         _root->optimize();
     }
 
+    /**
+     * Checks whether the projection is a noop.
+     */
+    bool isNoop() const final {
+        // The $addFields projection is noop if no fields are going to be added.
+        return _root->isAdditionSetEmpty();
+    }
+
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
         _root->reportDependencies(deps);
         return DepsTracker::State::SEE_NEXT;
