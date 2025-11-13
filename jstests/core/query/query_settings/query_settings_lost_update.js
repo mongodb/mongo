@@ -14,7 +14,7 @@
  *   # migration.
  *   # TODO: SERVER-94927 Remove Feature Flag for SPM-3684.
  *   cannot_run_during_upgrade_downgrade,
- *   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+ *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
  * ]
  */

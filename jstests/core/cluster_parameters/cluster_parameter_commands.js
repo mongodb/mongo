@@ -8,7 +8,7 @@
 //    not_allowed_with_signed_security_token,
 //   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
 //    uses_transactions,
-//    # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//    # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
 //    transitioning_replicaset_incompatible,
 //   ]
 

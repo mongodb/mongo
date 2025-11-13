@@ -16,7 +16,8 @@
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
 //   requires_getmore,
-//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   # TODO(SERVER-112424): Instantiate ScopedAllowImplicitCollectionCreate_UNSAFE object in
+//   # cloneCollectionAsCapped command
 //   transitioning_replicaset_incompatible,
 // ]
 

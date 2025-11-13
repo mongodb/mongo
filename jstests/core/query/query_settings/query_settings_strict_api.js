@@ -14,7 +14,7 @@
 //   uses_api_parameters,
 //   # Test includes SBE plan cache assertions if the SBE plan cache is used.
 //   examines_sbe_cache,
-//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
 //   transitioning_replicaset_incompatible,
 // ]
 //

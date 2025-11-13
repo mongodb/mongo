@@ -16,7 +16,7 @@
  *   directly_against_shardsvrs_incompatible,
  *   # setParameter not permitted with security tokens
  *   not_allowed_with_signed_security_token,
- *   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+ *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
  *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
  *   # consistent, no add/remove shard operations should occur during the test.

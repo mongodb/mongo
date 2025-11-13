@@ -4,7 +4,7 @@
 //   simulate_atlas_proxy_incompatible,
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
-//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
 //   transitioning_replicaset_incompatible,
 // ]
 //

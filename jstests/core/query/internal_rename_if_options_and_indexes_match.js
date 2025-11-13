@@ -15,7 +15,8 @@
 //   # this test dislikes.
 //   exclude_when_record_ids_replicated,
 //   requires_getmore,
-//   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+//   # TODO(SERVER-113810): Check accessing sharded cluster components on replicasets running with
+//   # --shardsvr
 //   transitioning_replicaset_incompatible,
 // ]
 

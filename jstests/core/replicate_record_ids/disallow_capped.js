@@ -12,7 +12,8 @@
  *   # capped collections connot be sharded
  *   assumes_unsharded_collection,
  *   featureFlagRecordIdsReplicated,
- *   # TODO(SERVER-113205): Investigate how this test could run during a transitional state
+ *   # TODO(SERVER-112424): Instantiate ScopedAllowImplicitCollectionCreate_UNSAFE object in
+ *   # cloneCollectionAsCapped command
  *   transitioning_replicaset_incompatible,
  * ]
  */
