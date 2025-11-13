@@ -28,7 +28,13 @@
  */
 #pragma once
 
+#ifdef __has_include
+#if __has_include("mongo/util/modules.h")
 #include "mongo/util/modules.h"
+#else
+#define MONGO_MOD_PUB
+#endif
+#endif  // __has_include
 
 #include <stddef.h>
 #include <stdint.h>
