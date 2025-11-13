@@ -70,13 +70,13 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
         }
         switch (elt.type) {
             case kParseNode: {
-                handle = VariantNodeHandle(elt.parse);
-                elt.parse = nullptr;
+                handle = VariantNodeHandle(elt.parseOrAst.parse);
+                elt.parseOrAst.parse = nullptr;
                 break;
             }
             case kAstNode: {
-                handle = VariantNodeHandle(elt.ast);
-                elt.ast = nullptr;
+                handle = VariantNodeHandle(elt.parseOrAst.ast);
+                elt.parseOrAst.ast = nullptr;
                 break;
             }
             default:

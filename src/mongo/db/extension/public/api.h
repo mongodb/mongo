@@ -417,7 +417,7 @@ typedef struct MongoExtensionExpandedArrayElement {
     union {
         MongoExtensionAggStageParseNode* parse;
         MongoExtensionAggStageAstNode* ast;
-    };
+    } parseOrAst;
 } MongoExtensionExpandedArrayElement;
 
 /**

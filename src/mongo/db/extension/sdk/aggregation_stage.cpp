@@ -59,12 +59,12 @@ struct ConsumeVariantNodeToAbi {
 
     void operator()(AggStageParseNodeHandle&& parseNode) const {
         dst.type = kParseNode;
-        dst.parse = parseNode.release();
+        dst.parseOrAst.parse = parseNode.release();
     }
 
     void operator()(AggStageAstNodeHandle&& astNode) const {
         dst.type = kAstNode;
-        dst.ast = astNode.release();
+        dst.parseOrAst.ast = astNode.release();
     }
 };
 }  // namespace

@@ -155,7 +155,7 @@ protected:
     explicit AggStageAstNode(std::string_view name) : _name(name) {}
 
 private:
-    const std::string_view _name;
+    const std::string _name;
 };
 
 /**
@@ -253,7 +253,7 @@ protected:
     explicit AggStageParseNode(std::string_view name) : _name(name) {}
 
 private:
-    const std::string_view _name;
+    const std::string _name;
 };
 
 /**

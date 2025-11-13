@@ -85,16 +85,18 @@ template <>
 inline void destroyAbiArrayElem(::MongoExtensionExpandedArrayElement& elt) noexcept {
     switch (elt.type) {
         case kParseNode: {
-            if (elt.parse && elt.parse->vtable && elt.parse->vtable->destroy) {
-                elt.parse->vtable->destroy(elt.parse);
-                elt.parse = nullptr;
+            auto& parse = elt.parseOrAst.parse;
+            if (parse && parse->vtable && parse->vtable->destroy) {
+                parse->vtable->destroy(parse);
+                parse = nullptr;
             }
             break;
         }
         case kAstNode: {
-            if (elt.ast && elt.ast->vtable && elt.ast->vtable->destroy) {
-                elt.ast->vtable->destroy(elt.ast);
-                elt.ast = nullptr;
+            auto& ast = elt.parseOrAst.ast;
+            if (ast && ast->vtable && ast->vtable->destroy) {
+                ast->vtable->destroy(ast);
+                ast = nullptr;
             }
             break;
         }
