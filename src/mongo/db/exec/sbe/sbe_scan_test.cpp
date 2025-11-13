@@ -28,7 +28,7 @@
  */
 
 /**
- * This file contains minimal tests for sbe::ScanStage and sbe::ParallelScanStage.
+ * This file contains minimal tests for sbe::ScanStage.
  */
 
 #include "mongo/base/string_data.h"
@@ -132,44 +132,6 @@ TEST_F(ScanStageTest, scanStage) {
                                                     false /* includeScanStartRecordId */,
                                                     false /* includeScanEndRecordId */);
 
-        return std::make_pair(scanSlot, std::move(scanStage));
-    };
-
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
-}
-
-TEST_F(ScanStageTest, ParallelScanStage) {
-    auto colls =
-        createCollection({fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}")}, boost::none);
-    UUID uuid = colls.getMainCollection()->uuid();
-    DatabaseName dbName = _nss.dbName();
-
-    auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
-    value::ValueGuard inputGuard{inputTag, inputVal};
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(BSON("_id" << 0 << "a" << 1) << BSON("_id" << 1 << "a" << 2)));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
-
-    auto makeStageFn = [uuid, dbName](value::SlotId scanSlot, std::unique_ptr<PlanStage> stage) {
-        sbe::value::SlotVector scanFieldSlots;
-        auto scanStage =
-            sbe::makeS<sbe::ParallelScanStage>(uuid,
-                                               dbName,
-                                               scanSlot,
-                                               boost::none /* recordIdSlot */,
-                                               boost::none /* snapshotIdSlot */,
-                                               boost::none /* indexIdentSlot */,
-                                               boost::none /* indexKeySlot */,
-                                               boost::none /* indexKeyPatternSlot */,
-                                               std::vector<std::string>{} /* scanFieldNames */,
-                                               scanFieldSlots,
-                                               nullptr /* yieldPolicy */,
-                                               kEmptyPlanNodeId,
-                                               ScanCallbacks{},
-                                               false /* participateInTrialRunTracking */
-            );
         return std::make_pair(scanSlot, std::move(scanStage));
     };
 
