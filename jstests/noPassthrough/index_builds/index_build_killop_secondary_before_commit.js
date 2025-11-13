@@ -4,6 +4,8 @@
  * - the killop results in the secondary crashing if the killop is after voting for commit.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   requires_fcv_71,
  *   requires_replication,
  *   incompatible_with_windows_tls,

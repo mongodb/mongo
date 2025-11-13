@@ -99,7 +99,6 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeSignalPrimaryForCommitReadiness);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeSignalingPrimaryForAbort);
-MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort);
 MONGO_FAIL_POINT_DEFINE(hangBeforeVoteCommitIndexBuild);
 
 const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActiveUserIndexBuilds"_sd;
@@ -734,8 +733,6 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 
 void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort(
     OperationContext* opCtx, ReplIndexBuildState* replState) {
-    hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort.pauseWhileSet(opCtx);
-
     const auto abortStatus = replState->getAbortStatus();
     LOGV2(7419402,
           "Index build: signaling primary to abort index build",

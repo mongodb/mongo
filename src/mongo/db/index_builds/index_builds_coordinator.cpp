@@ -114,6 +114,7 @@ MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeAbortCleanUp);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnStepUp);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBuildingIndex);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBuildingIndexSecond);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeWaitingUntilMajorityOpTime);
@@ -2979,12 +2980,17 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     // restart the index build will also be restarted. This is also susceptible to user killops, but
     // in that case, we will let the error escape and the server will crash.
     runOnAlternateContext(
-        opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
+        opCtx,
+        "self-abort",
+        [this, replState, status, indexBuildMethod = indexBuildOptions.indexBuildMethod](
+            OperationContext* abortCtx) {
+            hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort.pauseWhileSet(abortCtx);
             // The index builder thread will need to reach out to the current primary to abort on
             // its own. This can happen if an error is thrown, it is interrupted by a user killop,
             // or is killed internally by something like the DiskSpaceMonitor. Voting for abort is
             // only allowed if the node did not previously attempt to vote for commit.
-            if (replState->canVoteForAbort()) {
+            if (indexBuildMethod != IndexBuildMethodEnum::kPrimaryDriven &&
+                replState->canVoteForAbort()) {
                 // Always request an abort to the primary node, even if we are primary. If
                 // primary, the signal will loop back and cause an asynchronous external
                 // index build abort.
