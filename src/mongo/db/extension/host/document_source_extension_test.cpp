@@ -610,9 +610,10 @@ static constexpr std::string_view kExpandToSearchName = "$expandToSearch";
 static const BSONObj kSearchSpec = BSON(
     "$search" << BSON("index" << "default" << "text" << BSON("query" << "foo" << "path" << "a")));
 
-class FirstPosAggStageParseNode : public sdk::AggStageParseNode {
+class RequiresInputDocSourceAggStageParseNode : public sdk::AggStageParseNode {
 public:
-    FirstPosAggStageParseNode() : sdk::AggStageParseNode(sdk::shared_test_stages::kFirstName) {}
+    RequiresInputDocSourceAggStageParseNode()
+        : sdk::AggStageParseNode(sdk::shared_test_stages::kRequiresInputDocSourceName) {}
 
     static constexpr size_t kExpansionSize = 2;
 
@@ -624,9 +625,9 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::FirstPosAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::LastPosAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode>()));
         return expanded;
     }
 
@@ -635,13 +636,14 @@ public:
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
-        return std::make_unique<FirstPosAggStageParseNode>();
+        return std::make_unique<RequiresInputDocSourceAggStageParseNode>();
     }
 };
 
-class LastPosAggStageParseNode : public sdk::AggStageParseNode {
+class NotRequiresInputDocSourceAggStageParseNode : public sdk::AggStageParseNode {
 public:
-    LastPosAggStageParseNode() : sdk::AggStageParseNode(sdk::shared_test_stages::kLastName) {}
+    NotRequiresInputDocSourceAggStageParseNode()
+        : sdk::AggStageParseNode(sdk::shared_test_stages::kNotRequiresInputDocSourceName) {}
 
     static constexpr size_t kExpansionSize = 2;
 
@@ -653,9 +655,9 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::LastPosAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::FirstPosAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode>()));
         return expanded;
     }
 
@@ -664,7 +666,7 @@ public:
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
-        return std::make_unique<LastPosAggStageParseNode>();
+        return std::make_unique<NotRequiresInputDocSourceAggStageParseNode>();
     }
 };
 
@@ -872,58 +874,54 @@ TEST_F(DocumentSourceExtensionTest, NoOpParseNodeInheritsDefaultGetPropertiesFro
                   PrivilegeVector{});
 }
 
-TEST_F(DocumentSourceExtensionTest, NonePosAstNodeSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NonePosAggStageAstNode::make());
+TEST_F(DocumentSourceExtensionTest, RequiresInputDocSourceAggStageAstNodeSucceeds) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kNoneName), std::move(handle), _nss);
+        std::string(sdk::shared_test_stages::kRequiresInputDocSourceName), std::move(handle), _nss);
     ASSERT_FALSE(lp.isInitialSource());
 }
 
-TEST_F(DocumentSourceExtensionTest, FirstPosAstNodeSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::FirstPosAggStageAstNode::make());
+TEST_F(DocumentSourceExtensionTest, NotRequiresInputDocSourceAggStageAstNode) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kFirstName), std::move(handle), _nss);
-    ASSERT_TRUE(lp.isInitialSource());
-}
-
-TEST_F(DocumentSourceExtensionTest, FirstPosParseNodeInheritsInitialSourceFromFirstAstNode) {
-    auto parseNode = new sdk::ExtensionAggStageParseNode(FirstPosAggStageParseNode::make());
-    auto handle = AggStageParseNodeHandle{parseNode};
-
-    host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kFirstName),
+        std::string(sdk::shared_test_stages::kNotRequiresInputDocSourceName),
         std::move(handle),
-        _nss,
-        LiteParserOptions{});
+        _nss);
     ASSERT_TRUE(lp.isInitialSource());
 }
 
-TEST_F(DocumentSourceExtensionTest, LastPosAstNodeSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::LastPosAggStageAstNode::make());
-    auto handle = AggStageAstNodeHandle{astNode};
-
-    host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kLastName), std::move(handle), _nss);
-    ASSERT_FALSE(lp.isInitialSource());
-}
-
-TEST_F(DocumentSourceExtensionTest, LastPosParseNodeInheritsInitialSourceFromFirstAstNode) {
-    auto parseNode = new sdk::ExtensionAggStageParseNode(LastPosAggStageParseNode::make());
+TEST_F(DocumentSourceExtensionTest,
+       RequiresInputDocSourceAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
+    auto parseNode =
+        new sdk::ExtensionAggStageParseNode(RequiresInputDocSourceAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kLastName),
+        std::string(sdk::shared_test_stages::kRequiresInputDocSourceName),
         std::move(handle),
         _nss,
         LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
+}
+
+TEST_F(DocumentSourceExtensionTest,
+       NotRequiresInputDocSourceAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
+    auto parseNode =
+        new sdk::ExtensionAggStageParseNode(NotRequiresInputDocSourceAggStageParseNode::make());
+    auto handle = AggStageParseNodeHandle{parseNode};
+
+    host::DocumentSourceExtension::LiteParsedExpandable lp(
+        std::string(sdk::shared_test_stages::kNotRequiresInputDocSourceName),
+        std::move(handle),
+        _nss,
+        LiteParserOptions{});
+    ASSERT_TRUE(lp.isInitialSource());
 }
 
 TEST_F(DocumentSourceExtensionTest, ExpandToMatchParseNodeInheritsPropertiesFromMatch) {

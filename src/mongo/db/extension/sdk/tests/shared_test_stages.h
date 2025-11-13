@@ -585,6 +585,10 @@ static constexpr std::string_view kLastName = "$last";
 static constexpr std::string_view kBadPosName = "$badPos";
 static constexpr std::string_view kBadPosTypeName = "$badPosType";
 static constexpr std::string_view kUnknownPropertyName = "$unknownProperty";
+static constexpr std::string_view kRequiresInputDocSourceName = "$requiresInputDocSource";
+static constexpr std::string_view kNotRequiresInputDocSourceName = "$notRequiresInputDocSource";
+static constexpr std::string_view kBadRequiresInputDocSourceTypeName =
+    "$badRequiresInputDocSourceType";
 
 class NonePosAggStageAstNode : public sdk::AggStageAstNode {
 public:
@@ -685,6 +689,59 @@ public:
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<UnknownPropertyAggStageAstNode>();
+    }
+};
+
+class RequiresInputDocSourceAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    RequiresInputDocSourceAggStageAstNode() : sdk::AggStageAstNode(kRequiresInputDocSourceName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiresInputDocSource" << true);
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<RequiresInputDocSourceAggStageAstNode>();
+    }
+};
+
+class NotRequiresInputDocSourceAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    NotRequiresInputDocSourceAggStageAstNode()
+        : sdk::AggStageAstNode(kNotRequiresInputDocSourceName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiresInputDocSource" << false);
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<NotRequiresInputDocSourceAggStageAstNode>();
+    }
+};
+
+class BadRequiresInputDocSourceTypeAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    BadRequiresInputDocSourceTypeAggStageAstNode()
+        : sdk::AggStageAstNode(kBadRequiresInputDocSourceTypeName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiresInputDocSource" << BSONArray(BSON_ARRAY(1)));
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<BadRequiresInputDocSourceTypeAggStageAstNode>();
     }
 };
 

@@ -90,8 +90,13 @@ structs:
             position:
                 description: What position the stage must occupy in the pipeline.
                 type: MongoExtensionPositionRequirement
-                optional: true
                 default: kNone
+            requiresInputDocSource:
+                description: >-
+                    Whether this stage requires an input document source (i.e., it does not generate
+                    results itself, and must imstead pull inputs from an input DocumentSource).
+                type: bool
+                default: true
             requiredPrivileges:
                 type: array<MongoExtensionRequiredPrivilege>
                 optional: true

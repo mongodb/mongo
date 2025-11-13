@@ -204,7 +204,7 @@ public:
         }
 
         bool isInitialSource() const override {
-            return _properties.getPosition() == MongoExtensionPositionRequirementEnum::kFirst;
+            return !_properties.getRequiresInputDocSource();
         }
 
         bool requiresAuthzChecks() const override {

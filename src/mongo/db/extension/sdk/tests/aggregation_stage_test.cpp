@@ -268,6 +268,7 @@ TEST_F(AggStageTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds) {
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle.getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+    ASSERT_EQ(props.getRequiresInputDocSource(), true);
 }
 
 TEST_F(AggStageTest, NonePosAstNodeSucceeds) {
@@ -314,6 +315,29 @@ TEST_F(AggStageTest, UnknownPropertyAstNodeIsIgnored) {
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle.getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+}
+
+TEST_F(AggStageTest, RequiresInputDocSourceAggStageAstNodeSucceeds) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle.getProperties();
+    ASSERT_EQ(props.getRequiresInputDocSource(), true);
+}
+
+TEST_F(AggStageTest, NotRequiresInputDocSourceAggStageAstNodeSucceeds) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle.getProperties();
+    ASSERT_EQ(props.getRequiresInputDocSource(), false);
+}
+
+TEST_F(AggStageTest, BadRequiresInputDocSourceTypeAggStageAstNodeFails) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::BadRequiresInputDocSourceTypeAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
 class InvalidResourcePatternRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
