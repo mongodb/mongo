@@ -823,6 +823,34 @@ BSONObj getObjWithSanitizedStorageEngineOptions(OperationContext* opCtx, const B
     return cmd;
 }
 
+/**
+ * Returns whether to timestamp the write with the 'ts' field found in the operation. In general, we
+ * do this for secondary oplog application, but there are some exceptions.
+ */
+bool shouldAssignTimestampForOplogApplication(OperationContext& opCtx,
+                                              bool haveWrappingWriteUnitOfWork,
+                                              OplogApplication::Mode mode) {
+    if (opCtx.writesAreReplicated()) {
+        // We do not assign timestamps on replicated writes since they will get their oplog
+        // timestamp once they are logged. The operation may contain a timestamp if it is part
+        // of a applyOps command, but we ignore it so that we don't violate oplog ordering.
+        return false;
+    } else if (haveWrappingWriteUnitOfWork) {
+        // We do not assign timestamps to non-replicated writes that have a wrapping
+        // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include:
+        // Secondary oplog application of prepared transactions.
+        return false;
+    } else if (ReplicationCoordinator::get(&opCtx)->getSettings().isReplSet()) {
+        // Secondary oplog application not in a WUOW uses the timestamp in the operation
+        // document.
+        return true;
+    } else {
+        // Only assign timestamps on standalones during replication recovery when
+        // started with the 'recoverFromOplogAsStandalone' flag.
+        return OplogApplication::inRecovering(mode);
+    }
+}
+
 using OpApplyFn = std::function<Status(
     OperationContext* opCtx, const ApplierOperation& entry, OplogApplication::Mode mode)>;
 
@@ -1505,30 +1533,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
             str::stream() << "applyOps not supported on view: " << requestNss.toStringForErrorMsg(),
             collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, requestNss));
 
-    // Decide whether to timestamp the write with the 'ts' field found in the operation. In general,
-    // we do this for secondary oplog application, but there are some exceptions.
-    const bool assignOperationTimestamp = [opCtx, haveWrappingWriteUnitOfWork, mode] {
-        if (opCtx->writesAreReplicated()) {
-            // We do not assign timestamps on replicated writes since they will get their oplog
-            // timestamp once they are logged. The operation may contain a timestamp if it is part
-            // of a applyOps command, but we ignore it so that we don't violate oplog ordering.
-            return false;
-        } else if (haveWrappingWriteUnitOfWork) {
-            // We do not assign timestamps to non-replicated writes that have a wrapping
-            // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include:
-            // Secondary oplog application of prepared transactions.
-            return false;
-        } else if (ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
-            // Secondary oplog application not in a WUOW uses the timestamp in the operation
-            // document.
-            return true;
-        } else {
-            // Only assign timestamps on standalones during replication recovery when
-            // started with the 'recoverFromOplogAsStandalone' flag.
-            return OplogApplication::inRecovering(mode);
-        }
-        MONGO_UNREACHABLE;
-    }();
+    const bool assignOperationTimestamp =
+        shouldAssignTimestampForOplogApplication(*opCtx, haveWrappingWriteUnitOfWork, mode);
     invariant(!assignOperationTimestamp || !op.getTimestamp().isNull(),
               str::stream() << "Oplog entry did not have 'ts' field when expected: "
                             << redact(opOrGroupedInserts.toBSON()));
@@ -2190,10 +2196,34 @@ Status applyContainerOperation_inlock(OperationContext* opCtx,
     auto ident = op->getContainer();
     auto* engine = opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(opCtx);
+
+    const bool assignOperationTimestamp = shouldAssignTimestampForOplogApplication(
+        *opCtx, shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork(), mode);
+    const auto timestamp = op->getApplyOpsTimestamp().value_or(op->getTimestamp());
+    // If it is determined we need to set a timestamp for this operation, there should be one. It's
+    // possible for 'assignOperationTimestamp' to be false while a timestamp is supplied, we will
+    // ignore it below.
+    uassert(11348300,
+            str::stream() << "Oplog entry did not have 'ts' field when expected: "
+                          << redact(op->toBSONForLogging()),
+            !assignOperationTimestamp || !timestamp.isNull());
     const BSONObj o = op->getObject();
     const BSONElement k = o["k"];
 
     WriteUnitOfWork wuow{opCtx};
+    if (assignOperationTimestamp && !timestamp.isNull()) {
+        const auto existingTimestamp = ru->getCommitTimestamp();
+        // If there is an existing timestamp, it must match the timestamp we are trying to set.
+        uassert(11348301,
+                str::stream() << "Existing commit timestamp " << existingTimestamp.toString()
+                              << " does not match container operation timestamp "
+                              << timestamp.toString(),
+                existingTimestamp.isNull() || existingTimestamp == timestamp);
+
+        if (existingTimestamp.isNull()) {
+            uassertStatusOK(ru->setTimestamp(timestamp));
+        }
+    }
     Status s = Status::OK();
 
     switch (op->getOpType()) {

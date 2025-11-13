@@ -27,10 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/unittest/death_test.h"
@@ -92,7 +97,13 @@ protected:
         ServiceContextMongoDTest::setUp();
 
         _opCtx = cc().makeOperationContext();
-        auto* se = getServiceContext()->getStorageEngine();
+        auto* service = getServiceContext();
+        ReplicationCoordinator::set(service, std::make_unique<ReplicationCoordinatorMock>(service));
+
+        auto replCoord = ReplicationCoordinator::get(_opCtx.get());
+        ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+        auto* se = service->getStorageEngine();
         _bytesIdent = se->generateNewInternalIdent();
         _intIdent = se->generateNewInternalIdent();
         auto ru = se->newRecoveryUnit();
@@ -215,6 +226,75 @@ TEST_F(ApplyContainerOpsTest, ContainerOpApplyIntKey) {
     ASSERT_EQ(0, std::memcmp(g3.getValue().get(), v3.data, v3.length));
 }
 
+TEST_F(ApplyContainerOpsTest, ContainerOpsApplyOpsTimestampVisibility) {
+    const auto commitTs = Timestamp(20, 1);
+    const auto earlierTs = Timestamp(10, 1);
+
+    const int64_t k = 1;
+    const auto v = BSONBinData("A", 1, BinDataGeneral);
+    auto entry = makeContainerInsertOplogEntry(OpTime(), _nss, _intIdent, k, v);
+
+    // Having an applyOps timestamp and non-replicated writes matches the conditions of secondary
+    // application of container ops in a wrapping apply ops
+    entry.setApplyOpsTimestamp(commitTs);
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+    }
+
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());
+
+    // A read prior to the apply ops' timestamp should not see the write.
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, earlierTs);
+    auto missing = _get(_opCtx.get(), _intIdent, k);
+    ASSERT_EQ(missing.getStatus(), ErrorCodes::NoSuchKey);
+
+    // A read at or after the apply ops' timestamp should see the write.
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, commitTs);
+    auto visible = _get(_opCtx.get(), _intIdent, k);
+    ASSERT_OK(visible.getStatus());
+    ASSERT_EQ(0, std::memcmp(visible.getValue().get(), v.data, v.length));
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpsSingleOpTimestampVisibility) {
+    const auto commitTs = Timestamp(20, 1);
+    const auto earlierTs = Timestamp(10, 1);
+
+    const int64_t k = 1;
+    const auto v = BSONBinData("A", 1, BinDataGeneral);
+    auto entry = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _nss, _intIdent, k, v);
+
+    // Non-replicated writes with a timestamp on the oplog entry matches the conditions of
+    // secondary application of a single container op.
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+    }
+
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());
+
+    // A read prior to the oplog entry's timestamp should not see the write.
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, earlierTs);
+    auto missing = _get(_opCtx.get(), _intIdent, k);
+    ASSERT_EQ(missing.getStatus(), ErrorCodes::NoSuchKey);
+
+    // A read at or after the oplog entry's timestamp should see the write.
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, commitTs);
+    auto visible = _get(_opCtx.get(), _intIdent, k);
+    ASSERT_OK(visible.getStatus());
+    ASSERT_EQ(0, std::memcmp(visible.getValue().get(), v.data, v.length));
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
+}
+
 
 TEST_F(ApplyContainerOpsTest, ApplyContainerOpInvalidOpType) {
     auto k = 1;
@@ -234,6 +314,38 @@ DEATH_TEST_F(ApplyContainerOpsTest, ApplyContainerOpRequiresIXLock, "invariant")
         makeBaseParams(_nss, _intIdent, OpTypeEnum::kContainerInsert, BSON("k" << k << "v" << v))}};
 
     auto status = applyContainerOpHelper(_opCtx.get(), op, MODE_NONE);
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpsRequiresTimestamp) {
+    int64_t k = 1;
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+    auto nullOpTime = OpTime();
+
+    auto insertEntry = makeContainerInsertOplogEntry(nullOpTime, _nss, _bytesIdent, k, v);
+    auto deleteEntry = makeContainerDeleteOplogEntry(nullOpTime, _nss, _bytesIdent, k);
+
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+
+    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), insertEntry), DBException, 11348300);
+    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), deleteEntry), DBException, 11348300);
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpsRejectMismatchedExistingCommitTimestamp) {
+    const Timestamp commitTs(20, 1);
+    const Timestamp existingTs(10, 1);
+    int64_t k = 1;
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+    auto insertEntry = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _nss, _bytesIdent, k, v);
+    auto deleteEntry = makeContainerDeleteOplogEntry(OpTime(commitTs, 0), _nss, _bytesIdent, k);
+
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());
+    ru->setCommitTimestamp(existingTs);
+
+    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), insertEntry), DBException, 11348301);
+    ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), deleteEntry), DBException, 11348301);
+
+    ru->clearCommitTimestamp();
 }
 
 TEST_F(ApplyContainerOpsTest, ParseContainerOpFormatFailures) {
