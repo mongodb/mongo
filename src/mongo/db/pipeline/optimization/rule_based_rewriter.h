@@ -63,8 +63,14 @@ namespace mongo::rule_based_rewrites::pipeline {
 /**
  * Helper for defining a rule that calls optimizeAt() for a given document source.
  */
-#define OPTIMIZE_AT_RULE(DS) \
-    {"OPTIMIZE_AT_" #DS, alwaysTrue, Transforms::optimizeAtWrapper<DS>, kDefaultOptimizeAtPriority}
+#define OPTIMIZE_AT_RULE(DS)                              \
+    {                                                     \
+        .name = "OPTIMIZE_AT_" #DS,                       \
+        .precondition = alwaysTrue,                       \
+        .transform = Transforms::optimizeAtWrapper<DS>,   \
+        .priority = kDefaultOptimizeAtPriority,           \
+        .tags = PipelineRewriteContext::Tags::Reordering, \
+    }
 
 // For high priority rules that e.g. attempt to push a $match as early as possible.
 constexpr double kDefaultPushdownPriority = 100.0;
@@ -79,6 +85,14 @@ constexpr double kDefaultOptimizeInPlacePriority = 1.0;
  */
 class PipelineRewriteContext : public RewriteContext<PipelineRewriteContext, DocumentSource> {
 public:
+    enum Tags : TagSet {
+        None = 0,
+        // Rules that optimize the internals of a stage in place but never touch adjacent stages.
+        InPlace = 1 << 0,
+        // Rules that may e.g. reorder, combine or remove stages.
+        Reordering = 1 << 1,
+    };
+
     PipelineRewriteContext(Pipeline& pipeline)
         : PipelineRewriteContext(*pipeline.getContext(), pipeline.getSources()) {}
 

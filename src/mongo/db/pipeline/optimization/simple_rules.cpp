@@ -57,20 +57,29 @@ bool canSwapWithSingleDocTransformOrRedact(const PipelineRewriteContext& ctx) {
 }  // namespace
 
 REGISTER_RULES(DocumentSourceSample,
-               {"PUSHDOWN_SAMPLE",
-                canSwapWithSkippingOrLimitingStage,
-                Transforms::swapStageWithPrev,
-                kDefaultPushdownPriority});
+               {
+                   .name = "PUSHDOWN_SAMPLE",
+                   .precondition = canSwapWithSkippingOrLimitingStage,
+                   .transform = Transforms::swapStageWithPrev,
+                   .priority = kDefaultPushdownPriority,
+                   .tags = PipelineRewriteContext::Tags::Reordering,
+               });
 REGISTER_RULES(DocumentSourceSingleDocumentTransformation,
-               {"PUSHDOWN_SINGLE_DOC_TRANSFORMATION",
-                canSwapWithSingleDocTransformOrRedact,
-                Transforms::swapStageWithPrev,
-                kDefaultPushdownPriority},
+               {
+                   .name = "PUSHDOWN_SINGLE_DOC_TRANSFORMATION",
+                   .precondition = canSwapWithSingleDocTransformOrRedact,
+                   .transform = Transforms::swapStageWithPrev,
+                   .priority = kDefaultPushdownPriority,
+                   .tags = PipelineRewriteContext::Tags::Reordering,
+               },
                OPTIMIZE_AT_RULE(DocumentSourceSingleDocumentTransformation));
 REGISTER_RULES(DocumentSourceRedact,
-               {"PUSHDOWN_REDACT",
-                canSwapWithSingleDocTransformOrRedact,
-                Transforms::swapStageWithPrev,
-                kDefaultPushdownPriority},
+               {
+                   .name = "PUSHDOWN_REDACT",
+                   .precondition = canSwapWithSingleDocTransformOrRedact,
+                   .transform = Transforms::swapStageWithPrev,
+                   .priority = kDefaultPushdownPriority,
+                   .tags = PipelineRewriteContext::Tags::Reordering,
+               },
                OPTIMIZE_AT_RULE(DocumentSourceRedact));
 }  // namespace mongo::rule_based_rewrites::pipeline

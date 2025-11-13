@@ -248,6 +248,35 @@ TEST(RuleBasedRewriterTest, EnqueueHighestPriorityRule) {
     ASSERT_EQ(strings[1], "world");
 }
 
+TEST(RuleBasedRewriterTest, RunRulesThatHaveSpecificTags) {
+    enum TestRuleTags : TagSet {
+        Foo = 1 << 0,
+        Bar = 1 << 1,
+        Baz = 1 << 2,
+    };
+
+    auto makeRule = [](std::string name, TagSet tags) {
+        return Rule<TestRewriteContext>{
+            std::move(name), alwaysTrue, appendExclamationTransform, 1, tags};
+    };
+
+    std::vector<std::string> strings = {{"hello"}};
+    RewriteEngine<TestRewriteContext> engine{
+        {strings,
+         {
+             makeRule("SHOULD_APPLY_1", TestRuleTags::Foo),
+             makeRule("SHOULD_APPLY_2", TestRuleTags::Bar),
+             makeRule("SHOULD_APPLY_3", TestRuleTags::Bar | TestRuleTags::Baz),
+             {"SHOULD_NOT_APPLY", alwaysTrue, shouldNeverRun, 1, TestRuleTags::Baz},
+         }}};
+
+    auto tagsToRun = TestRuleTags::Foo | TestRuleTags::Bar;
+    engine.applyRules(tagsToRun);
+
+    ASSERT_EQ(strings.size(), 1U);
+    ASSERT_EQ(strings[0], "hello!!!");
+}
+
 DEATH_TEST(RuleBasedRewriterTest, EnqueueRuleFromRuleThenRequeue, "11010015") {
     std::vector<std::string> strings = {{"1", "2", "3"}};
 

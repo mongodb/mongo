@@ -41,6 +41,10 @@
 
 namespace mongo::rule_based_rewrites {
 
+// Represents a set of tags that can be assigned to a rule. It is up to implementations of `Context`
+// to define the meaning of each bit/tag.
+using TagSet = uint32_t;
+
 /**
  * Represents a rewrite rule, defined by a precondition, transformation and a priority.
  */
@@ -69,6 +73,11 @@ struct Rule {
      * Priority of the rule. Higher value means higher priority.
      */
     double priority = 0;
+
+    /**
+     * The engine can be made to only apply rules that have been assigned a certain tag.
+     */
+    TagSet tags = 0;
 };
 
 template <typename Context>
@@ -139,6 +148,18 @@ private:
     RewriteEngine<SubClass>* _engine;
 };
 
+namespace rule_detail {
+// Whether this rule has been assigned least one of the given tags.
+template <typename Context>
+constexpr bool hasTag(Rule<Context> rule, TagSet tags) {
+    if (tags == 0) {
+        // Empty tag set denotes that we want to run all rules.
+        return true;
+    }
+    return tags & rule.tags;
+}
+}  // namespace rule_detail
+
 /**
  * Concrete class responsible for driving the rewrite process. Provides an entry point for
  * optimization and manages a queue of rules to be applied. Owns the Context, which is used
@@ -153,7 +174,9 @@ public:
     }
 
     void addRule(Rule<Context> rule) {
-        _rules.emplace(std::move(rule));
+        if (rule_detail::hasTag(rule, _tagsToRun)) {
+            _rules.emplace(std::move(rule));
+        }
     }
 
     void addRules(std::vector<Rule<Context>> rules) {
@@ -165,7 +188,9 @@ public:
     /**
      * Entry point to optimization.
      */
-    void applyRules() {
+    void applyRules(TagSet tagsToRun = 0) {
+        _tagsToRun = tagsToRun;
+
         while (_context.hasMore()) {
             // Enqueue rules for the current position. Note that transforms can queue additional
             // rules.
@@ -246,6 +271,8 @@ private:
 
     Context _context;
     std::priority_queue<Rule<Context>> _rules;
+    // Only rules with at least one of these tags will be applied.
+    TagSet _tagsToRun{0};
 
     const size_t _maxRewrites;
     size_t _rewritesApplied{0};
