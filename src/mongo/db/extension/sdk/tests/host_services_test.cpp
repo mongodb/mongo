@@ -56,7 +56,7 @@ TEST_F(HostServicesTest, CreateLogMessageStructEmptyAttrs) {
     ::MongoExtensionLogSeverity logSeverity = ::MongoExtensionLogSeverity::kInfo;
 
     auto structuredLogGuard =
-        sdk::HostServicesHandle::createLogMessageStruct(logMessage, logCode, logSeverity, {});
+        sdk::LoggerHandle::createLogMessageStruct(logMessage, logCode, logSeverity, {});
     auto structuredLog = *structuredLogGuard.get();
     ASSERT_EQUALS(structuredLog.code, static_cast<uint32_t>(logCode));
     ASSERT_EQUALS(structuredLog.type, ::MongoExtensionLogType::kLog);
@@ -76,7 +76,7 @@ TEST_F(HostServicesTest, CreateLogMessageStructWithAttrs) {
     std::vector<sdk::ExtensionLogAttribute> attrs = {{"hi", "finley"}};
 
     auto structuredLogGuard =
-        sdk::HostServicesHandle::createLogMessageStruct(logMessage, logCode, logSeverity, attrs);
+        sdk::LoggerHandle::createLogMessageStruct(logMessage, logCode, logSeverity, attrs);
     auto structuredLog = *structuredLogGuard.get();
     ASSERT_EQUALS(structuredLog.code, static_cast<uint32_t>(logCode));
     ASSERT_EQUALS(structuredLog.type, ::MongoExtensionLogType::kLog);
@@ -103,7 +103,7 @@ TEST_F(HostServicesTest, CreateDebugLogMessageStructWithAttrs) {
     std::vector<sdk::ExtensionLogAttribute> attrs = {{"hi", "mongodb"}};
 
     auto structuredDebugLogGuard =
-        sdk::HostServicesHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel, attrs);
+        sdk::LoggerHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel, attrs);
     auto structuredDebugLog = *structuredDebugLogGuard.get();
 
     ASSERT_EQUALS(structuredDebugLog.code, static_cast<uint32_t>(logCode));
@@ -126,7 +126,7 @@ TEST_F(HostServicesTest, CreateDebugLogMessageStructEmptyAttrs) {
     std::int32_t logLevel = 1;
 
     auto structuredDebugLogGuard =
-        sdk::HostServicesHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel, {});
+        sdk::LoggerHandle::createDebugLogMessageStruct(logMessage, logCode, logLevel, {});
     auto structuredDebugLog = *structuredDebugLogGuard.get();
 
     ASSERT_EQUALS(structuredDebugLog.code, static_cast<uint32_t>(logCode));

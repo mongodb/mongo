@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/log_util.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
 
@@ -67,12 +68,11 @@ public:
         int level = bsonSpec.getIntField(kDebugLogLevelField);
 
         // This tests the functionality of the shouldLog host service.
-        if (sdk::HostServicesHandle::getHostServices()->shouldLog(
+        if (sdk::HostServicesHandle::getHostServices()->getLogger().shouldLog(
                 ::MongoExtensionLogSeverity(level), ::MongoExtensionLogType::kDebug)) {
-            sdk::HostServicesHandle::getHostServices()->log(
-                "Log level is enough", 11134101, ::MongoExtensionLogSeverity::kWarning);
+            sdk::sdk_log("Log level is enough", 11134101, ::MongoExtensionLogSeverity::kWarning);
         } else {
-            sdk::HostServicesHandle::getHostServices()->log(
+            sdk::sdk_log(
                 "Log level is not enough", 11134102, ::MongoExtensionLogSeverity::kWarning);
         }
 
@@ -85,8 +85,7 @@ public:
             }
         }
 
-        sdk::HostServicesHandle::getHostServices()->logDebug(
-            "Test log message", 11134100, level, attrs);
+        sdk::sdk_logDebug("Test log message", 11134100, level, attrs);
 
         return std::make_unique<DebugLogParseNode>(stageBson);
     }

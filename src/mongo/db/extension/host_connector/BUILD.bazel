@@ -43,10 +43,12 @@ mongo_cc_library(
     srcs = [
         "executable_agg_stage_adapter.cpp",
         "host_services_adapter.cpp",
+        "logger_adapter.cpp",
     ],
     hdrs = [
         "executable_agg_stage_adapter.h",
         "host_services_adapter.h",
+        "logger_adapter.h",
     ],
     deps = [
         "//src/mongo:base",

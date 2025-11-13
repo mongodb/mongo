@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/log_util.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
@@ -55,10 +56,9 @@ public:
         // Log an error log and short-circuit if the spec is empty or not an object.
         if (!stageBson.hasField(kStageName) || !stageBson.getField(kStageName).isABSONObj() ||
             stageBson.getField(kStageName).Obj().isEmpty()) {
-            sdk::HostServicesHandle::getHostServices()->log(
-                kStageName + " stage spec is empty or not an object.",
-                11134000,
-                ::MongoExtensionLogSeverity::kError);
+            sdk::sdk_log(kStageName + " stage spec is empty or not an object.",
+                         11134000,
+                         ::MongoExtensionLogSeverity::kError);
             return std::make_unique<LogParseNode>(stageBson);
         }
 
@@ -78,28 +78,26 @@ public:
         int numInfoLogLines = 0;
         if (!bsonSpec.hasElement(kNumInfoLogLinesField) ||
             !bsonSpec.getField(kNumInfoLogLinesField).isNumber()) {
-            sdk::HostServicesHandle::getHostServices()->log(
-                kStageName + " stage missing or invalid " + kNumInfoLogLinesField + " field.",
-                11134001,
-                ::MongoExtensionLogSeverity::kWarning,
-                attrs);
+            sdk::sdk_log(kStageName + " stage missing or invalid " + kNumInfoLogLinesField +
+                             " field.",
+                         11134001,
+                         ::MongoExtensionLogSeverity::kWarning,
+                         attrs);
         } else {
             numInfoLogLines = bsonSpec.getIntField(kNumInfoLogLinesField);
 
             if (numInfoLogLines < 0) {
-                sdk::HostServicesHandle::getHostServices()->log(
-                    kStageName + " stage must have non-negative value for " +
-                        kNumInfoLogLinesField + ".",
-                    11134002,
-                    ::MongoExtensionLogSeverity::kWarning,
-                    attrs);
+                sdk::sdk_log(kStageName + " stage must have non-negative value for " +
+                                 kNumInfoLogLinesField + ".",
+                             11134002,
+                             ::MongoExtensionLogSeverity::kWarning,
+                             attrs);
                 numInfoLogLines = 0;
             } else if (numInfoLogLines > 5) {
-                sdk::HostServicesHandle::getHostServices()->log(
-                    kStageName + " stage will not print more than 5 log lines.",
-                    11134003,
-                    ::MongoExtensionLogSeverity::kWarning,
-                    attrs);
+                sdk::sdk_log(kStageName + " stage will not print more than 5 log lines.",
+                             11134003,
+                             ::MongoExtensionLogSeverity::kWarning,
+                             attrs);
                 numInfoLogLines = 5;
             }
         }
@@ -107,8 +105,7 @@ public:
         // Log the requested number of info log lines.
         for (int i = 0; i < numInfoLogLines; i++) {
             // Uses the default severity of Info.
-            sdk::HostServicesHandle::getHostServices()->log(
-                "Logging info line for " + kStageName, 11134004, attrs);
+            sdk::sdk_log("Logging info line for " + kStageName, 11134004, attrs);
         }
 
         return std::make_unique<LogParseNode>(stageBson);

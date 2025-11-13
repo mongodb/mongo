@@ -723,6 +723,41 @@ typedef struct MongoExtensionLogMessage {
 } MongoExtensionLogMessage;
 
 /**
+ * MongoExtensionLogger enables extensions to send structured log messages to MongoDB's logging
+ * system.
+ *
+ * The logger is implemented by the host and provided to extensions through `HostServices`.
+ *
+ * The logger supports multiple severity levels (Info, Warning, Error) for standard logs and
+ * debug levels (1-5) for debug logs, allowing extensions to categorize messages by importance
+ * and emit debug traces conditionally based on server log level configuration.
+ */
+typedef struct MongoExtensionLogger {
+    const struct MongoExtensionLoggerVTable* vtable;
+} MongoExtensionLogger;
+
+/**
+ * Virtual function table for MongoExtensionLogger.
+ */
+typedef struct MongoExtensionLoggerVTable {
+    /**
+     * Logs a message from the extension. The log may be a severity log with severity INFO, WARNING,
+     * or ERROR. It may also be a debug log w/ a numeric debug log level.
+     */
+    MongoExtensionStatus* (*log)(const MongoExtensionLogMessage* rawLog);
+
+    /**
+     * This provides an optimization to the logging service, as it compares the provided log
+     * level/severity against the server's current log level before materializing and sending a log
+     * over the wire. 'logType' indicates whether levelOrSeverity is a level (kDebug) or a severity
+     * (kLog), as in the latter case in case we need to transform the value to a logv2::LogSeverity.
+     */
+    MongoExtensionStatus* (*should_log)(MongoExtensionLogSeverity levelOrSeverity,
+                                        ::MongoExtensionLogType logType,
+                                        bool* out);
+} MongoExtensionLoggerVTable;
+
+/**
  * MongoExtensionHostServices exposes services provided by the host to the extension.
  *
  * Currently, the VTable struct is a placeholder for future services.
@@ -736,10 +771,9 @@ typedef struct MongoExtensionHostServices {
  */
 typedef struct MongoExtensionHostServicesVTable {
     /**
-     * Logs a message from the extension. The log may be a severity log with severity INFO, WARNING,
-     * or ERROR. It may also be a debug log w/ a numeric debug log level.
+     * Retrieve the static logging instance on the host.
      */
-    MongoExtensionStatus* (*log)(const MongoExtensionLogMessage* rawLog);
+    MongoExtensionLogger* (*get_logger)();
 
     /**
      * Throws a non-fatal exception to end the current operation with an error. This should be
@@ -771,16 +805,6 @@ typedef struct MongoExtensionHostServicesVTable {
      */
     MongoExtensionStatus* (*create_id_lookup)(MongoExtensionByteView bsonSpec,
                                               MongoExtensionAggStageAstNode** node);
-
-    /**
-     * This provides an optimization to the logging service, as it compares the provided log
-     * level/severity against the server's current log level before materializing and sending a log
-     * over the wire. 'logType' indicates whether levelOrSeverity is a level (kDebug) or a severity
-     * (kLog), as in the latter case in case we need to transform the value to a logv2::LogSeverity.
-     */
-    MongoExtensionStatus* (*should_log)(MongoExtensionLogSeverity levelOrSeverity,
-                                        ::MongoExtensionLogType logType,
-                                        bool* out);
 } MongoExtensionHostServicesVTable;
 
 /**
