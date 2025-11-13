@@ -1370,11 +1370,11 @@ export class ShardingTest {
                 delete rsDefaults.settings;
 
                 // The number of nodes in the rs field will take priority.
-                let numReplicas;
-                if (otherParams.rs || otherParams["rs" + i]) {
-                    numReplicas = rsDefaults.nodes || 3;
-                } else {
-                    numReplicas = 1;
+                let numReplicas = 1; /* default */
+                if (rsDefaults.nodes) {
+                    numReplicas = rsDefaults.nodes;
+                } else if (otherParams.rs || otherParams["rs" + i]) {
+                    numReplicas = 3;
                 }
 
                 // Unless explicitly given a number of config servers, a config shard uses the
