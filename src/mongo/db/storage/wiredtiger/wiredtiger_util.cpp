@@ -634,16 +634,25 @@ int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WT_SESSION* s,
     return result.getValue();
 }
 
-size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
+size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB, double requestedCacheSizePct) {
+    invariant(!(requestedCacheSizeGB && requestedCacheSizePct));
     double cacheSizeMB;
     const double kMaxSizeCacheMB = 10 * 1000 * 1000;
-    if (requestedCacheSizeGB == 0) {
-        // Choose a reasonable amount of cache when not explicitly specified by user.
-        // Set a minimum of 256MB, otherwise use 50% of available memory over 1GB.
+    if (requestedCacheSizeGB <= 0) {
         ProcessInfo pi;
         double memSizeMB = pi.getMemSizeMB();
-        cacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
+        double userMemSizeMB =
+            std::min(WiredTigerUtil::memoryThresholdPercentage, requestedCacheSizePct) * memSizeMB;
+        if (requestedCacheSizePct <= 0) {
+            // Default (no size set by user).
+            // Set a minimum of 256MB, otherwise use 50% of available memory over 1GB.
+            cacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
+        } else {
+            // Percentage-based cache (cacheSizePct).
+            cacheSizeMB = std::max(256.0, userMemSizeMB);
+        }
     } else {
+        // Size-based cache (cacheSizeGB).
         cacheSizeMB = 1024 * requestedCacheSizeGB;
     }
     if (cacheSizeMB > kMaxSizeCacheMB) {
@@ -653,7 +662,7 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
               "maximumMB"_attr = kMaxSizeCacheMB);
         cacheSizeMB = kMaxSizeCacheMB;
     }
-    return static_cast<size_t>(cacheSizeMB);
+    return static_cast<size_t>(std::floor(cacheSizeMB));
 }
 
 logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {

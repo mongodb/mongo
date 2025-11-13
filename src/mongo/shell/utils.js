@@ -434,6 +434,7 @@ jsTestOptions = function() {
             setParametersMongocryptd: TestData.setParametersMongocryptd,
             storageEngine: TestData.storageEngine,
             storageEngineCacheSizeGB: TestData.storageEngineCacheSizeGB,
+            storageEngineCacheSizePct: TestData.storageEngineCacheSizePct,
             shellTlsEnabled: TestData.shellTlsEnabled || false,
             shellTlsCertificateKeyFile: TestData.shellTlsCertificateKeyFile,
             tlsCAFile: TestData.tlsCAFile,

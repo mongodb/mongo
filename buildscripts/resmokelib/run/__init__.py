@@ -1173,6 +1173,14 @@ class RunPlugin(PluginInterface):
             " setting for all mongod's.")
 
         mongodb_server_options.add_argument(
+            "--storageEngineCacheSizePct",
+            dest="storage_engine_cache_size_pct",
+            metavar="CONFIG",
+            help="Sets the storage engine cache size configuration as a percentage"
+            " setting for all mongod's.",
+        )
+
+        mongodb_server_options.add_argument(
             "--tlsMode", dest="tls_mode", metavar="TLS_MODE", help="Indicates what TLS mode mongod "
             "and mongos servers should be started with. See also: https://www.mongodb.com"
             "/docs/manual/reference/configuration-options/#mongodb-setting-net.tls.mode")

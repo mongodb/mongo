@@ -405,6 +405,7 @@ class MongodLauncher(object):
             shortcut_opts["inMemorySizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
         elif self.config.STORAGE_ENGINE == "wiredTiger" or self.config.STORAGE_ENGINE is None:
             shortcut_opts["wiredTigerCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
+            shortcut_opts["wiredTigerCacheSizePct"] = self.config.STORAGE_ENGINE_CACHE_SIZE_PCT
 
         # These options are just flags, so they should not take a value.
         opts_without_vals = ("logappend")

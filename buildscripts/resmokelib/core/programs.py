@@ -259,6 +259,7 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         "multiversionBinVersion": (shell_mixed_version, ""),
         "storageEngine": (config.STORAGE_ENGINE, ""),
         "storageEngineCacheSizeGB": (config.STORAGE_ENGINE_CACHE_SIZE, ""),
+        "storageEngineCacheSizePct": (config.STORAGE_ENGINE_CACHE_SIZE_PCT, ""),
         "testName": (test_name, ""),
         "wiredTigerCollectionConfigString": (config.WT_COLL_CONFIG, ""),
         "wiredTigerEngineConfigString": (config.WT_ENGINE_CONFIG, ""),

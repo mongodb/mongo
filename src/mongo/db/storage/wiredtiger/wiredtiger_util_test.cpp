@@ -51,10 +51,12 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -688,6 +690,31 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateNoBound) {
 
     session1->commit_transaction(session1, "durable_timestamp=1,commit_timestamp=1");
     ASSERT_EQ(0, cursor2->next(cursor2));
+}
+
+TEST(WiredTigerUtilTest, WTCacheSizeCalculation) {
+    ProcessInfo pi;
+    const double memSizeMB = pi.getMemSizeMB();
+    const auto tooLargeCacheMB = 100 * 1000 * 1000;
+    const auto tooLargeCachePct = 1;
+    const size_t defaultCacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
+    const auto maxCacheSizeMB = 10 * 1000 * 1000;
+
+    // Testing cacheSizeGB
+    ASSERT_EQUALS(WiredTigerUtil::getCacheSizeMB(-10, 0), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getCacheSizeMB(0),
+                  defaultCacheSizeMB); /* requestedCachePct = 0 */
+    ASSERT_EQUALS(WiredTigerUtil::getCacheSizeMB(10, 0), 10 * 1024);
+    ASSERT_EQUALS(WiredTigerUtil::getCacheSizeMB(tooLargeCacheMB, 0), maxCacheSizeMB);
+
+    // Testing cacheSizePct
+    ASSERT_EQUALS(WiredTigerUtil::getCacheSizeMB(0, -0.1), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getCacheSizeMB(0, 0.1), std::floor(0.1 * memSizeMB));
+    ASSERT_EQUALS(WiredTigerUtil::getCacheSizeMB(0, tooLargeCachePct), std::floor(0.8 * memSizeMB));
+}
+
+DEATH_TEST_F(WiredTigerUtilTest, WTCacheSizeInvalidValues, "invariant") {
+    WiredTigerUtil::getCacheSizeMB(10, 0.1);
 }
 
 }  // namespace

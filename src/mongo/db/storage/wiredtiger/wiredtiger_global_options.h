@@ -45,6 +45,7 @@ public:
 
     WiredTigerGlobalOptions()
         : cacheSizeGB(0),
+          cacheSizePct(0),
           statisticsLogDelaySecs(0),
           zstdCompressorLevel(0),
           directoryForIndexes(false),
@@ -55,6 +56,7 @@ public:
     Status store(const optionenvironment::Environment& params);
 
     double cacheSizeGB;
+    double cacheSizePct;
     size_t statisticsLogDelaySecs;
     std::string journalCompressor;
     int zstdCompressorLevel;
