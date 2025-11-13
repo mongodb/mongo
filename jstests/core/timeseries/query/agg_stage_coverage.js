@@ -288,6 +288,24 @@ const unpackTests = [
     }
 });
 
+// Skip all stages defined in the extensions module.
+const skippedExtensionsStages = [
+    "$assert",
+    "$checkNum",
+    "$debugLog",
+    "$explain",
+    "$log",
+    "$optionA",
+    "$shapify",
+    "$shapifyDesugar",
+    "$shardedExecutionSerialization",
+    "$stubStage",
+    "$testBar",
+    "$testFoo",
+    "$testFooSource",
+    "$toast",
+];
+
 // The following pipeline stages do not need to be tested for timeseries collections.
 // Stages that are skipped **must** be one of the following:
 // 1. Stages that only run on the admin database.
@@ -295,7 +313,9 @@ const unpackTests = [
 // 3. Stages that are tested elsewhere.
 // 4. Stages that can only run in stream processors.
 // 5. Stages that cannot be made by user requests and run on oplog data.
+// 6. Stages that are defined in the extensions module.
 const skippedStages = [
+    ...skippedExtensionsStages,
     // All change stream stages are temporarily here. TODO SERVER-113494 enable tests here.
     "$changeStream",
     "$changeStreamSplitLargeEvent",
