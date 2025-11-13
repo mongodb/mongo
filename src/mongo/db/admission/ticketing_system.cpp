@@ -392,12 +392,15 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
     int32_t writeOut = 0, writeAvailable = 0, writeTotalTickets = 0;
     _state.loadRelaxed().appendStats(b);
     b.append("totalDeprioritizations", _opsDeprioritized.loadRelaxed());
+    b.append("prioritizationEnabled", usesPrioritization());
 
     for (size_t i = 0; i < _holders.size(); ++i) {
         const auto priority = static_cast<AdmissionContext::Priority>(i);
 
         if (priority == AdmissionContext::Priority::kExempt) {
-            // Do not report statistics for kExempt as they are included in the normal priority pool
+            // Do not report statistics for kExempt as they are included in the normal priority
+            // pool. Also, low priority statistics should only be reported when prioritization is
+            // enabled.
             continue;
         }
 
@@ -407,37 +410,43 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
             ? kNormalPriorityName
             : kLowPriorityName;
         if (rw.read) {
-            readOut += rw.read->used();
-            readAvailable += rw.read->available();
-            readTotalTickets += rw.read->outof();
             if (!readStats.is_initialized()) {
                 readStats.emplace();
             }
             BSONObjBuilder bb(readStats->subobjStart(fieldName));
             rw.read->appendTicketStats(bb);
             rw.read->appendHolderStats(bb);
-            bb.done();
             if (priority == AdmissionContext::Priority::kNormal) {
-                BSONObjBuilder bb(readStats->subobjStart(kExemptPriorityName));
+                BSONObjBuilder exemptBuilder(readStats->subobjStart(kExemptPriorityName));
                 rw.read->appendExemptStats(readStats.value());
-                bb.done();
+                exemptBuilder.done();
+            }
+            auto obj = bb.done();
+            // Totalization of tickets for the aggregate only if prioritization is enabled.
+            if (priority == AdmissionContext::Priority::kNormal || usesPrioritization()) {
+                readOut += obj.getIntField("out");
+                readAvailable += obj.getIntField("available");
+                readTotalTickets += obj.getIntField("totalTickets");
             }
         }
         if (rw.write) {
-            writeOut += rw.write->used();
-            writeAvailable += rw.write->available();
-            writeTotalTickets += rw.write->outof();
             if (!writeStats.is_initialized()) {
                 writeStats.emplace();
             }
             BSONObjBuilder bb(writeStats->subobjStart(fieldName));
             rw.write->appendTicketStats(bb);
             rw.write->appendHolderStats(bb);
-            bb.done();
             if (priority == AdmissionContext::Priority::kNormal) {
-                BSONObjBuilder bb(writeStats->subobjStart(kExemptPriorityName));
+                BSONObjBuilder exemptBuilder(writeStats->subobjStart(kExemptPriorityName));
                 rw.write->appendExemptStats(writeStats.value());
-                bb.done();
+                exemptBuilder.done();
+            }
+            auto obj = bb.done();
+            // Totalization of tickets for the aggregate only if prioritization is enabled.
+            if (priority == AdmissionContext::Priority::kNormal || usesPrioritization()) {
+                writeOut += obj.getIntField("out");
+                writeAvailable += obj.getIntField("available");
+                writeTotalTickets += obj.getIntField("totalTickets");
             }
         }
     }

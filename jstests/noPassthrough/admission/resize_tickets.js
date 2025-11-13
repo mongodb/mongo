@@ -588,8 +588,8 @@ describe("Execution control concurrency adjustment algorithm", function () {
 
             const status = assert.commandWorked(mongod.adminCommand({serverStatus: 1}));
             const stats = status.queues.execution;
-            assert.eq(stats.read.normalPriority.totalTickets, customReadTickets);
-            assert.eq(stats.write.normalPriority.totalTickets, customWriteTickets);
+            assert.eq(stats.read.totalTickets, customReadTickets);
+            assert.eq(stats.write.totalTickets, customWriteTickets);
         });
 
         it(`should align tickets when transitioning from '${kThroughputProbing}' to '${kFixedWithPrio}'`, function () {

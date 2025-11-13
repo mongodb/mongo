@@ -19,13 +19,27 @@ const rst = new ReplSetTest({
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
             internalQueryExecYieldIterations: 1,
-            // Disable heuristic deprioritization to ensure readers are queued in the normal pool.
-            executionControlHeuristicDeprioritizationEnabled: false,
         },
     },
 });
 rst.startSet();
 rst.initiate();
+
+// Disable deprioritization to ensure readers are queued in the normal pool. Also, ensure the
+// algorithm is fixed concurrency to have a predictable number of tickets. They could be overriden
+// at startup by some variants, so, it is set here explicitly.
+assert.commandWorked(
+    rst.getPrimary().adminCommand({
+        setParameter: 1,
+        executionControlHeuristicDeprioritizationEnabled: false,
+    }),
+);
+assert.commandWorked(
+    rst.getPrimary().adminCommand({
+        setParameter: 1,
+        executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
+    }),
+);
 
 const dbName = jsTestName();
 const collName = "testcoll";
@@ -82,7 +96,7 @@ jsTestLog("Wait for no available read tickets");
 assert.soon(() => {
     let stats = db.runCommand({serverStatus: 1});
     jsTestLog(stats.queues.execution);
-    return stats.queues.execution.read.normalPriority.available == 0;
+    return stats.queues.execution.read.available == 0;
 }, "Expected to have no available read tickets.");
 
 // Force thread to sleep for 1ms to guarantee readers accrue wait time in queue.
