@@ -48,6 +48,9 @@ function runTest(startChangeStream) {
         assert.commandWorked(testDB.runCommand(command));
         assertNextChangeEvent(cursor, expectedOutput);
         assertDropCollection(testDB, collName);
+        // If this test is running with secondary read preference, it's necessary for the drop to
+        // propagate to all secondary nodes and be available for majority reads.
+        FixtureHelpers.awaitLastOpCommitted(testDB);
     }
 
     // Basic create collection command.
@@ -72,6 +75,9 @@ function runTest(startChangeStream) {
     });
     assertNextChangeEvent(cursor, {operationType: "insert", fullDocument: {_id: 0}, ns: ns, documentKey: {_id: 0}});
     assertDropCollection(testDB, collName);
+    // If this test is running with secondary read preference, it's necessary for the drop to
+    // propagate to all secondary nodes and be available for majority reads.
+    FixtureHelpers.awaitLastOpCommitted(testDB);
 
     // With capped collection parameters.
     let expectedSize = 1000;
@@ -190,6 +196,9 @@ function runTest(startChangeStream) {
     assert.commandWorked(testDB.runCommand({create: collName, timeseries: {timeField: "t"}}));
     test.assertNextChangesEqual({cursor: cursor, expectedChanges: []});
     assertDropCollection(testDB, collName);
+    // If this test is running with secondary read preference, it's necessary for the drop to
+    // propagate to all secondary nodes and be available for majority reads.
+    FixtureHelpers.awaitLastOpCommitted(testDB);
 
     if (FixtureHelpers.isMongos(db)) {
         cursor = startChangeStream();
@@ -204,6 +213,9 @@ function runTest(startChangeStream) {
             nsType: "collection",
         });
         assertDropCollection(testDB, collName);
+        // If this test is running with secondary read preference, it's necessary for the drop to
+        // propagate to all secondary nodes and be available for majority reads.
+        FixtureHelpers.awaitLastOpCommitted(testDB);
     }
 }
 
