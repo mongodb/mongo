@@ -312,6 +312,7 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     mongod_set_parameters = test_data.get("setParameters", {}).copy()
     mongos_set_parameters = test_data.get("setParametersMongos", {}).copy()
     mongocryptd_set_parameters = test_data.get("setParametersMongocryptd", {}).copy()
+    mongo_set_parameters = test_data.get("setParametersMongo", {}).copy()
 
     feature_flag_dict = {}
     if config.ENABLED_FEATURE_FLAGS is not None:
@@ -335,6 +336,9 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         mongocryptd_set_parameters.update(utils.load_yaml(config.MONGOCRYPTD_SET_PARAMETERS))
         mongocryptd_set_parameters.update(feature_flag_dict)
 
+    if config.MONGO_SET_PARAMETERS is not None:
+        mongo_set_parameters.update(utils.load_yaml(config.MONGO_SET_PARAMETERS))
+
     fixturelib = FixtureLib()
     mongod_launcher = standalone.MongodLauncher(fixturelib)
 
@@ -357,6 +361,7 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     test_data["setParameters"] = mongod_set_parameters
     test_data["setParametersMongos"] = mongos_set_parameters
     test_data["setParametersMongocryptd"] = mongocryptd_set_parameters
+    test_data["setShellParameters"] = mongo_set_parameters
 
     test_data["undoRecorderPath"] = config.UNDO_RECORDER_PATH
 
@@ -457,6 +462,10 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
 
         if "host" in kwargs:
             kwargs.pop("host")
+
+    for key in mongo_set_parameters:
+        val = str(mongo_set_parameters[key])
+        args.append(f"--setShellParameter={key}={val}")
 
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
