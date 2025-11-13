@@ -1214,6 +1214,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                         continue
                     if coll_name in excluded_any_db_collections:
                         continue
+                    # Skip collections that contain TTL indexes.
+                    if "ttl" in coll_name:
+                        continue
                     validate_cmd = {"validate": coll_name, "collHash": True}
                     ret = db.command(validate_cmd, check=False)
                     if "all" in ret and "metadata" in ret:
