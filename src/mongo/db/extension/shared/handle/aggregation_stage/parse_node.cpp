@@ -37,6 +37,7 @@
 namespace mongo::extension {
 
 MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
+MONGO_FAIL_POINT_DEFINE(failExtensionDPL);
 
 BSONObj AggStageParseNodeHandle::getQueryShape(
     const ::MongoExtensionHostQueryShapeOpts& opts) const {
@@ -96,4 +97,42 @@ std::vector<VariantNodeHandle> AggStageParseNodeHandle::expand() const {
     invokeCAndConvertStatusToException([&] { return vtable().expand(get(), &expandedArray); });
     return abiArrayToRaiiVector(expandedArray);
 }
+
+template <>
+struct RaiiVectorElemType<::MongoExtensionDPLArrayElement> {
+    using type = VariantDPLHandle;
+};
+
+template <>
+struct ArrayElemAsRaii<::MongoExtensionDPLArrayElement> {
+    using ArrayElem_t = ::MongoExtensionDPLArrayElement;
+    using RaiiElem_t = RaiiVectorElemType<ArrayElem_t>::type;
+    static RaiiElem_t consume(ArrayElem_t& elt) {
+        VariantDPLHandle handle = AggStageParseNodeHandle{nullptr};
+        if (MONGO_unlikely(failExtensionDPL.shouldFail())) {
+            uasserted(11365502, "Injected failure in DPL during handle transfer");
+        }
+        switch (elt.type) {
+            case kParse: {
+                handle = VariantDPLHandle(elt.element.parseNode);
+                elt.element.parseNode = nullptr;
+                break;
+            }
+            case kLogical: {
+                handle = VariantDPLHandle(elt.element.logicalStage);
+                elt.element.logicalStage = nullptr;
+                break;
+            }
+            default:
+                tasserted(11365500, "DPLArray element has invalid type tag");
+                break;
+        }
+        return handle;
+    }
+};
+
+std::vector<VariantDPLHandle> dplArrayToRaiiVector(::MongoExtensionDPLArray& arr) {
+    return abiArrayToRaiiVector(arr);
+}
+
 }  // namespace mongo::extension

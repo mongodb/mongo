@@ -39,7 +39,10 @@
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
+#include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
+#include "mongo/db/extension/shared/array/abi_array_to_raii_vector.h"
+#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
@@ -1173,6 +1176,92 @@ TEST_F(AggStageTest, ValidateExecAggStageLifecycleFunctions) {
     handle.detach();
     ASSERT_EQUALS(2, trackingExecAggStageImplPtr->getAttachCount());
     ASSERT_EQUALS(2, trackingExecAggStageImplPtr->getDetachCount());
+}
+
+TEST_F(AggStageTest, TestDPLRaiiVecToAbiArrayRoundTrip) {
+    shared_test_stages::CountingLogicalStage::alive = 0;
+    shared_test_stages::CountingParse::alive = 0;
+
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStage(shared_test_stages::CountingLogicalStage::make());
+    auto parseNode = new sdk::ExtensionAggStageParseNode(shared_test_stages::CountingParse::make());
+
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 1);
+    ASSERT_EQ(shared_test_stages::CountingParse::alive, 1);
+
+    // Convert vector of RAII handles to an ABI array.
+    std::vector<extension::VariantDPLHandle> originalVector;
+    originalVector.emplace_back(extension::LogicalAggStageHandle{logicalStage});
+    originalVector.emplace_back(extension::AggStageParseNodeHandle{parseNode});
+
+    std::vector<::MongoExtensionDPLArrayElement> abiArray{originalVector.size()};
+    ::MongoExtensionDPLArray abiArr{originalVector.size(), abiArray.data()};
+
+    sdk::raiiVectorToAbiArray(std::move(originalVector), abiArr);
+
+    // Verify ABI array is correctly populated.
+    ASSERT_EQ(abiArray[0].type, ::MongoExtensionDPLArrayElementType::kLogical);
+    ASSERT_NE(abiArray[0].element.logicalStage, nullptr);
+
+    ASSERT_EQ(abiArray[1].type, ::MongoExtensionDPLArrayElementType::kParse);
+    ASSERT_NE(abiArray[1].element.parseNode, nullptr);
+
+    // Convert ABI array to vector of RAII handles (round-trip)
+    auto roundTripVector = extension::dplArrayToRaiiVector(abiArr);
+
+    // Verify handle vector is correctly populated.
+    ASSERT_EQ(roundTripVector.size(), 2U);
+
+    ASSERT_TRUE(std::holds_alternative<extension::LogicalAggStageHandle>(roundTripVector[0]));
+    auto& logicalHandle = std::get<extension::LogicalAggStageHandle>(roundTripVector[0]);
+    ASSERT_EQ(logicalHandle.get(), logicalStage);
+
+    ASSERT_TRUE(std::holds_alternative<extension::AggStageParseNodeHandle>(roundTripVector[1]));
+    auto& parseHandle = std::get<extension::AggStageParseNodeHandle>(roundTripVector[1]);
+    ASSERT_EQ(parseHandle.get(), parseNode);
+
+    // Verify that the ABI array elements' ownership has been transferred, but the instances are
+    // still alive.
+    ASSERT_EQ(abiArray[0].element.logicalStage, nullptr);
+    ASSERT_EQ(abiArray[1].element.parseNode, nullptr);
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 1);
+    ASSERT_EQ(shared_test_stages::CountingParse::alive, 1);
+}
+
+TEST_F(AggStageTest, TestDPLRaiiVecToAbiArrayWithFailPoint) {
+    shared_test_stages::CountingLogicalStage::alive = 0;
+    shared_test_stages::CountingParse::alive = 0;
+
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStage(shared_test_stages::CountingLogicalStage::make());
+    auto parseNode = new sdk::ExtensionAggStageParseNode(shared_test_stages::CountingParse::make());
+
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 1);
+    ASSERT_EQ(shared_test_stages::CountingParse::alive, 1);
+
+    std::vector<extension::VariantDPLHandle> dplVec;
+    dplVec.emplace_back(extension::LogicalAggStageHandle{logicalStage});
+    dplVec.emplace_back(extension::AggStageParseNodeHandle{parseNode});
+
+    std::vector<::MongoExtensionDPLArrayElement> abiArray{dplVec.size()};
+    ::MongoExtensionDPLArray abiArr{dplVec.size(), abiArray.data()};
+
+    // Enable the fail point to test error handling.
+    auto failDPLConversion = globalFailPointRegistry().find("failVariantDPLConversion");
+    failDPLConversion->setMode(FailPoint::skip, 1);
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            extension::sdk::raiiVectorToAbiArray(std::move(dplVec), abiArr);
+        }(),
+        DBException,
+        11365501);
+
+    failDPLConversion->setMode(FailPoint::off, 0);
+
+    // Verify all instances are destroyed even after exception.
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 0);
+    ASSERT_EQ(shared_test_stages::CountingParse::alive, 0);
 }
 
 }  // namespace

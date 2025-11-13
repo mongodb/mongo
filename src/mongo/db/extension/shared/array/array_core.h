@@ -72,7 +72,15 @@ struct UnderlyingArrayElemType {
  * RAII handle (early exit).
  */
 template <typename ArrayElem_t>
-static inline void destroyAbiArrayElem(ArrayElem_t& elt) noexcept;
+inline void destroyAbiArrayElem(ArrayElem_t& elt) noexcept;
+
+template <typename T>
+inline void destroyAbi(T*& node) noexcept {
+    if (node && node->vtable && node->vtable->destroy) {
+        node->vtable->destroy(node);
+        node = nullptr;
+    }
+}
 
 // MongoExtensionExpandedArray specializations.
 template <>
@@ -85,19 +93,36 @@ template <>
 inline void destroyAbiArrayElem(::MongoExtensionExpandedArrayElement& elt) noexcept {
     switch (elt.type) {
         case kParseNode: {
-            auto& parse = elt.parseOrAst.parse;
-            if (parse && parse->vtable && parse->vtable->destroy) {
-                parse->vtable->destroy(parse);
-                parse = nullptr;
-            }
+            destroyAbi(elt.parseOrAst.parse);
             break;
         }
         case kAstNode: {
-            auto& ast = elt.parseOrAst.ast;
-            if (ast && ast->vtable && ast->vtable->destroy) {
-                ast->vtable->destroy(ast);
-                ast = nullptr;
-            }
+            destroyAbi(elt.parseOrAst.ast);
+            break;
+        }
+        default:
+            // Memory is leaked if the type tag is invalid, but this only happens if the
+            // extension violates the API contract.
+            break;
+    }
+}
+
+// MongoExtensionDPLArray specializations.
+template <>
+class AbiArrayType<::MongoExtensionDPLArrayElement> {
+public:
+    using type = ::MongoExtensionDPLArray;
+};
+
+template <>
+inline void destroyAbiArrayElem(::MongoExtensionDPLArrayElement& elt) noexcept {
+    switch (elt.type) {
+        case kParse: {
+            destroyAbi(elt.element.parseNode);
+            break;
+        }
+        case kLogical: {
+            destroyAbi(elt.element.logicalStage);
             break;
         }
         default:

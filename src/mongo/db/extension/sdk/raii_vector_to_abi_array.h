@@ -66,7 +66,7 @@ struct RaiiAsArrayElem {
  */
 template <typename VectorElem_t,
           typename Array_t = AbiArrayType<typename AbiArrayElemType<VectorElem_t>::type>::type>
-void raiiVectorToAbiArray(std::vector<VectorElem_t>&& inputVector, Array_t& outputArray) {
+void raiiVectorToAbiArray(std::vector<VectorElem_t> inputVector, Array_t& outputArray) {
     using RaiiAsArrayElem_t = RaiiAsArrayElem<VectorElem_t>;
     sdk_uassert(11113802,
                 (str::stream() << "Input vector returned a different "

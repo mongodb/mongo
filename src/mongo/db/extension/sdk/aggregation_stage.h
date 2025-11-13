@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
+#include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/get_next_result.h"
@@ -43,6 +44,12 @@
 #include <string_view>
 
 namespace mongo::extension::sdk {
+
+// Explicit template instantiations are provided in aggregation_stage.cpp.
+extern template void raiiVectorToAbiArray<VariantNodeHandle>(
+    std::vector<VariantNodeHandle> inputVector, ::MongoExtensionExpandedArray& outputArray);
+extern template void raiiVectorToAbiArray<VariantDPLHandle>(
+    std::vector<VariantDPLHandle> inputVector, ::MongoExtensionDPLArray& outputArray);
 
 /**
  * LogicalAggStage is the base class for implementing the

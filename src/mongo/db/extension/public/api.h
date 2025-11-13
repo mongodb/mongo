@@ -438,6 +438,39 @@ typedef struct MongoExtensionExpandedArray {
 } MongoExtensionExpandedArray;
 
 /**
+ * Types of elements that can be in a MongoExtensionDPLArray.
+ */
+typedef enum MongoExtensionDPLArrayElementType : uint32_t {
+    kParse = 0,   // Parse node
+    kLogical = 1  // Logical stage
+} MongoExtensionDPLArrayElementType;
+
+/**
+ * MongoExtensionDPLArrayElement represents a single element in a MongoExtensionDPLArray. Each
+ * element can be either a parse node or a logical stage.
+ */
+typedef struct MongoExtensionDPLArrayElement {
+    // Indicates what type the element is.
+    MongoExtensionDPLArrayElementType type;
+    union {
+        MongoExtensionAggStageParseNode* parseNode;
+        MongoExtensionLogicalAggStage* logicalStage;
+    } element;
+} MongoExtensionDPLArrayElement;
+
+/**
+ * MongoExtensionDPLArray represents an array of elements used during distributed planning. The
+ * array can contain either parse nodes or logical stages.
+ *
+ * Once the MongoExtensionDPLArray is populated by the extension, ownership is assumed to be
+ * transferred entirely to the Host.
+ */
+typedef struct MongoExtensionDPLArray {
+    size_t size;
+    struct MongoExtensionDPLArrayElement* const elements;
+} MongoExtensionDPLArray;
+
+/**
  * Virtual function table for MongoExtensionAggStageParseNode.
  */
 typedef struct MongoExtensionAggStageParseNodeVTable {

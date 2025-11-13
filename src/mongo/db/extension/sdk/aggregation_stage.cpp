@@ -45,9 +45,16 @@ struct AbiArrayElemType<VariantNodeHandle> {
     using type = ::MongoExtensionExpandedArrayElement;
 };
 
+template <>
+struct AbiArrayElemType<VariantDPLHandle> {
+    using type = ::MongoExtensionDPLArrayElement;
+};
+
 namespace sdk {
 
 MONGO_FAIL_POINT_DEFINE(failVariantNodeConversion);
+MONGO_FAIL_POINT_DEFINE(failVariantDPLConversion);
+
 namespace {
 
 /**
@@ -65,6 +72,24 @@ struct ConsumeVariantNodeToAbi {
     void operator()(AggStageAstNodeHandle&& astNode) const {
         dst.type = kAstNode;
         dst.parseOrAst.ast = astNode.release();
+    }
+};
+
+/**
+ * Converts an SDK VariantDPLHandle into a tagged union of ABI objects and writes the raw pointers
+ * into the host-allocated DPLArray element.
+ */
+struct ConsumeVariantDPLToAbi {
+    ::MongoExtensionDPLArrayElement& dst;
+
+    void operator()(AggStageParseNodeHandle&& parseNode) const {
+        dst.type = kParse;
+        dst.element.parseNode = parseNode.release();
+    }
+
+    void operator()(LogicalAggStageHandle&& logicalStage) const {
+        dst.type = kLogical;
+        dst.element.logicalStage = logicalStage.release();
     }
 };
 }  // namespace
@@ -99,5 +124,24 @@ struct RaiiAsArrayElem<VariantNodeHandle> {
         raiiVectorToAbiArray(std::move(expandedNodes), *expanded);
     });
 }
+
+template <>
+struct RaiiAsArrayElem<VariantDPLHandle> {
+    using VectorElem_t = VariantDPLHandle;
+    using ArrayElem_t = AbiArrayElemType<VectorElem_t>::type;
+
+    static void consume(ArrayElem_t& arrayElt, VectorElem_t&& vectorElt) {
+        if (MONGO_unlikely(failVariantDPLConversion.shouldFail())) {
+            sdk_uasserted(11365501, "Injected failure in VariantDPL conversion to DPLArrayElement");
+        }
+        std::visit(ConsumeVariantDPLToAbi{arrayElt}, std::move(vectorElt));
+    }
+};
+
+template void raiiVectorToAbiArray<VariantNodeHandle>(std::vector<VariantNodeHandle> inputVector,
+                                                      ::MongoExtensionExpandedArray& outputArray);
+template void raiiVectorToAbiArray<VariantDPLHandle>(std::vector<VariantDPLHandle> inputVector,
+                                                     ::MongoExtensionDPLArray& outputArray);
+
 }  // namespace sdk
 }  // namespace mongo::extension

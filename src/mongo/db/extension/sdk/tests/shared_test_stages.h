@@ -829,8 +829,38 @@ public:
     }
 };
 
+class CountingLogicalStage final : public sdk::LogicalAggStage {
+public:
+    static int alive;
+
+    CountingLogicalStage() {
+        ++alive;
+    }
+
+    ~CountingLogicalStage() override {
+        --alive;
+    }
+
+    BSONObj serialize() const override {
+        return BSON(std::string(kCountingName) << "serializedForExecution");
+    }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
+    std::unique_ptr<sdk::ExecAggStage> compile() const override {
+        return std::make_unique<NoOpExecAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::LogicalAggStage> make() {
+        return std::make_unique<CountingLogicalStage>();
+    }
+};
+
 inline int CountingParse::alive = 0;
 inline int CountingAst::alive = 0;
+inline int CountingLogicalStage::alive = 0;
 
 class NestedDesugaringParseNode final : public sdk::AggStageParseNode {
 public:
