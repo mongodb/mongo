@@ -99,7 +99,9 @@ public:
 
     void collect() {
         auto client = getService()->makeClient("collectionClient");
-        auto result = _collectorCollection->collect(client.get(), UseMultiServiceSchema{false});
+        std::vector<std::pair<std::string, int>> sectionSizes;
+        auto result =
+            _collectorCollection->collect(client.get(), UseMultiServiceSchema{false}, sectionSizes);
         LOGV2(11113101, "Collected FTDC sample", "obj"_attr = std::get<0>(result));
     }
 

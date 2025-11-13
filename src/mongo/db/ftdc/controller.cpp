@@ -306,6 +306,7 @@ void FTDCController::doLoop(Service* service) try {
     // reset to _config.metadataCaptureFrequency and countdown starts again.
     std::uint64_t metadataCaptureFrequencyCountdown = 1;
 
+    std::vector<std::pair<std::string, int>> sectionSizes;
     while (true) {
         _env->onStartLoop();
 
@@ -362,27 +363,48 @@ void FTDCController::doLoop(Service* service) try {
             iassert(_mgr->rotate(client));
         }
 
-        auto collectSample = feature_flags::gFeatureFlagGaplessFTDC.isEnabled()
-            ? _asyncPeriodicCollectors->collect(client, _multiServiceSchema)
-            : _periodicCollectors.collect(client, _multiServiceSchema);
+        sectionSizes.clear();
+        try {
+            auto collectSample = feature_flags::gFeatureFlagGaplessFTDC.isEnabled()
+                ? _asyncPeriodicCollectors->collect(client, _multiServiceSchema, sectionSizes)
+                : _periodicCollectors.collect(client, _multiServiceSchema, sectionSizes);
+            Status s = _mgr->writeSampleAndRotateIfNeeded(
+                client, std::get<0>(collectSample), std::get<1>(collectSample));
 
-        Status s = _mgr->writeSampleAndRotateIfNeeded(
-            client, std::get<0>(collectSample), std::get<1>(collectSample));
+            uassertStatusOK(s);
 
-        uassertStatusOK(s);
-
-        // Store a reference to the most recent document from the periodic collectors
-        {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-            _mostRecentPeriodicDocument = std::get<0>(collectSample);
+            // Store a reference to the most recent document from the periodic collectors
+            {
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                _mostRecentPeriodicDocument = std::get<0>(collectSample);
+            }
+        } catch (...) {
+            for (const auto& entry : sectionSizes) {
+                LOGV2_INFO(
+                    10630200, "FTDC Entry", "name"_attr = entry.first, "size"_attr = entry.second);
+            }
+            throw;
         }
 
         if (--metadataCaptureFrequencyCountdown == 0) {
             metadataCaptureFrequencyCountdown = _config.metadataCaptureFrequency;
-            auto collectSample = _periodicMetadataCollectors.collect(client, _multiServiceSchema);
-            Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
-                client, std::get<0>(collectSample), std::get<1>(collectSample));
-            iassert(s);
+            sectionSizes.clear();
+            try {
+                auto collectSample =
+                    _periodicMetadataCollectors.collect(client, _multiServiceSchema, sectionSizes);
+                Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
+                    client, std::get<0>(collectSample), std::get<1>(collectSample));
+                iassert(s);
+
+            } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+                for (const auto& entry : sectionSizes) {
+                    LOGV2_INFO(10630202,
+                               "FTDC Entry",
+                               "name"_attr = entry.first,
+                               "size"_attr = entry.second);
+                }
+                throw;
+            }
         }
     }
 } catch (...) {
