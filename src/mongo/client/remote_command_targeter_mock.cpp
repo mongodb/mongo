@@ -30,35 +30,16 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/retry_strategy.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_impl.h"
 
-#include <algorithm>
-#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 
 namespace mongo {
-namespace {
-
-HostAndPort getPrioritizedHostAndPort(const std::vector<HostAndPort>& hosts,
-                                      const TargetingMetadata& targetingMetadata) {
-    invariant(!hosts.empty());
-
-    const auto notDeprioritized = [&](const HostAndPort& server) {
-        return !targetingMetadata.deprioritizedServers.contains(server);
-    };
-
-    if (auto it = std::ranges::find_if(hosts, notDeprioritized); it != hosts.end()) {
-        return *it;
-    }
-
-    return hosts.front();
-}
-
-}  // namespace
 
 RemoteCommandTargeterMock::RemoteCommandTargeterMock()
     : _findHostReturnValue(Status(ErrorCodes::InternalError, "No return value set")) {}
@@ -85,7 +66,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
         return _findHostReturnValue.getStatus();
     }
 
-    return getPrioritizedHostAndPort(_findHostReturnValue.getValue(), targetingMetadata);
+    return firstHostPrioritized(_findHostReturnValue.getValue(),
+                                targetingMetadata.deprioritizedServers);
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(
@@ -96,7 +78,8 @@ SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(
         return _findHostReturnValue.getStatus();
     }
 
-    return getPrioritizedHostAndPort(_findHostReturnValue.getValue(), targetingMetadata);
+    return firstHostPrioritized(_findHostReturnValue.getValue(),
+                                targetingMetadata.deprioritizedServers);
 }
 
 SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHosts(

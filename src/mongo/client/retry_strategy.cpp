@@ -72,8 +72,10 @@ bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
     }
 
     if (containsSystemOverloadedErrorLabel(errorLabels)) {
-        if (target) {
-            _targetingMetadata.deprioritizedServers.emplace(*target);
+        if (target &&
+            std::ranges::find(_targetingMetadata.deprioritizedServers, *target) ==
+                _targetingMetadata.deprioritizedServers.end()) {
+            _targetingMetadata.deprioritizedServers.emplace_back(*target);
         }
         _backoffWithJitter.incrementAttemptCount();
     }

@@ -73,6 +73,13 @@ HostAndPort getLocalHostAndPort(ServiceContext* serviceContext) {
     return localHostAndPort;
 }
 
+auto getFirstHostPriotitizedWith(const TargetingMetadata& targetingMetadata) {
+    return [deprioritizedServers =
+                targetingMetadata.deprioritizedServers](std::span<const HostAndPort> hosts) {
+        return RemoteCommandTargeter::firstHostPrioritized(hosts, deprioritizedServers);
+    };
+}
+
 }  // namespace
 
 RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
@@ -109,8 +116,10 @@ SemiFuture<HostAndPort> RemoteCommandTargeterRS::findHost(
     if (_mustTargetLocalHost(readPref)) {
         return getLocalHostAndPort(_serviceContext);
     }
-    return _rsMonitor->getAtLeastOneHostOrRefresh(
-        readPref, targetingMetadata.deprioritizedServers, cancelToken);
+
+    return _rsMonitor->getHostsOrRefresh(readPref, {}, cancelToken)
+        .then(getFirstHostPriotitizedWith(targetingMetadata))
+        .semi();
 }
 
 SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterRS::findHosts(
@@ -118,7 +127,7 @@ SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterRS::findHosts(
     if (_mustTargetLocalHost(readPref)) {
         return std::vector<HostAndPort>{getLocalHostAndPort(_serviceContext)};
     }
-    return _rsMonitor->getHostsOrRefresh(readPref, cancelToken);
+    return _rsMonitor->getHostsOrRefresh(readPref, cancelToken).semi();
 }
 
 StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(
@@ -136,10 +145,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(
 
     bool maxTimeMsLesser = (opCtx->getRemainingMaxTimeMillis() <
                             Milliseconds(gDefaultFindReplicaSetHostTimeoutMS.load()));
-    auto swHostAndPort = _rsMonitor
-                             ->getAtLeastOneHostOrRefresh(readPref,
-                                                          targetingMetadata.deprioritizedServers,
-                                                          opCtx->getCancellationToken())
+    auto swHostAndPort = _rsMonitor->getHostsOrRefresh(readPref, opCtx->getCancellationToken())
+                             .then(getFirstHostPriotitizedWith(targetingMetadata))
                              .getNoThrow(opCtx);
 
     // If opCtx is interrupted, getHostOrRefresh may be canceled through the token (rather than

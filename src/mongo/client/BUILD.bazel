@@ -475,17 +475,22 @@ mongo_cc_library(
 mongo_cc_library(
     name = "remote_command_targeter",
     srcs = [
+        "remote_command_targeter.cpp",
         "remote_command_targeter_factory_impl.cpp",
         "remote_command_targeter_rs.cpp",
         "remote_command_targeter_standalone.cpp",
     ],
     hdrs = [
+        "remote_command_targeter.h",
+        "remote_command_targeter_factory.h",
         "remote_command_targeter_factory_impl.h",
         "remote_command_targeter_rs.h",
         "remote_command_targeter_standalone.h",
     ],
     deps = [
         ":clientdriver_network",
+        "//src/mongo:base",
+        "//src/mongo/client:connection_string",
         "//src/mongo/client:retry_strategy",
         "//src/mongo/db:service_context",
     ],
@@ -532,12 +537,11 @@ mongo_cc_library(
         "remote_command_targeter_mock.cpp",
     ],
     hdrs = [
-        "remote_command_targeter.h",
-        "remote_command_targeter_factory.h",
         "remote_command_targeter_factory_mock.h",
         "remote_command_targeter_mock.h",
     ],
     deps = [
+        ":remote_command_targeter",
         "//src/mongo/client:retry_strategy",
         "//src/mongo/db:server_base",
         "//src/mongo/util/net:network",
@@ -593,6 +597,7 @@ mongo_cc_unit_test(
         "mongo_uri_test.cpp",
         "read_preference_test.cpp",
         "remote_command_retry_scheduler_test.cpp",
+        "remote_command_targeter_test.cpp",
         "replica_set_monitor_server_parameters_test.cpp",
         "retry_strategy_test.cpp",
         "server_discovery_monitor_expedited_test.cpp",

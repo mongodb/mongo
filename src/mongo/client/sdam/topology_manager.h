@@ -34,9 +34,11 @@
 #include "mongo/client/sdam/topology_state_machine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 
+#include <concepts>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -51,11 +53,20 @@ public:
 
     virtual void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) = 0;
 
-    virtual TopologyDescriptionPtr getTopologyDescription() const = 0;
+    virtual std::shared_ptr<TopologyDescription> getTopologyDescription() const = 0;
 
-    virtual SemiFuture<std::vector<HostAndPort>> executeWithLock(
-        std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)>
-            func) = 0;
+    /**
+     * Executes the given function with the current TopologyDescription while holding the mutex.
+     */
+    decltype(auto) executeWithLock(std::invocable<std::shared_ptr<TopologyDescription>> auto func) {
+        auto lock = stdx::lock_guard{_mutex};
+        return func(_getTopologyDescriptionWithLock(lock));
+    }
+
+protected:
+    mutable mongo::stdx::mutex _mutex;
+    virtual std::shared_ptr<TopologyDescription> _getTopologyDescriptionWithLock(
+        WithLock) const = 0;
 };
 
 /**
@@ -63,7 +74,7 @@ public:
  * and Monitoring spec:
  *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst
  */
-class TopologyManagerImpl : public TopologyManager {
+class TopologyManagerImpl final : public TopologyManager {
     TopologyManagerImpl() = delete;
     TopologyManagerImpl(const TopologyManagerImpl&) = delete;
 
@@ -99,21 +110,15 @@ public:
     /**
      * Get the current TopologyDescription. This is safe to call from multiple threads.
      */
-    TopologyDescriptionPtr getTopologyDescription() const override;
-
-    /**
-     * Executes the given function with the current TopologyDescription while holding the mutex.
-     */
-    SemiFuture<std::vector<HostAndPort>> executeWithLock(
-        std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func)
-        override;
+    std::shared_ptr<TopologyDescription> getTopologyDescription() const override;
 
 private:
     void _publishTopologyDescriptionChanged(
-        const TopologyDescriptionPtr& oldTopologyDescription,
-        const TopologyDescriptionPtr& newTopologyDescription) const;
+        const std::shared_ptr<TopologyDescription>& oldTopologyDescription,
+        const std::shared_ptr<TopologyDescription>& newTopologyDescription) const;
 
-    mutable mongo::stdx::mutex _mutex;
+    std::shared_ptr<TopologyDescription> _getTopologyDescriptionWithLock(WithLock) const override;
+
     const SdamConfiguration _config;
     ClockSource* _clockSource;
     TopologyDescriptionPtr _topologyDescription;

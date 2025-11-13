@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,27 @@
  *    it in the license file.
  */
 
+#include "mongo/client/remote_command_targeter.h"
 
-#include "mongo/client/sdam/mock_topology_manager.h"
+namespace mongo {
 
-#include "mongo/client/sdam/topology_description.h"
-#include "mongo/util/assert_util.h"
+const HostAndPort& RemoteCommandTargeter::firstHostPrioritized(
+    std::span<const HostAndPort> hosts, std::span<const HostAndPort> deprioritizedServers) {
+    invariant(!hosts.empty());
 
-#include <memory>
-#include <mutex>
+    if (MONGO_likely(deprioritizedServers.empty())) {
+        return hosts.front();
+    }
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+    const auto notDeprioritized = [&](const HostAndPort& server) {
+        return std::ranges::find(deprioritizedServers, server) == deprioritizedServers.end();
+    };
 
+    if (auto it = std::ranges::find_if(hosts, notDeprioritized); it != hosts.end()) {
+        return *it;
+    }
 
-namespace mongo::sdam {
-
-MockTopologyManager::MockTopologyManager() {}
-
-bool MockTopologyManager::onServerDescription(const HelloOutcome& helloOutcome) {
-    fasserted(5429100);  // MockTopologyManager does not support onServerDescription
-    return true;
+    return hosts.front();
 }
 
-std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getTopologyDescriptionWithLock(lock);
-}
-
-void MockTopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {}
-
-void MockTopologyManager::setTopologyDescription(TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _topologyDescription = newDescription;
-}
-
-std::shared_ptr<TopologyDescription> MockTopologyManager::_getTopologyDescriptionWithLock(
-    WithLock) const {
-    return _topologyDescription;
-}
-
-}  // namespace mongo::sdam
+}  // namespace mongo

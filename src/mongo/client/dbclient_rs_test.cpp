@@ -231,116 +231,6 @@ TEST_F(BasicRS, CommandSecondaryPreferred) {
 }
 
 /**
- * Basic fixture with one primary and six secondaries.
- */
-class BasicRS7 : public BasicRS {
-protected:
-    BasicRS7() : BasicRS(7) {}
-};
-
-TEST_F(BasicRS7, GetAtLeastOneHostOrRefreshBasic) {
-    ReadPreferenceSetting criteria{ReadPreference::Nearest};
-    stdx::unordered_set<HostAndPort> emptyDeprioritized;
-
-    // deprioritized set is empty - getAtLeastOneHostOrRefresh should return any host
-    auto host = _rsmMonitor.getAtLeastOneHostOrRefresh(criteria, emptyDeprioritized);
-
-    // Should return a valid host
-    ASSERT_FALSE(host.empty());
-}
-
-TEST_F(BasicRS7, GetAtLeastOneHostOrRefreshDeprioritized) {
-    ReadPreferenceSetting criteria{ReadPreference::Nearest};
-    MockReplicaSet* replSet = getReplSet();
-    auto rsHosts = replSet->getHosts();
-
-    HostAndPort removedHost = rsHosts[0];
-
-    stdx::unordered_set<HostAndPort> deprioritized;
-
-    // Fill deprioritized servers - getAtLeastOneHostOrRefresh should avoid them
-    for (size_t i = 1; i < rsHosts.size(); ++i) {
-        deprioritized.insert(rsHosts[i]);
-    }
-    ASSERT_GT(deprioritized.size(), 0u);
-
-    auto host = _rsmMonitor.getAtLeastOneHostOrRefresh(criteria, deprioritized);
-
-    // Should return a valid host
-    ASSERT_FALSE(host.empty());
-    ASSERT_EQ(removedHost, host);
-    ASSERT_EQ(deprioritized.count(host), 0u);
-}
-
-TEST_F(BasicRS7, GetAtLeastOneHostOrRefreshAllDeprioritized) {
-    ReadPreferenceSetting criteria{ReadPreference::Nearest};
-    MockReplicaSet* replSet = getReplSet();
-    auto rsHosts = replSet->getHosts();
-
-    // All hosts deprioritized - getAtLeastOneHostOrRefresh should still return a host (fallback
-    // behavior)
-    stdx::unordered_set<HostAndPort> deprioritized;
-
-    for (size_t i = 0; i < rsHosts.size(); ++i) {
-        deprioritized.insert(rsHosts[i]);
-    }
-    ASSERT_GT(deprioritized.size(), 0u);
-
-    auto host = _rsmMonitor.getAtLeastOneHostOrRefresh(criteria, deprioritized);
-
-    // Should return a valid host
-    ASSERT_FALSE(host.empty());
-    ASSERT_EQ(deprioritized.count(host), 1u);
-}
-
-TEST_F(BasicRS7, GetAtLeastOneHostOrRefreshMultiple) {
-    ReadPreferenceSetting criteria{ReadPreference::Nearest};
-    MockReplicaSet* replSet = getReplSet();
-    auto rsHosts = replSet->getHosts();
-    ASSERT_GTE(rsHosts.size(), 3u);
-
-    stdx::unordered_set<HostAndPort> deprioritized;
-    deprioritized.insert(rsHosts.back());
-    deprioritized.insert(rsHosts.front());
-
-    // Multiple calls with same deprioritized set - should return non-deprioritized
-    for (int i = 0; i < 10; ++i) {
-        auto selectedHost = _rsmMonitor.getAtLeastOneHostOrRefresh(criteria, deprioritized);
-        ASSERT_FALSE(selectedHost.empty());
-
-        // Should never select the deprioritized host
-        ASSERT_EQ(deprioritized.count(selectedHost), 0u);
-    }
-}
-
-TEST_F(BasicRS7, GetAtLeastOneHostOrRefreshPrimaryOnly) {
-    // Primary-only read preference
-    ReadPreferenceSetting criteria{ReadPreference::PrimaryOnly};
-    stdx::unordered_set<HostAndPort> deprioritized;
-    // Deprioritize the primary
-    deprioritized.insert(HostAndPort(getReplSet()->getPrimary()));
-
-    auto selectedHost = _rsmMonitor.getAtLeastOneHostOrRefresh(criteria, deprioritized);
-
-    // Should return the primary as fallback
-    ASSERT_FALSE(selectedHost.empty());
-    ASSERT_EQ(selectedHost.toString(), getReplSet()->getPrimary());
-}
-
-TEST_F(BasicRS7, GetAtLeastOneHostOrRefreshSecondaryPreferred) {
-    ReadPreferenceSetting criteria{ReadPreference::SecondaryPreferred};
-    stdx::unordered_set<HostAndPort> deprioritized;
-    // Deprioritize primary, should select secondary with SecondaryPreferred
-    deprioritized.insert(HostAndPort(getReplSet()->getPrimary()));
-
-    auto selectedHost = _rsmMonitor.getAtLeastOneHostOrRefresh(criteria, deprioritized);
-
-    // Should not select the primary
-    ASSERT_NE(selectedHost.toString(), getReplSet()->getPrimary());
-    ASSERT_EQ(deprioritized.count(selectedHost), 0u);
-}
-
-/**
  * Setup for 2 member replica set will all of the nodes down.
  */
 class AllNodesDown : public DBClientRSTest {
@@ -566,19 +456,6 @@ TEST_F(PrimaryDown, Nearest) {
     auto cursor = replConn.find(std::move(findCmd), ReadPreferenceSetting{ReadPreference::Nearest});
     BSONObj doc = cursor->next();
     ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
-}
-
-TEST_F(PrimaryDown, GetAtLeastOneHostOrRefreshPrimaryDown) {
-    MockReplicaSet* replSet = getReplSet();
-    ReadPreferenceSetting criteria{ReadPreference::PrimaryPreferred};
-    stdx::unordered_set<HostAndPort> emptyDeprioritized;
-
-    // deprioritized set is empty - getAtLeastOneHostOrRefresh should return a secondary host
-    auto host = _rsmMonitor.getAtLeastOneHostOrRefresh(criteria, emptyDeprioritized);
-
-    // Should return a valid secondary host
-    ASSERT_FALSE(host.empty());
-    ASSERT_EQUALS(replSet->getSecondaries().front(), host.toString());
 }
 
 /**

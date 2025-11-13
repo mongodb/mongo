@@ -123,16 +123,11 @@ public:
         std::function<void()> cleanupCallback,
         std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
-    SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
-                                             const std::vector<HostAndPort>& excludedHosts,
-                                             const CancellationToken& cancelToken) override;
+    Future<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
+                                         const std::vector<HostAndPort>& excludedHosts,
+                                         const CancellationToken& cancelToken) override;
 
-    SemiFuture<HostAndPort> getAtLeastOneHostOrRefresh(
-        const ReadPreferenceSetting& readPref,
-        const stdx::unordered_set<HostAndPort>& deprioritizedServers,
-        const CancellationToken& cancelToken) override;
-
-    SemiFuture<std::vector<HostAndPort>> getHostsOrRefresh(
+    Future<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref,
         const std::vector<HostAndPort>& excludedHosts,
         const CancellationToken& cancelToken) override;
@@ -247,7 +242,8 @@ private:
         ConnectionString connectionString;
     };
 
-    SemiFuture<std::vector<HostAndPort>> _enqueueOutstandingQuery(
+
+    Future<std::vector<HostAndPort>> _enqueueOutstandingQuery(
         WithLock,
         const ReadPreferenceSetting& criteria,
         const std::vector<HostAndPort>& excludedHosts,

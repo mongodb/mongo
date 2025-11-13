@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/backoff_with_jitter.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
@@ -45,13 +44,14 @@
 #include <span>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include <boost/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
 
 struct TargetingMetadata {
-    stdx::unordered_set<HostAndPort> deprioritizedServers;
+    std::vector<HostAndPort> deprioritizedServers;
 };
 
 /**

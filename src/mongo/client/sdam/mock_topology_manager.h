@@ -47,16 +47,12 @@ public:
     bool onServerDescription(const HelloOutcome& helloOutcome) override;
     void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) override;
 
-    void setTopologyDescription(TopologyDescriptionPtr newDescription);
-    TopologyDescriptionPtr getTopologyDescription() const override;
-
-    SemiFuture<std::vector<HostAndPort>> executeWithLock(
-        std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func)
-        override;
+    void setTopologyDescription(std::shared_ptr<TopologyDescription> newDescription);
+    std::shared_ptr<TopologyDescription> getTopologyDescription() const override;
 
 private:
-    mutable mongo::stdx::mutex _mutex;
-    TopologyDescriptionPtr _topologyDescription;
+    std::shared_ptr<TopologyDescription> _topologyDescription;
+    std::shared_ptr<TopologyDescription> _getTopologyDescriptionWithLock(WithLock) const override;
 };
 
 }  // namespace mongo::sdam

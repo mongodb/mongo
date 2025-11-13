@@ -43,6 +43,7 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <span>
 #include <string>
 
 namespace mongo {

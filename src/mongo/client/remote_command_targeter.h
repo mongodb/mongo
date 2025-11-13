@@ -119,6 +119,15 @@ public:
      */
     virtual void markHostShuttingDown(const HostAndPort& host, const Status& status) = 0;
 
+    /**
+     * Uses the list of deprioritized servers to pick the most suitable host from the list of hosts.
+     *
+     * This function is exposed so that it can be tested separately, as findHost already executes
+     * this logic.
+     */
+    static const HostAndPort& firstHostPrioritized(
+        std::span<const HostAndPort> hosts, std::span<const HostAndPort> deprioritizedServers);
+
 protected:
     RemoteCommandTargeter() = default;
 };

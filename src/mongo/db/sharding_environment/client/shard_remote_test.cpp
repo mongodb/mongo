@@ -246,8 +246,9 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
         error, firstShardHostAndPort, errorLabelsSystemOverloaded));
     ASSERT_LT(retryBudget.getBalance_forTest(), initialBalance);
-    ASSERT(
-        retryStrategy.getTargetingMetadata().deprioritizedServers.contains(firstShardHostAndPort));
+    ASSERT_NE(std::ranges::find(retryStrategy.getTargetingMetadata().deprioritizedServers,
+                                firstShardHostAndPort),
+              retryStrategy.getTargetingMetadata().deprioritizedServers.end());
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
     ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);

@@ -30,6 +30,7 @@
 #include "mongo/client/sdam/topology_manager.h"
 
 #include "mongo/bson/oid.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_state_machine.h"
@@ -124,9 +125,9 @@ bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) 
     return true;
 }
 
-std::shared_ptr<TopologyDescription> TopologyManagerImpl::getTopologyDescription() const {
+TopologyDescriptionPtr TopologyManagerImpl::getTopologyDescription() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _topologyDescription;
+    return _getTopologyDescriptionWithLock(lock);
 }
 
 void TopologyManagerImpl::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {
@@ -153,12 +154,6 @@ void TopologyManagerImpl::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT r
           "replicaSet"_attr = getTopologyDescription()->getSetName());
 }
 
-SemiFuture<std::vector<HostAndPort>> TopologyManagerImpl::executeWithLock(
-    std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return func(_topologyDescription);
-}
-
 void TopologyManagerImpl::_publishTopologyDescriptionChanged(
     const TopologyDescriptionPtr& oldTopologyDescription,
     const TopologyDescriptionPtr& newTopologyDescription) const {
@@ -166,4 +161,9 @@ void TopologyManagerImpl::_publishTopologyDescriptionChanged(
         _topologyEventsPublisher->onTopologyDescriptionChangedEvent(oldTopologyDescription,
                                                                     newTopologyDescription);
 }
+
+TopologyDescriptionPtr TopologyManagerImpl::_getTopologyDescriptionWithLock(WithLock) const {
+    return _topologyDescription;
+}
+
 };  // namespace mongo::sdam

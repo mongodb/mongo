@@ -275,7 +275,8 @@ public:
     SemiFuture<HostAndPort> resolve(CancellationToken t,
                                     const TargetingMetadata& targetingMetadata) final {
         const auto notDeprioritized = [&](const HostAndPort& server) {
-            return !targetingMetadata.deprioritizedServers.contains(server);
+            return std::ranges::find(targetingMetadata.deprioritizedServers, server) ==
+                targetingMetadata.deprioritizedServers.end();
         };
 
         if (auto it = std::ranges::find_if(_resolvedHosts, notDeprioritized);
