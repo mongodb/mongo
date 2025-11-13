@@ -166,7 +166,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          num_files: 20
+          num_files: 40
           num_tasks: 20
           resmoke_args: >-
             --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
@@ -234,7 +234,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          num_files: 20
+          num_files: 40
           num_tasks: 20
           resmoke_args: >-
             --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
@@ -1550,7 +1550,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          num_files: 10
+          num_files: 20
           num_tasks: 40
           npm_command: update-fuzzer
           resmoke_args: >-
@@ -1580,7 +1580,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          num_files: 10
+          num_files: 20
           num_tasks: 40
           npm_command: update-fuzzer
           resmoke_args: >-
