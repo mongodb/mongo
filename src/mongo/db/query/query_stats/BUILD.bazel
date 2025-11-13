@@ -159,3 +159,23 @@ mongo_cc_benchmark(
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "shapifying_update_bm",
+    srcs = [
+        "shapifying_update_bm.cpp",
+    ],
+    header_deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_bm_constants",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":update_key",
+        "//src/mongo/db/query:query_bm_constants",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/query_shape:update_cmd_shape",
+        "//src/mongo/db/query/write_ops:parsed_update",
+    ],
+)

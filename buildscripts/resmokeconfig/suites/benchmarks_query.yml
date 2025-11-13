@@ -22,6 +22,7 @@ selector:
     - bazel-bin/**/query_settings_lookup_bm*
     - bazel-bin/**/rate_limiting_bm*
     - bazel-bin/**/shapifying_bm*
+    - bazel-bin/**/shapifying_update_bm*
     - bazel-bin/**/sbe_builder_bm*
 
 executor:

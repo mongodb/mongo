@@ -505,7 +505,9 @@ void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, const 
     state.meta = std::move(inputMetadata);
 }
 
-void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem, bool isInternalClient) {
+void ClientMetadata::setFromMetadata(Client* client,
+                                     const BSONElement& elem,
+                                     bool isInternalClient) {
     if (elem.eoo()) {
         return;
     }

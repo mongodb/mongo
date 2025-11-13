@@ -34,6 +34,15 @@
 
 namespace mongo {
 namespace query_benchmark_constants {
+extern const BSONObj kMockMetadataWrapper;
+extern const BSONElement kMockClientMetadataElem;
+
+enum class QueryComplexity : int { kIDHack = 0, kMildlyComplex, kMkComplex, kVeryComplex };
+extern BSONObj queryComplexityToJSON(const QueryComplexity& complexity);
+
+extern const BSONObj kIDHackPredicate;
+extern const BSONObj kMildlyComplexPredicate;
+
 extern const BSONObj kComplexPredicate;
 extern const BSONObj kComplexProjection;
 

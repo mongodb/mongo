@@ -51,27 +51,6 @@ static const NamespaceStringOrUUID kDefaultTestNss =
 
 static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
 
-// This is a snapshot of the client metadata generated from our IDHACK genny workload. The
-// specifics aren't so important, but it chosen in an attempt to be indicative of the size/shape
-// of this kind of thing "in the wild".
-const auto kMetadataWrapper = fromjson(R"({metadata: {
-        "application" : {
-            "name" : "Genny"
-        },
-        "driver" : {
-            "name" : "mongoc / mongocxx",
-            "version" : "1.23.2 / 3.7.0"
-        },
-        "os" : {
-            "type" : "Linux",
-            "name" : "Ubuntu",
-            "version" : "22.04",
-            "architecture" : "aarch64"
-        },
-        "platform" : "cfg=0x03215e88e9 posix=200809 stdc=201710 CC=GCC 11.3.0 CFLAGS=\"-fPIC\" LDFLAGS=\"\""
-    }})");
-auto kMockClientMetadataElem = kMetadataWrapper["metadata"];
-
 /**
  * Builds a sort specification with 'count' fields, like {field_0: 1, field_1: -1, field_2: 1, ...}.
  */
@@ -126,7 +105,9 @@ void runBenchmark(BSONObj predicate,
     if (skip) {
         fcr->setSkip(skip);
     }
-    ClientMetadata::setFromMetadata(opCtx->getClient(), kMockClientMetadataElem, false);
+
+    ClientMetadata::setFromMetadata(
+        opCtx->getClient(), query_benchmark_constants::kMockClientMetadataElem, false);
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
 
     // Run the benchmark.
@@ -141,19 +122,12 @@ void runBenchmark(BSONObj predicate, benchmark::State& state) {
 
 // Benchmark the performance of computing and hashing the query stats key for an IDHACK query.
 void BM_ShapfiyIDHack(benchmark::State& state) {
-    runBenchmark(fromjson("{_id: 4}"), state);
+    runBenchmark(query_benchmark_constants::kIDHackPredicate, state);
 }
 
 // Benchmark computing the query stats key and its hash for a mildly complex query predicate.
 void BM_ShapfiyMildlyComplex(benchmark::State& state) {
-    runBenchmark(fromjson(R"({
-        clientId: {$nin: ["432345", "4386945", "111111"]},
-        nEmployees: {$gte: 4, $lt: 20},
-        deactivated: false,
-        region: "US",
-        yearlySpend: {$lte: 1000}
-    })"),
-                 state);
+    runBenchmark(query_benchmark_constants::kMildlyComplexPredicate, state);
 }
 
 // Benchmark computing the query stats key and its hash for a complex query predicate.

@@ -237,7 +237,7 @@ public:
      * This function is only valid to invoke if you are on the Client's thread. This function takes
      * the Client lock.
      */
-    static void setFromMetadata(Client* client, BSONElement& elem, bool isInternalClient);
+    static void setFromMetadata(Client* client, const BSONElement& elem, bool isInternalClient);
 
     /**
      * Set the ClientMetadata for the OperationContext by reading it from the given BSONObj.
