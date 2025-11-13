@@ -36,6 +36,9 @@ filters:
   - "generated_suites/*query_shape_hash_stability*":
     approvers:
       - 10gen/query-execution-query-settings
+  - "generated_suites/*pqs*":
+    approvers:
+      - 10gen/query-execution-query-settings
   - "generated_suites/replica_sets_recordids_replicated_jscore_passthrough.yml":
     approvers:
       - 10gen/server-collection-write-path
