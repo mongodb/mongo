@@ -443,16 +443,9 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
 DocumentSourceMatch::splitSourceBy(const OrderedPathSet& fields,
                                    const StringMap<std::string>& renames) && {
-    return std::move(*this).splitSourceByFunc(fields, renames, expression::isIndependentOf);
-}
-
-pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::splitSourceByFunc(const OrderedPathSet& fields,
-                                       const StringMap<std::string>& renames,
-                                       expression::ShouldSplitExprFunc func) && {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
         expression::splitMatchExpressionBy(
-            std::move(_matchProcessor->getExpression()), fields, renames, func));
+            std::move(_matchProcessor->getExpression()), fields, renames));
 
     invariant(newExpr.first || newExpr.second);
 

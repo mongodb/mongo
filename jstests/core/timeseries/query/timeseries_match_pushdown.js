@@ -4,7 +4,8 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   requires_fcv_62,
+ *   # This test was modified to account for improvements made in 8.3.
+ *   requires_fcv_83,
  *   does_not_support_stepdowns,
  *   directly_against_shardsvrs_incompatible,
  * ]
@@ -97,6 +98,36 @@ runTest({
     expectedDocs: [
         {[timeField]: ISODate("2022-01-01T00:00:04"), [measureField]: 4, [metaField]: 1},
         {[timeField]: ISODate("2022-01-01T00:00:05"), [measureField]: 5, [metaField]: 2},
+    ],
+});
+
+// $gt on measurement, expressed as $expr rather than a match expression.
+runTest({
+    pipeline: [{$match: {$expr: {$gt: [`$${measureField}`, {$const: aMeasure}]}}}],
+    eventFilter: {
+        $and: [
+            {
+                a: {
+                    $_internalExprGt: 3,
+                },
+            },
+            {
+                $expr: {
+                    $gt: [
+                        "$a",
+                        {
+                            $const: 3,
+                        },
+                    ],
+                },
+            },
+        ],
+    },
+    expectedDocs: [
+        {[timeField]: ISODate("2022-01-01T00:00:04"), [measureField]: 4, [metaField]: 1},
+        {[timeField]: ISODate("2022-01-01T00:00:05"), [measureField]: 5, [metaField]: 2},
+        // This document matches because $expr comparison semantics to not type bracket.
+        {[timeField]: ISODate("2022-01-01T00:00:08"), [measureField]: [1, 2, 3], [metaField]: 2},
     ],
 });
 
@@ -376,8 +407,9 @@ runTest({
 });
 
 // $match on time and meta inside $expr. The entire $and expression can be rewritten into a
-// MatchExpression. However, for $expr predicates we only generate a wholeBucketFilter for single
-// predicates on the timeField.
+// MatchExpression. The portion of the $expr predicate on the time field can be used to generate a
+// wholeBucketFilter. The equality predicate on the meta field is pushed into the $cursor stage and
+// used to construct index bounds.
 runTest({
     docsToInsert: [
         {[timeField]: ISODate("2022-01-01T00:00:03"), [metaField]: 1},
@@ -385,16 +417,17 @@ runTest({
         {[timeField]: ISODate("2022-01-01T00:00:05"), [metaField]: 2},
     ],
     pipeline: [{$match: {$expr: {$and: [{$eq: [`$${metaField}`, 1]}, {$gt: [`$${timeField}`, aTime]}]}}}],
+    wholeBucketFilter: {
+        $and: [{[minTimeField]: {$_internalExprGt: aTime}}, {[minTimeField]: {$_internalExprGt: aTime}}],
+    },
     eventFilter: {
         $and: [
             {[timeField]: {$_internalExprGt: aTime}},
             {
                 $expr: {
-                    $and: [{$eq: [`$${metaField}`, {$const: 1}]}, {$gt: [`$${timeField}`, {$const: aTime}]}],
+                    $gt: [`$${timeField}`, {$const: aTime}],
                 },
             },
-            {[metaField]: {$_internalExprEq: 1}},
-            {[timeField]: {$_internalExprGt: aTime}},
         ],
     },
     expectedDocs: [{[timeField]: ISODate("2022-01-01T00:00:04"), [metaField]: 1}],
@@ -474,9 +507,9 @@ runTest({
     expectedDocs: [],
 });
 
-// $and inside $expr with comparison on meta and measurement. There should not be a
-// wholeBucketFilter, since the entire $and expression cannot be rewritten as a MatchExpression, and
-// for $expr predicates we only generate a wholeBucketFilter for single predicates on the timeField.
+// $and inside $expr with comparison on meta and measurement. The predicate on the meta field can
+// be split from the other predicate. It gets pushed into the $cursor stage and can be used to
+// construct index bounds.
 runTest({
     docsToInsert: [
         {[timeField]: ISODate("2022-01-01T00:00:00"), [measureField]: 0, [metaField]: 1},
@@ -494,14 +527,9 @@ runTest({
         },
     ],
     eventFilter: {
-        $and: [
-            {[metaField]: {$_internalExprGt: 1}},
-            {
-                $expr: {
-                    $and: [{$lt: [`$${measureField}`, `$${metaField}`]}, {$gt: [`$${metaField}`, {$const: 1}]}],
-                },
-            },
-        ],
+        $expr: {
+            $lt: [`$${measureField}`, `$${metaField}`],
+        },
     },
     expectedDocs: [
         {[timeField]: ISODate("2022-01-01T00:00:01"), [measureField]: 1, [metaField]: 2},
@@ -509,9 +537,8 @@ runTest({
     ],
 });
 
-// Same test as above, but the entire $and expression can be rewritten as a MatchExpression.
-// However, for $expr predicates we only generate a wholeBucketFilter for single predicates on the
-// timeField.
+// Same test as above, but the entire $and expression can be rewritten as a MatchExpression. Once
+// again, the predicate on the meta field can be pushed down into the $cursor stage.
 runTest({
     docsToInsert: [
         {[timeField]: ISODate("2022-01-01T00:00:00"), [measureField]: 0, [metaField]: 1},
@@ -528,11 +555,9 @@ runTest({
             {[measureField]: {$_internalExprGte: 2}},
             {
                 $expr: {
-                    $and: [{$gte: [`$${measureField}`, {$const: 2}]}, {$lt: [`$${metaField}`, {$const: 3}]}],
+                    $gte: [`$${measureField}`, {$const: 2}],
                 },
             },
-            {[measureField]: {$_internalExprGte: 2}},
-            {[metaField]: {$_internalExprLt: 3}},
         ],
     },
     expectedDocs: [

@@ -25,6 +25,12 @@ selector:
     # Includes expectations on failpoints being hit on specific shards.
     - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
 
+    # This test expects that $lookup gets pushed down to the shards in sharding passthroughs, but
+    # that pushdown only happens when the inner collection is sharded. In this passthrough, the
+    # inner collection can be unsplittable, causing the $lookup to run as part of the merging
+    # pipeline.
+    - jstests/aggregation/optimization/split_expr_match_expression_for_pushdown.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_profiling

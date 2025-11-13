@@ -51,6 +51,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/util/assert_util.h"
 
@@ -58,6 +59,7 @@
 #include <compare>
 #include <cstddef>
 #include <iterator>
+#include <queue>
 #include <set>
 #include <type_traits>
 
@@ -389,6 +391,158 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
 }
 
 /**
+ * Given a list of expressions ('children'), joins these children with a $and expression, and then
+ * returns the entire expression wrapped in an $expr.
+ *
+ * If the given list of 'children' is empty, returns nullptr.
+ */
+std::unique_ptr<ExprMatchExpression> createAndExprMatchExpression(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::vector<boost::intrusive_ptr<Expression>> children) {
+    if (children.empty()) {
+        return nullptr;
+    }
+
+    boost::intrusive_ptr<Expression> finalExpr;
+    if (children.size() == 1u) {
+        finalExpr = std::move(children[0]);
+    } else {
+        finalExpr = make_intrusive<ExpressionAnd>(expCtx.get(), std::move(children));
+    }
+
+    return std::make_unique<ExprMatchExpression>(std::move(finalExpr), expCtx);
+}
+
+/**
+ * An unoptimized expression may not have "flatted" conjunctions -- that is, there could be
+ * flattened $and nested directly within another $and. For example, we may have a nested structure
+ * such as {$and: [{$and: ["$x", "$y"]}, "$z"]}. This function performs a breadth-first search of
+ * the expression tree and returns a list of the expressions that form a logical conjunction through
+ * a chain of nested $and nodes.
+ *
+ * For the previous example, this function returns the list ["$x", "$y", "$z"].
+ */
+std::vector<boost::intrusive_ptr<Expression>> extractAndRelatedExprs(
+    boost::intrusive_ptr<Expression> root) {
+    std::queue<boost::intrusive_ptr<Expression>> q;
+    q.push(root);
+    std::vector<boost::intrusive_ptr<Expression>> result;
+
+    while (!q.empty()) {
+        auto curr = q.front();
+        q.pop();
+        if (dynamic_cast<ExpressionAnd*>(curr.get())) {
+            for (auto&& child : curr->getChildren()) {
+                q.push(child);
+            }
+        } else {
+            result.push_back(curr);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Given an $expr match expression ('expr'), a set of paths ('paths'), and a renames map, attempts
+ * to split the $expr into two $expr match expressions: the part which can be split out according to
+ * the given 'shouldSplit()' function, and the part which cannot be split out according to the
+ * 'shouldSplit()' function. Returns a pair which is the split out part first and the residual part
+ * second.
+ *
+ * The typical use case is to split the $expr into a part which is independent of a set of modified
+ * paths modulo renames. This allows a portion of an $expr to be pushed down even if the expression
+ * is partially dependent on a computed path.
+ *
+ * The independent part may need to account for 'renames'. For instance, if 'renames' contains the
+ * mapping "a -> b" and the original expression has a "$a" field path expression, then the
+ * independent part will need to be altered to use "$b" instead of "$a". If that is the case, then
+ * the $expr requiring a rename is added to the 'renameables' output parameter. It is the caller's
+ * responsibility to actually reflect the renames in the expression's path strings.
+ *
+ * As an example, imagine that this function is called with the following input:
+ *     expr: {$and: ["$w", "$x", "$y", "$z"]}
+ *     paths: {"w", "x"}
+ *     renames: {"y" -> "n"}
+ *     shouldSplit: expression::isExprIndependentOf()
+ *
+ * In this case the return value will be the pair
+ *    first: {$and: ["$y", "$z"]}
+ *    second: {$and: ["$w", "$x"]}
+ *
+ * The 'first' expression will also be added to 'renameables' to reflect the fact that the caller
+ * will need to replace "$y" with "$n".
+ */
+std::pair<std::unique_ptr<ExprMatchExpression>, std::unique_ptr<ExprMatchExpression>>
+splitExprMatchExpression(std::unique_ptr<ExprMatchExpression> expr,
+                         const OrderedPathSet& paths,
+                         const StringMap<std::string>& renames,
+                         expression::ShouldSplitExprFunc shouldSplit,
+                         expression::Renameables& renameables) {
+    // Bail out of further analysis if any randomness is involved or there are any special
+    // expressions that require the entire document.
+    DepsTracker depsTracker{};
+    dependency_analysis::addDependencies(expr.get(), &depsTracker);
+    if (depsTracker.needRandomGenerator || depsTracker.needWholeDocument) {
+        return {nullptr, std::move(expr)};
+    }
+
+    auto underlyingExpr = expr->getExpression();
+    auto res = shouldSplit(underlyingExpr, paths, renames);
+    if (res.shouldSplit) {
+        // The entire expression is independent.
+        if (res.requiresRename) {
+            // The second part of the pair is not used for $expr.
+            renameables.emplace_back(expr.get(), ""_sd);
+        }
+        return {std::move(expr), nullptr};
+    }
+
+    auto andRelatedExprs = extractAndRelatedExprs(underlyingExpr);
+    if (andRelatedExprs.size() == 1) {
+        // We did not find multiple expressions connected by a $and that could potentially be split
+        // apart from one other, so the entire expression is considered dependent.
+        return {nullptr, std::move(expr)};
+    }
+    tassert(10650501,
+            "Expected $expr to have multiple subexpressions connected by an $and",
+            andRelatedExprs.size() > 1);
+
+    bool independentPartRequiresRename = false;
+
+    // Partition the list of and-related expressions into those that are dependent on the given set
+    // of paths and those that are independent of the given set of paths.
+    std::vector<boost::intrusive_ptr<Expression>> independentChildren;
+    std::vector<boost::intrusive_ptr<Expression>> dependentChildren;
+    for (auto&& curExpr : andRelatedExprs) {
+        res = shouldSplit(curExpr, paths, renames);
+        if (res.shouldSplit) {
+            independentChildren.push_back(curExpr);
+            independentPartRequiresRename = independentPartRequiresRename || res.requiresRename;
+        } else {
+            dependentChildren.push_back(curExpr);
+            tassert(10650502,
+                    "A dependent expression should not require a rename",
+                    !res.requiresRename);
+        }
+    }
+
+    // Reconnect the independent and dependent lists with an $and and package them into a $expr. An
+    // empty list means that there are no dependent/independent children, in which case we return
+    // nullptr in place of the $expr.
+    auto expCtx = expr->getExpressionContext();
+    auto independentPart = createAndExprMatchExpression(expCtx, std::move(independentChildren));
+    auto dependentPart = createAndExprMatchExpression(expCtx, std::move(dependentChildren));
+
+    if (independentPartRequiresRename) {
+        // The second part of the pair is not used for $expr.
+        renameables.emplace_back(independentPart.get(), ""_sd);
+    }
+
+    return {std::move(independentPart), std::move(dependentPart)};
+}
+
+/**
  * Attempt to split 'expr' into two MatchExpressions according to 'shouldSplitOut', which describes
  * the conditions under which its argument can be split from 'expr'. Returns two pointers, where
  * each new MatchExpression contains a portion of 'expr'. The first contains the parts of 'expr'
@@ -399,8 +553,9 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     const OrderedPathSet& fields,
     const StringMap<std::string>& renames,
     expression::Renameables& renameables,
-    expression::ShouldSplitExprFunc shouldSplitOut) {
-    if (shouldSplitOut(*expr, fields, renames, renameables)) {
+    expression::ShouldSplitMatchExprFunc shouldSplitMatchExpr,
+    expression::ShouldSplitExprFunc shouldSplitExpr) {
+    if (shouldSplitMatchExpr(*expr, fields, renames, renameables)) {
         // 'expr' satisfies our split condition and can be completely split out.
         return {std::move(expr), nullptr};
     }
@@ -411,7 +566,13 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     // reset the state.
     renameables.clear();
 
-    if (expr->getCategory() != MatchExpression::MatchCategory::kLogical) {
+    if (expr->matchType() == MatchExpression::MatchType::EXPRESSION) {
+        std::unique_ptr<ExprMatchExpression> exprMatchExpr{
+            checked_cast<ExprMatchExpression*>(expr.release())};
+        auto [independentPart, dependentPart] = splitExprMatchExpression(
+            std::move(exprMatchExpr), fields, renames, shouldSplitExpr, renameables);
+        return {std::move(independentPart), std::move(dependentPart)};
+    } else if (expr->getCategory() != MatchExpression::MatchCategory::kLogical) {
         // 'expr' is a leaf and cannot be split out.
         return {nullptr, std::move(expr)};
     }
@@ -419,13 +580,19 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     std::vector<unique_ptr<MatchExpression>> splitOut;
     std::vector<unique_ptr<MatchExpression>> remaining;
 
+    // At this point the expression must be in the 'kLogical' category. We handle each logical
+    // match expression explicitly.
     switch (expr->matchType()) {
         case MatchExpression::AND: {
             auto andExpr = checked_cast<AndMatchExpression*>(expr.get());
             for (size_t i = 0; i < andExpr->numChildren(); i++) {
                 expression::Renameables childRenameables;
-                auto children = splitMatchExpressionByFunction(
-                    andExpr->releaseChild(i), fields, renames, childRenameables, shouldSplitOut);
+                auto children = splitMatchExpressionByFunction(andExpr->releaseChild(i),
+                                                               fields,
+                                                               renames,
+                                                               childRenameables,
+                                                               shouldSplitMatchExpr,
+                                                               shouldSplitExpr);
 
                 invariant(children.first || children.second);
 
@@ -454,7 +621,7 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
             for (size_t i = 0; i < norExpr->numChildren(); i++) {
                 expression::Renameables childRenameables;
                 auto child = norExpr->releaseChild(i);
-                if (shouldSplitOut(*child, fields, renames, childRenameables)) {
+                if (shouldSplitMatchExpr(*child, fields, renames, childRenameables)) {
                     splitOut.push_back(std::move(child));
                     // Accumulate the renameable expressions from the children.
                     renameables.insert(
@@ -472,7 +639,7 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
             return {nullptr, std::move(expr)};
         }
         default: {
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10650500);
         }
     }
 }
@@ -1164,6 +1331,84 @@ bool isIndependentOfImpl(E&& expr,
     }
 }
 
+namespace {
+
+// Helper function used by 'isExprIndependentOf()' and 'isExprOnlyDependentOn()'. The core analysis
+// comparing the dependencies of 'expr' to the given set of 'modifiedPaths' is delegated to the
+// given 'pathAnalysisCallback'.
+ShouldSplitExprResult exprDependenceAnalysisHelper(boost::intrusive_ptr<Expression> expr,
+                                                   const OrderedPathSet& modifiedPaths,
+                                                   const StringMap<std::string>& renames,
+                                                   auto pathAnalysisCallback) {
+    auto deps = expression::getDependencies(expr.get());
+    // We should have caught upstream if the expression needs the whole document or requires
+    // randomness.
+    tassert(10650503, "Did not expect expression to need whole document", !deps.needWholeDocument);
+    tassert(10650504, "Did not expect expression to involve randomness", !deps.needRandomGenerator);
+
+    // If the dependencies intersect with the modified path set, then this expression is not
+    // independent.
+    if (!pathAnalysisCallback(modifiedPaths, deps.fields)) {
+        return ShouldSplitExprResult{};
+    }
+
+    // Analyze renames. If any of the renames are equal to or a prefix of a dependency, a rename is
+    // required.
+    //
+    // If in the future we add support for complex renames where the new name contains multiple path
+    // components (as in the rename mapping "a.b" -> "c"), then this code will need to be enhanced
+    // to handle the case where the renamed path is deeper than the dependency. For instance, if the
+    // expression depends on "a" but "a.b" is the result of a rename, then the expression cannot be
+    // split out.
+    bool requiresRename = false;
+    for (const auto& dep : deps.fields) {
+        for (const auto& [renamedPath, _] : renames) {
+            if (dep == renamedPath || expression::isPathPrefixOf(renamedPath, dep)) {
+                // One of the dependencies needs to be fully or partially renamed.
+                requiresRename = true;
+            }
+        }
+    }
+
+    return ShouldSplitExprResult{.shouldSplit = true, .requiresRename = requiresRename};
+}
+
+// Helper function which returns true if the a set of depended-on paths derived from an expression
+// ('expressionDependencies') is a subset of 'isOnlyDependentOnPaths'.
+bool isOnlyDependentOnPathSetHelper(const OrderedPathSet& isOnlyDependentOnPaths,
+                                    const OrderedPathSet& expressionDependencies) {
+    // The approach below takes only O(n log n) time.
+    //
+    // Find the unique dependencies of pathSet.
+    auto pathsDeps = DepsTracker::simplifyDependencies(isOnlyDependentOnPaths,
+                                                       DepsTracker::TruncateToRootLevel::no);
+    auto pathsDepsCopy = OrderedPathSet(pathsDeps.begin(), pathsDeps.end());
+
+    // Now add the match expression's paths and see if the dependencies are the same.
+    pathsDepsCopy.insert(expressionDependencies.begin(), expressionDependencies.end());
+
+    return pathsDeps ==
+        DepsTracker::simplifyDependencies(std::move(pathsDepsCopy),
+                                          DepsTracker::TruncateToRootLevel::no);
+}
+
+}  // namespace
+
+ShouldSplitExprResult isExprOnlyDependentOn(boost::intrusive_ptr<Expression> expr,
+                                            const OrderedPathSet& modifiedPaths,
+                                            const StringMap<std::string>& renames) {
+    auto res = exprDependenceAnalysisHelper(
+        std::move(expr), modifiedPaths, renames, isOnlyDependentOnPathSetHelper);
+    tassert(10650505, "isExprOnlyDependentOn() should never require renames", !res.requiresRename);
+    return res;
+}
+
+ShouldSplitExprResult isExprIndependentOf(boost::intrusive_ptr<Expression> expr,
+                                          const OrderedPathSet& modifiedPaths,
+                                          const StringMap<std::string>& renames) {
+    return exprDependenceAnalysisHelper(std::move(expr), modifiedPaths, renames, areIndependent);
+}
+
 bool isIndependentOf(MatchExpression& expr,
                      const OrderedPathSet& pathSet,
                      const StringMap<std::string>& renames,
@@ -1203,13 +1448,6 @@ bool isOnlyDependentOnImpl(E&& expr,
         return false;
     }
 
-    // The approach below takes only O(n log n) time.
-
-    // Find the unique dependencies of pathSet.
-    auto pathsDeps =
-        DepsTracker::simplifyDependencies(pathSet, DepsTracker::TruncateToRootLevel::no);
-    auto pathsDepsCopy = OrderedPathSet(pathsDeps.begin(), pathsDeps.end());
-
     // Now add the match expression's paths and see if the dependencies are the same.
     auto exprDepsTracker = DepsTracker{};
     dependency_analysis::addDependencies(&expr, &exprDepsTracker);
@@ -1217,11 +1455,8 @@ bool isOnlyDependentOnImpl(E&& expr,
     if (exprDepsTracker.needRandomGenerator) {
         return false;
     }
-    pathsDepsCopy.insert(exprDepsTracker.fields.begin(), exprDepsTracker.fields.end());
 
-    return pathsDeps ==
-        DepsTracker::simplifyDependencies(std::move(pathsDepsCopy),
-                                          DepsTracker::TruncateToRootLevel::no);
+    return isOnlyDependentOnPathSetHelper(pathSet, exprDepsTracker.fields);
 }
 
 bool isOnlyDependentOn(MatchExpression& expr,
@@ -1241,10 +1476,11 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     unique_ptr<MatchExpression> expr,
     const OrderedPathSet& fields,
     const StringMap<std::string>& renames,
-    ShouldSplitExprFunc func /*= isIndependentOf */) {
+    expression::ShouldSplitMatchExprFunc shouldSplitMatchExpr,
+    expression::ShouldSplitExprFunc shouldSplitExpr) {
     Renameables renameables;
-    auto splitExpr =
-        splitMatchExpressionByFunction(std::move(expr), fields, renames, renameables, func);
+    auto splitExpr = splitMatchExpressionByFunction(
+        std::move(expr), fields, renames, renameables, shouldSplitMatchExpr, shouldSplitExpr);
     if (splitExpr.first && !renames.empty()) {
         applyRenamesToExpression(renames, &renameables);
     }

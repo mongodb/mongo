@@ -1,0 +1,72 @@
+Test case: simple conjunct
+===
+original match expression: { $expr: { $and: [ "$a", "$b" ] } }
+fields: {"a"}
+renames: {}
+split out: { $expr: "$b" }
+residual: { $expr: "$a" }
+
+Test case: conjunct of equalities
+===
+original match expression: { $expr: { $and: [ { $eq: [ "$a", { $const: 1 } ] }, { $eq: [ "$b", { $const: 2 } ] } ] } }
+fields: {"a"}
+renames: {}
+split out: { $expr: { $eq: [ "$b", { $const: 2 } ] } }
+residual: { $expr: { $eq: [ "$a", { $const: 1 } ] } }
+
+Test case: two levels of $and nesting
+===
+original match expression: { $expr: { $and: [ { $and: [ "$a", "$b" ] }, { $and: [ "$c", "$d" ] } ] } }
+fields: {"c"}
+renames: {}
+split out: { $expr: { $and: [ "$a", "$b", "$d" ] } }
+residual: { $expr: "$c" }
+
+Test case: three levels of $and nesting
+===
+original match expression: { $expr: { $and: [ { $and: [ { $and: [ "$a" ] }, { $and: [ "$b" ] } ] }, { $and: [ { $and: [ "$c" ] }, { $and: [ "$d" ] } ] } ] } }
+fields: {"a", "c"}
+renames: {}
+split out: { $expr: { $and: [ "$b", "$d" ] } }
+residual: { $expr: { $and: [ "$a", "$c" ] } }
+
+Test case: split both match expression and $expr
+===
+original match expression: { $and: [ { a: { $eq: 1 } }, { b: { $eq: 2 } }, { $expr: { $and: [ { $eq: [ "$c", { $const: 3 } ] }, { $eq: [ "$d", { $const: 4 } ] } ] } } ] }
+fields: {"b", "d"}
+renames: {}
+split out: { $and: [ { a: { $eq: 1 } }, { $expr: { $eq: [ "$c", { $const: 3 } ] } } ] }
+residual: { $and: [ { b: { $eq: 2 } }, { $expr: { $eq: [ "$d", { $const: 4 } ] } } ] }
+
+Test case: only partial split possible due to $or
+===
+original match expression: { $expr: { $and: [ { $or: [ { $eq: [ "$a", { $const: 1 } ] }, { $eq: [ "$b", { $const: 2 } ] } ] }, { $eq: [ "$c", { $const: 3 } ] } ] } }
+fields: {"b"}
+renames: {}
+split out: { $expr: { $eq: [ "$c", { $const: 3 } ] } }
+residual: { $expr: { $or: [ { $eq: [ "$a", { $const: 1 } ] }, { $eq: [ "$b", { $const: 2 } ] } ] } }
+
+Test case: split with overlapping dependencies
+===
+original match expression: { $expr: { $and: [ "$a", "$a.b", "$c" ] } }
+fields: {"a.b.z"}
+renames: {}
+split out: { $expr: "$c" }
+residual: { $expr: { $and: [ "$a", "$a.b" ] } }
+
+Test case: split with overlapping modified fields
+===
+original match expression: { $expr: { $and: [ "$a", "$a.b", "$a.b.c", "$d" ] } }
+fields: {"a", "a.b"}
+renames: {}
+split out: { $expr: "$d" }
+residual: { $expr: { $and: [ "$a", "$a.b", "$a.b.c" ] } }
+
+Test case: $expr considered independent even when under $or
+===
+original match expression: { $and: [ { a: { $eq: 1 } }, { $or: [ { $expr: { $and: [ "$b", "$c" ] } }, { d: { $eq: 2 } } ] } ] }
+fields: {"e"}
+renames: {}
+split out: { $and: [ { a: { $eq: 1 } }, { $or: [ { $expr: { $and: [ "$b", "$c" ] } }, { d: { $eq: 2 } } ] } ] }
+residual: nullptr
+

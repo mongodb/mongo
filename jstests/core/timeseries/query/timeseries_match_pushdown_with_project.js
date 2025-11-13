@@ -291,6 +291,31 @@ runTest({
     expectedResult: [{_id: 1, [metaField]: 42}],
 });
 
+// Match on the retained 'metaField', expressed as a $expr.
+runTest({
+    docs: [
+        {[timeField]: ISODate(), [metaField]: 42, a: 1, _id: 1},
+        {[timeField]: ISODate(), [metaField]: 43, a: 2, _id: 2},
+    ],
+    pipeline: [{$project: {[metaField]: 1}}, {$match: {$expr: {$eq: [`$${metaField}`, 42]}}}],
+    behaviour: {include: ["_id", metaField]},
+    expectedResult: [{_id: 1, [metaField]: 42}],
+});
+
+// Match on the retained 'metaField' and on a computed field, with the conjunction expressed as a $expr.
+runTest({
+    docs: [
+        {[timeField]: ISODate(), [metaField]: 42, a: 1, _id: 1},
+        {[timeField]: ISODate(), [metaField]: 43, a: 2, _id: 2},
+    ],
+    pipeline: [
+        {$project: {[metaField]: 1, computed: {$const: "foo"}}},
+        {$match: {$expr: {$and: [{$eq: [`$${metaField}`, 42]}, {$eq: ["$computed", "foo"]}]}}},
+    ],
+    behaviour: {include: ["_id", metaField]},
+    expectedResult: [{_id: 1, [metaField]: 42, computed: "foo"}],
+});
+
 // Match on the retained 'metaField' with no other fields retained. Even though the result contains
 // no event-level fields, we still have to "unpack" to generate the correct number of records.
 runTest({
@@ -308,6 +333,15 @@ runTest({
     docs: [{[timeField]: ISODate(), [metaField]: 42, a: 2, _id: 2}],
     pipeline: [{$project: {a: 1, _id: 0}}, {$match: {[metaField]: {$eq: 42}}}],
     behaviour: {include: ["a"]},
+    expectedResult: [],
+});
+
+// Match on an explicitly excluded 'metaField'.
+runTest({
+    docs: [{[timeField]: ISODate(), [metaField]: 42, a: 2, _id: 2}],
+    pipeline: [{$project: {[metaField]: 0}}, {$match: {[metaField]: {$eq: 42}}}],
+    // The exclusion projection is pushed before the $_internalUnpackBucket.
+    behaviour: {exclude: []},
     expectedResult: [],
 });
 

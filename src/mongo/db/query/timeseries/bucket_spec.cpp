@@ -425,7 +425,8 @@ BucketSpec::splitOutMetaOnlyPredicate(std::unique_ptr<MatchExpression> expr,
         std::move(expr),
         {std::string{*metaField}},
         {{std::string{*metaField}, std::string{kBucketMetaFieldName}}},
-        expression::isOnlyDependentOn);
+        expression::isOnlyDependentOn,
+        expression::isExprOnlyDependentOn);
 }
 
 BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(

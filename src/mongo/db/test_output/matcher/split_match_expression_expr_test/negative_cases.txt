@@ -1,0 +1,32 @@
+Test case: cannot split $or
+===
+original match expression: { $expr: { $or: [ "$a", "$b" ] } }
+fields: {"a"}
+renames: {}
+split out: nullptr
+residual: { $expr: { $or: [ "$a", "$b" ] } }
+
+Test case: cannot split $cond
+===
+original match expression: { $expr: { $cond: [ "$a", "$b", "$c" ] } }
+fields: {"b"}
+renames: {}
+split out: nullptr
+residual: { $expr: { $cond: [ "$a", "$b", "$c" ] } }
+
+Test case: avoid splitting with $rand
+===
+original match expression: { $expr: { $and: [ "$a", "$b", { $rand: {} } ] } }
+fields: {"a"}
+renames: {}
+split out: nullptr
+residual: { $expr: { $and: [ "$a", "$b", { $rand: {} } ] } }
+
+Test case: avoid splitting with $$ROOT
+===
+original match expression: { $expr: { $and: [ "$a", "$b", { $eq: [ "$c", "$$ROOT" ] } ] } }
+fields: {"a"}
+renames: {}
+split out: nullptr
+residual: { $expr: { $and: [ "$a", "$b", { $eq: [ "$c", "$$ROOT" ] } ] } }
+

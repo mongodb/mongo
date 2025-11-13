@@ -1,0 +1,40 @@
+Test case: simple negative case
+===
+original match expression: { $expr: { $eq: [ "$a", { $const: 3 } ] } }
+fields: {}
+renames: {}
+split out: nullptr
+residual: { $expr: { $eq: [ "$a", { $const: 3 } ] } }
+
+Test case: simple positive case
+===
+original match expression: { $expr: { $eq: [ "$a", { $const: 3 } ] } }
+fields: {"a"}
+renames: {}
+split out: { $expr: { $eq: [ "$a", { $const: 3 } ] } }
+residual: nullptr
+
+Test case: partial dependency in $and
+===
+original match expression: { $expr: { $and: [ { $eq: [ "$a", { $const: 3 } ] }, { $eq: [ "$b", { $const: 4 } ] } ] } }
+fields: {"a"}
+renames: {}
+split out: { $expr: { $eq: [ "$a", { $const: 3 } ] } }
+residual: { $expr: { $eq: [ "$b", { $const: 4 } ] } }
+
+Test case: partial dependency with $or prohibits split
+===
+original match expression: { $expr: { $or: [ { $eq: [ "$a", { $const: 3 } ] }, { $eq: [ "$b", { $const: 4 } ] } ] } }
+fields: {"a"}
+renames: {}
+split out: nullptr
+residual: { $expr: { $or: [ { $eq: [ "$a", { $const: 3 } ] }, { $eq: [ "$b", { $const: 4 } ] } ] } }
+
+Test case: partial dependency with rename
+===
+original match expression: { $expr: { $and: [ { $eq: [ "$a", { $const: 3 } ] }, { $eq: [ "$b", { $const: 4 } ] }, { $eq: [ "$c", { $const: 5 } ] } ] } }
+fields: {"a", "b"}
+renames: {"c" -> "d"}
+split out: { $expr: { $and: [ { $eq: [ "$a", { $const: 3 } ] }, { $eq: [ "$b", { $const: 4 } ] } ] } }
+residual: { $expr: { $eq: [ "$c", { $const: 5 } ] } }
+

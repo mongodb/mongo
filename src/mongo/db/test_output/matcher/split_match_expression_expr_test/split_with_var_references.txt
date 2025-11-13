@@ -1,0 +1,32 @@
+Test case: var reference properly distinguished from field path
+===
+original match expression: { $expr: { $let: { vars: { x: "$y" }, in: "$$x" } } }
+fields: {"x"}
+renames: {}
+split out: { $expr: { $let: { vars: { x: "$y" }, in: "$$x" } } }
+residual: nullptr
+
+Test case: var reference distinguished from field path in renames
+===
+original match expression: { $expr: { $let: { vars: { x: "$y" }, in: "$$x" } } }
+fields: {}
+renames: {"x" -> "z"}
+split out: { $expr: { $let: { vars: { x: "$y" }, in: "$$x" } } }
+residual: nullptr
+
+Test case: let expression is dependent due to field path expression in 'vars'
+===
+original match expression: { $expr: { $let: { vars: { x: "$y" }, in: "$$x" } } }
+fields: {"x", "y"}
+renames: {}
+split out: nullptr
+residual: { $expr: { $let: { vars: { x: "$y" }, in: "$$x" } } }
+
+Test case: rename gets applied within 'vars'
+===
+original match expression: { $expr: { $let: { vars: { x: "$y" }, in: "$$x" } } }
+fields: {"x"}
+renames: {"y" -> "z"}
+split out: { $expr: { $let: { vars: { x: "$z" }, in: "$$x" } } }
+residual: nullptr
+

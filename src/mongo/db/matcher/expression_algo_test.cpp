@@ -45,6 +45,7 @@
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -65,7 +66,6 @@ namespace mongo {
 
 using std::unique_ptr;
 using namespace std::string_literals;
-
 
 void assertMatchesEqual(const ParsedMatchExpressionForTest& expected,
                         const std::unique_ptr<MatchExpression>& actual) {
@@ -1968,6 +1968,277 @@ TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaMinMaxItemsByIsOnlyD
         )"));
 
     ASSERT_FALSE(residualExpr.get());
+}
+
+/**
+ * A test fixture designed for testing splitMatchExpressionBy() with $expr match expressions.
+ * Individual TEST_F() cases need only call 'makeCtx()' and then 'testSplitExpr()'. Doing so will
+ * add a test case to the golden output file which includes
+ *   - The definition of the test case, namely:
+ *     - the original match expression,
+ *     - the fields used for splitting, and
+ *     - the renames map.
+ *   - The result of performing the split:
+ *     - the split out (independent) expression with any renames applied, and
+ *     - the residual (dependent) expression.
+ */
+class SplitMatchExpressionExprTest : public unittest::Test {
+public:
+    SplitMatchExpressionExprTest() : goldenTestConfig{"src/mongo/db/test_output/matcher"} {}
+
+    unittest::GoldenTestContext makeCtx() {
+        return unittest::GoldenTestContext{&goldenTestConfig};
+    }
+
+    void testSplitExpr(
+        unittest::GoldenTestContext& gctx,
+        std::string testCaseName,
+        std::string matchExpressionStr,
+        const OrderedPathSet& fields,
+        const StringMap<std::string>& renames = {},
+        expression::ShouldSplitMatchExprFunc shouldSplitMatchExpr = expression::isIndependentOf,
+        expression::ShouldSplitExprFunc shouldSplitExpr = expression::isExprIndependentOf) {
+        ParsedMatchExpressionForTest matcher{matchExpressionStr};
+
+        gctx.outStream() << "Test case: " << testCaseName << std::endl << "===" << std::endl;
+        serializeExprToGolden("original match expression", matcher.get(), gctx);
+        serializeFieldSet(fields, gctx);
+        serializeRenames(renames, gctx);
+
+        auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
+            matcher.release(), fields, renames, shouldSplitMatchExpr, shouldSplitExpr);
+        serializeExprToGolden("split out", splitOutExpr.get(), gctx);
+        serializeExprToGolden("residual", residualExpr.get(), gctx);
+
+        gctx.outStream() << std::endl;
+    }
+
+private:
+    void serializeExprToGolden(std::string exprName,
+                               const MatchExpression* expr,
+                               unittest::GoldenTestContext& gctx) {
+        gctx.outStream() << exprName << ": ";
+        if (!expr) {
+            gctx.outStream() << "nullptr" << std::endl;
+        } else {
+            gctx.outStream() << expr->serialize() << std::endl;
+        }
+    }
+
+    template <typename T, typename F>
+    void serializeContainer(const T& container,
+                            F elemSerializer,
+                            unittest::GoldenTestContext& gctx) {
+        gctx.outStream() << "{";
+        bool first = true;
+        for (auto&& elem : container) {
+            if (!first) {
+                gctx.outStream() << ", ";
+            }
+            first = false;
+            gctx.outStream() << "\"" << elemSerializer(elem) << "\"";
+        }
+        gctx.outStream() << "}" << std::endl;
+    }
+
+    void serializeFieldSet(const OrderedPathSet& fields, unittest::GoldenTestContext& gctx) {
+        auto fieldSerializer = [](auto&& field) {
+            return field;
+        };
+        gctx.outStream() << "fields: ";
+        serializeContainer(fields, fieldSerializer, gctx);
+    }
+
+    void serializeRenames(const StringMap<std::string>& renames,
+                          unittest::GoldenTestContext& gctx) {
+        // Since 'StringMap' is unordered, convert it to a sorted vector of string pairs before
+        // serialization.
+        std::vector<std::pair<std::string, std::string>> renameVec;
+        for (auto&& r : renames) {
+            renameVec.push_back(r);
+        }
+        std::sort(renameVec.begin(), renameVec.end());
+
+        auto serializer = [](auto&& oneRename) {
+            return oneRename.first + "\" -> \"" + oneRename.second;
+        };
+        gctx.outStream() << "renames: ";
+        serializeContainer(renameVec, serializer, gctx);
+    }
+
+    unittest::GoldenTestConfig goldenTestConfig;
+};
+
+TEST_F(SplitMatchExpressionExprTest, BasicPositiveSplitMatchExpressionExpr) {
+    auto gctx = makeCtx();
+    testSplitExpr(gctx, "simple conjunct", "{$expr: {$and: ['$a', '$b']}}", {"a"});
+
+    testSplitExpr(gctx,
+                  "conjunct of equalities",
+                  "{$expr: {$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 2]}]}}",
+                  {"a"});
+
+    testSplitExpr(gctx,
+                  "two levels of $and nesting",
+                  "{$expr: {$and: [{$and: ['$a', '$b']}, {$and: ['$c', '$d']}]}}",
+                  {"c"});
+
+    testSplitExpr(gctx,
+                  "three levels of $and nesting",
+                  R"(
+{
+    $expr: {
+        $and: [{$and: [{$and: ["$a"]}, {$and: ["$b"]}]}, {$and: [{$and: ["$c"]}, {$and: ["$d"]}]}]
+    }
+})",
+                  {"a", "c"});
+
+    testSplitExpr(gctx,
+                  "split both match expression and $expr",
+                  "{a: 1, b: 2, $expr: {$and: [{$eq: ['$c', 3]}, {$eq: ['$d', 4]}]}}",
+                  {"b", "d"});
+
+    testSplitExpr(
+        gctx,
+        "only partial split possible due to $or",
+        "{$expr: {$and: [{$or: [{$eq: ['$a', 1]}, {$eq: ['$b', 2]}]}, {$eq: ['$c', 3]}]}}",
+        {"b"});
+
+    testSplitExpr(gctx,
+                  "split with overlapping dependencies",
+                  "{$expr: {$and: ['$a', '$a.b', '$c']}}",
+                  {"a.b.z"});
+
+    testSplitExpr(gctx,
+                  "split with overlapping modified fields",
+                  "{$expr: {$and: ['$a', '$a.b', '$a.b.c', '$d']}}",
+                  {"a", "a.b"});
+
+    testSplitExpr(gctx,
+                  "$expr considered independent even when under $or",
+                  "{a: 1, $or: [{$expr: {$and: ['$b', '$c']}}, {d: 2}]}",
+                  {"e"});
+}
+
+TEST_F(SplitMatchExpressionExprTest, NegativeCases) {
+    auto gctx = makeCtx();
+    testSplitExpr(gctx, "cannot split $or", "{$expr: {$or: ['$a', '$b']}}", {"a"});
+
+    testSplitExpr(gctx, "cannot split $cond", "{$expr: {$cond: ['$a', '$b', '$c']}}", {"b"});
+
+    testSplitExpr(
+        gctx, "avoid splitting with $rand", "{$expr: {$and: ['$a', '$b', {$rand: {}}]}}", {"a"});
+
+    testSplitExpr(gctx,
+                  "avoid splitting with $$ROOT",
+                  "{$expr: {$and: ['$a', '$b', {$eq: ['$c', '$$ROOT']}]}}",
+                  {"a"});
+}
+
+TEST_F(SplitMatchExpressionExprTest, SplitMatchExpressionExprHandlesRenames) {
+    auto gctx = makeCtx();
+    testSplitExpr(
+        gctx, "simple conjunct with rename", "{$expr: {$and: ['$a', '$b']}}", {"a"}, {{"b", "x"}});
+
+    testSplitExpr(gctx,
+                  "split both match expression and $expr with renames",
+                  "{a: 1, b: 2, $expr: {$and: [{$eq: ['$c', 3]}, {$eq: ['$d', 4]}]}}",
+                  {"b", "d"},
+                  {{"a", "x"}, {"c", "y"}, {"e", "z"}});
+
+    testSplitExpr(gctx,
+                  "rename prefix to shorter path",
+                  "{$expr: {$and: [{$eq: ['$a.b.c.d', 3]}, {$eq: ['$e.f.g', 4]}]}}",
+                  {"e"},
+                  {{"a.b.c", "x"}});
+
+    testSplitExpr(gctx,
+                  "rename path to shorter path",
+                  "{$expr: {$and: [{$eq: ['$a.b.c.d', 3]}, {$eq: ['$e.f.g', 4]}]}}",
+                  {"e"},
+                  {{"a.b.c.d", "x"}});
+
+    testSplitExpr(gctx,
+                  "rename prefix but preserve path length",
+                  "{$expr: {$and: [{$eq: ['$a.b', 3]}, {$eq: ['$e.f.g', 4]}]}}",
+                  {"e"},
+                  {{"a", "x"}});
+
+    testSplitExpr(gctx,
+                  "no applicable renames",
+                  "{$expr: {$and: [{$eq: ['$a.b', 3]}, {$eq: ['$e.f', 4]}]}}",
+                  {"e"},
+                  {{"x", "a"}, {"y", "b"}});
+}
+
+TEST_F(SplitMatchExpressionExprTest, IsExprOnlyDependentOn) {
+    auto gctx = makeCtx();
+    testSplitExpr(gctx,
+                  "simple negative case",
+                  "{$expr: {$eq: ['$a', 3]}}",
+                  {},
+                  {},
+                  expression::isOnlyDependentOn,
+                  expression::isExprOnlyDependentOn);
+
+    testSplitExpr(gctx,
+                  "simple positive case",
+                  "{$expr: {$eq: ['$a', 3]}}",
+                  {"a"},
+                  {},
+                  expression::isOnlyDependentOn,
+                  expression::isExprOnlyDependentOn);
+
+    testSplitExpr(gctx,
+                  "partial dependency in $and",
+                  "{$expr: {$and: [{$eq: ['$a', 3]}, {$eq: ['$b', 4]}]}}",
+                  {"a"},
+                  {},
+                  expression::isOnlyDependentOn,
+                  expression::isExprOnlyDependentOn);
+
+    testSplitExpr(gctx,
+                  "partial dependency with $or prohibits split",
+                  "{$expr: {$or: [{$eq: ['$a', 3]}, {$eq: ['$b', 4]}]}}",
+                  {"a"},
+                  {},
+                  expression::isOnlyDependentOn,
+                  expression::isExprOnlyDependentOn);
+
+    testSplitExpr(gctx,
+                  "partial dependency with rename",
+                  "{$expr: {$and: [{$eq: ['$a', 3]}, {$eq: ['$b', 4]}, {$eq: ['$c', 5]}]}}",
+                  {"a", "b"},
+                  {{"c", "d"}},
+                  expression::isOnlyDependentOn,
+                  expression::isExprOnlyDependentOn);
+}
+
+TEST_F(SplitMatchExpressionExprTest, SplitWithVarReferences) {
+    auto gctx = makeCtx();
+    testSplitExpr(gctx,
+                  "var reference properly distinguished from field path",
+                  "{$expr: {$let: {vars: {x: '$y'}, in: '$$x'}}}",
+                  {"x"},
+                  {});
+
+    testSplitExpr(gctx,
+                  "var reference distinguished from field path in renames",
+                  "{$expr: {$let: {vars: {x: '$y'}, in: '$$x'}}}",
+                  {},
+                  {{"x", "z"}});
+
+    testSplitExpr(gctx,
+                  "let expression is dependent due to field path expression in 'vars'",
+                  "{$expr: {$let: {vars: {x: '$y'}, in: '$$x'}}}",
+                  {"x", "y"},
+                  {});
+
+    testSplitExpr(gctx,
+                  "rename gets applied within 'vars'",
+                  "{$expr: {$let: {vars: {x: '$y'}, in: '$$x'}}}",
+                  {"x"},
+                  {{"y", "z"}});
 }
 
 TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {

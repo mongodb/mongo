@@ -312,7 +312,8 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
         ? expression::splitMatchExpressionBy(std::move(residualPred),
                                              {std::string{tsOptions.getTimeField()}} /*fields*/,
                                              {} /*renames*/,
-                                             expression::isOnlyDependentOn)
+                                             expression::isOnlyDependentOn,
+                                             expression::isExprOnlyDependentOn)
               .first
         : std::unique_ptr<MatchExpression>{};
 

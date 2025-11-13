@@ -66,6 +66,18 @@ bool hasPredicateOnPaths(const MatchExpression& expr,
                          const OrderedPathSet& paths);
 
 using PathOrExprMatchExpression = std::variant<PathMatchExpression*, ExprMatchExpression*>;
+
+/**
+ * A 'Renameables' is a list of match expression nodes which require renaming in order to push these
+ * match expressions before a preceding stage. The match expression may be either a
+ * 'PathMatchExpression' or a $expr.
+ *
+ * In the case of a 'PathMatchExpression', the second element of the std::pair is the path which the
+ * match expression node should use once the match is pushed down. In the case of $expr, the second
+ * element of the pair is the empty string. This is because a given $expr may contain several path
+ * expressions affected by renames, which requires logic elsewhere to traverse the expression tree
+ * looking for field path expressions which are affected by renames.
+ */
 using Renameables = std::vector<std::pair<PathOrExprMatchExpression, std::string>>;
 
 /**
@@ -238,8 +250,47 @@ void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "
 std::unique_ptr<MatchExpression> assumeImpreciseInternalExprNodesReturnTrue(
     std::unique_ptr<MatchExpression> expr);
 
-using ShouldSplitExprFunc = std::function<bool(
+/**
+ * A callback function which can be passed to 'splitMatchExpressionBy()' to control the logic by
+ * which a match expression is split into two parts.
+ */
+using ShouldSplitMatchExprFunc = std::function<bool(
     MatchExpression&, const OrderedPathSet&, const StringMap<std::string>&, Renameables&)>;
+
+/**
+ * A callback function which can be passed to 'splitMatchExpressionBy()' to control the logic by
+ * which a $expr is split into two parts. The return value indicates not only whether the
+ * 'Expression' can be split but also whether the part that can be split out requires renaming given
+ * the contents of the renames map.
+ */
+struct ShouldSplitExprResult {
+    bool shouldSplit = false;
+    bool requiresRename = false;
+};
+using ShouldSplitExprFunc = std::function<ShouldSplitExprResult(
+    boost::intrusive_ptr<Expression>, const OrderedPathSet&, const StringMap<std::string>&)>;
+
+/**
+ * Returns 'shouldSplit=true' iff the given 'expr' does not refer to any of the paths in the given
+ * set of 'modifiedPaths'.
+ *
+ * If the expression is independent, it may or may not need to account for the given set of
+ * 'renames'. If the expression is independent and renaming is required, then returns
+ * 'requiresRename=true'.
+ *
+ * Note that this function will never return 'shouldSplit=false' and 'requiresRename=true'.
+ */
+ShouldSplitExprResult isExprIndependentOf(boost::intrusive_ptr<Expression> expr,
+                                          const OrderedPathSet& modifiedPaths,
+                                          const StringMap<std::string>& renames);
+
+/**
+ * Returns 'shouldSplit=true' if all of the dependencies of 'expr' are in the given 'modifiedPaths'
+ * set. This function will never return 'requiresRename=true'.
+ */
+ShouldSplitExprResult isExprOnlyDependentOn(boost::intrusive_ptr<Expression> expr,
+                                            const OrderedPathSet& modifiedPaths,
+                                            const StringMap<std::string>& renames);
 
 /**
  * Attempt to split 'expr' into two MatchExpressions according to 'func'. 'func' describes the
@@ -265,7 +316,8 @@ std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
 splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
                        const OrderedPathSet& fields,
                        const StringMap<std::string>& renames,
-                       ShouldSplitExprFunc func = isIndependentOf);
+                       ShouldSplitMatchExprFunc shouldSplitMatchExpr = isIndependentOf,
+                       ShouldSplitExprFunc shouldSplitExpr = isExprIndependentOf);
 
 /**
  * Applies the renames specified in 'renames' & 'renameables'. 'renames' maps from path names in

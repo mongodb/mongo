@@ -251,11 +251,6 @@ private:
 
     DepsTracker::State getDependencies(const MatchExpression* expr, DepsTracker* deps) const;
 
-    std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
-    splitSourceByFunc(const OrderedPathSet& fields,
-                      const StringMap<std::string>& renames,
-                      expression::ShouldSplitExprFunc func) &&;
-
     std::shared_ptr<MatchProcessor> _matchProcessor;
     SbeCompatibility _sbeCompatibility{SbeCompatibility::notCompatible};
     bool _isTextQuery{false};

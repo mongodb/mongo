@@ -1,0 +1,48 @@
+Test case: simple conjunct with rename
+===
+original match expression: { $expr: { $and: [ "$a", "$b" ] } }
+fields: {"a"}
+renames: {"b" -> "x"}
+split out: { $expr: "$x" }
+residual: { $expr: "$a" }
+
+Test case: split both match expression and $expr with renames
+===
+original match expression: { $and: [ { a: { $eq: 1 } }, { b: { $eq: 2 } }, { $expr: { $and: [ { $eq: [ "$c", { $const: 3 } ] }, { $eq: [ "$d", { $const: 4 } ] } ] } } ] }
+fields: {"b", "d"}
+renames: {"a" -> "x", "c" -> "y", "e" -> "z"}
+split out: { $and: [ { x: { $eq: 1 } }, { $expr: { $eq: [ "$y", { $const: 3 } ] } } ] }
+residual: { $and: [ { b: { $eq: 2 } }, { $expr: { $eq: [ "$d", { $const: 4 } ] } } ] }
+
+Test case: rename prefix to shorter path
+===
+original match expression: { $expr: { $and: [ { $eq: [ "$a.b.c.d", { $const: 3 } ] }, { $eq: [ "$e.f.g", { $const: 4 } ] } ] } }
+fields: {"e"}
+renames: {"a.b.c" -> "x"}
+split out: { $expr: { $eq: [ "$x.d", { $const: 3 } ] } }
+residual: { $expr: { $eq: [ "$e.f.g", { $const: 4 } ] } }
+
+Test case: rename path to shorter path
+===
+original match expression: { $expr: { $and: [ { $eq: [ "$a.b.c.d", { $const: 3 } ] }, { $eq: [ "$e.f.g", { $const: 4 } ] } ] } }
+fields: {"e"}
+renames: {"a.b.c.d" -> "x"}
+split out: { $expr: { $eq: [ "$x", { $const: 3 } ] } }
+residual: { $expr: { $eq: [ "$e.f.g", { $const: 4 } ] } }
+
+Test case: rename prefix but preserve path length
+===
+original match expression: { $expr: { $and: [ { $eq: [ "$a.b", { $const: 3 } ] }, { $eq: [ "$e.f.g", { $const: 4 } ] } ] } }
+fields: {"e"}
+renames: {"a" -> "x"}
+split out: { $expr: { $eq: [ "$x.b", { $const: 3 } ] } }
+residual: { $expr: { $eq: [ "$e.f.g", { $const: 4 } ] } }
+
+Test case: no applicable renames
+===
+original match expression: { $expr: { $and: [ { $eq: [ "$a.b", { $const: 3 } ] }, { $eq: [ "$e.f", { $const: 4 } ] } ] } }
+fields: {"e"}
+renames: {"x" -> "a", "y" -> "b"}
+split out: { $expr: { $eq: [ "$a.b", { $const: 3 } ] } }
+residual: { $expr: { $eq: [ "$e.f", { $const: 4 } ] } }
+

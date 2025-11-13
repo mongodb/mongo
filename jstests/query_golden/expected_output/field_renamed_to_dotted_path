@@ -1,0 +1,40 @@
+
+
+[jsTest] ----
+[jsTest] Inserting docs:
+[jsTest] ----
+
+{  "_id" : 1 }
+{  "_id" : 2,  "a" : null }
+{  "_id" : 3,  "a" : 5 }
+{  "_id" : 4,  "a" : {  "b" : 1,  "c" : 1 } }
+{  "_id" : 5,  "a" : {  "b" : 1,  "c" : 1 } }
+{  "_id" : 6,  "a" : {  "b" : 1,  "c" : 1 } }
+
+
+[jsTest] ----
+[jsTest] Running test pipelines:
+[jsTest] ----
+
+Pipeline: [ { "$addFields" : { "x.y" : "$a" } }, { "$match" : { "x" : { "$eq" : { "y" : 5 } } } } ]
+{  "_id" : 3,  "a" : 5,  "x" : {  "y" : 5 } }
+
+Pipeline: [ { "$addFields" : { "x.y" : "$a" } }, { "$match" : { "x" : { "$eq" : { "y" : { "b" : 1, "c" : 1 } } } } } ]
+{  "_id" : 4,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+{  "_id" : 5,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+
+Pipeline: [ { "$addFields" : { "x.y" : "$a" } }, { "$match" : { "x.y" : { "$eq" : { "b" : 1, "c" : 1 } } } } ]
+{  "_id" : 4,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+{  "_id" : 5,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+
+Pipeline: [ { "$addFields" : { "x.y" : "$a" } }, { "$match" : { "$expr" : { "$eq" : [ "$x", { "y" : 5 } ] } } } ]
+{  "_id" : 3,  "a" : 5,  "x" : {  "y" : 5 } }
+
+Pipeline: [ { "$addFields" : { "x.y" : "$a" } }, { "$match" : { "$expr" : { "$eq" : [ "$x", { "y" : { "b" : 1, "c" : 1 } } ] } } } ]
+{  "_id" : 4,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+{  "_id" : 5,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+
+Pipeline: [ { "$addFields" : { "x.y" : "$a" } }, { "$match" : { "$expr" : { "$eq" : [ "$x.y", { "b" : 1, "c" : 1 } ] } } } ]
+{  "_id" : 4,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+{  "_id" : 5,  "a" : {  "b" : 1,  "c" : 1 },  "x" : {  "y" : {  "b" : 1,  "c" : 1 } } }
+

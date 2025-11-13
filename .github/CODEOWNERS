@@ -2830,6 +2830,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/test_output/matcher/debug_string_test/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/test_output/matcher/debug_string_test/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/test_output/matcher/split_match_expression_expr_test/OWNERS.yml
+/src/mongo/db/test_output/matcher/split_match_expression_expr_test/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/test_output/matcher/split_match_expression_expr_test/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/test_output/query/OWNERS.yml
 /src/mongo/db/test_output/query/**/* @10gen/query @svc-auto-approve-bot
 /src/mongo/db/test_output/query/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
