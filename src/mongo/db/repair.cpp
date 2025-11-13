@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -70,8 +69,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
-
-
+namespace {
 Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   StorageEngine* engine) {
@@ -84,20 +82,12 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
 
     opCtx->checkForInterrupt();
     CollectionWriter collWriter(opCtx, nss);
-    auto swIndexNameObjs = getIndexNameObjs(&(*collWriter));
-    if (!swIndexNameObjs.isOK())
-        return swIndexNameObjs.getStatus();
-
-    std::vector<BSONObj> indexSpecs = swIndexNameObjs.getValue().second;
-    Status status = rebuildIndexesOnCollection(opCtx, collWriter, indexSpecs, RepairData::kYes);
-    if (!status.isOK())
+    if (Status status = rebuildIndexesOnCollection(opCtx, collWriter); !status.isOK())
         return status;
 
     engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
     return Status::OK();
 }
-
-namespace {
 
 /**
  * Re-opening the database can throw an InvalidIndexSpecificationOption error. This can occur if the

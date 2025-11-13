@@ -30,41 +30,15 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/util/modules.h"
 
-#include <functional>
-#include <string>
-#include <utility>
-#include <vector>
-
-namespace mongo {
-typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
-
+namespace MONGO_MOD_PUBLIC mongo {
 /**
- * Returns a pair of parallel vectors. The first item is the index name. The second is the
- * `BSONObj` "index spec" with an index name matching the `filter`.
- *
- * @param filter is a predicate that is passed in an index name, returning true if the index
- *               should be included in the result.
- */
-StatusWith<IndexNameObjs> getIndexNameObjs(
-    const Collection* collection,
-    std::function<bool(const std::string&)> filter = [](const std::string& indexName) {
-        return true;
-    });
-
-/**
- * Rebuilds the indexes provided by the 'indexSpecs' on the given collection.
+ * Rebuilds the indexes on the given collection.
  * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
- * When 'repair' is set to kYes, this function will delete corrupt records when found, rather than
- * crashing.
+ * This function will delete corrupt records when found.
  */
-enum class RepairData { kYes, kNo };
-Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  CollectionWriter& collWriter,
-                                  const std::vector<BSONObj>& indexSpecs,
-                                  RepairData repair);
+Status rebuildIndexesOnCollection(OperationContext* opCtx, CollectionWriter& collWriter);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

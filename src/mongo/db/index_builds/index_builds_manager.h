@@ -133,10 +133,7 @@ public:
      * Returns the number of records and the size of the data iterated over.
      */
     StatusWith<std::pair<long long, long long>> startBuildingIndexForRecovery(
-        OperationContext* opCtx,
-        const CollectionAcquisition& coll,
-        const UUID& buildUUID,
-        RepairData repair);
+        OperationContext* opCtx, const CollectionAcquisition& coll, const UUID& buildUUID);
 
     /**
      * Document inserts observed during the scanning/insertion phase of an index build are not

@@ -633,8 +633,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
     OperationContext* opCtx,
     CollectionWriter& collWriter,
     const std::vector<BSONObj>& specs,
-    const UUID& buildUUID,
-    RepairData repair) {
+    const UUID& buildUUID) {
     auto indexes = toIndexBuildInfoVec(specs);
     const auto protocol = IndexBuildProtocol::kSinglePhase;
     auto status = _startIndexBuildForRecovery(opCtx, collWriter, indexes, buildUUID, protocol);
@@ -643,7 +642,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
     }
 
     // Complete the index build.
-    return _runIndexRebuildForRecovery(opCtx, collWriter, buildUUID, repair);
+    return _runIndexRebuildForRecovery(opCtx, collWriter, buildUUID);
 }
 
 Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opCtx,
@@ -3677,10 +3676,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexRebuildForRecovery(
-    OperationContext* opCtx,
-    CollectionWriter& collection,
-    const UUID& buildUUID,
-    RepairData repair) {
+    OperationContext* opCtx, CollectionWriter& collection, const UUID& buildUUID) {
     invariant(
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
 
@@ -3710,9 +3706,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
                                                            AcquisitionPrerequisites::kWrite),
                               MODE_X);
 
-        std::tie(numRecords, dataSize) =
-            uassertStatusOK(_indexBuildsManager.startBuildingIndexForRecovery(
-                opCtx, collAcquisition, buildUUID, repair));
+        std::tie(numRecords, dataSize) = uassertStatusOK(
+            _indexBuildsManager.startBuildingIndexForRecovery(opCtx, collAcquisition, buildUUID));
 
         // Since we are holding an exclusive collection lock to stop new writes, do not yield locks
         // while draining.

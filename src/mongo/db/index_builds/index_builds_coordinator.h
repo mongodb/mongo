@@ -204,8 +204,7 @@ public:
     /**
      * Runs the full index rebuild for recovery. This will only rebuild single-phase index builds.
      * Rebuilding an index in recovery mode verifies the BSON format of each document. Upon
-     * discovery of corruption, if 'repair' is kYes, this function will remove any documents with
-     * invalid BSON; otherwise, it will abort the server process.
+     * discovery of corruption, this function will remove any documents with invalid BSON.
      *
      * Returns the number of records and the size of the data iterated over, if successful.
      */
@@ -213,8 +212,7 @@ public:
         OperationContext* opCtx,
         CollectionWriter& collWriter,
         const std::vector<BSONObj>& specs,
-        const UUID& buildUUID,
-        RepairData repair);
+        const UUID& buildUUID);
 
     /**
      * Apply a 'startIndexBuild' oplog entry. Returns when the index build thread has started and
@@ -905,10 +903,7 @@ protected:
      * Returns the number of records and the size of the data iterated over, if successful.
      */
     StatusWith<std::pair<long long, long long>> _runIndexRebuildForRecovery(
-        OperationContext* opCtx,
-        CollectionWriter& collection,
-        const UUID& buildUUID,
-        RepairData repair);
+        OperationContext* opCtx, CollectionWriter& collection, const UUID& buildUUID);
 
     /**
      * Looks up active index build by UUID. Returns NoSuchKey if the build does not exist.
