@@ -94,8 +94,8 @@ ExpressionInternalIndexKey::ExpressionInternalIndexKey(ExpressionContext* expCtx
 }
 
 boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
-    invariant(_doc);
-    invariant(_spec);
+    tassert(11282951, "Missing doc field", _doc);
+    tassert(11282950, "Missing spec field", _spec);
 
     _doc = _doc->optimize();
     _spec = _spec->optimize();
@@ -103,8 +103,8 @@ boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
 }
 
 Value ExpressionInternalIndexKey::serialize(const SerializationOptions& options) const {
-    invariant(_doc);
-    invariant(_spec);
+    tassert(11282949, "Missing doc field", _doc);
+    tassert(11282948, "Missing spec field", _spec);
 
     auto specExprConstant = dynamic_cast<ExpressionConstant*>(_spec.get());
     tassert(7250400, "Failed to dynamic cast the 'spec' to 'ExpressionConstant'", specExprConstant);

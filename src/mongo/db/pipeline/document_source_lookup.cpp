@@ -481,8 +481,10 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
 PrivilegeVector DocumentSourceLookUp::LiteParsed::requiredPrivileges(
     bool isMongos, bool bypassDocumentValidation) const {
     PrivilegeVector requiredPrivileges;
-    invariant(_pipelines.size() <= 1);
-    invariant(_foreignNss);
+    tassert(11282983,
+            str::stream() << "$lookup only supports 1 subpipeline, got " << _pipelines.size(),
+            _pipelines.size() <= 1);
+    tassert(11282982, "Missing foreignNss", _foreignNss);
 
     // If no pipeline is specified or the local/foreignField syntax was used, then assume that we're
     // reading directly from the collection.
@@ -618,7 +620,9 @@ DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const
     OrderedPathSet modifiedPaths{_as.fullPath()};
     if (_unwindSrc) {
         auto pathsModifiedByUnwind = _unwindSrc->getModifiedPaths();
-        invariant(pathsModifiedByUnwind.type == GetModPathsReturn::Type::kFiniteSet);
+        tassert(11282981,
+                "Expecting $unwind to modify a finite set of paths",
+                pathsModifiedByUnwind.type == GetModPathsReturn::Type::kFiniteSet);
         modifiedPaths.insert(pathsModifiedByUnwind.paths.begin(),
                              pathsModifiedByUnwind.paths.end());
     }
@@ -627,7 +631,7 @@ DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const
 
 DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11282980, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (std::next(itr) == container->end()) {
         return container->end();
@@ -948,7 +952,9 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
 DepsTracker::State DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
     if (hasPipeline() || _letVariables.size() > 0) {
         // We will use the introspection pipeline which we prebuilt during construction.
-        invariant(_sharedState->resolvedIntrospectionPipeline);
+        tassert(11282979,
+                "Expecting introspection pipeline prebuilt",
+                _sharedState->resolvedIntrospectionPipeline);
 
         DepsTracker subDeps;
 

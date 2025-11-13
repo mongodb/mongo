@@ -466,7 +466,10 @@ bool Pipeline::needsShard() const {
 }
 
 bool Pipeline::requiredToRunOnRouter() const {
-    invariant(_splitState != PipelineSplitState::kSplitForShards);
+    tassert(11282937,
+            str::stream() << "Expecting split state not to be SplitForShards, got "
+                          << int(_splitState),
+            _splitState != PipelineSplitState::kSplitForShards);
 
     for (auto&& stage : _sources) {
         // If this pipeline is capable of splitting before the mongoS-only stage, then the pipeline
@@ -519,7 +522,9 @@ std::vector<BSONObj> Pipeline::serializeContainerForLogging(
     std::vector<Value> serialized = serializeContainer(container, opts);
     std::vector<BSONObj> redacted;
     for (auto&& stage : serialized) {
-        invariant(stage.getType() == BSONType::object);
+        tassert(11282936,
+                "Expecting serialized stage to be of type BSONObject",
+                stage.getType() == BSONType::object);
         redacted.push_back(redact(stage.getDocument().toBson()));
     }
     return redacted;
@@ -544,7 +549,9 @@ std::vector<BSONObj> Pipeline::serializeToBson(
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
     for (auto&& stage : serialized) {
-        invariant(stage.getType() == BSONType::object);
+        tassert(11282935,
+                "Expecting serialized stage to be of type BSONObject",
+                stage.getType() == BSONType::object);
         asBson.push_back(stage.getDocument().toBson());
     }
     return asBson;
@@ -556,7 +563,10 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
         auto beforeSize = array.size();
         stage->serializeToArray(array, opts);
         auto afterSize = array.size();
-        invariant(afterSize - beforeSize == 1u);
+        tassert(11282934,
+                str::stream() << "Expecting stage " << stage->getSourceName()
+                              << " to serialize into a single BSONObject",
+                afterSize - beforeSize == 1u);
     }
     return array;
 }

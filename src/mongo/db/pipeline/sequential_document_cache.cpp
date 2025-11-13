@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/sequential_document_cache.h"
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -37,7 +38,10 @@
 namespace mongo {
 
 void SequentialDocumentCache::add(Document doc) {
-    invariant(_status == CacheStatus::kBuilding);
+    tassert(11282925,
+            str::stream() << "Expect SequentialDocumentCache to be in Building ("
+                          << int(CacheStatus::kBuilding) << ") state, got " << int(_status),
+            _status == CacheStatus::kBuilding);
 
     if (checkCacheSize(doc) != CacheStatus::kAbandoned) {
         _sizeBytes += doc.getApproximateSize();
@@ -46,7 +50,10 @@ void SequentialDocumentCache::add(Document doc) {
 }
 
 void SequentialDocumentCache::freeze() {
-    invariant(_status == CacheStatus::kBuilding);
+    tassert(11282924,
+            str::stream() << "Expect SequentialDocumentCache to be in Building ("
+                          << int(CacheStatus::kBuilding) << ") state, got " << int(_status),
+            _status == CacheStatus::kBuilding);
 
     _status = CacheStatus::kServing;
     _cache.shrink_to_fit();
@@ -64,7 +71,10 @@ void SequentialDocumentCache::abandon() {
 }
 
 boost::optional<Document> SequentialDocumentCache::getNext() {
-    invariant(_status == CacheStatus::kServing);
+    tassert(11282923,
+            str::stream() << "Expect SequentialDocumentCache to be in Serving ("
+                          << int(CacheStatus::kServing) << ") state, got " << int(_status),
+            _status == CacheStatus::kServing);
 
     if (_cacheIter == _cache.end()) {
         return boost::none;
@@ -74,7 +84,10 @@ boost::optional<Document> SequentialDocumentCache::getNext() {
 }
 
 void SequentialDocumentCache::restartIteration() {
-    invariant(_status == CacheStatus::kServing);
+    tassert(11282922,
+            str::stream() << "Expect SequentialDocumentCache to be in Serving ("
+                          << int(CacheStatus::kServing) << ") state, got " << int(_status),
+            _status == CacheStatus::kServing);
     _cacheIter = _cache.begin();
 }
 

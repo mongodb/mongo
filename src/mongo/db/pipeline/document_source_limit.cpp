@@ -63,7 +63,7 @@ constexpr StringData DocumentSourceLimit::kStageName;
 
 DocumentSourceContainer::iterator DocumentSourceLimit::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11282987, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (std::next(itr) == container->end()) {
         return container->end();

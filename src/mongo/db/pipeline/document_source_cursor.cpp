@@ -90,11 +90,13 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
         &explainStatsBuilder);
 
     BSONObj explainStats = explainStatsBuilder.obj();
-    invariant(explainStats["queryPlanner"]);
+    tassert(11294806, "Missing queryPlanner field in explain stats", explainStats["queryPlanner"]);
     out["queryPlanner"] = Value(explainStats["queryPlanner"]);
 
     if (opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
-        invariant(explainStats["executionStats"]);
+        tassert(11294805,
+                "Missing executionStats field in explain stats",
+                explainStats["executionStats"]);
         out["executionStats"] = Value(explainStats["executionStats"]);
     }
 

@@ -78,7 +78,7 @@ static const Value keepVal = Value("keep"_sd);
 
 DocumentSourceContainer::iterator DocumentSourceRedact::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11282971, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (std::next(itr) == container->end()) {
         return container->end();

@@ -323,8 +323,8 @@ Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initi
                                           boost::intrusive_ptr<Expression> argument,
                                           const SerializationOptions& options) const {
     ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
-    invariant(ec);
-    invariant(ec->getValue().nullish());
+    tassert(11294818, "Expecting initializer expression to be a constant", ec);
+    tassert(11294817, "Expecting initializer expression to be nullish", ec->getValue().nullish());
 
     MutableDocument md;
     AccumulatorPercentile::serializeHelper(argument, options, _percentiles, _method, md);
@@ -440,8 +440,8 @@ Document AccumulatorMedian::serialize(boost::intrusive_ptr<Expression> initializ
                                       boost::intrusive_ptr<Expression> argument,
                                       const SerializationOptions& options) const {
     ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
-    invariant(ec);
-    invariant(ec->getValue().nullish());
+    tassert(11294816, "Expecting initializer expression to be a constant", ec);
+    tassert(11294815, "Expecting initializer expression to be nullish", ec->getValue().nullish());
 
     MutableDocument md;
     AccumulatorMedian::serializeHelper(argument, options, _percentiles, _method, md);

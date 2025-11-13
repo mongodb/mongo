@@ -444,6 +444,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         return std::pair(isSharded, std::move(optFilter));
     }();
 
+    auto tassertOwnershipFilter =
+        [](const boost::optional<ScopedCollectionFilter>& optOwnershipFilter) {
+            tassert(11282933, "Expecting ownership filter in sharded scenario", optOwnershipFilter);
+        };
+
     // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
     // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch
     // to a collection scan if the ratio of orphaned to owned documents encountered over the first
@@ -495,7 +500,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         if (isSharded) {
             // In the sharded case, we need to use a ShardFilterer within the ARHASH plan to
             // eliminate orphans from the working set, since the stage owns the cursor.
-            invariant(optOwnershipFilter);
+            tassertOwnershipFilter(optOwnershipFilter);
             maybeShardFilter = std::make_unique<ShardFiltererImpl>(*optOwnershipFilter);
         }
 
@@ -518,7 +523,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         if (isSharded) {
             // In the sharded case, we need to add a shard-filterer stage to the backup plan to
             // eliminate orphans. The trial plan is thus SHARDING_FILTER-COLLSCAN.
-            invariant(optOwnershipFilter);
+            tassertOwnershipFilter(optOwnershipFilter);
             collScanPlan = std::make_unique<ShardFilterStage>(
                 expCtx.get(), *optOwnershipFilter, ws.get(), std::move(collScanPlan));
         }
@@ -558,8 +563,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
             sampleSize / (numRecords * kMaxSampleRatioForRandCursor), kMaxSampleRatioForRandCursor);
         // Since the incoming operation is sharded, use the CSS to infer the filtering metadata for
         // the collection. We get the shard ownership filter after checking to see if the collection
-        // is sharded to avoid an invariant from being fired in this call.
-        invariant(optOwnershipFilter);
+        // is sharded to avoid an assert from being fired in this call.
+        tassertOwnershipFilter(optOwnershipFilter);
         // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
         auto randomCursorPlan = std::make_unique<ShardFilterStage>(
             expCtx.get(), *optOwnershipFilter, ws.get(), std::move(root));
@@ -922,7 +927,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool timeseriesBoundedSortOptimization,
     bool* shouldProduceEmptyDocs) {
-    invariant(shouldProduceEmptyDocs);
+    tassert(11282932, "Missing shouldProduceEmptyDocs option", shouldProduceEmptyDocs);
 
     // =============================================================================================
     // Do a few last-minute optimizations that push some of the stages from the pipeline into the
@@ -1794,7 +1799,9 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     }
 
     if (isChangeStream) {
-        invariant(expCtx->getTailableMode() == TailableModeEnum::kTailableAndAwaitData);
+        tassert(11282931,
+                "When querying the change stream expect TailableAndAwaitData mode",
+                expCtx->getTailableMode() == TailableModeEnum::kTailableAndAwaitData);
         plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
                         QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }

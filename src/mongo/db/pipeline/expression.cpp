@@ -1393,7 +1393,10 @@ ExpressionDateDiff::ExpressionDateDiff(ExpressionContext* const expCtx,
 boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* const expCtx,
                                                            BSONElement expr,
                                                            const VariablesParseState& vps) {
-    invariant(expr.fieldNameStringData() == "$dateDiff");
+    tassert(11282956,
+            str::stream() << "Expecting to parse $dateDiff field, got "
+                          << expr.fieldNameStringData(),
+            expr.fieldNameStringData() == "$dateDiff");
     uassert(5166301,
             "$dateDiff only supports an object as its argument",
             expr.type() == BSONType::object);
@@ -2636,7 +2639,9 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
 
     // An operator cannot be left-associative and commutative, because left-associative
     // operators need to preserve their order-of-operations.
-    invariant(!(getAssociativity() == Associativity::kLeft && isCommutative()));
+    tassert(11282955,
+            "Nary expression cannot be left-associative and commutative at the same time",
+            !(getAssociativity() == Associativity::kLeft && isCommutative()));
 
     // If the expression is associative, we can collapse all the consecutive constant operands
     // into one by applying the expression to those consecutive constant operands. If the

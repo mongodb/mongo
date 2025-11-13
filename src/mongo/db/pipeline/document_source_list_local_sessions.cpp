@@ -112,7 +112,7 @@ mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(
             return true;
         }
         // parseSpec should ensure users is non-empty.
-        invariant(spec.getUsers());
+        tassert(11282986, "ListSessionsSpec is missing Users field", spec.getUsers());
 
         const auto& myName =
             getUserNameForLoggedInUser(Client::getCurrent()->getOperationContext());
@@ -137,7 +137,6 @@ mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
 
     IDLParserContext ctx(stageName);
     auto ret = ListSessionsSpec::parse(spec.Obj(), ctx);
-
     uassert(ErrorCodes::UnsupportedFormat,
             str::stream() << stageName
                           << " may not specify {allUsers:true} and {users:[...]} at the same time",

@@ -5695,7 +5695,7 @@ TEST_F(PipelineMustRunOnRouterTest, UnsplittableRouterPipelineAssertsIfDisallowe
 
 DEATH_TEST_F(PipelineMustRunOnRouterTest,
              SplittablePipelineMustMergeOnRouterAfterSplit,
-             "invariant") {
+             "Tripwire assertion") {
     setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline =
         makePipeline({matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnRouter()});
@@ -5710,7 +5710,7 @@ DEATH_TEST_F(PipelineMustRunOnRouterTest,
 
     ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnRouter());
 
-    // Calling 'requiredToRunOnRouter' on the shard pipeline will hit an invariant.
+    // Calling 'requiredToRunOnRouter' on the shard pipeline will hit a tassert.
     splitPipeline.shardsPipeline->requiredToRunOnRouter();
 }
 

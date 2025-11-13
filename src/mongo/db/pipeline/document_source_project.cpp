@@ -139,7 +139,10 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
         return DocumentSourceProject::create(elem.Obj(), expCtx, elem.fieldNameStringData());
     }
 
-    invariant(elem.fieldNameStringData() == kAliasNameUnset);
+    tassert(11282972,
+            str::stream() << "Attempting to parse DocumentSourceProject from neither " << kStageName
+                          << ", nor " << kAliasNameUnset << " BSON object",
+            elem.fieldNameStringData() == kAliasNameUnset);
     uassert(31002,
             "$unset specification must be a string or an array",
             (elem.type() == BSONType::array || elem.type() == BSONType::string));

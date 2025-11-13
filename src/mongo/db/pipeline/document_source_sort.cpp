@@ -281,7 +281,7 @@ boost::optional<long long> DocumentSourceSort::getLimit() const {
 
 DocumentSourceContainer::iterator DocumentSourceSort::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11282961, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (_timeSorter) {
         // Do not absorb a limit, or combine with other sort stages.

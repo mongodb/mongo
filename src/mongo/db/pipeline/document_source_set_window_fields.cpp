@@ -408,7 +408,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
 
 DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11282966, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (itr == container->begin()) {
         return std::next(itr);

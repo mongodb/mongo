@@ -67,7 +67,10 @@ void visitAllValuesAtPathHelper(const Document& doc,
                                 const FieldPath& path,
                                 size_t fieldPathIndex,
                                 std::function<void(const Value&)> callback) {
-    invariant(path.getPathLength() > 0 && fieldPathIndex < path.getPathLength());
+    tassert(11294814,
+            str::stream() << "Expect path index to be in range (0, " << path.getPathLength()
+                          << "), got " << fieldPathIndex,
+            path.getPathLength() > 0 && fieldPathIndex < path.getPathLength());
 
     // The first field in the path must be treated as a field name, even if it is numeric as in
     // "0.a.1.b".

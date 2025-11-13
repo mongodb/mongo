@@ -69,7 +69,7 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
       _planExplainer{_pipeline.get(), _execPipeline.get()},
       _resumableScanType{resumableScanType} {
     // Pipeline plan executors must always have an ExpressionContext.
-    invariant(_expCtx);
+    tassert(11282930, "Missing ExpressionContext", _expCtx);
 
     // The caller is responsible for disposing this plan executor before deleting it, which will in
     // turn dispose the underlying pipeline. Therefore, there is no need to dispose the pipeline
@@ -85,7 +85,7 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
 PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId* recordIdOut) {
     // The pipeline-based execution engine does not track the record ids associated with documents,
     // so it is an error for the caller to ask for one.
-    invariant(!recordIdOut);
+    tassert(11282929, "Expect no recordIdOut from pipeline plan executor", !recordIdOut);
 
     if (!_stash.empty()) {
         if (objOut) {
@@ -221,7 +221,7 @@ void PlanExecutorPipeline::_validateChangeStreamsResumeToken(const Document& eve
     // Confirm that the document _id field matches the original resume token in the sort key field.
     auto resumeToken = event.metadata().getSortKey();
     auto idField = event.getField("_id");
-    invariant(!resumeToken.missing());
+    tassert(11282928, "Resume token is missing from the event", !resumeToken.missing());
     uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream() << "Encountered an event whose _id field, which contains the resume "
                              "token, was modified by the pipeline. Modifying the _id field of an "
@@ -288,7 +288,9 @@ void PlanExecutorPipeline::_initializeResumableScanState() {
 }
 
 void PlanExecutorPipeline::markAsKilled(Status killStatus) {
-    invariant(!killStatus.isOK());
+    tassert(11282927,
+            "Attempting to mark PlanExecutorPipeline as killed with status OK",
+            !killStatus.isOK());
     // If killed multiple times, only retain the first status.
     if (_killStatus.isOK()) {
         _killStatus = killStatus;

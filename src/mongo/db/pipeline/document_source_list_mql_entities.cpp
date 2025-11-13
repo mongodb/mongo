@@ -59,10 +59,11 @@ ALLOCATE_DOCUMENT_SOURCE_ID(listMqlEntities, DocumentSourceListMqlEntities::id)
 boost::intrusive_ptr<DocumentSource> DocumentSourceListMqlEntities::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto stageName = elem.fieldNameStringData();
-    invariant(
-        stageName == kStageName,
+    tassert(
+        11282984,
         str::stream() << "Unexpected stage registered with DocumentSourceListMqlEntities parser: "
-                      << stageName);
+                      << stageName,
+        stageName == kStageName);
     uassert(9590101,
             str::stream() << "expected an object as specification for " << kStageName
                           << " stage, got " << typeName(elem.type()),

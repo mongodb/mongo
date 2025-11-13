@@ -121,8 +121,10 @@ private:
                                               boost::optional<ResumeTokenData> startAfterInvalidate)
         : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
           _startAfterInvalidate(std::move(startAfterInvalidate)) {
-        invariant(!_startAfterInvalidate ||
-                  _startAfterInvalidate->fromInvalidate == ResumeTokenData::kFromInvalidate);
+        tassert(11294807,
+                "Expected the passed resume token to be from an invalidate notification",
+                !_startAfterInvalidate ||
+                    _startAfterInvalidate->fromInvalidate == ResumeTokenData::kFromInvalidate);
     }
 
     boost::optional<ResumeTokenData> _startAfterInvalidate;

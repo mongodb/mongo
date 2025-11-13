@@ -75,8 +75,10 @@ bool checkModifiedPathsSortReorder(const SortPattern& sortPattern,
 DocumentSourceContainer::iterator tryReorderingWithSort(DocumentSourceContainer::iterator itr,
                                                         DocumentSourceContainer* container) {
     auto docSource = itr->get();
-    invariant(dynamic_cast<DocumentSourceLookUp*>(docSource) ||
-              dynamic_cast<DocumentSourceGraphLookUp*>(docSource));
+    tassert(11282910,
+            "Reordering with sort only works with $lookup and $graphLookup",
+            dynamic_cast<DocumentSourceLookUp*>(docSource) ||
+                dynamic_cast<DocumentSourceGraphLookUp*>(docSource));
 
     // If we have $graphLookup or $lookup followed by $sort, and $sort does not use any fields
     // created by it, they can swap.

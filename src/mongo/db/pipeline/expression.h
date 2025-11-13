@@ -4351,8 +4351,10 @@ public:
      * i-th branch of the switch.
      */
     std::pair<const Expression*, const Expression*> getBranch(int i) const {
-        invariant(i >= 0);
-        invariant(i < numBranches());
+        tassert(11282954,
+                str::stream() << "Expression branch index " << i << " is out of bounds [0; "
+                              << numBranches() << ")",
+                i >= 0 && i < numBranches());
         return {_children[i * 2].get(), _children[i * 2 + 1].get()};
     }
 

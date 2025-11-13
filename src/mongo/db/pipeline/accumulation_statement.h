@@ -180,8 +180,8 @@ struct AccumulationExpression {
                            AccumulatorState::Factory factory,
                            StringData name)
         : initializer(initializer), argument(argument), factory(factory), name(name) {
-        invariant(this->initializer);
-        invariant(this->argument);
+        tassert(11294828, "Expecting initializer expression", this->initializer);
+        tassert(11294827, "Expecting argument expression", this->argument);
     }
 
     // The expression to use to obtain the input to the accumulator.

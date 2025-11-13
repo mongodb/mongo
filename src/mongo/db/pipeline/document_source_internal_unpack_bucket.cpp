@@ -1633,7 +1633,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
         return itr;
     }
 
-    invariant(*itr == this);
+    tassert(11282989, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     _optimizingRestOfPipeline = true;
     ON_BLOCK_EXIT([this] { _optimizingRestOfPipeline = false; });
@@ -1704,7 +1704,7 @@ bool DocumentSourceInternalUnpackBucket::tryToAbsorbTopKSortIntoGroup(
 DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
 
-    invariant(*itr == this);
+    tassert(11282988, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (_optimizingRestOfPipeline) {
         return std::next(itr);

@@ -70,11 +70,15 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
     const auto& idExpressions = _groupProcessor->getIdExpressions();
     // Add the _id.
     if (idFieldNames.empty()) {
-        invariant(idExpressions.size() == 1);
+        tassert(11282998,
+                "Expecting single idExpression in group processor",
+                idExpressions.size() == 1);
         insides["_id"] = idExpressions[0]->serialize(opts);
     } else {
         // Decomposed document case.
-        invariant(idExpressions.size() == idFieldNames.size());
+        tassert(11282997,
+                "Expect the number of idExpression to match the number of idFieldNames",
+                idExpressions.size() == idFieldNames.size());
         MutableDocument md;
         for (size_t i = 0; i < idExpressions.size(); i++) {
             md[opts.serializeFieldPathFromString(idFieldNames[i])] =
@@ -196,10 +200,14 @@ StringMap<boost::intrusive_ptr<Expression>> DocumentSourceGroupBase::getIdFields
     const auto& idFieldNames = _groupProcessor->getIdFieldNames();
     const auto& idExpressions = _groupProcessor->getIdExpressions();
     if (idFieldNames.empty()) {
-        invariant(idExpressions.size() == 1);
+        tassert(11282996,
+                "Expecting single idExpression in group processor",
+                idExpressions.size() == 1);
         return {{"_id", idExpressions[0]}};
     } else {
-        invariant(idFieldNames.size() == idExpressions.size());
+        tassert(11282995,
+                "Expect the number of idExpression to match the number of idFieldNames",
+                idExpressions.size() == idFieldNames.size());
         StringMap<boost::intrusive_ptr<Expression>> result;
         for (std::size_t i = 0; i < idFieldNames.size(); ++i) {
             result["_id." + idFieldNames[i]] = idExpressions[i];
@@ -288,7 +296,7 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
         if (pFieldName == "_id") {
             uassert(15948, "a group's _id may only be specified once", idExpressions.empty());
             _groupProcessor->setIdExpression(parseIdExpression(getExpCtx(), groupField, vps));
-            invariant(!idExpressions.empty());
+            tassert(11282994, "Empty list of idExpressions", !idExpressions.empty());
         } else if (pFieldName == kDoingMergeSpecField) {
             uassert(ErrorCodes::Unauthorized,
                     "Setting '$doingMerge' is not allowed in user requests",

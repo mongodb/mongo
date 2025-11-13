@@ -96,7 +96,10 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     const auto specifiedName = elem.fieldNameStringData();
-    invariant(specifiedName == kStageName || specifiedName == kAliasNameSet);
+    tassert(11294811,
+            str::stream() << "Attempting to parse DocumentSourceAddFields from neither "
+                          << kStageName << ", nor " << kAliasNameSet << " BSON object",
+            specifiedName == kStageName || specifiedName == kAliasNameSet);
 
     uassert(40272,
             str::stream() << specifiedName << " specification stage must be an object, got "

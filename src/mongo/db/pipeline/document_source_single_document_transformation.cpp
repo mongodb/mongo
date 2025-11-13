@@ -109,11 +109,13 @@ Value DocumentSourceSingleDocumentTransformation::serialize(
 }
 
 projection_executor::ExclusionNode& DocumentSourceSingleDocumentTransformation::getExclusionNode() {
-    invariant(getTransformerType() == TransformerInterface::TransformerType::kExclusionProjection);
+    tassert(11282965,
+            "Expecting exclusion projection transformation type",
+            getTransformerType() == TransformerInterface::TransformerType::kExclusionProjection);
     auto ret = dynamic_cast<projection_executor::ExclusionProjectionExecutor&>(
                    getTransformationProcessor()->getTransformer())
                    .getRoot();
-    invariant(ret);
+    tassert(11282964, "Missing ExclusionProjectionExecutor", ret);
     return *ret;
 }
 
@@ -154,7 +156,7 @@ DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::ma
 
 DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11282963, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (std::next(itr) == container->end()) {
         return container->end();

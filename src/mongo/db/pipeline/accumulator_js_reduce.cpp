@@ -332,11 +332,11 @@ Value AccumulatorJs::getValue(bool toBeMerged) {
     // _state is initialized when we encounter the first document in each group. We never create
     // empty groups: even in a {$group: {_id: 1, ...}}, we will return zero groups rather than one
     // empty group.
-    invariant(_state);
+    tassert(11294824, "$accumulator is missing state", _state);
 
     // Ensure we've actually called accumulate/merge for every input document.
     reduceMemoryConsumptionIfAble();
-    invariant(_pendingCalls.empty());
+    tassert(11294823, "Expecting $accumulator to have no pending calls", _pendingCalls.empty());
 
     // If toBeMerged then we return the current state, to be fed back in to accumulate / merge /
     // finalize later. If not toBeMerged then we return the final value, by calling finalize.
@@ -368,7 +368,7 @@ void AccumulatorJs::resetMemUsageBytes() {
 void AccumulatorJs::startNewGroup(Value const& input) {
     // Between groups the _state should be empty: we initialize it to be empty it in the
     // constructor, and we clear it at the end of each group (in .reset()).
-    invariant(!_state);
+    tassert(11294822, "Between groups the state should be empty", !_state);
 
     auto expCtx = getExpressionContext();
     auto jsExec = expCtx->getJsExecWithScope();
@@ -402,8 +402,11 @@ void AccumulatorJs::reset() {
 
 void AccumulatorJs::processInternal(const Value& input, bool merging) {
     // _state should be nonempty because we populate it in startNewGroup.
-    invariant(_state);
-    invariant(_pendingCalls.empty() || _pendingCallsMerging == merging);
+    tassert(11294821, "$accumulator is missing state", _state);
+    tassert(11294820,
+            str::stream() << "Expecting either no pending calls or pendingCallsMerging == "
+                          << (merging ? "true" : "false"),
+            _pendingCalls.empty() || _pendingCallsMerging == merging);
 
     if (!merging) {
         uassert(4544712,
@@ -423,7 +426,7 @@ void AccumulatorJs::processInternal(const Value& input, bool merging) {
 
 void AccumulatorJs::reduceMemoryConsumptionIfAble() {
     // _state should be nonempty because we populate it in startNewGroup.
-    invariant(_state);
+    tassert(11294819, "$accumulator is missing state", _state);
 
     if (_pendingCalls.empty()) {
         return;

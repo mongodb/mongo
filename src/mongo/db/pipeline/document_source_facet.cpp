@@ -334,9 +334,15 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
                                       << " is not allowed to be used within a $facet stage");
                     }
                     // We expect a stage within a $facet stage to have these properties.
-                    invariant(stageConstraints.requiredPosition ==
-                              StageConstraints::PositionRequirement::kNone);
-                    invariant(!stageConstraints.isIndependentOfAnyCollection);
+                    tassert(11294804,
+                            str::stream()
+                                << "Expecting $facet stage to have no position requirement, got "
+                                << static_cast<int>(stageConstraints.requiredPosition),
+                            stageConstraints.requiredPosition ==
+                                StageConstraints::PositionRequirement::kNone);
+                    tassert(11294803,
+                            "Expecting $facet stage not to be independent of any collection",
+                            !stageConstraints.isIndependentOfAnyCollection);
                 }
             });
 

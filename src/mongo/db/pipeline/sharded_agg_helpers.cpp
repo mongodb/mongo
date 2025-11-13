@@ -266,7 +266,9 @@ std::vector<RemoteCursor> establishShardCursors(
 
     if (targetAllHosts) {
         // If we are running on all shard servers we should never designate a particular server.
-        invariant(designatedHostsMap.empty());
+        tassert(11282921,
+                "Expecting no designated hosts when asked to target all hosts",
+                designatedHostsMap.empty());
         std::set<ShardId> shardIds;
         for (const auto& request : requests) {
             shardIds.emplace(request.shardId);
@@ -327,10 +329,10 @@ BSONObj buildNewKeyPattern(const ShardKeyPattern& shardKey, StringMap<std::strin
     BSONObjBuilder newPattern;
     for (auto&& elem : shardKey.getKeyPattern().toBSON()) {
         auto it = renames.find(elem.fieldNameStringData());
-        invariant(it != renames.end(),
-                  str::stream() << "Could not find new name of shard key field \""
-                                << elem.fieldName() << "\": rename map was "
-                                << mapToString(renames));
+        tassert(11282920,
+                str::stream() << "Could not find new name of shard key field \"" << elem.fieldName()
+                              << "\": rename map was " << mapToString(renames),
+                it != renames.end());
         newPattern.appendAs(elem, it->second);
     }
     return newPattern.obj();
@@ -351,10 +353,11 @@ StringMap<std::string> computeShardKeyRenameMap(const Pipeline* mergePipeline,
         traversalEnd = std::prev(traversalEnd);
     }
     auto renameMap = semantic_analysis::renamedPaths(traversalStart, traversalEnd, pathsOfShardKey);
-    invariant(renameMap,
-              str::stream()
-                  << "Analyzed pipeline was thought to preserve the shard key fields, but did not: "
-                  << Value(mergePipeline->serialize()).toString());
+    tassert(11282919,
+            str::stream()
+                << "Analyzed pipeline was thought to preserve the shard key fields, but did not: "
+                << Value(mergePipeline->serialize()).toString(),
+            renameMap);
     return *renameMap;
 }
 
@@ -668,7 +671,7 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     AggregateCommandRequest request,
     ShardId shardId,
     bool requestQueryStatsFromRemotes) {
-    invariant(!request.getExplain());
+    tassert(11282918, "Don't expect explain requests here", !request.getExplain());
 
     auto readPreference = uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(
         request.getUnwrappedReadPref().value_or(BSONObj())));
@@ -689,7 +692,9 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
                                             false /* allowPartialResults */,
                                             &routingCtx,
                                             Shard::RetryPolicy::kIdempotent);
-            invariant(cursors.size() == 1);
+            tassert(11282917,
+                    "Expecting single cursor when running directly on single shard",
+                    cursors.size() == 1);
 
             // Convert remote cursors into a vector of "owned" cursors.
             std::vector<OwnedRemoteCursor> ownedCursors;
@@ -1042,7 +1047,9 @@ std::vector<AsyncRequestsSender::Request> buildShardRequests(
     if (!resumeTokenMap.empty()) {
         // Resume tokens are particular to a host, so it will never make sense to use them when
         // running on all shard servers.
-        invariant(!targetAllHosts);
+        tassert(11282916,
+                "Don't expect targeting all hosts when having resume tokens",
+                !targetAllHosts);
         std::vector<AsyncRequestsSender::Request> requestsWithResumeTokens;
         requestsWithResumeTokens.reserve(requests.size());
         for (const auto& request : requests) {
@@ -1456,7 +1463,9 @@ void mergeExplainOutputFromShards(const std::vector<AsyncRequestsSender::Respons
         uassertStatusOK(shardResult.swResponse.getStatus());
         uassertStatusOK(getStatusFromCommandResult(shardResult.swResponse.getValue().data));
 
-        invariant(shardResult.shardHostAndPort);
+        tassert(11282915,
+                "Missing host and port from the shard response",
+                shardResult.shardHostAndPort);
 
         auto shardId = shardResult.shardId.toString();
         const auto& data = shardResult.swResponse.getValue().data;
@@ -1569,9 +1578,13 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
 
     // The pipeline is going to be explained on the shards, and we don't want to send a
     // mergeCursors stage.
-    invariant(pipeline->empty() ||
-              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
-    invariant(expCtx->getExplain());
+    tassert(11282913,
+            "Expect no $mergeCursors stage at the beginning of the pipeline",
+            pipeline->empty() ||
+                !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+    tassert(11282912,
+            "ExpressionContext is missing explain verbosity when targeting shards for explain",
+            expCtx->getExplain());
 
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),
                                               expCtx->getNamespaceString());

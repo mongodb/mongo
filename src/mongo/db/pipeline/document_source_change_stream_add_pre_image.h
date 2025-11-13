@@ -80,8 +80,10 @@ public:
                                           FullDocumentBeforeChangeModeEnum mode)
         : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
           _fullDocumentBeforeChangeMode(mode) {
-        // This stage should never be created with FullDocumentBeforeChangeMode::kOff.
-        invariant(_fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kOff);
+        tassert(11294809,
+                "ChangeStreamAddPreImage stage should never be created with "
+                "FullDocumentBeforeChangeMode::kOff.",
+                _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kOff);
     }
 
     /**
@@ -95,7 +97,9 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        invariant(pipeState != PipelineSplitState::kSplitForShards);
+        tassert(11294808,
+                "Expecting pipeline to be either unsplit or split for merging",
+                pipeState != PipelineSplitState::kSplitForShards);
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kAnyShard,

@@ -105,8 +105,6 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
     if (elem.type() == BSONType::string) {
         fields.push_back(elem.str());
     } else {
-        invariant(elem.type() == BSONType::array);
-
         BSONObjIterator iter(elem.Obj());
         while (iter.more()) {
             const BSONElement matchByElem = iter.next();
@@ -150,8 +148,6 @@ MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem) {
         return {MergeWhenMatchedModeEnum::kPipeline, parsePipelineFromBSON(elem)};
     }
 
-    invariant(elem.type() == BSONType::string);
-
     IDLParserContext ctx{DocumentSourceMergeSpec::kWhenMatchedFieldName};
     auto value = elem.valueStringData();
     auto mode = MergeWhenMatchedMode_parse(value, ctx);
@@ -168,7 +164,7 @@ void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
                                      StringData fieldName,
                                      BSONObjBuilder* bob) {
     if (policy.mode == MergeWhenMatchedModeEnum::kPipeline) {
-        invariant(policy.pipeline);
+        tassert(11282973, "Merge policy lacks the pipeline", policy.pipeline);
         bob->append(fieldName, *policy.pipeline);
     } else {
         bob->append(fieldName, MergeWhenMatchedMode_serializer(policy.mode));

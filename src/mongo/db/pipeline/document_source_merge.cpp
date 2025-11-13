@@ -196,7 +196,7 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (whenMatched == MergeWhenMatchedModeEnum::kPipeline) {
         auto pipeline = mergeSpec.getWhenMatched()->pipeline;
-        invariant(pipeline);
+        tassert(11282975, "$merge spec is missing the whenMatched pipeline", pipeline);
         liteParsedPipeline = LiteParsedPipeline(nss, *pipeline);
     }
     return std::make_unique<DocumentSourceMerge::LiteParsed>(spec.fieldName(),
@@ -208,7 +208,7 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
 
 PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(
     bool isMongos, bool bypassDocumentValidation) const {
-    invariant(_foreignNss);
+    tassert(11282974, "Missing foreignNss", _foreignNss);
     auto actions =
         ActionSet{getMergeStrategyDescriptors().at({_whenMatched, _whenNotMatched}).actions};
     if (bypassDocumentValidation) {

@@ -188,7 +188,7 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
       _groupByExpression(groupByExpression),
       _granularityRounder(granularityRounder),
       _nBuckets(numBuckets) {
-    invariant(!accumulationStatements.empty());
+    tassert(11294810, "Missing accumulationStatements", !accumulationStatements.empty());
     _accumulatedFields->reserve(accumulationStatements.size());
     for (auto&& accumulationStatement : accumulationStatements) {
         _accumulatedFields->push_back(accumulationStatement);

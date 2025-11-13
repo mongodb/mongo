@@ -281,9 +281,10 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
 PrivilegeVector DocumentSourceUnionWith::LiteParsed::requiredPrivileges(
     bool isMongos, bool bypassDocumentValidation) const {
     PrivilegeVector requiredPrivileges;
-    invariant(_pipelines.size() <= 1);
-    invariant(_foreignNss);
-
+    tassert(11282960,
+            str::stream() << "$unionWith only supports 1 subpipeline, got " << _pipelines.size(),
+            _pipelines.size() <= 1);
+    tassert(11282959, "Missing foreignNss", _foreignNss);
     // If no pipeline is specified, then assume that we're reading directly from the collection.
     // Otherwise check whether the pipeline starts with an "initial source" indicating that we don't
     // require the "find" privilege.
@@ -462,7 +463,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             return Value(DOC(getSourceName() << spec));
         }
 
-        invariant(pipeCopy);
+        tassert(11282958, "Missing pipeline copy", pipeCopy);
 
         auto preparePipelineAndExplain = [&](std::unique_ptr<Pipeline> pipeline) {
             // Query settings are looked up after parsing and therefore are not populated in the
@@ -501,7 +502,9 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
 
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
         // We expect this to be an explanation of a pipeline -- there should only be one field.
-        invariant(explainLocal.nFields() == 1);
+        tassert(11282957,
+                "Expecting pipeline explain to contain exactly 1 field",
+                explainLocal.nFields() == 1);
 
         auto spec = collectionless
             ? DOC("pipeline" << explainLocal.firstElement())

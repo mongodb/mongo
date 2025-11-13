@@ -109,7 +109,7 @@ public:
      * abandoned it is expected that the cache will not be used for subsequent operations.
      */
     void abandonCache() {
-        invariant(_cache);
+        tassert(11282967, "Missing document cache", _cache);
         _cache->abandon();
     }
 

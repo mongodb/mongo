@@ -39,7 +39,7 @@ const char* DocumentSourceInternalReplaceRoot::getSourceName() const {
 
 DocumentSourceContainer::iterator DocumentSourceInternalReplaceRoot::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11282991, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
     return itr;
 }
 

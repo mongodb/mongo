@@ -178,43 +178,53 @@ struct StageConstraints {
           lookupRequirement(lookupRequirement),
           unionRequirement(unionRequirement),
           streamType(streamType) {
-        // Stages which are allowed to run in $facet must not have any position requirements.
-        invariant(!(isAllowedInsideFacetStage() && requiredPosition != PositionRequirement::kNone));
+        tassert(11282909,
+                "Stages which are allowed to run in $facet must not have any position requirements",
+                !(isAllowedInsideFacetStage() && requiredPosition != PositionRequirement::kNone));
 
-        // No change stream stages are permitted to run in a $facet or $lookup pipelines.
-        invariant(!(isChangeStreamStage() && isAllowedInsideFacetStage()));
-        invariant(!(isChangeStreamStage() && isAllowedInLookupPipeline()));
+        tassert(11282908,
+                "No change stream stages are permitted to run in a $facet pipelines",
+                !(isChangeStreamStage() && isAllowedInsideFacetStage()));
+        tassert(11282907,
+                "No change stream stages are permitted to run in a $lookup pipelines",
+                !(isChangeStreamStage() && isAllowedInLookupPipeline()));
 
-        // Stages which write persistent data cannot be used in a $lookup pipeline.
-        invariant(!(isAllowedInLookupPipeline() && writesPersistentData()));
-        invariant(
-            !(isAllowedInLookupPipeline() && hostRequirement == HostTypeRequirement::kRouter));
+        tassert(11282906,
+                "Stages which write persistent data cannot be used in a $lookup pipeline",
+                !(isAllowedInLookupPipeline() && writesPersistentData()));
+        tassert(11282905,
+                "Stages from a $lookup pipeline cannot be executed on a router",
+                !(isAllowedInLookupPipeline() && hostRequirement == HostTypeRequirement::kRouter));
 
-        // Only streaming stages are permitted in $changeStream pipelines.
-        invariant(!(isAllowedInChangeStream() && streamType == StreamType::kBlocking));
+        tassert(11282904,
+                "Only streaming stages are permitted in $changeStream pipelines",
+                !(isAllowedInChangeStream() && streamType == StreamType::kBlocking));
+        tassert(11282903,
+                "A stage which is allowlisted for $changeStream cannot have a requirement to run "
+                "on a shard, since it needs to be able to run on mongoS in a cluster",
+                !(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
+                  (hostRequirement == HostTypeRequirement::kAnyShard ||
+                   hostRequirement == HostTypeRequirement::kAllShardHosts)));
 
-        // A stage which is allowlisted for $changeStream cannot have a requirement to run on a
-        // shard, since it needs to be able to run on mongoS in a cluster.
-        invariant(!(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
-                    (hostRequirement == HostTypeRequirement::kAnyShard ||
-                     hostRequirement == HostTypeRequirement::kAllShardHosts)));
+        tassert(11282902,
+                "A stage which is allowlisted for $changeStream cannot have a position requirement",
+                !(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
+                  requiredPosition != PositionRequirement::kNone));
 
-        // A stage which is allowlisted for $changeStream cannot have a position requirement.
-        invariant(!(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
-                    requiredPosition != PositionRequirement::kNone));
-
-        // Change stream stages should not be permitted with readConcern level "snapshot" or
-        // inside of a multi-document transaction.
         if (isChangeStreamStage()) {
-            invariant(!isAllowedInTransaction());
+            tassert(11282901,
+                    "Change stream stages should not be permitted with readConcern level "
+                    "\"snapshot\" or inside of a multi-document transaction",
+                    !isAllowedInTransaction());
         }
 
-        // Stages which write data to user collections should not be permitted with readConcern
-        // level "snapshot" or inside of a multi-document transaction.
         // TODO (SERVER-36259): relax this requirement when $out and/or $merge (which write
         // persistent data) is allowed in a transaction.
         if (diskRequirement == DiskUseRequirement::kWritesPersistentData) {
-            invariant(!isAllowedInTransaction());
+            tassert(11282900,
+                    "Stages which write data to user collections should not be permitted with "
+                    "readConcern level \"snapshot\" or inside of a multi-document transaction",
+                    !isAllowedInTransaction());
         }
 
         tassert(

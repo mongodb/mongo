@@ -54,7 +54,9 @@ void GroupProcessorBase::addAccumulationStatement(AccumulationStatement accumula
 void GroupProcessorBase::setExecutionStarted() {
     if (!_executionStarted) {
         _memoryTracker.clear();
-        invariant(_accumulatedFieldMemoryTrackers.empty());
+        tassert(11282941,
+                "Expect memory trackers list to be empty at the start of execution",
+                _accumulatedFieldMemoryTrackers.empty());
         for (const auto& accum : _accumulatedFields) {
             _accumulatedFieldMemoryTrackers.push_back(&_memoryTracker[accum.fieldName]);
         }
@@ -184,8 +186,13 @@ void GroupProcessorBase::accumulate(GroupsMap::iterator groupIter,
                                     size_t accumulatorIdx,
                                     Value accumulatorArg) {
     const size_t numAccumulators = _accumulatedFields.size();
-    invariant(numAccumulators == groupIter->second.size());
-    invariant(accumulatorIdx < numAccumulators);
+    tassert(11282940,
+            "Expect the number of accumulated fields to match the number of accumulators",
+            numAccumulators == groupIter->second.size());
+    tassert(11282911,
+            str::stream() << "Out of bounds access to accumulator states. Idx=" << accumulatorIdx
+                          << "; Number of accumulators=" << numAccumulators,
+            accumulatorIdx < numAccumulators);
 
     auto& accumulator = groupIter->second[accumulatorIdx];
     const auto prevMemUsage = accumulator->getMemUsage();
@@ -204,7 +211,9 @@ Value GroupProcessorBase::expandId(const Value& val) {
 
     // _id is a multi-field document containing the elements of val
     const std::vector<Value>& vals = val.getArray();
-    invariant(_idFieldNames.size() == vals.size());
+    tassert(11282939,
+            "Expect the number of field names to match the number of fields in the group id",
+            _idFieldNames.size() == vals.size());
     MutableDocument md(vals.size());
     for (size_t i = 0; i < vals.size(); i++) {
         md[_idFieldNames[i]] = vals[i];

@@ -81,7 +81,6 @@ void AccumulatorConcatArrays::processInternal(const Value& input, bool merging) 
 }
 
 void AccumulatorConcatArrays::addValuesFromArray(const Value& values) {
-    invariant(values.isArray());
     _memUsageTracker.add(values.getApproximateSize());
 
     uassert(ErrorCodes::ExceededMemoryLimit,

@@ -159,7 +159,9 @@ DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() 
     OrderedPathSet modifiedPaths{getAsField().fullPath()};
     if (_unwind) {
         auto pathsModifiedByUnwind = _unwind.value()->getModifiedPaths();
-        invariant(pathsModifiedByUnwind.type == GetModPathsReturn::Type::kFiniteSet);
+        tassert(11294802,
+                "Expecting only finite set of paths modified by $unwind",
+                pathsModifiedByUnwind.type == GetModPathsReturn::Type::kFiniteSet);
         modifiedPaths.insert(pathsModifiedByUnwind.paths.begin(),
                              pathsModifiedByUnwind.paths.end());
     }
@@ -194,7 +196,7 @@ StageConstraints DocumentSourceGraphLookUp::constraints(PipelineSplitState pipeS
 
 DocumentSourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    invariant(*itr == this);
+    tassert(11294801, "Expecting DocumentSource iterator pointing to this stage", *itr == this);
 
     if (std::next(itr) == container->end()) {
         return container->end();

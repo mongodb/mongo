@@ -163,7 +163,7 @@ public:
     }
 
     Status getKillStatus() const override {
-        invariant(isMarkedAsKilled());
+        tassert(11282926, "Expect PlanExecutorPipeline to be marked as killed", isMarkedAsKilled());
         return _killStatus;
     }
 

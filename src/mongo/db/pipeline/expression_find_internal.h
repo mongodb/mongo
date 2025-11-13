@@ -168,7 +168,10 @@ public:
     }
 
     boost::intrusive_ptr<Expression> optimize() final {
-        invariant(_children.size() == 1ul);
+        tassert(11282953,
+                str::stream() << "Expect exactly 1 child node in ExpressionInternalFindSlice, got "
+                              << _children.size(),
+                _children.size() == 1ul);
 
         _children[0] = _children[0]->optimize();
         return this;
@@ -227,7 +230,11 @@ public:
     }
 
     boost::intrusive_ptr<Expression> optimize() final {
-        invariant(_children.size() == 1ul);
+        tassert(
+            11282952,
+            str::stream() << "Expect exactly 1 child node in ExpressionInternalFindElemMatch, got "
+                          << _children.size(),
+            _children.size() == 1ul);
 
         _children[0] = _children[0]->optimize();
         // SERVER-43740: ideally we'd want to optimize '_matchExpr' here as well. However, given
