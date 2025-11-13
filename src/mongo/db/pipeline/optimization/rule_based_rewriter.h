@@ -63,11 +63,8 @@ namespace mongo::rule_based_rewrites::pipeline {
 /**
  * Helper for defining a rule that calls optimizeAt() for a given document source.
  */
-#define OPTIMIZE_AT_RULE(DS)                  \
-    {"OPTIMIZE_AT_" #DS,                      \
-     alwaysTrue,                              \
-     CommonTransforms::optimizeAtWrapper<DS>, \
-     kDefaultOptimizeAtPriority}
+#define OPTIMIZE_AT_RULE(DS) \
+    {"OPTIMIZE_AT_" #DS, alwaysTrue, Transforms::optimizeAtWrapper<DS>, kDefaultOptimizeAtPriority}
 
 // For high priority rules that e.g. attempt to push a $match as early as possible.
 constexpr double kDefaultPushdownPriority = 100.0;
@@ -155,7 +152,7 @@ private:
 
     const DocumentSourceVisitorRegistry& _registry;
 
-    friend struct CommonTransforms;
+    friend struct Transforms;
 };
 
 using PipelineRewriteRule = Rule<PipelineRewriteContext>;
@@ -165,12 +162,12 @@ using PipelineRewriteEngine = RewriteEngine<PipelineRewriteContext>;
  * Provides a set of common transformations that can be used either directly as transforms or inside
  * transforms to manipulate the pipeline.
  */
-struct CommonTransforms {
+struct Transforms {
     static bool swapStageWithPrev(PipelineRewriteContext& ctx);
     static bool swapStageWithNext(PipelineRewriteContext& ctx);
     static bool insertBefore(PipelineRewriteContext& ctx, DocumentSource& d);
     static bool insertAfter(PipelineRewriteContext& ctx, DocumentSource& d);
-    static bool erase(PipelineRewriteContext& ctx);
+    static bool eraseCurrent(PipelineRewriteContext& ctx);
     static bool eraseNext(PipelineRewriteContext& ctx);
 
     /**
@@ -223,16 +220,6 @@ struct CommonTransforms {
 inline bool alwaysTrue(PipelineRewriteContext&) {
     return true;
 }
-
-// TODO(SERVER-113603): Get rid of these
-[[maybe_unused]] static auto swapStageWithPrev = CommonTransforms::swapStageWithPrev;
-[[maybe_unused]] static auto swapStageWithNext = CommonTransforms::swapStageWithNext;
-[[maybe_unused]] static auto insertBefore = CommonTransforms::insertBefore;
-[[maybe_unused]] static auto insertAfter = CommonTransforms::insertAfter;
-[[maybe_unused]] static auto erase = CommonTransforms::erase;
-[[maybe_unused]] static auto eraseNext = CommonTransforms::eraseNext;
-[[maybe_unused]] static auto partialPushdown = CommonTransforms::partialPushdown;
-[[maybe_unused]] static auto noop = CommonTransforms::noop;
 
 namespace registration_detail {
 /**

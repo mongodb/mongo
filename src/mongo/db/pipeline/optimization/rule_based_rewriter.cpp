@@ -76,49 +76,49 @@ std::string PipelineRewriteContext::debugString() const {
     return ss;
 }
 
-bool CommonTransforms::swapStageWithNext(PipelineRewriteContext& ctx) {
+bool Transforms::swapStageWithNext(PipelineRewriteContext& ctx) {
     tassert(11010009, "Already at the end of the container", ctx.hasMore());
     ctx._itr = swapStages(ctx._container, ctx._itr, std::next(ctx._itr));
     return true;
 }
 
-bool CommonTransforms::swapStageWithPrev(PipelineRewriteContext& ctx) {
+bool Transforms::swapStageWithPrev(PipelineRewriteContext& ctx) {
     tassert(11010011, "Can't swap first stage with prev", !ctx.atFirstStage());
     ctx._itr = swapStages(ctx._container, std::prev(ctx._itr), ctx._itr);
     return true;
 }
 
-bool CommonTransforms::insertBefore(PipelineRewriteContext& ctx, DocumentSource& d) {
+bool Transforms::insertBefore(PipelineRewriteContext& ctx, DocumentSource& d) {
     ctx._container.insert(ctx._itr, &d);
     ctx._itr = std::prev(ctx._itr);
     return true;
 }
 
-bool CommonTransforms::insertAfter(PipelineRewriteContext& ctx, DocumentSource& d) {
+bool Transforms::insertAfter(PipelineRewriteContext& ctx, DocumentSource& d) {
     ctx._container.insert(std::next(ctx._itr), &d);
     return false;
 }
 
-bool CommonTransforms::erase(PipelineRewriteContext& ctx) {
+bool Transforms::eraseCurrent(PipelineRewriteContext& ctx) {
     ctx._itr = ctx._container.erase(ctx._itr);
     ctx._itr = prevOrFirstItr(ctx._container, ctx._itr);
     return true;
 }
 
-bool CommonTransforms::eraseNext(PipelineRewriteContext& ctx) {
+bool Transforms::eraseNext(PipelineRewriteContext& ctx) {
     tassert(11010020, "Already at the last stage", !ctx.atLastStage());
     ctx._container.erase(std::next(ctx._itr));
     return false;
 }
 
-bool CommonTransforms::partialPushdown(PipelineRewriteContext& ctx,
-                                       boost::intrusive_ptr<DocumentSource> pushdownPart,
-                                       boost::intrusive_ptr<DocumentSource> remainingPart) {
+bool Transforms::partialPushdown(PipelineRewriteContext& ctx,
+                                 boost::intrusive_ptr<DocumentSource> pushdownPart,
+                                 boost::intrusive_ptr<DocumentSource> remainingPart) {
     tassert(11010401, "Expected non-null stage for pushdown", pushdownPart);
 
     // Erase the original stage. 'ctx._itr' will now point to the previous stage (i.e., the stage
     // that we want in between the pushdown part and the remaining part).
-    erase(ctx);
+    eraseCurrent(ctx);
 
     // Insert the pushed down part before the current stage.
     ctx._container.insert(ctx._itr, std::move(pushdownPart));

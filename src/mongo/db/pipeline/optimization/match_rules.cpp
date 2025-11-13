@@ -108,8 +108,10 @@ bool isChangeStreamRouterPipelineStage(StringData stageName) {
     return change_stream_constants::kChangeStreamRouterPipelineStages.contains(stageName);
 }
 
-const PipelineRewriteRule kPushMatchBeforeChangeStreams{
-    "PUSH_MATCH_BEFORE_CHANGE_STREAMS", alwaysTrue, swapStageWithPrev, kDefaultPushdownPriority};
+const PipelineRewriteRule kPushMatchBeforeChangeStreams{"PUSH_MATCH_BEFORE_CHANGE_STREAMS",
+                                                        alwaysTrue,
+                                                        Transforms::swapStageWithPrev,
+                                                        kDefaultPushdownPriority};
 
 bool canPushMatchBefore(PipelineRewriteContext& ctx,
                         const DocumentSource* prev,
@@ -195,7 +197,8 @@ bool pushdownMatch(PipelineRewriteContext& ctx, DocumentSource& prev, DocumentSo
         ctx.advance();
     }
 
-    return partialPushdown(ctx, std::move(renameableMatchPart), std::move(nonRenameableMatchPart));
+    return Transforms::partialPushdown(
+        ctx, std::move(renameableMatchPart), std::move(nonRenameableMatchPart));
 }
 
 /**

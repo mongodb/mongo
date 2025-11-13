@@ -59,18 +59,18 @@ bool canSwapWithSingleDocTransformOrRedact(const PipelineRewriteContext& ctx) {
 REGISTER_RULES(DocumentSourceSample,
                {"PUSHDOWN_SAMPLE",
                 canSwapWithSkippingOrLimitingStage,
-                swapStageWithPrev,
+                Transforms::swapStageWithPrev,
                 kDefaultPushdownPriority});
 REGISTER_RULES(DocumentSourceSingleDocumentTransformation,
                {"PUSHDOWN_SINGLE_DOC_TRANSFORMATION",
                 canSwapWithSingleDocTransformOrRedact,
-                swapStageWithPrev,
+                Transforms::swapStageWithPrev,
                 kDefaultPushdownPriority},
                OPTIMIZE_AT_RULE(DocumentSourceSingleDocumentTransformation));
 REGISTER_RULES(DocumentSourceRedact,
                {"PUSHDOWN_REDACT",
                 canSwapWithSingleDocTransformOrRedact,
-                swapStageWithPrev,
+                Transforms::swapStageWithPrev,
                 kDefaultPushdownPriority},
                OPTIMIZE_AT_RULE(DocumentSourceRedact));
 }  // namespace mongo::rule_based_rewrites::pipeline
