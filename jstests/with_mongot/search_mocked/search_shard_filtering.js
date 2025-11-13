@@ -5,6 +5,7 @@
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mockPlanShardedSearchResponse,
+    mockPlanShardedSearchResponseOnConn,
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
@@ -31,6 +32,7 @@ const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 const collNS = testColl.getFullName();
+let cursorId = 100;
 
 assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
@@ -115,7 +117,8 @@ const history0 = [
     },
 ];
 const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
-s0Mongot.setMockResponses(history0, NumberLong(123), NumberLong(1124));
+s0Mongot.setMockResponses(history0, cursorId, cursorId + 1000);
+cursorId++;
 
 const mongot1ResponseBatch = [
     {_id: 11, $searchScore: 111},
@@ -137,7 +140,8 @@ const history1 = [
     },
 ];
 const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
-s1Mongot.setMockResponses(history1, NumberLong(456), NumberLong(1457));
+s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
+cursorId++;
 
 mockPlanShardedSearchResponse(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
@@ -154,6 +158,116 @@ const expectedDocs = [
 ];
 
 assert.eq(testColl.aggregate([{$search: mongotQuery}]).toArray(), expectedDocs);
+
+// Confirm shard filtering works across getMore's.
+s0Mongot.setMockResponses(history0, cursorId, cursorId + 1000);
+cursorId++;
+s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
+cursorId++;
+mockPlanShardedSearchResponse(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+assert.eq(testColl.aggregate([{$search: mongotQuery}], {cursor: {batchSize: 1}}).toArray(), expectedDocs);
+
+// Test $lookup and $unionWith with $search to ensure shard filtering works in a sub-pipeline.
+// Set up base coll to test shard filtering works within subpipelines.
+const baseCollName = jsTestName() + "baseColl";
+const baseColl = testDB.getCollection(baseCollName);
+
+assert.commandWorked(baseColl.insert({_id: 10}));
+assert.commandWorked(baseColl.insert({_id: 200}));
+// Shard base collection.
+st.shardColl(baseColl, {_id: 1}, {_id: 101}, {_id: 101});
+
+// Disable order check as order can be non-deterministic.
+const d0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
+const d1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
+d0Mongot.disableOrderCheck();
+d1Mongot.disableOrderCheck();
+
+// Test $lookup to ensure shard filtering works in a sub-pipeline.
+// Mock each shard twice as each shard will query the other.
+s0Mongot.setMockResponses(history0, cursorId, cursorId + 1000);
+cursorId++;
+s0Mongot.setMockResponses(history0, cursorId, cursorId + 1000);
+cursorId++;
+s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
+cursorId++;
+s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
+cursorId++;
+mockPlanShardedSearchResponseOnConn(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock, shard0Conn);
+mockPlanShardedSearchResponseOnConn(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock, shard1Conn);
+
+const lookupResult = baseColl
+    .aggregate([
+        {$lookup: {from: collName, pipeline: [{$search: mongotQuery}, {$sort: {_id: 1}}], as: "searchResults"}},
+        {$sort: {_id: 1}},
+    ])
+    .toArray();
+
+// Expected result: base collection documents with searchResults array (orphan filtered out).
+const expectedLookupSearchResults = [
+    {_id: 1, shardKey: 0, x: "ow"},
+    {_id: 2, shardKey: 0, x: "now", y: "lorem"},
+    {_id: 3, shardKey: 0, x: "brown", y: "ipsum"},
+    {_id: 4, shardKey: 0, x: "cow", y: "lorem ipsum"},
+    {_id: 11, shardKey: 100, x: "brown", y: "ipsum"},
+    {_id: 12, shardKey: 100, x: "cow", y: "lorem ipsum"},
+    {_id: 13, shardKey: 100, x: "brown", y: "ipsum"},
+    {_id: 14, shardKey: 100, x: "cow", y: "lorem ipsum"},
+    {_id: 16},
+];
+const expectedLookupDocs = [
+    {_id: 10, searchResults: expectedLookupSearchResults},
+    {_id: 200, searchResults: expectedLookupSearchResults},
+];
+assert.eq(lookupResult, expectedLookupDocs, "$lookup with $search should filter out orphans");
+
+// Test $unionWith with $search to ensure shard filtering works in a sub-pipeline.
+// Set up the same mock responses for the $search inside $unionWith.
+s0Mongot.setMockResponses(history0, cursorId, cursorId + 1000);
+cursorId++;
+s1Mongot.setMockResponses(history1, cursorId, cursorId + 1000);
+cursorId++;
+
+// The $unionWith is dispatched to shards randomly instead of always primary, so planShardedSearch may be issued in either shard.
+mockPlanShardedSearchResponseOnConn(
+    collName,
+    mongotQuery,
+    dbName,
+    undefined /*sortSpec*/,
+    stWithMock,
+    shard0Conn,
+    true /*maybeUnused*/,
+);
+mockPlanShardedSearchResponseOnConn(
+    collName,
+    mongotQuery,
+    dbName,
+    undefined /*sortSpec*/,
+    stWithMock,
+    shard1Conn,
+    true /*maybeUnused*/,
+);
+
+const unionWithResult = baseColl
+    .aggregate([{$unionWith: {coll: collName, pipeline: [{$search: mongotQuery}]}}, {$sort: {_id: 1}}])
+    .toArray();
+
+// Expected result: base collection documents + search results (with orphan filtered out).
+const expectedUnionDocs = [
+    {_id: 1, shardKey: 0, x: "ow"},
+    {_id: 2, shardKey: 0, x: "now", y: "lorem"},
+    {_id: 3, shardKey: 0, x: "brown", y: "ipsum"},
+    {_id: 4, shardKey: 0, x: "cow", y: "lorem ipsum"},
+    {_id: 10},
+    {_id: 11, shardKey: 100, x: "brown", y: "ipsum"},
+    {_id: 12, shardKey: 100, x: "cow", y: "lorem ipsum"},
+    {_id: 13, shardKey: 100, x: "brown", y: "ipsum"},
+    {_id: 14, shardKey: 100, x: "cow", y: "lorem ipsum"},
+    {_id: 16},
+    {_id: 200},
+];
+
+assert.eq(unionWithResult, expectedUnionDocs, "unionWith with $search should filter out orphans");
 
 // Verify that our orphaned document is still on shard0.
 assert.eq(shard0Conn.getDB(dbName)[collName].find({_id: 15}).itcount(), 1);

@@ -69,6 +69,10 @@ public:
         return _mainAcq && _mainAcq->collectionExists();
     }
 
+    bool hasNonExistentMainCollection() const {
+        return _mainAcq && _mainAcq->isCollection() && !_mainAcq->collectionExists();
+    }
+
     const CollectionPtr& getMainCollection() const {
         return _mainAcq ? _mainAcq->getCollectionPtr() : CollectionPtr::null;
     }

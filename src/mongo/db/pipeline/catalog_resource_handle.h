@@ -71,6 +71,11 @@ public:
         return _transactionResourcesStasher;
     }
 
+protected:
+    bool isAcquired() const {
+        return _resources.has_value();
+    }
+
 private:
     boost::optional<HandleTransactionResourcesFromStasher> _resources;
     boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>

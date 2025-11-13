@@ -74,7 +74,7 @@ assert.commandFailedWithCode(
         ],
         cursor: {},
     }),
-    31052,
+    11140100,
 );
 
 MongoRunner.stopMongod(conn);

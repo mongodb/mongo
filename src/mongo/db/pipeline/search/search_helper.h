@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -140,12 +141,10 @@ void assertSearchMetaAccessValid(const DocumentSourceContainer& shardsPipeline,
  * dispatched to shards. Nothing is done if first stage in the pipeline is not $search, and this
  * method should only be invoked for the DocumentSource-based implementation (legacy executor).
  * The preparation works includes:
- * 1. Desugars $search stage into $_internalSearchMongotRemote and $_internalSearchIdLookup
- * stages.
- * 2. Injects shard filterer for $_internalSearchIdLookup stage on shard only.
- * 3. Checks to see if in the current environment an additional pipeline needs to be run to generate
+
+ * 1. Checks to see if in the current environment an additional pipeline needs to be run to generate
  * metadata results.
- * 4. Establishes search cursors with mongot and attaches them to their relevant search and metadata
+ * 2. Establishes search cursors with mongot and attaches them to their relevant search and metadata
  * stages.
  *
  * This can modify the passed in pipeline but does not take ownership of it.
@@ -159,13 +158,10 @@ std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
     boost::optional<int64_t> userBatchSize);
 
 /**
- * This method works on preparation for $search in nested pipeline, e.g. sub-pipeline of
- * $lookup, for local read. Nothing is done if first stage in the pipeline is not $search, and
- * this method should only be invoked for the DocumentSource-based implementation (legacy executor).
- * The preparation works desugars $search stage into $_internalSearchMongotRemote and
- * $_internalSearchIdLookup stages.
+ * Desugars $search stage into $_internalSearchMongotRemote and $_internalSearchIdLookup stages and
+ * $vectorSearch to $vectorSearch and $_internalSearchIdLookup.
  */
-void prepareSearchForNestedPipelineLegacyExecutor(Pipeline* pipeline);
+void desugarSearchPipeline(Pipeline* pipeline);
 
 /**
  * Establishes the cursor for $search queries run in SBE.

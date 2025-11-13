@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -42,6 +41,7 @@
 
 namespace mongo {
 
+class DSInternalSearchIdLookUpCatalogResourceHandle;
 /**
  * Queries local collection for _id equality matches. Intended for use with
  * $_internalSearchMongotRemote (see $search) as part of the Search project.
@@ -99,13 +99,9 @@ public:
         BSONObj _ownedSpec;
     };
 
-    DocumentSourceInternalSearchIdLookUp(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        long long limit = 0,
-        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle = {},
-        boost::optional<MultipleCollectionAccessor> collections = boost::none,
-        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{},
-        boost::optional<SearchQueryViewSpec> view = boost::none);
+    DocumentSourceInternalSearchIdLookUp(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         long long limit = 0,
+                                         boost::optional<SearchQueryViewSpec> view = boost::none);
 
     const char* getSourceName() const final;
 
@@ -228,6 +224,10 @@ public:
         return _searchIdLookupMetrics;
     }
 
+    void bindCatalogInfo(
+        const MultipleCollectionAccessor& collections,
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> sharedStasher) final;
+
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
 
@@ -237,14 +237,8 @@ private:
 
     long long _limit = 0;
 
-    // Handle to catalog state.
-    boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
-
-    // TODO SERVER-111401 This doesn't need to be optional.
-    const boost::optional<MultipleCollectionAccessor> _collections;
-
-    // TODO SERVER-109825: Move to InternalSearchIdLookupStage class.
-    ExecShardFilterPolicy _shardFilterPolicy = AutomaticShardFiltering{};
+    // Handle to catalog state. Also contains the collection needed for execution.
+    boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle> _catalogResourceHandle;
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics =
         std::make_shared<SearchIdLookupMetrics>();
@@ -255,11 +249,24 @@ private:
 
 class DSInternalSearchIdLookUpCatalogResourceHandle : public DSCatalogResourceHandleBase {
 public:
-    using DSCatalogResourceHandleBase::DSCatalogResourceHandleBase;
+    DSInternalSearchIdLookUpCatalogResourceHandle(
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher,
+        CollectionAcquisition collection)
+        : DSCatalogResourceHandleBase(std::move(stasher)), _collection(std::move(collection)) {}
 
     void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override {
         MONGO_UNREACHABLE;
     }
+
+    CollectionAcquisition getCollection() {
+        tassert(11140101,
+                "catalogResourceHandle must be acquired to access the collection.",
+                isAcquired());
+        return _collection;
+    }
+
+private:
+    CollectionAcquisition _collection;
 };
 
 }  // namespace mongo

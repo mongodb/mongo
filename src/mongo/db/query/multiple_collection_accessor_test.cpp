@@ -206,6 +206,7 @@ TEST_F(MultipleCollectionAccessorTest, mainCollectionViaAcquisition) {
     auto accessor = MultipleCollectionAccessor(acquisition);
     ASSERT_EQ(acquisition.getCollectionPtr(), accessor.getMainCollection());
     ASSERT_EQ(acquisition.uuid(), accessor.getMainCollectionAcquisition().uuid());
+    ASSERT_FALSE(accessor.hasNonExistentMainCollection());
 }
 
 TEST_F(MultipleCollectionAccessorTest, mainViewViaAcquisition) {
@@ -220,6 +221,7 @@ TEST_F(MultipleCollectionAccessorTest, mainViewViaAcquisition) {
 
     auto accessor = MultipleCollectionAccessor(acquisition);
     ASSERT_FALSE(accessor.hasMainCollection());
+    ASSERT_FALSE(accessor.hasNonExistentMainCollection());
 }
 
 TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAcquisition) {
@@ -299,6 +301,26 @@ TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAcquisition) {
     // Views return a null CollectionPtr.
     ASSERT_FALSE(accessor.lookupCollection(secondaryView1));
     ASSERT_FALSE(accessor.lookupCollection(secondaryView2));
+}
+
+TEST_F(MultipleCollectionAccessorTest, nonExistentCollection) {
+    // Create a namespace for a collection that doesn't exist in the catalog.
+    const NamespaceString nonExistentNss =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "nonExistent");
+
+    // Acquire the non-existent collection (this should succeed but the collection won't exist).
+    const auto acquisition = acquireCollectionOrView(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(
+            operationContext(), nonExistentNss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    auto accessor = MultipleCollectionAccessor(acquisition);
+
+    ASSERT_TRUE(accessor.hasNonExistentMainCollection());
+    ASSERT_FALSE(accessor.hasMainCollection());
+    // getMainCollection() should return a null CollectionPtr.
+    ASSERT_FALSE(accessor.getMainCollection());
 }
 
 }  // namespace

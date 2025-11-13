@@ -433,6 +433,20 @@ public:
     void reattachToOperationContext(OperationContext* opCtx);
 
     /**
+     * Passes catalog information to underlying DocumentSources that need to directly access
+     * collection data during execution.
+     *
+     * This method should be called on a fully desugared pipeline and MUST be invoked on all
+     * pipelines before execution begins, including on subpipelines, to ensure all stages receive
+     * the necessary catalog information.
+     *
+     * This is for shard-level catalog information and not for routing information.
+     */
+    void bindCatalogInfo(
+        const MultipleCollectionAccessor& collections,
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> sharedStasher);
+
+    /**
      * Recursively validate the operation contexts associated with this pipeline. Return true if
      * all document sources and subpipelines point to the given operation context.
      */

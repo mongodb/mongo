@@ -847,6 +847,14 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     checkValidOperationContext();
 }
 
+void Pipeline::bindCatalogInfo(
+    const MultipleCollectionAccessor& collections,
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) {
+    for (auto&& source : _sources) {
+        source->bindCatalogInfo(collections, stasher);
+    }
+}
+
 bool Pipeline::validateOperationContext(const OperationContext* opCtx) const {
     return std::all_of(_sources.begin(), _sources.end(), [this, opCtx](const auto& source) {
         // All sources in a pipeline must share its expression context. Subpipelines may have a

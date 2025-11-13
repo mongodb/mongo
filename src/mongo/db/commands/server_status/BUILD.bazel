@@ -160,6 +160,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:pipeline.h",
         "//src/mongo/db/pipeline:pipeline_split_state.h",
         "//src/mongo/db/pipeline:resume_token.h",
+        "//src/mongo/db/pipeline:shard_role_transaction_resources_stasher_for_pipeline.h",
         "//src/mongo/db/pipeline:stage_constraints.h",
         "//src/mongo/db/pipeline:storage_stats_spec_gen",
         "//src/mongo/db/pipeline:transformer_interface.h",

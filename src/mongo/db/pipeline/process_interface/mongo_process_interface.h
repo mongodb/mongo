@@ -494,7 +494,8 @@ public:
      * this method on a shard server will only return results which match the pipeline on that
      * shard.
      *
-     * Accepts catalog information that will be used for the new returned pipeline.
+     * Accepts catalog information that will be used for the new returned pipeline. Collections
+     * should be locked. The caller should handle acquiring and releasing catalog resources.
      *
      * Unlike attachCursorSourceToPipelineForLocalRead(), this method does not accept additional
      * configuration through 'aggRequest' or 'shouldUseCollectionDefaultCollator' parameters.

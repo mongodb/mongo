@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
-#include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 
 namespace mongo {
@@ -47,8 +46,6 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
         documentSource->getExpCtx(),
         documentSource->_limit,
         documentSource->_catalogResourceHandle,
-        documentSource->_collections,
-        documentSource->_shardFilterPolicy,
         documentSource->_searchIdLookupMetrics,
         documentSource->_viewPipeline
             ? documentSource->_viewPipeline->clone(documentSource->getExpCtx())
@@ -66,17 +63,14 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
     StringData stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
-    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
-    const boost::optional<MultipleCollectionAccessor> collections,
-    ExecShardFilterPolicy shardFilterPolicy,
+    const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
+        catalogResourceHandle,
     const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
     std::unique_ptr<mongo::Pipeline> viewPipeline)
     : Stage(stageName, expCtx),
       _stageName(stageName),
       _limit(limit),
       _catalogResourceHandle(catalogResourceHandle),
-      _collections(collections),
-      _shardFilterPolicy(shardFilterPolicy),
       _searchIdLookupMetrics(searchIdLookupMetrics),
       _viewPipeline(std::move(viewPipeline)) {}
 
@@ -115,8 +109,8 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
         if (!documentId.missing()) {
             auto documentKey = Document({{"_id", documentId}});
 
-            uassert(31052,
-                    "Collection must have a UUID to use $_internalSearchIdLookup.",
+            tassert(31052,
+                    "Collection should exist when using $_internalSearchIdLookup.",
                     pExpCtx->getUUID().has_value());
 
             // Find the document by performing a local read.
@@ -134,19 +128,21 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
                 pipeline->appendPipeline(_viewPipeline->clone(pExpCtx));
             }
 
-            // TODO SERVER-111401 Only use attachCursorSourceToPipelineForLocalReadWithCatalog()
-            // path.
-            if (_catalogResourceHandle && _collections) {
+            // Scope ScopedSetShardRole to ensure it's cleaned up before any future execution.
+            {
                 _catalogResourceHandle->acquire(pExpCtx->getOperationContext());
-                pipeline =
-                    pExpCtx->getMongoProcessInterface()
-                        ->attachCursorSourceToPipelineForLocalReadWithCatalog(
-                            std::move(pipeline), _collections.value(), _catalogResourceHandle);
+                auto collection = _catalogResourceHandle->getCollection();
+                // We set the shard role to include the shard filterer during query planning.
+                ScopedSetShardRole setShardRole(pExpCtx->getOperationContext(),
+                                                collection.nss(),
+                                                collection.getShardVersion(),
+                                                collection.getDatabaseVersion());
+                pipeline = pExpCtx->getMongoProcessInterface()
+                               ->attachCursorSourceToPipelineForLocalReadWithCatalog(
+                                   std::move(pipeline),
+                                   MultipleCollectionAccessor{collection},
+                                   _catalogResourceHandle);
                 _catalogResourceHandle->release();
-            } else {
-                pipeline =
-                    pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-                        std::move(pipeline), boost::none, false, _shardFilterPolicy);
             }
 
             auto execPipeline = buildPipeline(pipeline->freeze());
@@ -171,5 +167,6 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
     _searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
     return output.freeze();
 }
+
 }  // namespace exec::agg
 }  // namespace mongo

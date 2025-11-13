@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -52,9 +51,8 @@ public:
         StringData stageName,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long limit,
-        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
-        boost::optional<MultipleCollectionAccessor> collections,
-        ExecShardFilterPolicy shardFilterPolicy,
+        const boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle>&
+            catalogResourceHandle,
         const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
         std::unique_ptr<mongo::Pipeline> viewPipeline);
 
@@ -71,13 +69,9 @@ private:
     const std::string _stageName;
     const long long _limit;
 
-    // Handle on catalog state that can be acquired and released during doGetNext().
-    boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
-
-    // TODO SERVER-111401 This should no longer be optional.
-    const boost::optional<MultipleCollectionAccessor> _collections;
-
-    ExecShardFilterPolicy _shardFilterPolicy;
+    // Handle on catalog state that can be acquired and released during doGetNext(). Also contains
+    // the collection needed for execution.
+    boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle> _catalogResourceHandle;
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics;
     DocumentSourceIdLookupStats _stats;

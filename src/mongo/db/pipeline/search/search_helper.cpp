@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/search/search_helper.h"
 
-#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -65,21 +64,6 @@ MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
 
 namespace search_helpers {
 namespace {
-void desugarSearchPipeline(Pipeline* pipeline) {
-    auto searchStage = pipeline->popFrontWithName(DocumentSourceSearch::kStageName);
-    auto& sources = pipeline->getSources();
-    if (searchStage) {
-        auto desugaredPipeline = dynamic_cast<DocumentSourceSearch*>(searchStage.get())->desugar();
-        sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
-    }
-    auto vectorSearchStage = pipeline->popFrontWithName(DocumentSourceVectorSearch::kStageName);
-    if (vectorSearchStage) {
-        auto desugaredPipeline =
-            dynamic_cast<DocumentSourceVectorSearch*>(vectorSearchStage.get())->desugar();
-        sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
-    }
-}
-
 // Asserts that $$SEARCH_META is accessed correctly, that is, it is set by a prior stage, and is
 // not accessed in a subpipline. It is assumed that if there is a
 // 'DocumentSourceInternalSearchMongotRemote' then '$$SEARCH_META' will be set at some point in the
@@ -342,13 +326,26 @@ void assertSearchMetaAccessValid(const DocumentSourceContainer& shardsPipeline,
     assertSearchMetaAccessValidHelper({&shardsPipeline, &mergePipeline});
 }
 
+void desugarSearchPipeline(Pipeline* pipeline) {
+    auto searchStage = pipeline->popFrontWithName(DocumentSourceSearch::kStageName);
+    auto& sources = pipeline->getSources();
+    if (searchStage) {
+        auto desugaredPipeline = dynamic_cast<DocumentSourceSearch*>(searchStage.get())->desugar();
+        sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
+    }
+    auto vectorSearchStage = pipeline->popFrontWithName(DocumentSourceVectorSearch::kStageName);
+    if (vectorSearchStage) {
+        auto desugaredPipeline =
+            dynamic_cast<DocumentSourceVectorSearch*>(vectorSearchStage.get())->desugar();
+        sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
+    }
+}
+
 std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     Pipeline* origPipeline,
     DocsNeededBounds bounds,
     boost::optional<int64_t> userBatchSize) {
-    // First, desuguar $search, and inject shard filterer.
-    desugarSearchPipeline(origPipeline);
 
     // TODO SERVER-94874 Establish mongot cursor for $searchMeta queries too.
     if ((expCtx->getExplain() &&
@@ -454,12 +451,6 @@ std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
 
     // Can return null if we did not build a metadata pipeline.
     return newPipeline;
-}
-
-void prepareSearchForNestedPipelineLegacyExecutor(Pipeline* pipeline) {
-    desugarSearchPipeline(pipeline);
-    // TODO SERVER-94874 Establish mongot cursor here, like is done in
-    // prepareSearchForTopLevelPipelineLegacyExecutor.
 }
 
 void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -685,24 +676,15 @@ void promoteStoredSourceOrAddIdLookup(
                          "$ifNull" << BSON_ARRAY("$" + kProtocolStoredFieldsName << "$$ROOT"))));
         desugaredPipeline.push_back(
             DocumentSourceReplaceRoot::createFromBson(replaceRootSpec.firstElement(), expCtx));
-        // Note: intentionally not including a shard filtering operator here. The isolation
+        // Note: No shard filtering is done for storedSource. The isolation
         // semantics are already weaker here so this was deemed OK. Potentially part of that
         // conversation: the documents are not guaranteed to have the shard key, and we don't have
         // an idLookup to go get it.
     } else {
-        auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(expCtx);
         // idLookup must always be immediately after the first stage in the desugared pipeline
-        auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
-            expCtx,
-            limit,
-            nullptr /*catalogResourceHandle*/,
-            boost::none /*MultipleCollectionAccessor*/,
-            buildExecShardFilterPolicy(shardFilterer),
-            view);
+        auto idLookupStage =
+            make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx, limit, view);
         desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
-        if (shardFilterer) {
-            desugaredPipeline.push_back(std::move(shardFilterer));
-        }
 
         // Check if the first stage in the pipeline is a mongotRemoteStage (only exists for
         // $search).

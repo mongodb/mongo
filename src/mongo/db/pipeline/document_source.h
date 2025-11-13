@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline_split_state.h"
+#include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
@@ -672,6 +673,24 @@ public:
     virtual bool validateSourceOperationContext(const OperationContext* opCtx) const {
         return _expCtx->getOperationContext() == opCtx;
     }
+
+    /**
+     * Stages must override this method if they need access to collection data during execution
+     * (e.g. to read documents, scan indexes, etc.). Stages can obtain the collectionAcquisitions
+     * they need from 'collections'. The 'stasher' must be used to maintain these acquisitions and
+     * manage TransactionResources as execution occurs.
+     *
+     * This is for shard-level catalog information and not for routing information. Stages that act
+     * as a router for their subpipelines do not need to define it.
+     *
+     * Pipeline::bindCatalogInfo() MUST be invoked on any pipeline before execution begins to
+     * ensure all stages receive the necessary catalog information.
+     *
+     * TODO SERVER-113754: $cursor and $geoNearCursor should implement this function.
+     */
+    virtual void bindCatalogInfo(
+        const MultipleCollectionAccessor& collections,
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) {}
 
 protected:
     DocumentSource(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
