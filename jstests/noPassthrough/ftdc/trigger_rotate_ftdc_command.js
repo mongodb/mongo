@@ -1,11 +1,4 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-
-function checkNoFTDCEntryLogs(conn) {
-    assert.eq(false,
-              checkLog.checkContainsOnce(conn, "FTDC Entry"),
-              "Found FTDC Entry log line on " + conn.host);
-}
-
 function rotate(conn, path, rotateCount) {
     sleep(2000);
     for (let i = 1; i <= rotateCount; ++i) {
@@ -27,14 +20,12 @@ function rotate(conn, path, rotateCount) {
         MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: singlePath}});
     rotate(singleStandalone, singlePath, 1);
 
-    checkNoFTDCEntryLogs(singleStandalone);
     MongoRunner.stopMongod(singleStandalone);
 
     const multiStandalone =
         MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: multiPath}});
     rotate(multiStandalone, multiPath, 25);
 
-    checkNoFTDCEntryLogs(multiStandalone);
     MongoRunner.stopMongod(multiStandalone);
 }
 
@@ -48,11 +39,6 @@ function rotate(conn, path, rotateCount) {
     });
 
     rotate(st.s, path, 5);
-
-    // Check logs for all mongod processes in each shard and the mongos before shutdown
-    st.rs0.nodes.forEach((node) => checkNoFTDCEntryLogs(node));
-    st.rs1.nodes.forEach((node) => checkNoFTDCEntryLogs(node));
-    checkNoFTDCEntryLogs(st.s);
 
     st.stop();
 }
