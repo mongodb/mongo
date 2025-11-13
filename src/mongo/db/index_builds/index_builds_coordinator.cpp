@@ -46,6 +46,7 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
@@ -806,13 +807,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         MODE_IX,
         Date_t::max(),
         Lock::DBLockSkipOptions{
-            false,
-            false,
-            false,
-            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
-                ? rss::consensus::IntentRegistry::Intent::Write
-                : rss::consensus::IntentRegistry::Intent::LocalWrite});
+            false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
 
     CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
@@ -2459,13 +2454,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
         MODE_IX,
         Date_t::max(),
         Lock::DBLockSkipOptions{
-            false,
-            false,
-            false,
-            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
-                ? rss::consensus::IntentRegistry::Intent::Write
-                : rss::consensus::IntentRegistry::Intent::LocalWrite});
+            false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
     CollectionWriter collWriter(opCtx, collectionUUID);
     invariant(collWriter);
@@ -3492,15 +3481,20 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         return CommitResult::kLockTimeout;
     }
 
-    auto autoGetCollOptions =
-        auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-            .explicitIntent =
-                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
-                ? rss::consensus::IntentRegistry::Intent::Write
-                : rss::consensus::IntentRegistry::Intent::LocalWrite});
-    AutoGetCollection indexBuildEntryColl(
-        opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, autoGetCollOptions);
+    boost::optional<AutoGetCollection> indexBuildEntryColl;
+
+    auto autoGetCollOptions = auto_get_collection::Options{}.globalLockOptions(
+        Lock::GlobalLockOptions{.explicitIntent = action == IndexBuildAction::kCommitQuorumSatisfied
+                                    ? rss::consensus::IntentRegistry::Intent::Write
+                                    : rss::consensus::IntentRegistry::Intent::LocalWrite});
+    try {
+        indexBuildEntryColl.emplace(
+            opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, autoGetCollOptions);
+    } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+        return CommitResult::kNoLongerPrimary;
+    } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+        return CommitResult::kNoLongerPrimary;
+    }
 
     // If we are no longer primary after receiving a commit quorum, we must restart and wait for a
     // new signal from a new primary because we cannot commit. Note that two-phase index builds can
@@ -3660,7 +3654,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         replState->setPostFailureState(status);
         // This index build failed due to an indexing error in normal circumstances. Abort while
         // still holding the RSTL and collection locks.
-        _completeSelfAbort(opCtx, replState, *indexBuildEntryColl);
+        _completeSelfAbort(opCtx, replState, *indexBuildEntryColl.get());
         throw;
     }
 
@@ -3668,7 +3662,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // correctness, we must perform these final writes. Temporarily disable interrupts.
     UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
 
-    removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *indexBuildEntryColl, *replState);
+    removeIndexBuildEntryAfterCommitOrAbort(
+        opCtx, dbAndUUID, *indexBuildEntryColl.get(), *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.get());
     LOGV2(20663,
           "Index build: completed successfully",
