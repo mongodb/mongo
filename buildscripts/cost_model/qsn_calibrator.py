@@ -81,6 +81,13 @@ def calibrate_node(
     labels = X_vars.columns.tolist()
     X = sm.add_constant(X_vars)
 
+    # TODO(SERVER-110398): Clean this up by not relying on fixed '2' value
+    if node_config.type == "SORT" and not X_vars.empty and "SPILL" not in node_name:
+        # This prints the average execution time for input cardinality '2'
+        mask = X_vars.iloc[:, 0] == 2.0
+        avg_exec_time = y[mask].mean()
+        print(f"{node_name}: Startup Cost -> {avg_exec_time} ns")
+
     def fit(X, y):
         nnls = LinearRegression(positive=True, fit_intercept=False)
         model = nnls.fit(X, y)

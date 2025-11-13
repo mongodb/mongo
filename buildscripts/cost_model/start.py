@@ -308,7 +308,7 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
 
     # By combining a sort with a limit, we trigger the top-K sorting algorithm, which works
     # for both the simple and default sort algorithms.
-    limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
+    limits = [2, 5, 10, 50, 75, 100, 150, 300, 500, 1000]
     for limit in limits:
         requests.append(
             Query(
@@ -328,6 +328,30 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
                 expected_stage="SORT",
             )
         )
+
+    await workload_execution.execute(
+        database, main_config.workload_execution, collections, requests
+    )
+
+
+async def execute_sorts_spill(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collections = [c for c in collections if c.name.startswith("large_sort")]
+    assert len(collections) == 6
+
+    requests = [
+        # A standard sort applies the simple sort algorithm.
+        Query(
+            {"sort": {"payload": 1}},
+            note="SORT_SIMPLE_SPILL",
+            expected_stage={"SORT": {"usedDisk": True}},
+        ),
+        # Including the recordId explicitly forces the use of the default sort algorithm.
+        Query(
+            {"projection": {"$recordId": {"$meta": "recordId"}}, "sort": {"payload": 1}},
+            note="SORT_DEFAULT_SPILL",
+            expected_stage={"SORT": {"usedDisk": True}},
+        ),
+    ]
 
     await workload_execution.execute(
         database, main_config.workload_execution, collections, requests
@@ -650,6 +674,7 @@ async def main():
             execute_limits,
             execute_skips,
             execute_sorts,
+            execute_sorts_spill,
             execute_merge_sorts,
             execute_ors,
             execute_sort_intersections,

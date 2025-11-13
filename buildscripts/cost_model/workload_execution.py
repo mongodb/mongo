@@ -146,7 +146,7 @@ class WorkloadExecution:
         return False
 
     def _check_explain(self, expected_stage: Any, explain: dict) -> bool:
-        root = explain["queryPlanner"]["winningPlan"]
+        root = explain["executionStats"]["executionStages"]
         return self._check_explain_helper(expected_stage, root)
 
     async def _run_query(self, coll_info: CollectionInfo, query: Query, result: Sequence):
