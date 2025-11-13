@@ -31,6 +31,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source.h"
@@ -275,7 +276,7 @@ public:
     /**
      * Setter used for testing to allow tick source to be mocked.
      */
-    void setTickSource_forTest(TickSource* tickSource) {
+    MONGO_MOD_PRIVATE void setTickSource_forTest(TickSource* tickSource) {
         _tickSource = tickSource;
     }
 

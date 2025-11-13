@@ -478,7 +478,7 @@ audit:
     - src/mongo/rpc/metadata/audit*
     - src/mongo/s/client_metadata_propagation_egress_hook*
 
-encrypted_storage_engine:
+storage_engine_api.encrypted_storage_engine:
   meta:
     slack: server-security
     jira: Server Security
