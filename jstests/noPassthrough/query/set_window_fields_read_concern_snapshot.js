@@ -8,10 +8,11 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -43,9 +44,8 @@ for (let i = 0; i < 30; i++) {
 }
 assert.commandWorked(coll.insert(documents));
 
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(testDB.getMongo()),
-                       "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       1500);
+setParameterOnAllNonConfigNodes(
+    testDB.getMongo(), "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 1500);
 const rsStatus = rst.status();
 const lastClusterTime = rsStatus.optimes.lastCommittedOpTime.ts;
 const lowerBound = -21;

@@ -16,11 +16,13 @@
  *   directly_against_shardsvrs_incompatible,
  *   # setParameter not permitted with security tokens
  *   not_allowed_with_signed_security_token,
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
@@ -29,7 +31,9 @@ import {
     isExpress
 } from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db.getCollection('express_coll');
 
@@ -66,7 +70,7 @@ function runWithParamsAllNodes(db, keyValPairs, fn) {
             const prevVal = db.adminCommand(getParamObj);
             prevVals.push(prevVal[flag]);
 
-            setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, val);
+            setParameterOnAllNonConfigNodes(db.getMongo(), flag, val);
         }
 
         return fn();
@@ -74,8 +78,7 @@ function runWithParamsAllNodes(db, keyValPairs, fn) {
         for (let i = 0; i < keyValPairs.length; i++) {
             const flag = keyValPairs[i].key;
 
-            setParameterOnAllHosts(
-                DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, prevVals[i]);
+            setParameterOnAllNonConfigNodes(db.getMongo(), flag, prevVals[i]);
         }
     }
 }

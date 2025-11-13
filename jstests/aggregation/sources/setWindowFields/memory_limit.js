@@ -4,20 +4,25 @@
  *
  * @tags: [
  *   not_allowed_with_signed_security_token,
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
 
 // Test that we can set the memory limit.
-const nonConfigNodes = DiscoverTopology.findNonConfigNodes(db.getMongo());
-setParameterOnAllHosts(nonConfigNodes, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 1200);
+setParameterOnAllNonConfigNodes(
+    db.getMongo(), "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 1200);
 
 // Create a collection with enough documents in a single partition to go over the memory limit.
 const docsPerPartition = 10;
@@ -36,15 +41,20 @@ assert.commandFailedWithCode(coll.runCommand({
 // The same query passes with a higher memory limit. Note that the amount of memory consumed by the
 // stage is roughly double the size of the documents since each document has an internal cache.
 const perDocSize = 1200;
-setParameterOnAllHosts(nonConfigNodes,
-                       "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       (perDocSize * docsPerPartition * 3) + 1024);
-assert.commandWorked(coll.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [{$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$largeStr"}}}}],
-    cursor: {},
-    allowDiskUse: false
-}));
+setParameterOnAllNonConfigNodes(
+    db.getMongo(),
+    "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+    perDocSize * docsPerPartition * 3 + 1024,
+);
+assert.commandWorked(
+    coll.runCommand({
+        aggregate: coll.getName(),
+        pipeline:
+            [{$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$largeStr"}}}}],
+        cursor: {},
+        allowDiskUse: false,
+    }),
+);
 
 // The query passes with multiple partitions of the same size.
 for (let i = docsPerPartition; i < docsPerPartition * 2; i++) {
@@ -63,9 +73,11 @@ assert.commandWorked(coll.runCommand({
     allowDiskUse: false
 }));
 
-setParameterOnAllHosts(nonConfigNodes,
-                       "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       (perDocSize * docsPerPartition) + 1024);
+setParameterOnAllNonConfigNodes(
+    db.getMongo(),
+    "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+    perDocSize * docsPerPartition + 1024,
+);
 
 // Test that the query fails with a window function that stores documents.
 assert.commandFailedWithCode(coll.runCommand({
@@ -82,5 +94,5 @@ assert.commandFailedWithCode(coll.runCommand({
 }),
                              [5643011, 5414201]);
 // Reset limit for other tests.
-setParameterOnAllHosts(
-    nonConfigNodes, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 100 * 1024 * 1024);
+setParameterOnAllNonConfigNodes(
+    db.getMongo(), "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 100 * 1024 * 1024);

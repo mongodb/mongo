@@ -15,18 +15,22 @@
  *   assumes_superuser_permissions,
  *   # This test relies on query commands returning specific batch-sized responses.
  *   assumes_no_implicit_cursor_exhaustion,
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
     setAvailableDiskSpaceMode
 } from "jstests/libs/release_memory_util.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
     return accumulateServerStatusMetric(db, metrics => metrics.query.setWindowFields.spills);
@@ -37,7 +41,7 @@ function getServerParameter() {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [memoryKnob]: 1}))[memoryKnob];
 }
 function setServerParameter(value) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), memoryKnob, value);
+    setParameterOnAllNonConfigNodes(db.getMongo(), memoryKnob, value);
 }
 const memoryInitialValue = getServerParameter();
 

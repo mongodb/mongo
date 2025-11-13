@@ -3,17 +3,22 @@
  * reported to the slow query log for aggregations with $bucketAuto using the classic engine in a
  * sharded cluster.  Note that explain is not tested here because explain("executionStats") does not
  * report the merging part of a split pipeline and $bucketAuto is forced to run on the merging node.
+ * @tags: [
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
+ * ]
  */
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {runShardedMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const st = new ShardingTest(Object.assign({shards: 2}));
 const testDB = st.s.getDB("test");
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(testDB.getMongo()),
-                       "internalQueryFrameworkControl",
-                       "forceClassicEngine");
+setParameterOnAllNonConfigNodes(
+    testDB.getMongo(), "internalQueryFrameworkControl", "forceClassicEngine");
 
 const collName = jsTestName();
 const coll = testDB[collName];

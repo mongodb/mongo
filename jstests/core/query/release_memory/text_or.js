@@ -10,23 +10,29 @@
  *   uses_getmore_outside_of_transaction,
  *   # This test relies on query commands returning specific batch-sized responses.
  *   assumes_no_implicit_cursor_exhaustion,
+ *   # $text is not supported on views.
+ *   incompatible_with_views,
+ *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+ *   # consistent, no add/remove shard operations should occur during the test.
+ *   assumes_stable_shard_list,
  * ]
  */
 
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
     setAvailableDiskSpaceMode
 } from "jstests/libs/release_memory_util.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getServerParameter(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
 }
 
 function setServerParameter(knob, value) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+    setParameterOnAllNonConfigNodes(db.getMongo(), knob, value);
 }
 
 db.dropDatabase();

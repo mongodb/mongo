@@ -4,19 +4,23 @@
 //   requires_fcv_81,
 //   requires_persistence,
 //   requires_non_retryable_commands,
+//   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
+//   # consistent, no add/remove shard operations should occur during the test.
+//   assumes_stable_shard_list,
 // ]
 
 import {arrayDiff} from "jstests/aggregation/extras/utils.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
-import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {
+    setParameterOnAllNonConfigNodes
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getServerParameter(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
 }
 
 function setServerParameter(knob, value) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+    setParameterOnAllNonConfigNodes(db.getMongo(), knob, value);
 }
 
 function getTextOrExecutionStats(explain) {
