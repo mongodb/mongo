@@ -103,7 +103,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
         stat_cursor = session_follow2.open_cursor('statistics:' + self.uri)
-        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys][2]
+        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # Only the committed update can be garbage collected.
         self.assertEqual(garbage_collected, 1)
 
@@ -158,7 +158,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
         stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
-        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys][2]
+        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # Only the committed update can be garbage collected.
         self.assertEqual(garbage_collected, 1)
         stat_cursor.close()
@@ -174,6 +174,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         cursor_follow = self.session_follow.open_cursor(self.uri)
         cursor_follow[3] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
+        cursor_follow.close()
 
         # Make the rollback stable.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(30)}")
@@ -192,7 +193,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
         stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
-        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys][2]
+        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # The aborted prepared update is garbage collected.
         self.assertEqual(garbage_collected, 2)
         stat_cursor.close()
@@ -226,7 +227,7 @@ class test_layered65(wttest.WiredTigerTestCase):
         cursor_follow[2] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
-        # Make the prepred update stable.
+        # Make the updates stable.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(10)}")
         self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(10)}")
 
@@ -267,9 +268,13 @@ class test_layered65(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
         stat_cursor = session_follow2.open_cursor('statistics:' + self.uri)
-        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys][2]
-        # Only the non-prepared key can be garbage collected.
-        self.assertEqual(garbage_collected, 1)
+        garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
+        # The keys are garbaged collected from the disk image.
+        self.assertEqual(garbage_collected_update_chain, 0)
+
+        # The update before the prepared update should be garbage collected from the disk image.
+        garbage_collected_disk_image = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_disk_image][2]
+        self.assertEqual(garbage_collected_disk_image, 2)
 
     def test_prepared_update_rollback(self):
         self.create_follower()
@@ -345,43 +350,48 @@ class test_layered65(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
         stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
-        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys][2]
-        # Only the committed update can be garbage collected.
-        self.assertEqual(garbage_collected, 1)
+        garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
+        # The keys are garbaged collected from the disk image.
+        self.assertEqual(garbage_collected_update_chain, 0)
+
+        # The update before the prepared update should be garbage collected from the disk image.
+        garbage_collected_disk_image = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_disk_image][2]
+        self.assertEqual(garbage_collected_disk_image, 2)
         stat_cursor.close()
 
-        # FIXME-WT-15489: enable this after we stop writing prepared update to disk for in-memory btrees
-
         # Insert another committed update.
-        # self.session.begin_transaction()
-        # cursor = self.session.open_cursor(self.uri)
-        # cursor[3] = "value1"
-        # self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
+        self.session.begin_transaction()
+        cursor = self.session.open_cursor(self.uri)
+        cursor[3] = "value1"
+        self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
 
         # Insert the committed update on follower.
-        # self.session_follow.begin_transaction()
-        # cursor_follow = self.session_follow.open_cursor(self.uri)
-        # cursor_follow[3] = "value1"
-        # self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
+        self.session_follow.begin_transaction()
+        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow[3] = "value1"
+        self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
+        cursor_follow.close()
 
         # Make the rollback stable.
-        # self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(30)}")
-        # self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(30)}")
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(30)}")
+        self.conn_follow.set_timestamp(f"stable_timestamp={self.timestamp_str(30)}")
 
-        # self.session.checkpoint()
+        self.session.checkpoint()
 
         # Advance the checkpoint on the follower.
-        # self.disagg_advance_checkpoint(self.conn_follow)
+        self.disagg_advance_checkpoint(self.conn_follow)
 
         # Evict the data.
-        # session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        # evict_cursor = session_follow2.open_cursor(self.uri)
-        # evict_cursor.set_key(3)
-        # evict_cursor.search()
-        # evict_cursor.close()
+        session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
+        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor.set_key(3)
+        evict_cursor.search()
+        evict_cursor.close()
 
-        # stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
-        # garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys][2]
-        # # The aborted prepared update is garbage collected.
-        # self.assertEqual(garbage_collected, 2)
-        # stat_cursor.close()
+        stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
+        garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
+        # The aborted prepared update is garbage collected.
+        self.assertEqual(garbage_collected_update_chain, 1)
+        garbage_collected_disk_image = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_disk_image][2]
+        self.assertEqual(garbage_collected_disk_image, 2)
+        stat_cursor.close()

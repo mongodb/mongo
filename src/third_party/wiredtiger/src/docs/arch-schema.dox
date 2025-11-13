@@ -93,9 +93,15 @@ WT_SESSION::drop operation drops the specified \c uri. The method will delete al
 and metadata entries. It is possible to keep the underlying files by specifying
 \c "remove_files=false" in the config string.
 
+Although the drop operation is non-transactional, if it fails, it will force the current
+transaction to roll back to avoid potential disruption to the data written by the transaction.
+
 @subsection schema_alter Alter
 
 WT_SESSION::alter allows modification of some table settings after creation.
+
+Although the alter operation is non-transactional, if it fails, it will force the current
+transaction to roll back to avoid potential disruption to the data written by the transaction.
 
 @subsection schema_truncate Truncate
 

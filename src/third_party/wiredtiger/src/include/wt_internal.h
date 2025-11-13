@@ -501,6 +501,8 @@ struct __wti_rec_kv;
 typedef struct __wti_rec_kv WTI_REC_KV;
 struct __wti_reconcile;
 typedef struct __wti_reconcile WTI_RECONCILE;
+struct __wti_update_select;
+typedef struct __wti_update_select WTI_UPDATE_SELECT;
 union __wt_lsn;
 typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;

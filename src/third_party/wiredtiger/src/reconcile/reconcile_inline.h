@@ -504,8 +504,9 @@ __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT
     WT_BTREE *btree;
     WT_TIME_WINDOW *tw;
 
-    WT_ASSERT(
-      session, (upd_select != NULL && vpack == NULL) || (upd_select == NULL && vpack != NULL));
+    WT_ASSERT(session,
+      (upd_select != NULL && !WT_REC_HAS_ON_DISK(vpack)) ||
+        (upd_select == NULL && WT_REC_HAS_ON_DISK(vpack)));
     tw = upd_select != NULL ? &upd_select->tw : &vpack->tw;
 
     btree = S2BT(session);

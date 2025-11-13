@@ -435,7 +435,7 @@ struct __wti_reconcile {
         WT_TIME_AGGREGATE_MERGE((session), &(chunk)->ta_after_split_boundary, (ta_agg)); \
     } while (0)
 
-typedef struct {
+struct __wti_update_select {
     WT_UPDATE *upd;       /* Update to write (or NULL) */
     WT_UPDATE *tombstone; /* The tombstone to write (or NULL) */
 
@@ -443,7 +443,7 @@ typedef struct {
 
     bool upd_saved;       /* An element on the row's update chain was saved */
     bool no_ts_tombstone; /* Tombstone without a timestamp */
-} WTI_UPDATE_SELECT;
+};
 
 #define WTI_UPDATE_SELECT_INIT(upd_select)      \
     do {                                        \
@@ -481,7 +481,14 @@ typedef struct {
       (r)->multi_next == 0 &&                                                             \
       !F_ISSET_ATOMIC_16(r->ref->page, WT_PAGE_REC_FAIL | WT_PAGE_INTL_PINDEX_UPDATE) &&  \
       WT_REC_RESULT_SINGLE_PAGE((session), (r))
+/*
+ * Macro to check if an update's transaction ID and timestamp is obsolete and can be pruned.
+ */
+#define WT_REC_CAN_PRUNE_UPD(txnid, timestamp, r)                                    \
+    ((r)->rec_prune_timestamp != WT_TS_NONE && (txnid) < (r)->rec_start_oldest_id && \
+      (timestamp) <= r->rec_prune_timestamp)
 
+#define WT_REC_HAS_ON_DISK(vpack) (vpack != NULL && vpack->type != WT_CELL_DEL)
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
 extern int __wti_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page, const uint8_t *addr,

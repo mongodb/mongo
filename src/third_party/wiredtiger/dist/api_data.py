@@ -1719,6 +1719,10 @@ methods = {
                     Return the key, value as raw data.
                     ''',
                     type='boolean', undoc=True),
+                Config('cross_key', 'false', r'''
+                    Allow version cursos to walk across keys while calling next().
+                    ''',
+                    type='boolean', undoc=True),
         ]),
         Config('release_evict', 'false', r'''
             Configure the cursor to evict the page positioned on when the reset API call is used''',

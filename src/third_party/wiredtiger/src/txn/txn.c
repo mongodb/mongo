@@ -1287,20 +1287,6 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         }
         break;
     case RESOLVE_IN_MEMORY:
-        /*
-         * For in-memory configurations of WiredTiger if a prepared update is reconciled and then
-         * rolled back, the on-page value will not be marked as aborted until the next eviction. In
-         * the special case where this rollback operation results in the update chain being entirely
-         * comprised of aborted updates, other transactions attempting to write to the same key will
-         * look at the on-page value, think the prepared transaction is still active, and falsely
-         * report a write conflict. To prevent this scenario, prepend a tombstone to the update
-         * chain.
-         */
-        if (!commit && first_committed_upd == NULL) {
-            tw_found = __wt_read_cell_time_window(cbt, &tw);
-            if (tw_found && WT_TIME_WINDOW_HAS_PREPARE(&tw))
-                WT_ERR(__txn_prepare_rollback_delete_key(session, op, cbt));
-        }
         break;
     default:
         WT_ERR_PANIC(

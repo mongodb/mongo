@@ -1463,7 +1463,6 @@ __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
      */
     WT_RET(__wt_cursor_get_raw_key(to_dup, &key));
     __wt_cursor_set_raw_key(cursor, &key);
-    WT_RET(__wt_cursor_localkey(cursor));
 
     /*
      * We now have a reference to the raw key, but we don't know anything about the memory in which
