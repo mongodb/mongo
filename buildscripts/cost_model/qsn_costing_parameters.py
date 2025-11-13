@@ -101,6 +101,7 @@ class ParametersBuilderClassic:
                 "average_document_size_in_bytes",
                 "number_of_fields",
                 "n_index_fields",
+                "n_top_level_and_children",
             ],
         )
 
@@ -118,6 +119,7 @@ class ParametersBuilderClassic:
             n_processed=node.n_processed,
             seeks=node.seeks,
             n_index_fields=node.n_index_fields,
+            n_top_level_and_children=node.n_top_level_and_children,
         )
 
     @staticmethod
@@ -128,6 +130,7 @@ class ParametersBuilderClassic:
         n_processed: int = None,
         seeks: int = None,
         n_index_fields=None,
+        n_top_level_and_children=None,
     ):
         return [
             stage,
@@ -135,6 +138,7 @@ class ParametersBuilderClassic:
             n_processed,
             seeks,
             n_index_fields,
+            n_top_level_and_children,
             params.note,
             params.keys_length_in_bytes,
             params.average_document_size_in_bytes,

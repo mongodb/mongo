@@ -50,6 +50,7 @@ class ExecutionStats:
     n_children: int
     seeks: Optional[int]
     n_index_fields: Optional[int]
+    n_top_level_and_children: Optional[int]
 
 
 @dataclass

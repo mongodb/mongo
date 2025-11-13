@@ -45,6 +45,7 @@ class Node:
     seeks: Optional[int]
     children: list[Node]
     n_index_fields: Optional[int]
+    n_top_level_and_children: Optional[int]
 
     def get_execution_time(self):
         """Execution time of this node without execution time of its children"""
@@ -55,7 +56,7 @@ class Node:
     def print(self, level=0):
         """Pretty print the execution tree"""
         print(
-            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}, nIndexFields: {self.n_index_fields}'
+            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}, nIndexFields: {self.n_index_fields}, nTopLevelAndChildren: {self.n_top_level_and_children}'
         )
         for child in self.children:
             child.print(level + 1)
@@ -168,4 +169,9 @@ def get_common_fields(json_stage: dict[str, Any]) -> dict[str, Any]:
         "n_returned": json_stage["nReturned"],
         "seeks": json_stage.get("seeks"),
         "n_index_fields": len(json_stage.get("keyPattern")) if "keyPattern" in json_stage else None,
+        "n_top_level_and_children": (
+            len(json_stage.get("filter").get("$and")) if "$and" in json_stage.get("filter") else 1
+        )
+        if "filter" in json_stage
+        else None,
     }

@@ -105,6 +105,7 @@ def get_execution_stats(
                 seeks=enode.seeks,
                 # n_index_fields will be None for any node but IXSCAN.
                 n_index_fields=enode.n_index_fields,
+                n_top_level_and_children=enode.n_top_level_and_children,
             )
         )
     return result

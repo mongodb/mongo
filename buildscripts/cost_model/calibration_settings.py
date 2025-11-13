@@ -179,16 +179,22 @@ def create_coll_scan_collection_template(
                 ),
                 indexed=True,
             ),
-            config.FieldTemplate(
-                name="int_uniform_unindexed",
-                data_type=config.DataType.INTEGER,
-                distribution=RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 2)),
-                indexed=False,
-            ),
         ],
         compound_indexes=[],
         cardinalities=cardinalities,
     )
+
+    # 10 more unindexed fields whose value is always 1.
+    filter_fields = [
+        config.FieldTemplate(
+            name=f"int_uniform_unindexed_{i}",
+            data_type=config.DataType.INTEGER,
+            distribution=RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 2)),
+            indexed=False,
+        )
+        for i in range(10)
+    ]
+    template.fields.extend(filter_fields)
 
     if payload_size > 0:
         payload_distr = random_strings_distr(payload_size, 1000)
@@ -439,6 +445,30 @@ qsn_nodes = [
         type="IXSCAN",
         variables_override=lambda df: pd.concat(
             [df["n_index_fields"].rename("Number of fields in index")],
+            axis=1,
+        ),
+    ),
+    config.QsNodeCalibrationConfig(
+        name="FETCH_W_FILTERS_W_DIFF_NUM_LEAVES",
+        type="FETCH",
+        variables_override=lambda df: pd.concat(
+            [df["n_top_level_and_children"].rename("Number of filters")],
+            axis=1,
+        ),
+    ),
+    config.QsNodeCalibrationConfig(
+        name="COLLSCAN_W_FILTERS_W_DIFF_NUM_LEAVES",
+        type="COLLSCAN",
+        variables_override=lambda df: pd.concat(
+            [df["n_top_level_and_children"].rename("Number of filters")],
+            axis=1,
+        ),
+    ),
+    config.QsNodeCalibrationConfig(
+        name="IXSCAN_W_FILTERS_W_DIFF_NUM_LEAVES",
+        type="IXSCAN",
+        variables_override=lambda df: pd.concat(
+            [df["n_top_level_and_children"].rename("Number of filters")],
             axis=1,
         ),
     ),
