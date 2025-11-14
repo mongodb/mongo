@@ -286,6 +286,23 @@ public:
     void benchmarkSortArrayBSONObj(benchmark::State& state);
     void benchmarkSortArray2D(benchmark::State& state);
 
+    void benchmarkTopNIntRandom(benchmark::State& state);
+    void benchmarkTopNIntSequential(benchmark::State& state);
+    void benchmarkTopNString(benchmark::State& state);
+    void benchmarkTopNBSONObj(benchmark::State& state);
+    void benchmarkBottomNIntRandom(benchmark::State& state);
+    void benchmarkBottomNIntSequential(benchmark::State& state);
+    void benchmarkBottomNString(benchmark::State& state);
+    void benchmarkBottomNBSONObj(benchmark::State& state);
+    void benchmarkTopIntRandom(benchmark::State& state);
+    void benchmarkTopIntSequential(benchmark::State& state);
+    void benchmarkTopString(benchmark::State& state);
+    void benchmarkTopBSONObj(benchmark::State& state);
+    void benchmarkBottomIntRandom(benchmark::State& state);
+    void benchmarkBottomIntSequential(benchmark::State& state);
+    void benchmarkBottomString(benchmark::State& state);
+    void benchmarkBottomBSONObj(benchmark::State& state);
+
     void benchmarkRand(benchmark::State& state);
 
     void benchmarkMaxSingleInput(benchmark::State& state);
@@ -436,6 +453,70 @@ private:
                                                                                                 \
     BENCHMARK_F(Fixture, SortArray2D)(benchmark::State & state) {                               \
         benchmarkSortArray2D(state);                                                            \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopNIntRandom)(benchmark::State & state) {                             \
+        benchmarkTopNIntRandom(state);                                                          \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopNIntSequential)(benchmark::State & state) {                         \
+        benchmarkTopNIntSequential(state);                                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopNString)(benchmark::State & state) {                                \
+        benchmarkTopNString(state);                                                             \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopNBSONObj)(benchmark::State & state) {                               \
+        benchmarkTopNBSONObj(state);                                                            \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomNIntRandom)(benchmark::State & state) {                          \
+        benchmarkBottomNIntRandom(state);                                                       \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomNIntSequential)(benchmark::State & state) {                      \
+        benchmarkBottomNIntSequential(state);                                                   \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomNString)(benchmark::State & state) {                             \
+        benchmarkBottomNString(state);                                                          \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomNBSONObj)(benchmark::State & state) {                            \
+        benchmarkBottomNBSONObj(state);                                                         \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopIntRandom)(benchmark::State & state) {                              \
+        benchmarkTopIntRandom(state);                                                           \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopIntSequential)(benchmark::State & state) {                          \
+        benchmarkTopIntSequential(state);                                                       \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopString)(benchmark::State & state) {                                 \
+        benchmarkTopString(state);                                                              \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, TopBSONObj)(benchmark::State & state) {                                \
+        benchmarkTopBSONObj(state);                                                             \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomIntRandom)(benchmark::State & state) {                           \
+        benchmarkBottomIntRandom(state);                                                        \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomIntSequential)(benchmark::State & state) {                       \
+        benchmarkBottomIntSequential(state);                                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomString)(benchmark::State & state) {                              \
+        benchmarkBottomString(state);                                                           \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, BottomBSONObj)(benchmark::State & state) {                             \
+        benchmarkBottomBSONObj(state);                                                          \
     }                                                                                           \
                                                                                                 \
     BENCHMARK_F(Fixture, ConditionalCond)(benchmark::State & state) {                           \

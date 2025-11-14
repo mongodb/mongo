@@ -3760,9 +3760,7 @@ public:
                    boost::intrusive_ptr<Expression> n,
                    boost::intrusive_ptr<Expression> input,
                    const PatternValueCmp& sortBy)
-        : Expression(expCtx, {std::move(n), std::move(input)}), _sortBy(sortBy) {
-        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : Expression(expCtx, {std::move(n), std::move(input)}), _sortBy(sortBy) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
@@ -3815,9 +3813,7 @@ public:
     ExpressionTop(ExpressionContext* const expCtx,
                   boost::intrusive_ptr<Expression> input,
                   const PatternValueCmp& sortBy)
-        : Expression(expCtx, {std::move(input)}), _sortBy(sortBy) {
-        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : Expression(expCtx, {std::move(input)}), _sortBy(sortBy) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
@@ -3865,9 +3861,7 @@ public:
                       boost::intrusive_ptr<Expression> n,
                       boost::intrusive_ptr<Expression> input,
                       const PatternValueCmp& sortBy)
-        : Expression(expCtx, {std::move(n), std::move(input)}), _sortBy(sortBy) {
-        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : Expression(expCtx, {std::move(n), std::move(input)}), _sortBy(sortBy) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
@@ -3920,9 +3914,7 @@ public:
     ExpressionBottom(ExpressionContext* const expCtx,
                      boost::intrusive_ptr<Expression> input,
                      const PatternValueCmp& sortBy)
-        : Expression(expCtx, {std::move(input)}), _sortBy(sortBy) {
-        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : Expression(expCtx, {std::move(input)}), _sortBy(sortBy) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;

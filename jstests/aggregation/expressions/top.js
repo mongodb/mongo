@@ -4,6 +4,8 @@
  *   requires_fcv_83
  * ]
  */
+import "jstests/libs/query/sbe_assert_error_override.js";
+
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let coll = db.top_expr;

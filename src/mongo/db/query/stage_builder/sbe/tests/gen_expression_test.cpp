@@ -894,6 +894,30 @@ TEST_F(GoldenGenExpressionTest, TestExprArraySet) {
         runTest(arrReverseExpr.get(), rootSlot, Value(expected), "ExpressionSortArray"_sd);
     }
     {
+        BSONObj expr = fromjson("{ $topN: { n: 2, input: '$arr2', sortBy: -1 } }");
+        auto topNExpr =
+            ExpressionTopN::parse(_expCtx.get(), expr.firstElement(), _expCtx->variablesParseState);
+        runTest(topNExpr.get(), rootSlot, Value(BSON_ARRAY("str" << 2.5)), "ExpressionTopN"_sd);
+    }
+    {
+        BSONObj expr = fromjson("{ $top: { input: '$arr2', sortBy: -1 } }");
+        auto topExpr =
+            ExpressionTop::parse(_expCtx.get(), expr.firstElement(), _expCtx->variablesParseState);
+        runTest(topExpr.get(), rootSlot, Value("str"_sd), "ExpressionTop"_sd);
+    }
+    {
+        BSONObj expr = fromjson("{ $bottomN: { n: 2, input: '$arr2', sortBy: -1 } }");
+        auto bottomNExpr = ExpressionBottomN::parse(
+            _expCtx.get(), expr.firstElement(), _expCtx->variablesParseState);
+        runTest(bottomNExpr.get(), rootSlot, Value(BSON_ARRAY(2.5 << 1)), "ExpressionBottomN"_sd);
+    }
+    {
+        BSONObj expr = fromjson("{ $bottom: { input: '$arr2', sortBy: -1 } }");
+        auto bottomExpr = ExpressionBottom::parse(
+            _expCtx.get(), expr.firstElement(), _expCtx->variablesParseState);
+        runTest(bottomExpr.get(), rootSlot, Value(1), "ExpressionBottom"_sd);
+    }
+    {
         ExpressionIsArray isArrExpr(_expCtx.get(), {fieldArr2Expr});
         runTest(&isArrExpr, rootSlot, Value(true), "ExpressionIsArray"_sd);
     }

@@ -105,5 +105,61 @@ ExpressionSortArray
         else fail(7158001, "$sortArray input argument must be an array") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionTopN
+
+    let [
+        l18.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if ((2 != trunc(2)) ?: true) 
+        then fail(1127469, "$topN requires 'n' to be an integer") 
+        elif (typeMatch(l18.0, 1088) ?: true) 
+        then null 
+        elif isArray(l18.0) 
+        then topN(2, move(l18.0), {"" : -1L}) 
+        else fail(11274611, "$topN input argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionTop
+
+    let [
+        l20.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if (typeMatch(l20.0, 1088) ?: true) 
+        then null 
+        elif isArray(l20.0) 
+        then top(move(l20.0), {"" : -1L}) 
+        else fail(11274612, "$top input argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionBottomN
+
+    let [
+        l22.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if ((2 != trunc(2)) ?: true) 
+        then fail(1127469, "$bottomN requires 'n' to be an integer") 
+        elif (typeMatch(l22.0, 1088) ?: true) 
+        then null 
+        elif isArray(l22.0) 
+        then bottomN(2, move(l22.0), {"" : -1L}) 
+        else fail(11274611, "$bottomN input argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionBottom
+
+    let [
+        l24.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if (typeMatch(l24.0, 1088) ?: true) 
+        then null 
+        elif isArray(l24.0) 
+        then bottom(move(l24.0), {"" : -1L}) 
+        else fail(11274612, "$bottom input argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionIsArray
 (isArray(getField(s1, "arr2")) ?: false) 

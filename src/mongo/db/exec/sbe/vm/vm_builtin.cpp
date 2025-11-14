@@ -277,6 +277,14 @@ std::string builtinToString(Builtin b) {
             return "reverseArray";
         case Builtin::sortArray:
             return "sortArray";
+        case Builtin::topN:
+            return "topN";
+        case Builtin::top:
+            return "top";
+        case Builtin::bottomN:
+            return "bottomN";
+        case Builtin::bottom:
+            return "bottom";
         case Builtin::dateAdd:
             return "dateAdd";
         case Builtin::hasNullBytes:
@@ -623,6 +631,8 @@ std::string builtinToString(Builtin b) {
             return "cellFoldValues_P";
         case Builtin::cellBlockGetFlatValuesBlock:
             return "cellBlockGetFlatValuesBlock";
+        case Builtin::singleByteEndMarker:
+            MONGO_UNREACHABLE_TASSERT(11274613);
         case Builtin::currentDate:
             return "currentDate";
         default:
@@ -876,6 +886,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinReverseArray(arity);
         case Builtin::sortArray:
             return builtinSortArray(arity);
+        case Builtin::topN:
+            return builtinTopN(arity);
+        case Builtin::top:
+            return builtinTop(arity);
+        case Builtin::bottomN:
+            return builtinBottomN(arity);
+        case Builtin::bottom:
+            return builtinBottom(arity);
         case Builtin::dateAdd:
             return builtinDateAdd(arity);
         case Builtin::hasNullBytes:
@@ -1223,6 +1241,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinCellBlockGetFlatValuesBlock(arity);
         case Builtin::currentDate:
             return builtinCurrentDate(arity);
+        case Builtin::singleByteEndMarker:
+            MONGO_UNREACHABLE_TASSERT(11274614);
     }
 
     MONGO_UNREACHABLE_TASSERT(11122947);

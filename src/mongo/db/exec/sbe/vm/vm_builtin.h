@@ -201,6 +201,10 @@ enum class Builtin : uint16_t {
     isArrayEmpty,
     reverseArray,
     sortArray,
+    topN,
+    top,
+    bottomN,
+    bottom,
     dateAdd,
     hasNullBytes,
     getRegexPattern,
@@ -336,7 +340,7 @@ enum class Builtin : uint16_t {
     aggRemovableBottomNFinalize,
 
     // Additional one-byte builtins go here.
-
+    singleByteEndMarker,
     // Start of 2 byte builtins.
     valueBlockExists = 256,
     valueBlockTypeMatch,
@@ -389,6 +393,10 @@ enum class Builtin : uint16_t {
 
     currentDate,
 };  // enum class Builtin
+
+static_assert(static_cast<uint16_t>(Builtin::singleByteEndMarker) < 256,
+              "singleByteEndMarker must be less than 256 to ensure all preceding builtins fit in "
+              "a single byte");
 
 std::string builtinToString(Builtin b);
 

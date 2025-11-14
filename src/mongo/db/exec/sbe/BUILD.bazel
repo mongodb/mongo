@@ -424,6 +424,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_set_expressions_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_shard_filter_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_to_upper_to_lower_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_topn_bottomn_expr_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_topn_bottomn_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_trigonometric_expressions_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_trunc_builtin_test.cpp",

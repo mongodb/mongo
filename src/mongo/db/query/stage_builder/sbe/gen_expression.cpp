@@ -2693,19 +2693,19 @@ public:
     }
 
     void visit(const ExpressionTopN* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitTopNOrBottomN(expr, "topN"_sd);
     }
 
     void visit(const ExpressionTop* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitTopOrBottom(expr, "top"_sd);
     }
 
     void visit(const ExpressionBottomN* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitTopNOrBottomN(expr, "bottomN"_sd);
     }
 
     void visit(const ExpressionBottom* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitTopOrBottom(expr, "bottom"_sd);
     }
 
     void visit(const ExpressionSlice* expr) final {
@@ -3557,6 +3557,92 @@ private:
         pushExpr(_b.makeLet(frameId,
                             SbExpr::makeSeq(std::move(inputExpr), std::move(placeExpr)),
                             std::move(abtExpr)));
+    }
+
+    /**
+     * Shared logic for $topN and $bottomN expressions
+     */
+    template <typename ExprType>
+    void visitTopNOrBottomN(const ExprType* expr, StringData functionName) {
+        auto input = popExpr();
+        auto n = popExpr();
+
+        auto frameId = _context->state.frameId();
+        SbVar nVar{frameId, 0};
+        SbVar inputVar{frameId, 1};
+
+        auto [specTag, specVal] = makeValue(expr->getSortPattern());
+        auto specConstant = _b.makeConstant(specTag, specVal);
+
+        auto nIsNegative = _b.makeBinaryOp(abt::Operations::Lt, nVar, _b.makeInt64Constant(0));
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction("isArray", inputVar));
+        auto nIsNotNumericOrIntegral =
+            _b.makeBinaryOp(abt::Operations::Or,
+                            _b.generateNonNumericCheck(nVar),
+                            _b.makeFillEmptyTrue(_b.makeBinaryOp(
+                                abt::Operations::Neq, nVar, _b.makeFunction("trunc", nVar))));
+
+        auto functionArgs = SbExpr::makeSeq(nVar, inputVar, std::move(specConstant));
+
+        auto collatorSlot = _context->state.getCollatorSlot();
+        if (collatorSlot) {
+            functionArgs.emplace_back(SbVar{*collatorSlot});
+        }
+
+        auto resultExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(nVar), _b.makeNullConstant()},
+                SbExprPair{std::move(nIsNotNumericOrIntegral),
+                           _b.makeFail(ErrorCodes::Error{1127469},
+                                       str::stream() << "$" << functionName
+                                                     << " requires 'n' to be an integer")},
+                SbExprPair{
+                    std::move(nIsNegative),
+                    _b.makeFail(ErrorCodes::Error{11274610},
+                                str::stream()
+                                    << "$" << functionName
+                                    << " requires a non-negative integer for the n argument")},
+                SbExprPair{_b.generateNullMissingOrUndefined(inputVar), _b.makeNullConstant()},
+                SbExprPair{std::move(argumentIsNotArray),
+                           _b.makeFail(ErrorCodes::Error{11274611},
+                                       str::stream() << "$" << functionName
+                                                     << " input argument must be an array")}),
+            _b.makeFunction(functionName, std::move(functionArgs)));
+        pushExpr(_b.makeLet(
+            frameId, SbExpr::makeSeq(std::move(n), std::move(input)), std::move(resultExpr)));
+    }
+
+    /**
+     * Shared logic for $top and $bottom expressions
+     */
+    template <typename ExprType>
+    void visitTopOrBottom(const ExprType* expr, StringData functionName) {
+        auto input = popExpr();
+
+        auto frameId = _context->state.frameId();
+        SbVar inputVar{frameId, 0};
+
+        auto [specTag, specVal] = makeValue(expr->getSortPattern());
+        auto specConstant = _b.makeConstant(specTag, specVal);
+
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction("isArray", inputVar));
+
+        auto functionArgs = SbExpr::makeSeq(inputVar, std::move(specConstant));
+
+        auto collatorSlot = _context->state.getCollatorSlot();
+        if (collatorSlot) {
+            functionArgs.emplace_back(SbVar{*collatorSlot});
+        }
+
+        auto resultExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(inputVar), _b.makeNullConstant()},
+                SbExprPair{std::move(argumentIsNotArray),
+                           _b.makeFail(ErrorCodes::Error{11274612},
+                                       str::stream() << "$" << functionName
+                                                     << " input argument must be an array")}),
+            _b.makeFunction(functionName, std::move(functionArgs)));
+        pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(input)), std::move(resultExpr)));
     }
 
     /**

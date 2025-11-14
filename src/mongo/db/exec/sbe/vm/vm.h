@@ -342,6 +342,11 @@ enum class AggFirstLastNElems { kQueue, kN, kSizeOfArray };
  */
 enum class AggAccumulatorNElems { kValues = 0, kN, kMemUsage, kMemLimit, kSizeOfArray };
 
+/**
+ * Enum to specify whether to extract top or bottom N elements.
+ */
+enum class TopBottomSense { kTop, kBottom };
+
 class ByteCode {
     // The number of bytes per stack entry.
     static constexpr size_t sizeOfElement =
@@ -965,6 +970,14 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinIsArrayEmpty(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinReverseArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSortArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTopN(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTop(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinBottomN(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinBottom(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> topOrBottomImpl(ArityType arity,
+                                                                   TopBottomSense sense);
+    FastTuple<bool, value::TypeTags, value::Value> topOrBottomNImpl(ArityType arity,
+                                                                    TopBottomSense sense);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinHasNullBytes(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinGetRegexPattern(ArityType arity);
