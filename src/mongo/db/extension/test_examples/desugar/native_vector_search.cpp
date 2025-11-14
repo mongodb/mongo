@@ -104,7 +104,7 @@ public:
     }
 
     /**
-     * Emit the canonical query shape used for explain/plan-cache hashing.
+     * Emit the canonical query shape used for plan-cache hashing.
      */
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         BSONObjBuilder bob;
