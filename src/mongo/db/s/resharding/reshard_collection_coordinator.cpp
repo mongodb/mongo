@@ -139,12 +139,27 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                   << "' not found in cluster catalog",
                     cmOld.hasRoutingTable());
 
+            // rewriteCollection does not provide a shard key because it reshards the collection on
+            // its existing key. To avoid using stale metadata, we fetch and set the current shard
+            // key here after acquiring the DDL lock.
+            auto provenance = _doc.getProvenance();
+            auto currentShardKey = cmOld.getShardKeyPattern().getKeyPattern().toBSON();
+            if (resharding::isRewriteCollection(provenance)) {
+                _request.setKey(currentShardKey);
+                _doc.setReshardCollectionRequest(_request);
+            } else {
+                tassert(11342701,
+                        "Shard key not provided in reshardCollection request. Provide 'key' for "
+                        "all resharding requests except rewriteCollection.",
+                        _doc.getKey());
+            }
+
             StateDoc newDoc(_doc);
-            newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
+            newDoc.setOldShardKey(currentShardKey);
             newDoc.setOldCollectionUUID(cmOld.getUUID());
             _updateStateDocument(opCtx, std::move(newDoc));
 
-            ConfigsvrReshardCollection configsvrReshardCollection(nss(), _doc.getKey());
+            ConfigsvrReshardCollection configsvrReshardCollection(nss(), *(_doc.getKey()));
             configsvrReshardCollection.setDbName(nss().dbName());
             configsvrReshardCollection.setUnique(_doc.getUnique());
             configsvrReshardCollection.setCollation(_doc.getCollation());
@@ -184,14 +199,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                                     _doc.getPerformVerification());
             configsvrReshardCollection.setPerformVerification(_doc.getPerformVerification());
 
-            auto provenance = _doc.getProvenance();
             if (resharding::isMoveCollection(provenance)) {
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream()
                             << "MoveCollection can only be called on an unsharded collection.",
                         !cmOld.isSharded());
-            } else if (provenance &&
-                       provenance.get() == ReshardingProvenanceEnum::kUnshardCollection) {
+            } else if (resharding::isUnshardCollection(provenance)) {
                 // If the collection is already unsharded, this request should be a no-op. Check
                 // that the user didn't specify a "to" shard other than the shard the collection
                 // lives on - if it is different, return an error.
@@ -230,7 +243,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                    "when using the forceRedistribution option. The "
                                    "forceRedistribution option is meant for redistributing the "
                                    "collection to a different set of shards.",
-                            cmOld.getShardKeyPattern().isShardKey(_doc.getKey()));
+                            cmOld.getShardKeyPattern().isShardKey(*(_doc.getKey())));
                 }
             }
 

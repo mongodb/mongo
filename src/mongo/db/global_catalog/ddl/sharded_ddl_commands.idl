@@ -375,7 +375,7 @@ structs:
             key:
                 type: object
                 description: "The index specification document to use as the new shard key."
-                optional: false
+                optional: true
             unique:
                 type: bool
                 description: "Whether the shard key index should enforce a unique constraint."

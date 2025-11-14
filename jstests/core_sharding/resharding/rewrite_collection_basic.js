@@ -13,6 +13,8 @@
 
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 import {getShardNames} from "jstests/sharding/libs/sharding_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const shardNames = getShardNames(db);
 const collName = jsTestName();
@@ -69,3 +71,38 @@ assert.throwsWithCode(
         ),
     [ErrorCodes.BadValue, ErrorCodes.ZoneNotFound],
 );
+
+jsTest.log.info(
+    "Succeed when reshardCollection changes the shard key after rewriteCollection is run but before it locks",
+);
+
+const rewritePauseBeforeLock = configureFailPoint(mongos, "hangRewriteCollectionBeforeRunningReshardCollection");
+
+const awaitRewriteResult = startParallelShell(
+    funWithArgs(function (ns) {
+        assert.commandWorked(db.adminCommand({rewriteCollection: ns, numInitialChunks: 1}));
+    }, ns),
+    mongos.port,
+);
+rewritePauseBeforeLock.wait();
+
+assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}));
+
+// Verify that the shard key for the collection was changed to newKey
+let collCount = mongos
+    .getDB("config")
+    .getCollection("collections")
+    .find({_id: ns, key: {newKey: 1}})
+    .itcount();
+assert.eq(collCount, 1);
+
+rewritePauseBeforeLock.off();
+awaitRewriteResult();
+
+// Verify that the shard key for the collection remained newKey after rewriteCollection completed
+collCount = mongos
+    .getDB("config")
+    .getCollection("collections")
+    .find({_id: ns, key: {newKey: 1}})
+    .itcount();
+assert.eq(collCount, 1);

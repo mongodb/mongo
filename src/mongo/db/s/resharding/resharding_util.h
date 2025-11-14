@@ -428,6 +428,11 @@ bool isMoveCollection(const boost::optional<ReshardingProvenanceEnum>& provenanc
 bool isUnshardCollection(const boost::optional<ReshardingProvenanceEnum>& provenance);
 
 /**
+ * Returns true if the provenance is rewriteCollection.
+ */
+bool isRewriteCollection(const boost::optional<ReshardingProvenanceEnum>& provenance);
+
+/**
  * Helper function to create a thread pool for _markKilledExecutor member of resharding POS.
  */
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName);

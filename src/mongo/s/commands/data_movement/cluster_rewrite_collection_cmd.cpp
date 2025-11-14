@@ -43,6 +43,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangRewriteCollectionBeforeRunningReshardCollection);
+
 class ClusterRewriteCollectionCmd final : public TypedCommand<ClusterRewriteCollectionCmd> {
 public:
     using Request = RewriteCollection;
@@ -58,13 +60,6 @@ public:
 
             // ForceRedistribution is set to true to force resharding.
             reshardCollectionRequest.setForceRedistribution(true);
-
-            // Retrieve the current shard key and pass it to reshardCollection. If shard key becomes
-            // stale due to a concurrent operation, the ReshardCollectionCoordinator will detect it
-            // and throw an error.
-            auto catalogClient = Grid::get(opCtx)->catalogClient();
-            CollectionType coll = catalogClient->getCollection(opCtx, nss);
-            reshardCollectionRequest.setKey(coll.getKeyPattern().toBSON());
 
             // Other parameter values are passed through to reshardCollection.
             reshardCollectionRequest.setZones(request().getZones());
@@ -87,6 +82,13 @@ public:
 
             generic_argument_util::setMajorityWriteConcern(rewriteCollectionRequest,
                                                            &opCtx->getWriteConcern());
+
+            if (MONGO_unlikely(hangRewriteCollectionBeforeRunningReshardCollection.shouldFail())) {
+                LOGV2(11342700,
+                      "Hanging rewriteCollection due to failpoint "
+                      "'hangRewriteCollectionBeforeRunningReshardCollection'");
+                hangRewriteCollectionBeforeRunningReshardCollection.pauseWhileSet(opCtx);
+            }
 
             LOGV2(8328900,
                   "Running a reshard collection command for the rewrite collection request.",
