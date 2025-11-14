@@ -36,6 +36,9 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
@@ -43,8 +46,10 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
@@ -59,6 +64,9 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/unittest/unittest.h"
@@ -625,6 +633,395 @@ TEST_F(CollectionValidationTest, HashPrefixesCases) {
         CollectionValidation::validateHashes({"abcd", "a", "ABCDEF"}, /*equalLength=*/true),
         DBException,
         ErrorCodes::InvalidOptions);
+}
+
+template <class T = BSONObj>
+BSONObj replaceNestedField(const BSONObj& bson,
+                           std::span<const StringData> nestedFieldNames,
+                           const T& replacement) {
+    invariant(!nestedFieldNames.empty());
+    const StringData cur = nestedFieldNames.front();
+    BSONObjBuilder bob;
+    // Ordering must be preserved to avoid out of order errors, so fields must be added one-by-one.
+    for (const auto& elem : bson) {
+        if (elem.fieldNameStringData() == cur) {
+            if (nestedFieldNames.size() == 1) {
+                bob.append(cur, replacement);
+            } else {
+                bob.append(
+                    cur,
+                    replaceNestedField(elem.Obj(),
+                                       {nestedFieldNames.begin() + 1, nestedFieldNames.end()},
+                                       replacement));
+            }
+        } else {
+            bob.append(elem);
+        }
+    }
+    return bob.obj();
+}
+
+BSONObj removeNestedField(const BSONObj& bson, std::span<const StringData> nestedFieldNames) {
+    invariant(!nestedFieldNames.empty());
+    const StringData cur = nestedFieldNames.front();
+    auto removed = bson.removeField(cur);
+    if (nestedFieldNames.size() == 1) {
+        return removed;
+    } else if (bson.hasField(cur)) {
+        BSONObjBuilder bob;
+        bob.appendElements(removed);
+        bob.append(cur,
+                   removeNestedField(bson.getField(cur).Obj(),
+                                     {nestedFieldNames.begin() + 1, nestedFieldNames.end()}));
+        return bob.obj();
+    }
+    MONGO_UNREACHABLE;
+}
+
+class TimeseriesCollectionValidationTest : public CatalogTestFixture {
+public:
+protected:
+    TimeseriesCollectionValidationTest(Options options = {})
+        : CatalogTestFixture(std::move(options)) {
+        _nss = NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+    }
+
+    static BSONObj getSampleDoc() {
+        return ::mongo::fromjson(R"BSON({
+            "_id" : {"$oid": "61be04541ad72e8d5d257550"},
+            "control" : {
+                "version" : 2,
+                "min" : {
+                    "_id" : {"$oid": "6912089d8302f7b0ec8eef41"},
+                    "date" : {"$date": "2021-12-18T15:55:00Z"},
+                    "close" : 252.47,
+                    "volume" : 27890
+                },
+                "max" : {
+                    "_id" : {"$oid": "6912089d8302f7b0ec8eef45"},
+                    "date" : {"$date": "2021-12-18T15:59:00Z"},
+                    "close" : 254.03,
+                    "volume" : 55046
+                },
+                "count" : 5
+            },
+            "ticker" : "MDB",
+            "data" : {
+                "_id" : {"$binary": "BwBpEgidgwL3sOyO70WAGwAAAAAAAAAA", "$type":"07"},
+                "date" : {"$binary": "CQAg6EDOfQEAAIEMTB0AAAAAAA4AAAAAAAAAAA==", "$type":"07"},
+                "close" : {"$binary": "AQApXI/C9cBvQLD7BBgAHAK2AAA=", "$type":"07"},
+                "volume" : {"$binary": "AQAAAAAAwKnjQJB7C0YAo3jwqwA=", "$type":"07"}
+            }
+        })BSON");
+    }
+
+    void insertDoc(BSONObj doc) {
+        ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
+        WriteUnitOfWork wuow(_opCtx);
+        const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        ASSERT_TRUE(coll->isTimeseriesCollection());
+        ASSERT_OK(
+            collection_internal::insertDocument(_opCtx, *coll, InsertStatement{doc}, nullptr));
+        wuow.commit();
+    }
+
+    static BSONObj getSampleDocMismatchedMeasurementField(StringData measurementField) {
+        const auto origBson = getSampleDoc();
+        const BSONColumn colData(origBson.getObjectField("data"_sd).firstElement());
+
+        BSONColumnBuilder bcb;
+        const size_t sz = colData.size();
+        // Copy one less element to mangle the data.
+        for (size_t copied = 0; const auto& datum : colData) {
+            if (copied == sz - 1) {
+                break;
+            }
+            bcb.append(datum);
+            ++copied;
+        }
+
+        const std::vector<StringData> nested = {"data"_sd, measurementField};
+        return replaceNestedField(origBson, nested, bcb.finalize());
+    }
+
+    NamespaceString _nss;
+    OperationContext* _opCtx{nullptr};
+    CollectionOptions _options;
+    CollectionValidation::ValidateMode _validateMode{
+        CollectionValidation::ValidateMode::kForegroundFullCheckBSON};
+
+private:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        _options.uuid = UUID::gen();
+        _options.timeseries = TimeseriesOptions(/*timeField*/ "date");
+        _options.timeseries->setBucketRoundingSeconds(60);
+        _options.timeseries->setBucketMaxSpanSeconds(60 * 60 * 24);
+        _options.timeseries->setMetaField("ticker"_sd);
+        _options.timeseries->setGranularity(BucketGranularityEnum::Seconds);
+        _options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+        _opCtx = operationContext();
+    };
+};
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationGoodData) {
+    const BSONObj bson = getSampleDoc();
+    ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
+    {
+        WriteUnitOfWork wuow(_opCtx);
+        const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        ASSERT_TRUE(coll->isTimeseriesCollection());
+        ASSERT_OK(
+            collection_internal::insertDocument(_opCtx, *coll, InsertStatement{bson}, nullptr));
+        wuow.commit();
+    }
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadBucketSpan) {
+    _options.timeseries->setBucketMaxSpanSeconds(30);
+    insertDoc(getSampleDoc());
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadControlCount) {
+    static constexpr std::array nested = {"control"_sd, "count"_sd};
+    insertDoc(replaceNestedField(getSampleDoc(), nested, 4));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMin) {
+    static constexpr std::array nested = {"control"_sd, "min"_sd};
+    insertDoc(removeNestedField(getSampleDoc(), nested));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMax) {
+    static constexpr std::array nested = {"control"_sd, "max"_sd};
+    insertDoc(removeNestedField(getSampleDoc(), nested));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinTimestamp) {
+    const auto invalidDoc = std::invoke([] {
+        static constexpr auto newMinIso = "1990-12-18T15:59:00Z"_sd;
+        auto doc = getSampleDoc();
+        auto oid = doc.getField("_id"_sd).OID();
+        oid.setTimestamp(dateFromISOString(newMinIso).getValue().toMillisSinceEpoch());
+        doc = replaceNestedField(doc, std::array{"_id"_sd}, oid);
+        doc = replaceNestedField(doc,
+                                 std::array{"control"_sd, "min"_sd, "date"_sd},
+                                 dateFromISOString(newMinIso).getValue());
+        return doc;
+    });
+    insertDoc(invalidDoc);
+    // Timestamp and ID generate errors for mismatch between data and control block and for
+    // improperly formatted bucket as the timestamp and _id are coupled. This test keeps the two
+    // values aligned but mismatches the control and data block min values.
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinIdField) {
+    static constexpr std::array nested = {"control"_sd, "min"_sd, "_id"_sd};
+    insertDoc(replaceNestedField(getSampleDoc(), nested, "xyz"_sd));
+    // Timestamp and ID generate errors for mismatch between data and control block and for
+    // improperly formatted bucket as the timestamp and _id are coupled.
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 2, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinMeasurement) {
+    static constexpr std::array nested = {"control"_sd, "min"_sd, "volume"_sd};
+    insertDoc(replaceNestedField(getSampleDoc(), nested, 42));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMaxMeasurement) {
+    static constexpr std::array nested = {"control"_sd, "max"_sd, "volume"_sd};
+    insertDoc(replaceNestedField(getSampleDoc(), nested, 1'000'000));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest,
+       TimeseriesValidationIncorrectMaxTimestampWithBucketSpanError) {
+    static constexpr std::array nested = {"control"_sd, "max"_sd, "date"_sd};
+    insertDoc(replaceNestedField(
+        getSampleDoc(), nested, dateFromISOString("2025-12-18T15:59:00Z"_sd).getValue()));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMaxTimestampTooHigh) {
+    static constexpr std::array nested = {"control"_sd, "max"_sd, "date"_sd};
+    insertDoc(replaceNestedField(
+        getSampleDoc(), nested, dateFromISOString("2021-12-18T16:00:00Z"_sd).getValue()));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMaxTimestampTooLow) {
+    static constexpr std::array nested = {"control"_sd, "max"_sd, "date"_sd};
+    insertDoc(replaceNestedField(
+        getSampleDoc(), nested, dateFromISOString("2021-12-18T10:00:00Z"_sd).getValue()));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesControlSchema) {
+    auto doc = getSampleDoc();
+    const auto control = doc.getObjectField("control"_sd);
+    const auto newMinObj = std::invoke([&control] {
+        auto minObj = control.getField("min").Obj();
+        // Rotate the fields by 1 then reinsert the object into the control block.
+        BSONObjBuilder bob;
+        for (auto it = std::next(minObj.begin(), 1); it != minObj.end(); ++it) {
+            bob.append(*it);
+        }
+        bob.append(minObj.firstElement());
+        return bob.obj();
+    });
+    insertDoc(replaceNestedField(doc, std::array{"control"_sd, "min"_sd}, newMinObj));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectBucketObjectID) {
+    static constexpr std::array nested = {"_id"_sd};
+    const auto doc = getSampleDoc();
+    auto oid = doc.getField("_id"_sd).OID();
+    oid.setTimestamp(dateFromISOString("1990-12-18T15:59:00Z"_sd).getValue().toMillisSinceEpoch());
+    insertDoc(replaceNestedField(doc, nested, oid));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingDate) {
+    static constexpr std::array nested = {"data"_sd, "date"_sd};
+    insertDoc(removeNestedField(getSampleDoc(), nested));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMeasurementClose) {
+    static constexpr std::array nested = {"data"_sd, "close"_sd};
+    insertDoc(removeNestedField(getSampleDoc(), nested));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMeasurementFieldVolume) {
+    static constexpr std::array nested = {"data"_sd, "volume"_sd};
+    insertDoc(removeNestedField(getSampleDoc(), nested));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMismatchedMeasurementFieldClose) {
+    insertDoc(getSampleDocMismatchedMeasurementField("close"_sd));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMismatchedMeasurementFieldVolume) {
+    insertDoc(getSampleDocMismatchedMeasurementField("volume"_sd));
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationCorruptData) {
+    const auto corruptSampleDoc = std::invoke([] {
+        const BSONObj bsonOrig = getSampleDoc();
+        std::vector<char> sampleDocBuf;
+        const auto bsonSpan = std::span(bsonOrig.objdata(), bsonOrig.objsize());
+        std::ranges::copy(bsonSpan, std::back_inserter(sampleDocBuf));
+
+        // BFS to handle nesting, for the first compressed column object found, remove some
+        // bytes to corrupt the data.
+        for (std::deque<BSONElement> q{bsonOrig.begin(), bsonOrig.end()}; !q.empty();) {
+            const auto elem = q.front();
+            q.pop_front();
+            if (elem.isBinData(BinDataType::Column)) {
+                int sz{0};
+                const auto binData = elem.binData(sz);
+                // Subtype should be the preceding byte.
+                ASSERT_EQ(stdx::to_underlying(BinDataType::Column), binData[-1])
+                    << "Something went wrong, the binary type should be Column data";
+                const ptrdiff_t dist = (binData - bsonOrig.objdata());
+                // Remove a chunk from the data buffer.
+                const auto beg = sampleDocBuf.begin() + dist;
+                const auto end = sampleDocBuf.begin() + dist + (sz / 2 + 1);
+                sampleDocBuf.erase(beg, end);
+                ASSERT_LT(sampleDocBuf.size(), size_t(bsonOrig.objsize()));
+                break;  // Mangling the buffer will invalidate elements still in the queue, so
+                        // break on the first element to be changed.
+            } else if (elem.isABSONObj()) {
+                const auto bsonObj = elem.Obj();
+                q.insert(q.end(), bsonObj.begin(), bsonObj.end());
+            }
+        }
+        BSONObj bson(sampleDocBuf.data());
+        return bson.getOwned();  // Make sure this is owned as sampleDocBuf will go out of scope.
+    });
+
+    ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
+    {
+        WriteUnitOfWork wuow(_opCtx);
+        const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        ASSERT_TRUE(coll->isTimeseriesCollection());
+        ASSERT_OK(collection_internal::insertDocument(
+            _opCtx, *coll, InsertStatement{corruptSampleDoc}, nullptr));
+        wuow.commit();
+    }
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 2},
+                       {_validateMode});
 }
 
 }  // namespace
