@@ -11,6 +11,8 @@
  *  command_not_supported_in_serverless,
  *  # TODO(SERVER-113803): Support setDefaultRWConcern on replicaset started with --shardsvr
  *  transitioning_replicaset_incompatible,
+ *  # The test uses a failpoint that is only available on mongod.
+ *  assumes_against_mongod_not_mongos,
  * ]
  */
 

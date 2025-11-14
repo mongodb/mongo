@@ -643,7 +643,7 @@ class ShardedClusterBuilder(FixtureBuilder):
             mixed_bin_versions = [BinVersionEnum.NEW] * 2
 
         return make_fixture(
-            "ReplicaSetFixture",
+            sharded_cluster.get_rs_fixture_name(),
             configsvr_logger,
             sharded_cluster.job_num,
             mixed_bin_versions=mixed_bin_versions,
@@ -682,7 +682,7 @@ class ShardedClusterBuilder(FixtureBuilder):
             ]
 
         return make_fixture(
-            "ReplicaSetFixture",
+            sharded_cluster.get_rs_fixture_name(),
             rs_shard_logger,
             sharded_cluster.job_num,
             num_nodes=num_rs_nodes_per_shard,
