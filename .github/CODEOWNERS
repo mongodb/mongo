@@ -1507,6 +1507,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/query_golden/OWNERS.yml
 /jstests/query_golden/**/* @10gen/query-optimization @svc-auto-approve-bot
+/jstests/query_golden/**/*plan_stability* @10gen/query-optimization-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/query_golden_sharding/OWNERS.yml
 /jstests/query_golden_sharding/**/* @10gen/query-optimization @svc-auto-approve-bot
