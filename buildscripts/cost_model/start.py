@@ -186,11 +186,7 @@ async def execute_collection_scans(
                         expected_stage={
                             "COLLSCAN": {
                                 "direction": dir_text.lower(),
-                                "filter": {
-                                    "$and": [
-                                        {"int_uniform_unindexed_0": {"$gt": 0}},
-                                    ]
-                                },
+                                "filter": {"int_uniform_unindexed_0": {"$gt": 0}},
                             }
                         },
                     )
@@ -497,15 +493,7 @@ async def execute_fetches(database: DatabaseInstance, collections: Sequence[Coll
                     }
                 },
                 note="FETCH_W_FILTER",
-                expected_stage={
-                    "FETCH": {
-                        "filter": {
-                            "$and": [
-                                {"int_uniform_unindexed_0": {"$gt": 0}},
-                            ]
-                        }
-                    }
-                },
+                expected_stage={"FETCH": {"filter": {"int_uniform_unindexed_0": {"$gt": 0}}}},
             )
         )
 
