@@ -157,13 +157,14 @@ teams:
   - name: "Server Security"
     slack_tags:
       - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+      - "<@U02HWKGMAQL>" # adam.rayner@mongodb.com - Lead
+  - name: "Server Programmability"
+    slack_tags:
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
   - name: "Networking & Observability"
     slack_tags:
-      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
   - name: "Workload Scheduling"
-    slack_tags:
-      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
-  - name: "Server Programmability"
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
   - name: "Cluster Scalability"
