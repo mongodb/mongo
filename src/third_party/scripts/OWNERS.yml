@@ -1,10 +1,8 @@
 version: 1.0.0
 filters:
-  # TODO(SERVER-SERVER-110179): Change ownership of `gen_thirdpartyreadme.py` and
-  # `README.third_party.md.template` to @10gen/code-review-team-ssdlc.
   - "gen_thirdpartyreadme.py":
     approvers:
-      - 10gen/server-security
+      - 10gen/code-review-team-ssdlc
   - "README.third_party.md.template":
     approvers:
-      - 10gen/server-security
+      - 10gen/code-review-team-ssdlc

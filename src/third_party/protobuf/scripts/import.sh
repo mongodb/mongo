@@ -8,7 +8,8 @@ set -vx
 
 NAME=protobuf
 REVISION="v4.25.0"
-VERSION="4.25.0"
+# VERSION variable is not used in this script, but is in here for SBOM generation. Should match the official release tag
+VERSION="v25.0"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf
 PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf/patches

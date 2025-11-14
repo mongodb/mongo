@@ -27,140 +27,103 @@ a notice will be included in
 | [Apache Avro C++]                                    | Apache-2.0                                     | 1.12.0                                   |                      | ✗                               |
 | [Asio C++ Library]                                   | BSL-1.0                                        | 1.34.2                                   |                      | ✗                               |
 | [AWS SDK for C++]                                    | Apache-2.0                                     | 1.11.471                                 |                      | ✗                               |
-| [benchmark]                                          | Apache-2.0                                     | v1.5.2                                   |                      |                                 |
+| [benchmark]                                          | Apache-2.0                                     | 1.5.2                                    |                      |                                 |
 | [Boost C++ Libraries]                                | BSL-1.0                                        | 1.88.0                                   |                      | ✗                               |
 | [c-ares]                                             | MIT                                            | 1.27.0                                   |                      | ✗                               |
+| [cpptrace]                                           | MIT                                            | 1.0.3                                    |                      |                                 |
 | [CRoaring]                                           | Apache-2.0 OR MIT                              | 3.0.1                                    |                      | ✗                               |
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer                | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                                            | 11.2.0                                   |                      | ✗                               |
-| [github.com/facebook/folly]                          | Apache-2.0                                     | v2025.04.21.00                           |                      | ✗                               |
+| [github.com/facebook/folly]                          | Apache-2.0                                     | 2023.12.25.00                            |                      | ✗                               |
 | [googletest]                                         | BSD-3-Clause                                   | 1.17.0                                   |                      |                                 |
 | [gperftools]                                         | BSD-3-Clause                                   | 2.9.1                                    |                      | ✗                               |
 | [gRPC (C++)]                                         | Apache-2.0                                     | 1.59.5                                   |                      | ✗                               |
-| [immer]                                              | BSL-1.0                                        | 0.8.0                                    |                      | ✗                               |
-| [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                                   | v2.0U1                                   |                      | ✗                               |
-| [International Components for Unicode C/C++ (ICU4C)] | Unicode-3.0                                    | 57.1                                     | ✗                    | ✗                               |
+| [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                                    | 57.1                                     | ✗                    | ✗                               |
+| [immer]                                              | BSL-1.0                                        | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
+| [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                                   | 2.0.1                                    |                      | ✗                               |
 | [JSON Schema Store]                                  | Apache-2.0                                     | 6847cfc3a17a04a7664474212db50c627e1e3408 |                      |                                 |
 | [JSON-Schema-Test-Suite]                             | MIT                                            | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
-| [libdwarf]                                           | LGPL-2.1-or-later, BSD-3-Clause, Public Domain | v2.1.0                                   |                      |                                 |
+| [libdwarf]                                           | LGPL-2.1-or-later, BSD-3-Clause, Public Domain | 2.1.0                                    |                      |                                 |
 | [libmongocrypt]                                      | Apache-2.0                                     | 1.15.0                                   | ✗                    | ✗                               |
 | [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                                   | 2.6.0                                    |                      | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                                      | 1.18.2                                   | ✗                    | ✗                               |
-| [libunwind]                                          | MIT                                            | v1.8.1                                   |                      | ✗                               |
+| [libunwind]                                          | MIT                                            | 1.8.1                                    |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                                   | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
 | [MongoDB C Driver]                                   | Apache-2.0                                     | 1.28.1                                   | ✗                    | ✗                               |
 | [Mozilla Firefox ESR]                                | MPL-2.0                                        | 128.11.0esr                              |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                                  | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
-| [nlohmann/json]                                      | MIT                                            | 3.10.5                                   |                      |                                 |
 | [nlohmann/json]                                      | MIT                                            | 3.11.3                                   | ✗                    |                                 |
 | [node]                                               | ISC                                            | 22.1.0                                   |                      |                                 |
-| [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.17                                     | ✗                    |                                 |
+| [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.17.0                                   | ✗                    |                                 |
 | [opentelemetry-proto]                                | Apache-2.0                                     | 1.3.2                                    | ✗                    |                                 |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception              | 10.40                                    |                      | ✗                               |
-| [Protobuf]                                           | BSD-3-Clause                                   | v4.25.0                                  |                      | ✗                               |
-| [pypi/asn1crypto]                                    | MIT                                            | 1.5.1                                    |                      |                                 |
-| [pypi/bottle]                                        | MIT                                            | 0.12.25                                  |                      |                                 |
-| [pypi/concurrencytest]                               | GPL-3.0-or-later                               | 0.1.2                                    |                      |                                 |
-| [pypi/discover]                                      | BSD-3-Clause                                   | 0.4.0                                    |                      |                                 |
-| [pypi/extras]                                        | MIT                                            | 0.0.3                                    |                      |                                 |
-| [pypi/iso8601]                                       | MIT                                            | 2.1.0                                    |                      |                                 |
+| [Protobuf]                                           | BSD-3-Clause                                   | v25.0                                    |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                                            | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                                     | 0.5.0                                    |                      |                                 |
-| [pypi/oscrypto]                                      | MIT                                            | 1.3.0                                    |                      |                                 |
-| [pypi/python-subunit]                                | (Apache-2.0 OR BSD-3-Clause)                   | 1.4.4                                    |                      |                                 |
-| [pypi/testscenarios]                                 | BSD-3-Clause                                   | 0.4                                      |                      |                                 |
-| [pypi/testtools]                                     | MIT                                            | 2.7.1                                    |                      |                                 |
-| [re2]                                                | BSD-3-Clause                                   | 2023-11-01                               |                      | ✗                               |
-| [S2 Geometry Library]                                | Apache-2.0                                     | c872048da5d1                             | ✗                    | ✗                               |
-| [SafeInt]                                            | MIT                                            | 3.0.26                                   |                      | ✗                               |
+| [re2]                                                | BSD-3-Clause                                   | 2025-08-05                               |                      | ✗                               |
+| [S2 Geometry Library]                                | Apache-2.0                                     | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
+| [SafeInt]                                            | MIT                                            | 3.0.28a                                  |                      | ✗                               |
 | [snappy]                                             | BSD-3-Clause                                   | 1.1.10                                   | ✗                    | ✗                               |
-| [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                                   | 7b264ffa0f767c579d052fd8142558dc8264d795 | ✗                    | ✗                               |
-| [tcmalloc]                                           | Apache-2.0                                     | 093ba93c1bd6dca03b0a8334f06d01b019244291 |                      | ✗                               |
+| [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                                   | 1.0.0                                    | ✗                    | ✗                               |
+| [tcmalloc]                                           | Apache-2.0                                     | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
 | [timelib]                                            | MIT                                            | 2022.13                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                               | 8.0.0                                    | ✗                    | ✗                               |
-| [valgrind.h]                                         | BSD-4-Clause                                   | 3.17.0                                   |                      | ✗                               |
-| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only                   | mongodb-master                           | ✗                    | ✗                               |
+| [valgrind.h]                                         | BSD-4-Clause                                   | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
+| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only                   | 8.2.0-alpha2                             | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                                            | 0.6.3                                    |                      | ✗                               |
 | [zlib]                                               | Zlib                                           | 1.3.1                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only                   | 1.5.5                                    | ✗                    | ✗                               |
 
-[AWS SDK for C++]: https://github.com/aws/aws-sdk-cpp
-[Abseil Common Libraries (C++)]: https://github.com/abseil/abseil-cpp
-[Apache Avro C++]: https://avro.apache.org/
-[Asio C++ Library]: https://github.com/chriskohlhoff/asio
-[Boost C++ Libraries]: http://www.boost.org/
-[CRoaring]: https://github.com/RoaringBitmap/CRoaring
-[Cyrus SASL]: https://www.cyrusimap.org/sasl/
-[Intel® Decimal Floating-Point Math Library]: https://software.intel.com/en-us/articles/intel-decimal-floating-point-math-library
-[International Components for Unicode C/C++ (ICU4C)]: http://site.icu-project.org/download/
-[JSON Schema Store]: https://www.schemastore.org/json/
-[JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite
-[LibTomCrypt]: https://github.com/libtom/libtomcrypt/releases
-[MongoDB C Driver]: https://github.com/mongodb/mongo-c-driver
-[Mozilla Firefox ESR]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
+[AWS SDK for C++]: https://github.com/aws/aws-sdk-cpp.git
+[Abseil Common Libraries (C++)]: https://github.com/abseil/abseil-cpp.git
+[Apache Avro C++]: https://github.com/apache/avro.git
+[Asio C++ Library]: https://github.com/chriskohlhoff/asio.git
+[Boost C++ Libraries]: https://github.com/boostorg/boost.git
+[CRoaring]: https://github.com/roaringbitmap/croaring.git
+[Cyrus SASL]: https://github.com/cyrusimap/cyrus-sasl.git
+[ICU4C - International Components for Unicode C/C++]: https://github.com/unicode-org/icu.git
+[Intel® Decimal Floating-Point Math Library]: https://www.netlib.org/misc/intel/
+[JSON Schema Store]: https://github.com/schemastore/schemastore.git
+[JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
+[LibTomCrypt]: https://github.com/libtom/libtomcrypt.git
+[MongoDB C Driver]: https://github.com/mongodb/mongo-c-driver.git
+[Mozilla Firefox ESR]: https://github.com/mozilla-firefox/firefox.git
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
-[PCRE2 - Perl-Compatible Regular Expressions]: http://www.pcre.org/
-[Protobuf]: https://github.com/protocolbuffers/protobuf
-[S2 Geometry Library]: https://github.com/google/s2geometry
-[SafeInt]: https://github.com/dcleblanc/SafeInt
-[Snowball Stemming Algorithms (libstemmer)]: https://github.com/snowballstem/snowball
+[PCRE2 - Perl-Compatible Regular Expressions]: https://github.com/pcre2project/pcre2.git
+[Protobuf]: https://github.com/protocolbuffers/protobuf.git
+[S2 Geometry Library]: https://github.com/google/s2geometry.git
+[SafeInt]: https://github.com/dcleblanc/safeint.git
+[Snowball Stemming Algorithms (libstemmer)]: http://github.com/snowballstem/snowball.git
 [Unicode Character Database]: http://www.unicode.org/versions/enumeratedversions.html
-[WiredTiger]: https://source.wiredtiger.com/
-[Zstandard (zstd)]: https://github.com/facebook/zstd
-[benchmark]: https://github.com/google/benchmark
-[c-ares]: https://c-ares.org/
-[fmt]: http://fmtlib.net/
-[gRPC (C++)]: https://github.com/grpc/grpc
-[github.com/facebook/folly]: https://github.com/facebook/folly
-[googletest]: https://github.com/google/googletest
-[gperftools]: https://github.com/gperftools/gperftools
-[immer]: https://github.com/arximboldi/immer
-[libdwarf]: https://github.com/davea42/libdwarf-code
-[libmongocrypt]: https://github.com/mongodb/libmongocrypt
-[librdkafka - The Apache Kafka C/C++ library]: https://github.com/confluentinc/librdkafka
-[libunwind]: http://www.github.com/libunwind/libunwind
+[WiredTiger]: https://github.com/wiredtiger/wiredtiger.git
+[Zstandard (zstd)]: https://github.com/facebook/zstd.git
+[benchmark]: https://github.com/google/benchmark.git
+[c-ares]: https://github.com/c-ares/c-ares.git
+[cpptrace]: https://github.com/jeremy-rifkin/cpptrace.git
+[fmt]: https://github.com/fmtlib/fmt.git
+[gRPC (C++)]: https://github.com/grpc/grpc.git
+[github.com/facebook/folly]: https://github.com/facebook/folly.git
+[googletest]: https://github.com/google/googletest.git
+[gperftools]: https://github.com/gperftools/gperftools.git
+[immer]: https://github.com/arximboldi/immer.git
+[libdwarf]: https://github.com/davea42/libdwarf-code.git
+[libmongocrypt]: https://github.com/mongodb/libmongocrypt.git
+[librdkafka - The Apache Kafka C/C++ library]: https://github.com/confluentinc/librdkafka.git
+[libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
-[nlohmann/json]: https://github.com/nlohmann/json
-[nlohmann/json]: https://github.com/open-telemetry/opentelemetry-proto
-[node]: https://nodejs.org/en/blog/release
-[opentelemetry-cpp]: https://github.com/open-telemetry/opentelemetry-cpp/
+[nlohmann/json]: https://github.com/nlohmann/json.git
+[node]: https://nodejs.org/
+[opentelemetry-cpp]: https://github.com/open-telemetry/opentelemetry-cpp.git
 [opentelemetry-proto]: https://github.com/open-telemetry/opentelemetry-proto
-[pypi/asn1crypto]: https://pypi.org/project/asn1crypto/
-[pypi/bottle]: https://bottlepy.org/docs/dev/
-[pypi/concurrencytest]: https://pypi.org/project/concurrencytest/
-[pypi/discover]: https://pypi.org/project/discover/
-[pypi/extras]: https://github.com/testing-cabal/extras
-[pypi/iso8601]: https://pypi.org/project/iso8601/
 [pypi/ocspbuilder]: https://github.com/wbond/ocspbuilder
 [pypi/ocspresponder]: https://github.com/threema-ch/ocspresponder
-[pypi/oscrypto]: https://pypi.org/project/oscrypto/
-[pypi/python-subunit]: https://github.com/testing-cabal/subunit
-[pypi/testscenarios]: https://pypi.org/project/testscenarios/
-[pypi/testtools]: https://github.com/testing-cabal/testtools
-[re2]: https://github.com/google/re2
-[snappy]: https://github.com/google/snappy/releases
-[tcmalloc]: https://github.com/google/tcmalloc
-[timelib]: https://github.com/derickr/timelib
-[valgrind.h]: http://valgrind.org/downloads/current.html
-[yaml-cpp]: https://github.com/jbeder/yaml-cpp/releases
-[zlib]: https://zlib.net/
-
-## WiredTiger Vendored Test Libraries
-
-The following libraries are transitively included by WiredTiger,
-and are used by that component for testing. They don't appear in
-released binary artifacts.
-
-| Name                       |
-| -------------------------- |
-| nlohmann/json@3.10.5       |
-| pypi/concurrencytest@0.1.2 |
-| pypi/discover@0.4.0        |
-| pypi/extras@0.0.3          |
-| pypi/iso8601@2.1.0         |
-| pypi/python-subunit@1.4.4  |
-| pypi/testscenarios@0.4     |
-| pypi/testtools@2.7.1       |
+[re2]: https://github.com/google/re2.git
+[snappy]: https://github.com/google/tcmalloc.git
+[tcmalloc]: https://github.com/google/tcmalloc.git
+[timelib]: https://github.com/derickr/timelib.git
+[valgrind.h]: https://sourceware.org/git/valgrind.git
+[yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
+[zlib]: https://zlib.net/fossils/
 
 ## Dynamically Linked Libraries
 

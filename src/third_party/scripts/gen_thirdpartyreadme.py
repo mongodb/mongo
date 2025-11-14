@@ -9,9 +9,9 @@ warnings.filterwarnings("ignore", message="\nYou don't have the C version of Nam
 
 from Cheetah.Template import Template
 
-SBOM_PATH = "../../../sbom.json"
-TEMPLATE_PATH = "README.third_party.md.template"
-README_PATH = "../../../README.third_party.md"
+SBOM_PATH = "sbom.json"
+TEMPLATE_PATH = "src/third_party/scripts/README.third_party.md.template"
+README_PATH = "README.third_party.md"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -26,14 +26,9 @@ def main():
 
     component_links_string = sbom_to_component_links_string(sbom)
 
-    wiredtiger_chart = sbom_to_wiredtiger_chart(sbom)
-    right_pad_chart_values(wiredtiger_chart)
-    wiredtiger_chart_string = chart_to_string(wiredtiger_chart)
-
     template_data = {
         "component_chart": component_chart_string,
         "component_links": component_links_string,
-        "wiredtiger_chart": wiredtiger_chart_string,
     }
     create_markdown_with_template(template_data)
 
@@ -121,23 +116,6 @@ def sbom_to_component_links_string(sbom: dict) -> list[list[str]]:
     return "\n".join(link_list)
 
 
-def sbom_to_wiredtiger_chart(sbom: dict) -> list[list[str]]:
-    components = sbom["components"]
-    wiredtiger_chart = [["Name"]]
-
-    for component in components:
-        check_component_validity(component)
-        locations = get_component_locations(component)
-        for location in locations:
-            if location.startswith("src/third_party/wiredtiger/"):
-                bisect.insort(
-                    wiredtiger_chart,
-                    ([component["name"].replace("|", "") + "@" + component["version"]]),
-                )
-
-    return wiredtiger_chart
-
-
 def check_component_validity(component) -> None:
     for required_key in ["name", "version", "licenses"]:
         if required_key not in component:
@@ -147,15 +125,21 @@ def check_component_validity(component) -> None:
 
 
 def get_component_info_link(component) -> str:
+    # Get externalReferences or "info_link" properties
     name = component["name"]
     links = []
+    if "externalReferences" in component:
+        for externalReference in component["externalReferences"]:
+            u, t = externalReference["url"], externalReference["type"]
+            if t in ["distribution","vcs","website"]:
+                links.append(u)
     if "properties" in component:
         for prop in component["properties"]:
             k, v = prop["name"], prop["value"]
             if k == "info_link":
                 links.append(v)
         if len(links) != 1:
-            logging.warning("Warning: Expected 1 info_link for %s. Got %d:", name, len(links))
+            logging.warning("Warning: Expected 1 externalReferences or info_link for %s. Got %d:", name, len(links))
             if len(links) > 1:
                 logging.warning(" ".join(links))
                 logging.warning("Using first link only.")

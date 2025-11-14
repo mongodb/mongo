@@ -32,7 +32,8 @@ pnpm-lock.yaml @10gen/devprod-correctness @svc-auto-approve-bot
 poetry.lock @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 pyproject.toml @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 poetry_requirements.txt @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
-sbom.json @10gen/server-security @svc-auto-approve-bot
+README.third_party.md @10gen/code-review-team-ssdlc @svc-auto-approve-bot
+sbom.json @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
@@ -285,6 +286,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/s3_binary/OWNERS.yml
 /buildscripts/s3_binary/ @10gen/devprod-build @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/sbom/OWNERS.yml
+/buildscripts/sbom/ @10gen/code-review-team-ssdlc @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/smoke_tests/OWNERS.yml
 /buildscripts/smoke_tests/**/server_programmability.yml @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/smoke_tests/**/catalog_and_routing.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -316,6 +320,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tests/resmokelib/OWNERS.yml
 /buildscripts/tests/resmokelib/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/tests/sbom_linter/OWNERS.yml
+/buildscripts/tests/sbom_linter/ @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tests/timeouts/OWNERS.yml
 /buildscripts/tests/timeouts/ @10gen/devprod-correctness @svc-auto-approve-bot
@@ -3277,8 +3284,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/libmongocrypt/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/third_party/scripts/OWNERS.yml
-/src/third_party/scripts/**/gen_thirdpartyreadme.py @10gen/server-security @svc-auto-approve-bot
-/src/third_party/scripts/**/README.third_party.md.template @10gen/server-security @svc-auto-approve-bot
+/src/third_party/scripts/**/gen_thirdpartyreadme.py @10gen/code-review-team-ssdlc @svc-auto-approve-bot
+/src/third_party/scripts/**/README.third_party.md.template @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 
 # The following patterns are parsed from ./tools/OWNERS.yml
 /tools/**/* @10gen/devprod-build @svc-auto-approve-bot

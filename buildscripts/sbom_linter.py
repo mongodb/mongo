@@ -35,7 +35,7 @@ MISSING_VERSION_IN_SBOM_COMPONENT_ERROR = "Component must include a version."
 MISSING_VERSION_IN_IMPORT_FILE_ERROR = "Missing version in the import file: "
 MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR = "Component must include a license."
 COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR = "Could not find or read the import script file"
-VERSION_MISMATCH_ERROR = "Version mismatch: "
+VERSION_MISMATCH_ERROR = "Version mismatch (may simply be an artifact of SBOM automation): "
 
 
 # A class for managing error messages for components
@@ -123,14 +123,15 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
         return
 
     valid_license = False
-    for license in component["licenses"]:
-        if "expression" in license:
-            expression = license.get("expression")
-        elif "license" in license:
-            if "id" in license["license"]:
+    expression = None
+    for component_license in component["licenses"]:
+        if "expression" in component_license:
+            expression = component_license.get("expression")
+        elif "license" in component_license:
+            if "id" in component_license["license"]:
                 # Should be a valid SPDX license ID
-                expression = license["license"].get("id")
-            elif "name" in license["license"]:
+                expression = component_license["license"].get("id")
+            elif "name" in component_license["license"]:
                 # If SPDX does not define the license used, the name field may be used to provide the license name
                 valid_license = True
 
@@ -196,9 +197,8 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
     elif strip_extra_prefixes(script_version) != strip_extra_prefixes(
         comp_version
     ) and strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_pedigree_version):
-        error_manager.append_full_error_message(
-            VERSION_MISMATCH_ERROR
-            + f"\nscript version:{script_version}\nsbom component version:{comp_version}\nsbom component pedigree version:{comp_pedigree_version}"
+        print(
+            f"WARNING: {VERSION_MISMATCH_ERROR}\n  script version:{script_version}\n  sbom component version:{comp_version}\n  sbom component pedigree version:{comp_pedigree_version}"
         )
 
 

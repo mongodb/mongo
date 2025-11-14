@@ -1,0 +1,29 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+
+py_library(
+    name = "config",
+    srcs = ["config.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "endorctl_utils",
+    srcs = ["endorctl_utils.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_sbom",
+    srcs = ["generate_sbom.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "config",
+        "endorctl_utils",
+    ],
+)
+
+py_binary(
+    name = "sbom_files_pr",
+    srcs = ["sbom_files_pr.py"],
+    visibility = ["//visibility:public"],
+)
