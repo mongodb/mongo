@@ -2174,8 +2174,9 @@ Status WiredTigerRecordStore::updateOplogSize(OperationContext* opCtx, long long
     _oplogMaxSize.store(newOplogSize);
 
     std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
-    invariant(_oplogTruncateMarkers);
-    _oplogTruncateMarkers->adjust(opCtx, newOplogSize);
+    if (_oplogTruncateMarkers) {
+        _oplogTruncateMarkers->adjust(opCtx, newOplogSize);
+    }
     return Status::OK();
 }
 

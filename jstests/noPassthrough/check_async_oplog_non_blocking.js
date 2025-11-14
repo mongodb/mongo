@@ -104,6 +104,13 @@ jsTestLog("+++ 3");
 
     assert(primaryDb.pigs.drop());
 }
+jsTestLog("+++ 4");
+
+// Check for ops that modify oplog state.
+{
+    // 990 is the minimum.
+    assert.commandWorked(primary.getDB('admin').runCommand({replSetResizeOplog: 1, size: 991}));
+}
 
 // Verify we're still sampling.
 assert(samplingIsIncomplete(primary));
