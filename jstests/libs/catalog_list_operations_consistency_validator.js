@@ -28,6 +28,8 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 function assertNoUnrecognizedFields(restParameters, sourceName, targetName, sourceObject) {
     assert(
         !Object.keys(restParameters).length,
@@ -363,7 +365,16 @@ function validateListCatalogToListCollectionsConsistency(listCatalog, listCollec
         ),
     );
     const sortedListCollections = sortCollectionsInPlace([...listCollections]);
-
+    // TODO (SERVER-95599): Remove this workaround under the "if" for the configDebugDump once 9.0 becomes last LTS.
+    // This is because v8.2 and v8.3 binaries handle this field differently for views and timeseries. We just prevent any comparison.
+    if (isMultiversion) {
+        listCollectionsFromListCatalog.forEach((e) => {
+            if (e.type == "view" || e.type == "timeseries") delete e.info.configDebugDump;
+        });
+        sortedListCollections.forEach((e) => {
+            if (e.type == "view" || e.type == "timeseries") delete e.info.configDebugDump;
+        });
+    }
     const equals = bsonUnorderedFieldArrayEquals(listCollectionsFromListCatalog, sortedListCollections);
     if (!equals) {
         const message =
