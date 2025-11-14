@@ -408,11 +408,12 @@ buildvariants:
     tags: ["required"]
     activate: true
     run_on:
-      - amazon2023.3-arm64-large
+      - amazon2023.3-arm64-m6g-4xlarge
     expansions:
       build_timeout_seconds: 900
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
+        --release=True
         --dbg_level=1
         --separate_debug=False
       evergreen_remote_exec: on

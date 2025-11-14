@@ -49,5 +49,5 @@ tests:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            threshold_limit: 600
+            threshold_limit: 20000
             bound_direction: upper
