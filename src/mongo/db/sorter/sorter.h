@@ -355,6 +355,11 @@ private:
      */
     void _ensureOpenForWriting();
 
+    /**
+     * Returns lastPosixError() or a generic iostream error code if no posix error set.
+     */
+    std::error_code _getErrorCode();
+
     // The current offset of the end of the storage if there may be unflushed data, or -1 if the
     // file either has not yet been opened or has been flushed.
     std::streamoff _offset = -1;

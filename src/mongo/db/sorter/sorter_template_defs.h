@@ -1453,7 +1453,7 @@ inline void SorterFile::read(std::streamoff offset, std::streamsize size, void* 
 
         uassert(5479100,
                 str::stream() << "Error flushing file " << _path.string() << ": "
-                              << errorMessage(lastPosixError()),
+                              << errorMessage(_getErrorCode()),
                 _file);
     }
 
@@ -1462,7 +1462,7 @@ inline void SorterFile::read(std::streamoff offset, std::streamsize size, void* 
 
     uassert(16817,
             str::stream() << "Error reading file " << _path.string() << ": "
-                          << errorMessage(lastPosixError()),
+                          << errorMessage(_getErrorCode()),
             _file);
 
     invariant(_file.gcount() == size,
@@ -1471,7 +1471,7 @@ inline void SorterFile::read(std::streamoff offset, std::streamsize size, void* 
 
     uassert(51049,
             str::stream() << "Error reading file " << _path.string() << ": "
-                          << errorMessage(lastPosixError()),
+                          << errorMessage(_getErrorCode()),
             _file.tellg() >= 0);
 }
 
@@ -1490,12 +1490,10 @@ inline void SorterFile::write(const char* data, std::streamsize size) {
                       str::stream() << ex.what() << ": " << _path.string());
         }
         uasserted(5642403,
-                  str::stream() << "Error writing to file " << _path.string() << ": "
-                                << errorMessage(lastPosixError()));
-    } catch (const std::exception&) {
+                  str::stream() << "Error writing to file " << _path.string() << ": " << ex.what());
+    } catch (const std::exception& ex) {
         uasserted(16821,
-                  str::stream() << "Error writing to file " << _path.string() << ": "
-                                << errorMessage(lastPosixError()));
+                  str::stream() << "Error writing to file " << _path.string() << ": " << ex.what());
     }
 }
 
@@ -1517,7 +1515,7 @@ inline void SorterFile::_open() {
 
     uassert(16818,
             str::stream() << "Error opening file " << _path.string() << ": "
-                          << errorMessage(lastPosixError()),
+                          << errorMessage(_getErrorCode()),
             _file.good());
 
     if (_stats) {
@@ -1537,6 +1535,15 @@ inline void SorterFile::_ensureOpenForWriting() {
         _offset = boost::filesystem::file_size(_path);
         _file.seekp(_offset);
     }
+}
+
+inline std::error_code SorterFile::_getErrorCode() {
+    auto err = lastPosixError();
+    // If no posix error, check for iostream error.
+    if (!err && (_file.fail() || _file.bad())) {
+        return std::make_error_code(std::io_errc::stream);
+    }
+    return err;
 }
 
 //
