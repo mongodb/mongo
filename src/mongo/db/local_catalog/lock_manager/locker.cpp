@@ -40,6 +40,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/tsan_ignore.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -47,15 +48,6 @@
 
 namespace mongo {
 namespace {
-
-// Ignore data races in certain functions when running with TSAN. For performance reasons,
-// diagnostic commands are expected to race with concurrent lock acquisitions while gathering
-// statistics.
-#if __has_feature(thread_sanitizer)
-#define MONGO_TSAN_IGNORE __attribute__((no_sanitize("thread")))
-#else
-#define MONGO_TSAN_IGNORE
-#endif
 
 MONGO_FAIL_POINT_DEFINE(enableTestOnlyFlagforRSTL);
 MONGO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
@@ -303,6 +295,8 @@ void Locker::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
     }
 }
 
+// For performance reasons, diagnostic commands are expected to race with concurrent lock
+// acquisitions while gathering statistics.
 MONGO_TSAN_IGNORE
 FlowControlTicketholder::CurOp Locker::getFlowControlStats() const {
     return _flowControlStats;
@@ -528,6 +522,8 @@ ResourceId Locker::getWaitingResource() const {
     return _waitingResource;
 }
 
+// For performance reasons, diagnostic commands are expected to race with concurrent lock
+// acquisitions while gathering statistics.
 MONGO_TSAN_IGNORE
 void Locker::getLockerInfo(
     LockerInfo* lockerInfo,
@@ -862,6 +858,8 @@ void Locker::dump() const {
     LOGV2(20523, "Locker status", "id"_attr = _id, "requests"_attr = entries);
 }
 
+// For performance reasons, diagnostic commands are expected to race with concurrent lock
+// acquisitions while gathering statistics.
 MONGO_TSAN_IGNORE
 LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
     dassert(!getWaitingResource().isValid());

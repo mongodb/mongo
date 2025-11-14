@@ -31,6 +31,7 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/new.h"
+#include "mongo/util/concurrency/tsan_ignore.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
@@ -54,8 +55,13 @@ class DataWithLockFreeReads {
 public:
     using datum_type = DatumT;
 
+    // Ignore data races in certain functions when running with TSAN. In
+    // particular, ignore concurrent access to _buffers[x] because it is
+    // protected by WithLock on write and by the generation counter on read.
+
     // store() requires the caller to hold the lock that protects the
     // uncached value to avoid races.
+    MONGO_TSAN_IGNORE
     void store(WithLock lk, const datum_type& datum) {
         auto curGen = _generation.load();
         auto nextGen = curGen + 1;
@@ -63,6 +69,7 @@ public:
         invariant(_generation.compareAndSwap(&curGen, nextGen));
     }
 
+    MONGO_TSAN_IGNORE
     datum_type load() const {
         while (true) {
             // Get the counter, use it to index buffers and perform a read, and

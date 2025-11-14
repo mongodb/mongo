@@ -15,6 +15,7 @@ filegroup(
         "lock_free_read_list.h",
         "spin_lock.h",
         "ticketholder.h",
+        "tsan_ignore.h",
     ],
 )
 
