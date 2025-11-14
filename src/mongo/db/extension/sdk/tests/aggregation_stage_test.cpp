@@ -271,6 +271,7 @@ TEST_F(AggStageTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds) {
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle.getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+    ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kNone);
     ASSERT_EQ(props.getRequiresInputDocSource(), true);
 }
 
@@ -320,19 +321,21 @@ TEST_F(AggStageTest, UnknownPropertyAstNodeIsIgnored) {
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
 }
 
-TEST_F(AggStageTest, RequiresInputDocSourceAggStageAstNodeSucceeds) {
+TEST_F(AggStageTest, TransformAggStageAstNodeSucceeds) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode::make());
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle.getProperties();
     ASSERT_EQ(props.getRequiresInputDocSource(), true);
 }
 
-TEST_F(AggStageTest, NotRequiresInputDocSourceAggStageAstNodeSucceeds) {
+TEST_F(AggStageTest, SearchLikeSourceAggStageAstNodeSucceeds) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode::make());
+        sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle.getProperties();
+    ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
+    ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kAnyShard);
     ASSERT_EQ(props.getRequiresInputDocSource(), false);
 }
 

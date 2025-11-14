@@ -48,6 +48,25 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
     return Value(BSONObj());
 }
 
+StageConstraints DocumentSourceExtensionOptimizable::constraints(
+    PipelineSplitState pipeState) const {
+    // Default properties if unset
+    auto constraints = DocumentSourceExtension::constraints(pipeState);
+
+    // Apply potential overrides from static properties.
+    if (!_properties.getRequiresInputDocSource()) {
+        constraints.setConstraintsForNoInputSources();
+    }
+    if (auto pos = static_properties_util::toPositionRequirement(_properties.getPosition())) {
+        constraints.requiredPosition = *pos;
+    }
+    if (auto host = static_properties_util::toHostTypeRequirement(_properties.getHostType())) {
+        constraints.hostRequirement = *host;
+    }
+
+    return constraints;
+}
+
 DocumentSource::Id DocumentSourceExtensionOptimizable::getId() const {
     return id;
 }

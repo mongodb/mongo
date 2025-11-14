@@ -585,8 +585,8 @@ static constexpr std::string_view kLastName = "$last";
 static constexpr std::string_view kBadPosName = "$badPos";
 static constexpr std::string_view kBadPosTypeName = "$badPosType";
 static constexpr std::string_view kUnknownPropertyName = "$unknownProperty";
-static constexpr std::string_view kRequiresInputDocSourceName = "$requiresInputDocSource";
-static constexpr std::string_view kNotRequiresInputDocSourceName = "$notRequiresInputDocSource";
+static constexpr std::string_view kTransformName = "$transform";
+static constexpr std::string_view kSearchLikeSourceStageName = "$searchLikeSource";
 static constexpr std::string_view kBadRequiresInputDocSourceTypeName =
     "$badRequiresInputDocSourceType";
 
@@ -692,9 +692,9 @@ public:
     }
 };
 
-class RequiresInputDocSourceAggStageAstNode : public sdk::AggStageAstNode {
+class TransformAggStageAstNode : public sdk::AggStageAstNode {
 public:
-    RequiresInputDocSourceAggStageAstNode() : sdk::AggStageAstNode(kRequiresInputDocSourceName) {}
+    TransformAggStageAstNode() : sdk::AggStageAstNode(kTransformName) {}
 
     BSONObj getProperties() const override {
         return BSON("requiresInputDocSource" << true);
@@ -705,17 +705,17 @@ public:
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<RequiresInputDocSourceAggStageAstNode>();
+        return std::make_unique<TransformAggStageAstNode>();
     }
 };
 
-class NotRequiresInputDocSourceAggStageAstNode : public sdk::AggStageAstNode {
+class SearchLikeSourceAggStageAstNode : public sdk::AggStageAstNode {
 public:
-    NotRequiresInputDocSourceAggStageAstNode()
-        : sdk::AggStageAstNode(kNotRequiresInputDocSourceName) {}
+    SearchLikeSourceAggStageAstNode() : sdk::AggStageAstNode(kSearchLikeSourceStageName) {}
 
     BSONObj getProperties() const override {
-        return BSON("requiresInputDocSource" << false);
+        return BSON("requiresInputDocSource" << false << "position" << "first" << "hostType"
+                                             << "anyShard");
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
@@ -723,7 +723,7 @@ public:
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<NotRequiresInputDocSourceAggStageAstNode>();
+        return std::make_unique<SearchLikeSourceAggStageAstNode>();
     }
 };
 

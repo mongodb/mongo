@@ -610,10 +610,10 @@ static constexpr std::string_view kExpandToSearchName = "$expandToSearch";
 static const BSONObj kSearchSpec = BSON(
     "$search" << BSON("index" << "default" << "text" << BSON("query" << "foo" << "path" << "a")));
 
-class RequiresInputDocSourceAggStageParseNode : public sdk::AggStageParseNode {
+class TransformAggStageParseNode : public sdk::AggStageParseNode {
 public:
-    RequiresInputDocSourceAggStageParseNode()
-        : sdk::AggStageParseNode(sdk::shared_test_stages::kRequiresInputDocSourceName) {}
+    TransformAggStageParseNode()
+        : sdk::AggStageParseNode(sdk::shared_test_stages::kTransformName) {}
 
     static constexpr size_t kExpansionSize = 2;
 
@@ -625,9 +625,9 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::TransformAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::SearchLikeSourceAggStageAstNode>()));
         return expanded;
     }
 
@@ -636,14 +636,14 @@ public:
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
-        return std::make_unique<RequiresInputDocSourceAggStageParseNode>();
+        return std::make_unique<TransformAggStageParseNode>();
     }
 };
 
-class NotRequiresInputDocSourceAggStageParseNode : public sdk::AggStageParseNode {
+class SearchLikeSourceAggStageParseNode : public sdk::AggStageParseNode {
 public:
-    NotRequiresInputDocSourceAggStageParseNode()
-        : sdk::AggStageParseNode(sdk::shared_test_stages::kNotRequiresInputDocSourceName) {}
+    SearchLikeSourceAggStageParseNode()
+        : sdk::AggStageParseNode(sdk::shared_test_stages::kSearchLikeSourceStageName) {}
 
     static constexpr size_t kExpansionSize = 2;
 
@@ -655,9 +655,9 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::SearchLikeSourceAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::TransformAggStageAstNode>()));
         return expanded;
     }
 
@@ -666,7 +666,7 @@ public:
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
-        return std::make_unique<NotRequiresInputDocSourceAggStageParseNode>();
+        return std::make_unique<SearchLikeSourceAggStageParseNode>();
     }
 };
 
@@ -874,36 +874,33 @@ TEST_F(DocumentSourceExtensionTest, NoOpParseNodeInheritsDefaultGetPropertiesFro
                   PrivilegeVector{});
 }
 
-TEST_F(DocumentSourceExtensionTest, RequiresInputDocSourceAggStageAstNodeSucceeds) {
+TEST_F(DocumentSourceExtensionTest, TransformAggStageAstNodeSucceeds) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::RequiresInputDocSourceAggStageAstNode::make());
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kRequiresInputDocSourceName), std::move(handle), _nss);
+        std::string(sdk::shared_test_stages::kTransformName), std::move(handle), _nss);
     ASSERT_FALSE(lp.isInitialSource());
 }
 
-TEST_F(DocumentSourceExtensionTest, NotRequiresInputDocSourceAggStageAstNode) {
+TEST_F(DocumentSourceExtensionTest, SearchLikeSourceAggStageAstNode) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::NotRequiresInputDocSourceAggStageAstNode::make());
+        sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kNotRequiresInputDocSourceName),
-        std::move(handle),
-        _nss);
+        std::string(sdk::shared_test_stages::kSearchLikeSourceStageName), std::move(handle), _nss);
     ASSERT_TRUE(lp.isInitialSource());
 }
 
 TEST_F(DocumentSourceExtensionTest,
-       RequiresInputDocSourceAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
-    auto parseNode =
-        new sdk::ExtensionAggStageParseNode(RequiresInputDocSourceAggStageParseNode::make());
+       TransformAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
+    auto parseNode = new sdk::ExtensionAggStageParseNode(TransformAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kRequiresInputDocSourceName),
+        std::string(sdk::shared_test_stages::kTransformName),
         std::move(handle),
         _nss,
         LiteParserOptions{});
@@ -911,13 +908,12 @@ TEST_F(DocumentSourceExtensionTest,
 }
 
 TEST_F(DocumentSourceExtensionTest,
-       NotRequiresInputDocSourceAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
-    auto parseNode =
-        new sdk::ExtensionAggStageParseNode(NotRequiresInputDocSourceAggStageParseNode::make());
+       SearchLikeSourceAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
+    auto parseNode = new sdk::ExtensionAggStageParseNode(SearchLikeSourceAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kNotRequiresInputDocSourceName),
+        std::string(sdk::shared_test_stages::kSearchLikeSourceStageName),
         std::move(handle),
         _nss,
         LiteParserOptions{});

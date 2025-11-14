@@ -179,15 +179,32 @@ DocumentSourceExtension::distributedPlanLogic() {
 }
 
 StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeState) const {
-    auto constraints = StageConstraints(StageConstraints::StreamType::kStreaming,
-                                        StageConstraints::PositionRequirement::kNone,
-                                        StageConstraints::HostTypeRequirement::kNone,
+    // Default constraints for extension stages.
+    //
+    // Only DocumentSourceExtensionOptimizable has access to MongoExtensionStaticProperties and
+    // overrides constraints() accordingly. DocumentSourceExtensionExpandable is a pre-desugar
+    // wrapper around an AggStageParseNode and therefore always uses these defaults.
+    //
+    // This is acceptable because the aggregate command calls validateCommon() twice:
+    //   (1) pre-desugar, when Expandable stages are still present, and
+    //   (2) post-desugar/optimization, when all extension stages have been replaced by their
+    //       expanded children, whose own constraints() reflect the true placement/host semantics.
+    //
+    // As long as validateCommon() is run again after desugaring, these defaults should remain as
+    // lenient as possible to avoid prematurely rejecting a valid pipeline. If new callers begin
+    // relying on constraints() before desugaring for correctness, we may need to surface
+    // constraint metadata on the ParseNode or delay constraint checks until after desugar.
+    auto constraints = StageConstraints(StreamType::kStreaming,
+                                        PositionRequirement::kNone,
+                                        HostTypeRequirement::kNone,
                                         DiskUseRequirement::kNoDiskUse,
                                         FacetRequirement::kNotAllowed,
                                         TransactionRequirement::kNotAllowed,
                                         LookupRequirement::kNotAllowed,
                                         UnionRequirement::kNotAllowed,
                                         ChangeStreamRequirement::kDenylist);
+    constraints.canRunOnTimeseries = false;
+
     return constraints;
 }
 

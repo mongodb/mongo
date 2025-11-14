@@ -47,9 +47,15 @@ public:
 
     Value serialize(const SerializationOptions& opts) const override;
 
+    StageConstraints constraints(PipelineSplitState pipeState) const override;
+
     static const Id& id;
 
     Id getId() const override;
+
+    const MongoExtensionStaticProperties& getStaticProperties() const {
+        return _properties;
+    }
 
     // Wrapper around the LogicalAggStageHandle::compile() method. Returns an ExecAggStageHandle.
     ExecAggStageHandle compile() {
@@ -57,11 +63,14 @@ public:
     }
 
 protected:
+    const MongoExtensionStaticProperties _properties;
     const LogicalAggStageHandle _logicalStage;
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        AggStageAstNodeHandle astNode)
-        : DocumentSourceExtension(astNode.getName(), expCtx), _logicalStage(astNode.bind()) {}
+        : DocumentSourceExtension(astNode.getName(), expCtx),
+          _properties(astNode.getProperties()),
+          _logicalStage(astNode.bind()) {}
 };
 
 }  // namespace mongo::extension::host

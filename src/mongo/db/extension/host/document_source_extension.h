@@ -31,6 +31,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host/static_properties_util.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/desugarer.h"
@@ -189,7 +190,7 @@ public:
 
                     ActionSet actions;
                     for (const auto& entry : rp.getActions()) {
-                        actions.addAction(toActionType(entry.getAction()));
+                        actions.addAction(static_properties_util::toActionType(entry.getAction()));
                     }
 
                     tassert(11350600,
@@ -215,25 +216,6 @@ public:
         }
 
     private:
-        static ActionType toActionType(const MongoExtensionPrivilegeActionEnum& action) {
-            switch (action) {
-                case MongoExtensionPrivilegeActionEnum::kFind:
-                    return ActionType::find;
-                case MongoExtensionPrivilegeActionEnum::kListIndexes:
-                    return ActionType::listIndexes;
-                case MongoExtensionPrivilegeActionEnum::kListSearchIndexes:
-                    return ActionType::listSearchIndexes;
-                case MongoExtensionPrivilegeActionEnum::kPlanCacheRead:
-                    return ActionType::planCacheRead;
-                case MongoExtensionPrivilegeActionEnum::kCollStats:
-                    return ActionType::collStats;
-                case MongoExtensionPrivilegeActionEnum::kIndexStats:
-                    return ActionType::indexStats;
-                default:
-                    MONGO_UNREACHABLE_TASSERT(11350601);
-            }
-        }
-
         const AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;
         const NamespaceString _nss;

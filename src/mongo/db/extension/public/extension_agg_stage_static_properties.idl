@@ -44,6 +44,17 @@ enums:
             kNone: "none"
             kFirst: "first"
             kLast: "last"
+    MongoExtensionHostTypeRequirement:
+        description: >-
+            Where the stage is permitted to be run in a sharded cluster.
+        type: string
+        values:
+            kNone: "none"
+            kLocalOnly: "localOnly"
+            kRunOnceAnyNode: "runOnceAnyNode"
+            kAnyShard: "anyShard"
+            kRouter: "router"
+            kAllShardHosts: "allShardHosts"
     MongoExtensionPrivilegeResourcePattern:
         description: What resource the privilege applies to.
         type: string
@@ -90,6 +101,10 @@ structs:
             position:
                 description: What position the stage must occupy in the pipeline.
                 type: MongoExtensionPositionRequirement
+                default: kNone
+            hostType:
+                description: Where the stage can be executed when the pipeline is run in a sharded cluster.
+                type: MongoExtensionHostTypeRequirement
                 default: kNone
             requiresInputDocSource:
                 description: >-

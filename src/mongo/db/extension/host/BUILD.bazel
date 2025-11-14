@@ -41,6 +41,7 @@ mongo_cc_library(
         "extension_stage.h",
         "host_portal.h",
         "query_execution_context.h",
+        "static_properties_util.h",
     ],
     deps = [
         ":extension_operation_metrics_registry",

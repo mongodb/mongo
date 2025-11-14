@@ -90,4 +90,46 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, serializeWithWrongOptsFails
         optimizable->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
 }
 
+TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties) {
+    // These should also be the default static properties for Transform stages.
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    const auto& staticProperties = optimizable->getStaticProperties();
+    ASSERT_TRUE(staticProperties.getRequiresInputDocSource());
+    ASSERT_EQ(staticProperties.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+    ASSERT_EQ(staticProperties.getHostType(), MongoExtensionHostTypeRequirementEnum::kNone);
+
+    auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
+
+    ASSERT_EQ(constraints.requiredPosition, StageConstraints::PositionRequirement::kNone);
+    ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kNone);
+    ASSERT_TRUE(constraints.requiresInputDocSource);
+    ASSERT_TRUE(constraints.consumesLogicalCollectionData);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithSourceStageStaticProperties) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    const auto& staticProperties = optimizable->getStaticProperties();
+    ASSERT_FALSE(staticProperties.getRequiresInputDocSource());
+    ASSERT_EQ(staticProperties.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
+    ASSERT_EQ(staticProperties.getHostType(), MongoExtensionHostTypeRequirementEnum::kAnyShard);
+
+    auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
+
+    ASSERT_EQ(constraints.requiredPosition, StageConstraints::PositionRequirement::kFirst);
+    ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kAnyShard);
+    ASSERT_FALSE(constraints.requiresInputDocSource);
+    ASSERT_FALSE(constraints.consumesLogicalCollectionData);
+}
 }  // namespace mongo::extension
