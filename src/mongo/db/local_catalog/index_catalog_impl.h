@@ -187,7 +187,9 @@ public:
 
     std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
-    std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> getEntriesShared(
+        InclusionPolicy inclusionPolicy) const override;
+
 
     using IndexIterator = IndexCatalog::IndexIterator;
     std::unique_ptr<IndexIterator> getIndexIterator(InclusionPolicy inclusionPolicy) const override;

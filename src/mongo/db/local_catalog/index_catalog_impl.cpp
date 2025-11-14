@@ -1676,9 +1676,36 @@ std::shared_ptr<const IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
     return indexDescriptor->getEntry()->shared_from_this();
 }
 
-std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getAllReadyEntriesShared()
-    const {
-    return {_readyIndexes.begin(), _readyIndexes.end()};
+std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getEntriesShared(
+    InclusionPolicy inclusionPolicy) const {
+
+    // Queries need to be able to efficiently iterate over ready indexes, so special-case that
+    // with a more efficient version that doesn't need to copy anything.
+    if (inclusionPolicy == InclusionPolicy::kReady) {
+        return {_readyIndexes.begin(), _readyIndexes.end()};
+    }
+
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> allIndexes;
+
+    if (inclusionPolicy & InclusionPolicy::kReady) {
+        for (const auto& entry : _readyIndexes) {
+            allIndexes.push_back(entry);
+        }
+    }
+
+    if (inclusionPolicy & InclusionPolicy::kUnfinished) {
+        for (const auto& entry : _buildingIndexes) {
+            allIndexes.push_back(entry);
+        }
+    }
+
+    if (inclusionPolicy & InclusionPolicy::kFrozen) {
+        for (const auto& entry : _frozenIndexes) {
+            allIndexes.push_back(entry);
+        }
+    }
+
+    return allIndexes;
 }
 
 const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,

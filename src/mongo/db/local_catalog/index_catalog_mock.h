@@ -153,9 +153,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared()
-        const override {
-        return {};
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> getEntriesShared(
+        InclusionPolicy inclusionPolicy) const override {
+        return {_indexEntries.begin(), _indexEntries.end()};
     }
 
     class IteratorMock : public IndexIterator {

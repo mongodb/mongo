@@ -68,25 +68,27 @@
 namespace mongo {
 namespace {
 
-CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
-    auto desc = ice.descriptor();
+CoreIndexInfo indexInfoFromIndexCatalogEntry(std::shared_ptr<const IndexCatalogEntry> ice) {
+    auto desc = ice->descriptor();
     invariant(desc);
 
-    auto accessMethod = ice.accessMethod();
+    auto accessMethod = ice->accessMethod();
     invariant(accessMethod);
 
     const WildcardProjection* projExec = nullptr;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
         projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
 
+    auto filterExpression = ice->getFilterExpression();
+    auto collator = ice->getCollator();
     return {desc->keyPattern(),
             desc->getIndexType(),
             desc->isSparse(),
             IndexEntry::Identifier{desc->indexName()},
-            ice.getFilterExpression(),
-            ice.getCollator(),
+            filterExpression,
+            collator,
             projExec,
-            ice.shared_from_this()};
+            std::move(ice)};
 }
 
 }  // namespace
@@ -102,12 +104,10 @@ CollectionQueryInfo::PlanCacheState::PlanCacheState(OperationContext* opCtx,
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
     // catalog may be in an inconsistent state.  SERVER-18346.
-    auto ii = collection->getIndexCatalog()->getIndexIterator(
-        IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
-    while (ii->more()) {
-        const IndexCatalogEntry* ice = ii->next();
+    for (auto&& ice : collection->getIndexCatalog()->getEntriesShared(
+             IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished)) {
         if (ice->accessMethod()) {
-            indexCores.emplace_back(indexInfoFromIndexCatalogEntry(*ice));
+            indexCores.emplace_back(indexInfoFromIndexCatalogEntry(std::move(ice)));
         }
     }
 

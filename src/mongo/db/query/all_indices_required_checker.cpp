@@ -51,7 +51,8 @@ AllIndicesRequiredChecker::AllIndicesRequiredChecker(
 
 void AllIndicesRequiredChecker::saveIndicesForCollection(const CollectionPtr& collection) {
     if (collection) {
-        auto allEntriesShared = collection->getIndexCatalog()->getAllReadyEntriesShared();
+        auto allEntriesShared =
+            collection->getIndexCatalog()->getEntriesShared(IndexCatalog::InclusionPolicy::kReady);
         auto& indexMap = _identEntries[collection->uuid()];
         for (auto&& index : allEntriesShared) {
             indexMap[index->descriptor()->indexName()] = index->getIdent();

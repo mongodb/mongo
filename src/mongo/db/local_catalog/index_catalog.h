@@ -300,10 +300,10 @@ public:
         const IndexDescriptor*) const = 0;
 
     /**
-     * Returns a vector of shared pointers to all index entries. Excludes unfinished indexes.
+     * Returns a vector of shared pointers to all index entries.
      */
-    virtual std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared()
-        const = 0;
+    virtual std::vector<std::shared_ptr<const IndexCatalogEntry>> getEntriesShared(
+        InclusionPolicy inclusionPolicy) const = 0;
 
     /**
      * Returns an iterator for the index descriptors in this IndexCatalog.

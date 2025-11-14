@@ -109,8 +109,9 @@ private:
     const std::vector<ResolvedPath>& _resolvedPaths;
 };
 
-const IndexCatalogEntry* betterIndexForProbe(const IndexCatalogEntry* first,
-                                             const IndexCatalogEntry* second) {
+std::shared_ptr<const IndexCatalogEntry> betterIndexForProbe(
+    std::shared_ptr<const IndexCatalogEntry> first,
+    std::shared_ptr<const IndexCatalogEntry> second) {
     auto& firstKeyPattern = first->descriptor()->keyPattern();
     auto& secondKeyPattern = second->descriptor()->keyPattern();
     if (firstKeyPattern.nFields() < secondKeyPattern.nFields()) {
@@ -151,21 +152,21 @@ bool indexSatisfiesJoinPredicates(const IndexCatalogEntry& ice,
 boost::optional<IndexEntry> bestIndexSatisfyingJoinPredicates(
     const IndexCatalog& indexCatalog, const std::vector<IndexedJoinPredicate>& joinPreds) {
     auto it = indexCatalog.getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
-    boost::optional<const IndexCatalogEntry*> bestIndex{boost::none};
-    while (it->more()) {
-        auto ice = it->next();
+    std::shared_ptr<const IndexCatalogEntry> bestIndex = nullptr;
+    for (auto&& ice : indexCatalog.getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
         if (indexSatisfiesJoinPredicates(*ice, joinPreds)) {
-            if (!bestIndex.has_value()) {
+            if (!bestIndex) {
                 bestIndex = ice;
             } else {
                 // Keep the better suited index in 'bestIndex'.
-                bestIndex = betterIndexForProbe(bestIndex.get(), ice);
+                bestIndex = betterIndexForProbe(bestIndex, ice);
             }
         }
     }
-    if (bestIndex.has_value()) {
-        auto ice = bestIndex.get();
-        auto desc = ice->descriptor();
+    if (bestIndex) {
+        auto desc = bestIndex->descriptor();
+        auto filterExpression = bestIndex->getFilterExpression();
+        auto collator = bestIndex->getCollator();
         return IndexEntry{desc->keyPattern(),
                           desc->getIndexType(),
                           desc->version(),
@@ -175,11 +176,11 @@ boost::optional<IndexEntry> bestIndexSatisfyingJoinPredicates(
                           desc->isSparse(),
                           desc->unique(),
                           IndexEntry::Identifier{desc->indexName()},
-                          ice->getFilterExpression(),
+                          filterExpression,
                           desc->infoObj(),
-                          ice->getCollator(),
+                          collator,
                           nullptr /*wildcardProjection*/,
-                          ice->shared_from_this()};
+                          std::move(bestIndex)};
     }
     return boost::none;
 }

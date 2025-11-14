@@ -66,12 +66,14 @@ namespace {
  */
 IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                            const CollectionPtr& collection,
-                                           const IndexCatalogEntry& ice,
+                                           std::shared_ptr<const IndexCatalogEntry> ice,
                                            const CanonicalQuery& canonicalQuery) {
-    auto desc = ice.descriptor();
+    auto desc = ice->descriptor();
     tassert(11321048, "Index catalog entry descriptor must not be null", desc);
 
     if (desc->isIdIndex()) {
+        auto filterExpression = ice->getFilterExpression();
+        auto collator = ice->getCollator();
         // _id indexes are guaranteed to be non-multikey. Determining whether the index is multikey
         // has a small cost associated with it, so we skip that here to make _id lookups faster.
         return {desc->keyPattern(),
@@ -83,16 +85,17 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                 desc->isSparse(),
                 desc->unique(),
                 IndexEntry::Identifier{desc->indexName()},
-                ice.getFilterExpression(),
+                filterExpression,
                 desc->infoObj(),
-                ice.getCollator(),
-                nullptr /* wildcard projection */};
+                collator,
+                nullptr /* wildcard projection */,
+                std::move(ice)};
     }
 
-    auto accessMethod = ice.accessMethod();
+    auto accessMethod = ice->accessMethod();
     tassert(11321049, "Index catalog entry access method must not be null", accessMethod);
 
-    const bool isMultikey = ice.isMultikey(opCtx, collection);
+    const bool isMultikey = ice->isMultikey(opCtx, collection);
 
     const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
@@ -114,7 +117,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             }
 
             multikeyPathSet =
-                getWildcardMultikeyPathSet(opCtx, &ice, projectedFields, &mkAccessStats);
+                getWildcardMultikeyPathSet(opCtx, ice.get(), projectedFields, &mkAccessStats);
 
             LOGV2_DEBUG(20920,
                         2,
@@ -125,12 +128,15 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
         }
     }
 
+    auto filterExpression = ice->getFilterExpression();
+    auto collator = ice->getCollator();
+    auto multikeyPaths = ice->getMultikeyPaths(opCtx, collection);
     return {desc->keyPattern(),
             desc->getIndexType(),
             desc->version(),
             isMultikey,
             // The fixed-size vector of multikey paths stored in the index catalog.
-            ice.getMultikeyPaths(opCtx, collection),
+            std::move(multikeyPaths),
             // The set of multikey paths from special metadata keys stored in the index itself.
             // Indexes that have these metadata keys do not store a fixed-size vector of multikey
             // metadata in the index catalog. Depending on the index type, an index uses one of
@@ -139,11 +145,11 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             desc->isSparse(),
             desc->unique(),
             IndexEntry::Identifier{desc->indexName()},
-            ice.getFilterExpression(),
+            filterExpression,
             desc->infoObj(),
-            ice.getCollator(),
+            collator,
             wildcardProjection,
-            ice.shared_from_this()};
+            std::move(ice)};
 }
 
 void fillOutIndexEntries(OperationContext* opCtx,
@@ -152,12 +158,8 @@ void fillOutIndexEntries(OperationContext* opCtx,
                          std::vector<IndexEntry>& entries) {
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
-    std::vector<const IndexCatalogEntry*> indexCatalogEntries;
-    auto ii =
-        collection->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
-    while (ii->more()) {
-        const IndexCatalogEntry* ice = ii->next();
-
+    for (auto&& ice :
+         collection->getIndexCatalog()->getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
         // Indexes excluded from API version 1 should _not_ be used for planning if apiStrict is
         // set to true.
         auto indexType = ice->descriptor()->getIndexType();
@@ -172,14 +174,10 @@ void fillOutIndexEntries(OperationContext* opCtx,
             continue;
         }
 
-        indexCatalogEntries.push_back(ice);
+        entries.emplace_back(
+            indexEntryFromIndexCatalogEntry(opCtx, collection, std::move(ice), canonicalQuery));
     }
 
-    entries.reserve(indexCatalogEntries.size());
-    for (auto ice : indexCatalogEntries) {
-        entries.emplace_back(
-            indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
-    }
     pauseAfterFillingOutIndexEntries.pauseWhileSet();
 }
 
@@ -597,10 +595,8 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
     const bool strictDistinctOnly =
         distinctArgs.plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY;
 
-    auto ii =
-        collectionPtr->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
-    while (ii->more()) {
-        const IndexCatalogEntry* ice = ii->next();
+    for (auto&& ice : collectionPtr->getIndexCatalog()->getEntriesShared(
+             IndexCatalog::InclusionPolicy::kReady)) {
         const IndexDescriptor* desc = ice->descriptor();
 
         // Skip the addition of hidden indexes to prevent use in query planning.
@@ -617,8 +613,8 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
                                        query,
                                        distinctArgs.flipDistinctScanDirection,
                                        strictDistinctOnly)) {
-            indices.push_back(
-                indexEntryFromIndexCatalogEntry(opCtx, collectionPtr, *ice, canonicalQuery));
+            indices.push_back(indexEntryFromIndexCatalogEntry(
+                opCtx, collectionPtr, std::move(ice), canonicalQuery));
         }
     }
 
