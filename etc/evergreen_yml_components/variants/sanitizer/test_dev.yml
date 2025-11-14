@@ -607,7 +607,7 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - name: &enterprise-rhel8-debug-tsan-required enterprise-rhel8-debug-tsan-required
+  - name: &linux-arm64-tsan-essential-required linux-arm64-tsan-essential-required
     display_name: "! Amazon Linux 2023 arm64 TSAN Enterprise Essential"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
@@ -629,7 +629,7 @@ buildvariants:
         archive-mongocryptd-debug
       lang_environment: LANG=C
       toolchain_version: stable
-      compile_variant: *enterprise-rhel8-debug-tsan-required
+      compile_variant: *linux-arm64-tsan-essential-required
       san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
       build_mongot: true
       download_mongot_release: true
