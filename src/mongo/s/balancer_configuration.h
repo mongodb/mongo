@@ -37,6 +37,7 @@
 #include "mongo/s/balancer_configuration_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -74,7 +75,7 @@ class StatusWith;
  * TODO SERVER-107399 Remove this class once done, as users should no longer directly update this
  * document.
  */
-class BalancerSettingsType {
+class MONGO_MOD_PUBLIC BalancerSettingsType {
 public:
     /**
      * Part of schema to enforce on config.settings document relating to documents with _id:
@@ -104,7 +105,7 @@ private:
  *
  * chunksize: { value: <value in MB between 1 and 1024> }
  */
-class ChunkSizeSettingsType {
+class MONGO_MOD_PUBLIC ChunkSizeSettingsType {
 public:
     // The key under which this setting is stored on the config server
     static const char kKey[];
@@ -159,7 +160,7 @@ private:
  *
  * automerge: { enabled: <true|false> }
  */
-class AutoMergeSettingsType {
+class MONGO_MOD_PUBLIC AutoMergeSettingsType {
 public:
     // The key under which this setting is stored on the config server
     static const char kKey[];
@@ -190,7 +191,7 @@ private:
 /**
  * Contains settings, which control the behaviour of the balancer.
  */
-class BalancerConfiguration {
+class MONGO_MOD_PUBLIC BalancerConfiguration {
     BalancerConfiguration(const BalancerConfiguration&) = delete;
     BalancerConfiguration& operator=(const BalancerConfiguration&) = delete;
 
@@ -208,37 +209,37 @@ public:
      * Non-blocking method, which checks whether the balancer is enabled (without checking for the
      * balancing window).
      */
-    mongo::BalancerModeEnum getBalancerMode() const;
+    MONGO_MOD_PRIVATE mongo::BalancerModeEnum getBalancerMode() const;
 
     /**
      * Synchronous method, which writes the balancer mode to the configuration data.
      */
-    Status setBalancerMode(OperationContext* opCtx, mongo::BalancerModeEnum mode);
+    MONGO_MOD_PRIVATE Status setBalancerMode(OperationContext* opCtx, mongo::BalancerModeEnum mode);
 
     /**
      * Returns whether balancing is allowed based on both the enabled state of the balancer and the
      * balancing window.
      */
-    bool shouldBalance(OperationContext* opCtx) const;
-    bool shouldBalanceForAutoMerge(OperationContext* opCtx) const;
+    MONGO_MOD_PRIVATE bool shouldBalance(OperationContext* opCtx) const;
+    MONGO_MOD_PRIVATE bool shouldBalanceForAutoMerge(OperationContext* opCtx) const;
 
     /**
      * Returns the secondary throttle options for the balancer.
      */
-    MigrationSecondaryThrottleOptions getSecondaryThrottle() const;
+    MONGO_MOD_PRIVATE MigrationSecondaryThrottleOptions getSecondaryThrottle() const;
 
     /**
      * Returns whether the balancer should wait for deletion of orphaned chunk data at the end of
      * each migration.
      */
-    bool waitForDelete() const;
+    MONGO_MOD_PRIVATE bool waitForDelete() const;
 
     /**
      * Returns whether the balancer should attempt to schedule migrations of 'large' chunks. If
      * false, the balancer will instead mark these chunks as 'jumbo', meaning they will not be
      * scheduled for any split or move in the future.
      */
-    bool attemptToBalanceJumboChunks() const;
+    MONGO_MOD_PRIVATE bool attemptToBalanceJumboChunks() const;
 
     /**
      * Returns the max chunk size after which a chunk would be considered jumbo.
@@ -250,9 +251,9 @@ public:
     /**
      * Change the cluster wide auto merge settings.
      */
-    Status changeAutoMergeSettings(OperationContext* opCtx, bool enable);
+    MONGO_MOD_PRIVATE Status changeAutoMergeSettings(OperationContext* opCtx, bool enable);
 
-    bool shouldAutoMerge() const {
+    MONGO_MOD_PRIVATE bool shouldAutoMerge() const {
         return _shouldAutoMerge.loadRelaxed();
     }
 
@@ -265,30 +266,31 @@ public:
      * This method is thread-safe but it doesn't make sense to be called from more than one thread
      * at a time.
      */
-    Status refreshAndCheck(OperationContext* opCtx);
+    MONGO_MOD_NEEDS_REPLACEMENT Status refreshAndCheck(OperationContext* opCtx);
 
     /**
      * Constructs a settings object with the default values. To be used when no balancer settings
      * have been specified.
      */
-    BalancerSettings createDefaultSettings();
+    MONGO_MOD_PRIVATE BalancerSettings createDefaultSettings();
 
     /**
      * Interprets the BSON content as balancer settings and extracts the respective values.
      */
-    StatusWith<BalancerSettings> getSettingsFromBSON(OperationContext* opCtx, const BSONObj& obj);
+    MONGO_MOD_PRIVATE StatusWith<BalancerSettings> getSettingsFromBSON(OperationContext* opCtx,
+                                                                       const BSONObj& obj);
 
     /**
      * Returns true if either 'now' is in the balancing window or if no balancing window exists.
      */
-    bool isTimeInBalancingWindow(OperationContext* opCtx,
-                                 const boost::posix_time::ptime& now) const;
+    MONGO_MOD_PRIVATE bool isTimeInBalancingWindow(OperationContext* opCtx,
+                                                   const boost::posix_time::ptime& now) const;
 
 
     /**
      * Modify the balancer settings directly. This is used for testing purposes only.
      */
-    void setBalancerSettingsForTest(const BalancerSettings& settings) {
+    MONGO_MOD_PRIVATE void setBalancerSettingsForTest(const BalancerSettings& settings) {
         stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
         _balancerSettings = settings;
     }

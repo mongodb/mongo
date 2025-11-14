@@ -41,6 +41,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/catalog_cache/routing_information_cache.h"
+#include "mongo/db/global_catalog/ddl/repair_sharded_collection_chunks_history_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -51,7 +52,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/vector_clock/vector_clock.h"
-#include "mongo/s/request_types/repair_sharded_collection_chunks_history_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 

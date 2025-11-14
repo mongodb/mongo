@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

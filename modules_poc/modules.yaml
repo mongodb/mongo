@@ -578,7 +578,6 @@ data_movement:
     - src/mongo/s/commands/*move_chunk*
     - src/mongo/s/request_types/auto_split_vector.idl
     - src/mongo/s/request_types/migration_secondary_throttle*
-    - src/mongo/s/request_types/repair_sharded_collection_chunks_history.idl
     - src/mongo/s/request_types/cleanup_orphaned.idl
     - src/mongo/s/migration_blocking_operation/migration_blocking_operation*
 
