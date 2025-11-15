@@ -34,7 +34,7 @@ a notice will be included in
 | [CRoaring]                                           | Apache-2.0 OR MIT                              | 3.0.1                                    |                      | ✗                               |
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer                | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                                            | 11.2.0                                   |                      | ✗                               |
-| [github.com/facebook/folly]                          | Apache-2.0                                     | 2023.12.25.00                            |                      | ✗                               |
+| [folly]                                              | Apache-2.0                                     | 2023.12.25.00                            |                      | ✗                               |
 | [googletest]                                         | BSD-3-Clause                                   | 1.17.0                                   |                      |                                 |
 | [gperftools]                                         | BSD-3-Clause                                   | 2.9.1                                    |                      | ✗                               |
 | [gRPC (C++)]                                         | Apache-2.0                                     | 1.59.5                                   |                      | ✗                               |
@@ -101,8 +101,8 @@ a notice will be included in
 [c-ares]: https://github.com/c-ares/c-ares.git
 [cpptrace]: https://github.com/jeremy-rifkin/cpptrace.git
 [fmt]: https://github.com/fmtlib/fmt.git
+[folly]: https://github.com/facebook/folly.git
 [gRPC (C++)]: https://github.com/grpc/grpc.git
-[github.com/facebook/folly]: https://github.com/facebook/folly.git
 [googletest]: https://github.com/google/googletest.git
 [gperftools]: https://github.com/gperftools/gperftools.git
 [immer]: https://github.com/arximboldi/immer.git

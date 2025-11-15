@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:a973a3fe-5abe-4432-91fa-cc30c1034545",
-  "version": 7,
+  "version": 8,
   "metadata": {
-    "timestamp": "2025-11-04T18:17:46Z",
+    "timestamp": "2025-11-15T06:04:26Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.624"
+          "version": "v1.7.637"
         }
       ]
     }
@@ -955,7 +955,7 @@
       },
       "author": "Meta",
       "group": "facebook",
-      "name": "github.com/facebook/folly",
+      "name": "folly",
       "version": "2023.12.25.00",
       "description": "An open-source C++ library developed and used at Facebook.",
       "licenses": [
@@ -1154,7 +1154,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/google/googletest@1.17.0",
+      "bom-ref": "pkg:github/google/googletest@v1.17.0",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1175,7 +1175,7 @@
       ],
       "copyright": "Copyright 2008, Google Inc. All rights reserved.",
       "cpe": "cpe:2.3:a:google:google_test:1.17.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/google/googletest@1.17.0",
+      "purl": "pkg:github/google/googletest@v1.17.0",
       "externalReferences": [
         {
           "url": "https://github.com/google/googletest.git",
@@ -1956,7 +1956,7 @@
         }
       ],
       "copyright": "Copyright (c) 2013-2022 Niels Lohmann <http://nlohmann.me>.",
-      "purl": "pkg:github/nlohmann/json@3.11.3",
+      "purl": "pkg:github/nlohmann/json@v3.11.3",
       "externalReferences": [
         {
           "url": "https://github.com/nlohmann/json.git",
@@ -2207,7 +2207,7 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf:4.25.0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:google:protobuf:v25.0:*:*:*:*:*:*:*",
       "purl": "pkg:github/protocolbuffers/protobuf@v25.0",
       "externalReferences": [
         {
@@ -2596,7 +2596,7 @@
         "pkg:github/google/re2@2025-08-05",
         "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
         "pkg:github/google/snappy@1.1.10",
-        "pkg:github/google/googletest@1.17.0",
+        "pkg:github/google/googletest@v1.17.0",
         "pkg:github/gperftools/gperftools@gperftools-2.9.1",
         "pkg:github/grpc/grpc@1.59.5",
         "pkg:github/unicode-org/icu@icu-release-57-1",
@@ -2697,7 +2697,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/googletest@1.17.0",
+      "ref": "pkg:github/google/googletest@v1.17.0",
       "dependsOn": []
     },
     {
