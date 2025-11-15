@@ -41,4 +41,3 @@ commands:
         api_version: ""
         type: namespacestring
         strict: false
-        mod_visibility: public

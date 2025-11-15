@@ -48,7 +48,6 @@ types:
 structs:
     AutoSplitVectorResponse:
         description: "The reply of an autoSplitVector command."
-        mod_visibility: public
         strict: false
         is_command_reply: true
         fields:
@@ -65,7 +64,6 @@ commands:
         strict: false
         namespace: concatenate_with_db
         api_version: ""
-        mod_visibility: public
         fields:
             keyPattern:
                 type: object_owned

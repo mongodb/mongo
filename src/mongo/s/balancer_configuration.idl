@@ -26,7 +26,6 @@
 # it in the license file.
 
 global:
-    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/s/request_types/migration_secondary_throttle_options.h"

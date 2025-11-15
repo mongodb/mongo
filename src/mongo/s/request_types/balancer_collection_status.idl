@@ -29,7 +29,6 @@
 # _configsvrBalancerCollectionStatus and balancerCollectionStatus IDL File
 
 global:
-    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

@@ -40,13 +40,13 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/global_catalog/ddl/repair_sharded_collection_chunks_history_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
+#include "mongo/s/request_types/repair_sharded_collection_chunks_history_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <string>

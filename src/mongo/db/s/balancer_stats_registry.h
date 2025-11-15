@@ -37,7 +37,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -54,8 +53,7 @@ namespace mongo {
  * and terminated on stepDown.
  */
 
-class MONGO_MOD_NEEDS_REPLACEMENT BalancerStatsRegistry
-    : public ReplicaSetAwareServiceShardSvr<BalancerStatsRegistry> {
+class BalancerStatsRegistry : public ReplicaSetAwareServiceShardSvr<BalancerStatsRegistry> {
 
     BalancerStatsRegistry(const BalancerStatsRegistry&) = delete;
     BalancerStatsRegistry& operator=(const BalancerStatsRegistry&) = delete;
@@ -75,11 +73,11 @@ public:
      *
      * If the registy is not initialized this function will be a noop.
      */
-    MONGO_MOD_PRIVATE void updateOrphansCount(const UUID& collectionUUID, long long delta);
+    void updateOrphansCount(const UUID& collectionUUID, long long delta);
     void onRangeDeletionTaskInsertion(const UUID& collectionUUID, long long numOrphanDocs);
     void onRangeDeletionTaskDeletion(const UUID& collectionUUID, long long numOrphanDocs);
 
-    MONGO_MOD_PRIVATE long long getCollNumOrphanDocs(const UUID& collectionUUID) const;
+    long long getCollNumOrphanDocs(const UUID& collectionUUID) const;
 
     /**
      * Retrieves the numOrphanDocs from the balancer stats registry if initialized or runs an
