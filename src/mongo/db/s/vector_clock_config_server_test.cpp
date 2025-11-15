@@ -35,6 +35,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
@@ -62,11 +64,6 @@ protected:
     VectorClockConfigServerTest()
         : ConfigServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
 
-    void createKeysCollection() {
-        DBDirectClient client(operationContext());
-        client.createCollection(NamespaceString::kKeysCollectionNamespace);
-    }
-
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
@@ -88,6 +85,35 @@ protected:
 
         ConfigServerTestFixture::tearDown();
     }
+
+    void makeClientUnauthorizedToAdvanceTime(Client* client) {
+        auto sessionState = std::make_unique<AuthzSessionExternalStateMock>(client);
+        auto authSession =
+            std::make_unique<AuthorizationSessionImpl>(std::move(sessionState), client);
+        AuthorizationSession::set(client, std::move(authSession));
+    }
+
+    void makeClusterTimeToBeSigned() {
+        // The timestamp is only signed if the client is not authorized to advance time.
+        makeClientUnauthorizedToAdvanceTime(operationContext()->getClient());
+
+        LogicalTimeValidator::get(getServiceContext())
+            ->enableKeyGenerator(operationContext(), true);
+
+        // Create a dummy key to be able to sign timestamps.
+        // Note that it's not possible to automatically generate new keys since the
+        // `setupMajorityReads` has been explicitly disabled for this test suite.
+        KeysCollectionDocument keyDoc(_kKeyId);
+        keyDoc.setKeysCollectionDocumentBase(
+            {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), NamespaceString::kKeysCollectionNamespace, keyDoc.toBSON()));
+
+        _keyManager->refreshNow(operationContext());
+        _keyManager->stopMonitoring();
+    }
+
+    int _kKeyId = 1;
 
 private:
     std::shared_ptr<KeysCollectionManager> _keyManager;
@@ -185,17 +211,8 @@ TEST_F(VectorClockConfigServerTest, TickToTopologyTime) {
 }
 
 TEST_F(VectorClockConfigServerTest, GossipOutInternal) {
-    // Create the admin.system.keys collection to prevent a potential race condition with the vector
-    // clock on slower machines. Without this step, the admin.system.keys collection creation
-    // performed in the following enableKeyGenerator operation, updating the vector clock, might
-    // occur before the node has finished gossiping out, resulting in a time mismatch and causing
-    // the test to fail.
-    createKeysCollection();
-
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
-
-    LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
 
     vc->tickClusterTime(1);                           // (1, 1)
     const auto clusterTime = vc->tickClusterTime(1);  // (1, 2)
@@ -221,17 +238,8 @@ TEST_F(VectorClockConfigServerTest, GossipOutInternal) {
 }
 
 TEST_F(VectorClockConfigServerTest, GossipOutExternal) {
-    // Create the admin.system.keys collection to prevent a potential race condition with the vector
-    // clock on slower machines. Without this step, the admin.system.keys collection creation
-    // performed in the following enableKeyGenerator operation, updating the vector clock, might
-    // occur before the node has finished gossiping out, resulting in a time mismatch and causing
-    // the test to fail.
-    createKeysCollection();
-
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
-
-    LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
 
     vc->tickClusterTime(1);                           // (1, 1)
     const auto clusterTime = vc->tickClusterTime(1);  // (1, 2)
@@ -252,6 +260,36 @@ TEST_F(VectorClockConfigServerTest, GossipOutExternal) {
     // signature.
     ASSERT_TRUE(obj["$clusterTime"].Obj().hasField("signature"));
     ASSERT_EQ(obj["$clusterTime"].Obj()["signature"].Obj()["keyId"].Long(), 0);
+    ASSERT_FALSE(obj.hasField("$configTime"));
+    ASSERT_FALSE(obj.hasField("$topologyTime"));
+}
+
+TEST_F(VectorClockConfigServerTest, GossipOutExternalWithSignedClusterTime) {
+    auto sc = getServiceContext();
+    auto vc = VectorClockMutable::get(sc);
+
+    makeClusterTimeToBeSigned();
+
+    vc->tickClusterTime(1);                           // (1, 1)
+    const auto clusterTime = vc->tickClusterTime(1);  // (1, 2)
+    const auto configTime = LogicalTime(Timestamp(1, 1));
+    vc->tickConfigTimeTo(configTime);
+    const auto topologyTime = LogicalTime(Timestamp(1, 0));
+    vc->tickTopologyTimeTo(topologyTime);
+
+
+    BSONObjBuilder bob;
+    vc->gossipOut(operationContext(), &bob);
+    auto obj = bob.obj();
+
+    // On config servers, gossip out to external clients should have $clusterTime, but not
+    // $configTime or $topologyTime.
+    ASSERT_TRUE(obj.hasField("$clusterTime"));
+    ASSERT_EQ(obj["$clusterTime"].Obj()["clusterTime"].timestamp(), clusterTime.asTimestamp());
+    // A signature is always attached for external clients. Client is not authed, so it receives a
+    // valid signature.
+    ASSERT_TRUE(obj["$clusterTime"].Obj().hasField("signature"));
+    ASSERT_EQ(obj["$clusterTime"].Obj()["signature"].Obj()["keyId"].Long(), _kKeyId);
     ASSERT_FALSE(obj.hasField("$configTime"));
     ASSERT_FALSE(obj.hasField("$topologyTime"));
 }
