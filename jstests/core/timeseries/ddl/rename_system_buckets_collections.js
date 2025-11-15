@@ -55,7 +55,7 @@ function runTests(targetDbName) {
     }
     {
         jsTest.log(
-            "Renaming a simple collection to a bucket collection without timeseries options works");
+            "Renaming a simple collection to a bucket collection without timeseries options fails");
         setupEnv();
         assert.commandWorked(db.createCollection(collName));
         const res = db.adminCommand({
