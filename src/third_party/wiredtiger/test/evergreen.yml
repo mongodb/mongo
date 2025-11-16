@@ -158,10 +158,26 @@ functions:
     params:
       shell: bash
       script: |
-        set -o errexit
         set -o verbose
+        max_attempts=5
+        command="git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git"
         if ! [ -d "./automation-scripts" ]; then
-          git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Attempt $attempt of $max_attempts cloning automation-scripts'"
+            $command
+            # Check the exit status of the command
+            if [ $? -eq 0 ]; then
+              echo "Clone succeeded on attempt $attempt."
+              exit 0
+            else
+              if [ $attempt -eq $max_attempts ]; then
+                echo "Clone failed after $max_attempts attempts."
+                exit 1
+              fi
+            fi
+            # Delay before reattempting the clone
+            sleep 1
+          done
         fi
   "fetch artifacts": &fetch_artifacts
     command: s3.get
