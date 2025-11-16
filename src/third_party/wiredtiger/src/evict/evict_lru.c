@@ -1323,6 +1323,20 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
     }
 
     WT_STAT_CONN_INCRV(session, cache_eviction_pages_queued_post_lru, queue->evict_candidates);
+
+    /*
+     * Add stats about pages that have been queued.
+     */
+    for (candidates = 0; candidates < queue->evict_candidates; ++candidates) {
+        WT_PAGE *page = queue->evict_queue[candidates].ref->page;
+        if (__wt_page_is_modified(page))
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_pages_queued_dirty);
+        else if (page->modify != NULL)
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_pages_queued_updates);
+        else
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_pages_queued_clean);
+    }
+
     queue->evict_current = queue->evict_queue;
     __wt_spin_unlock(session, &queue->evict_lock);
 
@@ -1796,7 +1810,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     WT_REF *ref;
     WT_TXN *txn;
     uint64_t internal_pages_already_queued, internal_pages_queued, internal_pages_seen;
-    uint64_t min_pages, pages_already_queued, pages_seen, pages_queued, refs_walked;
+    uint64_t min_pages, pages_already_queued, pages_queued, pages_seen, refs_walked;
+    uint64_t pages_seen_clean, pages_seen_dirty, pages_seen_updates;
     uint32_t read_flags, remaining_slots, target_pages, walk_flags;
     int restarts;
     bool give_up, modified, urgent_queued, want_page;
@@ -1975,6 +1990,7 @@ rand_next:
      * case we are appending and only the last page in the file is live.
      */
     internal_pages_already_queued = internal_pages_queued = internal_pages_seen = 0;
+    pages_seen_clean = pages_seen_dirty = pages_seen_updates = 0;
     for (evict = start, pages_already_queued = pages_queued = pages_seen = refs_walked = 0;
          evict < end && (ret == 0 || ret == WT_NOTFOUND);
          last_parent = ref == NULL ? NULL : ref->home,
@@ -2042,6 +2058,13 @@ rand_next:
         page = ref->page;
         modified = __wt_page_is_modified(page);
         page->evict_pass_gen = cache->evict_pass_gen;
+
+        if (__wt_page_is_modified(page))
+            ++pages_seen_dirty;
+        else if (page->modify != NULL)
+            ++pages_seen_updates;
+        else
+            ++pages_seen_clean;
 
         /* Count internal pages seen. */
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
@@ -2219,6 +2242,9 @@ fast:
       session, cache_eviction_internal_pages_already_queued, internal_pages_already_queued);
     WT_STAT_CONN_INCRV(session, cache_eviction_internal_pages_queued, internal_pages_queued);
     WT_STAT_CONN_DATA_INCR(session, cache_eviction_walk_passes);
+    WT_STAT_CONN_DATA_INCRV(session, cache_eviction_pages_seen_clean, pages_seen_clean);
+    WT_STAT_CONN_DATA_INCRV(session, cache_eviction_pages_seen_dirty, pages_seen_dirty);
+    WT_STAT_CONN_DATA_INCRV(session, cache_eviction_pages_seen_updates, pages_seen_updates);
     return (0);
 }
 
