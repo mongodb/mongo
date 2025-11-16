@@ -463,7 +463,7 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
                                                              StringData ident,
                                                              const RecordStore::Options& options,
                                                              boost::optional<UUID> uuid) {
-    if (ident == ident::kMbdCatalog) {
+    if (ident == ident::kMdbCatalog) {
         return std::make_unique<EphemeralForTestRecordStore>(uuid, ident, &_catalogInfo);
     } else if (options.isOplog) {
         return std::make_unique<DevNullRecordStore::Oplog>(*uuid, ident, options.oplogMaxSize);

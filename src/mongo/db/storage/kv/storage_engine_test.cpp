@@ -341,7 +341,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     // There are two idents. `_mdb_catalog` and the ident for `db.coll1`.
     ASSERT_EQUALS(static_cast<const unsigned long>(2), idents.size());
     ASSERT_TRUE(idents.find(collInfo.ident) != idents.end());
-    ASSERT_TRUE(idents.find(ident::kMbdCatalog) != idents.end());
+    ASSERT_TRUE(idents.find(ident::kMdbCatalog) != idents.end());
 
     // Drop the `db.coll1` table, while leaving the MDBCatalog entry.
     ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),

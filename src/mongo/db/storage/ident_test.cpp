@@ -279,7 +279,7 @@ TEST_F(IdentGenerationTest, ValidCollectionIdents) {
     ASSERT_TRUE(ident::isValidIdent("index/collection/0-1-2"));
 
     // The special hardcoded collection idents
-    ASSERT_TRUE(ident::isValidIdent(ident::kMbdCatalog));
+    ASSERT_TRUE(ident::isValidIdent(ident::kMdbCatalog));
     ASSERT_TRUE(ident::isValidIdent(ident::kSizeStorer));
 }
 

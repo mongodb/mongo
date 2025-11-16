@@ -169,14 +169,14 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
 void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                                        LastShutdownState lastShutdownState) {
     bool catalogExists =
-        _engine->hasIdent(*shard_role_details::getRecoveryUnit(opCtx), ident::kMbdCatalog);
+        _engine->hasIdent(*shard_role_details::getRecoveryUnit(opCtx), ident::kMdbCatalog);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
         invariant(repairObserver->isIncomplete());
 
         LOGV2(22246, "Repairing catalog metadata");
         Status status =
-            _engine->repairIdent(*shard_role_details::getRecoveryUnit(opCtx), ident::kMbdCatalog);
+            _engine->repairIdent(*shard_role_details::getRecoveryUnit(opCtx), ident::kMdbCatalog);
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             LOGV2_WARNING(22264, "Catalog data modified by repair", "error"_attr = status);
@@ -195,7 +195,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
 
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         auto status = _engine->createRecordStore(
-            provider, kCatalogInfoNamespace, ident::kMbdCatalog, catalogRecordStoreOpts);
+            provider, kCatalogInfoNamespace, ident::kMdbCatalog, catalogRecordStoreOpts);
 
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
@@ -208,7 +208,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
 
     _catalogRecordStore = _engine->getRecordStore(opCtx,
                                                   kCatalogInfoNamespace,
-                                                  ident::kMbdCatalog,
+                                                  ident::kMdbCatalog,
                                                   catalogRecordStoreOpts,
                                                   boost::none /* uuid */);
 

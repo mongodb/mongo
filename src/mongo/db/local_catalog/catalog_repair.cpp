@@ -171,7 +171,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
             engine->getEngine()->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx));
         for (auto& elem : vec)
             engineIdents.insert(std::move(elem));
-        if (auto it = engineIdents.find(ident::kMbdCatalog); it != engineIdents.end())
+        if (auto it = engineIdents.find(ident::kMdbCatalog); it != engineIdents.end())
             engineIdents.erase(it);
     }
 

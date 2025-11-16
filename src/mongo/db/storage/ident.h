@@ -59,7 +59,7 @@ namespace ident {
 // The size storer and catalog have hardcoded idents as we need to be able to open them before we
 // can look up idents in the catalog.
 constexpr inline StringData kSizeStorer = "sizeStorer"_sd;
-constexpr inline StringData kMbdCatalog = "_mdb_catalog"_sd;
+constexpr inline StringData kMdbCatalog = "_mdb_catalog"_sd;
 
 /**
  * By default, a storage engine table is uniquely identified by an 'ident' that comes in 1 of 4

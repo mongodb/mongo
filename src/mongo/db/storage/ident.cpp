@@ -297,7 +297,7 @@ bool validateTag(StringData uniqueTag) {
 
 bool isValidIdent(StringData ident) {
     // These internal idents do not follow the normal scheme
-    if (ident == kSizeStorer || ident == kMbdCatalog)
+    if (ident == kSizeStorer || ident == kMdbCatalog)
         return true;
     return parseIdent(ident).has_value();
 }
