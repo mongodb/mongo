@@ -66,6 +66,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -343,6 +344,21 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
             mergeCmd[GenericArguments::kRequestGossipRoutingCacheFieldName] =
                 Value(arrayBuilder.arr());
         }
+    }
+
+    auto rawData = mergeCmd.peek()[(GenericArguments::kRawDataFieldName)];
+    auto isRawOpCtx = isRawDataOperation(mergeCtx->getOperationContext());
+    tassert(11346800,
+            "Trying to send a non-rawData command from a rawData operation",
+            rawData.missing() || rawData.coerceToBool() || !isRawOpCtx);
+
+    // TODO(SERVER-108928): 'rawData' should be declared as should_forward_to_shards: true
+    // The merge command preserves the 'rawData' field from the original pipeline command, which
+    // leads to 'rawData' being attached twice to the network request. That's why we remove it from
+    // the command here. Only if sending a 'rawData' command from a non-'rawData' operation, we must
+    // keep it for it to be included in the outgoing network request.
+    if (!rawData.missing() && (!rawData.coerceToBool() || isRawOpCtx)) {
+        mergeCmd.remove(GenericArguments::kRawDataFieldName);
     }
 
     // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual

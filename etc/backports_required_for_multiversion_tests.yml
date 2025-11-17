@@ -488,6 +488,8 @@ last-continuous:
       ticket: SERVER-112520
     - test_file: jstests/query_golden/distinct_index_eligibility_md.js
       ticket: SERVER-111486
+    - test_file: jstests/sharding/query/lookup/lookup_foreign_local_different_shards.js
+      ticket: SERVER-113468
     - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
       ticket: SERVER-110953
   suites: null
@@ -1035,6 +1037,8 @@ last-lts:
       ticket: SERVER-112520
     - test_file: jstests/query_golden/distinct_index_eligibility_md.js
       ticket: SERVER-111486
+    - test_file: jstests/sharding/query/lookup/lookup_foreign_local_different_shards.js
+      ticket: SERVER-113468
     - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
       ticket: SERVER-110953
   suites: null
