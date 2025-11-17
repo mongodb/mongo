@@ -69,7 +69,6 @@ mongo_cc_library(
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_gen",
         "//src/mongo/db/commands:test_commands_enabled.h",
         "//src/mongo/db/commands/server_status:server_status_metric.h",
-        "//src/mongo/db/exec:exec_shard_filter_policy.h",
         "//src/mongo/db/exec:shard_filterer.h",
         "//src/mongo/db/exec/matcher:match_details.h",
         "//src/mongo/db/exec/mutable_bson:const_element.h",

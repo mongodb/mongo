@@ -34,7 +34,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/classic/update_stage.h"
-#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
@@ -101,8 +100,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     size_t plannerOptions = QueryPlannerParams::DEFAULT,
     Pipeline* pipeline = nullptr,
     bool needsMerge = false,
-    boost::optional<TraversalPreference> traversalPreference = boost::none,
-    ExecShardFilterPolicy = AutomaticShardFiltering{});
+    boost::optional<TraversalPreference> traversalPreference = boost::none);
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
     OperationContext* opCtx,

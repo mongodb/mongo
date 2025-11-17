@@ -40,7 +40,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
@@ -347,8 +346,7 @@ std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadImpl(
     CollectionOrViewAcquisitionMap& allAcquisitions,
     bool isAnySecondaryCollectionNotLocal,
     boost::optional<const AggregateCommandRequest&> aggRequest,
-    bool shouldUseCollectionDefaultCollator,
-    ExecShardFilterPolicy shardFilterPolicy) {
+    bool shouldUseCollectionDefaultCollator) {
     const boost::intrusive_ptr<ExpressionContext>& expCtx = pipeline->getContext();
 
     if (expCtx->eligibleForSampling()) {
@@ -410,8 +408,7 @@ std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadImpl(
                                                           expCtx->getNamespaceString(),
                                                           resolvedAggRequest,
                                                           pipeline.get(),
-                                                          catalogResourceHandle,
-                                                          shardFilterPolicy);
+                                                          catalogResourceHandle);
 
     const bool isMongotPipeline = search_helpers::isMongotPipeline(pipeline.get());
     // We split up mongot special logic as bindCatalogInfo() should be called on a desugared search
@@ -770,8 +767,7 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     bool attachCursorAfterOptimizing,
     std::function<void(Pipeline* pipeline)> optimizePipeline,
     bool shouldUseCollectionDefaultCollator,
-    boost::optional<const AggregateCommandRequest&> aggRequest,
-    ExecShardFilterPolicy shardFilterPolicy) {
+    boost::optional<const AggregateCommandRequest&> aggRequest) {
 
     // If the pipeline doesn't require any collection acquisition, since it produces it's own data,
     // or attachCursorAfterOptimizing is false we do not need to attach a cursor or perform viewless
@@ -804,8 +800,7 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
                                                         allAcquisitions,
                                                         isAnySecondaryCollectionNotLocal,
                                                         aggRequest,
-                                                        shouldUseCollectionDefaultCollator,
-                                                        shardFilterPolicy);
+                                                        shouldUseCollectionDefaultCollator);
 }
 
 std::unique_ptr<Pipeline>
@@ -830,8 +825,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalReadWithCatalo
 std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     std::unique_ptr<Pipeline> pipeline,
     boost::optional<const AggregateCommandRequest&> aggRequest,
-    bool shouldUseCollectionDefaultCollator,
-    ExecShardFilterPolicy shardFilterPolicy) {
+    bool shouldUseCollectionDefaultCollator) {
     const boost::intrusive_ptr<ExpressionContext>& expCtx = pipeline->getContext();
 
     if (!requiresCollectionAcquisition(*pipeline)) {
@@ -847,8 +841,7 @@ std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipe
                                                         allAcquisitions,
                                                         isAnySecondaryCollectionNotLocal,
                                                         aggRequest,
-                                                        shouldUseCollectionDefaultCollator,
-                                                        shardFilterPolicy);
+                                                        shouldUseCollectionDefaultCollator);
 }
 
 std::string CommonMongodProcessInterface::getShardName(OperationContext* opCtx) const {

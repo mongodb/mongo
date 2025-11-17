@@ -42,7 +42,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/local_catalog/shard_role_api/resource_yielder.h"
 #include "mongo/db/matcher/expression.h"
@@ -521,8 +520,7 @@ public:
     virtual std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
         std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        bool shouldUseCollectionDefaultCollator = false,
-        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) = 0;
+        bool shouldUseCollectionDefaultCollator = false) = 0;
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying collection
@@ -540,8 +538,7 @@ public:
         bool attachCursorAfterOptimizing,
         std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
         bool shouldUseCollectionDefaultCollator = false,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) = 0;
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) = 0;
 
     /**
      * Returns a vector of owned BSONObjs, each of which contains details of an in-progress

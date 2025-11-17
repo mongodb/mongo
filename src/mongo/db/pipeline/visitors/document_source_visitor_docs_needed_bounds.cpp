@@ -229,10 +229,6 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceMatch& source) {
     ctx->applyPossibleDecreaseStage();
 }
 
-void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalShardFilter& source) {
-    ctx->applyPossibleDecreaseStage();
-}
-
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceRedact& source) {
     // $redact may function like a $match if it redacts an entire document, so it may decrease
     // the number of documents in the result stream.

@@ -39,7 +39,6 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -123,8 +122,7 @@ public:
                                                               expCtx->getNamespaceString(),
                                                               nullptr /*resolvedAggRequest*/,
                                                               pipeline.get(),
-                                                              cursorCatalogResourceHandle,
-                                                              AutomaticShardFiltering{});
+                                                              cursorCatalogResourceHandle);
 
         return pipeline;
     }

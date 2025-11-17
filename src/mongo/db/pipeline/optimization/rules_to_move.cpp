@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/document_source_internal_list_collections.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_internal_replace_root.h"
-#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
@@ -68,8 +67,6 @@ REGISTER_RULES(DocumentSourceGraphLookUp, OPTIMIZE_AT_RULE(DocumentSourceGraphLo
 REGISTER_RULES(DocumentSourceInternalProjection,
                OPTIMIZE_AT_RULE(DocumentSourceInternalProjection));
 REGISTER_RULES(DocumentSourceSort, OPTIMIZE_AT_RULE(DocumentSourceSort));
-REGISTER_RULES(DocumentSourceInternalShardFilter,
-               OPTIMIZE_AT_RULE(DocumentSourceInternalShardFilter));
 
 // Owned by the Query Execution team.
 REGISTER_RULES(DocumentSourceSequentialDocumentCache,

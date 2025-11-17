@@ -260,7 +260,7 @@ public:
 
     CollectionAcquisition getCollection() {
         tassert(11140101,
-                "catalogResourceHandle must be acquired to access the collection.",
+                "catalogResourceHandle must be acquired to access the collection",
                 isAcquired());
         return _collection;
     }

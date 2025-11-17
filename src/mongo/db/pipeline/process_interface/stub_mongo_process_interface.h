@@ -281,8 +281,7 @@ public:
     std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
         std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        bool shouldUseCollectionDefaultCollator = false,
-        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) override {
+        bool shouldUseCollectionDefaultCollator = false) override {
         MONGO_UNREACHABLE;
     }
 
@@ -292,8 +291,7 @@ public:
         bool attachCursorAfterOptimizing,
         std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
         bool shouldUseCollectionDefaultCollator = false,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) override {
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) override {
         MONGO_UNREACHABLE;
     }
 

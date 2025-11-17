@@ -1305,13 +1305,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::size_t plannerOptions,
     Pipeline* pipeline,
     bool needsMerge,
-    boost::optional<TraversalPreference> traversalPreference,
-    ExecShardFilterPolicy execShardFilterPolicy) {
+    boost::optional<TraversalPreference> traversalPreference) {
     invariant(canonicalQuery);
 
     // Ensure that the shard filter option is set if this is a shard.
-    if (OperationShardingState::isComingFromRouter(opCtx) &&
-        std::holds_alternative<AutomaticShardFiltering>(execShardFilterPolicy)) {
+    if (OperationShardingState::isComingFromRouter(opCtx)) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 

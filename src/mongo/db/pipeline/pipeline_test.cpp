@@ -37,7 +37,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -162,8 +161,7 @@ class StubExplainInterface : public StubMongoProcessInterface {
     std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
         std::unique_ptr<Pipeline> pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest,
-        bool shouldUseCollectionDefaultCollator,
-        ExecShardFilterPolicy = AutomaticShardFiltering{}) override {
+        bool shouldUseCollectionDefaultCollator) override {
         return pipeline;
     }
 };

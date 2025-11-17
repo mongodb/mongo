@@ -110,7 +110,7 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
             auto documentKey = Document({{"_id", documentId}});
 
             tassert(31052,
-                    "Collection should exist when using $_internalSearchIdLookup.",
+                    "Collection should exist when using $_internalSearchIdLookup",
                     pExpCtx->getUUID().has_value());
 
             // Find the document by performing a local read.
