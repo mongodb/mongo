@@ -544,16 +544,12 @@ protected:
      */
     boost::optional<Record> seekExactCommon(const RecordId& id);
 
-    const uint64_t _tableId;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
     OperationContext* _opCtx;
     RecoveryUnit* _ru;
-    const std::string _uri;
-    const std::string _ident;
+    const WiredTigerRecordStore& _rs;
     boost::optional<WiredTigerCursor> _cursor;
-    const KeyFormat _keyFormat;
     const bool _forward;
-    const boost::optional<UUID> _uuid;
     bool _skipNextAdvance = false;
     bool _eof = false;
     bool _hasRestored = true;
