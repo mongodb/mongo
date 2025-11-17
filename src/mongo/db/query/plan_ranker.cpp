@@ -56,7 +56,8 @@ namespace {
 class DefaultPlanScorer final : public PlanScorer<PlanStageStats> {
 protected:
     double calculateProductivity(const PlanStageStats* stats) const final {
-        invariant(stats->common.works != 0);
+        tassert(
+            11321201, "Expected plan stats works to be greater than 0", stats->common.works != 0);
         return static_cast<double>(stats->common.advanced) /
             static_cast<double>(stats->common.works);
     }

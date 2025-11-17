@@ -94,8 +94,8 @@ std::pair<value::SlotAccessor*, value::SlotAccessor*> TrialRuntimeExecutor::prep
     stage_builder::PlanStageData* data,
     const bool preparingFromCache,
     RemoteCursorMap* remoteCursors) const {
-    invariant(root);
-    invariant(data);
+    tassert(11321202, "root must not be null", root);
+    tassert(11321203, "data must not be null", data);
 
     stage_builder::prepareSlotBasedExecutableTree(
         _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache, remoteCursors);

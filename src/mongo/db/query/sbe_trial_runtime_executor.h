@@ -58,7 +58,7 @@ public:
           _cq(cq),
           _yieldPolicy(yieldPolicy),
           _indexExistenceChecker(indexExistenceChecker) {
-        invariant(_opCtx);
+        tassert(11321204, "opCtx must not be null", _opCtx);
     }
 
     /**

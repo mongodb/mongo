@@ -223,7 +223,7 @@ template <typename PlanStageType, typename ResultType, typename Data>
 StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
     const CanonicalQuery& cq) {
-    invariant(!candidates.empty());
+    tassert(11321200, "candidates must not be empty", !candidates.empty());
     // A plan that hits EOF is automatically scored above
     // its peers. If multiple plans hit EOF during the same
     // set of round-robin calls to work(), then all such plans
