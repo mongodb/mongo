@@ -32,17 +32,15 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
-#include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 

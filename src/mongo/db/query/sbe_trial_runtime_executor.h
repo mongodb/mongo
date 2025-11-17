@@ -36,6 +36,7 @@
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 

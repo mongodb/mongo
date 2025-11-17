@@ -35,6 +35,7 @@
 #include "mongo/db/query/stage_builder/sbe/abt/strong_alias.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax_fwd_declare.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::abt {
 

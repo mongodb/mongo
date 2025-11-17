@@ -36,6 +36,7 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

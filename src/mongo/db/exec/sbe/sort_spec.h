@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe {
 /**

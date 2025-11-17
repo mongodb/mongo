@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::abt {
 

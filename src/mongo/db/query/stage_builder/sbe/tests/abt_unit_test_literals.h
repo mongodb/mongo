@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/util/modules.h"
 
 #include <sstream>
 #include <string>

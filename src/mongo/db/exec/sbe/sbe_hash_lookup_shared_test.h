@@ -33,7 +33,6 @@
  * This file contains tests for sbe::LoopJoinStage.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -44,26 +43,14 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/util/stage_results_printer.h"
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/values/value_printer.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
-#include <memory>
 #include <ostream>
 #include <string>
-#include <utility>
 
 #include <boost/optional/optional.hpp>
 

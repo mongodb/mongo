@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/in_list_data.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>

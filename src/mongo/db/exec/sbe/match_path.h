@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/field_ref.h"
+#include "mongo/util/modules.h"
 
 #include <ostream>
 

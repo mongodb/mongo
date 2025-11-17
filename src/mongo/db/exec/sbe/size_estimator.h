@@ -46,15 +46,14 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/stages/window.h"
 #include "mongo/db/exec/sbe/values/row.h"
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
 
 /**

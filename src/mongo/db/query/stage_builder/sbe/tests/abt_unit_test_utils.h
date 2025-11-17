@@ -35,6 +35,7 @@
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

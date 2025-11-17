@@ -44,6 +44,7 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <tuple>

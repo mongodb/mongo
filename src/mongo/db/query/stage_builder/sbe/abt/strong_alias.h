@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 namespace mongo::abt {

@@ -33,15 +33,10 @@
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 
+#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-
-#include <cstddef>
-#include <ostream>
 
 #include <boost/optional/optional.hpp>
 

@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

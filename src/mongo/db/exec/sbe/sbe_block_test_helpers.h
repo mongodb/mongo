@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

@@ -32,6 +32,7 @@
 #include "mongo/stdx/trusted_hasher.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <unordered_map>
 #include <unordered_set>

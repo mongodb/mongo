@@ -44,19 +44,17 @@
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
-#include <cstdint>
-#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
