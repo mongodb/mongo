@@ -7,6 +7,27 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 export const kShellApplicationName = "MongoDB Shell";
 export const kDefaultQueryStatsHmacKey = BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=");
 
+export const queryShapeUpdateFieldsRequired = ["cmdNs", "command", "u", "q", "multi", "upsert"];
+// The outer fields not nested inside queryShape.
+export const updateKeyFieldsRequired = [
+    "queryShape",
+    "collectionType",
+    "client",
+    "ordered",
+    "bypassDocumentValidation",
+];
+export const updateKeyFieldsComplex = [
+    ...updateKeyFieldsRequired,
+    "comment",
+    "readConcern",
+    "apiDeprecationErrors",
+    "apiVersion",
+    "apiStrict",
+    "maxTimeMS",
+    "$readPreference",
+    "hint",
+];
+
 /**
  * Utility for checking that the aggregated queryStats metrics are logical (follows sum >= max >=
  * min, and sum = max = min if only one execution).

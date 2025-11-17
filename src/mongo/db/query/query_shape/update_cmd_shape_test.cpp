@@ -132,6 +132,605 @@ TEST_F(UpdateCmdShapeTest, BasicReplacementUpdateShape) {
                      SerializationContext::stateDefault()));
 }
 
+TEST_F(UpdateCmdShapeTest, BasicPipelineUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { x: {$eq: 3} }, u: [ { "$set": { "foo": "bar", "num": 42 } } ], multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "foo": "?string",
+                        "num": "?number"
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                        "$eq": 1
+                    }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "foo": {
+                            "$const": "?"
+                        },
+                        "num": {
+                            "$const": 1
+                        }
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+/**
+ * Test that expressions in a pipeline-style update are properly shapified.
+ * As a side effect, this also tests that we don't optimize the pipeline during shapification.
+ * Expressions should be preserved in their original form, not pre-computed.
+ */
+TEST_F(UpdateCmdShapeTest, PipelineUpdateWithExpressionsShape) {
+    // Expressions like {$add: [1, 2]} remain as expressions and are not folded to constant values
+    // like 3.
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { x: 1 }, 
+            u: [ 
+                { 
+                    "$set": { 
+                        "computed": { "$add": [1, 2] },
+                        "product": { "$multiply": [3, 4] },
+                        "nested": { "$add": [{ "$multiply": [2, 3] }, 1] }
+                    } 
+                } 
+            ],
+            multi: false, 
+            upsert: false 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "computed": {
+                            "$add": "?array<?number>"
+                        },
+                        "product": {
+                            "$multiply": "?array<?number>"
+                        },
+                        "nested": {
+                            "$add": [
+                                {
+                                    "$multiply": "?array<?number>"
+                                },
+                                "?number"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": 1
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "computed": {
+                            "$add": [1, 1]
+                        },
+                        "product": {
+                            "$multiply": [1, 1]
+                        },
+                        "nested": {
+                            "$add": [
+                                {
+                                    "$multiply": [1, 1]
+                                },
+                                1
+                            ]
+                        }
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PipelineUpdateWithConstantsShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { x: 1 }, 
+            u: [ { "$set": { "foo": "$$myVar", "num": "$$myNum" } } ],
+            c: { "myVar": "hello", "myNum": 42 },
+            multi: false, 
+            upsert: false 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "foo": "$$myVar",
+                        "num": "$$myNum"
+                    }
+                }
+            ],
+            "c": {
+                "myVar": "?string",
+                "myNum": "?number"
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": 1
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "foo": "$$myVar",
+                        "num": "$$myNum"
+                    }
+                }
+            ],
+            "c": {
+                "myVar": "?",
+                "myNum": 1
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+/**
+ * Test that complicated things like object literals are properly shapified when they are in the "c"
+ * field.
+ */
+TEST_F(UpdateCmdShapeTest, PipelineUpdateWithComplexConstantsShape) {
+    // Even though "nestedObject" has expression-like syntax, it should be treated as an object
+    // literal.
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { x: 1 }, 
+            u: [ { "$set": { "x": "$$simpleObject", "nested": "$$nestedObject" } } ],
+            c: { 
+                "simpleObject": { "a": 1 },
+                "nestedObject": { "$pretendField": [{ "$anotherFakeOne": [3, 4] }, 5] }
+            },
+            multi: false, 
+            upsert: false 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "x": "$$simpleObject",
+                        "nested": "$$nestedObject"
+                    }
+                }
+            ],
+            "c": {
+                "simpleObject": "?object",
+                "nestedObject": "?object"
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": 1
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "x": "$$simpleObject",
+                        "nested": "$$nestedObject"
+                    }
+                }
+            ],
+            "c": {
+                "simpleObject": {
+                    "?": "?"
+                },
+                "nestedObject": {
+                    "?": "?"
+                }
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+/**
+ * Test that a pipeline update with all allowed stages ($addFields, $project, $replaceRoot) is
+ * properly shapified.
+ */
+TEST_F(UpdateCmdShapeTest, PipelineUpdateWithAllAllowedStagesShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { x: {$eq: 3} }, 
+            u: [ 
+                { "$addFields": { "newField": "value", "count": 42 } },
+                { "$project": { "oldField": 0, "_id": 1 } }, 
+                { "$replaceRoot": { "newRoot": { "finalDoc": "$$ROOT", "processed": true } } }
+            ], 
+            multi: false, 
+            upsert: false 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$addFields": {
+                        "newField": "?string",
+                        "count": "?number"
+                    }
+                },
+                {
+                    "$project": {
+                        "oldField": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "finalDoc": "$$ROOT",
+                            "processed": "?bool"
+                        }
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": 1
+                }
+            },
+            "u": [
+                {
+                    "$addFields": {
+                        "newField": {
+                            "$const": "?"
+                        },
+                        "count": {
+                            "$const": 1
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "oldField": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "finalDoc": "$$ROOT",
+                            "processed": {
+                                "$const": true
+                            }
+                        }
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": 1
+                }
+            },
+            "u": [
+                {
+                    "$addFields": {
+                        "newField": {
+                            "$const": "?"
+                        },
+                        "count": {
+                            "$const": 1
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "oldField": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "finalDoc": "$$ROOT",
+                            "processed": {
+                                "$const": true
+                            }
+                        }
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+/**
+ * Test that stage aliases get shapified properly.
+ * - $set is an alias for $addFields and will be preserved.
+ * - $unset will desguar to $project
+ * - $replaceWith will desugar to $replaceRoot
+ */
+TEST_F(UpdateCmdShapeTest, PipelineUpdateWithStageAliasesShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { y: {$gt: 5} }, 
+            u: [ 
+                { "$set": { "status": "updated", "version": 2 } },
+                { "$unset": "tempField" }, 
+                { "$replaceWith": { "newDoc": "$$ROOT", "timestamp": "$$NOW" } } 
+            ], 
+            multi: true, 
+            upsert: true 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "y": {
+                    "$gt": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "status": "?string",
+                        "version": "?number"
+                    }
+                },
+                {
+                    "$project": {
+                        "tempField": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "newDoc": "$$ROOT",
+                            "timestamp": "$$NOW"
+                        }
+                    }
+                }
+            ],
+            "multi": true,
+            "upsert": true
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "y": {
+                    "$gt": 1
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "status": {
+                            "$const": "?"
+                        },
+                        "version": {
+                            "$const": 1
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "tempField": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "newDoc": "$$ROOT",
+                            "timestamp": "$$NOW"
+                        }
+                    }
+                }
+            ],
+            "multi": true,
+            "upsert": true
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
 TEST_F(UpdateCmdShapeTest, BatchReplacementUpdateShape) {
     auto shapes = makeShapesFromUpdate(R"({
         update: "testColl",
@@ -191,6 +790,77 @@ TEST_F(UpdateCmdShapeTest, BatchReplacementUpdateShape) {
                          SerializationContext::stateDefault()));
 }
 
+TEST_F(UpdateCmdShapeTest, BatchPipelineUpdateShape) {
+    auto shapes = makeShapesFromUpdate(R"({
+        update: "testColl",
+        updates: [
+          { q: { y: { "$gt": 5 } }, u: [ { "$unset": "oldField" }, { "$set": { "status": "updated" } } ], multi: true, upsert: false },
+          { q: { z: true }, u: [ { "$replaceWith": { "newDoc": "$$ROOT", "timestamp": "$$NOW" } } ], multi: false, upsert: true }
+        ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_EQ(shapes.size(), 2);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "y": {
+                    "$gt": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$project": {
+                        "oldField": false,
+                        "_id": true
+                    }
+                },
+                {
+                    "$set": {
+                        "status": "?string"
+                    }
+                }
+            ],
+            "multi": true,
+            "upsert": false
+        })",
+        shapes[0].toBson(_operationContext.get(),
+                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "z": {
+                    "$eq": "?bool"
+                }
+            },
+            "u": [
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "newDoc": "$$ROOT",
+                            "timestamp": "$$NOW"
+                        }
+                    }
+                }
+            ],
+            "multi": false,
+            "upsert": true
+        })",
+        shapes[1].toBson(_operationContext.get(),
+                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         SerializationContext::stateDefault()));
+}
+
 TEST_F(UpdateCmdShapeTest, IncludesOptionalValues) {
     // Test setting optional values such as 'multi' and 'upsert' to verify that they are included in
     // the query shape.
@@ -242,6 +912,25 @@ TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
               hash.toHexString());
 }
 
+TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValueWithConstants) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { x: {$eq: 3} }, 
+            u: [ { "$set": { "foo": "$$myVar", "num": "$$myNum" } } ],
+            c: { "myVar": "hello", "myNum": 42 },
+            multi: false, 
+            upsert: false 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    auto serializationContext = SerializationContext::stateCommandRequest();
+    const auto hash = shape.sha256Hash(_operationContext.get(), serializationContext);
+    ASSERT_EQ("12B31ED7147537EFBE834F3620782ECCBE4414916490E8B5ADCE529040313E59",
+              hash.toHexString());
+}
+
 TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
@@ -259,6 +948,32 @@ TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
     ASSERT_EQ(updateComponents.size(),
               sizeof(UpdateCmdShapeComponents) + updateComponents.representativeQ.objsize() +
                   updateComponents._representativeUObj.objsize() + letSize -
+                  sizeof(LetShapeComponent));
+}
+
+TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponentsWithPipelineAndConstants) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { x: {$eq: 3} }, 
+            u: [ { "$set": { "foo": "$$myVar", "num": "$$myNum" } } ],
+            c: { "myVar": "hello", "myNum": 42 },
+            multi: false, 
+            upsert: false 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    auto updateComponents =
+        static_cast<const UpdateCmdShapeComponents&>(shape.specificComponents());
+
+    const auto letSize = updateComponents.let.size();
+    ASSERT(updateComponents.representativeC);
+    const auto cSize = updateComponents.representativeC->objsize();
+
+    ASSERT_EQ(updateComponents.size(),
+              sizeof(UpdateCmdShapeComponents) + updateComponents.representativeQ.objsize() +
+                  updateComponents._representativeUObj.objsize() + cSize + letSize -
                   sizeof(LetShapeComponent));
 }
 

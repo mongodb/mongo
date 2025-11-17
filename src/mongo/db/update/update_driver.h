@@ -194,6 +194,10 @@ public:
         return _objDoc;
     }
 
+    const UpdateExecutor* getUpdateExecutor() const {
+        return _updateExecutor.get();
+    }
+
     bool needMatchDetails() const {
         return _positional;
     }

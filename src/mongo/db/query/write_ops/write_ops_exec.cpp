@@ -1435,10 +1435,23 @@ void registerRequestForQueryStats(OperationContext* opCtx,
     }
 
     // Skip unsupported update types.
-    // TODO(SERVER-110343) and TODO(SERVER-110344) Support pipeline and modifier updates.
+    // TODO(SERVER-110344) Support modifier updates.
     if (parsedUpdate.getRequest()->getUpdateModification().type() !=
-        write_ops::UpdateModification::Type::kReplacement) {
+            write_ops::UpdateModification::Type::kReplacement &&
+        parsedUpdate.getRequest()->getUpdateModification().type() !=
+            write_ops::UpdateModification::Type::kPipeline) {
         return;
+    }
+
+    // TODO(SERVER-113688): Support recording query stats for pipeline updates containing
+    // $_internalApplyOplogUpdate.
+    if (parsedUpdate.getRequest()->getUpdateModification().type() ==
+        write_ops::UpdateModification::Type::kPipeline) {
+        if (parsedUpdate.getDriver()
+                ->getUpdateExecutor()
+                ->getCheckExistenceForDiffInsertOperations()) {
+            return;
+        }
     }
 
     // Compute QueryShapeHash and record it in CurOp.

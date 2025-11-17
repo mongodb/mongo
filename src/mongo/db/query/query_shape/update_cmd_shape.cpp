@@ -52,17 +52,51 @@ BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate, const SerializationOption
     return matchExpr ? matchExpr->serialize(opts) : BSONObj{};
 }
 
-Value shapifyUpdateOp(const write_ops::UpdateModification& modification,
+Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
                       const SerializationOptions& opts =
                           SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+    const auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
+
     tassert(11034201,
             "Unsupported type of update modification",
-            modification.type() == write_ops::UpdateModification::Type::kReplacement);
+            modType == write_ops::UpdateModification::Type::kReplacement ||
+                modType == write_ops::UpdateModification::Type::kPipeline);
 
-    if (modification.type() == write_ops::UpdateModification::Type::kReplacement) {
-        return opts.serializeLiteral(modification.getUpdateReplacement());
+    if (modType == write_ops::UpdateModification::Type::kReplacement) {
+        return opts.serializeLiteral(
+            parsedUpdate.getRequest()->getUpdateModification().getUpdateReplacement());
+    } else if (modType == write_ops::UpdateModification::Type::kPipeline) {
+        // Retrieve pipeline from the update driver to avoid re-parsing. We use the
+        // PipelineExecutor's serialize because it filters out the queue stage that was not
+        // originally part of the user's pipeline.
+        const auto* executor = parsedUpdate.getDriver()->getUpdateExecutor();
+        const auto* pipelineExecutor = static_cast<const PipelineExecutor*>(executor);
+        return Value(pipelineExecutor->serialize(opts));
     }
     return {};
+}
+
+boost::optional<BSONObj> shapifyUpdateConstants(const ParsedUpdate& parsedUpdate,
+                                                const SerializationOptions& opts) {
+    if (parsedUpdate.getDriver()->type() != UpdateDriver::UpdateType::kPipeline) {
+        return boost::none;
+    }
+
+    const boost::optional<BSONObj>& constants = parsedUpdate.getRequest()->getUpdateConstants();
+    if (!constants.has_value() || constants->isEmpty()) {
+        return boost::none;
+    }
+
+    BSONObjBuilder shapifiedConstants;
+
+    // Shapify each constant value, but keep variable names unchanged.
+    for (const auto& elem : constants.value()) {
+        StringData varName = elem.fieldNameStringData();
+        Value shapifiedValue = opts.serializeLiteral(elem);
+        shapifiedValue.addToBsonObj(&shapifiedConstants, varName);
+    }
+
+    return shapifiedConstants.obj();
 }
 
 }  // namespace
@@ -71,12 +105,11 @@ UpdateCmdShapeComponents::UpdateCmdShapeComponents(const ParsedUpdate& parsedUpd
                                                    LetShapeComponent let,
                                                    const SerializationOptions& opts)
     : representativeQ(shapifyQuery(parsedUpdate, opts)),
-      _representativeUObj(
-          shapifyUpdateOp(parsedUpdate.getRequest()->getUpdateModification(), opts).wrap(""_sd)),
+      _representativeUObj(shapifyUpdateOp(parsedUpdate, opts).wrap(""_sd)),
+      representativeC(shapifyUpdateConstants(parsedUpdate, opts)),
       multi(parsedUpdate.getRequest()->getMulti()),
       upsert(parsedUpdate.getRequest()->isUpsert()),
       let(let) {
-    // TODO(SERVER-110343): Suppport storing 'representativeC' when shapifying pipeline udpates.
     // TODO(SERVER-110344): Support representativeArrayFilters when shapifying update modifiers.
 }
 
@@ -86,8 +119,6 @@ void UpdateCmdShapeComponents::HashValue(absl::HashState state) const {
     state = absl::HashState::combine(
         std::move(state), representativeC.has_value(), representativeArrayFilters.has_value());
     if (representativeC) {
-        // TODO(SERVER-110343): Revisit here when supporting storing 'representativeC' when
-        // shapifying pipeline udpates.
         state = absl::HashState::combine(std::move(state), simpleHash(*representativeC));
     }
     if (representativeArrayFilters) {

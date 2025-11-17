@@ -321,6 +321,10 @@ UpdateDriver* ParsedUpdateBase::getDriver() {
     return &_driver;
 }
 
+const UpdateDriver* ParsedUpdateBase::getDriver() const {
+    return &_driver;
+}
+
 bool ParsedUpdateBase::isEligibleForArbitraryTimeseriesUpdate() const {
     return _timeseriesUpdateQueryExprs.get() != nullptr;
 }

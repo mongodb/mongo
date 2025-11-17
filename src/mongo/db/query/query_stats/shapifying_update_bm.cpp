@@ -159,7 +159,7 @@ void BM_ShapifyAndSHA256Hash(benchmark::State& state) {
 // TODO SERVER-111930: Enable this benchmark once recording query stats for
 // updates with simple ID query.
 // static_cast<int>(query_benchmark_constants::QueryComplexity::kIDHack),
-// TODO SERVER-110343 and SERVER-110344: Once shapifying modifier and pipeline update types are
+// TODO SERVER-114006 and SERVER-110344: Once shapifying modifier and pipeline update types are
 // supported, add arguments for those as well.
 #define ADD_ARGS()                                                                          \
     ArgNames({"queryComplexity"})                                                           \

@@ -114,6 +114,11 @@ public:
     UpdateDriver* getDriver();
 
     /**
+     * Get a read-only pointer to the update driver.
+     */
+    const UpdateDriver* getDriver() const;
+
+    /**
      * Get the YieldPolicy, adjusted for GodMode.
      */
     PlanYieldPolicy::YieldPolicy yieldPolicy() const;
