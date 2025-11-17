@@ -45,7 +45,7 @@ extern "C" {
         static auto ext = std::make_unique<sdk::ExtensionAdapter>(
             std::make_unique<MyExtension>(),
             // Major version is one more than the currently-supported version.
-            ::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major + 1, 0, 0});
+            ::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major + 1, 0});
         *extension = reinterpret_cast<const ::MongoExtension*>(ext.get());
     });
 }

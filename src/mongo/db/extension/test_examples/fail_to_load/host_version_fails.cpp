@@ -56,12 +56,10 @@ extern "C" {
     // host's and extensionB's minor version is higher than host's.
     return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {
         const ::MongoExtensionAPIVersion verA{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
-                                              MONGODB_EXTENSION_API_MINOR_VERSION,
-                                              MONGODB_EXTENSION_API_PATCH_VERSION};
+                                              MONGODB_EXTENSION_API_MINOR_VERSION};
 
         const ::MongoExtensionAPIVersion verB{MONGODB_EXTENSION_API_MAJOR_VERSION,
-                                              MONGODB_EXTENSION_API_MINOR_VERSION + 1,
-                                              MONGODB_EXTENSION_API_PATCH_VERSION};
+                                              MONGODB_EXTENSION_API_MINOR_VERSION + 1};
 
         if (sdk::isVersionCompatible(sdk::to_span(hostVersions), &verA)) {
             static auto extA =

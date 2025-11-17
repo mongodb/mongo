@@ -359,7 +359,7 @@ TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
                               test_util::makeEmptyExtensionConfig(
                                   "libload_highest_compatible_version_mongo_extension.so")));
 
-    std::vector<BSONObj> pipeline = {BSON("$extensionV3" << BSONObj())};
+    std::vector<BSONObj> pipeline = {BSON("$extensionV1" << BSONObj())};
     auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
@@ -368,14 +368,12 @@ TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
         dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
 
     ASSERT_TRUE(extensionStage != nullptr);
-    ASSERT_EQUALS(std::string(extensionStage->getSourceName()), "$extensionV3");
+    ASSERT_EQUALS(std::string(extensionStage->getSourceName()), "$extensionV1");
 
     // Assert that the other extension versions registered aren't available.
-    pipeline = {BSON("$extensionV1" << BSONObj())};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
     pipeline = {BSON("$extensionV2" << BSONObj())};
     ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
-    pipeline = {BSON("$extensionV4" << BSONObj())};
+    pipeline = {BSON("$extensionV3" << BSONObj())};
     ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
 }
 

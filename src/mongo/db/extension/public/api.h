@@ -47,25 +47,21 @@ extern "C" {
  * Represents the API version of the MongoDB extension, to ensure compatibility between the MongoDB
  * server and the extension.
  *
- * The version is composed of three parts: major, minor, and patch. The major version is incremented
- * for incompatible changes, the minor version for for backward-compatible changes, and the patch
- * version for bug fixes.
+ * The version is composed of two parts: major and minor. The major version is incremented
+ * for incompatible changes and the minor version for for backward-compatible changes.
  */
 typedef struct {
     uint32_t major;
     uint32_t minor;
-    uint32_t patch;
 } MongoExtensionAPIVersion;
 
 #define MONGODB_EXTENSION_API_MAJOR_VERSION 0
 #define MONGODB_EXTENSION_API_MINOR_VERSION 0
-#define MONGODB_EXTENSION_API_PATCH_VERSION 0
 
 // The current API version of the MongoDB extension.
-#define MONGODB_EXTENSION_API_VERSION                                             \
-    MongoExtensionAPIVersion {                                                    \
-        MONGODB_EXTENSION_API_MAJOR_VERSION, MONGODB_EXTENSION_API_MINOR_VERSION, \
-            MONGODB_EXTENSION_API_PATCH_VERSION                                   \
+#define MONGODB_EXTENSION_API_VERSION                                            \
+    MongoExtensionAPIVersion {                                                   \
+        MONGODB_EXTENSION_API_MAJOR_VERSION, MONGODB_EXTENSION_API_MINOR_VERSION \
     }
 
 /**

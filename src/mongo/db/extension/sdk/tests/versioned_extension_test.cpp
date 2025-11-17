@@ -34,8 +34,8 @@
 namespace mongo::extension::sdk {
 namespace {
 
-VersionedExtension makeTestVersionedExtension(uint32_t major, uint32_t minor, uint32_t patch) {
-    return VersionedExtension{::MongoExtensionAPIVersion{major, minor, patch},
+VersionedExtension makeTestVersionedExtension(uint32_t major, uint32_t minor) {
+    return VersionedExtension{::MongoExtensionAPIVersion{major, minor},
                               []() -> std::unique_ptr<sdk::Extension> {
                                   return nullptr;
                               }};
@@ -48,60 +48,51 @@ protected:
 
 
 TEST_F(VersionedExtensionGreaterComparatorTest, ComparesMajorVersionsCorrectly) {
-    auto v2_0_0 = makeTestVersionedExtension(2, 0, 0);
-    auto v1_9_9 = makeTestVersionedExtension(1, 9, 9);
+    auto v2_0 = makeTestVersionedExtension(2, 0);
+    auto v1_9 = makeTestVersionedExtension(1, 9);
 
-    ASSERT_TRUE(comp(v2_0_0, v1_9_9));
-    ASSERT_FALSE(comp(v1_9_9, v2_0_0));
+    ASSERT_TRUE(comp(v2_0, v1_9));
+    ASSERT_FALSE(comp(v1_9, v2_0));
 }
 
 TEST_F(VersionedExtensionGreaterComparatorTest, ComparesMinorVersionsCorrectly) {
-    auto v1_2_0 = makeTestVersionedExtension(1, 2, 0);
-    auto v1_1_9 = makeTestVersionedExtension(1, 1, 9);
+    auto v1_2 = makeTestVersionedExtension(1, 2);
+    auto v1_1 = makeTestVersionedExtension(1, 1);
 
-    ASSERT_TRUE(comp(v1_2_0, v1_1_9));
-    ASSERT_FALSE(comp(v1_1_9, v1_2_0));
-}
-
-TEST_F(VersionedExtensionGreaterComparatorTest, ComparesPatchVersionsCorrectly) {
-    auto v1_0_1 = makeTestVersionedExtension(1, 0, 1);
-    auto v1_0_0 = makeTestVersionedExtension(1, 0, 0);
-
-    ASSERT_TRUE(comp(v1_0_1, v1_0_0));
-    ASSERT_FALSE(comp(v1_0_0, v1_0_1));
+    ASSERT_TRUE(comp(v1_2, v1_1));
+    ASSERT_FALSE(comp(v1_1, v1_2));
 }
 
 TEST_F(VersionedExtensionGreaterComparatorTest, ComparesEqualVersionsCorrectly) {
-    auto v1_2_3_a = makeTestVersionedExtension(1, 2, 3);
-    auto v1_2_3_b = makeTestVersionedExtension(1, 2, 3);
+    auto v1_2_a = makeTestVersionedExtension(1, 2);
+    auto v1_2_b = makeTestVersionedExtension(1, 2);
 
-    ASSERT_FALSE(comp(v1_2_3_a, v1_2_3_b));
-    ASSERT_FALSE(comp(v1_2_3_b, v1_2_3_a));
-    ASSERT_FALSE(comp(v1_2_3_a, v1_2_3_a));
+    ASSERT_FALSE(comp(v1_2_a, v1_2_b));
+    ASSERT_FALSE(comp(v1_2_b, v1_2_a));
+    ASSERT_FALSE(comp(v1_2_a, v1_2_a));
 }
 
 TEST_F(VersionedExtensionGreaterComparatorTest, OrdersSetCorrectly) {
     std::set<VersionedExtension, VersionedExtensionGreaterComparator> versionedSet;
 
-    versionedSet.insert(makeTestVersionedExtension(1, 10, 0));
-    versionedSet.insert(makeTestVersionedExtension(2, 0, 1));
-    versionedSet.insert(makeTestVersionedExtension(0, 9, 9));
-    versionedSet.insert(makeTestVersionedExtension(2, 1, 0));
-    versionedSet.insert(makeTestVersionedExtension(1, 9, 5));
+    versionedSet.insert(makeTestVersionedExtension(1, 10));
+    versionedSet.insert(makeTestVersionedExtension(2, 0));
+    versionedSet.insert(makeTestVersionedExtension(0, 9));
+    versionedSet.insert(makeTestVersionedExtension(2, 1));
+    versionedSet.insert(makeTestVersionedExtension(1, 9));
 
     std::vector<::MongoExtensionAPIVersion> correctlyOrderedVersions = {
-        ::MongoExtensionAPIVersion{2, 1, 0},
-        ::MongoExtensionAPIVersion{2, 0, 1},
-        ::MongoExtensionAPIVersion{1, 10, 0},
-        ::MongoExtensionAPIVersion{1, 9, 5},
-        ::MongoExtensionAPIVersion{0, 9, 9}};
+        ::MongoExtensionAPIVersion{2, 1},
+        ::MongoExtensionAPIVersion{2, 0},
+        ::MongoExtensionAPIVersion{1, 10},
+        ::MongoExtensionAPIVersion{1, 9},
+        ::MongoExtensionAPIVersion{0, 9}};
 
     auto setIt = versionedSet.begin();
 
     for (const auto& version : correctlyOrderedVersions) {
         ASSERT_EQUALS(version.major, setIt->version.major);
         ASSERT_EQUALS(version.minor, setIt->version.minor);
-        ASSERT_EQUALS(version.patch, setIt->version.patch);
         setIt++;
     }
 
@@ -111,8 +102,8 @@ TEST_F(VersionedExtensionGreaterComparatorTest, OrdersSetCorrectly) {
 TEST_F(VersionedExtensionGreaterComparatorTest, OrderedSetBlocksDoubleInsert) {
     std::set<VersionedExtension, VersionedExtensionGreaterComparator> versionedSet;
 
-    ASSERT_TRUE(versionedSet.insert(makeTestVersionedExtension(1, 2, 3)).second);
-    ASSERT_FALSE(versionedSet.insert(makeTestVersionedExtension(1, 2, 3)).second);
+    ASSERT_TRUE(versionedSet.insert(makeTestVersionedExtension(1, 2)).second);
+    ASSERT_FALSE(versionedSet.insert(makeTestVersionedExtension(1, 2)).second);
 }
 
 }  // namespace

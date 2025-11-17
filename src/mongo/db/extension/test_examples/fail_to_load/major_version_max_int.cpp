@@ -46,7 +46,7 @@ extern "C" {
         static auto ext = std::make_unique<sdk::ExtensionAdapter>(
             std::make_unique<MyExtension>(),
             // Major version is max uint32_t, which is incompatible with the current version
-            ::MongoExtensionAPIVersion{UINT32_MAX, 0, 0});
+            ::MongoExtensionAPIVersion{UINT32_MAX, 0});
         *extension = reinterpret_cast<const ::MongoExtension*>(ext.get());
     });
 }

@@ -49,7 +49,6 @@ public:
 
 REGISTER_EXTENSION_WITH_VERSION(ExtensionA,
                                 (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
-                                                            MONGODB_EXTENSION_API_MINOR_VERSION,
-                                                            MONGODB_EXTENSION_API_PATCH_VERSION}))
+                                                            MONGODB_EXTENSION_API_MINOR_VERSION}))
 REGISTER_EXTENSION_WITH_VERSION(ExtensionB, (MONGODB_EXTENSION_API_VERSION))
 DEFINE_GET_EXTENSION()

@@ -49,8 +49,7 @@ struct VersionedExtensionGreaterComparator {
         const ::MongoExtensionAPIVersion versionB = b.version;
 
         // Sorts from highest version to lowest version.
-        return std::tie(versionA.major, versionA.minor, versionA.patch) >
-            std::tie(versionB.major, versionB.minor, versionB.patch);
+        return std::tie(versionA.major, versionA.minor) > std::tie(versionB.major, versionB.minor);
     }
 };
 

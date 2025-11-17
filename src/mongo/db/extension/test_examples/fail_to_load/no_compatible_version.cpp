@@ -43,6 +43,7 @@ public:
 // versionedExtensions set. This is compared to the "major/minor_version_too_high/low" tests as
 // those don't use the macro and instead confirm the error code thrown by
 // assertVersionCompatibility.
-REGISTER_EXTENSION_WITH_VERSION(
-    MyExtension, (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major + 1, 0, 0}))
+REGISTER_EXTENSION_WITH_VERSION(MyExtension,
+                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major + 1,
+                                                            0}))
 DEFINE_GET_EXTENSION()

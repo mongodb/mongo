@@ -59,29 +59,20 @@ namespace sdk = mongo::extension::sdk;
         }                                                                                        \
     };
 
-// Generate code for 4 extension versions, all with unique stage names.
+// Generate code for 3 extension versions, all with unique stage names.
 DEFINE_EXTENSION_VERSION(1)
 DEFINE_EXTENSION_VERSION(2)
 DEFINE_EXTENSION_VERSION(3)
-DEFINE_EXTENSION_VERSION(4)
 
-// v1 is the base version, v2 increments the patch version, v3 increments the patch version again
-// (highest compatible), and v4 increments the major version (not compatible). v4 should be first in
-// the versionedExtensions set but skipped due to its incompatibility. We register the extensions in
-// this odd order to make sure the set is sorting and not just getting lucky with placement.
+// v1 is the base version, v2 increments the minor version, and v3 increments
+// the major version (not compatible). We register the extensions in this odd order to make sure the
+// set is sorting and not just getting lucky with placement.
 REGISTER_EXTENSION_WITH_VERSION(ExtensionV2,
                                 (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION,
-                                                            MONGODB_EXTENSION_API_MINOR_VERSION,
-                                                            MONGODB_EXTENSION_API_PATCH_VERSION +
+                                                            MONGODB_EXTENSION_API_MINOR_VERSION +
                                                                 1}))
-REGISTER_EXTENSION_WITH_VERSION(ExtensionV4,
-                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
-                                                            MONGODB_EXTENSION_API_MINOR_VERSION,
-                                                            MONGODB_EXTENSION_API_PATCH_VERSION}))
 REGISTER_EXTENSION_WITH_VERSION(ExtensionV3,
-                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION,
-                                                            MONGODB_EXTENSION_API_MINOR_VERSION,
-                                                            MONGODB_EXTENSION_API_PATCH_VERSION +
-                                                                2}))
+                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
+                                                            MONGODB_EXTENSION_API_MINOR_VERSION}))
 REGISTER_EXTENSION_WITH_VERSION(ExtensionV1, (MONGODB_EXTENSION_API_VERSION))
 DEFINE_GET_EXTENSION()
