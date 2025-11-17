@@ -77,8 +77,7 @@ function checkReshardingActiveIndex() {
     // Since downgrading does not restore the index, we don't check for the index's presence
     // until we force a step-up (re-initializing the coordinator)
 
-    st.configRS.awaitReplication();
-    assert.commandWorked(st.configRS.getSecondary().adminCommand({replSetStepUp: 1}));
+    st.configRS.stepUp(st.configRS.getSecondary());
     st.configRS.waitForPrimaryOnlyServices(st.configRS.getPrimary());
     activeIndex = getActiveIndex(st.configRS.getPrimary());
     if (FeatureFlagUtil.isPresentAndEnabled(st.s, "ReshardingImprovements")) {
