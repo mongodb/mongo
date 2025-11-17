@@ -600,7 +600,6 @@ buildvariants:
       exec_timeout_factor: 1.5
       test_flags: >-
         --runAllFeatureFlagTests
-        --additionalFeatureFlags "featureFlagCreateViewlessTimeseriesCollections"
         --mongodSetParameters="{internalQueryUnifiedWriteExecutor: true}"
         --mongosSetParameters="{internalQueryUnifiedWriteExecutor: true}"
     # For now just unified write executor suites but tasks will be added as development continues.
@@ -640,6 +639,8 @@ buildvariants:
       - name: unified_write_executor_sharding_jscore_passthrough_with_balancer_gen
       - name: unified_write_executor_fle2_sharding
       - name: unified_write_executor_fle2_sharding_high_cardinality
+      - name: unified_write_executor_sharding_legacy_timeseries_no_rawdata_gen
+      - name: unified_write_executor_sharding_jscore_passthrough_legacy_timeseries_no_rawdata_gen
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

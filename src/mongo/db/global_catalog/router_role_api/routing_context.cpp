@@ -32,6 +32,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
@@ -66,18 +67,37 @@ boost::optional<Timestamp> getEffectiveAtClusterTime(OperationContext* opCtx) {
 
 RoutingContext::RoutingContext(OperationContext* opCtx,
                                const std::vector<NamespaceString>& nssList,
-                               bool allowLocks)
-    : _catalogCache(Grid::get(opCtx)->catalogCache()) {
+                               bool allowLocks,
+                               bool checkTimeseriesBucketsNss)
+    : _catalogCache(Grid::get(opCtx)->catalogCache()),
+      _checkTimeseriesBucketsNss(checkTimeseriesBucketsNss) {
     _nssRoutingInfoMap.reserve(nssList.size());
 
     for (const auto& nss : nssList) {
-        const auto cri = uassertStatusOK(_getCollectionRoutingInfo(opCtx, nss, allowLocks));
-        auto [it, inserted] = _nssRoutingInfoMap.try_emplace(
-            nss, RoutingInfoEntry{std::move(cri), false /* validated */});
-        tassert(10292300,
-                str::stream() << "Namespace " << nss.toStringForErrorMsg()
-                              << " declared multiple times in RoutingContext",
-                inserted);
+        auto insertRoutingInfo = [&](NamespaceString nss, CollectionRoutingInfo cri) {
+            auto [it, inserted] = _nssRoutingInfoMap.try_emplace(
+                nss, RoutingInfoEntry{std::move(cri), false /* validated */});
+            tassert(10292300,
+                    str::stream() << "Namespace " << nss.toStringForErrorMsg()
+                                  << " declared multiple times in RoutingContext",
+                    inserted);
+        };
+
+        auto cri = uassertStatusOK(_getCollectionRoutingInfo(opCtx, nss, allowLocks));
+
+        // For tracked legacy timeseries collection we only register the buckets collection in the
+        // global catalog, therefore we only need to check when the logical namespace does not have
+        // a routing table.
+        if (checkTimeseriesBucketsNss && !cri.getChunkManager().hasRoutingTable()) {
+            auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+            const auto& bucketsCri =
+                uassertStatusOK(_getCollectionRoutingInfo(opCtx, bucketsNss, allowLocks));
+            if (bucketsCri.hasRoutingTable()) {
+                insertRoutingInfo(bucketsNss, bucketsCri);
+            }
+        }
+
+        insertRoutingInfo(nss, std::move(cri));
     }
 }
 
@@ -153,6 +173,13 @@ void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
     if (auto& validated = _nssRoutingInfoMap.at(nss).validated; !validated) {
         validated = true;
     }
+
+    if (_checkTimeseriesBucketsNss) {
+        auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+        if (_nssRoutingInfoMap.contains(bucketsNss)) {
+            _nssRoutingInfoMap.at(bucketsNss).validated = true;
+        }
+    }
 }
 
 void RoutingContext::onStaleError(const Status& status,
@@ -201,6 +228,13 @@ void RoutingContext::skipValidation() {
 
 void RoutingContext::release(const NamespaceString& nss) {
     _releasedNssList.insert(nss);
+
+    if (_checkTimeseriesBucketsNss) {
+        auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+        if (_nssRoutingInfoMap.contains(bucketsNss)) {
+            _releasedNssList.insert(bucketsNss);
+        }
+    }
 }
 
 void RoutingContext::validateOnContextEnd() const {

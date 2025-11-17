@@ -316,6 +316,11 @@ public:
     const OptionalBool& getRawData() const;
 
     /**
+     * Returns the specified "sort" field if present.
+     */
+    boost::optional<mongo::BSONObj> getSort(int index) const;
+
+    /**
      * Returns a BSON representation of the specified write op. Note that this representation
      * may be specific to BatchedCommandRequest and may differ from the representation used by
      * other types of write commands.
@@ -597,6 +602,11 @@ public:
     const OptionalBool& getRawData() const;
 
     /**
+     * Returns the specified "sort" field if present.
+     */
+    boost::optional<mongo::BSONObj> getSort(int index) const;
+
+    /**
      * Returns a BSON representation of the specified write op. Note that this representation may
      * be specific to BulkWriteCommandRequest and may differ from the representation used by other
      * write commands.
@@ -848,6 +858,11 @@ public:
      * Returns whether the command operates on the timeseries bucket raw data.
      */
     const OptionalBool& getRawData() const;
+
+    /**
+     * Returns the specified "sort" field if present.
+     */
+    boost::optional<mongo::BSONObj> getSort(int index) const;
 
     /**
      * Returns a BSON representation of the specified write op. Note that this representation may
@@ -1280,6 +1295,9 @@ public:
     decltype(auto) getEncryptionInformation() const {
         return visitImpl(
             [&](auto&& r) -> decltype(auto) { return r.getEncryptionInformation(_index); });
+    }
+    decltype(auto) getSort() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getSort(_index); });
     }
     decltype(auto) toBSON() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.toBSON(_index); });

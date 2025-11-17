@@ -119,12 +119,12 @@ public:
         }
 
         for (const auto& shard : analysis.shardsAffected) {
+            auto nss = writeOp.getNss();
             auto it = _batch->requestByShardId.find(shard.shardName);
             if (it != _batch->requestByShardId.end()) {
                 SimpleWriteBatch::ShardRequest& request = it->second;
                 request.ops.push_back(writeOp);
 
-                auto nss = writeOp.getNss();
                 auto versionFound = request.versionByNss.find(nss);
                 if (versionFound != request.versionByNss.end()) {
                     tassert(10387001,
@@ -133,11 +133,20 @@ public:
                 }
 
                 request.versionByNss.emplace_hint(versionFound, nss, shard);
+
+                if (analysis.isViewfulTimeseries) {
+                    request.nssIsViewfulTimeseries.emplace(nss);
+                }
             } else {
+                std::set<NamespaceString> nssIsViewfulTimeseries;
+                if (analysis.isViewfulTimeseries) {
+                    nssIsViewfulTimeseries.emplace(nss);
+                }
                 _batch->requestByShardId.emplace(
                     shard.shardName,
                     SimpleWriteBatch::ShardRequest{
-                        std::map<NamespaceString, ShardEndpoint>{{writeOp.getNss(), shard}},
+                        std::map<NamespaceString, ShardEndpoint>{{nss, shard}},
+                        std::move(nssIsViewfulTimeseries),
                         std::vector<WriteOp>{writeOp}});
             }
 
@@ -296,7 +305,8 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
             if (analysis.type == kNonTargetedWrite) {
                 auto sampleId =
                     analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{NonTargetedWriteBatch{*writeOp, std::move(sampleId)}},
+                return {WriteBatch{NonTargetedWriteBatch{
+                            *writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
                         std::move(opsWithErrors)};
             }
             // If the first WriteOp is kInternalTransaction, put it in a InternalTransactionBatch
@@ -312,9 +322,9 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
             if (analysis.type == kMultiWriteBlockingMigrations) {
                 auto sampleId =
                     analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {
-                    WriteBatch{MultiWriteBlockingMigrationsBatch{*writeOp, std::move(sampleId)}},
-                    std::move(opsWithErrors)};
+                return {WriteBatch{MultiWriteBlockingMigrationsBatch{
+                            *writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
+                        std::move(opsWithErrors)};
             }
             // If the first WriteOp is kMultiShard, then add the op to a SimpleBatch and then break
             // and return the batch.
@@ -434,7 +444,8 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
             if (analysis.type == kNonTargetedWrite) {
                 auto sampleId =
                     analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{NonTargetedWriteBatch{writeOp, std::move(sampleId)}},
+                return {WriteBatch{NonTargetedWriteBatch{
+                            writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
                         std::move(opsWithErrors)};
             }
             // If the first WriteOp is kInternalTransaction, then consume the op and put it in a
@@ -450,7 +461,8 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
             if (analysis.type == kMultiWriteBlockingMigrations) {
                 auto sampleId =
                     analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{MultiWriteBlockingMigrationsBatch{writeOp, std::move(sampleId)}},
+                return {WriteBatch{MultiWriteBlockingMigrationsBatch{
+                            writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
                         std::move(opsWithErrors)};
             }
             // If the op is kSingleShard or kMultiShard, then add the op to a SimpleBatch and keep

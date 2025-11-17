@@ -56,6 +56,13 @@ enum BatchType {
 struct Analysis {
     BatchType type;
     std::vector<ShardEndpoint> shardsAffected;
+    // TODO SERVER-106874 remove the 'isViewfulTimeseries' flag entirely once 9.0 becomes last LTS.
+    // By then we will only have viewless timeseries that do not require nss translation.
+    //
+    // 'isViewfulTimeseries' is set to true when the write op is on the main namespace of a viewful
+    // timeseries collection. This flag makes sure the executor sends the command with translation
+    // to buckets namespace correctly.
+    bool isViewfulTimeseries;
     boost::optional<analyze_shard_key::TargetedSampleId> targetedSampleId;
 };
 

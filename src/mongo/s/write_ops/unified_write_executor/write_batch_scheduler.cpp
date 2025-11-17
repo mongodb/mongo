@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/server_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -170,7 +171,8 @@ StatusWith<std::unique_ptr<RoutingContext>> WriteBatchScheduler::initRoutingCont
             const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
                 shard_role_details::getLocker(opCtx)->isLocked();
 
-            return std::make_unique<RoutingContext>(opCtx, std::move(nssList), allowLocks);
+            return std::make_unique<RoutingContext>(
+                opCtx, std::move(nssList), allowLocks, true /* checkTimeseriesBucketsNss */);
         } catch (const DBException& ex) {
             // For NamespaceNotFound errors, we will retry a couple of times before returning
             // the error to the caller. For all other types of errors, we return the error to

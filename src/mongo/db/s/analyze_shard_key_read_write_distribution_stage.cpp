@@ -197,12 +197,13 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
                                std::move(routingTableHistory))),
                            boost::none);
 
-    return CollectionRoutingInfoTargeter(
-        nss,
-        CollectionRoutingInfo{
-            std::move(cm),
-            DatabaseTypeValueHandle(DatabaseType{
-                nss.dbName(), ShardId("0"), DatabaseVersion(UUID::gen(), validAfter)})});
+    auto routingCtx = RoutingContext::createSynthetic(
+        {{nss,
+          CollectionRoutingInfo{
+              std::move(cm),
+              DatabaseTypeValueHandle(DatabaseType{
+                  nss.dbName(), ShardId("0"), DatabaseVersion(UUID::gen(), validAfter)})}}});
+    return CollectionRoutingInfoTargeter(nss, *routingCtx);
 }
 
 /**

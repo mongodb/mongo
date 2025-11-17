@@ -59,9 +59,13 @@ void WriteOpAnalyzerImpl::recordTargetingStats(OperationContext* opCtx,
 StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                                                   RoutingContext& routingCtx,
                                                   const WriteOp& op) try {
-    const auto& cri = routingCtx.getCollectionRoutingInfo(op.getNss());
+    // TODO SERVER-106874 remove the namespace translation check in this function entirely once 9.0
+    // becomes last LTS. By then we will only have viewless timeseries that do not require nss
+    // translation.
     // TODO SERVER-103782 Don't use CRITargeter.
-    CollectionRoutingInfoTargeter targeter(op.getNss(), cri);
+    auto nss = op.getNss();
+    CollectionRoutingInfoTargeter targeter(nss, routingCtx);
+
     // TODO SERVER-103781 Add support for kPartialKeyWithId.
     // TODO SERVER-103146 Add kChangesOwnership.
     // TODO SERVER-103781 Add support for "WriteWithoutShardKeyWithId" writes.
@@ -83,7 +87,6 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
 
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
-    const auto& cm = cri.getChunkManager();
     const bool isShardedTimeseries = targeter.isTrackedTimeSeriesNamespace();
     const bool isUpdate = op.getType() == WriteType::kUpdate;
     const bool isRetryableWrite = opCtx->isRetryableWrite();
@@ -91,6 +94,12 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool isRawData = isRawDataOperation(opCtx);
     const bool isTimeseriesRetryableUpdateOp =
         isShardedTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
+    // We consider the request to be on the main namespace of a viewful timeseries collection when
+    // the underlying CRI is a non-viewless timeseries entry and the client request is on the main
+    // namespace not the buckets namespace.
+    auto isRequestOnTimeseriesBucketCollection = nss.isTimeseriesBucketsCollection();
+    const bool isViewfulTimeseries =
+        targeter.isTrackedTimeSeriesBucketsNamespace() && !isRequestOnTimeseriesBucketCollection;
 
     const bool enableMultiWriteBlockingMigrations =
         coordinate_multi_update_util::shouldCoordinateMultiWrite(
@@ -100,33 +109,45 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool isMultiWriteBlockingMigrations =
         (isUpdate || isDelete) && isMultiWrite && enableMultiWriteBlockingMigrations;
 
+    if (isShardedTimeseries && op.isFindAndModify()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform findAndModify with sort on a sharded timeseries collection",
+                !op.getSort() || isRawDataOperation(opCtx));
+    }
+
     auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
         opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
 
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
         recordTargetingStats(opCtx, targeter, tr, op);
-        return Analysis{
-            BatchType::kNonTargetedWrite, std::move(tr.endpoints), std::move(targetedSampleId)};
+        return Analysis{BatchType::kNonTargetedWrite,
+                        std::move(tr.endpoints),
+                        isViewfulTimeseries,
+                        std::move(targetedSampleId)};
     } else if (isMultiWriteBlockingMigrations) {
         return Analysis{BatchType::kMultiWriteBlockingMigrations,
                         std::move(tr.endpoints),
+                        isViewfulTimeseries,
                         std::move(targetedSampleId)};
     } else if (isTimeseriesRetryableUpdateOp) {
         // Special case for time series since an update could affect two documents in the underlying
         // buckets collection.
-        tassert(10413901,
-                "Unified Write Executor does not support viewful timeseries collections",
-                cm.isNewTimeseriesWithoutView());
         // Targetting code in this path can only handle writes with the full shardKey in the query.
         tassert(10413902,
                 "Writes without shard key must go through non-targeted path",
                 !(tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId));
-        return Analysis{
-            BatchType::kInternalTransaction, std::move(tr.endpoints), std::move(targetedSampleId)};
+        // Note we do not translate viewful timeseries collection namespace here, it will be
+        // translated within the transaction when we analyze the request again.
+        return Analysis{BatchType::kInternalTransaction,
+                        std::move(tr.endpoints),
+                        false /* isTimeseries */,
+                        std::move(targetedSampleId)};
     } else if (tr.endpoints.size() == 1) {
         recordTargetingStats(opCtx, targeter, tr, op);
-        return Analysis{
-            BatchType::kSingleShard, std::move(tr.endpoints), std::move(targetedSampleId)};
+        return Analysis{BatchType::kSingleShard,
+                        std::move(tr.endpoints),
+                        isViewfulTimeseries,
+                        std::move(targetedSampleId)};
     } else {
         recordTargetingStats(opCtx, targeter, tr, op);
         // For updates/upserts/deletes running outside of a transaction that need to target more
@@ -148,8 +169,10 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                 opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
         }
 
-        return Analysis{
-            BatchType::kMultiShard, std::move(tr.endpoints), std::move(targetedSampleId)};
+        return Analysis{BatchType::kMultiShard,
+                        std::move(tr.endpoints),
+                        isViewfulTimeseries,
+                        std::move(targetedSampleId)};
     }
 } catch (const DBException& ex) {
     auto status = ex.toStatus();

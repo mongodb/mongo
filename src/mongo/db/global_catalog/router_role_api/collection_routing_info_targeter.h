@@ -92,9 +92,11 @@ public:
                                   const NamespaceString& nss,
                                   boost::optional<OID> expectedEpoch = boost::none);
 
-    /* Initializes the targeter with a custom CollectionRoutingInfo cri, in order to support
-     * using a custom (synthetic) routing table */
-    CollectionRoutingInfoTargeter(const NamespaceString& nss, const CollectionRoutingInfo& cri);
+    /**
+     * Initializes the targeter using the cri in the passed 'routingCtx', in order to support using
+     * a custom (synthetic) routing table.
+     */
+    CollectionRoutingInfoTargeter(const NamespaceString& nss, const RoutingContext& routingCtx);
 
     const NamespaceString& getNS() const override;
 

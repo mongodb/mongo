@@ -52,6 +52,11 @@ public:
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
 
+    const bool nss0IsViewfulTimeseries = false;
+    const bool nss1IsViewfulTimeseries = true;
+    const bool nss2IsViewfulTimeseries = false;
+    const std::set<NamespaceString> nssIsViewfulTimeseries{nss1};
+
     const UUID uuid0 = UUID::gen();
     const UUID uuid1 = UUID::gen();
     const UUID uuid2 = UUID::gen();
@@ -93,12 +98,17 @@ public:
     NamespaceInfoEntry getNamespaceInfoEntry(const NamespaceString& nss,
                                              boost::optional<ShardVersion> shardVersion,
                                              boost::optional<DatabaseVersion> databaseVersion,
-                                             boost::optional<UUID> collectionUUID) {
+                                             boost::optional<UUID> collectionUUID,
+                                             bool isViewfulTimeseries = false) {
 
-        NamespaceInfoEntry entry(nss);
+        auto translatedNss = isViewfulTimeseries ? nss.makeTimeseriesBucketsNamespace() : nss;
+        NamespaceInfoEntry entry(translatedNss);
         entry.setShardVersion(shardVersion);
         entry.setDatabaseVersion(databaseVersion);
         entry.setCollectionUUID(collectionUUID);
+        if (isViewfulTimeseries) {
+            entry.setIsTimeseriesNamespace(true);
+        }
         return entry;
     }
 
@@ -140,6 +150,9 @@ public:
             }
             if (expectedNsInfos[i].getShardVersion()) {
                 ASSERT_EQ(*expectedNsInfos[i].getShardVersion(), *nsInfo.getShardVersion());
+            }
+            if (expectedNsInfos[i].getIsTimeseriesNamespace()) {
+                ASSERT_TRUE(nsInfo.getIsTimeseriesNamespace());
             }
         }
 
@@ -215,6 +228,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
                  {nss1, nss1Shard1},
                  {nss2, nss2Shard1},
              },
+             nssIsViewfulTimeseries,
              {WriteOp(bulkRequest, 0), WriteOp(bulkRequest, 1), WriteOp(bulkRequest, 2)},
          }},
         {shardId2,
@@ -222,6 +236,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
              {
                  {nss2, nss2Shard2},
              },
+             nssIsViewfulTimeseries,
              {WriteOp(bulkRequest, 1)},
          }},
     }};
@@ -257,8 +272,10 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
                 BSON("delete" << 0 << "filter" << BSON("a" << 2) << "multi" << false),
             },
             {
-                getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion, uuid1),
-                getNamespaceInfoEntry(nss2, nss2ShardVersion1, boost::none, uuid2),
+                getNamespaceInfoEntry(
+                    nss1, boost::none, nss1DbVersion, uuid1, nss1IsViewfulTimeseries),
+                getNamespaceInfoEntry(
+                    nss2, nss2ShardVersion1, boost::none, uuid2, nss2IsViewfulTimeseries),
             },
             lsid,
             txnNumber,
@@ -274,7 +291,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
                               << BSON("$set" << BSON("b" << 1)) << "upsert" << false),
             },
             {
-                getNamespaceInfoEntry(nss2, nss2ShardVersion2, boost::none, uuid2),
+                getNamespaceInfoEntry(
+                    nss2, nss2ShardVersion2, boost::none, uuid2, nss2IsViewfulTimeseries),
             },
             lsid,
             txnNumber,
@@ -303,6 +321,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
     auto batch = SimpleWriteBatch{{{shardId1,
                                     {
                                         {{nss1, nss1Shard1}},
+                                        nssIsViewfulTimeseries,
                                         {WriteOp(bulkRequest, 0)},
                                     }}}};
     auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
@@ -345,7 +364,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
                                    getNamespaceInfoEntry(nss1,
                                                          boost::none /* shardVersion */,
                                                          nss1DbVersion,
-                                                         boost::none /* collectionUUID */),
+                                                         boost::none /* collectionUUID */,
+                                                         nss1IsViewfulTimeseries),
                                },
                                lsid,
                                txnNumber,
@@ -382,6 +402,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
     auto batch = SimpleWriteBatch{{{shardId1,
                                     {
                                         {{nss1, nss1Shard1}},
+                                        nssIsViewfulTimeseries,
                                         {WriteOp(bulkRequest, 0)},
                                     }}}};
     auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
@@ -419,7 +440,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
                 getNamespaceInfoEntry(nss1,
                                       boost::none /* shardVersion */,
                                       nss1DbVersion,
-                                      boost::none /* collectionUUID */),
+                                      boost::none /* collectionUUID */,
+                                      nss1IsViewfulTimeseries),
             },
             lsid,
             txnNumber,
@@ -446,6 +468,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
     auto batch = SimpleWriteBatch{{{shardId1,
                                     {
                                         {{nss1, nss1Shard1}},
+                                        nssIsViewfulTimeseries,
                                         {WriteOp(bulkRequest, 0), WriteOp(bulkRequest, 1)},
                                     }}}};
     auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
@@ -481,7 +504,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
                 getNamespaceInfoEntry(nss1,
                                       boost::none /* shardVersion */,
                                       nss1DbVersion,
-                                      boost::none /* collectionUUID */),
+                                      boost::none /* collectionUUID */,
+                                      nss1IsViewfulTimeseries),
             },
             lsid,
             txnNumber,
@@ -536,6 +560,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) 
     auto batch = SimpleWriteBatch{{{shardId1,
                                     {
                                         {{nss1, nss1Shard1}},
+                                        nssIsViewfulTimeseries,
                                         {WriteOp(findAndModifyRequest)},
                                     }}}};
     auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
@@ -565,18 +590,19 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) 
         nss1Shard1.shardVersion->serialize("", &builder);
         auto shardVersionBson = builder.obj().firstElement().Obj().getOwned();
 
-        ASSERT_BSONOBJ_EQ_UNORDERED(
-            BSON("findAndModify" << nss1.coll() << "query" << query << "fields" << fields << "sort"
-                                 << sort << "hint" << hint << "collation" << collation
-                                 << "arrayFilters" << BSON_ARRAY(arrayFilters) << "remove" << remove
-                                 << "update" << update << "lsid" << lsid.toBSON() << "upsert"
-                                 << upsert << "new" << newParam << "bypassDocumentValidation"
-                                 << bypassDocumentValidation << "let" << let << "maxTimeMS"
-                                 << maxTimeMS << "comment" << comment << "txnNumber" << txnNumber
-                                 << "databaseVersion" << nss1DbVersion.toBSON() << "shardVersion"
-                                 << shardVersionBson << "readConcern" << BSONObj() << "writeConcern"
-                                 << operationContext()->getWriteConcern().toBSON()),
-            request.cmdObj);
+        auto expectedCmdObj = BSON(
+            "findAndModify" << nss1.makeTimeseriesBucketsNamespace().coll() << "query" << query
+                            << "fields" << fields << "sort" << sort << "hint" << hint << "collation"
+                            << collation << "arrayFilters" << BSON_ARRAY(arrayFilters) << "remove"
+                            << remove << "update" << update << "lsid" << lsid.toBSON() << "upsert"
+                            << upsert << "new" << newParam << "bypassDocumentValidation"
+                            << bypassDocumentValidation << "let" << let << "maxTimeMS" << maxTimeMS
+                            << "comment" << comment << "txnNumber" << txnNumber << "databaseVersion"
+                            << nss1DbVersion.toBSON() << "shardVersion" << shardVersionBson
+                            << "readConcern" << BSONObj() << "writeConcern"
+                            << operationContext()->getWriteConcern().toBSON()
+                            << "isTimeseriesNamespace" << true);
+        ASSERT_BSONOBJ_EQ_UNORDERED(expectedCmdObj, request.cmdObj);
 
         return emptyFindAndModifyCommandReplyObj;
     });

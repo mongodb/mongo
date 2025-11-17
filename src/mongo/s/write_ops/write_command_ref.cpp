@@ -252,6 +252,18 @@ const OptionalBool& BatchWriteCommandRefImpl::getRawData() const {
     return getRequest().getGenericArguments().getRawData();
 }
 
+boost::optional<mongo::BSONObj> BatchWriteCommandRefImpl::getSort(int index) const {
+    using RetT = const boost::optional<mongo::BSONObj>;
+    return visitOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BSONObj& insertDoc) -> RetT { return boost::none; },
+            [&](const write_ops::UpdateOpEntry& updateOp) -> RetT { return updateOp.getSort(); },
+            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT {
+                return boost::none;
+            }});
+}
+
 BSONObj BatchWriteCommandRefImpl::toBSON(int index) const {
     return visitOpData(index,
                        OverloadedVisitor{[&](const BSONObj& insertDoc) { return insertDoc; },
@@ -405,6 +417,18 @@ const OptionalBool& BulkWriteCommandRefImpl::getRawData() const {
     return getRequest().getRawData();
 }
 
+boost::optional<mongo::BSONObj> BulkWriteCommandRefImpl::getSort(int index) const {
+    using RetT = const boost::optional<mongo::BSONObj>;
+    return visitOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BulkWriteInsertOp& insertOp) -> RetT { return boost::none; },
+            [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getSort(); },
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
+                return boost::none;
+            }});
+}
+
 BSONObj BulkWriteCommandRefImpl::toBSON(int index) const {
     return visitOpData(index, [&](const auto& op) { return op.toBSON(); });
 }
@@ -524,6 +548,10 @@ FindAndModifyCommandRefImpl::getEncryptionInformation(int index) const {
 
 const OptionalBool& FindAndModifyCommandRefImpl::getRawData() const {
     return getRequest().getRawData();
+}
+
+boost::optional<mongo::BSONObj> FindAndModifyCommandRefImpl::getSort(int index) const {
+    return getRequest().getSort();
 }
 
 BSONObj FindAndModifyCommandRefImpl::toBSON(int index) const {

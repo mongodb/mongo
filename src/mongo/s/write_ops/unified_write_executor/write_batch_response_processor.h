@@ -261,7 +261,6 @@ private:
      */
     void noteRetryableError(OperationContext* opCtx,
                             RoutingContext& routingCtx,
-                            boost::optional<WriteOp> op,
                             const Status& status);
 
     /**

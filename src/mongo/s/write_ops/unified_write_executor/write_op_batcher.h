@@ -58,6 +58,7 @@ struct SimpleWriteBatch {
     // but target different namespaces.
     struct ShardRequest {
         std::map<NamespaceString, ShardEndpoint> versionByNss;
+        std::set<NamespaceString> nssIsViewfulTimeseries;
         std::vector<WriteOp> ops;
         std::map<WriteOpId, UUID> sampleIds;
     };
@@ -97,6 +98,7 @@ struct SimpleWriteBatch {
 struct NonTargetedWriteBatch {
     WriteOp op;
     boost::optional<UUID> sampleId;
+    bool isViewfulTimeseries;
 
     std::vector<WriteOp> getWriteOps() const {
         std::vector<WriteOp> result;
@@ -135,6 +137,7 @@ struct InternalTransactionBatch {
 struct MultiWriteBlockingMigrationsBatch {
     WriteOp op;
     boost::optional<UUID> sampleId;
+    bool isViewfulTimeseries;
 
     std::vector<WriteOp> getWriteOps() const {
         std::vector<WriteOp> result;

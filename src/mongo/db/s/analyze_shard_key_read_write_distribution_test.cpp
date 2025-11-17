@@ -155,13 +155,15 @@ protected:
         auto cm = ChunkManager(RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
                                    std::move(routingTableHistory))),
                                boost::none);
-        return CollectionRoutingInfoTargeter(
-            nss,
-            CollectionRoutingInfo{
-                std::move(cm),
-                DatabaseTypeValueHandle(DatabaseType{nss.dbName(),
+        auto routingCtx = RoutingContext::createSynthetic(
+            {{nss,
+              CollectionRoutingInfo{std::move(cm),
+                                    DatabaseTypeValueHandle(
+                                        DatabaseType{nss.dbName(),
                                                      ShardId("dummyPrimaryShard"),
-                                                     DatabaseVersion(UUID::gen(), timestamp)})});
+                                                     DatabaseVersion(UUID::gen(), timestamp)})}}});
+        routingCtx->skipValidation();
+        return CollectionRoutingInfoTargeter(nss, *routingCtx);
     }
 
     int32_t getRandomInt(int32_t limit) const {

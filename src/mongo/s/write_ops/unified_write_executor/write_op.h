@@ -120,6 +120,10 @@ public:
         return _ref.getMulti();
     }
 
+    boost::optional<mongo::BSONObj> getSort() const {
+        return _ref.getSort();
+    }
+
     bool isUpsert() const {
         return _ref.getUpsert();
     }

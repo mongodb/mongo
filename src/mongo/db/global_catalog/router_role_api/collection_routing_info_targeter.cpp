@@ -184,9 +184,18 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* o
       _cri(_routingCtx->getCollectionRoutingInfo(_nss)) {}
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceString& nss,
-                                                             const CollectionRoutingInfo& cri)
-    : _nss(nss), _routingCtx(RoutingContext::createSynthetic({{nss, cri}})), _cri(cri) {
-    invariant(!cri.hasRoutingTable() || cri.getChunkManager().getNss() == nss);
+                                                             const RoutingContext& routingCtx)
+    : _nss(nss), _cri(routingCtx.getCollectionRoutingInfo(nss)) {
+    // TODO SERVER-106874 remove the namespace translation check entirely once 9.0 becomes last
+    // LTS. By then we will only have viewless timeseries that do not require nss translation.
+    auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+    if (routingCtx.hasNss(bucketsNss)) {
+        _nss = bucketsNss;
+        _cri = routingCtx.getCollectionRoutingInfo(_nss);
+        _nssConvertedToTimeseriesBuckets = true;
+    }
+    _routingCtx = RoutingContext::createSynthetic({{_nss, _cri}});
+    invariant(!_cri.hasRoutingTable() || _cri.getChunkManager().getNss() == _nss);
 }
 
 /**

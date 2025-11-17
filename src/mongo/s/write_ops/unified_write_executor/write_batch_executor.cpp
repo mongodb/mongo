@@ -194,6 +194,7 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     bool errorsOnly,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -216,6 +217,15 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
         nsInfo.setCollectionUUID(op.getCollectionUUID());
         nsInfo.setEncryptionInformation(op.getEncryptionInformation());
 
+        // Translate timeseries collection to bucket namespace if detected by the analyzer.
+        if (nssIsViewfulTimeseries.contains(nss)) {
+            nsInfo.setNs(nss.makeTimeseriesBucketsNamespace());
+            if (!isRawDataOperation(opCtx)) {
+                nsInfo.setIsTimeseriesNamespace(true);
+            }
+        }
+
+        // Append shard versions if needed.
         if (!versionByNss.empty()) {
             auto versionIt = versionByNss.find(nss);
             tassert(10346801,
@@ -286,6 +296,7 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     bool errorsOnly,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -298,6 +309,7 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
         buildBulkWriteRequestWithoutTxnInfo(opCtx,
                                             ops,
                                             versionByNss,
+                                            nssIsViewfulTimeseries,
                                             sampleIds,
                                             errorsOnly,
                                             allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -319,6 +331,7 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
     IsEmbeddedCommand isEmbeddedCommand,
@@ -328,6 +341,8 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
     const auto& op = ops.front();
     tassert(10394902, "Expected a findAndModify request", op.getCommand().isFindAndModifyCommand());
 
+    auto& nss = op.getNss();
+
     // Make a copy of the original request and clear attributes that we may append later.
     auto request = op.getCommand().getFindAndModifyCommandRequest();
     request.setLsid(boost::none);
@@ -335,10 +350,17 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
     request.setWriteConcern(boost::none);
     request.setReadConcern(boost::none);
 
-    auto versionIt = versionByNss.find(op.getNss());
+    auto versionIt = versionByNss.find(nss);
     if (versionIt != versionByNss.end()) {
         request.setShardVersion(versionIt->second.shardVersion);
         request.setDatabaseVersion(versionIt->second.databaseVersion);
+    }
+
+    if (nssIsViewfulTimeseries.contains(nss)) {
+        request.setNamespace(nss.makeTimeseriesBucketsNamespace());
+        if (!isRawDataOperation(opCtx)) {
+            request.setIsTimeseriesNamespace(true);
+        }
     }
 
     auto sampleIdIt = sampleIds.find(op.getId());
@@ -391,6 +413,7 @@ BSONObj WriteBatchExecutor::buildRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     bool errorsOnly,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -402,6 +425,7 @@ BSONObj WriteBatchExecutor::buildRequest(
         return buildFindAndModifyRequest(opCtx,
                                          ops,
                                          versionByNss,
+                                         nssIsViewfulTimeseries,
                                          sampleIds,
                                          allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                                          isEmbeddedCommand,
@@ -411,6 +435,7 @@ BSONObj WriteBatchExecutor::buildRequest(
         return buildBulkWriteRequest(opCtx,
                                      ops,
                                      versionByNss,
+                                     nssIsViewfulTimeseries,
                                      sampleIds,
                                      errorsOnly,
                                      allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -580,6 +605,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
             buildRequest(opCtx,
                          shardRequest.ops,
                          shardRequest.versionByNss,
+                         shardRequest.nssIsViewfulTimeseries,
                          shardRequest.sampleIds,
                          errorsOnly,
                          boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
@@ -697,6 +723,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     const WriteOp& writeOp = batch.op;
+    const auto& nss = writeOp.getNss();
 
     bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
         opCtx->isRetryableWrite() || TransactionRouter::get(opCtx);
@@ -710,9 +737,14 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     // to the shards.
     const bool errorsOnly = getErrorsOnlyForShardRequest({writeOp});
 
+    std::set<NamespaceString> nssIsViewfulTimeseries;
+    if (batch.isViewfulTimeseries) {
+        nssIsViewfulTimeseries.emplace(nss);
+    }
     auto cmdObj = buildRequest(opCtx,
                                {writeOp},
-                               {}, /* versionByNss */
+                               {},                                /* versionByNss */
+                               std::move(nssIsViewfulTimeseries), /* nssIsViewfulTimeseries */
                                sampleIds,
                                errorsOnly,
                                allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -721,8 +753,8 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                ShouldAppendReadWriteConcern::No);
 
     boost::optional<WriteConcernErrorDetail> wce;
-    auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
-        opCtx, writeOp.getNss(), std::move(cmdObj), wce);
+    auto swRes =
+        write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, std::move(cmdObj), wce);
 
     auto swResponse = swRes.isOK() ? StatusWith{swRes.getValue().getResponse().getOwned()}
                                    : StatusWith<BSONObj>{swRes.getStatus()};
@@ -752,6 +784,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         opCtx,
         {writeOp},
         {}, /* versionByNss */
+        {}, /* nssIsViewfulTimeseries */
         sampleIds,
         errorsOnly,
         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
@@ -811,6 +844,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto cmdObj = buildRequest(opCtx,
                                {writeOp},
                                {}, /* versionByNss */
+                               {}, /* nssIsViewfulTimeseries */
                                {}, /* sampleIds */
                                errorsOnly,
                                boost::none, /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */

@@ -250,13 +250,15 @@ void CollectionRoutingInfoTargeterTest::
                                                       << "hashed"));
 
     auto cm = makeCustomChunkManager(shardKeyPattern, splitPoints);
-    auto criTargeter = CollectionRoutingInfoTargeter(
-        kNss,
-        CollectionRoutingInfo{
-            std::move(cm),
-            DatabaseTypeValueHandle(DatabaseType{kNss.dbName(),
-                                                 ShardId("dummyShardPrimary"),
-                                                 DatabaseVersion(UUID::gen(), Timestamp(1, 0))})});
+    auto routingCtx = RoutingContext::createSynthetic(
+        {{kNss,
+          CollectionRoutingInfo{std::move(cm),
+                                DatabaseTypeValueHandle(DatabaseType{
+                                    kNss.dbName(),
+                                    ShardId("dummyShardPrimary"),
+                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0))})}}});
+    routingCtx->skipValidation();
+    auto criTargeter = CollectionRoutingInfoTargeter(kNss, *routingCtx);
     ASSERT_EQ(criTargeter.getRoutingInfo().getChunkManager().numChunks(), 5);
 
     // Cause the global chunk manager to have some other configuration.
@@ -655,11 +657,14 @@ public:
         const auto cri = makeUntrackedCollectionRoutingInfo(kNss);
         primaryShard = cri.getDbPrimaryShardId();
         dbVersion = cri.getDbVersion();
-        return CollectionRoutingInfoTargeter(kNss, cri);
+        routingCtx = RoutingContext::createSynthetic({{kNss, cri}});
+        routingCtx->skipValidation();
+        return CollectionRoutingInfoTargeter(kNss, *routingCtx);
     };
 
     ShardId primaryShard;
     DatabaseVersion dbVersion;
+    std::unique_ptr<RoutingContext> routingCtx;
 };
 
 TEST_F(CollectionRoutingInfoTargeterUntrackedTest, InsertIsTargetedToDbPrimaryShard) {
@@ -712,11 +717,14 @@ public:
 
         shardVersion = cri.getCollectionVersion();
 
-        return CollectionRoutingInfoTargeter(kNss, cri);
+        routingCtx = RoutingContext::createSynthetic({{kNss, cri}});
+        routingCtx->skipValidation();
+        return CollectionRoutingInfoTargeter(kNss, *routingCtx);
     };
 
     ShardId owningShard;
     ShardVersion shardVersion;
+    std::unique_ptr<RoutingContext> routingCtx;
 };
 
 TEST_F(CollectionRoutingInfoTargeterUnshardedTest, InsertIsTargetedToOwningShard) {

@@ -321,7 +321,6 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
 
 void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
                                                      RoutingContext& routingCtx,
-                                                     boost::optional<WriteOp> op,
                                                      const Status& status) {
     if (status == ErrorCodes::CannotImplicitlyCreateCollection) {
         LOGV2_DEBUG(11182203,
@@ -335,12 +334,7 @@ void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
         } else {
             LOGV2_DEBUG(10346900, 4, "Noting stale config response", "status"_attr = status);
         }
-
-        if (op) {
-            routingCtx.onStaleError(status, op->getNss());
-        } else {
-            routingCtx.onStaleError(status);
-        }
+        routingCtx.onStaleError(status);
     } else if (status == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
         LOGV2_DEBUG(10413104,
                     4,
@@ -394,7 +388,7 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
         const bool isRetryableErr = write_op_helpers::isRetryErrCode(status.code());
 
         if (isRetryableErr) {
-            noteRetryableError(opCtx, routingCtx, boost::none /*op*/, status);
+            noteRetryableError(opCtx, routingCtx, status);
         }
 
         handleShutdownError(opCtx, response);
@@ -634,7 +628,7 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
 
                 // If a retryable error occurred, inform 'routingCtx' if needed.
                 if (isRetryableErr) {
-                    noteRetryableError(opCtx, routingCtx, op, status);
+                    noteRetryableError(opCtx, routingCtx, status);
                 }
 
                 // If 'item' is an error and 'orderedOrInTxn' is true, -OR- if 'item' is a

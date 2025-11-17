@@ -55,11 +55,17 @@ struct RoutingInfoEntry {
  */
 class RoutingContext {
 public:
+    /**
+     * Initialize and acquire the routing tables from a list of given namespaces. If
+     * 'checkTimeseriesBucketsNss' is set to true, then it will also check the timeseries buckets
+     * namespace and acquire their routing tables.
+     */
     // TODO SERVER-102931: Integrate the RouterAcquisitionSnapshot
     RoutingContext(OperationContext* opCtx,
                    const std::vector<NamespaceString>&
                        nssList,  // list of required namespaces for the routing operation
-                   bool allowLocks = false);
+                   bool allowLocks = false,
+                   bool checkTimeseriesBucketsNss = false);
 
     // TODO SERVER-102931: Integrate the RouterAcquisitionSnapshot
     /**
@@ -166,6 +172,11 @@ private:
     // If set, skip validation prior to destruction that the RoutingContext has had its routing
     // tables validated by sending a versioned request to a shard
     bool _skipValidation = false;
+
+    // TODO SERVER-106874 remove the namespace translation check entirely once 9.0 becomes
+    // last LTS. By then we will only have viewless timeseries that do not require nss
+    // translation.
+    bool _checkTimeseriesBucketsNss = false;
 };
 
 class MockRoutingContext : public RoutingContext {
@@ -191,11 +202,9 @@ public:
 
     void onRequestSentForNss(const NamespaceString& nss) override {}
     void onStaleError(const Status& status, boost::optional<const NamespaceString&> nss) override {
-        if (nss.has_value()) {
-            errors.emplace(*nss, status);
-        }
+        errors.emplace_back(status);
     };
-    stdx::unordered_map<NamespaceString, Status> errors;
+    std::vector<Status> errors;
 };
 
 namespace routing_context_utils {

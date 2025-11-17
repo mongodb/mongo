@@ -614,8 +614,11 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
         SimpleWriteBatchResponse{
             {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2})}});
 
-    ASSERT_EQ(routingCtx.errors.at(nss1).code(), ErrorCodes::StaleConfig);
-    ASSERT_EQ(routingCtx.errors.at(nss2).code(), ErrorCodes::StaleDbVersion);
+    ASSERT_EQ(routingCtx.errors.size(), 2);
+    ASSERT_EQ(routingCtx.errors[0].code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(routingCtx.errors[0].extraInfo<StaleConfigInfo>()->getNss(), nss1);
+    ASSERT_EQ(routingCtx.errors[1].code(), ErrorCodes::StaleDbVersion);
+    ASSERT_EQ(routingCtx.errors[1].extraInfo<StaleDbRoutingVersion>()->getDb(), nss2.dbName());
 
     // Assert all the op was returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 2);
@@ -680,8 +683,11 @@ TEST_F(WriteBatchResponseProcessorTest, MixedStalenessErrorsAndOk) {
             {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op3})},
             {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op2, op4})}});
 
-    ASSERT_EQ(routingCtx.errors.size(), 1);
-    ASSERT_EQ(routingCtx.errors.at(nss1).code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(routingCtx.errors.size(), 2);
+    ASSERT_EQ(routingCtx.errors[0].code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(routingCtx.errors[0].extraInfo<StaleConfigInfo>()->getNss(), nss1);
+    ASSERT_EQ(routingCtx.errors[1].code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(routingCtx.errors[1].extraInfo<StaleConfigInfo>()->getNss(), nss1);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
     // Assert failed ops were returned for retry.
