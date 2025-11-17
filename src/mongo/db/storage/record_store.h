@@ -45,6 +45,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -75,7 +76,7 @@ class ValidationOptions;
 /**
  * The data items stored in a RecordStore.
  */
-struct Record {
+struct MONGO_MOD_PUBLIC Record {
     RecordId id;
     RecordData data;
 };
@@ -123,7 +124,7 @@ struct Record {
  * TODO SERVER-18934 Handle this above the storage engine layer so storage engines don't have to
  * deal with capped visibility.
  */
-class RecordCursor {
+class MONGO_MOD_OPEN RecordCursor {
 public:
     virtual ~RecordCursor() = default;
 
@@ -194,7 +195,7 @@ public:
  * some cursors are not required to support seeking. All storage engines must support detecting the
  * existence of Records.
  */
-class SeekableRecordCursor : public RecordCursor {
+class MONGO_MOD_OPEN SeekableRecordCursor : public RecordCursor {
 public:
     /**
      * Tells bounded 'seek' whether the bound excludes or includes the bound 'start'.
@@ -245,7 +246,7 @@ public:
  * Queries with the awaitData option use this notifier object to wait for more data to be
  * inserted into the capped collection.
  */
-class CappedInsertNotifier {
+class MONGO_MOD_PUBLIC CappedInsertNotifier {
 public:
     /**
      * Wakes up all threads waiting.
@@ -305,7 +306,7 @@ private:
  * This class must be thread-safe. In addition, for storage engines implementing the KVEngine some
  * methods must be thread safe, see MDBCatalog.
  */
-class RecordStore {
+class MONGO_MOD_OPEN RecordStore {
 public:
     class Capped;
     class Oplog;
@@ -647,7 +648,7 @@ public:
     virtual RecordStoreContainer getContainer() = 0;
 };
 
-class RecordStore::Capped {
+class MONGO_MOD_OPEN RecordStore::Capped {
 public:
     struct TruncateAfterResult {
         int64_t recordsRemoved = 0;
@@ -689,7 +690,7 @@ public:
                                               bool inclusive) = 0;
 };
 
-class RecordStore::Oplog {
+class MONGO_MOD_OPEN RecordStore::Oplog {
 public:
     /**
      * Storage engines can choose whether to support changing the oplog size online.

@@ -37,6 +37,7 @@
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
 
@@ -48,6 +49,8 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/serialization/strong_typedef.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

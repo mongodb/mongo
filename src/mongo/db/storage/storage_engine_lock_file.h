@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -41,9 +42,9 @@
 
 namespace mongo {
 
-constexpr StringData kLockFileBasename = "mongod.lock"_sd;
+MONGO_MOD_FILE_PRIVATE constexpr StringData kLockFileBasename = "mongod.lock"_sd;
 
-class StorageEngineLockFile {
+class MONGO_MOD_PUBLIC StorageEngineLockFile {
     StorageEngineLockFile(const StorageEngineLockFile&) = delete;
     StorageEngineLockFile& operator=(const StorageEngineLockFile&) = delete;
 

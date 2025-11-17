@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/container.h"
@@ -34,13 +36,14 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <span>
 
 #include <boost/optional/optional.hpp>
 
-#pragma once
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

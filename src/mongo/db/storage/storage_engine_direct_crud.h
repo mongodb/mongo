@@ -33,7 +33,10 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
+
+MONGO_MOD_PUBLIC;
 
 /**
  * An API for performing writes directly to the 'StorageEngine.'

@@ -37,6 +37,7 @@
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -47,6 +48,8 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -606,7 +609,7 @@ public:
      * OperationContext and may not be the same as when the Change was registered on the
      * RecoveryUnit. See above for usage restrictions.
      */
-    class Change {
+    class MONGO_MOD_OPEN Change {
     public:
         virtual ~Change() {}
 

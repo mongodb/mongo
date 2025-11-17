@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -38,7 +39,7 @@ namespace mongo {
 
 class OperationContext;
 
-class RecoveryUnitNoop : public RecoveryUnit {
+class MONGO_MOD_OPEN RecoveryUnitNoop : public RecoveryUnit {
 public:
     bool isNoop() const final {
         return true;

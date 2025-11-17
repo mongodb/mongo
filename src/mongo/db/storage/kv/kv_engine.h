@@ -37,6 +37,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -49,7 +50,7 @@ class OperationContext;
 class RecoveryUnit;
 class SnapshotManager;
 
-class KVEngine {
+class MONGO_MOD_OPEN KVEngine {
 public:
     using IdentKey = std::variant<std::span<const char>, int64_t>;
 

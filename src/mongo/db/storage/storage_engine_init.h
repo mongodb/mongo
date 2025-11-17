@@ -36,10 +36,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/utility.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

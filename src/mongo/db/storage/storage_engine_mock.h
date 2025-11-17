@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * Mock storage engine.
  */
-class StorageEngineMock : public StorageEngine {
+class MONGO_MOD_OPEN StorageEngineMock : public StorageEngine {
 public:
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
         return nullptr;
