@@ -104,9 +104,19 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "query_util_bitset",
+    srcs = [
+    ],
+    hdrs = [
+        "bitset_iterator.h",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "query_util_test",
     srcs = [
+        "bitset_iterator_test.cpp",
         "cartesian_product_test.cpp",
         "deferred_test.cpp",
         "hash_roaring_set_test.cpp",
@@ -121,6 +131,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":jparse_util",
+        ":query_util_bitset",
         "//src/mongo/db:query_exec",
     ],
 )
