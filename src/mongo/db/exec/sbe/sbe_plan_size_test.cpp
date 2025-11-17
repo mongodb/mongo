@@ -36,7 +36,6 @@
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
@@ -130,12 +129,6 @@ TEST_F(PlanSizeTest, BsonScan) {
 
 TEST_F(PlanSizeTest, CoScan) {
     auto stage = makeS<CoScanStage>(kEmptyPlanNodeId);
-    assertPlanSize(*stage);
-}
-
-TEST_F(PlanSizeTest, Exchange) {
-    auto stage = makeS<ExchangeConsumer>(
-        mockS(), 1, makeSV(), ExchangePolicy::broadcast, nullptr, mockE(), kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
 
