@@ -113,7 +113,9 @@ public:
         std::replace(ident.begin(), ident.end(), '.', '-');
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-        const auto res = _engine->createRecordStore(provider, nss, ident, RecordStore::Options{});
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        const auto res =
+            _engine->createRecordStore(provider, ru, nss, ident, RecordStore::Options{});
         return _engine->getRecordStore(opCtx, nss, ident, RecordStore::Options{}, UUID::gen());
     }
 

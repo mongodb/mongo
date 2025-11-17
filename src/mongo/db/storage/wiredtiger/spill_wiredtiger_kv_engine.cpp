@@ -130,7 +130,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(Re
 
 std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
     RecoveryUnit& ru, StringData ident, KeyFormat keyFormat) {
-    WiredTigerSession session(_connection.get());
+    auto& session = *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
 
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = keyFormat;
@@ -178,7 +178,7 @@ bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const
 }
 
 int64_t SpillWiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, StringData ident) {
-    WiredTigerSession session{_connection.get()};
+    auto& session = *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
     return WiredTigerUtil::getIdentSize(session, WiredTigerUtil::buildTableUri(ident));
 }
 

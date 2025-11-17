@@ -119,8 +119,9 @@ public:
     Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
         const std::string identName = _storageEngine->generateNewCollectionIdent(collName.dbName());
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         return _storageEngine->getEngine()->createRecordStore(
-            provider, collName, identName, RecordStore::Options{});
+            provider, ru, collName, identName, RecordStore::Options{});
     }
 
     Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, StringData indexName) {

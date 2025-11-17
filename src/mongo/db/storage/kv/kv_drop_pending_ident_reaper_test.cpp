@@ -91,6 +91,7 @@ public:
     }
 
     Status createRecordStore(const rss::PersistenceProvider&,
+                             RecoveryUnit& ru,
                              const NamespaceString& nss,
                              StringData ident,
                              const RecordStore::Options& options) override {

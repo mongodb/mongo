@@ -168,15 +168,14 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
 
 void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                                        LastShutdownState lastShutdownState) {
-    bool catalogExists =
-        _engine->hasIdent(*shard_role_details::getRecoveryUnit(opCtx), ident::kMdbCatalog);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    bool catalogExists = _engine->hasIdent(ru, ident::kMdbCatalog);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
         invariant(repairObserver->isIncomplete());
 
         LOGV2(22246, "Repairing catalog metadata");
-        Status status =
-            _engine->repairIdent(*shard_role_details::getRecoveryUnit(opCtx), ident::kMdbCatalog);
+        Status status = _engine->repairIdent(ru, ident::kMdbCatalog);
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             LOGV2_WARNING(22264, "Catalog data modified by repair", "error"_attr = status);
@@ -195,7 +194,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
 
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         auto status = _engine->createRecordStore(
-            provider, kCatalogInfoNamespace, ident::kMdbCatalog, catalogRecordStoreOpts);
+            provider, ru, kCatalogInfoNamespace, ident::kMdbCatalog, catalogRecordStoreOpts);
 
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
@@ -436,8 +435,11 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     const auto recordStoreOptions =
         _catalog->getParsedRecordStoreOptions(opCtx, catalogId, collectionName);
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    Status status = _engine->recoverOrphanedIdent(
-        provider, collectionName, collectionIdent, recordStoreOptions);
+    Status status = _engine->recoverOrphanedIdent(provider,
+                                                  *shard_role_details::getRecoveryUnit(opCtx),
+                                                  collectionName,
+                                                  collectionIdent,
+                                                  recordStoreOptions);
 
     bool dataModified = status.code() == ErrorCodes::DataModifiedByRepair;
     if (!status.isOK() && !dataModified) {

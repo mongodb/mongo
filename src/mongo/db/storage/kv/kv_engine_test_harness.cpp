@@ -118,8 +118,10 @@ protected:
         auto opCtx = clientAndCtx.opCtx();
         KVEngine* engine = helper->getEngine();
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         ASSERT_OK(
             engine->createRecordStore(provider,
+                                      ru,
                                       NamespaceString::createNamespaceString_forTest("catalog"),
                                       "collection-catalog",
                                       RecordStore::Options{}));
@@ -235,7 +237,8 @@ protected:
                                                 boost::optional<UUID> uuid) {
         auto opCtx = _makeOperationContext(engine);
         auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
-        ASSERT_OK(engine->createRecordStore(provider, nss, ident, recordStoreOptions));
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, recordStoreOptions));
         auto rs = engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
         ASSERT(rs);
         return rs;

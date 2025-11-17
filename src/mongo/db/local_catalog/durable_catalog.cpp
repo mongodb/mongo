@@ -293,7 +293,13 @@ StatusWith<std::unique_ptr<RecordStore>> createCollection(
     auto status = createStorage(
         opCtx,
         ident,
-        [&] { return engine->createRecordStore(provider, nss, ident, recordStoreOptions); },
+        [&] {
+            return engine->createRecordStore(provider,
+                                             *shard_role_details::getRecoveryUnit(opCtx),
+                                             nss,
+                                             ident,
+                                             recordStoreOptions);
+        },
         [&] { return mdbCatalog->hasCollectionIdent(opCtx, ident); });
     if (!status.isOK()) {
         return status;

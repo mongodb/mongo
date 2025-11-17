@@ -240,7 +240,8 @@ public:
         RecordStore::Options options;
         auto& provider =
             rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
-        ASSERT_OK(engine->createRecordStore(provider, nss, ident, options));
+        auto& ru = *shard_role_details::getRecoveryUnit(op.get());
+        ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, options));
         rs = engine->getRecordStore(op, nss, ident, options, UUID::gen());
         ASSERT(rs);
     }

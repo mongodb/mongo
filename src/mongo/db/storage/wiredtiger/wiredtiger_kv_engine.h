@@ -395,11 +395,13 @@ public:
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
     Status createRecordStore(const rss::PersistenceProvider& provider,
+                             RecoveryUnit& ru,
                              const NamespaceString& ns,
                              StringData ident,
                              const RecordStore::Options& options) override {
         // Parameters required for a standard WiredTigerRecordStore.
         return _createRecordStore(provider,
+                                  ru,
                                   ns,
                                   ident,
                                   options.keyFormat,
@@ -448,7 +450,8 @@ public:
      * latest checkpoint. This requires reading the entire table and should only be used when
      * absolutely required to ensure the import succeeds
      */
-    Status importRecordStore(StringData ident,
+    Status importRecordStore(RecoveryUnit& ru,
+                             StringData ident,
                              const BSONObj& storageMetadata,
                              bool panicOnCorruptWtMetadata,
                              bool repair) override;
@@ -500,6 +503,7 @@ public:
     Status repairIdent(RecoveryUnit& ru, StringData ident) override;
 
     Status recoverOrphanedIdent(const rss::PersistenceProvider&,
+                                RecoveryUnit& ru,
                                 const NamespaceString& nss,
                                 StringData ident,
                                 const RecordStore::Options& options) override;
@@ -743,6 +747,7 @@ private:
     };
 
     Status _createRecordStore(const rss::PersistenceProvider& provider,
+                              RecoveryUnit& ru,
                               const NamespaceString& ns,
                               StringData ident,
                               KeyFormat keyFormat,

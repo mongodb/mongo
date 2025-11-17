@@ -133,6 +133,7 @@ public:
      * Creates a 'RecordStore' and generated from the provided 'options'.
      */
     virtual Status createRecordStore(const rss::PersistenceProvider&,
+                                     RecoveryUnit& ru,
                                      const NamespaceString& nss,
                                      StringData ident,
                                      const RecordStore::Options& options) = 0;
@@ -149,7 +150,8 @@ public:
      * Similar to createRecordStore but this imports from an existing table with the provided ident
      * instead of creating a new one.
      */
-    virtual Status importRecordStore(StringData ident,
+    virtual Status importRecordStore(RecoveryUnit& ru,
+                                     StringData ident,
                                      const BSONObj& storageMetadata,
                                      bool panicOnCorruptWtMetadata,
                                      bool repair) {
@@ -266,10 +268,11 @@ public:
      * it still exists when recovered.
      */
     virtual Status recoverOrphanedIdent(const rss::PersistenceProvider& provider,
+                                        RecoveryUnit& ru,
                                         const NamespaceString& nss,
                                         StringData ident,
                                         const RecordStore::Options& recordStoreOptions) {
-        auto status = createRecordStore(provider, nss, ident, recordStoreOptions);
+        auto status = createRecordStore(provider, ru, nss, ident, recordStoreOptions);
         if (status.isOK()) {
             return {ErrorCodes::DataModifiedByRepair, "Orphan recovery created a new record store"};
         }
