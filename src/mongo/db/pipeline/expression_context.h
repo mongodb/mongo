@@ -1016,14 +1016,6 @@ public:
         return _featureFlagMqlJsEngineGap.get(VersionContext::getDecoration(getOperationContext()));
     }
 
-    void incrNumNestedExpressionFieldPathComponentsParsed(int n) {
-        _numNestedExpressionFieldPathComponentsParsed += n;
-    }
-
-    int getNumNestedExpressionFieldPathComponentsParsed() {
-        return _numNestedExpressionFieldPathComponentsParsed;
-    }
-
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1284,8 +1276,6 @@ private:
     bool _isCappedDelete = false;
 
     InterruptChecker _interruptChecker;
-
-    int _numNestedExpressionFieldPathComponentsParsed = 0;
 
     // We use this set to indicate whether or not a system variable was referenced in the query that
     // is being executed (if the variable was referenced, it is an element of this set).

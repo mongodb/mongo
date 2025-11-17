@@ -74,8 +74,6 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
     _internalQuerySpillingMinAvailableDiskSpaceBytes =
         static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed());
-    _internalQueryMaxNumExprFieldPathComponentsSupportedInSbe = static_cast<int64_t>(
-        internalQueryMaxNumExprFieldPathComponentsSupportedInSbe.loadRelaxed());
 
     _isJoinOrderingEnabled = internalEnableJoinOptimization.load();
     _randomJoinOrderSeed = internalRandomJoinOrderSeed.load();
@@ -168,11 +166,6 @@ bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
 
 int64_t QueryKnobConfiguration::getInternalQuerySpillingMinAvailableDiskSpaceBytes() const {
     return _internalQuerySpillingMinAvailableDiskSpaceBytes;
-}
-
-int64_t QueryKnobConfiguration::getInternalQueryMaxNumExprFieldPathComponentsSupportedInSbe()
-    const {
-    return _internalQueryMaxNumExprFieldPathComponentsSupportedInSbe;
 }
 
 }  // namespace mongo

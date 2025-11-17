@@ -82,7 +82,6 @@ public:
     bool canPushDownFullyCompatibleStages() const;
 
     int64_t getInternalQuerySpillingMinAvailableDiskSpaceBytes() const;
-    int64_t getInternalQueryMaxNumExprFieldPathComponentsSupportedInSbe() const;
 
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
@@ -103,6 +102,5 @@ private:
     bool _isJoinOrderingEnabled;
     int64_t _randomJoinOrderSeed;
     int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;
-    int64_t _internalQueryMaxNumExprFieldPathComponentsSupportedInSbe;
 };
 }  // namespace mongo

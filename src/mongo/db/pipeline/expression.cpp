@@ -1686,23 +1686,12 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
             expCtx->setSystemVarReferencedInQuery(varId);
         }
 
-        auto ret = new ExpressionFieldPath(expCtx, std::string{fieldPath}, varId);
-        size_t pathLength = ret->getFieldPath().getPathLength();
-        if (pathLength > 1) {
-            // Only count nested fields.
-            expCtx->incrNumNestedExpressionFieldPathComponentsParsed(static_cast<int>(pathLength));
-        }
-        return ret;
-    }
-    auto ret = new ExpressionFieldPath(expCtx,
+        return new ExpressionFieldPath(expCtx, std::string{fieldPath}, varId);
+    } else {
+        return new ExpressionFieldPath(expCtx,
                                        "CURRENT." + raw.substr(1),  // strip the "$" prefix
                                        vps.getVariable("CURRENT"));
-    size_t pathLength = ret->getFieldPath().getPathLength();
-    if (pathLength > 2) {
-        // Only count nested fields, excluding the leading CURRENT.
-        expCtx->incrNumNestedExpressionFieldPathComponentsParsed(static_cast<int>(pathLength - 1));
     }
-    return ret;
 }
 
 intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::createPathFromString(
