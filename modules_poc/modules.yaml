@@ -669,8 +669,7 @@ networking:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
-    # TODO SERVER-113765: uncomment the following line.
-    # fully_marked: true
+    fully_marked: true
   files:
     - src/mongo/client/
     - src/mongo/dbtests/clienttests.cpp
