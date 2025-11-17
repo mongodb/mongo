@@ -4,6 +4,7 @@
  *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {runReadOnlyTest} from "jstests/readonly/lib/read_only_test.js";
 
 runReadOnlyTest(
@@ -13,7 +14,6 @@ runReadOnlyTest(
 
             collectionNames: ["foo", "bar", "baz", "garply"],
             tsCollectionName: "tsColl",
-            tsBucketsCollectionName: "system.buckets.tsColl",
             indexSpecs: [{a: 1}, {a: 1, b: -1}, {a: 1, b: 1, c: -1}],
 
             load: function (writableCollection) {
@@ -34,7 +34,7 @@ runReadOnlyTest(
                     db.createCollection(this.tsCollectionName, {timeseries: {timeField: "time", metaField: "meta"}}),
                 );
 
-                this.collectionNames.push(this.tsCollectionName, this.tsBucketsCollectionName);
+                this.collectionNames.push(this.tsCollectionName, getTimeseriesCollForDDLOps(db, this.tsCollectionName));
 
                 // Create some indexes so we can verify that listIndexes works in read-only mode.
                 for (let indexSpec of this.indexSpecs) {
