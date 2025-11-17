@@ -10,10 +10,61 @@ sys.path.append(REPO_ROOT)
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 
+def get_terminal_stream(fd_env_var: str):
+    """Return a Python file object for the original terminal FD."""
+    fd_str = os.environ.get(fd_env_var)
+    if not fd_str:
+        return None
+
+    # Handle Windows CON device
+    if fd_str == "CON":
+        # On Windows, open CON device for console output
+        # Use the appropriate stream based on the variable name
+        if "STDOUT" in fd_env_var:
+            try:
+                return open("CON", "w", buffering=1)
+            except (OSError, IOError):
+                return None
+        elif "STDERR" in fd_env_var:
+            try:
+                return open("CON", "w", buffering=1)
+            except (OSError, IOError):
+                return None
+        return None
+
+    # Handle Unix file descriptors
+    if fd_str.isdigit():
+        fd = int(fd_str)
+        try:
+            return os.fdopen(fd, "w", buffering=1)
+        except (OSError, ValueError):
+            return None
+
+    return None
+
+
 def setup_auth_wrapper():
     from buildscripts.bazel_rules_mongo.engflow_auth.engflow_auth import setup_auth
 
-    setup_auth(verbose=False)
+    term_out = get_terminal_stream("MONGO_WRAPPER_STDOUT_FD")
+    term_err = get_terminal_stream("MONGO_WRAPPER_STDERR_FD")
+
+    # Save current stdout/stderr
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+
+    try:
+        if term_out:
+            sys.stdout = term_out
+        if term_err:
+            sys.stderr = term_err
+
+        setup_auth(verbose=False)
+
+    finally:
+        # Restore original stdout/stderr to whatever wrapper has
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
 
 def engflow_auth(args):
