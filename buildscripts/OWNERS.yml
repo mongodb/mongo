@@ -47,3 +47,6 @@ filters:
   - "evergreen_gen_streams*":
     approvers:
       - 10gen/streams-engine
+  - "compare_evergreen_versions.py":
+    approvers:
+      - 10gen/devprod-correctness

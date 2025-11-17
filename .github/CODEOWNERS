@@ -77,6 +77,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/powercycle* @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/golden_test.py @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/evergreen_gen_streams* @10gen/streams-engine @svc-auto-approve-bot
+/buildscripts/compare_evergreen_versions.py @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/antithesis/OWNERS.yml
 /buildscripts/antithesis/ @10gen/devprod-correctness @svc-auto-approve-bot
