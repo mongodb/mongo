@@ -1,6 +1,14 @@
-// Check $match pipeline stage.
-// - Filtering behavior equivalent to a mongo query.
-// - $where and geo operators are not allowed
+/**
+ * Check $match pipeline stage.
+ * - Filtering behavior equivalent to a mongo query.
+ * - $where and geo operators are not allowed
+ *
+ * @tags: [
+ *   # SERVER-101260 changed the behavior for SBE engine
+ *   requires_fcv_83,
+ * ]
+ */
+
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_aggregation_match;
@@ -137,10 +145,19 @@ function checkMatchResults(indexed) {
     coll.remove({});
     assert.commandWorked(coll.insert({_id: 0}));
     assert.commandWorked(coll.insert({_id: 1, a: null}));
+    assert.commandWorked(coll.insert({_id: 2, a: []}));
     assert.commandWorked(coll.insert({_id: 3, a: 0}));
+    assert.commandWorked(coll.insert({_id: 4, a: [[]]}));
+    assert.commandWorked(coll.insert({_id: 5, a: [2, 2, 2]}));
     assertResults([{_id: 0}, {_id: 1, a: null}], {a: null});
     assertResults(null, {a: {$exists: true}});
     assertResults(null, {a: {$exists: false}});
+    assertResults(
+        [{_id: 0}, {_id: 1, a: null}, {_id: 2, a: []}, {_id: 3, a: 0}, {_id: 4, a: [[]]}, {_id: 5, a: [2, 2, 2]}],
+        {x: null},
+    );
+    assertResults([{_id: 0}, {_id: 1, a: null}, {_id: 3, a: 0}], {"a.y": null});
+    assertResults([{_id: 0}, {_id: 1, a: null}, {_id: 3, a: 0}], {"a.y.z": null});
 
     // $elemMatch
     coll.remove({});
@@ -152,6 +169,46 @@ function checkMatchResults(indexed) {
     assert.commandWorked(coll.insert({_id: 0, a: [{b: 1}, {c: 2}]}));
     assert.commandWorked(coll.insert({_id: 1, a: [{b: 1, c: 2}]}));
     assertResults([{_id: 1, a: [{b: 1, c: 2}]}], {a: {$elemMatch: {b: 1, c: 2}}});
+
+    coll.remove({});
+    assert.commandWorked(coll.insert({_id: 3, a: [[{x: {y: 1}}]]}));
+    assert.commandWorked(coll.insert({_id: 4, a: [undefined]}));
+    assert.commandWorked(coll.insert({_id: 5, a: [["blah"]]}));
+    assert.commandWorked(coll.insert({_id: 6, a: [[]]}));
+    assert.commandWorked(coll.insert({_id: 7, a: [null]}));
+    assert.commandWorked(coll.insert({_id: 8, a: [2]}));
+    assert.commandWorked(coll.insert({_id: 9, a: []}));
+    assert.commandWorked(coll.insert({_id: 10, a: [{x: 1}]}));
+    assert.commandWorked(coll.insert({_id: 11, a: [{y: 1}]}));
+    assertResults(
+        [
+            {_id: 3, a: [[{x: {y: 1}}]]},
+            {_id: 5, a: [["blah"]]},
+            {_id: 6, a: [[]]},
+            {_id: 11, a: [{y: 1}]},
+        ],
+        {a: {$elemMatch: {x: null}}},
+    );
+    assertResults(
+        [
+            {_id: 3, a: [[{x: {y: 1}}]]},
+            {_id: 5, a: [["blah"]]},
+            {_id: 6, a: [[]]},
+            {_id: 10, a: [{x: 1}]},
+            {_id: 11, a: [{y: 1}]},
+        ],
+        {a: {$elemMatch: {"x.y": null}}},
+    );
+    assertResults(
+        [
+            {_id: 3, a: [[{x: {y: 1}}]]},
+            {_id: 5, a: [["blah"]]},
+            {_id: 6, a: [[]]},
+            {_id: 10, a: [{x: 1}]},
+            {_id: 11, a: [{y: 1}]},
+        ],
+        {a: {$elemMatch: {"x.y.z": null}}},
+    );
 
     // $size
     coll.remove({});

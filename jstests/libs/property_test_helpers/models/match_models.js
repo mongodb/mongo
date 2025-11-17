@@ -92,12 +92,7 @@ export function getMatchPredicateSpec({
     // For recursive arbitraries, the `tie` function is how we refer to other arbitraries involved
     // in the recursion. We can't directly refer to them, since they're not created yet.
     return fc.letrec((tie) => {
-        const allowedConditions = [
-            leafConditionArb,
-            // TODO SERVER-101260
-            // After these tickets are complete, re-enable $elemMatch.
-            // tie('elemMatch')
-        ];
+        const allowedConditions = [leafConditionArb, tie("elemMatch")];
         if (allowNot) {
             allowedConditions.push(tie("not"));
         }
