@@ -548,7 +548,8 @@ private:
      * Sets up the in-memory and durable state of the index build.
      *
      * This function should only be called when in recovery mode, because the index tables are
-     * recreated.
+     * recreated. The caller should hold the necessary resources to prevent replication state
+     * transitions.
      */
     Status _startIndexBuildForRecovery(OperationContext* opCtx,
                                        CollectionWriter& collWriter,

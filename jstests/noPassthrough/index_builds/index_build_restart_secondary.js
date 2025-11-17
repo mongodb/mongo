@@ -3,8 +3,6 @@
  * node starts back up.
  *
  * @tags: [
- *   # TODO (SERVER-112093): This test may indicate an issue with secondaries for primary driven index builds.
- *   primary_driven_index_builds_incompatible,
  *   requires_persistence,
  *   requires_replication,
  * ]

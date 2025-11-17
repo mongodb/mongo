@@ -693,6 +693,25 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             // Unfinished index builds that are not resumable will drop and recreate the index table
             // using the same ident to avoid doing untimestamped writes to the catalog.
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
+            // With primary driven index builds, nodes do not need to clear unfinished indexes
+            // during recovery. For secondaries, replicating the oplog will pick up the index build
+            // from where it left off. For primaries, they will clean up on step up.
+            const auto resetIndexIdent = [&] {
+                // TODO (SERVER-109664): Early return whenever the protocol is not primary driven.
+                if (protocol != IndexBuildProtocol::kTwoPhase ||
+                    !isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+                    return true;
+                }
+                auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+                const bool isRecoveringAsStandalone =
+                    replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
+
+                // During standalone recovery and magic restore, there will be no oplog
+                // application to drive the index build to completion.
+                return isRecoveringAsStandalone || storageGlobalParams.magicRestore;
+            }();
+
             for (auto& indexBuildInfo : indexes) {
                 auto indexCatalog = collWriter.getWritableCollection(opCtx)->getIndexCatalog();
                 auto writableEntry = indexCatalog->getWritableEntryByName(
@@ -700,10 +719,12 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                     indexBuildInfo.getIndexName(),
                     IndexCatalog::InclusionPolicy::kUnfinished |
                         IndexCatalog::InclusionPolicy::kFrozen);
-                Status status = indexCatalog->resetUnfinishedIndexForRecovery(
-                    opCtx, collWriter.getWritableCollection(opCtx), writableEntry);
-                if (!status.isOK()) {
-                    return status;
+                if (resetIndexIdent) {
+                    Status status = indexCatalog->resetUnfinishedIndexForRecovery(
+                        opCtx, collWriter.getWritableCollection(opCtx), writableEntry);
+                    if (!status.isOK()) {
+                        return status;
+                    }
                 }
 
                 const auto durableBuildUUID =
