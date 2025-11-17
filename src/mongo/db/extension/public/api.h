@@ -582,14 +582,6 @@ typedef struct MongoExtensionGetNextResult {
 } MongoExtensionGetNextResult;
 
 /**
- * MongoExtensionOpCtx represents an OperationContext that can be attached to an execution stage.
- * The vtable is a placeholder for now but will be properly implemented in the future.
- */
-typedef struct MongoExtensionOpCtx {
-    void* const vtable;
-} MongoExtensionOpCtx;
-
-/**
  * MongoExtensionExecAggStage is the abstraction representing the executable phase of
  * a stage by the extension.
  */
@@ -649,24 +641,6 @@ typedef struct MongoExtensionExecAggStageVTable {
      * Frees all acquired resources.
      */
     MongoExtensionStatus* (*close)(MongoExtensionExecAggStage* execAggStage);
-
-    /**
-     * Attaches an OperationContext to the execution stage. The OperationContext is guaranteed to be
-     * valid until detach() is called.
-     *
-     * This function is added here to future-proof the API. A no-op implementation must be provided
-     * for the time being.
-     */
-    MongoExtensionStatus* (*attach)(MongoExtensionExecAggStage* execAggStage,
-                                    MongoExtensionOpCtx* ctx);
-
-    /**
-     * Detaches an OperationContext from the execution stage.
-     *
-     * This function is added here to future-proof the API. A no-op implementation must be provided
-     * for the time being.
-     */
-    MongoExtensionStatus* (*detach)(MongoExtensionExecAggStage* execAggStage);
 } MongoExtensionExecAggStageVTable;
 
 /**

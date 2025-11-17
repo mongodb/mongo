@@ -452,10 +452,6 @@ public:
 
     virtual void close() = 0;
 
-    virtual void attach(::MongoExtensionOpCtx* ctx) = 0;
-
-    virtual void detach() = 0;
-
 protected:
     ExecAggStage(std::string_view name) : _name(name) {}
 
@@ -595,17 +591,6 @@ private:
             [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().close(); });
     }
 
-    static ::MongoExtensionStatus* _extAttach(::MongoExtensionExecAggStage* execAggStage,
-                                              ::MongoExtensionOpCtx* ctx) noexcept {
-        return wrapCXXAndConvertExceptionToStatus(
-            [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().attach(ctx); });
-    }
-
-    static ::MongoExtensionStatus* _extDetach(::MongoExtensionExecAggStage* execAggStage) noexcept {
-        return wrapCXXAndConvertExceptionToStatus(
-            [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().detach(); });
-    }
-
     static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {.destroy = &_extDestroy,
                                                                   .get_next = &_extGetNext,
                                                                   .get_name = &_extGetName,
@@ -613,9 +598,7 @@ private:
                                                                       &_extCreateMetrics,
                                                                   .open = &_extOpen,
                                                                   .reopen = &_extReopen,
-                                                                  .close = &_extClose,
-                                                                  .attach = &_extAttach,
-                                                                  .detach = &_extDetach};
+                                                                  .close = &_extClose};
     std::unique_ptr<ExecAggStage> _execAggStage;
 };
 

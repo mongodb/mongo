@@ -54,10 +54,6 @@ public:
     void reopen() override {}
 
     void close() override {}
-
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
 };
 
 class ShardedExecutionSerializationLogicalStage : public sdk::LogicalAggStage {

@@ -135,24 +135,6 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _hostAttach(::MongoExtensionExecAggStage* execAggStage,
-                                               ::MongoExtensionOpCtx* ctx) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11216703,
-                      "_hostAttach should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
-    }
-
-    static ::MongoExtensionStatus* _hostDetach(
-        ::MongoExtensionExecAggStage* execAggStage) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11216704,
-                      "_hostDetach should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
-    }
-
     static constexpr ::MongoExtensionExecAggStageVTable VTABLE{.destroy = &_hostDestroy,
                                                                .get_next = &_hostGetNext,
                                                                .get_name = &_hostGetName,
@@ -160,9 +142,7 @@ private:
                                                                    &_hostCreateMetrics,
                                                                .open = &_hostOpen,
                                                                .reopen = &_hostReopen,
-                                                               .close = &_hostClose,
-                                                               .attach = &_hostAttach,
-                                                               .detach = &_hostDetach};
+                                                               .close = &_hostClose};
 
     std::unique_ptr<host::ExecAggStage> _execAggStage;
 };

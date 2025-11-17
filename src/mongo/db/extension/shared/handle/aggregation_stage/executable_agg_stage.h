@@ -86,10 +86,6 @@ public:
 
     void close();
 
-    void attach(::MongoExtensionOpCtx* ctx);
-
-    void detach();
-
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(10956800, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
@@ -99,8 +95,6 @@ protected:
         tassert(11216705, "ExecAggStage 'open' is null", vtable.open != nullptr);
         tassert(11216706, "ExecAggStage 'reopen' is null", vtable.reopen != nullptr);
         tassert(11216707, "ExecAggStage 'close' is null", vtable.close != nullptr);
-        tassert(11216708, "ExecAggStage 'attach' is null", vtable.attach != nullptr);
-        tassert(11216709, "ExecAggStage 'detach' is null", vtable.detach != nullptr);
     }
 };
 
@@ -126,10 +120,6 @@ public:
 
     void close();
 
-    void attach(::MongoExtensionOpCtx* ctx);
-
-    void detach();
-
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(11213502, "ExecAggStage 'get_name' is null", vtable.get_name != nullptr);
@@ -138,8 +128,6 @@ protected:
         tassert(11216710, "ExecAggStage 'open' is null", vtable.open != nullptr);
         tassert(11216711, "ExecAggStage 'reopen' is null", vtable.reopen != nullptr);
         tassert(11216712, "ExecAggStage 'close' is null", vtable.close != nullptr);
-        tassert(11216713, "ExecAggStage 'attach' is null", vtable.attach != nullptr);
-        tassert(11216714, "ExecAggStage 'detach' is null", vtable.detach != nullptr);
     }
 };
 

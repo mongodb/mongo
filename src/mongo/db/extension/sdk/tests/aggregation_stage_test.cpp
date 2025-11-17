@@ -848,10 +848,6 @@ public:
 
     void close() override {}
 
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
-
     static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
         return std::make_unique<ValidExtensionExecAggStage>("$noOp");
     }
@@ -888,28 +884,12 @@ public:
         _initialized = false;
     }
 
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {
-        ++_attachCount;
-    }
-
-    void detach() override {
-        ++_detachCount;
-    }
-
     bool isResourceAllocated() const {
         return _resourceAllocated;
     }
 
     bool isInitialized() const {
         return _initialized;
-    }
-
-    int getAttachCount() const {
-        return _attachCount;
-    }
-
-    int getDetachCount() const {
-        return _detachCount;
     }
 
     static inline std::unique_ptr<ExecAggStage> make() {
@@ -919,8 +899,6 @@ public:
 private:
     bool _resourceAllocated = false;
     bool _initialized = false;
-    int _attachCount = 0;
-    int _detachCount = 0;
 };
 
 TEST(AggregationStageTest, ValidExecAggStageVTableGetNextSucceeds) {
@@ -1013,10 +991,6 @@ public:
     void reopen() override {}
 
     void close() override {}
-
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
 
     static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
         return std::make_unique<GetMetricsExtensionExecAggStage>("$getMetrics");
@@ -1170,15 +1144,6 @@ TEST_F(AggStageTest, ValidateExecAggStageLifecycleFunctions) {
     handle.close();
     ASSERT_FALSE(trackingExecAggStageImplPtr->isResourceAllocated());
     ASSERT_FALSE(trackingExecAggStageImplPtr->isInitialized());
-
-    // Confirm attach and detach are set up as no-ops.
-    ::MongoExtensionOpCtx ctx{nullptr};
-    handle.attach(&ctx);
-    handle.attach(&ctx);
-    handle.detach();
-    handle.detach();
-    ASSERT_EQUALS(2, trackingExecAggStageImplPtr->getAttachCount());
-    ASSERT_EQUALS(2, trackingExecAggStageImplPtr->getDetachCount());
 }
 
 TEST_F(AggStageTest, TestDPLRaiiVecToAbiArrayRoundTrip) {

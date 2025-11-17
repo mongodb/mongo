@@ -67,10 +67,6 @@ public:
     void reopen() override {}
 
     void close() override {}
-
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
 };
 
 class NoOpLogicalAggStage : public sdk::LogicalAggStage {
@@ -169,10 +165,6 @@ public:
     void reopen() override {}
 
     void close() override {}
-
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
 
 private:
     // Every SourceExecAggStage object will have access to the same test document suite.
@@ -1043,10 +1035,6 @@ public:
 
     void close() override {}
 
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
-
     static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
         return std::make_unique<ValidExtensionExecAggStage>();
     }
@@ -1090,10 +1078,6 @@ public:
     void reopen() override {}
 
     void close() override {}
-
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
 
     static inline std::unique_ptr<sdk::ExecAggStage> make() {
         return std::unique_ptr<sdk::ExecAggStage>(new NoOpExtensionExecAggStage());

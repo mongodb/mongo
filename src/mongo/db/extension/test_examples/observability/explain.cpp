@@ -55,10 +55,6 @@ public:
     void reopen() override {}
 
     void close() override {}
-
-    void attach(::MongoExtensionOpCtx* /*ctx*/) override {}
-
-    void detach() override {}
 };
 
 class ExplainLogicalStage : public sdk::LogicalAggStage {
