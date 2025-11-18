@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/util/str.h"
 
@@ -40,6 +41,22 @@ namespace {
 std::string nodeSetToString(const NodeSet& set, size_t numNodesToPrint = kMaxNodesInJoin) {
     return set.to_string().substr(kMaxNodesInJoin - numNodesToPrint, numNodesToPrint);
 }
+
+/**
+ * Helper to pretty-print join method.
+ */
+std::string joinMethodToString(JoinMethod method) {
+    switch (method) {
+        case JoinMethod::HJ:
+            return "HJ";
+        case JoinMethod::NLJ:
+            return "NLJ";
+        case JoinMethod::INLJ:
+            return "INLJ";
+    }
+
+    MONGO_UNREACHABLE_TASSERT(11336901);
+}
 }  // namespace
 
 std::string BaseNode::toString(size_t numNodesToPrint, std::string indentStr) const {
@@ -50,18 +67,7 @@ std::string BaseNode::toString(size_t numNodesToPrint, std::string indentStr) co
 std::string JoiningNode::toString(size_t numNodesToPrint, std::string indentStr) const {
     auto ss = std::stringstream() << indentStr << "[" << nodeSetToString(bitset, numNodesToPrint)
                                   << "] ";
-    const auto methodStr = [this]() {
-        switch (method) {
-            case JoinMethod::HJ:
-                return "HJ";
-            case JoinMethod::NLJ:
-                return "NLJ";
-            case JoinMethod::INLJ:
-                return "INLJ";
-        }
-
-        MONGO_UNREACHABLE_TASSERT(11336901);
-    }();
+    const auto methodStr = joinMethodToString(method);
 
     ss << methodStr;
     return ss.str();
@@ -130,6 +136,24 @@ std::string JoinPlanNodeRegistry::joinPlansToString(const JoinPlans& plans,
 
 NodeSet JoinPlanNodeRegistry::getBitset(JoinPlanNodeId id) const {
     return std::visit([](const auto& n) { return n.bitset; }, get(id));
+}
+
+BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
+                                                 size_t numNodesToPrint) const {
+    return std::visit(
+        OverloadedVisitor{[this, numNodesToPrint](const JoiningNode& join) {
+                              return BSON("subset"
+                                          << nodeSetToString(join.bitset, numNodesToPrint)
+                                          << "method" << joinMethodToString(join.method) << "left"
+                                          << joinPlanNodeToBSON(join.left, numNodesToPrint)
+                                          << "right"
+                                          << joinPlanNodeToBSON(join.right, numNodesToPrint));
+                          },
+                          [numNodesToPrint](const BaseNode& base) {
+                              return BSON("subset" << nodeSetToString(base.bitset, numNodesToPrint)
+                                                   << "accessPath" << base.soln->summaryString());
+                          }},
+        get(nodeId));
 }
 
 }  // namespace mongo::join_ordering

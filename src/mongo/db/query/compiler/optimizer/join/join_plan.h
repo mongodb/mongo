@@ -161,6 +161,8 @@ public:
                                      size_t numNodesToPrint = kMaxNodesInJoin,
                                      std::string indentStr = "") const;
 
+    BSONObj joinPlanNodeToBSON(JoinPlanNodeId node, size_t numNodesToPrint = kMaxNodesInJoin) const;
+
 private:
     std::vector<JoinPlanNode> _allJoinPlans;
 };

@@ -32,8 +32,11 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
+#include "mongo/logv2/log.h"
 
 #include <sstream>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::join_ordering {
 namespace {
@@ -56,6 +59,12 @@ void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
     // TODO SERVER-113059: Rudimentary cost metric/tracking.
     subset.plans.push_back(
         _registry.registerJoinNode(subset, method, left.bestPlan(), right.bestPlan()));
+
+    LOGV2_DEBUG(11336912,
+                5,
+                "Enumerating plan for join subset",
+                "plan"_attr =
+                    _registry.joinPlanNodeToBSON(subset.plans.back(), _joinGraph.numNodes()));
 }
 
 void PlanEnumeratorContext::enumerateJoinPlans(PlanTreeShape type,
