@@ -45,6 +45,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -65,7 +66,7 @@ struct SplitPolicyParams {
     ShardId primaryShardId;
 };
 
-class InitialSplitPolicy {
+class MONGO_MOD_PUBLIC InitialSplitPolicy {
 public:
     virtual ~InitialSplitPolicy() {}
 
@@ -123,7 +124,7 @@ public:
 /**
  * Default optimization strategy where we create a single chunk on the primary shard.
  */
-class SingleChunkOnPrimarySplitPolicy : public InitialSplitPolicy {
+class MONGO_MOD_PUBLIC SingleChunkOnPrimarySplitPolicy : public InitialSplitPolicy {
 public:
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -133,7 +134,7 @@ public:
 /**
  * Create a single chunk on a specified shard.
  */
-class SingleChunkOnShardSplitPolicy : public InitialSplitPolicy {
+class MONGO_MOD_PUBLIC SingleChunkOnShardSplitPolicy : public InitialSplitPolicy {
 public:
     SingleChunkOnShardSplitPolicy(OperationContext* opCtx, ShardId dataShard);
 
@@ -149,7 +150,7 @@ private:
  * Split point building strategy to be used when the appropriate splitpoints can be trivially
  * deduced from the shard key.
  */
-class SplitPointsBasedSplitPolicy : public InitialSplitPolicy {
+class MONGO_MOD_PUBLIC SplitPointsBasedSplitPolicy : public InitialSplitPolicy {
 public:
     /**
      * Constructor used when generating split points for a hashed-prefix shard key.
@@ -216,7 +217,7 @@ private:
 /**
  * In this strategy we directly generate a single chunk for each tag range.
  */
-class SingleChunkPerTagSplitPolicy : public AbstractTagsBasedSplitPolicy {
+class MONGO_MOD_PUBLIC SingleChunkPerTagSplitPolicy : public AbstractTagsBasedSplitPolicy {
 public:
     SingleChunkPerTagSplitPolicy(
         OperationContext* opCtx,
@@ -236,7 +237,7 @@ private:
  * case, we generate one chunk per tag range and then further split each of these using the hashed
  * field of the shard key.
  */
-class PresplitHashedZonesSplitPolicy : public AbstractTagsBasedSplitPolicy {
+class MONGO_MOD_PUBLIC PresplitHashedZonesSplitPolicy : public AbstractTagsBasedSplitPolicy {
 public:
     PresplitHashedZonesSplitPolicy(
         OperationContext* opCtx,
@@ -258,7 +259,7 @@ private:
 /**
  * Split point building strategy for resharding.
  */
-class SamplingBasedSplitPolicy : public InitialSplitPolicy {
+class MONGO_MOD_PUBLIC SamplingBasedSplitPolicy : public InitialSplitPolicy {
 public:
     using SampleDocumentPipeline = std::unique_ptr<Pipeline>;
 
@@ -319,13 +320,14 @@ public:
 
     static constexpr int kDefaultSamplesPerChunk = 10;
 
-    static std::unique_ptr<SampleDocumentSource> makePipelineDocumentSource_forTest(
-        OperationContext* opCtx,
-        boost::intrusive_ptr<DocumentSource> initialSource,
-        const NamespaceString& ns,
-        const ShardKeyPattern& shardKey,
-        int numInitialChunks,
-        int samplesPerChunk);
+    // TODO This should ideally be file_private.
+    MONGO_MOD_NEEDS_REPLACEMENT static std::unique_ptr<SampleDocumentSource>
+    makePipelineDocumentSource_forTest(OperationContext* opCtx,
+                                       boost::intrusive_ptr<DocumentSource> initialSource,
+                                       const NamespaceString& ns,
+                                       const ShardKeyPattern& shardKey,
+                                       int numInitialChunks,
+                                       int samplesPerChunk);
 
 private:
     static std::unique_ptr<SampleDocumentSource> _makePipelineDocumentSource(

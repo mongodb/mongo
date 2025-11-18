@@ -169,15 +169,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "repair_sharded_collection_chunks_history_gen",
-    src = "repair_sharded_collection_chunks_history.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "update_zone_key_range_gen",
     src = "update_zone_key_range.idl",
     deps = [

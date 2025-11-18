@@ -29,6 +29,7 @@
 # Feature flags for balancer functionality.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo::feature_flags"
 
 imports:

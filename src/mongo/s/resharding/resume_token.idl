@@ -36,6 +36,7 @@ structs:
     ResumeTokenOplogTimestamp:
         description: "Token format which facilitates resuming from the most recently-observed timestamp in the oplog"
         strict: true
+        mod_visibility: public
         fields:
             ts:
                 type: timestamp
