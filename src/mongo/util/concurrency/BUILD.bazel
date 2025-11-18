@@ -24,10 +24,6 @@ mongo_cc_library(
     srcs = [
         "spin_lock.cpp",
     ],
-    hdrs = [
-        "spin_lock.h",
-        "//src/mongo/platform:pause.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -37,12 +33,6 @@ mongo_cc_library(
     name = "admission_context",
     srcs = [
         "admission_context.cpp",
-    ],
-    hdrs = [
-        "admission_context.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
     ],
     deps = [
         ":spin_lock",
@@ -61,9 +51,6 @@ mongo_cc_library(
         "ticketholder.cpp",
         "ticketholder_parameters_gen",
     ],
-    hdrs = [
-        "ticketholder.h",
-    ],
     deps = [
         ":admission_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
@@ -80,9 +67,6 @@ mongo_cc_library(
     srcs = [
         "ticketholder_queue_stats.cpp",
     ],
-    hdrs = [
-        "ticketholder_queue_stats.h",
-    ],
     deps = [
         ":admission_context",
         "//src/mongo/db:server_base",
@@ -95,10 +79,6 @@ mongo_cc_library(
     name = "thread_pool",
     srcs = [
         "thread_pool.cpp",
-    ],
-    hdrs = [
-        "thread_pool.h",
-        "//src/mongo/util/concurrency:thread_pool_interface.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -131,7 +111,6 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "lock_free_read_list_test",
     srcs = ["lock_free_read_list_test.cpp"],
-    private_hdrs = ["//src/mongo/unittest:join_thread.h"],
     tags = ["mongo_unittest_second_group"],
     deps = [],
 )
@@ -149,7 +128,6 @@ mongo_cc_benchmark(
 mongo_cc_benchmark(
     name = "ticketholder_bm",
     srcs = ["ticketholder_bm.cpp"],
-    private_hdrs = ["//src/mongo/util:latency_distribution.h"],
     tags = [
         "second_half_bm",
     ],
@@ -158,7 +136,6 @@ mongo_cc_benchmark(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/local_catalog/lock_manager",
-        "//src/mongo/util:tick_source_mock",
     ],
 )
 

@@ -16,14 +16,6 @@ mongo_cc_library(
         "explain_common.cpp",
         "find_common.cpp",
     ],
-    hdrs = [
-        "explain_common.h",
-        "find.h",
-        "find_common.h",
-    ],
-    header_deps = [
-        "//src/mongo/db:curop_failpoint_helpers",
-    ],
     deps = [
         ":canonical_query_base",
         "//src/mongo:base",
@@ -36,10 +28,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "canonical_distinct",
     srcs = ["canonical_distinct.cpp"],
-    hdrs = [
-        "canonical_distinct.h",
-    ],
-    private_hdrs = ["//src/mongo/db/pipeline:document_source_replace_root.h"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:commands",
@@ -52,9 +40,6 @@ mongo_cc_library(
     srcs = [
         "query_fcv_environment_for_test.cpp",
     ],
-    hdrs = [
-        "query_fcv_environment_for_test.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -65,31 +50,17 @@ mongo_cc_library(
     srcs = [
         "random_utils.cpp",
     ],
-    hdrs = [
-        "random_utils.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
 )
 
-mongo_cc_library(
-    name = "shard_key_diagnostic_printer",
-    hdrs = [
-        "shard_key_diagnostic_printer.h",
-    ],
-)
+mongo_cc_library(name = "shard_key_diagnostic_printer")
 
 mongo_cc_library(
     name = "parsed_find_command",
     srcs = [
         "parsed_find_command.cpp",
-    ],
-    hdrs = [
-        "parsed_find_command.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/pipeline",
     ],
     deps = [
         "//src/mongo:base",
@@ -105,10 +76,6 @@ mongo_cc_library(
         "canonical_query.cpp",
         "canonical_query_encoder.cpp",
     ],
-    hdrs = [
-        "canonical_query.h",
-        "canonical_query_encoder.h",
-    ],
     deps = [
         ":parsed_find_command",
         "//src/mongo/db/pipeline",
@@ -119,9 +86,6 @@ mongo_cc_library(
     name = "parsed_distinct_command",
     srcs = [
         "parsed_distinct_command.cpp",
-    ],
-    hdrs = [
-        "parsed_distinct_command.h",
     ],
     deps = [
         ":canonical_distinct",
@@ -137,12 +101,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape:find_cmd_shape.cpp",
         "//src/mongo/db/query/query_stats:find_key.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/query/query_shape:count_cmd_shape.h",
-        "//src/mongo/db/query/query_shape:distinct_cmd_shape.h",
-        "//src/mongo/db/query/query_shape:find_cmd_shape.h",
-        "//src/mongo/db/query/query_stats:find_key.h",
-    ],
     deps = [
         ":parsed_distinct_command",
     ],
@@ -153,9 +111,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/query/util:memory_util.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/query/util:memory_util.h",
-    ],
     deps = [
         "//src/mongo/util:processinfo",
     ],
@@ -164,6 +119,7 @@ mongo_cc_library(
 idl_generator(
     name = "explain_verbosity_gen",
     src = "explain_verbosity.idl",
+    idl_self_dep = True,
 )
 
 mongo_cc_library(
@@ -173,11 +129,6 @@ mongo_cc_library(
         "analyze_regex.cpp",
         "explain_options.cpp",
         ":explain_verbosity_gen",
-    ],
-    hdrs = [
-        "allowed_contexts.h",
-        "analyze_regex.h",
-        "explain_options.h",
     ],
     deps = [
         "//src/mongo/db:api_parameters",
@@ -230,9 +181,6 @@ mongo_cc_library(
     srcs = [
         "plan_yield_policy.cpp",
     ],
-    hdrs = [
-        "plan_yield_policy.h",
-    ],
     deps = [
         "//src/mongo/db:shard_role",
         "//src/mongo/db/local_catalog/lock_manager",
@@ -245,9 +193,6 @@ mongo_cc_library(
     name = "plan_yield_policy_sbe",
     srcs = [
         "plan_yield_policy_sbe.cpp",
-    ],
-    hdrs = [
-        "plan_yield_policy_sbe.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -264,9 +209,6 @@ mongo_cc_library(
     srcs = [
         "plan_yield_policy_release_memory.cpp",
     ],
-    hdrs = [
-        "plan_yield_policy_release_memory.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",
@@ -282,16 +224,6 @@ mongo_cc_library(
         "plan_executor.cpp",
         "plan_yield_policy_remote_cursor.cpp",
         "yield_policy_callbacks_impl.cpp",
-    ],
-    hdrs = [
-        "oplog_wait_config.h",
-        "plan_executor.h",
-        "plan_yield_policy_remote_cursor.h",
-        "yield_policy_callbacks_impl.h",
-    ],
-    header_deps = [
-        ":query_common",
-        "//src/mongo/db:server_base",
     ],
     deps = [
         ":plan_yield_policy",
@@ -313,9 +245,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/query/util:spill_util.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/query/util:spill_util.h",
-    ],
     deps = [
         "//src/mongo/db/storage:disk_space_util",
     ],
@@ -326,10 +255,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",
-        "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.h",
     ],
     deps = [
         ":memory_util",
@@ -350,7 +275,6 @@ mongo_cc_library(
         "sampling_confidence_interval.cpp",
         "sbe_hashAgg_increased_spilling_mode.cpp",
     ],
-    private_hdrs = ["//src/mongo/db/query/query_stats:rate_limiting.h"],
     deps = [
         ":on_parameter_change_updaters",
         "//src/mongo/db:server_base",
@@ -362,9 +286,6 @@ mongo_cc_library(
     name = "query_knob_configuration",
     srcs = [
         "query_knob_configuration.cpp",
-    ],
-    hdrs = [
-        "query_knob_configuration.h",
     ],
     deps = [
         ":query_knobs",
@@ -384,9 +305,6 @@ idl_generator(
 
 mongo_cc_library(
     name = "index_multikey_helpers",
-    hdrs = [
-        "index_multikey_helpers.h",
-    ],
     deps = [
         "//src/mongo/db/index:index_access_method",
     ],
@@ -410,24 +328,6 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_enumerator:memo_prune.cpp",
         "//src/mongo/db/query/plan_enumerator:plan_enumerator.cpp",
     ],
-    hdrs = [
-        "distinct_access.h",
-        "index_tag.h",
-        "planner_access.h",
-        "planner_analysis.h",
-        "planner_ixselect.h",
-        "planner_wildcard_helpers.h",
-        "query_planner.h",
-        "query_planner_common.h",
-        "query_settings.h",
-        "record_id_range.h",
-        "//src/mongo/db/query/plan_cache:plan_cache_diagnostic_printer.h",
-        "//src/mongo/db/query/plan_cache:plan_cache_indexability.h",
-        "//src/mongo/db/query/plan_enumerator:enumerator_memo.h",
-        "//src/mongo/db/query/plan_enumerator:memo_prune.h",
-        "//src/mongo/db/query/plan_enumerator:plan_enumerator.h",
-    ],
-    private_hdrs = ["//src/mongo/util:map_utils.h"],
     deps = [
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -450,11 +350,6 @@ mongo_cc_library(
         "//src/mongo/db/query/timeseries:bucket_level_comparison_predicate_generator.cpp",
         "//src/mongo/db/query/timeseries:bucket_level_id_predicate_generator.cpp",
         "//src/mongo/db/query/timeseries:bucket_spec.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/query/timeseries:bucket_level_comparison_predicate_generator.h",
-        "//src/mongo/db/query/timeseries:bucket_level_id_predicate_generator.h",
-        "//src/mongo/db/query/timeseries:bucket_spec.h",
     ],
     deps = [
         "//src/mongo/db:query_expressions",
@@ -499,17 +394,7 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:kill_cursors_gen",
         "//src/mongo/db/query/client_cursor:release_memory_gen",
     ],
-    hdrs = [
-        "count_request.h",
-        "view_response_formatter.h",
-        "//src/mongo/db/query/client_cursor:cursor_response.h",
-    ],
-    private_hdrs = [
-        "//src/mongo/db/query/client_cursor:clientcursor.h",
-        "//src/mongo/db/query/client_cursor:cursor_id.h",
-    ],
     deps = [
-        "//src/mongo:core_headers_library",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
@@ -540,17 +425,6 @@ mongo_cc_library(
         "tailable_mode.cpp",
         "tailable_mode_gen",
     ],
-    hdrs = [
-        "query_request_helper.h",
-        "tailable_mode.h",
-    ],
-    header_deps = [
-        "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:test_commands_enabled",
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/s:common_s",
-    ],
     deps = [
         ":hint_parser",
         "//src/mongo/crypto:fle_fields",
@@ -569,11 +443,6 @@ mongo_cc_library(
         "hint_parser.cpp",
         ":hint_gen",
     ],
-    hdrs = [
-        "hint_parser.h",
-        ":hint_gen",
-        "//src/mongo:core_headers",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:cluster_role",
@@ -587,9 +456,6 @@ mongo_cc_library(
         "index_hint.cpp",
         ":index_hint_gen",
     ],
-    header_deps = [
-        "//src/mongo/db/repl:oplog_buffer_batched_queue",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -600,9 +466,6 @@ mongo_cc_library(
     srcs = [
         "map_reduce_output_format.cpp",
     ],
-    hdrs = [
-        "map_reduce_output_format.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -611,9 +474,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "explain_diagnostic_printer",
     srcs = [],
-    hdrs = [
-        "//src/mongo/db/query:explain_diagnostic_printer.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:commands",
@@ -625,9 +485,6 @@ mongo_cc_library(
     srcs = [
         "query_test_service_context.cpp",
     ],
-    hdrs = [
-        "query_test_service_context.h",
-    ],
     deps = [
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/query/collation:collator_factory_mock",
@@ -638,9 +495,6 @@ mongo_cc_library(
     name = "query_planner_test_fixture",
     srcs = [
         "query_planner_test_fixture.cpp",
-    ],
-    hdrs = [
-        "query_planner_test_fixture.h",
     ],
     deps = [
         ":query_planner_test_lib",
@@ -655,9 +509,6 @@ mongo_cc_library(
     srcs = [
         "query_planner_test_lib.cpp",
     ],
-    hdrs = [
-        "query_planner_test_lib.h",
-    ],
     deps = [
         ":query_planner",
         ":query_test_service_context",
@@ -670,9 +521,6 @@ mongo_cc_library(
     srcs = [
         "shard_filterer_factory_mock.cpp",
     ],
-    hdrs = [
-        "shard_filterer_factory_mock.h",
-    ],
     deps = [
         "//src/mongo/db:query_exec",
     ],
@@ -682,10 +530,6 @@ mongo_cc_library(
     name = "canonical_query_test_util",
     srcs = [
         "canonical_query_test_util.cpp",
-    ],
-    hdrs = [
-        "canonical_query_test_util.h",
-        "//src/mongo:core_headers",
     ],
     deps = [
         ":canonical_query_base",
@@ -720,10 +564,6 @@ mongo_cc_unit_test(
     data = [
         "//src/mongo/db/query/test_output/query_planner_i_x_select_test:test_data",
     ],
-    private_hdrs = [
-        ":wildcard_test_utils.h",
-        "//src/mongo/db/query/util:cartesian_product.h",
-    ],
     tags = [
         "mongo_unittest_first_group",
     ],
@@ -733,7 +573,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d",
         "//src/mongo/db/local_catalog:collection_mock",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 
@@ -759,7 +598,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 
@@ -778,7 +616,6 @@ mongo_cc_unit_test(
         "record_id_range_test.cpp",
         "view_response_formatter_test.cpp",
     ],
-    private_hdrs = [":wildcard_test_utils.h"],
     tags = [
         "mongo_unittest_fifth_group",
     ],
@@ -795,7 +632,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/rpc",
         "//src/mongo/util:clock_source_mock",
     ],
@@ -804,11 +640,6 @@ mongo_cc_unit_test(
 mongo_cc_benchmark(
     name = "canonical_query_bm",
     srcs = ["canonical_query_bm.cpp"],
-    header_deps = [
-        "//src/mongo/db/matcher:expressions_mongod_only",
-        "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:canonical_query_base",
-    ],
     tags = ["query_bm"],
     deps = [
         "//src/mongo/db/query:query_fcv_environment_for_test",
@@ -831,7 +662,6 @@ mongo_cc_benchmark(
 mongo_cc_library(
     name = "query_bm_constants",
     srcs = ["query_bm_constants.cpp"],
-    hdrs = ["query_bm_constants.h"],
     deps = ["//src/mongo:base"],
 )
 
@@ -839,12 +669,6 @@ mongo_cc_library(
     name = "query_bm_fixture",
     srcs = [
         "query_bm_fixture.cpp",
-    ],
-    hdrs = [
-        "query_bm_fixture.h",
-    ],
-    header_deps = [
-        "//src/mongo/unittest:benchmark_util",
     ],
     deps = [
         "//src/mongo/db:read_write_concern_defaults_mock",

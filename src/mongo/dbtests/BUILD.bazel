@@ -22,11 +22,6 @@ mongo_cc_library(
         "framework_options_gen",
         "framework_options_init.cpp",
     ],
-    hdrs = [
-        "framework.h",
-        "framework_options.h",
-        "//src/mongo/dbtests:dbtests.h",
-    ],
     deps = [
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:server_base",
@@ -53,12 +48,6 @@ mongo_cc_library(
         "//src/mongo/dbtests/mock:mock_dbclient_connection.cpp",
         "//src/mongo/dbtests/mock:mock_remote_db_server.cpp",
         "//src/mongo/dbtests/mock:mock_replica_set.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/dbtests/mock:mock_conn_registry.h",
-        "//src/mongo/dbtests/mock:mock_dbclient_connection.h",
-        "//src/mongo/dbtests/mock:mock_remote_db_server.h",
-        "//src/mongo/dbtests/mock:mock_replica_set.h",
     ],
     deps = [
         "//src/mongo/client:clientdriver_network",
@@ -145,19 +134,14 @@ mongo_cc_binary(
         "wildcard_multikey_persistence_test.cpp",
         "//src/mongo/db/local_catalog:catalogtests.cpp",
         "//src/mongo/db/local_catalog:indexcatalogtests.cpp",
-    ] + select({
+    ],
+    srcs_select = [{
         "//bazel/config:js_engine_mozjs": [
             "jstests.cpp",
             "matchertests.cpp",
         ],
         "//conditions:default": [],
-    }),
-    private_hdrs = [
-        ":storage_debug_util.h",
-        "//src/mongo/db:session_manager_mongod.h",
-        "//src/mongo/idl:server_parameter_test_controller.h",
-        "//src/mongo/util:embedded_builder.h",
-    ],
+    }],
     tags = ["dbtest"],
     deps = [
         "deps_shim",

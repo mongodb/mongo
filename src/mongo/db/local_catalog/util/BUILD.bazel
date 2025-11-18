@@ -15,7 +15,5 @@ mongo_cc_unit_test(
         "partitioned_test.cpp",
     ],
     tags = ["mongo_unittest_seventh_group"],
-    deps = [
-        "//src/mongo:core_headers_library",
-    ],
+    deps = [],
 )

@@ -15,9 +15,6 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment/client:shard.cpp",
         "//src/mongo/db/sharding_environment/client:shard_gen",
     ],
-    hdrs = [
-        "//src/mongo/db/sharding_environment/client:shard.h",
-    ],
     deps = [
         "//src/mongo/client:remote_command_retry_scheduler",
         "//src/mongo/client:retry_strategy",
@@ -32,10 +29,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/sharding_environment/client:num_hosts_targeted_metrics.cpp",
         "//src/mongo/db/sharding_environment/client:shard_remote.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/sharding_environment/client:num_hosts_targeted_metrics.h",
-        "//src/mongo/db/sharding_environment/client:shard_remote.h",
     ],
     deps = [
         ":shard_interface",

@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "transaction_operations.cpp",
     ],
-    hdrs = [
-        "transaction_operations.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/repl:oplog_entry",
@@ -44,10 +41,6 @@ mongo_cc_library(
         "sep_transaction_client.cpp",
         "transaction_api.cpp",
         "transaction_with_retries_api.cpp",
-    ],
-    hdrs = [
-        "internal_transaction_metrics.h",
-        "transaction_api.h",
     ],
     deps = [
         "//src/mongo/db:operation_time_tracker",
@@ -80,15 +73,6 @@ mongo_cc_library(
         "transaction_participant_resource_yielder.cpp",
         ":transaction_participant_gen",
         ":transactions_stats_gen",
-    ],
-    hdrs = [
-        "retryable_writes_stats.h",
-        "server_transactions_metrics.h",
-        "session_catalog_mongod_transaction_interface_impl.h",
-        "transaction_history_iterator.h",
-        "transaction_metrics_observer.h",
-        "transaction_participant.h",
-        "transaction_participant_resource_yielder.h",
     ],
     deps = [
         ":transaction_operations",
@@ -156,7 +140,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/stats:transaction_stats",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/executor:inline_executor",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s:sharding_router_api",
     ],
 )

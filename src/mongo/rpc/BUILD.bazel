@@ -15,11 +15,6 @@ mongo_cc_library(
         "message.cpp",
         "op_msg.cpp",
     ],
-    hdrs = [
-        "message.h",
-        "op_compressed.h",
-        "op_msg.h",
-    ],
     deps = [
         "//src/mongo/bson:bson_validate",  # TODO(SERVER-93876): Remove.
         "//src/mongo/bson/dotted_path:dotted_path_support",
@@ -50,9 +45,6 @@ mongo_cc_library(
         "//src/mongo/rpc/metadata:client_metadata.cpp",
         "//src/mongo/rpc/metadata:client_metadata_gen",
     ],
-    hdrs = [
-        "//src/mongo/rpc/metadata:client_metadata.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
@@ -72,13 +64,6 @@ mongo_cc_library(
         "//src/mongo/rpc/metadata:egress_metadata_hook_list.cpp",
         "//src/mongo/rpc/metadata:oplog_query_metadata.cpp",
         "//src/mongo/rpc/metadata:repl_set_metadata.cpp",
-    ],
-    hdrs = [
-        "metadata.h",
-        "//src/mongo/rpc/metadata:egress_metadata_hook_list.h",
-        "//src/mongo/rpc/metadata:metadata_hook.h",
-        "//src/mongo/rpc/metadata:oplog_query_metadata.h",
-        "//src/mongo/rpc/metadata:repl_set_metadata.h",
     ],
     deps = [
         ":client_metadata",
@@ -115,16 +100,6 @@ mongo_cc_library(
         "reply_builder_interface.cpp",
         ":object_check_gen",
     ],
-    hdrs = [
-        "check_allowed_op_query_cmd.h",
-        "factory.h",
-        "legacy_reply.h",
-        "legacy_reply_builder.h",
-        "legacy_request.h",
-        "object_check.h",
-        "op_msg_rpc_impls.h",
-        "reply_builder_interface.h",
-    ],
     deps = [
         ":message",
         ":metadata",
@@ -147,13 +122,6 @@ mongo_cc_library(
         "//src/mongo/rpc/metadata:audit_user_attrs.cpp",
         "//src/mongo/rpc/metadata:audit_user_attrs_client_observer.cpp",
         "//src/mongo/rpc/metadata:impersonated_client_session.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/rpc/metadata:audit_client_attrs.h",
-        "//src/mongo/rpc/metadata:audit_metadata.h",
-        "//src/mongo/rpc/metadata:audit_user_attrs.h",
-        "//src/mongo/rpc/metadata:audit_user_attrs_client_observer.h",
-        "//src/mongo/rpc/metadata:impersonated_client_session.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -184,9 +152,6 @@ mongo_cc_library(
         "rewrite_state_change_errors.cpp",
         "rewrite_state_change_errors_server_parameter_gen",
     ],
-    hdrs = [
-        "rewrite_state_change_errors.h",
-    ],
     deps = [
         ":message",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
@@ -205,7 +170,6 @@ mongo_cc_library(
         "write_concern_error_detail.cpp",
         "write_concern_error_gen",
     ],
-    private_hdrs = [":write_concern_error_detail.h"],
     deps = [
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:common",
@@ -217,9 +181,6 @@ mongo_cc_library(
     name = "get_status_from_command_result",
     srcs = [
         "get_status_from_command_result.cpp",
-    ],
-    hdrs = [
-        "get_status_from_command_result.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -256,7 +217,6 @@ mongo_cc_unit_test(
         "//src/mongo/rpc/metadata:repl_set_metadata_test.cpp",
         "//src/mongo/rpc/metadata:security_token_metadata_test.cpp",
     ],
-    private_hdrs = [":op_msg_test.h"],
     tags = ["mongo_unittest_fifth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
@@ -271,7 +231,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/transport:transport_layer_mock",
         "//src/third_party/wiredtiger:wiredtiger_checksum",
     ],

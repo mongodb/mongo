@@ -15,12 +15,6 @@ mongo_cc_library(
         "query_solution.cpp",
         "stage_types.cpp",
     ],
-    hdrs = [
-        "query_solution.h",
-        "query_solution_helpers.h",
-        "stage_types.h",
-        "//src/mongo/db/query:query_planner_common.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
@@ -36,11 +30,6 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "query_solution_test",
     srcs = ["query_solution_test.cpp"],
-    private_hdrs = [
-        "//src/mongo/db/query/collation:collator_interface_mock.h",
-        "//src/mongo/db/query:query_test_service_context.h",
-        "//src/mongo/db/query:wildcard_test_utils.h",
-    ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":query_solution",

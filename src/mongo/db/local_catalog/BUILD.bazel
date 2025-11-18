@@ -11,10 +11,6 @@ exports_files(
 
 mongo_cc_library(
     name = "index_catalog_mock",
-    hdrs = [
-        "index_catalog_mock.h",
-    ],
-    private_hdrs = [":index_catalog_entry_mock.h"],
     deps = [
     ],
 )
@@ -23,9 +19,6 @@ mongo_cc_library(
     name = "cannot_convert_index_to_unique_info",
     srcs = [
         "cannot_convert_index_to_unique_info.cpp",
-    ],
-    hdrs = [
-        "cannot_convert_index_to_unique_info.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -60,13 +53,6 @@ mongo_cc_library(
         "collection_options_gen",
         "collection_options_validation.cpp",
     ],
-    hdrs = [
-        "clustered_collection_util.h",
-        "collection_options.h",
-        "collection_options_validation.h",
-        "//src/mongo/db/index:index_constants.h",
-    ],
-    private_hdrs = ["//src/mongo/db/local_catalog/ddl:create_command_validation.h"],
     deps = [
         # TODO(SERVER-93876): Technically only requires `//src/mongo/db:common`.
         "//src/mongo/crypto:encrypted_field_config",
@@ -86,9 +72,6 @@ mongo_cc_library(
     srcs = [
         "local_oplog_info.cpp",
     ],
-    hdrs = [
-        "local_oplog_info.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:vector_clock_mutable",
@@ -106,9 +89,6 @@ mongo_cc_library(
     name = "durable_catalog",
     srcs = [
         "durable_catalog.cpp",
-    ],
-    hdrs = [
-        "durable_catalog.h",
     ],
     deps = [
         ":collection_record_store_options",
@@ -128,9 +108,6 @@ mongo_cc_library(
     srcs = [
         "durable_catalog_entry_metadata.cpp",
     ],
-    hdrs = [
-        "durable_catalog_entry_metadata.h",
-    ],
     deps = [
         ":collection_options",
         "//src/mongo/db:common",
@@ -147,13 +124,6 @@ mongo_cc_library(
         "uncommitted_multikey.cpp",
         "views_for_database.cpp",
     ],
-    hdrs = [
-        "collection_catalog.h",
-        "historical_catalogid_tracker.h",
-        "uncommitted_catalog_updates.h",
-        "uncommitted_multikey.h",
-        "views_for_database.h",
-    ],
     deps = [
         ":durable_catalog",
         ":durable_catalog_entry_metadata",
@@ -164,7 +134,6 @@ mongo_cc_library(
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:exceptions",
         "//src/mongo/db/storage:mdb_catalog",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
@@ -178,12 +147,6 @@ mongo_cc_library(
         "//src/mongo/db/query:collection_query_info.cpp",
         "//src/mongo/db/query:query_settings_decoration.cpp",
         "//src/mongo/db/query/plan_cache:plan_cache_key_factory.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/query:collection_index_usage_tracker_decoration.h",
-        "//src/mongo/db/query:collection_query_info.h",
-        "//src/mongo/db/query:query_settings_decoration.h",
-        "//src/mongo/db/query/plan_cache:plan_cache_key_factory.h",
     ],
     deps = [
         "index_catalog",
@@ -213,9 +176,6 @@ mongo_cc_library(
     srcs = [
         "collection_uuid_mismatch_info.cpp",
     ],
-    hdrs = [
-        "collection_uuid_mismatch_info.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -237,73 +197,6 @@ mongo_cc_library(
         "index_catalog.cpp",
         "index_catalog_entry.cpp",
     ],
-    hdrs = [
-        "clustered_collection_options_gen",
-        "collection_options_gen",
-        "index_catalog.h",
-        "index_catalog_entry.h",
-        "//src/mongo/base:error_codes_header",
-        "//src/mongo/bson:bson_validate_gen",
-        "//src/mongo/client:client_api_version_parameters_gen",
-        "//src/mongo/client:hedging_mode_gen",
-        "//src/mongo/client:read_preference_gen",
-        "//src/mongo/crypto:encryption_fields_gen",
-        "//src/mongo/crypto:fle_stats_gen",
-        "//src/mongo/db:api_parameters_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db:multitenancy_gen",
-        "//src/mongo/db:namespace_spec_gen",
-        "//src/mongo/db:read_write_concern_provenance_base_gen",
-        "//src/mongo/db:write_concern_gen",
-        "//src/mongo/db/auth:access_checks_gen",
-        "//src/mongo/db/auth:action_type_gen",
-        "//src/mongo/db/auth:auth_types_gen",
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_gen",
-        "//src/mongo/db/global_catalog:type_collection_common_types_gen",
-        "//src/mongo/db/global_catalog/router_role_api:gossiped_routing_cache_gen",
-        "//src/mongo/db/matcher/schema:encrypt_schema_gen",
-        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
-        "//src/mongo/db/pipeline:document_source_change_stream_gen",
-        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
-        "//src/mongo/db/pipeline:storage_stats_spec_gen",
-        "//src/mongo/db/query:distinct_command_gen",
-        "//src/mongo/db/query:explain_verbosity_gen",
-        "//src/mongo/db/query:find_command_gen",
-        "//src/mongo/db/query:query_feature_flags_gen",
-        "//src/mongo/db/query:query_knobs_gen",
-        "//src/mongo/db/query:tailable_mode_gen",
-        "//src/mongo/db/query/client_cursor:cursor_response_gen",
-        "//src/mongo/db/query/client_cursor:generic_cursor_gen",
-        "//src/mongo/db/query/query_settings:query_settings_gen",
-        "//src/mongo/db/query/write_ops:single_write_result_gen",
-        "//src/mongo/db/query/write_ops:write_ops_gen",
-        "//src/mongo/db/repl:apply_ops_gen",
-        "//src/mongo/db/repl:member_config_gen",
-        "//src/mongo/db/repl:oplog_entry_gen",
-        "//src/mongo/db/repl:optime_base_gen",
-        "//src/mongo/db/repl:read_concern_gen",
-        "//src/mongo/db/repl:repl_server_parameters_gen",
-        "//src/mongo/db/repl:repl_set_config_gen",
-        "//src/mongo/db/repl:repl_set_config_params_gen",
-        "//src/mongo/db/session:logical_session_cache_gen",
-        "//src/mongo/db/session:logical_session_id_gen",
-        "//src/mongo/db/sorter:sorter_gen",
-        "//src/mongo/db/timeseries:timeseries_gen",
-        "//src/mongo/db/vector_clock:vector_clock_gen",
-        "//src/mongo/db/versioning_protocol:chunk_version_gen",
-        "//src/mongo/db/versioning_protocol:database_version_base_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/rpc:topology_version_gen",
-        "//src/mongo/rpc/metadata:audit_metadata_gen",
-        "//src/mongo/util/version:releases_header",
-    ],
-    header_deps = [
-        "//src/mongo/db/exec/mutable_bson:mutable_bson",
-        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
-        "//src/mongo/db/query:hint_parser",
-        "//src/mongo/db/repl:oplog_buffer_batched_queue",
-        "//src/mongo/db/storage:duplicate_key_error_info",
-    ],
     deps = [
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/db:server_base",
@@ -317,13 +210,6 @@ mongo_cc_library(
     srcs = [
         "database_holder.cpp",
     ],
-    hdrs = [
-        "database.h",
-        "database_holder.h",
-        "virtual_collection_options.h",
-        "//src/mongo/db:dbcommands_gen",
-        "//src/mongo/db/pipeline:external_data_source_option_gen",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",
@@ -332,9 +218,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "database_holder_mock",
-    hdrs = [
-        "database_holder_mock.h",
-    ],
     deps = [
         ":database_holder",
     ],
@@ -345,9 +228,6 @@ mongo_cc_library(
     srcs = [
         "document_validation.cpp",
     ],
-    hdrs = [
-        "document_validation.h",
-    ],
     deps = [
         "//src/mongo/db:service_context",
     ],
@@ -357,10 +237,6 @@ mongo_cc_library(
     name = "index_key_validate",
     srcs = [
         "index_key_validate.cpp",
-    ],
-    hdrs = [
-        "index_key_validate.h",
-        "//src/mongo/db/ttl:ttl_collection_cache.h",
     ],
     deps = [
         "//src/mongo/db:common",
@@ -377,9 +253,6 @@ mongo_cc_library(
     srcs = [
         "throttle_cursor.cpp",
     ],
-    hdrs = [
-        "throttle_cursor.h",
-    ],
     deps = [
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/query_stats",
@@ -392,9 +265,6 @@ mongo_cc_library(
     name = "catalog_stats",
     srcs = [
         "catalog_stats.cpp",
-    ],
-    hdrs = [
-        "catalog_stats.h",
     ],
     deps = [
         ":collection_catalog",
@@ -409,9 +279,6 @@ mongo_cc_library(
     name = "index_repair",
     srcs = [
         "index_repair.cpp",
-    ],
-    hdrs = [
-        "index_repair.h",
     ],
     deps = [
         ":collection_options",
@@ -430,9 +297,6 @@ mongo_cc_library(
     name = "catalog_repair",
     srcs = [
         "catalog_repair.cpp",
-    ],
-    hdrs = [
-        "catalog_repair.h",
     ],
     deps = [
         ":durable_catalog",
@@ -460,23 +324,6 @@ mongo_cc_library(
         "unique_collection_name.cpp",
         "//src/mongo/db/collection_crud:capped_utils.cpp",
     ],
-    hdrs = [
-        "backwards_compatible_collection_options_util.h",
-        "coll_mod.h",
-        "coll_mod_index.h",
-        "collection_catalog_helper.h",
-        "collection_compact.h",
-        "create_collection.h",
-        "drop_collection.h",
-        "drop_database.h",
-        "drop_indexes.h",
-        "external_data_source_scope_guard.h",
-        "list_indexes.h",
-        "rename_collection.h",
-        "unique_collection_name.h",
-        "//src/mongo/db/collection_crud:capped_utils.h",
-    ],
-    private_hdrs = ["//src/mongo/db/op_observer:batched_write_policy.h"],
     deps = [
         ":cannot_convert_index_to_unique_info",
         ":collection_options",
@@ -526,9 +373,6 @@ mongo_cc_library(
     srcs = [
         "catalog_control.cpp",
     ],
-    hdrs = [
-        "catalog_control.h",
-    ],
     deps = [
         ":catalog_repair",
         ":catalog_stats",
@@ -552,9 +396,6 @@ mongo_cc_library(
     srcs = [
         "collection_record_store_options.cpp",
     ],
-    hdrs = [
-        "collection_record_store_options.h",
-    ],
     deps = [
         ":collection_options",
         "//src/mongo/db:server_base",
@@ -572,15 +413,6 @@ mongo_cc_library(
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "virtual_collection_impl.cpp",
-    ],
-    hdrs = [
-        "collection_impl.h",
-        "database_holder_impl.h",
-        "database_impl.h",
-        "index_catalog_entry_helpers.h",
-        "index_catalog_entry_impl.h",
-        "index_catalog_impl.h",
-        "virtual_collection_impl.h",
     ],
     deps = [
         "catalog_helpers",
@@ -642,9 +474,6 @@ mongo_cc_library(
     srcs = [
         "snapshot_helper.cpp",
     ],
-    hdrs = [
-        "snapshot_helper.h",
-    ],
     deps = [
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/repl:repl_coordinator_interface",
@@ -655,9 +484,6 @@ mongo_cc_library(
     name = "catalog_test_fixture",
     srcs = [
         "catalog_test_fixture.cpp",
-    ],
-    hdrs = [
-        "catalog_test_fixture.h",
     ],
     deps = [
         ":catalog_helpers",
@@ -672,9 +498,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "collection_mock",
-    hdrs = [
-        "collection_mock.h",
-    ],
     deps = [":collection_options"],
 )
 
@@ -758,7 +581,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/validate:collection_validation",
         "//src/mongo/db/validate:validate_idl",
         "//src/mongo/db/validate:validate_state",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:pcre_wrapper",
@@ -780,7 +602,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/query/collation:collator_interface_mock",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
     ],
 )
@@ -816,7 +637,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/validate:collection_validation",
         "//src/mongo/db/validate:validate_idl",
         "//src/mongo/db/validate:validate_state",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:pcre_wrapper",
@@ -864,9 +684,6 @@ mongo_cc_library(
     name = "validate_db_metadata_command",
     srcs = [
         ":validate_db_metadata_gen",
-    ],
-    header_deps = [
-        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
     ],
     deps = [
         "//src/mongo/db:server_base",

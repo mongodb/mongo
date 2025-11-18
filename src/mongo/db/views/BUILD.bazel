@@ -16,12 +16,6 @@ mongo_cc_library(
         "view.cpp",
         "view_graph.cpp",
     ],
-    hdrs = [
-        "util.h",
-        "view.h",
-        "view_graph.h",
-        "//src/mongo/db/query/collation:collator_factory_interface.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/query/collation:collator_interface",
@@ -32,27 +26,6 @@ mongo_cc_library(
     name = "resolved_view",
     srcs = [
         "resolved_view.cpp",
-    ],
-    hdrs = [
-        "resolved_view.h",
-        "//src/mongo/db/exec/agg:exec_pipeline.h",
-        "//src/mongo/db/exec/agg:pipeline_builder.h",
-        "//src/mongo/db/pipeline:document_source_limit.h",
-        "//src/mongo/db/pipeline:document_source_rank_fusion.h",
-        "//src/mongo/db/pipeline:document_source_score_fusion.h",
-        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
-        "//src/mongo/db/pipeline:timeseries_index_conversion_options.h",
-        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
-        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
-        "//src/mongo/db/pipeline/search:document_source_list_search_indexes.h",
-        "//src/mongo/db/pipeline/search:document_source_list_search_indexes_gen",
-        "//src/mongo/db/pipeline/search:document_source_search.h",
-        "//src/mongo/db/pipeline/search:document_source_search_meta.h",
-        "//src/mongo/db/pipeline/search:document_source_vector_search.h",
-        "//src/mongo/db/pipeline/search:search_helper_bson_obj.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/query/search:mongot_cursor",
     ],
     deps = [
         "//src/mongo:base",
@@ -66,9 +39,6 @@ mongo_cc_library(
     name = "view_catalog_helpers",
     srcs = [
         "view_catalog_helpers.cpp",
-    ],
-    hdrs = [
-        "view_catalog_helpers.h",
     ],
     deps = [
         ":resolved_view",
@@ -98,7 +68,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/repl:replmocks",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
     ],
 )

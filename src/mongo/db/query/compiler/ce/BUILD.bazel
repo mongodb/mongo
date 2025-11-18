@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "ce_common.cpp",
     ],
-    hdrs = [
-        "ce_common.h",
-    ],
     deps = [
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
         "//src/mongo/db/query/compiler/stats:stats_gen",
@@ -28,9 +25,6 @@ mongo_cc_library(
     name = "ce_test_utils",
     srcs = [
         "ce_test_utils.cpp",
-    ],
-    hdrs = [
-        "ce_test_utils.h",
     ],
     deps = [
         ":ce_common",

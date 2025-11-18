@@ -18,15 +18,6 @@ mongo_cc_library(
         "value.cpp",
         "value_comparator.cpp",
     ],
-    hdrs = [
-        "document.h",
-        "document_comparator.h",
-        "document_metadata_fields.h",
-        "value.h",
-        "value_comparator.h",
-        "//src/mongo/db:feature_flag.h",
-        "//src/mongo/db/query:query_feature_flags_gen",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/pipeline:field_path",
@@ -40,9 +31,6 @@ mongo_cc_library(
     name = "document_value_test_util",
     srcs = [
         "document_value_test_util.cpp",
-    ],
-    hdrs = [
-        "document_value_test_util.h",
     ],
     deps = [
         ":document_value",

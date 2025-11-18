@@ -11,10 +11,6 @@ exports_files(
 mongo_cc_library(
     name = "handle",
     srcs = [],
-    hdrs = [
-        "byte_buf_handle.h",
-        "handle.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",

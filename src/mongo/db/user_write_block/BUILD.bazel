@@ -59,10 +59,6 @@ mongo_cc_library(
     srcs = [
         ":set_user_write_block_mode_gen",
     ],
-    hdrs = [
-        "//src/mongo/db/auth:authorization_contract.h",
-        "//src/mongo/db/global_catalog/ddl:notify_sharding_event_utils.h",
-    ],
     deps = [
         ":user_writes_block_reason_idl",
         "//src/mongo/db:server_base",

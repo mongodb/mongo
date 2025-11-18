@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "censor_cmdline.cpp",
     ],
-    hdrs = [
-        "censor_cmdline.h",
-    ],
     deps = [
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/options_parser",

@@ -14,10 +14,6 @@ mongo_cc_library(
     srcs = [
         "rate_limiting.cpp",
     ],
-    hdrs = [
-        "rate_limiting.h",
-        "//src/mongo/util:overloaded_visitor.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/util:clock_sources",
@@ -35,18 +31,6 @@ mongo_cc_library(
         "supplemental_metrics_stats.cpp",
         "vector_search_stats_entry.cpp",
     ],
-    hdrs = [
-        "aggregated_metric.h",
-        "optimizer_metrics_stats_entry.h",
-        "query_stats.h",
-        "query_stats_entry.h",
-        "query_stats_failed_to_record_info.h",
-        "supplemental_metrics_stats.h",
-        "vector_search_stats_entry.h",
-    ],
-    header_deps = [
-        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
-    ],
     deps = [
         ":key",
         ":rate_limiting",
@@ -61,12 +45,6 @@ mongo_cc_library(
     srcs = [
         "key.cpp",
     ],
-    hdrs = [
-        "key.h",
-    ],
-    header_deps = [
-        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
-    ],
     deps = [
         ":rate_limiting",
         "//src/mongo/db:api_parameters",
@@ -79,9 +57,6 @@ mongo_cc_library(
     name = "update_key",
     srcs = [
         "update_key.cpp",
-    ],
-    hdrs = [
-        "update_key.h",
     ],
     deps = [
         ":key",
@@ -118,10 +93,6 @@ mongo_cc_unit_test(
         "supplemental_metrics_test.cpp",
         "update_key_test.cpp",
     ],
-    header_deps = [
-        "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_controller",
-    ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":query_stats",
@@ -148,10 +119,6 @@ mongo_cc_benchmark(
     srcs = [
         "shapifying_bm.cpp",
     ],
-    header_deps = [
-        "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:query_bm_constants",
-    ],
     tags = ["query_bm"],
     deps = [
         "//src/mongo/db/query:query_bm_constants",
@@ -164,10 +131,6 @@ mongo_cc_benchmark(
     name = "shapifying_update_bm",
     srcs = [
         "shapifying_update_bm.cpp",
-    ],
-    header_deps = [
-        "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:query_bm_constants",
     ],
     tags = ["query_bm"],
     deps = [

@@ -11,9 +11,6 @@ exports_files(
 
 mongo_cc_library(
     name = "histogram_common",
-    hdrs = [
-        "histogram_common.h",
-    ],
     deps = [
         "//src/mongo/db/query/compiler/ce:ce_common",
     ],
@@ -24,10 +21,6 @@ mongo_cc_library(
     srcs = [
         "histogram_estimation_impl.cpp",
         "histogram_estimator.cpp",
-    ],
-    hdrs = [
-        "histogram_estimation_impl.h",
-        "histogram_estimator.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
@@ -43,9 +36,6 @@ mongo_cc_library(
     name = "histogram_test_utils",
     srcs = [
         "histogram_test_utils.cpp",
-    ],
-    hdrs = [
-        "histogram_test_utils.h",
     ],
     deps = [
         ":histogram_estimator",

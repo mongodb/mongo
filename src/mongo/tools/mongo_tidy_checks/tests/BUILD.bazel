@@ -53,6 +53,7 @@ tests = [
             test + ".cpp",
             "tidy_check_headers",
         ],
+        auto_header = False,
         # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
         # to see.
         copts = [

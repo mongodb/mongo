@@ -27,18 +27,6 @@ mongo_cc_library(
         "topology_state_machine.cpp",
         ":sdam_configuration_parameters_gen",
     ],
-    hdrs = [
-        "election_id_set_version_pair.h",
-        "sdam.h",
-        "sdam_configuration.h",
-        "sdam_datatypes.h",
-        "server_description.h",
-        "server_selector.h",
-        "topology_description.h",
-        "topology_listener.h",
-        "topology_manager.h",
-        "topology_state_machine.h",
-    ],
     deps = [
         "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
@@ -63,13 +51,6 @@ mongo_cc_library(
         "topology_description_builder.cpp",
         "topology_listener_mock.cpp",
     ],
-    hdrs = [
-        "mock_topology_manager.h",
-        "sdam_test_base.h",
-        "server_description_builder.h",
-        "topology_description_builder.h",
-        "topology_listener_mock.h",
-    ],
     deps = [
         ":sdam",
         "//src/mongo:base",
@@ -81,9 +62,6 @@ mongo_cc_library(
     srcs = [
         "json_test_arg_parser.cpp",
         ":json_test_runner_cli_options_gen",
-    ],
-    hdrs = [
-        "json_test_arg_parser.h",
     ],
     deps = [
         ":sdam",

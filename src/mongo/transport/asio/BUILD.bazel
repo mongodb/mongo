@@ -11,9 +11,6 @@ exports_files(
 
 mongo_cc_library(
     name = "asio_socket_test_util",
-    hdrs = [
-        "asio_socket_test_util.h",
-    ],
     deps = [
         "//src/mongo/unittest",
         "//src/third_party/asio",

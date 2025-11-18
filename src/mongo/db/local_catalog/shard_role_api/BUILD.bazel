@@ -15,18 +15,7 @@ mongo_cc_library(
     srcs = [
         "resource_yielders.cpp",
     ],
-    hdrs = [
-        "resource_yielders.h",
-        "//src/mongo/db/transaction:transaction_participant_resource_yielder.h",
-        "//src/mongo/s:transaction_router_resource_yielder.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
-        "//src/mongo/executor:async_rpc_error_info",
-        "//src/mongo/idl:idl_parser",
-    ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/storage:damage_vector",
     ],
 )

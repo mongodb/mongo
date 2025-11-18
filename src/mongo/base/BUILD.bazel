@@ -71,18 +71,12 @@ mongo_cc_library(
     srcs = [
         "environment_buffer.cpp",
     ],
-    hdrs = [
-        "environment_buffer.h",
-    ],
 )
 
 mongo_cc_library(
     name = "system_error",
     srcs = [
         "system_error.cpp",
-    ],
-    hdrs = [
-        "system_error.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -93,9 +87,6 @@ mongo_cc_library(
     name = "secure_allocator",
     srcs = [
         "secure_allocator.cpp",
-    ],
-    hdrs = [
-        "secure_allocator.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -130,7 +121,6 @@ mongo_cc_unit_test(
         "system_error_test.cpp",
         "uuid_test.cpp",
     ],
-    private_hdrs = [":data_type_validated.h"],
     tags = [
         "mongo_unittest_seventh_group",
         "platform",

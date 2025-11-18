@@ -43,23 +43,6 @@ mongo_cc_library(
     srcs = [
         "populate_cursor.cpp",
     ],
-    hdrs = [
-        "populate_cursor.h",
-        "//src/mongo/db/commands/query_cmd:bulk_write_common.h",
-        "//src/mongo/db/commands/query_cmd:bulk_write_gen",
-        "//src/mongo/db/query:find.h",
-        "//src/mongo/db/query:find_common.h",
-        "//src/mongo/db/sharding_environment:grid.h",
-        "//src/mongo/s/query/exec:cluster_client_cursor.h",
-        "//src/mongo/s/query/exec:cluster_client_cursor_guard.h",
-        "//src/mongo/s/query/exec:cluster_client_cursor_impl.h",
-        "//src/mongo/s/query/exec:cluster_client_cursor_params.h",
-        "//src/mongo/s/query/exec:cluster_cursor_manager.h",
-        "//src/mongo/s/query/exec:cluster_query_result.h",
-        "//src/mongo/s/query/exec:router_exec_stage.h",
-        "//src/mongo/s/query/exec:router_stage_queued_data.h",
-        "//src/mongo/s/write_ops:bulk_write_reply_info.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/commands/query_cmd:bulk_write_common",

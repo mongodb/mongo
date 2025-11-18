@@ -26,9 +26,6 @@ mongo_cc_library(
         "knobs.cpp",
         "stage_memory_limit_knobs_gen",
     ],
-    hdrs = [
-        "knobs.h",
-    ],
     local_defines = ["QUERY_STAGE_MEMORY_LIMITS_KNOBS_PRIVATE_OVERRIDE"],
     deps = [
         "//src/mongo/db:server_base",

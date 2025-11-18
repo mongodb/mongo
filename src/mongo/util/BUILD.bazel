@@ -52,7 +52,6 @@ mongo_cc_library(
         "buildinfo.cpp",
         ":buildinfo_gen",
     ],
-    hdrs = ["buildinfo.h"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/idl:idl_parser",
@@ -73,9 +72,6 @@ mongo_cc_library(
     name = "caching",
     srcs = [
         "read_through_cache.cpp",
-    ],
-    hdrs = [
-        "read_through_cache.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -104,16 +100,8 @@ mongo_cc_library(
     srcs = [
         "boost_assert_shim.cpp",
     ],
-    hdrs = [
-        "boost_assert_shim.h",
-        "modules.h",
-        "//src/mongo/platform:compiler.h",
-    ],
     copts = [
         "-Isrc/third_party/boost",
-    ],
-    deps = [
-        "//src/third_party/boost:headers",
     ],
 )
 
@@ -121,9 +109,6 @@ mongo_cc_library(
     name = "debugger",
     srcs = [
         "debugger.cpp",
-    ],
-    hdrs = [
-        "debugger.h",
     ],
     local_defines = select({
         "//bazel/config:use_gdbserver_enabled": ["USE_GDBSERVER"],
@@ -138,9 +123,6 @@ mongo_cc_library(
     srcs = [
         "winutil.cpp",
     ],
-    hdrs = [
-        "winutil.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -150,9 +132,6 @@ mongo_cc_library(
     name = "secure_compare_memory",
     srcs = [
         "secure_compare_memory.cpp",
-    ],
-    hdrs = [
-        "secure_compare_memory.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -164,9 +143,6 @@ mongo_cc_library(
     srcs = [
         "secure_zero_memory.cpp",
     ],
-    hdrs = [
-        "secure_zero_memory.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -176,9 +152,6 @@ mongo_cc_library(
     name = "background_job",
     srcs = [
         "background.cpp",
-    ],
-    hdrs = [
-        "background.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -193,11 +166,6 @@ mongo_cc_library(
         "clock_source.cpp",
         "fast_clock_source_factory.cpp",
     ],
-    hdrs = [
-        "background_thread_clock_source.h",
-        "clock_source.h",
-        "fast_clock_source_factory.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -208,10 +176,6 @@ mongo_cc_library(
     srcs = [
         "alarm.cpp",
         "alarm_runner_background_thread.cpp",
-    ],
-    hdrs = [
-        "alarm.h",
-        "alarm_runner_background_thread.h",
     ],
     deps = [
         ":clock_sources",
@@ -224,10 +188,6 @@ mongo_cc_library(
     srcs = [
         "executor_stats.cpp",
     ],
-    hdrs = [
-        "executor_stats.h",
-        "//src/mongo/logv2:log_severity_suppressor.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_options",
@@ -238,9 +198,6 @@ mongo_cc_library(
     name = "string_listset",
     srcs = [
         "string_listset.cpp",
-    ],
-    hdrs = [
-        "string_listset.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -286,9 +243,6 @@ mongo_cc_library(
         "icu.cpp",
         "//src/third_party/node:icu_get_string_width.cpp",
     ],
-    hdrs = [
-        "icu.h",
-    ],
     deps = [
         ":icu_init",
         "//src/mongo:base",
@@ -301,9 +255,6 @@ mongo_cc_library(
     srcs = [
         "log_and_backoff.cpp",
     ],
-    hdrs = [
-        "log_and_backoff.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -313,9 +264,6 @@ mongo_cc_library(
     name = "summation",
     srcs = [
         "summation.cpp",
-    ],
-    hdrs = [
-        "summation.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -327,12 +275,6 @@ mongo_cc_library(
     srcs = [
         "progress_meter.cpp",
     ],
-    hdrs = [
-        "progress_meter.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -343,9 +285,6 @@ mongo_cc_library(
     srcs = [
         "periodic_runner.cpp",
     ],
-    hdrs = [
-        "periodic_runner.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -355,9 +294,6 @@ mongo_cc_library(
     name = "periodic_runner_impl",
     srcs = [
         "periodic_runner_impl.cpp",
-    ],
-    hdrs = [
-        "periodic_runner_impl.h",
     ],
     deps = [
         ":periodic_runner",  # TODO(SERVER-93876): Remove.
@@ -372,9 +308,6 @@ mongo_cc_library(
     srcs = [
         "periodic_runner_factory.cpp",
     ],
-    hdrs = [
-        "periodic_runner_factory.h",
-    ],
     deps = [
         ":periodic_runner_impl",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
@@ -387,12 +320,6 @@ mongo_cc_library(
     srcs = [
         "safe_num.cpp",
     ],
-    hdrs = [
-        "safe_num.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -403,13 +330,6 @@ mongo_cc_library(
     srcs = [
         "dns_query.cpp",
     ],
-    hdrs = [
-        "dns_query.h",
-    ] + select({
-        "@platforms//os:windows": ["dns_query_windows-impl.h"],
-        "//bazel/config:posix": ["dns_query_posix-impl.h"],
-        "//conditions:default": [],
-    }),
     deps = [
         "//src/mongo:base",
     ],
@@ -421,9 +341,6 @@ mongo_cc_library(
         "password.cpp",
         ":password_params_gen",
     ],
-    hdrs = [
-        "password.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -431,14 +348,15 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "pin_code_segments",
-    srcs = select({
-        "@platforms//os:linux": [
-            "pin_code_segments.cpp",
-            ":pin_code_segments_params_gen",
-        ],
-    } | {
-        "//conditions:default": ["pin_code_segments_noop.cpp"],
-    }),
+    srcs_select = [
+        {
+            "@platforms//os:linux": [
+                "pin_code_segments.cpp",
+                ":pin_code_segments_params_gen",
+            ],
+            "//conditions:default": ["pin_code_segments_noop.cpp"],
+        },
+    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -461,10 +379,6 @@ mongo_cc_library(
         "md5.cpp",
         "password_digest.cpp",
     ],
-    hdrs = [
-        "md5.h",
-        "password_digest.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/third_party/tomcrypt-1.18.2:tomcrypt_md5",
@@ -476,9 +390,6 @@ mongo_cc_library(
     srcs = [
         "clock_source_mock.cpp",
     ],
-    hdrs = [
-        "clock_source_mock.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -489,19 +400,8 @@ mongo_cc_library(
     srcs = [
         "future_util.cpp",
     ],
-    hdrs = [
-        "future_util.h",
-    ],
     deps = [
         "//src/mongo/executor:task_executor_interface",
-    ],
-)
-
-mongo_cc_library(
-    name = "tick_source_mock",
-    srcs = [],
-    hdrs = [
-        "tick_source_mock.h",
     ],
 )
 
@@ -510,12 +410,8 @@ mongo_cc_library(
     srcs = [
         "mock_periodic_runner.cpp",
     ],
-    hdrs = [
-        "mock_periodic_runner.h",
-    ],
     deps = [
         ":periodic_runner",
-        ":tick_source_mock",
         "//src/mongo:base",
     ],
 )
@@ -524,9 +420,6 @@ mongo_cc_library(
     name = "tracing_support",
     srcs = [
         "tracing_support.cpp",
-    ],
-    hdrs = [
-        "tracing_support.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -538,9 +431,6 @@ mongo_cc_library(
     srcs = [
         "elapsed_tracker.cpp",
     ],
-    hdrs = [
-        "elapsed_tracker.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/util/net:network",  # this is for using listener to check elapsed time
@@ -550,7 +440,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "pcre_wrapper",
     srcs = ["pcre.cpp"],
-    private_hdrs = [":pcre.h"],
     deps = [
         "//src/mongo:base",
         "//src/third_party/pcre2",
@@ -560,7 +449,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "pcre_util",
     srcs = ["pcre_util.cpp"],
-    private_hdrs = [":pcre_util.h"],
     deps = [
         ":pcre_wrapper",
         "//src/mongo:base",
@@ -570,7 +458,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "procparser",
     srcs = ["procparser.cpp"],
-    private_hdrs = [":procparser.h"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -583,7 +470,8 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "processinfo",
-    srcs = ["processinfo.cpp"] + select({
+    srcs = ["processinfo.cpp"],
+    srcs_select = [{
         "@platforms//os:{}".format(os): ["processinfo_{}.cpp".format(os)]
         for os in [
             "freebsd",
@@ -594,8 +482,7 @@ mongo_cc_library(
         ]
     } | {
         "//conditions:default": ["processinfo_unknown.cpp"],
-    }),
-    private_hdrs = [":processinfo.h"],
+    }],
     deps = [
         ":pcre_wrapper",
         "//src/mongo:base",
@@ -609,9 +496,6 @@ mongo_cc_library(
     name = "perfctr_collect",
     srcs = [
         "perfctr_collect.cpp",
-    ],
-    hdrs = [
-        "perfctr_collect.h",
     ],
     target_compatible_with = select({
         "@platforms//os:windows": [],
@@ -633,9 +517,6 @@ mongo_cc_library(
         "assert_util_parameters.cpp",
         ":assert_util_parameters_gen",
     ],
-    hdrs = [
-        "assert_util_parameters.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -645,15 +526,14 @@ mongo_cc_library(
     name = "signal_handlers",
     srcs = [
         "signal_handlers.cpp",
-    ] + select({
-        "@platforms//os:windows": [
-            "signal_win32.cpp",
-        ],
-        "//conditions:default": [],
-    }),
-    hdrs = [
-        "signal_handlers.h",
-        "signal_win32.h",
+    ],
+    srcs_select = [
+        {
+            "@platforms//os:windows": [
+                "signal_win32.cpp",
+            ],
+            "//conditions:default": [],
+        },
     ],
     deps = [
         "//src/mongo:base",
@@ -667,9 +547,6 @@ mongo_cc_library(
     name = "ntservice",
     srcs = [
         "ntservice.cpp",
-    ],
-    hdrs = [
-        "ntservice.h",
     ],
     deps = [
         ":signal_handlers",
@@ -692,9 +569,6 @@ mongo_cc_library(
     srcs = [
         "tcmalloc_parameters_gen",
         "tcmalloc_set_parameter.cpp",
-    ],
-    hdrs = [
-        "tcmalloc_set_parameter.h",
     ],
     local_defines = select({
         "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
@@ -738,14 +612,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "allocator_thread",
-    srcs = select({
-        "//bazel/config:tcmalloc_gperf_enabled": ["allocator_tcmalloc_thread.cpp"],
-        "//bazel/config:tcmalloc_google_enabled": ["allocator_tcmalloc_thread.cpp"],
-        "//conditions:default": ["allocator_system_thread.cpp"],
-    }),
-    hdrs = [
-        "allocator_thread.h",
-    ],
     copts = select({
         "//bazel/config:gcc_or_clang": ["-Wno-sign-compare"],
         "//conditions:default": [],
@@ -754,6 +620,11 @@ mongo_cc_library(
         "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
         "//conditions:default": [],
     }),
+    srcs_select = [{
+        "//bazel/config:tcmalloc_gperf_enabled": ["allocator_tcmalloc_thread.cpp"],
+        "//bazel/config:tcmalloc_google_enabled": ["allocator_tcmalloc_thread.cpp"],
+        "//conditions:default": ["allocator_system_thread.cpp"],
+    }],
     deps = [
         "//src/mongo/db:server_base",
     ] + select({
@@ -835,7 +706,6 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
-        ":tick_source_mock",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:tracing_support",
     ],
@@ -875,18 +745,6 @@ mongo_cc_unit_test(
 mongo_cc_binary(
     name = "pretty_printer_test_program",
     srcs = ["pretty_printer_test_program.cpp"],
-    private_hdrs = [
-        "//src/mongo/db/auth:cluster_auth_mode.h",
-        "//src/mongo/db/repl:optime.h",
-        "//src/mongo/db:database_name.h",
-        "//src/mongo/db:database_name_reserved.h",
-        "//src/mongo/db:namespace_string.h",
-        "//src/mongo/db:namespace_string_reserved.h",
-        "//src/mongo/db:server_options.h",
-        "//src/mongo/db:tenant_id.h",
-        "//src/mongo/util/net:cidr.h",
-        "//src/mongo/util/version:releases.h",
-    ],
     tags = [
         "dist_test",
     ],
@@ -1025,16 +883,12 @@ mongo_cc_unit_test(
         "time_support_test.cpp",
         "timer_test.cpp",
         "util_sort_test.cpp",
-    ] + select({
-        "@platforms//os:linux": ["procparser_test.cpp"],
-        "//conditions:default": [],
-    }),
-    private_hdrs = [
-        ":executor_test_util.h",
-        ":future_test_utils.h",
-        ":latency_distribution.h",
-        ":sort.h",
-        "//src/mongo/unittest:join_thread.h",
+    ],
+    srcs_select = [
+        {
+            "@platforms//os:linux": ["procparser_test.cpp"],
+            "//conditions:default": [],
+        },
     ],
     tags = [
         "mongo_unittest_fourth_group",
@@ -1065,7 +919,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util/concurrency:thread_pool",
     ],
 )
@@ -1076,7 +929,6 @@ mongo_cc_unit_test(
         "signal_handlers_asynchronous_test.cpp",
         "signal_handlers_synchronous_test.cpp",
     ],
-    private_hdrs = [":fixed_string.h"],
     tags = ["mongo_unittest_first_group"],
     target_compatible_with = select({
         "@platforms//os:windows": ["@platforms//:incompatible"],
@@ -1296,10 +1148,7 @@ mongo_cc_unit_test(
     ],
 )
 
-mongo_cc_library(
-    name = "stacktrace_test_helpers",
-    private_hdrs = [":stacktrace_test_helpers.h"],
-)
+mongo_cc_library(name = "stacktrace_test_helpers")
 
 mongo_cc_unit_test(
     name = "stacktrace_libunwind_test",
@@ -1308,7 +1157,6 @@ mongo_cc_unit_test(
         "stacktrace_libunwind_test.cpp",
         "stacktrace_libunwind_test_functions.cpp",
     ],
-    private_hdrs = [":stacktrace_libunwind_test_functions.h"],
     tags = [
         "mongo_unittest_fourth_group",
         "server-programmability",
@@ -1337,10 +1185,7 @@ mongo_cc_unit_test(
     deps = ["stacktrace_test_helpers"],
 )
 
-mongo_cc_library(
-    name = "packaged_task",
-    private_hdrs = [":packaged_task.h"],
-)
+mongo_cc_library(name = "packaged_task")
 
 py_binary(
     name = "pretty_printer_test",
@@ -1354,8 +1199,6 @@ mongo_cc_library(
         "varint.cpp",
         "varint_details.cpp",
     ],
-    hdrs = ["varint.h"],
-    private_hdrs = [":varint_details.h"],
     deps = [
         "//src/mongo:base",
     ],

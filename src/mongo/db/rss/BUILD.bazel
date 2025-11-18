@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "replicated_storage_service.cpp",
     ],
-    hdrs = [
-        "replicated_storage_service.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",
@@ -27,9 +24,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "persistence_provider",
-    hdrs = [
-        "persistence_provider.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",
@@ -38,9 +32,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "service_lifecycle",
-    hdrs = [
-        "service_lifecycle.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",

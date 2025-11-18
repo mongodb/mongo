@@ -30,4 +30,10 @@ S3_SHA256_HASHES = {
     "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_rhel8_ppc64le.gz": "ad0bc6188223abc115a653945ada288ac4f6232ec7226b975bb1efda8b898095",
     "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_rhel9_ppc64le.gz": "73805acc4786df9b414b1b28ce40680cd6c9a9a0fb58712928711ee6786c939d",
     "https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/v2.0.1/db-contrib-tool_v2.0.1_windows_x64.exe.gz": "f138b09612d143fc67c8cc8efb8cfbae13ce50cf8049a7d802c5cd262176346a",
+    "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-manylinux2014-aarch64": "746beac19b27b866546ff43c5f629327409b933856adeec9652d3853d1658a01",
+    "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-manylinux2014-x86_64": "6ebf46fc6d69d90cb767abdf850b504e2541a5fd72d6efbd4397c0b7d0dae06d",
+    "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-manylinux2014-ppc64le": "2755083296eb66b5f7eb90dea74ced923f8fec1837e84a6bff5b878c923e4542",
+    "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-manylinux2014-s390x": "d018b9a755293ec16289e55b37c4b92d4a51e73fbe7aa3414c1809901e7bde04",
+    "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-macos-universal2": "eb65e7234928e13db25fe75fdcafd798871f248a9763b49821eab6cd469b2832",
+    "https://mdb-build-public.s3.amazonaws.com/rg-binaries/v15.1.0/rg-windows-x86_64.exe": "bc3a0a1771ad0b44e5319e0edd0dd8bb8544b6f8ca80a6caa2273f41efe1117b",
 }

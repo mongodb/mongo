@@ -9,7 +9,6 @@ exports_files(
 mongo_cc_library(
     name = "throw_hook",
     srcs = ["throw_hook.cpp"],
-    hdrs = ["throw_hook.h"],
     # Link all calls to __cxa_throw to __wrap___cxa_throw instead. Link
     # calls to __real___cxa_throw to __cxa_throw. This needs to be included
     # in every link operation where we want to install our hook, so it
@@ -28,10 +27,6 @@ mongo_cc_library(
     srcs = [
         "visibility_test_libcommon.cpp",
     ],
-    hdrs = [
-        "visibility.h",
-        "visibility_test_libcommon.h",
-    ],
     mongo_api_name = "visibility_test_libcommon",
 )
 
@@ -39,9 +34,6 @@ mongo_cc_library(
     name = "visibility_test_lib1",
     srcs = [
         "visibility_test_lib1.cpp",
-    ],
-    hdrs = [
-        "visibility_test_lib1.h",
     ],
     mongo_api_name = "visibility_test_lib1",
     deps = [
@@ -54,9 +46,6 @@ mongo_cc_library(
     srcs = [
         "visibility_test_lib2.cpp",
     ],
-    hdrs = [
-        "visibility_test_lib2.h",
-    ],
     mongo_api_name = "visibility_test_lib2",
     deps = [
         ":visibility_test_lib1",
@@ -67,7 +56,6 @@ mongo_cc_unit_test(
     name = "visibility1_test",
     srcs = ["visibility_test1.cpp"],
     has_custom_mainline = True,
-    private_hdrs = ["//src/mongo/util:exit_code.h"],
     tags = [
         "mongo_unittest_third_group",
         "server-programmability",
@@ -81,7 +69,6 @@ mongo_cc_unit_test(
     name = "visibility2_test",
     srcs = ["visibility_test2.cpp"],
     has_custom_mainline = True,
-    private_hdrs = ["//src/mongo/util:exit_code.h"],
     tags = [
         "mongo_unittest_first_group",
         "server-programmability",
@@ -107,7 +94,6 @@ mongo_cc_unit_test(
         "stack_locator_test.cpp",
         "waitable_atomic_test.cpp",
     ],
-    private_hdrs = ["//src/mongo/unittest:join_thread.h"],
     tags = [
         "mongo_unittest_fourth_group",
         "server-programmability",
@@ -120,7 +106,6 @@ mongo_cc_unit_test(
     minimum_test_resources = {
         "cpu_cores": 2,
     },
-    private_hdrs = ["//src/mongo/unittest:join_thread.h"],
     tags = [
         "mongo_unittest_sixth_group",
         "server-programmability",

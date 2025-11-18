@@ -18,10 +18,6 @@ mongo_cc_library(
         "explain.cpp",
         "reference_tracker.cpp",
     ],
-    hdrs = [
-        "explain.h",
-        "reference_tracker.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/query/stage_builder/sbe/abt/syntax:syntax_expr",

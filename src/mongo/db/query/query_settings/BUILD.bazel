@@ -30,11 +30,6 @@ mongo_cc_library(
         "query_settings_hash.cpp",
         ":query_settings_gen",
     ],
-    hdrs = [
-        "index_hints_serialization.h",
-        "query_framework_serialization.h",
-        "query_settings_hash.h",
-    ],
     deps = [
         ":query_settings_service_dependencies",
         "//src/mongo/db:namespace_spec",
@@ -61,9 +56,6 @@ mongo_cc_library(
     srcs = [
         "query_settings_service_dependencies.cpp",
     ],
-    hdrs = [
-        "query_settings_service_dependencies.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_cmds_idl",
@@ -79,14 +71,6 @@ mongo_cc_library(
         "query_settings_service.cpp",
         "query_settings_usage_tracker.cpp",
         ":query_settings_cluster_parameter_gen",
-    ],
-    hdrs = [
-        "query_settings_service.h",
-    ],
-    private_hdrs = [
-        ":query_settings_backfill.h",
-        ":query_settings_manager.h",
-        ":query_settings_usage_tracker.h",
     ],
     deps = [
         ":query_settings",
@@ -128,7 +112,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/executor:mock_async_rpc",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/unittest",
     ],
@@ -147,7 +130,6 @@ mongo_cc_benchmark(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:processinfo",
     ],
 )

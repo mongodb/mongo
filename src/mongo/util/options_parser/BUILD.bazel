@@ -35,16 +35,6 @@ mongo_cc_library(
         "startup_options.cpp",
         "value.cpp",
     ],
-    hdrs = [
-        "constraints.h",
-        "environment.h",
-        "option_description.h",
-        "option_section.h",
-        "options_parser.h",
-        "startup_option_init.h",
-        "startup_options.h",
-        "value.h",
-    ],
     copts = select({
         ":options_parser_needs_no_missing_indentation_flag": [
             "-Wno-misleading-indentation",

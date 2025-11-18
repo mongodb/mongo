@@ -60,9 +60,6 @@ mongo_cc_library(
         ":logical_session_cache_gen",
         ":logical_session_cache_stats_gen",
     ],
-    hdrs = [
-        "logical_session_cache.h",
-    ],
     deps = [
         ":logical_session_id",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
@@ -72,9 +69,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "logical_session_cache_noop",
-    hdrs = [
-        "logical_session_cache_noop.h",
-    ],
     deps = [
         ":logical_session_cache",
     ],
@@ -97,12 +91,6 @@ mongo_cc_library(
         "kill_sessions_common.cpp",
         "session_killer.cpp",
         ":kill_sessions_gen",
-    ],
-    hdrs = [
-        "kill_sessions.h",
-        "kill_sessions_common.h",
-        "kill_sessions_util.h",
-        "session_killer.h",
     ],
     deps = [
         ":logical_session_id_helpers",
@@ -151,10 +139,6 @@ mongo_cc_library(
     srcs = [
         "session_catalog.cpp",
     ],
-    hdrs = [
-        "session.h",
-        "session_catalog.h",
-    ],
     deps = [
         ":kill_sessions",
         ":logical_session_id",  # TODO(SERVER-93876): Remove.
@@ -177,9 +161,6 @@ mongo_cc_library(
     srcs = [
         "sessions_collection.cpp",
     ],
-    hdrs = [
-        "sessions_collection.h",
-    ],
     deps = [
         ":logical_session_id",  # TODO(SERVER-93876): Remove.
         ":logical_session_id_helpers",  # TODO(SERVER-93876): Remove.
@@ -200,12 +181,6 @@ mongo_cc_library(
         "service_liaison_impl.cpp",
         "service_liaison_router.cpp",
     ],
-    hdrs = [
-        "logical_session_cache_impl.h",
-        "service_liaison.h",
-        "service_liaison_impl.h",
-        "service_liaison_router.h",
-    ],
     deps = [
         ":kill_sessions",
         ":logical_session_cache",
@@ -220,9 +195,6 @@ mongo_cc_library(
     name = "sessions_collection_rs",
     srcs = [
         "sessions_collection_rs.cpp",
-    ],
-    hdrs = [
-        "sessions_collection_rs.h",
     ],
     deps = [
         ":sessions_collection",
@@ -240,9 +212,6 @@ mongo_cc_library(
     srcs = [
         "kill_sessions_remote.cpp",
     ],
-    hdrs = [
-        "kill_sessions_remote.h",
-    ],
     deps = [
         ":kill_sessions",
         "//src/mongo/db:query_exec",
@@ -255,10 +224,6 @@ mongo_cc_library(
     srcs = [
         "service_liaison_shard.cpp",
         "sessions_collection_standalone.cpp",
-    ],
-    hdrs = [
-        "service_liaison_shard.h",
-        "sessions_collection_standalone.h",
     ],
     deps = [
         ":logical_session_cache_impl",
@@ -283,15 +248,6 @@ mongo_cc_library(
         "session_catalog_mongod.cpp",
         ":internal_transactions_reap_service_gen",
         ":session_txn_record_gen",
-    ],
-    hdrs = [
-        "internal_transactions_reap_service.h",
-        "session_catalog_mongod.h",
-        "session_catalog_mongod_transaction_interface.h",
-        "//src/mongo/db/transaction:server_transactions_metrics.h",
-        "//src/mongo/db/transaction:transaction_metrics_observer.h",
-        "//src/mongo/db/transaction:transaction_participant.h",
-        "//src/mongo/db/transaction:transactions_stats_gen",
     ],
     deps = [
         ":kill_sessions",
@@ -321,9 +277,6 @@ mongo_cc_library(
     srcs = [
         "kill_sessions_local.cpp",
     ],
-    hdrs = [
-        "kill_sessions_local.h",
-    ],
     deps = [
         ":kill_sessions",
         ":session_catalog",
@@ -337,9 +290,6 @@ mongo_cc_library(
     name = "sessions_collection_mock",
     srcs = [
         "sessions_collection_mock.cpp",
-    ],
-    hdrs = [
-        "sessions_collection_mock.h",
     ],
     deps = [
         ":logical_session_id",

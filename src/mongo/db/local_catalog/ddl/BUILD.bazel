@@ -170,7 +170,6 @@ mongo_cc_library(
     srcs = [
         ":server_parameters_gen",
     ],
-    hdrs = [],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -180,9 +179,6 @@ mongo_cc_library(
     name = "rename_collection_idl",
     srcs = [
         ":rename_collection_gen",
-    ],
-    header_deps = [
-        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
     ],
     deps = [
         "//src/mongo/db:commands",

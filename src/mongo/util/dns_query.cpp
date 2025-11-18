@@ -43,8 +43,6 @@
 #define MONGO_ALLOW_INCLUDE_UTIL_DNS_QUERY_PLATFORM
 #ifdef WIN32
 #include "mongo/util/dns_query_windows-impl.h"
-#elif defined(__ANDROID__) || defined(__EMSCRIPTEN__)
-#include "mongo/util/dns_query_android-impl.h"
 #else
 #include "mongo/util/dns_query_posix-impl.h"
 #endif

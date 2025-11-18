@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "dependencies.cpp",
     ],
-    hdrs = [
-        "dependencies.h",
-    ],
     deps = [
         "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/pipeline:field_path",
@@ -28,10 +25,6 @@ mongo_cc_library(
     srcs = [
         "expression_dependencies.cpp",
         "match_expression_dependencies.cpp",
-    ],
-    hdrs = [
-        "expression_dependencies.h",
-        "match_expression_dependencies.h",
     ],
     deps = [
         ":dependencies",

@@ -25,12 +25,6 @@ mongo_cc_library(
         "join_graph.cpp",
         "path_resolver.cpp",
     ],
-    hdrs = [
-        "adjacency_matrix.h",
-        "join_graph.h",
-        "logical_defs.h",
-        "path_resolver.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:canonical_query_base",
@@ -109,9 +103,6 @@ mongo_cc_library(
     srcs = [
         "join_predicate.cpp",
     ],
-    hdrs = [
-        "join_predicate.h",
-    ],
     deps = [
         "//src/mongo/db/pipeline:field_path",
     ],
@@ -136,9 +127,6 @@ mongo_cc_library(
     srcs = [
         "reorder_joins.cpp",
     ],
-    hdrs = [
-        "reorder_joins.h",
-    ],
     deps = [
         ":plan_enumerator",
         ":solution_storage",
@@ -148,9 +136,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "solution_storage",
-    hdrs = [
-        "solution_storage.h",
-    ],
     deps = [
         "//src/mongo/db/query:canonical_query_base",
     ],
@@ -160,9 +145,6 @@ mongo_cc_library(
     name = "unit_test_helpers",
     srcs = [
         "unit_test_helpers.cpp",
-    ],
-    hdrs = [
-        "unit_test_helpers.h",
     ],
     deps = [
         "//src/mongo/db:server_base",

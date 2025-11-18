@@ -165,24 +165,10 @@ mongo_cc_library(
     ],
 )
 
-# This library is the base for both tracing and tracing_internal libraries. Files
-# included in this library must use ifdefs to provide no-op implementations if
-# MONGO_CONFIG_OTEL is not defined.
-mongo_cc_library(
-    name = "tracing_base",
-    hdrs = [
-        "//src/mongo/otel/traces/span:span.h",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
 # Library for public facing tracing API used by the larger codebase.
 mongo_cc_library(
     name = "tracing",
     deps = [
-        ":tracing_base",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/otel:otel_base",
@@ -207,7 +193,6 @@ mongo_cc_library(
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
         ":span_telemetry_context",
-        ":tracing_base",
         ":tracing_initialization",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
@@ -221,10 +206,6 @@ mongo_cc_library(
     name = "tracing_test_util",
     srcs = [
         "mock_exporter.cpp",
-    ],
-    hdrs = [
-        "mock_exporter.h",
-        ":otel_test_fixture.h",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [

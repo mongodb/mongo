@@ -90,6 +90,9 @@ struct DebugInfo {
         : createdFromQuery(other.createdFromQuery), decision(other.decision->clone()) {}
 
     DebugInfo& operator=(const DebugInfo& other) {
+        if (this == &other) {
+            return *this;
+        }
         createdFromQuery = other.createdFromQuery;
         decision = other.decision->clone();
         return *this;

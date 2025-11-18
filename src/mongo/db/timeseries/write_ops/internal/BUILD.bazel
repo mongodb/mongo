@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "timeseries_write_ops_internal.cpp",
     ],
-    hdrs = [
-        "timeseries_write_ops_internal.h",
-    ],
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",

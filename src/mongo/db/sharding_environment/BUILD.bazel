@@ -73,9 +73,6 @@ mongo_cc_library(
     srcs = [
         ":sharding_runtime_d_params_gen",
     ],
-    hdrs = [
-        ":sharding_runtime_d_params.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.

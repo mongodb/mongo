@@ -38,10 +38,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "hello_response",
     srcs = ["hello_response.cpp"],
-    hdrs = [
-        "hello_response.h",
-    ],
-    private_hdrs = ["//src/mongo/db/repl:optime_with.h"],
     deps = [
         "//src/mongo/db/repl:optime",
         "//src/mongo/rpc:metadata",
@@ -52,9 +48,6 @@ mongo_cc_library(
     name = "hello_auth",
     srcs = [
         "hello_auth.cpp",
-    ],
-    hdrs = [
-        "hello_auth.h",
     ],
     deps = [
         ":hello_command",
@@ -70,9 +63,6 @@ mongo_cc_library(
     name = "topology_version_observer",
     srcs = [
         "topology_version_observer.cpp",
-    ],
-    hdrs = [
-        "topology_version_observer.h",
     ],
     deps = [
         "//src/mongo/db:service_context",

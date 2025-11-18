@@ -33,22 +33,6 @@ mongo_cc_library(
         "test_health_observer.cpp",
         ":health_monitoring_server_parameters_gen",
     ],
-    hdrs = [
-        "deadline_future.h",
-        "dns_health_observer.h",
-        "fault.h",
-        "fault_facet.h",
-        "fault_facet_impl.h",
-        "fault_manager.h",
-        "fault_manager_config.h",
-        "health_check_status.h",
-        "health_observer.h",
-        "health_observer_base.h",
-        "health_observer_registration.h",
-        "progress_monitor.h",
-        "state_machine.h",
-        "test_health_observer.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
@@ -80,11 +64,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "fault_manager_test_suite",
     srcs = [],
-    hdrs = [
-        "fault_facet_mock.h",
-        "fault_manager_test_suite.h",
-        "health_observer_mock.h",
-    ],
     deps = [
         ":fault_manager",
         "//src/mongo:base",
@@ -92,7 +71,6 @@ mongo_cc_library(
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:task_executor_test_fixture",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/transport:transport_layer_manager",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/concurrency:thread_pool",

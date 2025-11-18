@@ -14,10 +14,6 @@ mongo_cc_library(
     srcs = [
         "index_bounds.cpp",
     ],
-    hdrs = [
-        "index_bounds.h",
-        "//src/mongo/db/storage:index_entry_comparison.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/query/compiler/physical_model/interval",

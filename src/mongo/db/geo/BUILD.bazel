@@ -18,13 +18,6 @@ mongo_cc_library(
         "r2_region_coverer.cpp",
         "shapes.cpp",
     ],
-    hdrs = [
-        "big_polygon.h",
-        "hash.h",
-        "r2_region_coverer.h",
-        "shapes.h",
-    ],
-    private_hdrs = ["//src/mongo/util/transitional_tools_do_not_use:vector_spooling.h"],
     deps = [
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",
@@ -39,11 +32,6 @@ mongo_cc_library(
     srcs = [
         "geometry_container.cpp",
         "geoparser.cpp",
-    ],
-    hdrs = [
-        "geoconstants.h",
-        "geometry_container.h",
-        "geoparser.h",
     ],
     deps = [
         ":geometry",

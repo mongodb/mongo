@@ -28,9 +28,6 @@ mongo_cc_library(
     srcs = [
         "ssl_options.cpp",
     ],
-    hdrs = [
-        "ssl_options.h",
-    ],
     deps = [
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/options_parser",
@@ -42,9 +39,6 @@ mongo_cc_library(
     srcs = [
         "ssl_types.cpp",
     ],
-    hdrs = [
-        "ssl_types.h",
-    ],
     deps = [
         ":ssl_options",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
@@ -53,7 +47,7 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "ssl_parameters_auth",
-    srcs = select({
+    srcs_select = [{
         "//bazel/config:ssl_enabled": [
             "ssl_parameters_auth.cpp",
             "ssl_parameters_auth_gen",
@@ -61,7 +55,7 @@ mongo_cc_library(
         "//conditions:default": [
             "ssl_parameters_auth_none.cpp",
         ],
-    }),
+    }],
     deps = select({
         "//bazel/config:ssl_enabled": [
             ":ssl_options",  # TODO(SERVER-93876): Remove.
@@ -147,9 +141,6 @@ mongo_cc_library(
         "ssl_options_server.cpp",
         "ssl_options_server_gen",
     ],
-    hdrs = [
-        "//src/mongo/db:server_feature_flags_gen",
-    ],
     deps = [
         ":ssl_options",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
@@ -168,58 +159,41 @@ idl_generator(
     ],
 )
 
-# TODO(SERVER-94377): Rework this.
-filegroup(
-    name = "ssl_manager_file",
-    srcs = select({
-        "//bazel/config:ssl_provider_{}".format(ssl_provider): [
-            "ssl_manager_{}.cpp".format(ssl_provider),
-        ]
-        for ssl_provider in [
-            "apple",
-            "openssl",
-            "windows",
-            "none",
-        ]
-    } | {
-        # Intentionally blank.
-        "//conditions:default": [],
-    }),
-)
-
 mongo_cc_library(
     name = "ssl_manager",
     srcs = [
         "sock.cpp",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            ":ssl_manager_file",
-            "//src/mongo/util/net/private:ssl_expiration.cpp",
-            "ssl_manager.cpp",
-            "ssl_parameters.cpp",
-            "ssl_stream.cpp",
-            "//src/mongo/util/net/ssl",
-            "//src/mongo/util/net/ssl/impl",
-            "//src/mongo/util/net/ssl/detail",
-            "//src/mongo/util/net/ssl/detail/impl",
-            "ssl_peer_info.cpp",
-            "ssl_parameters_gen",
-            "//src/mongo/util/net/ocsp:ocsp_manager.cpp",
-        ],
-    } | {
-        "//conditions:default": ["ssl_manager_none.cpp"],
-    }),
-    hdrs = [
-        "ssl.hpp",
-        "ssl_manager.h",
-        "ssl_parameters.h",
-        "ssl_peer_info.h",
-        "//src/mongo/executor:network_interface_factory.h",
-        "//src/mongo/rpc/metadata:metadata_hook.h",
-        "//src/mongo/util:strong_weak_finish_line.h",
-        "//src/mongo/util/net:dh_openssl.h",
-        "//src/mongo/util/net/ocsp:ocsp_manager.h",
-        "//src/mongo/util/net/private:ssl_expiration.h",
+    ],
+    srcs_select = [
+        {
+            "//bazel/config:ssl_enabled": [
+                "//src/mongo/util/net/private:ssl_expiration.cpp",
+                "ssl_manager.cpp",
+                "ssl_parameters.cpp",
+                "ssl_stream.cpp",
+                "//src/mongo/util/net/ssl",
+                "//src/mongo/util/net/ssl/impl",
+                "//src/mongo/util/net/ssl/detail",
+                "//src/mongo/util/net/ssl/detail/impl",
+                "ssl_peer_info.cpp",
+                "ssl_parameters_gen",
+                "//src/mongo/util/net/ocsp:ocsp_manager.cpp",
+            ],
+            "//conditions:default": [],
+        },
+        {
+            "//bazel/config:ssl_provider_{}".format(ssl_provider): [
+                "ssl_manager_{}.cpp".format(ssl_provider),
+            ]
+            for ssl_provider in [
+                "apple",
+                "openssl",
+                "windows",
+                "none",
+            ]
+        } | {
+            "//conditions:default": [],
+        },
     ],
     deps = [
         "network",
@@ -261,12 +235,6 @@ idl_generator(
 mongo_cc_library(
     name = "mock_http_client",
     srcs = ["http_client_mock.cpp"],
-    hdrs = [
-        "cidr.h",
-        "http_client.h",
-        "http_client_mock.h",
-    ],
-    private_hdrs = ["//src/mongo/base:data_builder.h"],
     deps = [
         "//src/mongo:base",
     ],
@@ -280,10 +248,6 @@ idl_generator(
 mongo_cc_library(
     name = "http_client",
     srcs = ["http_client.cpp"],
-    hdrs = [
-        "http_client.h",
-    ],
-    private_hdrs = ["//src/mongo/base:data_builder.h"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/commands:test_commands_enabled",
@@ -295,9 +259,6 @@ mongo_cc_library(
     srcs = [
         "hostandport.cpp",
         ":hostandport_gen",
-    ],
-    hdrs = [
-        "hostandport.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -314,12 +275,6 @@ mongo_cc_library(
         "socket_exception.cpp",
         "socket_utils.cpp",
     ],
-    private_hdrs = [
-        ":hostname_canonicalization.h",
-        ":socket_exception.h",
-        ":socket_utils.h",
-        "//src/mongo/util/concurrency:value.h",
-    ],
     deps = [
         ":hostandport_impl",
         "//src/mongo/db:server_base",
@@ -332,9 +287,6 @@ mongo_cc_library(
     name = "ssl_util",
     srcs = [
         "ssl_util.cpp",
-    ],
-    hdrs = [
-        "ssl_util.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -353,31 +305,6 @@ config_setting(
 
 mongo_cc_library(
     name = "http_client_impl",
-    srcs = select({
-        "//bazel/config:http_client_enabled": [
-            "http_client_options.cpp",
-            ":http_client_options_gen",
-        ],
-        "//conditions:default": [
-            "http_client_none.cpp",
-        ],
-    }) + select({
-        ":http_client_enabled_windows": [
-            "http_client_winhttp.cpp",
-        ],
-        "//bazel/config:http_client_enabled": [
-            "http_client_curl.cpp",
-        ],
-        "//conditions:default": [],
-    }),
-    hdrs = [
-        "//src/mongo/util:strong_weak_finish_line.h",
-    ] + select({
-        "//bazel/config:http_client_enabled": [
-            "http_client_options.h",
-        ],
-        "//conditions:default": [],
-    }),
     linkopts = select({
         ":http_client_enabled_windows": [
             "winhttp.lib",
@@ -387,6 +314,26 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+    srcs_select = [
+        {
+            "//bazel/config:http_client_enabled": [
+                "http_client_options.cpp",
+                ":http_client_options_gen",
+            ],
+            "//conditions:default": [
+                "http_client_none.cpp",
+            ],
+        },
+        {
+            ":http_client_enabled_windows": [
+                "http_client_winhttp.cpp",
+            ],
+            "//bazel/config:http_client_enabled": [
+                "http_client_curl.cpp",
+            ],
+            "//conditions:default": [],
+        },
+    ],
     deps = [
         ":http_client",
         "//src/mongo:base",
@@ -420,9 +367,6 @@ mongo_cc_library(
     srcs = [
         "sock_test_utils.cpp",
     ],
-    hdrs = [
-        "sock_test_utils.h",
-    ],
     deps = [
         ":network",
         ":ssl_manager",
@@ -439,7 +383,6 @@ mongo_cc_unit_test(
     data = [
         "//jstests/libs:test_pem_files",
     ],
-    private_hdrs = ["//src/mongo/util/cmdline_utils:censor_cmdline_test.h"],
     tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
         "//bazel/config:ssl_enabled": [],

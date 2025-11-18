@@ -18,23 +18,6 @@ mongo_cc_library(
         "bsoncolumnbuilder.cpp",
         "simple8b_type_util.cpp",
     ],
-    hdrs = [
-        "binary_reopen.h",
-        "bson_element_storage.h",
-        "bsoncolumn.h",
-        "bsoncolumn.inl",
-        "bsoncolumn_helpers.h",
-        "bsoncolumn_interleaved.h",
-        "bsoncolumn_util.h",
-        "bsoncolumnbuilder.h",
-        "bsonobj_traversal.h",
-        "simple8b.h",
-        "simple8b.inl",
-        "simple8b_builder.h",
-        "simple8b_helpers.h",
-        "simple8b_type_util.h",
-        "//src/mongo/util:overloaded_visitor.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -44,9 +27,6 @@ mongo_cc_library(
     name = "bson_column_fuzzer_impl",
     srcs = [
         "bsoncolumn_fuzzer_impl.cpp",
-    ],
-    hdrs = [
-        "bsoncolumn_fuzzer_impl.h",
     ],
     deps = [
         ":column",
@@ -59,11 +39,6 @@ mongo_cc_library(
     srcs = [
         "bsoncolumn_fuzzer_util.cpp",
     ],
-    hdrs = [
-        "bsoncolumn_expressions.h",
-        "bsoncolumn_expressions_internal.h",
-        "bsoncolumn_fuzzer_util.h",
-    ],
     deps = [
         ":column",
         "//src/mongo:base",
@@ -75,11 +50,6 @@ mongo_cc_library(
     name = "bsoncolumn_test_util",
     srcs = [
         "bsoncolumn_test_util.cpp",
-    ],
-    hdrs = [
-        "bsoncolumn_expressions.h",
-        "bsoncolumn_expressions_internal.h",
-        "bsoncolumn_test_util.h",
     ],
     deps = [
         ":column",

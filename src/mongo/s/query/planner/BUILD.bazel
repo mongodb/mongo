@@ -15,10 +15,6 @@ mongo_cc_library(
         "cluster_aggregate.cpp",
         "cluster_aggregation_planner.cpp",
     ],
-    hdrs = [
-        "cluster_aggregate.h",
-        "cluster_aggregation_planner.h",
-    ],
     deps = [
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:shared_request_handling",
@@ -45,9 +41,6 @@ mongo_cc_library(
     name = "cluster_find",
     srcs = [
         "cluster_find.cpp",
-    ],
-    hdrs = [
-        "cluster_find.h",
     ],
     deps = [
         "//src/mongo/db:commands",

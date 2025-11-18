@@ -14,7 +14,6 @@ idl_generator(
     src = "explain.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/query:explain_verbosity_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
@@ -40,10 +39,6 @@ mongo_cc_library(
         "bulk_write_crud_op.cpp",
         "bulk_write_parser.cpp",
         ":bulk_write_gen",
-    ],
-    hdrs = [
-        "bulk_write_crud_op.h",
-        "bulk_write_parser.h",
     ],
     deps = [
         "//src/mongo/crypto:fle_fields",
@@ -72,9 +67,6 @@ mongo_cc_library(
     name = "current_op_common",
     srcs = [
         "current_op_common.cpp",
-    ],
-    hdrs = [
-        "current_op_common.h",
     ],
     deps = [
         "//src/mongo/db:commands",
@@ -112,14 +104,6 @@ mongo_cc_library(
         "map_reduce_out_options.cpp",
         ":map_reduce_gen",
     ],
-    hdrs = [
-        "map_reduce_global_variable_scope.h",
-        "map_reduce_javascript_code.h",
-        "map_reduce_out_options.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -129,9 +113,6 @@ mongo_cc_library(
     name = "update_metrics",
     srcs = [
         "update_metrics.cpp",
-    ],
-    hdrs = [
-        "update_metrics.h",
     ],
     deps = [
         "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
@@ -143,9 +124,6 @@ mongo_cc_library(
     name = "write_commands_common",
     srcs = [
         "write_commands_common.cpp",
-    ],
-    hdrs = [
-        "write_commands_common.h",
     ],
     deps = [
         ":update_metrics",
@@ -161,15 +139,6 @@ mongo_cc_library(
     name = "bulk_write_common",
     srcs = [
         "bulk_write_common.cpp",
-    ],
-    hdrs = [
-        "bulk_write_common.h",
-        "//src/mongo/db/exec/sbe:in_list.h",
-        "//src/mongo/db/query:explain.h",
-        "//src/mongo/db/query:multiple_collection_accessor.h",
-        "//src/mongo/db/query/plan_cache:sbe_plan_cache.h",
-        "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
-        "//src/mongo/db/query/write_ops:update_request.h",
     ],
     deps = [
         ":bulk_write_parser",
@@ -218,11 +187,6 @@ mongo_cc_library(
         ":query_settings_cmds_gen",
         "query_settings_cmds.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/exec/agg:query_settings_stage.h",
-        "//src/mongo/db/pipeline:document_source_query_settings.h",
-        "//src/mongo/s/query/exec:async_results_merger_params_gen",
-    ],
     deps = [
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:commands",
@@ -242,9 +206,6 @@ mongo_cc_library(
     name = "bulk_write_command",
     srcs = [
         "bulk_write.cpp",
-    ],
-    hdrs = [
-        "bulk_write.h",
     ],
     deps = [
         ":bulk_write_common",
@@ -291,9 +252,6 @@ mongo_cc_library(
     srcs = [
         "map_reduce_agg.cpp",
     ],
-    hdrs = [
-        "map_reduce_agg.h",
-    ],
     deps = [
         ":map_reduce_parser",
         "//src/mongo/db:query_exec",
@@ -330,9 +288,6 @@ mongo_cc_library(
     name = "release_memory_cmd",
     srcs = [
         "release_memory_cmd.cpp",
-    ],
-    hdrs = [
-        "release_memory_cmd.h",
     ],
     deps = [
         "//src/mongo/db:commands",

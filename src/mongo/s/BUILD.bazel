@@ -56,10 +56,6 @@ mongo_cc_library(
     srcs = [
         "shard_targeting_helpers.cpp",
     ],
-    hdrs = [
-        "shard_targeting_helpers.h",
-        "//src/mongo/db/global_catalog:shard_key_pattern.h",
-    ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo:base",
@@ -86,24 +82,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/router_role_api:router_role.cpp",
         "//src/mongo/db/global_catalog/router_role_api:routing_context.cpp",
     ],
-    hdrs = [
-        "multi_statement_transaction_requests_sender.h",
-        "router_transactions_metrics.h",
-        "session_catalog_router.h",
-        "transaction_router.h",
-        "transaction_router_resource_yielder.h",
-        "//src/mongo/db/cluster_parameters:set_cluster_server_parameter_router_impl.h",
-        "//src/mongo/db/global_catalog:shard_key_pattern_query_util.h",
-        "//src/mongo/db/global_catalog/ddl:cluster_ddl.h",
-        "//src/mongo/db/global_catalog/router_role_api:cluster_commands_helpers.h",
-        "//src/mongo/db/global_catalog/router_role_api:collection_routing_info_targeter.h",
-        "//src/mongo/db/global_catalog/router_role_api:collection_uuid_mismatch.h",
-        "//src/mongo/db/global_catalog/router_role_api:ns_targeter.h",
-        "//src/mongo/db/global_catalog/router_role_api:router_role.h",
-        "//src/mongo/db/query/write_ops:update_request.h",
-        "//src/mongo/db/stats:single_transaction_stats.h",
-    ],
-    private_hdrs = ["//src/mongo/db/global_catalog/router_role_api:routing_context.h"],
     deps = [
         ":async_requests_sender",
         ":grid",
@@ -136,9 +114,6 @@ mongo_cc_library(
     srcs = [
         "async_requests_sender.cpp",
     ],
-    hdrs = [
-        "async_requests_sender.h",
-    ],
     deps = [
         ":grid",
         ":mongos_server_parameters",
@@ -158,11 +133,6 @@ mongo_cc_library(
         "query_analysis_sampler_util.cpp",
         "query_analysis_server_status.cpp",
     ],
-    hdrs = [
-        "query_analysis_client.h",
-        "query_analysis_sampler.h",
-        "query_analysis_sampler_util.h",
-    ],
     deps = [
         ":analyze_shard_key_common",
         ":grid",
@@ -181,9 +151,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/sharding_environment:shard_retry_server_parameters_gen",
         "//src/mongo/db/sharding_environment:shard_shared_state_cache.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/sharding_environment:shard_shared_state_cache.h",
     ],
     deps = [
         "//src/mongo/client:retry_strategy",
@@ -207,22 +174,6 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment/client:config_shard_wrapper.cpp",
         "//src/mongo/db/sharding_environment/client:shard_factory.cpp",
         "//src/mongo/db/topology:shard_registry.cpp",
-    ],
-    hdrs = [
-        "balancer_configuration.h",
-        "//src/mongo/db/global_catalog/catalog_cache:catalog_cache.h",
-        "//src/mongo/db/global_catalog/catalog_cache:catalog_cache_loader.h",
-        "//src/mongo/db/global_catalog/catalog_cache:config_server_catalog_cache_loader.h",
-        "//src/mongo/db/global_catalog/catalog_cache:config_server_catalog_cache_loader_impl.h",
-        "//src/mongo/db/global_catalog/catalog_cache:routing_information_cache.h",
-        "//src/mongo/db/global_catalog/catalog_cache:shard_server_catalog_cache_loader.h",
-        "//src/mongo/db/global_catalog/ddl:shard_util.h",
-        "//src/mongo/db/sharding_environment:cluster_identity_loader.h",
-        "//src/mongo/db/sharding_environment:grid.h",
-        "//src/mongo/db/sharding_environment:router_uptime_reporter.h",
-        "//src/mongo/db/sharding_environment/client:config_shard_wrapper.h",
-        "//src/mongo/db/sharding_environment/client:shard_factory.h",
-        "//src/mongo/db/topology:shard_registry.h",
     ],
     deps = [
         ":common_s",  # TODO(SERVER-93876): Remove.
@@ -256,9 +207,6 @@ mongo_cc_library(
     srcs = [
         "load_balancer_support.cpp",
     ],
-    hdrs = [
-        "load_balancer_support.h",
-    ],
     deps = [
         ":mongos_server_parameters",
         "//src/mongo/db:server_base",
@@ -276,21 +224,6 @@ mongo_cc_library(
         ":analyze_shard_key_common_gen",
         ":analyze_shard_key_documents_gen",
         ":analyze_shard_key_server_parameters_gen",
-    ],
-    hdrs = [
-        "analyze_shard_key_common.h",
-        "analyze_shard_key_role.h",
-        "query_analysis_sample_tracker.h",
-        "//src/mongo/db/commands/query_cmd:bulk_write_gen",
-    ],
-    private_hdrs = [
-        ":query_analysis_sampler.h",
-        "//src/mongo/db/commands/query_cmd:bulk_write_crud_op.h",
-        "//src/mongo/db/commands/query_cmd:bulk_write_parser.h",
-        "//src/mongo/db/repl:replica_set_aware_service.h",
-        "//src/mongo/db/s:query_analysis_writer.h",
-        "//src/mongo/idl:mutable_observer_registry.h",
-        "//src/mongo/s/write_ops:batched_command_request.h",
     ],
     deps = [
         "//src/mongo/db:server_base",
@@ -336,7 +269,6 @@ idl_generator(
 mongo_cc_library(
     name = "add_shard_idl",
     srcs = ["//src/mongo/db/topology:add_shard_gen"],
-    hdrs = ["//src/mongo/db/auth:authorization_contract.h"],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/global_catalog:type_shard_identity_idl",
@@ -427,81 +359,6 @@ mongo_cc_library(
         "//src/mongo/s/resharding:resume_token_gen",
         "//src/mongo/s/resharding:type_collection_fields_gen",
     ],
-    hdrs = [
-        "//src/mongo/db/s:auto_split_vector.h",
-        "//src/mongo/db/global_catalog:type_changelog.h",
-        "//src/mongo/db/global_catalog:type_chunk.h",
-        "//src/mongo/db/global_catalog:type_chunk_range.h",
-        "//src/mongo/db/global_catalog:type_collection.h",
-        "//src/mongo/db/global_catalog:type_mongos.h",
-        "//src/mongo/db/global_catalog:type_shard.h",
-        "//src/mongo/db/global_catalog:type_tags.h",
-        "//src/mongo/db/global_catalog/ddl:merge_chunk_request_valid.h",
-        "//src/mongo/s/request_types:migration_secondary_throttle_options.h",
-        "//src/mongo/db/global_catalog/ddl:remove_shard_from_zone_request_type.h",
-        "//src/mongo/s/request_types:update_zone_key_range_serialization.h",
-        "//src/mongo/s/resharding:resharding_coordinator_service_conflicting_op_in_progress_info.h",
-        "//src/mongo/db/global_catalog/ddl:cannot_implicitly_create_collection_info.h",
-        "cluster_umc_error_with_write_concern_error_info.h",
-        "//src/mongo/db/global_catalog:chunk.h",
-        "//src/mongo/db/global_catalog:chunk_manager.h",
-        "//src/mongo/db/global_catalog/catalog_cache:shard_cannot_refresh_due_to_locks_held_exception.h",
-        "//src/mongo/db/global_catalog:shard_key_pattern.h",
-        "//src/mongo/db/versioning_protocol:shard_version_factory.h",
-        "//src/mongo/db/versioning_protocol:stale_exception.h",
-        "transaction_participant_failed_unyield_exception.h",
-        "would_change_owning_shard_exception.h",
-        "//src/mongo/db/local_catalog/ddl:drop_gen",
-
-        # Header-only.
-        "//src/mongo/db/commands:txn_cmds_gen",
-        "//src/mongo/db/s:forwardable_operation_metadata_gen",
-        "//src/mongo/db/session:kill_sessions_gen",
-        "//src/mongo/db/sharding_environment/client:shard_gen",
-    ],
-    private_hdrs = [
-        ":async_requests_sender.h",
-        ":async_rpc_shard_targeter.h",
-        ":transaction_router.h",
-        "//src/mongo/client:async_remote_command_targeter_adapter.h",
-        "//src/mongo/client:remote_command_targeter.h",
-        "//src/mongo/client:remote_command_targeter_factory.h",
-        "//src/mongo/client:remote_command_targeter_factory_impl.h",
-        "//src/mongo/db/admission:ingress_admission_context.h",
-        "//src/mongo/db/global_catalog/catalog_cache:catalog_cache.h",
-        "//src/mongo/db/global_catalog/catalog_cache:catalog_cache_loader.h",
-        "//src/mongo/db/global_catalog/catalog_cache:config_server_catalog_cache_loader.h",
-        "//src/mongo/db/global_catalog/catalog_cache:shard_server_catalog_cache_loader.h",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_util.h",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_util_detail.h",
-        "//src/mongo/db/local_catalog:drop_collection.h",
-        "//src/mongo/db/repl:optime_with.h",
-        "//src/mongo/db/repl:primary_only_service.h",
-        "//src/mongo/db/session:kill_sessions.h",
-        "//src/mongo/db/session:kill_sessions_util.h",
-        "//src/mongo/db/session:session.h",
-        "//src/mongo/db/session:session_catalog.h",
-        "//src/mongo/db/session:session_killer.h",
-        "//src/mongo/db/sharding_environment/client:shard.h",
-        "//src/mongo/db/sharding_environment/client:shard_factory.h",
-        "//src/mongo/db/sharding_environment:grid.h",
-        "//src/mongo/db/sharding_environment:shard_shared_state_cache.h",
-        "//src/mongo/db/stats:single_transaction_stats.h",
-        "//src/mongo/db/topology:shard_registry.h",
-        "//src/mongo/db/transaction:transaction_api.h",
-        "//src/mongo/executor:async_rpc.h",
-        "//src/mongo/executor:async_rpc_retry_policy.h",
-        "//src/mongo/executor:async_rpc_targeter.h",
-        "//src/mongo/executor:async_rpc_util.h",
-        "//src/mongo/executor:inline_executor.h",
-        "//src/mongo/executor:task_executor_pool.h",
-        "//src/mongo/rpc/metadata:audit_metadata.h",
-        "//src/mongo/s/write_ops:batched_command_response.h",
-        "//src/mongo/s/write_ops:batched_upsert_detail.h",
-        "//src/mongo/util/concurrency:ticketholder_queue_stats.h",
-        "//src/mongo/util:future_util.h",
-        "//src/mongo/util:producer_consumer_queue.h",
-    ],
     deps = [
         "//src/mongo/client:connection_string",
         "//src/mongo/db/commands:create_command",
@@ -540,10 +397,6 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment:mongos_hello_response.cpp",
         "//src/mongo/db/topology:mongos_topology_coordinator.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/sharding_environment:mongos_hello_response.h",
-        "//src/mongo/db/topology:mongos_topology_coordinator.h",
-    ],
     deps = [
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
@@ -574,9 +427,6 @@ mongo_cc_library(
     srcs = [
         "sharding_task_executor.cpp",
     ],
-    hdrs = [
-        "sharding_task_executor.h",
-    ],
     deps = [
         ":sharding_router_api",
         "//src/mongo/db:operation_time_tracker",
@@ -599,15 +449,6 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment:sharding_initialization.cpp",
         "//src/mongo/db/sharding_environment/client:sharding_connection_hook.cpp",
         "//src/mongo/db/sharding_environment/client:sharding_network_connection_hook.cpp",
-    ],
-    hdrs = [
-        "client_metadata_propagation_egress_hook.h",
-        "initialize_tenant_to_shard_cache.h",
-        "sharding_task_executor_pool_controller.h",
-        "//src/mongo/db/global_catalog/router_role_api:routing_table_cache_gossip_metadata_hook.h",
-        "//src/mongo/db/sharding_environment:sharding_initialization.h",
-        "//src/mongo/db/sharding_environment/client:sharding_connection_hook.h",
-        "//src/mongo/db/sharding_environment/client:sharding_network_connection_hook.h",
     ],
     deps = [
         ":grid",
@@ -633,9 +474,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/s/write_ops:write_without_shard_key_util.cpp",
     ],
-    hdrs = [
-        "//src/mongo/s/write_ops:write_without_shard_key_util.h",
-    ],
     deps = [
         ":sharding_router_api",
         "//src/mongo/db/query/write_ops:parsed_update",
@@ -655,19 +493,6 @@ mongo_cc_library(
     name = "sharding_api",
     srcs = [
         "cluster_write.cpp",
-    ],
-    hdrs = [
-        "cluster_write.h",
-        "//src/mongo/s/write_ops:batch_write_exec.h",
-        "//src/mongo/s/write_ops:batch_write_op.h",
-        "//src/mongo/s/write_ops:bulk_write_exec.h",
-        "//src/mongo/s/write_ops:bulk_write_reply_info.h",
-        "//src/mongo/s/write_ops:coordinate_multi_update_util.h",
-        "//src/mongo/s/write_ops:fle.h",
-        "//src/mongo/s/write_ops:pause_migrations_during_multi_updates_enablement.h",
-        "//src/mongo/s/write_ops:wc_error.h",
-        "//src/mongo/s/write_ops:write_op.h",
-        "//src/mongo/s/write_ops/unified_write_executor:unified_write_executor.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
@@ -695,9 +520,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/global_catalog/ddl:sessions_collection_sharded.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/global_catalog/ddl:sessions_collection_sharded.h",
-    ],
     deps = [
         ":sharding_api",
         "//src/mongo/db:server_base",
@@ -712,10 +534,6 @@ mongo_cc_library(
         "router_transactions_server_status.cpp",
         "service_entry_point_router_role.cpp",
         "//src/mongo/db/sharding_environment:s_sharding_server_status.cpp",
-    ],
-    hdrs = [
-        "client_transport_observer_mongos.h",
-        "service_entry_point_router_role.h",
     ],
     deps = [
         ":load_balancer_support",
@@ -853,12 +671,6 @@ mongo_cc_library(
         "read_write_concern_defaults_cache_lookup_mongos.cpp",
         "//src/mongo/db/sharding_environment:version_mongos.cpp",
     ],
-    private_hdrs = [
-        ":mongos_main.h",
-        ":mongos_options.h",
-        ":read_write_concern_defaults_cache_lookup_mongos.h",
-        "//src/mongo/db/sharding_environment:version_mongos.h",
-    ],
     deps = [
         # NOTE: Do not add new libdeps (public or private) here unless
         # required by the linker to satisfy symbol dependencies from
@@ -962,13 +774,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/catalog_cache:shard_server_catalog_cache_loader_mock.cpp",
         "//src/mongo/db/sharding_environment:sharding_test_fixture_common.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/global_catalog/catalog_cache:catalog_cache_loader_mock.h",
-        "//src/mongo/db/global_catalog/catalog_cache:catalog_cache_mock.h",
-        "//src/mongo/db/global_catalog/catalog_cache:config_server_catalog_cache_loader_mock.h",
-        "//src/mongo/db/global_catalog/catalog_cache:shard_server_catalog_cache_loader_mock.h",
-        "//src/mongo/db/sharding_environment:sharding_test_fixture_common.h",
-    ],
     deps = [
         ":grid",
         ":sharding_router_api",
@@ -989,10 +794,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/global_catalog/catalog_cache:catalog_cache_test_fixture.cpp",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/global_catalog/catalog_cache:catalog_cache_test_fixture.h",
-        "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture.h",
     ],
     deps = [
         ":sharding_initialization",
@@ -1072,10 +873,6 @@ mongo_cc_unit_test(
         "//src/mongo/s/write_ops:write_op_test.cpp",
         "//src/mongo/s/write_ops:write_without_shard_key_util_test.cpp",
     ],
-    private_hdrs = [
-        "//src/mongo/db/global_catalog/router_role_api:mock_ns_targeter.h",
-        "//src/mongo/db/global_catalog:chunks_test_util.h",
-    ],
     tags = [
         "mongo_unittest_sixth_group",
     ],
@@ -1102,7 +899,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/executor:async_rpc",
         "//src/mongo/idl:cluster_server_parameter",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s/commands:cluster_commands",
         "//src/mongo/s/commands:cluster_commands_common",
         "//src/mongo/util:periodic_runner_factory",
@@ -1129,7 +925,6 @@ mongo_cc_unit_test(
 mongo_cc_benchmark(
     name = "service_entry_point_router_role_bm",
     srcs = ["service_entry_point_router_role_bm.cpp"],
-    private_hdrs = ["//src/mongo/db:service_entry_point_bm_fixture.h"],
     tags = ["sep_bm"],
     deps = [
         ":startup_initialization",

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -11,10 +12,54 @@ import traceback
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from buildscripts.s3_binary.hashes import S3_SHA256_HASHES
-from buildscripts.util.download_utils import (
-    download_from_s3_with_boto,
-    download_from_s3_with_requests,
-)
+
+
+def _run(cmd: list[str]) -> tuple[int, str]:
+    try:
+        r = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False, text=True
+        )
+        return r.returncode, r.stdout
+    except Exception as e:
+        return 127, f"{type(e).__name__}: {e}"
+
+
+def _download_with_curl_or_wget(url: str, out_path: str) -> bool:
+    """
+    Try curl, then wget. Returns True on success.
+    Respects SSL_CERT_FILE / SSL_CERT_DIR if set.
+    """
+    # curl
+    curl = shutil.which("curl")
+    if curl:
+        code, out = _run(
+            [
+                curl,
+                "--fail",
+                "--location",
+                "--silent",
+                "--show-error",
+                "--retry",
+                "3",
+                "--retry-connrefused",
+                "--connect-timeout",
+                "15",
+                "--output",
+                out_path,
+                url,
+            ]
+        )
+        if code == 0:
+            return True
+
+    # wget
+    wget = shutil.which("wget")
+    if wget:
+        code, out = _run([wget, "-q", *(_wget_cert_args()), "-O", out_path, url])
+        if code == 0:
+            return True
+
+    return False
 
 
 def read_sha_file(filename):
@@ -30,14 +75,19 @@ def _fetch_remote_sha256_hash(s3_path: str):
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         tempfile_name = temp_file.name
         try:
+            from buildscripts.util.download_utils import download_from_s3_with_boto
+
             download_from_s3_with_boto(s3_path + ".sha256", temp_file.name)
             downloaded = True
         except Exception:
             try:
+                from buildscripts.util.download_utils import download_from_s3_with_requests
+
                 download_from_s3_with_requests(s3_path + ".sha256", temp_file.name)
                 downloaded = True
             except Exception:
-                pass
+                # curl/wget fallback
+                downloaded = _download_with_curl_or_wget(s3_path + ".sha256", temp_file.name)
 
     if downloaded:
         result = read_sha_file(tempfile_name)
@@ -95,15 +145,31 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_n
     for i in range(5):
         try:
             print(f"Downloading {s3_path}...")
+            ok = False
+
             try:
+                from buildscripts.util.download_utils import download_from_s3_with_boto
+
                 download_from_s3_with_boto(s3_path, output_path)
+                ok = True
             except Exception:
                 try:
+                    from buildscripts.util.download_utils import download_from_s3_with_requests
+
                     download_from_s3_with_requests(s3_path, output_path, raise_on_error=True)
+                    ok = True
                 except Exception:
-                    if ignore_file_not_exist:
-                        print("Failed to find remote file. Ignoring and skipping...")
-                        return
+                    ok = False
+
+            if not ok:
+                # curl/wget fallback
+                ok = _download_with_curl_or_wget(s3_path, output_path)
+
+            if not ok:
+                if ignore_file_not_exist:
+                    print("Failed to find remote file. Ignoring and skipping...")
+                    return
+                raise RuntimeError("All download methods failed")
 
             validate_file(s3_path, output_path, remote_sha_allowed)
             break

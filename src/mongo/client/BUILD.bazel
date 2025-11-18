@@ -18,14 +18,6 @@ mongo_cc_library(
         "connection_string.cpp",
         "mongo_uri.cpp",
     ],
-    hdrs = [
-        "connection_string.h",
-        "mongo_uri.h",
-    ],
-    private_hdrs = [
-        "//src/mongo/db/auth:sasl_command_constants.h",
-        "//src/mongo/util:dns_name.h",
-    ],
     deps = [
         "//src/mongo/util:dns_query",
         "//src/mongo/util/net:network",
@@ -37,9 +29,6 @@ mongo_cc_library(
     name = "internal_auth",
     srcs = [
         "internal_auth.cpp",
-    ],
-    hdrs = [
-        "internal_auth.h",
     ],
     deps = [
         ":connection_string",
@@ -96,33 +85,15 @@ mongo_cc_library(
         "sasl_oidc_client_types_gen",
         "sasl_plain_client_conversation.cpp",
         "sasl_scram_client_conversation.cpp",
-    ] + select({
+    ],
+    srcs_select = [{
         "//bazel/config:ssl_enabled": [
             "sasl_aws_client_conversation.cpp",
             "sasl_aws_client_options_gen",
             "sasl_x509_client_conversation.cpp",
         ],
         "//conditions:default": [],
-    }),
-    hdrs = [
-        "native_sasl_client_session.h",
-        "sasl_aws_client_options.h",
-        "sasl_client_authenticate.h",
-        "sasl_client_conversation.h",
-        "sasl_client_session.h",
-        "sasl_oidc_client_conversation.h",
-        "sasl_oidc_client_params.h",
-        "sasl_plain_client_conversation.h",
-        "sasl_scram_client_conversation.h",
-        "sasl_x509_client_conversation.h",
-        "scram_client_cache.h",
-        "//src/mongo/crypto:mechanism_scram.h",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            "sasl_aws_client_conversation.h",
-        ],
-        "//conditions:default": [],
-    }),
+    }],
     deps = [
         ":connection_string",
         "//src/mongo/base:secure_allocator",  # TODO(SERVER-93876): Remove.
@@ -152,9 +123,6 @@ mongo_cc_library(
     srcs = [
         "authenticate.cpp",
     ],
-    hdrs = [
-        "authenticate.h",
-    ],
     deps = [
         ":connection_string",  # TODO(SERVER-93876): Remove.
         ":internal_auth",  # TODO(SERVER-93876): Remove.
@@ -170,9 +138,6 @@ mongo_cc_library(
     name = "async_client",
     srcs = [
         "async_client.cpp",
-    ],
-    hdrs = [
-        "async_client.h",
     ],
     deps = [
         ":authentication",
@@ -234,11 +199,6 @@ mongo_cc_library(
         "index_spec.cpp",
         "mongo_shell_options_gen",
     ],
-    hdrs = [
-        "dbclient_base.h",
-        "dbclient_cursor.h",
-        "index_spec.h",
-    ],
     deps = [
         ":authentication",
         ":connection_string",  # TODO(SERVER-93876): Remove.
@@ -264,6 +224,17 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "grpc_clientdriver_network",
+    srcs = [
+        "dbclient_grpc_stream.cpp",
+    ],
+    no_undefined_ref_DO_NOT_USE = False,
+    deps = [
+        "//src/mongo/transport/grpc:grpc_transport_layer",
+    ],
+)
+
+mongo_cc_library(
     name = "clientdriver_network",
     srcs = [
         "connection_string_connect.cpp",
@@ -284,35 +255,7 @@ mongo_cc_library(
         "streamable_replica_set_monitor_discovery_time_processor.cpp",
         "streamable_replica_set_monitor_error_handler.cpp",
         "streamable_replica_set_monitor_query_processor.cpp",
-    ] + select({
-        "//bazel/config:build_grpc_enabled": [
-            "dbclient_grpc_stream.cpp",
-        ],
-        "//conditions:default": [],
-    }),
-    hdrs = [
-        "connpool.h",
-        "dbclient_connection.h",
-        "dbclient_rs.h",
-        "dbclient_session.h",
-        "global_conn_pool.h",
-        "replica_set_change_notifier.h",
-        "replica_set_monitor.h",
-        "replica_set_monitor_interface.h",
-        "replica_set_monitor_manager.h",
-        "replica_set_monitor_stats.h",
-        "server_discovery_monitor.h",
-        "server_ping_monitor.h",
-        "streamable_replica_set_monitor.h",
-        "streamable_replica_set_monitor_discovery_time_processor.h",
-        "streamable_replica_set_monitor_error_handler.h",
-        "streamable_replica_set_monitor_query_processor.h",
-    ] + select({
-        "//bazel/config:build_grpc_enabled": [
-            "dbclient_grpc_stream.h",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     deps = [
         ":clientdriver_minimal",
         ":read_preference",  # TODO(SERVER-93876): Remove.
@@ -335,6 +278,7 @@ mongo_cc_library(
         "//src/mongo/util/net:ssl_manager",
     ] + select({
         "//bazel/config:build_grpc_enabled": [
+            "grpc_clientdriver_network",
             "//src/mongo/transport/grpc:grpc_transport_layer",
         ],
         "//conditions:default": [],
@@ -377,10 +321,6 @@ mongo_cc_library(
     srcs = [
         ":sasl_aws_protocol_common_gen",
     ],
-    hdrs = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/query:explain_verbosity_gen",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -392,9 +332,6 @@ mongo_cc_library(
         "replica_set_monitor_server_parameters.cpp",
         ":replica_set_monitor_server_parameters_gen",
     ],
-    hdrs = [
-        "replica_set_monitor_server_parameters.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -405,16 +342,6 @@ mongo_cc_library(
     srcs = [
         "sasl_aws_client_protocol.cpp",
         "sasl_aws_client_protocol_gen",
-    ],
-    hdrs = [
-        "sasl_aws_client_protocol.h",
-        "sasl_aws_protocol_common.h",
-        "sasl_aws_protocol_common_gen",
-        "//src/mongo/bson:bson_validate_gen",
-        "//src/mongo/util:kms_message_support.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/repl:oplog_buffer_batched_queue",
     ],
     target_compatible_with = select({
         "//bazel/config:ssl_enabled": [],
@@ -444,9 +371,6 @@ mongo_cc_library(
     srcs = [
         "remote_command_retry_scheduler.cpp",
     ],
-    hdrs = [
-        "remote_command_retry_scheduler.h",
-    ],
     deps = [
         ":retry_strategy",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
@@ -458,9 +382,6 @@ mongo_cc_library(
     name = "fetcher",
     srcs = [
         "fetcher.cpp",
-    ],
-    hdrs = [
-        "fetcher.h",
     ],
     deps = [
         ":remote_command_retry_scheduler",
@@ -479,13 +400,6 @@ mongo_cc_library(
         "remote_command_targeter_factory_impl.cpp",
         "remote_command_targeter_rs.cpp",
         "remote_command_targeter_standalone.cpp",
-    ],
-    hdrs = [
-        "remote_command_targeter.h",
-        "remote_command_targeter_factory.h",
-        "remote_command_targeter_factory_impl.h",
-        "remote_command_targeter_rs.h",
-        "remote_command_targeter_standalone.h",
     ],
     deps = [
         ":clientdriver_network",
@@ -506,10 +420,6 @@ mongo_cc_library(
         "sasl_sspi.cpp",
         "sasl_sspi_options.cpp",
         "sasl_sspi_options_gen",
-    ],
-    hdrs = [
-        "cyrus_sasl_client_session.h",
-        "sasl_sspi_options.h",
     ],
     linkopts = [
         "-lsasl2",
@@ -536,10 +446,6 @@ mongo_cc_library(
         "remote_command_targeter_factory_mock.cpp",
         "remote_command_targeter_mock.cpp",
     ],
-    hdrs = [
-        "remote_command_targeter_factory_mock.h",
-        "remote_command_targeter_mock.h",
-    ],
     deps = [
         ":remote_command_targeter",
         "//src/mongo/client:retry_strategy",
@@ -552,9 +458,6 @@ mongo_cc_library(
     name = "replica_set_monitor_test_helper",
     srcs = [
         "streamable_replica_set_monitor_for_testing.cpp",
-    ],
-    hdrs = [
-        "streamable_replica_set_monitor_for_testing.h",
     ],
     deps = [
         ":replica_set_monitor_protocol_test_util",
@@ -569,9 +472,6 @@ mongo_cc_library(
     srcs = [
         "replica_set_monitor_protocol_test_util.cpp",
     ],
-    hdrs = [
-        "replica_set_monitor_protocol_test_util.h",
-    ],
     deps = [
         "clientdriver_network",
     ],
@@ -580,7 +480,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "dbclient_mockcursor",
     srcs = ["dbclient_mockcursor.cpp"],
-    hdrs = ["dbclient_mockcursor.h"],
     deps = ["clientdriver_minimal"],
 )
 
@@ -609,10 +508,6 @@ mongo_cc_unit_test(
     data = [
         "//src/mongo/client/mongo_uri_tests:test_data",
     ],
-    private_hdrs = [
-        "//src/mongo/util:executor_test_util.h",
-        "//src/mongo/util:future_test_utils.h",
-    ],
     tags = ["mongo_unittest_fourth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
@@ -638,7 +533,6 @@ mongo_cc_unit_test(
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:task_executor_test_fixture",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/rpc:command_status",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/unittest:task_executor_proxy",
@@ -658,7 +552,6 @@ mongo_cc_unit_test(
         ":replica_set_monitor_test_helper",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/dbtests:mocklib",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:clock_source_mock",
     ],
 )
@@ -761,9 +654,6 @@ mongo_cc_library(
     srcs = [
         "backoff_with_jitter.cpp",
     ],
-    hdrs = [
-        "backoff_with_jitter.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -775,13 +665,8 @@ mongo_cc_library(
         "retry_strategy.cpp",
         ":retry_strategy_server_parameters_gen",
     ],
-    hdrs = [
-        "retry_strategy.h",
-        "//src/mongo/base:error_codes_header",
-    ],
     deps = [
         ":backoff_with_jitter",
-        "//src/mongo:core_headers_library",
         "//src/mongo/db:error_labels",
         "//src/third_party/folly:folly_token_bucket",
     ],

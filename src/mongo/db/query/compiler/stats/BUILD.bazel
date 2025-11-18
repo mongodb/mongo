@@ -25,11 +25,6 @@ mongo_cc_library(
         "value_utils.cpp",
         ":stats_for_histograms_gen",
     ],
-    hdrs = [
-        "ce_histogram.h",
-        "scalar_histogram.h",
-        "value_utils.h",
-    ],
     deps = [
         "//src/mongo/db:sbe_values",
         "//src/mongo/db/exec:docval_to_sbeval",
@@ -41,9 +36,6 @@ mongo_cc_library(
     srcs = [
         "max_diff.cpp",
     ],
-    hdrs = [
-        "max_diff.h",
-    ],
     deps = [
         ":stats_histograms",
     ],
@@ -51,9 +43,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "collection_statistics_interface",
-    hdrs = [
-        "collection_statistics.h",
-    ],
     deps = [
         ":stats_histograms",
     ],
@@ -66,13 +55,6 @@ mongo_cc_library(
         "stats_cache.cpp",
         "stats_cache_loader_impl.cpp",
         "stats_catalog.cpp",
-    ],
-    hdrs = [
-        "collection_statistics_impl.h",
-        "stats_cache.h",
-        "stats_cache_loader.h",
-        "stats_cache_loader_impl.h",
-        "stats_catalog.h",
     ],
     deps = [
         ":collection_statistics_interface",
@@ -88,9 +70,6 @@ mongo_cc_library(
     srcs = [
         "test_utils.cpp",
     ],
-    hdrs = [
-        "test_utils.h",
-    ],
     deps = [
         "//src/mongo/db:sbe_values",
     ],
@@ -101,9 +80,6 @@ mongo_cc_library(
     srcs = [
         "collection_statistics_mock.cpp",
     ],
-    hdrs = [
-        "collection_statistics_mock.h",
-    ],
     deps = [
         ":collection_statistics_interface",
     ],
@@ -113,9 +89,6 @@ mongo_cc_library(
     name = "maxdiff_test_utils",
     srcs = [
         "maxdiff_test_utils.cpp",
-    ],
-    hdrs = [
-        "maxdiff_test_utils.h",
     ],
     deps = [
         ":stats_histograms",
@@ -135,9 +108,6 @@ mongo_cc_library(
     srcs = [
         "rand_utils.cpp",
     ],
-    hdrs = [
-        "rand_utils.h",
-    ],
     deps = [
         ":stats_histograms",
         "//src/mongo:base",
@@ -152,7 +122,6 @@ mongo_cc_unit_test(
         "stats_cache_loader_mock.cpp",
         "stats_cache_test.cpp",
     ],
-    private_hdrs = [":stats_cache_loader_mock.h"],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":stats",
@@ -231,7 +200,6 @@ mongo_cc_unit_test(
         "stats_cache_loader_test.cpp",
         "stats_cache_loader_test_fixture.cpp",
     ],
-    private_hdrs = [":stats_cache_loader_test_fixture.h"],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         "//src/mongo/db:multitenancy",

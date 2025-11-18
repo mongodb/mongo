@@ -12,23 +12,6 @@ mongo_cc_library(
     srcs = [
         "set_terminate_internals.cpp",
     ],
-    hdrs = [
-        "chrono.h",
-        "condition_variable.h",
-        "exception.h",
-        "future.h",
-        "mutex.h",
-        "new.h",
-        "thread.h",
-        "trusted_hasher.h",
-        "type_traits.h",
-        "unordered_map.h",
-        "unordered_set.h",
-        "utility.h",
-        "//src/mongo/platform:compiler.h",
-        "//src/mongo/util:modules.h",
-        "//src/mongo/util:parking_lot.h",
-    ],
 )
 
 mongo_cc_unit_test(

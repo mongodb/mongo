@@ -17,9 +17,6 @@ mongo_cc_library(
     srcs = [
         "bench.cpp",
     ],
-    hdrs = [
-        "bench.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_minimal",
@@ -35,9 +32,6 @@ mongo_cc_library(
     srcs = [
         "program_runner.cpp",
     ],
-    hdrs = [
-        "program_runner.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/base:environment_buffer",
@@ -50,9 +44,6 @@ mongo_cc_library(
     srcs = [
         "linenoise_utf8.cpp",
     ],
-    hdrs = [
-        "linenoise_utf8.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -62,9 +53,6 @@ mongo_cc_library(
     name = "shell_options_storage",
     srcs = [
         "shell_options_storage.cpp",
-    ],
-    hdrs = [
-        "shell_options.h",
     ],
     copts = select({
         "@platforms//os:windows": [
@@ -122,9 +110,6 @@ mongo_cc_library(
         "kms.cpp",
         "kms_local.cpp",
     ],
-    hdrs = [
-        "kms.h",
-    ],
     deps = [
         ":kms_idl",
         "//src/mongo:base",
@@ -143,16 +128,6 @@ mongo_cc_library(
         "shell_utils.cpp",
         "shell_utils_extended.cpp",
         "shell_utils_launcher.cpp",
-    ],
-    hdrs = [
-        "named_pipe_test_helper.h",
-        "shell_options.h",
-        "shell_utils.h",
-        "shell_utils_extended.h",
-        "shell_utils_launcher.h",
-        "//src/mongo/bson:bson_bin_util.h",
-        "//src/mongo/bson:bsonobj_comparator.h",
-        "//src/mongo/transport:message_compressor_options_client_gen",
     ],
     deps = [
         ":benchrun",
@@ -198,9 +173,6 @@ mongo_cc_library(
     srcs = [
         "encrypted_dbclient_base.cpp",
     ],
-    hdrs = [
-        "encrypted_dbclient_base.h",
-    ],
     copts = select({
         "@platforms//os:windows": [
             "/Zc:preprocessor",
@@ -234,10 +206,6 @@ mongo_cc_library(
     srcs = [
         "linenoise.cpp",
         "mk_wcwidth.cpp",
-    ],
-    hdrs = [
-        "linenoise.h",
-        "mk_wcwidth.h",
     ],
     deps = [
         ":linenoise_utf8",
@@ -353,9 +321,6 @@ mongo_cc_library(
     srcs = [
         "mongojs.cpp",
     ],
-    header_deps = [
-        "//src/mongo/db/op_observer:op_observer",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -365,12 +330,12 @@ mongo_cc_library(
     name = "shell_options_register",
     srcs = [
         "shell_options_gen",
-    ] + select({
-        "//bazel/config:build_grpc_enabled": ["shell_options_grpc_gen"],
-        "//conditions:default": {},
-    }),
-    hdrs = [
-        "shell_utils.h",
+    ],
+    srcs_select = [
+        {
+            "//bazel/config:build_grpc_enabled": ["shell_options_grpc_gen"],
+            "//conditions:default": [],
+        },
     ],
     deps = [
         "shell_options_storage",
@@ -452,9 +417,6 @@ mongo_cc_library(
     name = "mongo_main",
     srcs = [
         "mongo_main.cpp",
-    ],
-    hdrs = [
-        "mongo_main.h",
     ],
     target_compatible_with = select({
         "//bazel/config:js_engine_mozjs": [],
@@ -541,10 +503,11 @@ mongo_cc_unit_test(
         "program_runner_test.cpp",
         "shell_options_test.cpp",
         "shell_utils_test.cpp",
-    ] + select({
+    ],
+    srcs_select = [{
         "//bazel/config:ssl_enabled": ["kms_test.cpp"],
         "//conditions:default": [],
-    }),
+    }],
     tags = ["mongo_unittest_fifth_group"],
     deps = ["shell_test_dependencies"],
 )

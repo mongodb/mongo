@@ -16,13 +16,6 @@ mongo_cc_library(
         "collect_query_stats_mongod.cpp",
         "cursor_manager.cpp",
     ],
-    hdrs = [
-        "clientcursor.h",
-        "collect_query_stats_mongod.h",
-        "cursor_manager.h",
-        "//src/mongo/db/local_catalog:external_data_source_scope_guard.h",  # TODO(SERVER-95100): Remove
-        "//src/mongo/db/memory_tracking:operation_memory_usage_tracker.h",
-    ],
     deps = [
         ":cursor_server_params",
         "//src/mongo/db:commands",
@@ -47,10 +40,6 @@ mongo_cc_library(
         "cursor_idl_validator.cpp",
         ":cursor_response_gen",
     ],
-    hdrs = [
-        "cursor_idl_validator.h",
-        "//src/mongo/db/memory_tracking:operation_memory_usage_tracker.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -69,9 +58,6 @@ mongo_cc_library(
     srcs = [
         "cursor_server_params.cpp",
         ":cursor_server_params_gen",
-    ],
-    hdrs = [
-        "cursor_server_params.h",
     ],
     deps = [
         "//src/mongo/db:server_base",
@@ -94,10 +80,6 @@ mongo_cc_library(
         "generic_cursor_utils.cpp",
         ":generic_cursor_gen",
     ],
-    hdrs = [
-        "cursor_id.h",
-        "generic_cursor_utils.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
@@ -119,9 +101,6 @@ mongo_cc_library(
     name = "release_memory_util",
     srcs = [
         "release_memory_util.cpp",
-    ],
-    hdrs = [
-        "release_memory_util.h",
     ],
     deps = [
         "//src/mongo/db:server_base",
@@ -165,6 +144,5 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":client_cursor",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

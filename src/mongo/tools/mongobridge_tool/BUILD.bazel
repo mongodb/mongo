@@ -26,10 +26,6 @@ mongo_cc_binary(
         "mongobridge_options_gen",
         "mongobridge_options_init.cpp",
     ],
-    private_hdrs = [
-        ":bridge_commands.h",
-        ":mongobridge_options.h",
-    ],
     tags = [
         "dist_test",
     ],

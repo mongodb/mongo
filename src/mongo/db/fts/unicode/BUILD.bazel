@@ -64,16 +64,6 @@ mongo_cc_library(
         "codepoints_diacritic_map.cpp",
         "string.cpp",
     ],
-    hdrs = [
-        "byte_vector.h",
-        "codepoints.h",
-        "string.h",
-    ] + select({
-        "@platforms//cpu:x86_64": ["byte_vector_sse2.h"],
-        "@platforms//cpu:aarch64": ["byte_vector_neon.h"],
-        "@platforms//cpu:ppc": ["byte_vector_altivec.h"],
-        "//conditions:default": [],
-    }),
     deps = [
         "//src/mongo:base",
         "//src/mongo/shell:linenoise_utf8",

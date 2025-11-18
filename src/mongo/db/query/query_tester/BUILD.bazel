@@ -16,12 +16,6 @@ mongo_cc_library(
         "test.cpp",
         "testfile.cpp",
     ],
-    hdrs = [
-        "command_helpers.h",
-        "file_helpers.h",
-        "test.h",
-        "testfile.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_network",
@@ -37,7 +31,6 @@ mongo_cc_library(
 mongo_cc_binary(
     name = "mongotest",
     srcs = ["main.cpp"],
-    private_hdrs = [":mock_version_info.h"],
     tags = [
         "devcore",
         "dist_test",

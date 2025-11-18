@@ -14,10 +14,6 @@ mongo_cc_library(
     srcs = [
         "operation_memory_usage_tracker.cpp",
     ],
-    hdrs = [
-        "memory_usage_tracker.h",
-        "operation_memory_usage_tracker.h",
-    ],
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
@@ -37,6 +33,5 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:document_source_mock",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

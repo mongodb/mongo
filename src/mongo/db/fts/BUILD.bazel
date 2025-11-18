@@ -13,11 +13,6 @@ exports_files(
 mongo_cc_library(
     name = "fts_query_noop",
     srcs = ["fts_query_noop.cpp"],
-    hdrs = [
-        "fts_query.h",
-        "fts_query_noop.h",
-        "fts_util.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -42,7 +37,7 @@ STOP_WORD_LANGUAGES = [
 ]
 
 render_template(
-    name = "stop_words_list_cpp_gen",
+    name = "stop_words_list_cpp",
     srcs = [
         "stop_words_{}.txt".format(lang)
         for lang in STOP_WORD_LANGUAGES
@@ -78,26 +73,8 @@ mongo_cc_library(
         "fts_util.cpp",
         "stemmer.cpp",
         "stop_words.cpp",
+        "stop_words_list.cpp",
         "tokenizer.cpp",
-        ":stop_words_list_cpp_gen",
-    ],
-    hdrs = [
-        "fts_basic_phrase_matcher.h",
-        "fts_basic_tokenizer.h",
-        "fts_element_iterator.h",
-        "fts_index_format.h",
-        "fts_language.h",
-        "fts_matcher.h",
-        "fts_query_impl.h",
-        "fts_query_parser.h",
-        "fts_spec.h",
-        "fts_unicode_phrase_matcher.h",
-        "fts_unicode_tokenizer.h",
-        "fts_util.h",
-        "stemmer.h",
-        "stop_words.h",
-        "stop_words_list.h",
-        "tokenizer.h",
     ],
     deps = [
         "//src/mongo:base",

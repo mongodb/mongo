@@ -23,19 +23,6 @@ mongo_cc_library(
         "database_change_stream_shard_targeter_impl.cpp",
         "historical_placement_fetcher_impl.cpp",
     ],
-    hdrs = [
-        "all_databases_change_stream_shard_targeter_impl.h",
-        "change_stream_db_absent_state_event_handler.h",
-        "change_stream_db_present_state_event_handler.h",
-        "change_stream_reader_builder_impl.h",
-        "change_stream_shard_targeter_state_event_handler.h",
-        "collection_change_stream_db_absent_state_event_handler.h",
-        "collection_change_stream_db_present_state_event_handler.h",
-        "collection_change_stream_shard_targeter_impl.h",
-        "data_to_shards_allocation_query_service_impl.h",
-        "database_change_stream_shard_targeter_impl.h",
-        "historical_placement_fetcher_impl.h",
-    ],
     deps = [
         ":change_streams_control_events",
         "//src/mongo/db:namespace_spec",
@@ -53,9 +40,6 @@ mongo_cc_library(
     srcs = [
         "control_events.cpp",
     ],
-    hdrs = [
-        "control_events.h",
-    ],
     deps = [
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
@@ -72,11 +56,6 @@ mongo_cc_unit_test(
         "collection_change_stream_shard_targeter_impl_test.cpp",
         "control_events_test.cpp",
         "data_to_shards_allocation_query_service_impl_test.cpp",
-    ],
-    private_hdrs = [
-        ":change_stream_shard_targeter_state_event_handler_mock.h",
-        "//src/mongo/db/pipeline:change_stream_reader_context_mock.h",
-        "//src/mongo/db/pipeline:historical_placement_fetcher_mock.h",
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [

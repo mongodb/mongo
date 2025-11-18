@@ -46,30 +46,6 @@ mongo_cc_library(
         "wire_version_provider.cpp",
         ":grpc_feature_flag_gen",
     ],
-    hdrs = [
-        "channel_pool.h",
-        "client.h",
-        "client_cache.h",
-        "client_context.h",
-        "client_stream.h",
-        "grpc_client_context.h",
-        "grpc_client_stream.h",
-        "grpc_server_context.h",
-        "grpc_server_stream.h",
-        "grpc_session.h",
-        "grpc_session_manager.h",
-        "grpc_transport_layer.h",
-        "grpc_transport_layer_impl.h",
-        "metadata.h",
-        "reactor.h",
-        "serialization.h",
-        "server.h",
-        "server_context.h",
-        "server_stream.h",
-        "service.h",
-        "util.h",
-        "wire_version_provider.h",
-    ],
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         "//src/mongo/client:connection_string",
@@ -94,9 +70,6 @@ mongo_cc_library(
     name = "grpc_async_client_factory",
     srcs = [
         "async_client_factory.cpp",
-    ],
-    hdrs = [
-        "async_client_factory.h",
     ],
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
@@ -189,29 +162,6 @@ mongo_cc_library(
         "mock_server_context.cpp",
         "mock_server_stream.cpp",
     ],
-    hdrs = [
-        "bidirectional_pipe.h",
-        "grpc_transport_layer_mock.h",
-        "mock_client.h",
-        "mock_client_context.h",
-        "mock_client_stream.h",
-        "mock_server_context.h",
-        "mock_server_stream.h",
-        "mock_stub.h",
-        "mock_util.h",
-        "mock_wire_version_provider.h",
-        "test_fixtures.h",
-    ],
-    header_deps = [
-        "//src/mongo/unittest",
-    ],
-    private_hdrs = [
-        "//src/mongo/db:service_context_test_fixture.h",
-        "//src/mongo/transport:test_fixtures.h",
-        "//src/mongo/transport:transport_layer_mock.h",
-        "//src/mongo/unittest:join_thread.h",
-        "//src/mongo/util:clock_source_mock.h",
-    ],
     deps = [
         ":grpc_transport_layer",
         "//src/mongo:base",
@@ -241,10 +191,6 @@ mongo_cc_unit_test(
     data = [
         "//jstests/libs:test_crt_files",
         "//jstests/libs:test_pem_files",
-    ],
-    private_hdrs = [
-        "//src/mongo/transport:reactor_test_fixture.h",
-        "//src/mongo/transport:session_workflow_test_util.h",
     ],
     tags = [
         "incompatible_with_bazel_remote_test",

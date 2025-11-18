@@ -23,9 +23,6 @@ mongo_cc_library(
         "ingress_request_rate_limiter.cpp",
         ":ingress_request_rate_limiter_gen",
     ],
-    hdrs = [
-        "ingress_request_rate_limiter.h",
-    ],
     deps = [
         ":rate_limiter",
         "//src/mongo:base",
@@ -48,9 +45,6 @@ mongo_cc_library(
         "ingress_admission_controller.cpp",
         ":ingress_admission_control_gen",
     ],
-    hdrs = [
-        "ingress_admission_controller.h",
-    ],
     deps = [
         ":ingress_admission_context",
         ":rate_limiter",
@@ -70,11 +64,6 @@ mongo_cc_library(
         "throughput_probing.cpp",
         "throughput_probing_gen",
         "ticketing_system.cpp",
-    ],
-    hdrs = [
-        "concurrency_adjustment_validator.h",
-        "throughput_probing.h",
-        "ticketing_system.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
@@ -116,9 +105,6 @@ mongo_cc_library(
     srcs = [
         "execution_admission_context.cpp",
     ],
-    hdrs = [
-        "execution_admission_context.h",
-    ],
     deps = [
         "//src/mongo/util/concurrency:admission_context",
     ],
@@ -128,9 +114,6 @@ mongo_cc_library(
     name = "ingress_admission_context",
     srcs = [
         "ingress_admission_context.cpp",
-    ],
-    hdrs = [
-        "ingress_admission_context.h",
     ],
     deps = [
         "//src/mongo/db:service_context",
@@ -142,9 +125,6 @@ mongo_cc_library(
     name = "rate_limiter",
     srcs = [
         "rate_limiter.cpp",
-    ],
-    hdrs = [
-        "rate_limiter.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -173,9 +153,6 @@ mongo_cc_library(
     name = "flow_control",
     srcs = [
         "flow_control.cpp",
-    ],
-    hdrs = [
-        "flow_control.h",
     ],
     deps = [
         ":flow_control_parameters",

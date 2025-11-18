@@ -20,10 +20,6 @@ mongo_cc_library(
         "wiredtiger_customization_hooks.cpp",
         "wiredtiger_extensions.cpp",
     ],
-    hdrs = [
-        "wiredtiger_customization_hooks.h",
-        "wiredtiger_extensions.h",
-    ],
     target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,
     deps = [
         "//src/mongo:base",
@@ -71,37 +67,6 @@ mongo_cc_library(
         "wiredtiger_storage_options_config_string_flags_parser.cpp",
         "wiredtiger_util.cpp",
     ],
-    hdrs = [
-        "spill_wiredtiger_kv_engine.h",
-        "wiredtiger_begin_transaction_block.h",
-        "wiredtiger_cache_pressure_monitor.h",
-        "wiredtiger_compiled_configuration.h",
-        "wiredtiger_connection.h",
-        "wiredtiger_container.h",
-        "wiredtiger_cursor.h",
-        "wiredtiger_cursor_helpers.h",
-        "wiredtiger_error_util.h",
-        "wiredtiger_event_handler.h",
-        "wiredtiger_global_options.h",
-        "wiredtiger_index.h",
-        "wiredtiger_index_cursor_generic.h",
-        "wiredtiger_index_util.h",
-        "wiredtiger_kv_engine.h",
-        "wiredtiger_managed_session.h",
-        "wiredtiger_oplog_manager.h",
-        "wiredtiger_prepare_conflict.h",
-        "wiredtiger_record_store.h",
-        "wiredtiger_recovery_unit.h",
-        "wiredtiger_session.h",
-        "wiredtiger_size_storer.h",
-        "wiredtiger_snapshot_manager.h",
-        "wiredtiger_stats.h",
-        "wiredtiger_storage_options_config_string_flags_parser.h",
-        "wiredtiger_util.h",
-        "//src/mongo/db/storage:journal_listener.h",
-        "//src/mongo/db/storage:snapshot_manager.h",
-        "//src/mongo/db/storage/kv:kv_engine.h",
-    ],
     target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,
     deps = [
         "storage_wiredtiger_customization_hooks",
@@ -113,10 +78,8 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:container",
-        "//src/mongo/db/storage:exceptions",
         "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:index_entry_comparison",
-        "//src/mongo/db/storage:kv_backup_block",
         "//src/mongo/db/storage:prepare_conflict_tracker",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:recovery_unit_base",
@@ -144,10 +107,6 @@ mongo_cc_library(
         "wiredtiger_options_init.cpp",
         "wiredtiger_server_status.cpp",
     ],
-    hdrs = [
-        "spill_wiredtiger_server_status.h",
-        "wiredtiger_server_status.h",
-    ],
     target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,
     deps = [
         "storage_wiredtiger_core",
@@ -167,9 +126,6 @@ mongo_cc_library(
     srcs = [
         "wiredtiger_record_store_test_harness.cpp",
     ],
-    hdrs = [
-        "wiredtiger_record_store_test_harness.h",
-    ],
     deps = [
         ":storage_wiredtiger_core",
         "//src/mongo/db:service_context_test_fixture",
@@ -184,7 +140,6 @@ mongo_cc_library(
     srcs = [
         "wiredtiger_index_test_harness.cpp",
     ],
-    hdrs = [],
     deps = [
         "storage_wiredtiger_core",
         "//src/mongo/db:service_context_non_d",
@@ -210,10 +165,6 @@ mongo_cc_unit_test(
         "wiredtiger_storage_options_config_string_flags_parser_test.cpp",
         "wiredtiger_util_test.cpp",
     ],
-    private_hdrs = [
-        "//src/mongo/util:executor_test_util.h",
-        "//src/mongo/util:future_test_utils.h",
-    ],
     tags = [
         "mongo_unittest_eighth_group",
         "server-storage-engine-integration",
@@ -230,7 +181,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:storage_engine_metadata",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/kv:kv_engine_test_harness",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:clock_source_mock",
     ],

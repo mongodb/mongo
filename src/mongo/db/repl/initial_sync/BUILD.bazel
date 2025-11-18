@@ -23,9 +23,6 @@ mongo_cc_library(
         "database_cloner_common.cpp",
         "database_cloner_gen",
     ],
-    hdrs = [
-        "database_cloner_common.h",
-    ],
     deps = [
         "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
@@ -40,13 +37,6 @@ mongo_cc_library(
         "initial_sync_shared_data.cpp",
         "repl_sync_shared_data.cpp",
     ],
-    hdrs = [
-        "initial_sync_shared_data.h",
-        "repl_sync_shared_data.h",
-        "//src/mongo:core_headers",
-        "//src/mongo/db:wire_version.h",
-        "//src/mongo/db/query/client_cursor:cursor_id.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -56,9 +46,6 @@ mongo_cc_library(
     name = "base_cloner",
     srcs = [
         "base_cloner.cpp",
-    ],
-    hdrs = [
-        "base_cloner.h",
     ],
     deps = [
         ":repl_sync_shared_data",
@@ -77,12 +64,6 @@ mongo_cc_library(
         "collection_cloner.cpp",
         "database_cloner.cpp",
         "initial_sync_base_cloner.cpp",
-    ],
-    hdrs = [
-        "all_database_cloner.h",
-        "collection_cloner.h",
-        "database_cloner.h",
-        "initial_sync_base_cloner.h",
     ],
     deps = [
         ":base_cloner",
@@ -114,16 +95,6 @@ mongo_cc_library(
         "initial_syncer_common_stats.cpp",
         "initial_syncer_factory.cpp",
     ],
-    hdrs = [
-        "callback_completion_guard.h",
-        "initial_sync_state.h",
-        "initial_syncer.h",
-        "initial_syncer_common_stats.h",
-        "initial_syncer_factory.h",
-        "initial_syncer_interface.h",
-        "//src/mongo/dbtests/mock:mock_dbclient_connection.h",
-        "//src/mongo/dbtests/mock:mock_remote_db_server.h",
-    ],
     deps = [
         ":initial_sync_cloners",
         ":repl_sync_shared_data",
@@ -153,7 +124,6 @@ mongo_cc_unit_test(
     name = "initial_syncer_test",
     size = "small",
     srcs = ["initial_syncer_test.cpp"],
-    private_hdrs = ["//src/mongo/db/storage:storage_engine_mock.h"],
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":initial_syncer",
@@ -178,10 +148,6 @@ mongo_cc_library(
     srcs = [
         "cloner_test_fixture.cpp",
         "initial_sync_cloner_test_fixture.cpp",
-    ],
-    hdrs = [
-        "cloner_test_fixture.h",
-        "initial_sync_cloner_test_fixture.h",
     ],
     deps = [
         "//src/mongo/db/repl:repl_server_parameters",
@@ -214,6 +180,5 @@ mongo_cc_unit_test(
         ":initial_sync_cloners",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/storage:storage_options",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

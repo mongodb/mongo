@@ -19,9 +19,6 @@ mongo_cc_library(
     srcs = [
         "timeseries_write_ops.cpp",
     ],
-    hdrs = [
-        "timeseries_write_ops.h",
-    ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "timeseries_write_ops_utils_internal",
@@ -49,14 +46,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "timeseries_write_ops_utils_internal",
     srcs = ["timeseries_write_ops_utils_internal.cpp"],
-    hdrs = [
-        "measurement.h",
-        "//src/mongo/db/timeseries/bucket_catalog:bucket_catalog_helpers.h",
-        "//src/mongo/db/timeseries/bucket_catalog:flat_bson.h",
-        "//src/mongo/db/timeseries/bucket_catalog:write_batch.h",
-        "//src/mongo/util/tracking",
-    ],
-    private_hdrs = [":timeseries_write_ops_utils_internal.h"],
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
@@ -80,9 +69,6 @@ mongo_cc_library(
     srcs = [
         "timeseries_write_ops_utils.cpp",
     ],
-    hdrs = [
-        "timeseries_write_ops_utils.h",
-    ],
     deps = [
         "timeseries_write_ops_utils_internal",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
@@ -102,6 +88,5 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/write_ops:write_ops_exec",
         "//src/mongo/db/timeseries:timeseries_test_fixture",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

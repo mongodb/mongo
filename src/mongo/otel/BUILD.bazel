@@ -16,10 +16,6 @@ mongo_cc_library(
     srcs = [
         "telemetry_context_holder.cpp",
     ],
-    hdrs = [
-        "telemetry_context.h",
-        "telemetry_context_holder.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
     ],

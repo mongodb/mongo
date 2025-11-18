@@ -40,7 +40,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:security_token",
         "//src/mongo/db/commands:core",
         "//src/mongo/db/local_catalog/lock_manager",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:clock_source_mock",
     ],

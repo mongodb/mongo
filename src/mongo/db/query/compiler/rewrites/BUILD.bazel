@@ -11,9 +11,6 @@ exports_files(
 mongo_cc_library(
     name = "rule_based_rewriter",
     srcs = [],
-    hdrs = [
-        "rule_based_rewriter.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],

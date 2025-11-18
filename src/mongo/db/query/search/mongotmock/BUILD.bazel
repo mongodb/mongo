@@ -18,9 +18,6 @@ mongo_cc_library(
         "mongotmock_options_init.cpp",
         "mongotmock_state.cpp",
     ],
-    hdrs = [
-        "mongotmock_state.h",
-    ],
     deps = [
         "//src/mongo/db:api_parameters",
         "//src/mongo/db:server_options_servers",

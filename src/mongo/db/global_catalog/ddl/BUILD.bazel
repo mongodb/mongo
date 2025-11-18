@@ -404,9 +404,6 @@ mongo_cc_library(
     srcs = [
         ":notify_sharding_event_gen",
     ],
-    header_deps = [
-        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],

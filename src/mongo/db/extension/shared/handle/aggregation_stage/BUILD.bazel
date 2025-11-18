@@ -17,13 +17,6 @@ mongo_cc_library(
         "parse_node.cpp",
         "stage_descriptor.cpp",
     ],
-    hdrs = [
-        "ast_node.h",
-        "executable_agg_stage.h",
-        "logical.h",
-        "parse_node.h",
-        "stage_descriptor.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",

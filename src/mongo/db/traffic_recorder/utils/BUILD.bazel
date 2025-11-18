@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "task_scheduler.cpp",
     ],
-    hdrs = [
-        "task_scheduler.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/query/util:stop_token",

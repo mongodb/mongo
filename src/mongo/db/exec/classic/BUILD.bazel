@@ -22,9 +22,6 @@ mongo_cc_library(
     srcs = [
         "query_shard_server_test_fixture.cpp",
     ],
-    hdrs = [
-        "query_shard_server_test_fixture.h",
-    ],
     deps = [
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",

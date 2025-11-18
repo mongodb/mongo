@@ -28,22 +28,6 @@ mongo_cc_library(
         "rollover.cpp",
         "write_batch.cpp",
     ],
-    hdrs = [
-        "bucket.h",
-        "bucket_catalog.h",
-        "bucket_catalog_helpers.h",
-        "bucket_catalog_internal.h",
-        "bucket_identifiers.h",
-        "bucket_metadata.h",
-        "bucket_state_registry.h",
-        "execution_stats.h",
-        "flat_bson.h",
-        "global_bucket_catalog.h",
-        "measurement_map.h",
-        "reopening.h",
-        "rollover.h",
-        "write_batch.h",
-    ],
     deps = [
         "//src/mongo/bson/column",
         "//src/mongo/db:dbdirectclient",
@@ -84,7 +68,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries:timeseries_test_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

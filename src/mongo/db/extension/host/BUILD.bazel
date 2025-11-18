@@ -34,15 +34,6 @@ mongo_cc_library(
         "document_source_extension_optimizable.cpp",
         "extension_stage.cpp",
     ],
-    hdrs = [
-        "document_source_extension.h",
-        "document_source_extension_expandable.h",
-        "document_source_extension_optimizable.h",
-        "extension_stage.h",
-        "host_portal.h",
-        "query_execution_context.h",
-        "static_properties_util.h",
-    ],
     deps = [
         ":extension_operation_metrics_registry",
         "//src/mongo:base",
@@ -63,15 +54,9 @@ mongo_cc_library(
         "load_stub_parsers.cpp",
         "//src/mongo/db/pipeline:document_source_list_extensions.cpp",
     ],
-    hdrs = [
-        "load_extension.h",
-        "load_extension_test_util.h",
-        "load_stub_parsers.h",
-    ],
     deps = [
         ":extension_host",
         "//src/mongo:base",
-        "//src/mongo:core_headers_library",
         "//src/mongo/db/query:query_knobs",
         "//src/third_party/yaml-cpp:yaml",
     ],
@@ -125,7 +110,6 @@ mongo_cc_unit_test(
     deps = [
         ":extension_loader",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
     ],
 )

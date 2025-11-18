@@ -14,12 +14,6 @@ mongo_cc_library(
     srcs = [
         "multikey_dotted_path_support.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/query/bson:multikey_dotted_path_support.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
-    ],
     deps = [
         "//src/mongo:base",
     ],

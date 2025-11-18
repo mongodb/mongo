@@ -24,9 +24,6 @@ mongo_cc_library(
     srcs = [
         "validate_options.cpp",
     ],
-    hdrs = [
-        "validate_options.h",
-    ],
     deps = [
         "//src/mongo/bson:bson_validate",
     ],
@@ -37,9 +34,6 @@ mongo_cc_library(
     srcs = [
         "validate_results.cpp",
     ],
-    hdrs = [
-        "validate_results.h",
-    ],
     deps = [
         ":validate_options",
     ],
@@ -49,9 +43,6 @@ mongo_cc_library(
     name = "validate_state",
     srcs = [
         "validate_state.cpp",
-    ],
-    hdrs = [
-        "validate_state.h",
     ],
     deps = [
         ":validate_idl",
@@ -81,13 +72,6 @@ mongo_cc_library(
         "collection_validation.cpp",
         "index_consistency.cpp",
         "validate_adaptor.cpp",
-    ],
-    hdrs = [
-        "collection_validation.h",
-    ],
-    private_hdrs = [
-        ":index_consistency.h",
-        ":validate_adaptor.h",
     ],
     deps = [
         ":validate_results",

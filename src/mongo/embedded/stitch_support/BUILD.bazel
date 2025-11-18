@@ -15,10 +15,6 @@ mongo_cc_library(
     srcs = [
         "stitch_support.cpp",
     ],
-    hdrs = [
-        "stitch_support.h",
-        "//src/mongo/embedded:api_common.h",
-    ],
     additional_linker_inputs = select({
         "@platforms//os:linux": [
             ":libstitch_support.version_script.lds",
@@ -80,10 +76,6 @@ mongo_cc_library(
     name = "stitch_support_duplicate",
     srcs = [
         "stitch_support.cpp",
-    ],
-    hdrs = [
-        "stitch_support.h",
-        "//src/mongo/embedded:api_common.h",
     ],
     additional_linker_inputs = select({
         "@platforms//os:linux": [

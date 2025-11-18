@@ -22,9 +22,6 @@ mongo_cc_library(
     srcs = [
         "sorter_stats.cpp",
     ],
-    hdrs = [
-        "sorter_stats.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -36,13 +33,6 @@ mongo_cc_library(
         "sorter_checksum_calculator.cpp",
         "sorter_file_name.cpp",
         "sorter_gen",
-    ],
-    hdrs = [
-        "sorter.h",
-        "sorter_checksum_calculator.h",
-        "sorter_file_name.h",
-        "sorter_template_defs.h",
-        "//src/mongo/db/query/util:spill_util.h",
     ],
     deps = [
         ":sorter_stats",  # TODO(SERVER-93876): Remove.
@@ -58,10 +48,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "sorter_test_utils",
-    hdrs = [
-        "sorter_test_utils.h",
-    ],
-    private_hdrs = [":sorter_test_utils.h"],
     deps = [
         ":sorter_base",
         "//src/mongo/db/storage:encryption_hooks",

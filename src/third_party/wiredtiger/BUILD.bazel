@@ -115,21 +115,24 @@ mongo_cc_library(
     name = "wiredtiger_checksum",
     srcs = [
         "src/checksum/software/checksum.c",
-    ] + select({
-        "@platforms//cpu:aarch64": WT_FILELIST_ARM64_HOST,
-        "@platforms//cpu:x86_64": WT_FILELIST_X86_HOST,
-        "@platforms//cpu:ppc": WT_FILELIST_POWERPC_HOST,
-        "@platforms//cpu:s390x": [
-            WT_FILELIST_ZSERIES_HOST[0],
-            ":wiredtiger_s390x_checksum_index_1",
-        ],
-    }) + glob(["**/*.h"]) + [
+    ] + glob(["**/*.h"]) + [
         "wt_config_header",
     ],
     hdrs = WT_PUBLIC_HEADERS,
     copts = WT_CCFLAGS,
     includes = ["."],
     local_defines = WT_DEFINES,
+    srcs_select = [
+        {
+            "@platforms//cpu:aarch64": WT_FILELIST_ARM64_HOST,
+            "@platforms//cpu:x86_64": WT_FILELIST_X86_HOST,
+            "@platforms//cpu:ppc": WT_FILELIST_POWERPC_HOST,
+            "@platforms//cpu:s390x": [
+                WT_FILELIST_ZSERIES_HOST[0],
+                ":wiredtiger_s390x_checksum_index_1",
+            ],
+        },
+    ],
 )
 
 mongo_cc_library(
@@ -138,10 +141,7 @@ mongo_cc_library(
         "ext/compressors/snappy/snappy_compress.c",
         "ext/compressors/zlib/zlib_compress.c",
         "ext/compressors/zstd/zstd_compress.c",
-    ] + select({
-        "//bazel/config:posix": WT_FILELIST_POSIX_HOST,
-        "@platforms//os:windows": [file for file in WT_FILELIST_WINDOWS_HOST if file != "src/os_win/os_futex.c"],
-    }) + glob(["**/*.h"]) + ["wt_config_header"],
+    ] + glob(["**/*.h"]) + ["wt_config_header"],
     hdrs = WT_PUBLIC_HEADERS,
     copts = WT_CCFLAGS,
     includes = ["."] + select({
@@ -153,6 +153,12 @@ mongo_cc_library(
         "//bazel/config:posix": ["-ldl"],
         "//conditions:default": [],
     }),
+    srcs_select = [
+        {
+            "//bazel/config:posix": WT_FILELIST_POSIX_HOST,
+            "@platforms//os:windows": [file for file in WT_FILELIST_WINDOWS_HOST if file != "src/os_win/os_futex.c"],
+        },
+    ],
     deps = [
         "wiredtiger_checksum",
         "//src/third_party/snappy",

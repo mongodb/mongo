@@ -14,17 +14,6 @@ mongo_cc_library(
     srcs = [
         "expr.cpp",
     ],
-    hdrs = [
-        "expr.h",
-        "syntax.h",
-        "syntax_fwd_declare.h",
-        "//src/mongo/db/query/stage_builder/sbe/abt:comparison_op.h",
-        "//src/mongo/db/query/stage_builder/sbe/abt:containers.h",
-        "//src/mongo/db/query/stage_builder/sbe/abt:strong_alias.h",
-    ],
-    header_deps = [
-        "//src/mongo/db:sbe_values",
-    ],
     deps = [
         "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",  # needed to register extended type destruction for MakeObjSpec :(
         "//src/mongo/stdx",

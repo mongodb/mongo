@@ -23,11 +23,6 @@ mongo_cc_library(
         "simulator_options_init.cpp",
         ":simulator_options_gen",
     ],
-    hdrs = [
-        "event_queue.h",
-        "simulation.h",
-        "simulator_options.h",
-    ],
     deps = [
         "//src/mongo/db:server_options",
         "//src/mongo/db:server_options_base",
@@ -35,7 +30,6 @@ mongo_cc_library(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/util:pcre_wrapper",
-        "//src/mongo/util:tick_source_mock",
         "//src/mongo/util/options_parser:options_parser_init",
     ],
 )
@@ -55,9 +49,6 @@ mongo_cc_library(
     name = "workload_characteristics",
     srcs = [
         "workload_characteristics.cpp",
-    ],
-    hdrs = [
-        "workload_characteristics.h",
     ],
     deps = [
         "//src/mongo:base",

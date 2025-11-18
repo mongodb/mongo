@@ -16,16 +16,6 @@ mongo_cc_library(
         "projection_ast_util.cpp",
         "projection_parser.cpp",
     ],
-    hdrs = [
-        "projection.h",
-        "projection_ast.h",
-        "projection_ast_util.h",
-        "projection_ast_visitor.h",
-        "projection_parser.h",
-        "//src/mongo/base:exact_cast.h",
-        "//src/mongo/db/query/compiler/rewrites/matcher:expression_optimizer.h",
-    ],
-    private_hdrs = [":projection_ast_path_tracking_visitor.h"],
     deps = [
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",

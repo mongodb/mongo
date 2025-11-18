@@ -22,11 +22,6 @@ mongo_cc_library(
         "interval_evaluation_tree.cpp",
         ":expression_geo_index_knobs_gen",
     ],
-    hdrs = [
-        "expression_geo_index_mapping.h",
-        "index_bounds_builder.h",
-        "interval_evaluation_tree.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/geo:geometry",
@@ -40,7 +35,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "index_bounds_builder_test_fixture",
-    private_hdrs = [":index_bounds_builder_test_fixture.h"],
     deps = [
         ":index_bounds_builder",
         "//src/mongo/db/pipeline:expression_context_for_test",

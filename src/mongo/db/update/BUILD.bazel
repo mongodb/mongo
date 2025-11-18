@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "document_diff_test_helpers.cpp",
     ],
-    hdrs = [
-        "document_diff_test_helpers.h",
-    ],
     deps = [
         ":update",
     ],
@@ -26,9 +23,6 @@ mongo_cc_library(
     name = "pattern_cmp",
     srcs = [
         "pattern_cmp.cpp",
-    ],
-    hdrs = [
-        "pattern_cmp.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -45,16 +39,6 @@ mongo_cc_library(
         "document_diff_applier.cpp",
         "document_diff_calculator.cpp",
         "document_diff_serialization.cpp",
-    ],
-    hdrs = [
-        "document_diff_applier.h",
-        "document_diff_calculator.h",
-        "document_diff_serialization.h",
-        "//src/mongo/base:error_codes_header",
-    ],
-    private_hdrs = [
-        "//src/mongo/util:dynamic_bitset.h",
-        "//src/mongo/util:inlined_storage.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -73,16 +57,6 @@ mongo_cc_library(
         "storage_validation.cpp",
         "update_oplog_entry_serialization.cpp",
         "v2_log_builder.cpp",
-    ],
-    hdrs = [
-        "field_checker.h",
-        "log_builder_interface.h",
-        "path_support.h",
-        "runtime_update_path.h",
-        "storage_validation.h",
-        "update_executor.h",
-        "update_oplog_entry_serialization.h",
-        "v2_log_builder.h",
     ],
     deps = [
         ":pattern_cmp",  # TODO(SERVER-93876): Remove.
@@ -120,30 +94,6 @@ mongo_cc_library(
         "update_node.cpp",
         "update_object_node.cpp",
     ],
-    hdrs = [
-        "addtoset_node.h",
-        "arithmetic_node.h",
-        "array_culling_node.h",
-        "bit_node.h",
-        "compare_node.h",
-        "conflict_placeholder_node.h",
-        "current_date_node.h",
-        "modifier_node.h",
-        "modifier_table.h",
-        "pop_node.h",
-        "pull_node.h",
-        "pullall_node.h",
-        "push_node.h",
-        "rename_node.h",
-        "set_node.h",
-        "unset_node.h",
-        "update_array_node.h",
-        "update_internal_node.h",
-        "update_leaf_node.h",
-        "update_node.h",
-        "update_node_visitor.h",
-        "update_object_node.h",
-    ],
     deps = [
         ":update_common",
         "//src/mongo/db:update_index_data",
@@ -159,12 +109,6 @@ mongo_cc_library(
         "object_transform_executor.cpp",
         "pipeline_executor.cpp",
     ],
-    hdrs = [
-        "delta_executor.h",
-        "object_replace_executor.h",
-        "object_transform_executor.h",
-        "pipeline_executor.h",
-    ],
     deps = [
         ":update_common",
         ":update_document_diff",
@@ -178,16 +122,6 @@ mongo_cc_library(
     srcs = [
         "update_driver.cpp",
         "update_util.cpp",
-    ],
-    hdrs = [
-        "update_driver.h",
-        "update_tree_executor.h",
-        "update_util.h",
-        "//src/mongo/db/exec/sbe:in_list.h",
-        "//src/mongo/db/query:explain.h",
-        "//src/mongo/db/query/plan_cache:sbe_plan_cache.h",
-        "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
-        "//src/mongo/db/query/write_ops:update_request.h",
     ],
     deps = [
         ":update",
@@ -233,7 +167,6 @@ mongo_cc_unit_test(
         "update_serialization_test.cpp",
         "v2_log_builder_test.cpp",
     ],
-    private_hdrs = [":update_node_test_fixture.h"],
     tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":update",

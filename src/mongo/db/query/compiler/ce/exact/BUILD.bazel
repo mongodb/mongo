@@ -11,9 +11,6 @@ exports_files(
 
 mongo_cc_library(
     name = "exact_cardinality_interface",
-    hdrs = [
-        "exact_cardinality.h",
-    ],
     deps = [
         "//src/mongo/db:query_expressions",
     ],

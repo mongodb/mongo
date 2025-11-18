@@ -17,17 +17,6 @@ mongo_cc_library(
         "petrick.cpp",
         "quine_mccluskey.cpp",
     ],
-    hdrs = [
-        "bitset_algebra.h",
-        "bitset_tree.h",
-        "petrick.h",
-        "quine_mccluskey.h",
-    ],
-    private_hdrs = [
-        "//src/mongo/util:dynamic_bitset.h",
-        "//src/mongo/util:inlined_storage.h",
-        "//src/mongo/util:stream_utils.h",
-    ],
     deps = [
         "//src/mongo/db:mongohasher",
     ],
@@ -41,7 +30,6 @@ mongo_cc_unit_test(
         "petrick_test.cpp",
         "quine_mccluskey_test.cpp",
     ],
-    private_hdrs = [":bitset_test_util.h"],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":boolean_simplification",

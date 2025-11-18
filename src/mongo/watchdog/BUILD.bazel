@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "watchdog.cpp",
     ],
-    hdrs = [
-        "watchdog.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
@@ -28,9 +25,6 @@ mongo_cc_library(
     name = "watchdog_register",
     srcs = [
         "watchdog_register.cpp",
-    ],
-    hdrs = [
-        "watchdog_register.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -48,9 +42,6 @@ mongo_cc_library(
         "watchdog_mongod.cpp",
         "watchdog_mongod_gen",
     ],
-    hdrs = [
-        "watchdog_mongod.h",
-    ],
     deps = [
         ":watchdog",
         ":watchdog_register",
@@ -66,7 +57,6 @@ mongo_cc_library(
     srcs = [
         "watchdog_mock.cpp",
     ],
-    hdrs = ["watchdog_mock.h"],
     deps = [
         ":watchdog",
         "//src/mongo/db:service_context",

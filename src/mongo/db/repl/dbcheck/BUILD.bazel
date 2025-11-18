@@ -86,10 +86,6 @@ mongo_cc_library(
         "dbcheck_idl.cpp",
         ":dbcheck_gen",
     ],
-    hdrs = [
-        "dbcheck.h",
-        "dbcheck_idl.h",
-    ],
     deps = [
         ":health_log_interface",
         "//src/mongo/bson:bson_validate",
@@ -108,10 +104,6 @@ mongo_cc_library(
     name = "dbcheck_test_fixture",
     srcs = [
         "dbcheck_test_fixture.cpp",
-    ],
-    hdrs = [
-        "dbcheck_test_fixture.h",
-        "//src/mongo/db/op_observer:operation_logger_mock.h",
     ],
     deps = [
         ":dbcheck",

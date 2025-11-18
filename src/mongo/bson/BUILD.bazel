@@ -23,14 +23,6 @@ mongo_cc_library(
         "bson_validate.cpp",
         ":bson_validate_gen",
     ],
-    hdrs = [
-        "bson_validate.h",
-        "//src/mongo/crypto:encryption_fields_util.h",
-        "//src/mongo/crypto:fle_field_schema_gen",
-    ],
-    header_deps = [
-        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson/column",
@@ -54,10 +46,6 @@ mongo_cc_unit_test(
         "oid_test.cpp",
         "ordering_test.cpp",
         "simple_bsonobj_comparator_test.cpp",
-    ],
-    private_hdrs = [
-        ":bsonelement_comparator.h",
-        ":bsonobj_comparator.h",
     ],
     tags = [
         "mongo_unittest_first_group",
@@ -90,7 +78,6 @@ mongo_cc_fuzzer_test(
         "bson_validate_fuzzer.cpp",
         "bson_validate_old.cpp",
     ],
-    private_hdrs = [":bson_validate_old.h"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",

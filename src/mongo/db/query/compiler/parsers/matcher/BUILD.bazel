@@ -16,11 +16,6 @@ mongo_cc_library(
         "expression_parser.cpp",
         "matcher_type_set_parser.cpp",
     ],
-    hdrs = [
-        "expression_geo_parser.h",
-        "expression_parser.h",
-        "matcher_type_set_parser.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
@@ -33,9 +28,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "parsed_match_expression_for_test",
-    hdrs = [
-        "parsed_match_expression_for_test.h",
-    ],
     deps = [
         ":matcher_parser",
         "//src/mongo/db/pipeline:expression_context_for_test",

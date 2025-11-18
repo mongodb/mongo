@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "sampling_test_utils.cpp",
     ],
-    hdrs = [
-        "sampling_test_utils.h",
-    ],
     deps = [
         "//src/mongo/db:write_stage_common",
         "//src/mongo/db/collection_crud",
@@ -33,9 +30,6 @@ mongo_cc_library(
     srcs = [
         "math.cpp",
     ],
-    hdrs = [
-        "math.h",
-    ],
     deps = [
         "//src/mongo/db/query/compiler/ce:ce_common",
     ],
@@ -46,10 +40,6 @@ mongo_cc_library(
     srcs = [
         "sampling_estimator_impl.cpp",
     ],
-    hdrs = [
-        "sampling_estimator.h",
-        "sampling_estimator_impl.h",
-    ],
     deps = [
         ":sampling_math",
         "//src/mongo/db:query_exec",
@@ -59,9 +49,6 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "sampling_estimator_interface",
-    hdrs = [
-        "sampling_estimator.h",
-    ],
     deps = [
         "//src/mongo/db:query_expressions",
     ],

@@ -15,10 +15,6 @@ mongo_cc_library(
         "operation_latency_histogram.cpp",
         "top.cpp",
     ],
-    hdrs = [
-        "operation_latency_histogram.h",
-        "top.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
@@ -30,9 +26,6 @@ mongo_cc_library(
     name = "api_version_metrics",
     srcs = [
         "api_version_metrics.cpp",
-    ],
-    hdrs = [
-        "api_version_metrics.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -63,10 +56,6 @@ mongo_cc_library(
         ":read_concern_stats_gen",
         ":server_write_concern_metrics_gen",
     ],
-    hdrs = [
-        "server_read_concern_metrics.h",
-        "server_write_concern_metrics.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -89,9 +78,6 @@ mongo_cc_library(
         "read_preference_metrics.cpp",
         ":read_preference_metrics_gen",
     ],
-    hdrs = [
-        "read_preference_metrics.h",
-    ],
     deps = [
         "//src/mongo/client:read_preference",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
@@ -106,9 +92,6 @@ mongo_cc_library(
     srcs = [
         "single_transaction_stats.cpp",
     ],
-    hdrs = [
-        "single_transaction_stats.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/repl:read_concern_args",
@@ -121,13 +104,6 @@ mongo_cc_library(
     srcs = [
         "timer_stats.cpp",
     ],
-    hdrs = [
-        "//src/mongo/base:error_codes_header",
-        "//src/mongo/db/stats:timer_stats.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/fts:fts_query_noop",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -138,9 +114,6 @@ mongo_cc_library(
     srcs = [
         "counters_sort.cpp",
     ],
-    hdrs = [
-        "counters_sort.h",
-    ],
     deps = [
         "//src/mongo/db/commands/server_status:server_status_metric",
     ],
@@ -150,18 +123,6 @@ mongo_cc_library(
     name = "counters",
     srcs = [
         "counters.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/bson:bsonelement_comparator.h",
-        "//src/mongo/db/exec/sbe/values:key_string_entry.h",
-        "//src/mongo/db/exec/sbe/values:value.h",
-        "//src/mongo/db/matcher:expression_leaf.h",
-        "//src/mongo/db/matcher:expression_path.h",
-        "//src/mongo/db/matcher:in_list_data.h",
-        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
-        "//src/mongo/db/pipeline:javascript_execution.h",
-        "//src/mongo/db/pipeline:resume_token.h",
-        "//src/mongo/db/storage:sorted_data_interface.h",
     ],
     deps = [
         ":counters_sort",
@@ -177,9 +138,6 @@ mongo_cc_library(
     srcs = [
         "lock_server_status_section.cpp",
         "storage_stats.cpp",
-    ],
-    hdrs = [
-        "storage_stats.h",
     ],
     deps = [
         ":top",
@@ -225,14 +183,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/commands/server_status:server_status_core",
-    ],
-)
-
-mongo_cc_library(
-    name = "counter_ops",
-    srcs = [],
-    hdrs = [
-        "counter_ops.h",
     ],
 )
 

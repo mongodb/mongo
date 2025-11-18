@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "write_ops_exec_util.cpp",
     ],
-    hdrs = [
-        "write_ops_exec_util.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:shard_role_api",
@@ -29,10 +26,6 @@ mongo_cc_library(
     srcs = [
         "parsed_update_array_filters.cpp",
         "parsed_update_base.cpp",
-    ],
-    hdrs = [
-        "parsed_update.h",
-        "parsed_update_array_filters.h",
     ],
     deps = [
         "//src/mongo/db:disk_use_options_idl",
@@ -51,11 +44,6 @@ mongo_cc_library(
         "parsed_delete.cpp",
         "parsed_update.cpp",
         "update_result.cpp",
-    ],
-    hdrs = [
-        "parsed_delete.h",
-        "parsed_update.h",
-        "update_result.h",
     ],
     deps = [
         "delete_request_idl",
@@ -92,12 +80,6 @@ mongo_cc_library(
         "update.cpp",
         "write_ops_retryability.cpp",
         ":single_write_result_gen",
-    ],
-    hdrs = [
-        "delete.h",
-        "insert.h",
-        "update.h",
-        "write_ops_retryability.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -138,16 +120,6 @@ mongo_cc_library(
         "write_ops.cpp",
         ":write_ops_gen",
     ],
-    hdrs = [
-        "write_ops.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/global_catalog:sharding_catalog_client",
-    ],
-    private_hdrs = [
-        "//src/mongo/db/update:update_oplog_entry_serialization.h",
-        "//src/mongo/db/update:update_oplog_entry_version.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/crypto:encrypted_field_config",
@@ -168,9 +140,6 @@ mongo_cc_library(
     name = "write_ops_parsers_test_helpers",
     srcs = [
         "write_ops_parsers_test_helpers.cpp",
-    ],
-    hdrs = [
-        "write_ops_parsers_test_helpers.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -194,13 +163,6 @@ mongo_cc_library(
     srcs = [
         ":delete_request_gen",
     ],
-    hdrs = [
-        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/repl:oplog_buffer_batched_queue",
-        "//src/mongo/db/commands/server_status:server_status_core",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/pipeline",
@@ -212,9 +174,6 @@ mongo_cc_library(
     name = "write_ops_exec",
     srcs = [
         "write_ops_exec.cpp",
-    ],
-    hdrs = [
-        "write_ops_exec.h",
     ],
     deps = [
         ":write_ops",
@@ -282,7 +241,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/db/transaction",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

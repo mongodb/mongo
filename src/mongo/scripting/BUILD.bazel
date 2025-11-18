@@ -15,12 +15,6 @@ mongo_cc_library(
     srcs = [
         "bson_template_evaluator.cpp",
     ],
-    hdrs = [
-        "bson_template_evaluator.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/fts:fts_query_noop",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -41,12 +35,6 @@ mongo_cc_library(
         "utils.cpp",
         ":deadline_monitor_gen",
     ],
-    hdrs = [
-        "dbdirectclient_factory.h",
-        "deadline_monitor.h",
-        "engine.h",
-        "jsexception.h",
-    ],
     deps = [
         ":bson_template_evaluator",  # TODO(SERVER-93876): Remove.
         "//src/mongo/client:clientdriver_minimal",
@@ -58,7 +46,30 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "scripting",
-    srcs = select({
+    copts = select({
+        "@platforms//os:windows": [
+            # The default MSVC preprocessor elides commas in some cases as a
+            # convenience, but this behavior breaks compilation of jspubtd.h.
+            # Enabling the newer preprocessor fixes the problem.
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:compiler_type_clang": [
+            "-Wno-dangling",
+        ],
+        "//bazel/config:compiler_type_gcc": [
+            "-Wno-dangling-pointer",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
+        "//conditions:default": [],
+    }),
+    srcs_select = [{
         "//bazel/config:js_engine_none": [
             "scripting_none.cpp",
         ],
@@ -111,83 +122,10 @@ mongo_cc_library(
             "//src/mongo/scripting/mozjs:valuereader.cpp",
             "//src/mongo/scripting/mozjs:valuewriter.cpp",
         ],
-    }),
-    hdrs = select({
-        "//bazel/config:js_engine_none": [
-            "scripting_none.cpp",
-        ],
-        "//bazel/config:js_engine_mozjs": [
-            "//src/mongo/scripting/mozjs:base.h",
-            "//src/mongo/scripting/mozjs:bindata.h",
-            "//src/mongo/scripting/mozjs:bson.h",
-            "//src/mongo/scripting/mozjs:code.h",
-            "//src/mongo/scripting/mozjs:countdownlatch.h",
-            "//src/mongo/scripting/mozjs:cursor.h",
-            "//src/mongo/scripting/mozjs:cursor_handle.h",
-            "//src/mongo/scripting/mozjs:db.h",
-            "//src/mongo/scripting/mozjs:dbcollection.h",
-            "//src/mongo/scripting/mozjs:dbpointer.h",
-            "//src/mongo/scripting/mozjs:dbquery.h",
-            "//src/mongo/scripting/mozjs:dbref.h",
-            "//src/mongo/scripting/mozjs:engine.h",
-            "//src/mongo/scripting/mozjs:error.h",
-            "//src/mongo/scripting/mozjs:exception.h",
-            "//src/mongo/scripting/mozjs:global.h",
-            "//src/mongo/scripting/mozjs:idwrapper.h",
-            "//src/mongo/scripting/mozjs:implscope.h",
-            "//src/mongo/scripting/mozjs:internedstring.defs",
-            "//src/mongo/scripting/mozjs:internedstring.h",
-            "//src/mongo/scripting/mozjs:jsstringwrapper.h",
-            "//src/mongo/scripting/mozjs:jsthread.h",
-            "//src/mongo/scripting/mozjs:lifetimestack.h",
-            "//src/mongo/scripting/mozjs:maxkey.h",
-            "//src/mongo/scripting/mozjs:minkey.h",
-            "//src/mongo/scripting/mozjs:module_loader.h",
-            "//src/mongo/scripting/mozjs:mongo.h",
-            "//src/mongo/scripting/mozjs:mongohelpers.h",
-            "//src/mongo/scripting/mozjs:nativefunction.h",
-            "//src/mongo/scripting/mozjs:numberdecimal.h",
-            "//src/mongo/scripting/mozjs:numberint.h",
-            "//src/mongo/scripting/mozjs:numberlong.h",
-            "//src/mongo/scripting/mozjs:object.h",
-            "//src/mongo/scripting/mozjs:objectwrapper.h",
-            "//src/mongo/scripting/mozjs:oid.h",
-            "//src/mongo/scripting/mozjs:proxyscope.h",
-            "//src/mongo/scripting/mozjs:regexp.h",
-            "//src/mongo/scripting/mozjs:resumetoken.h",
-            "//src/mongo/scripting/mozjs:session.h",
-            "//src/mongo/scripting/mozjs:status.h",
-            "//src/mongo/scripting/mozjs:timestamp.h",
-            "//src/mongo/scripting/mozjs:uri.h",
-            "//src/mongo/scripting/mozjs:valuereader.h",
-            "//src/mongo/scripting/mozjs:valuewriter.h",
-            "//src/mongo/scripting/mozjs:wrapconstrainedmethod.h",
-            "//src/mongo/scripting/mozjs:wraptype.h",
-        ],
-    }),
-    copts = select({
-        "@platforms//os:windows": [
-            # The default MSVC preprocessor elides commas in some cases as a
-            # convenience, but this behavior breaks compilation of jspubtd.h.
-            # Enabling the newer preprocessor fixes the problem.
-            "/Zc:preprocessor",
-            "/wd5104",
-            "/wd5105",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "//bazel/config:compiler_type_clang": [
-            "-Wno-dangling",
-        ],
-        "//bazel/config:compiler_type_gcc": [
-            "-Wno-dangling-pointer",
-        ],
-        "//conditions:default": [],
-    }),
-    local_defines = select({
-        "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
-        "//conditions:default": [],
-    }),
+    }],
+    textual_hdrs = [
+        "//src/mongo/scripting/mozjs:internedstring.defs",
+    ],
     deps = [
         ":scripting_common",
         "//src/mongo/util:buildinfo",
@@ -210,9 +148,6 @@ mongo_cc_library(
     srcs = [
         "engine_none.cpp",
     ],
-    hdrs = [
-        "engine_none.cpp",
-    ],
     deps = [
         ":scripting_common",
     ],
@@ -221,9 +156,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "scripting_server",
     srcs = [
-        "scripting_server.cpp",
-    ],
-    hdrs = [
         "scripting_server.cpp",
     ],
     deps = select({

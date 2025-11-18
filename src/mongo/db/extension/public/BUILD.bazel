@@ -14,19 +14,14 @@ mongo_cc_library(
         ":extension_agg_stage_static_properties_gen",
         ":extension_error_types_gen",
     ],
-    hdrs = [],
     deps = [
         ":api",
         "//src/mongo:base",
-        "//src/mongo:core_headers_library",
         "//src/mongo/idl:idl_parser",
     ],
 )
 
-mongo_cc_library(
-    name = "api",
-    hdrs = ["api.h"],
-)
+mongo_cc_library(name = "api")
 
 idl_generator(
     name = "extension_error_types_gen",

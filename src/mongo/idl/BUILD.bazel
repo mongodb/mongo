@@ -47,7 +47,6 @@ idl_generator(
 mongo_cc_library(
     name = "cluster_server_parameter_server_status",
     srcs = ["//src/mongo/db/cluster_parameters:cluster_server_parameter_server_status.cpp"],
-    private_hdrs = ["//src/mongo/db/cluster_parameters:cluster_server_parameter_server_status.h"],
     deps = [
         "//src/mongo/bson:bson_validate",
         "//src/mongo/db:server_base",
@@ -115,14 +114,6 @@ mongo_cc_library(
     srcs = [
         "idl_parser.cpp",
     ],
-    hdrs = [
-        "idl_parser.h",
-        "//src/mongo:core_headers",
-    ],
-    header_deps = [
-        "//src/mongo/db/auth:cluster_auth_mode",
-        "//src/mongo/db/fts:fts_query_noop",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:cluster_role",
@@ -133,9 +124,6 @@ mongo_cc_library(
     name = "cluster_parameter_synchronization_helpers",
     srcs = [
         "//src/mongo/db/cluster_parameters:cluster_parameter_synchronization_helpers.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/cluster_parameters:cluster_parameter_synchronization_helpers.h",
     ],
     deps = [
         "//src/mongo/db:audit",
@@ -150,9 +138,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_initializer.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_initializer.h",
-    ],
     deps = [
         ":cluster_parameter_synchronization_helpers",
         "//src/mongo/db:server_base",
@@ -166,9 +151,6 @@ mongo_cc_library(
     name = "cluster_server_parameter_op_observer",
     srcs = [
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_op_observer.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_op_observer.h",
     ],
     deps = [
         ":cluster_parameter_synchronization_helpers",
@@ -185,9 +167,6 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_common.cpp",
     ],
-    hdrs = [
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_common.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/commands:list_databases_for_all_tenants_command",
@@ -201,9 +180,6 @@ mongo_cc_library(
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_refresher.cpp",
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_refresher_gen",
     ],
-    hdrs = [
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_refresher.h",
-    ],
     deps = [
         ":cluster_server_parameter",
         ":cluster_server_parameter_common",
@@ -216,20 +192,8 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "server_parameter_test_controller",
-    srcs = [],
-    hdrs = [
-        "server_parameter_test_controller.h",
-        "//src/mongo/db:server_parameter.h",
-    ],
-)
-
-mongo_cc_library(
     name = "server_parameter_test_util",
     srcs = [],
-    hdrs = [
-        "server_parameter_test_util.h",
-    ],
     deps = [
         "//src/mongo/db:service_context_d_test_fixture",
     ],
@@ -247,7 +211,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_test_gen",
         "//src/mongo/db/cluster_parameters:cluster_server_parameter_test_util.cpp",
     ],
-    private_hdrs = ["//src/mongo/db/cluster_parameters:cluster_server_parameter_test_util.h"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":cluster_parameter_synchronization_helpers",
@@ -293,16 +256,6 @@ mongo_cc_unit_test(
         ":unittest_gen",
         ":unittest_import_gen",
     ],
-    private_hdrs = [
-        ":config_option_test.h",
-        ":idl_test.h",
-        ":idl_test_types.h",
-        ":server_parameter_specialized_test.h",
-        ":server_parameter_with_storage_test.h",
-        "//src/mongo/db/repl:collection_bulk_loader.h",
-        "//src/mongo/db/repl:storage_interface.h",
-        "//src/mongo/util/cmdline_utils:censor_cmdline_test.h",
-    ],
     tags = [
         "mongo_unittest_fifth_group",
         "server-programmability",
@@ -310,9 +263,7 @@ mongo_cc_unit_test(
     deps = [
         ":cluster_server_parameter",
         ":idl_parser",
-        ":server_parameter_test_controller",
         ":server_parameter_test_util",
-        "//src/mongo:core_headers_library",
         "//src/mongo/client:connection_string",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
@@ -347,10 +298,6 @@ mongo_cc_library(
     name = "basic_types_serialization",
     srcs = [
         "basic_types_serialization.cpp",
-    ],
-    hdrs = [
-        "basic_types_serialization.h",
-        "//src/mongo:core_headers",
     ],
     deps = [
         "//src/mongo:base",

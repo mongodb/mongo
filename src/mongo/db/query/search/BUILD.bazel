@@ -62,9 +62,6 @@ mongo_cc_library(
         "mongot_options.cpp",
         ":mongot_options_gen",
     ],
-    hdrs = [
-        "mongot_options.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/util/net:network",
@@ -80,19 +77,6 @@ mongo_cc_library(
         ":internal_search_cluster_parameters_gen",
         ":internal_search_mongot_remote_spec_gen",
         ":search_query_view_spec_gen",
-    ],
-    hdrs = [
-        "mongot_cursor.h",
-        "mongot_cursor_getmore_strategy.h",
-    ],
-    private_hdrs = [
-        "//src/mongo/db/exec/agg:exec_pipeline.h",
-        "//src/mongo/db/exec/agg:pipeline_builder.h",
-        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
-        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
-        "//src/mongo/db/pipeline:catalog_resource_handle.h",
-        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
-        "//src/mongo/db/pipeline:shard_role_transaction_resources_stasher_for_pipeline.h",
     ],
     deps = [
         ":mongot_options",  # TODO(SERVER-93876): Remove.
@@ -111,9 +95,6 @@ mongo_cc_library(
         "search_index_options.cpp",
         ":search_index_options_gen",
     ],
-    hdrs = [
-        "search_index_options.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/util/net:network",
@@ -124,9 +105,6 @@ mongo_cc_library(
     name = "search_task_executors",
     srcs = [
         "search_task_executors.cpp",
-    ],
-    hdrs = [
-        "search_task_executors.h",
     ],
     deps = [
         ":mongot_options",
@@ -146,9 +124,6 @@ mongo_cc_library(
     srcs = [
         "search_index_process_interface.cpp",
     ],
-    hdrs = [
-        "search_index_process_interface.h",
-    ],
     deps = [
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
@@ -165,9 +140,6 @@ mongo_cc_library(
     srcs = [
         "search_index_common.cpp",
         ":manage_search_index_request_gen",
-    ],
-    hdrs = [
-        "search_index_common.h",
     ],
     deps = [
         "search_index_options",
@@ -186,9 +158,6 @@ mongo_cc_library(
     srcs = [
         "search_index_process_shard.cpp",
     ],
-    hdrs = [
-        "search_index_process_shard.h",
-    ],
     deps = [
         ":search_index_process_interface",
         "//src/mongo/db/local_catalog:collection_catalog",
@@ -200,9 +169,6 @@ mongo_cc_library(
     name = "search_index_process_router",
     srcs = [
         "search_index_process_router.cpp",
-    ],
-    hdrs = [
-        "search_index_process_router.h",
     ],
     deps = [
         ":search_index_process_interface",
@@ -226,12 +192,6 @@ mongo_cc_unit_test(
 
 mongo_cc_library(
     name = "search_index_command_testing_helper",
-    hdrs = [
-        "mongot_options.h",
-        "search_index_command_testing_helper.h",
-        "//src/mongo/db/query/client_cursor:clientcursor.h",
-        "//src/mongo/db/query/client_cursor:cursor_response.h",
-    ],
     deps = [
         ":search_index_common",
         ":search_index_options",
@@ -247,19 +207,12 @@ mongo_cc_unit_test(
         "mongot_cursor_helpers_test.cpp",
         "mongot_cursor_test.cpp",
     ],
-    private_hdrs = [
-        "//src/mongo/executor:pinned_connection_task_executor_test_fixture.h",
-        "//src/mongo/executor:task_executor_cursor_test_fixture.h",
-        "//src/mongo/transport:test_fixtures.h",
-        "//src/mongo/unittest:join_thread.h",
-    ],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":mongot_cursor",
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:network_interface_tl",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/transport:transport_layer_mock",
     ],
 )

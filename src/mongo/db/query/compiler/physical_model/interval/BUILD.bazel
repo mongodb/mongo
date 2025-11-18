@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "interval.cpp",
     ],
-    hdrs = [
-        "interval.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],

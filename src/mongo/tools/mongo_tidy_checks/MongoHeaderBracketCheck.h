@@ -48,6 +48,10 @@ public:
                              clang::Preprocessor* ModuleExpanderPP) override;
     // used to store option `mongoSourceDirs`; supports both absolute and relative paths
     std::vector<llvm::StringRef> mongoSourceDirs;
+
+    // The path component that denotes the repo's root source directory (default: "src").
+    // Used to compute canonical include paths "from src/".
+    std::string srcRootComponent;
 };
 
 }  // namespace mongo::tidy

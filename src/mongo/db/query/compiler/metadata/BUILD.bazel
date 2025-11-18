@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "index_entry.cpp",
     ],
-    hdrs = [
-        "index_entry.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",

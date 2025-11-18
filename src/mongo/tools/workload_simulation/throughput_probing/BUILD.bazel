@@ -16,10 +16,6 @@ mongo_cc_binary(
         "ticketed_workload_driver.cpp",
         "workloads.cpp",
     ],
-    private_hdrs = [
-        ":throughput_probing_simulator.h",
-        ":ticketed_workload_driver.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",

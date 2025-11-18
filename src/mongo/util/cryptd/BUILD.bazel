@@ -27,11 +27,6 @@ mongo_cc_library(
         "cryptd_service_entry_point.cpp",
         "cryptd_watchdog.cpp",
     ],
-    hdrs = [
-        "cryptd_options.h",
-        "cryptd_service_entry_point.h",
-        "cryptd_watchdog.h",
-    ],
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:dbmessage",

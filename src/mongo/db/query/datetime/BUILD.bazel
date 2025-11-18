@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "date_time_support.cpp",
     ],
-    hdrs = [
-        "date_time_support.h",
-    ],
     deps = [
         "//src/mongo/db:service_context",
         "//src/third_party/timelib",

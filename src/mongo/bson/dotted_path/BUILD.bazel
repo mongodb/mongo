@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "dotted_path_support.cpp",
     ],
-    hdrs = [
-        "dotted_path_support.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],

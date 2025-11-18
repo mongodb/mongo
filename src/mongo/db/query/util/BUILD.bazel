@@ -11,9 +11,6 @@ exports_files(
 
 mongo_cc_library(
     name = "cluster_find_util",
-    hdrs = [
-        "cluster_find_util.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
@@ -32,9 +29,6 @@ mongo_cc_library(
     srcs = [
         "jparse_util.cpp",
     ],
-    hdrs = [
-        "jparse_util.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/query/datetime:date_time_support",
@@ -46,9 +40,6 @@ mongo_cc_library(
     srcs = [
         "string_util.cpp",
     ],
-    hdrs = [
-        "string_util.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -58,18 +49,12 @@ mongo_cc_library(
     name = "stop_token",
     srcs = [
     ],
-    hdrs = [
-        "stop_token.h",
-    ],
 )
 
 mongo_cc_library(
     name = "validate_id",
     srcs = [
         "validate_id.cpp",
-    ],
-    hdrs = [
-        "validate_id.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -81,12 +66,8 @@ mongo_cc_library(
     srcs = [
         "rank_fusion_util.cpp",
     ],
-    hdrs = [
-        "rank_fusion_util.h",
-    ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo:core_headers_library",
         "//src/mongo/db/query:query_knobs",
     ],
 )
@@ -125,7 +106,6 @@ mongo_cc_unit_test(
         "string_util_test.cpp",
         "validate_id_test.cpp",
     ],
-    private_hdrs = [":cartesian_product.h"],
     tags = [
         "mongo_unittest_third_group",
     ],

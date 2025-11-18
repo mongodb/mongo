@@ -15,10 +15,6 @@ mongo_cc_library(
         "sort_executor.cpp",
         "sort_key_comparator.cpp",
     ],
-    hdrs = [
-        "sort_executor.h",
-        "sort_key_comparator.h",
-    ],
     deps = [
         ":working_set",
         "//src/mongo/db/pipeline/spilling:spilling_stats",
@@ -37,9 +33,6 @@ mongo_cc_library(
     srcs = [
         "js_function.cpp",
     ],
-    hdrs = [
-        "js_function.h",
-    ],
     deps = [
         "//src/mongo/db:service_context",
         "//src/mongo/db/auth",
@@ -53,9 +46,6 @@ mongo_cc_library(
     name = "working_set",
     srcs = [
         "//src/mongo/db/exec/classic:working_set.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/exec/classic:working_set.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -75,9 +65,6 @@ mongo_cc_library(
     srcs = [
         "scoped_timer.cpp",
     ],
-    hdrs = [
-        "scoped_timer.h",
-    ],
     deps = [
         "//src/mongo/db:service_context",
         "//src/mongo/util/net:network",
@@ -88,9 +75,6 @@ mongo_cc_library(
     name = "bucket_unpacker",
     srcs = [
         "//src/mongo/db/exec/timeseries:bucket_unpacker.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/exec/timeseries:bucket_unpacker.h",
     ],
     deps = [
         "//src/mongo/bson/column",
@@ -109,17 +93,6 @@ mongo_cc_library(
         "projection_executor_builder.cpp",
         "projection_node.cpp",
     ],
-    hdrs = [
-        "add_fields_projection_executor.h",
-        "exclusion_projection_executor.h",
-        "inclusion_projection_executor.h",
-        "projection_executor_builder.h",
-        "projection_node.h",
-    ],
-    private_hdrs = [
-        "//src/mongo/base:exact_cast.h",
-        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_path_tracking_visitor.h",
-    ],
     deps = [
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/matcher:expression_algo",
@@ -132,9 +105,6 @@ mongo_cc_library(
     srcs = [
         "str_trim_utils.cpp",
     ],
-    hdrs = [
-        "str_trim_utils.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -144,9 +114,6 @@ mongo_cc_library(
     name = "substr_utils",
     srcs = [
         "substr_utils.cpp",
-    ],
-    hdrs = [
-        "substr_utils.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -213,10 +180,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/matcher:matcher_test.cpp",
         "//src/mongo/db/exec/timeseries:bucket_unpacker_test.cpp",
     ],
-    private_hdrs = [
-        "//src/mongo/db/exec/expression:evaluate_test_helpers.h",
-        "//src/mongo/db/pipeline:document_source_test_optimizations.h",
-    ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":projection_executor",
@@ -238,7 +201,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/dbtests:mocklib",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:clock_source_mock",
     ],
 )
@@ -248,15 +210,11 @@ mongo_cc_library(
     srcs = [
         "expression_bm_fixture.cpp",
     ],
-    hdrs = [
-        "expression_bm_fixture.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/third_party/benchmark",
     ],
 )
@@ -277,9 +235,6 @@ mongo_cc_benchmark(
 
 mongo_cc_library(
     name = "docval_to_sbeval",
-    hdrs = [
-        "docval_to_sbeval.h",
-    ],
     deps = [
         "//src/mongo/db:sbe_values",
     ],
@@ -289,9 +244,6 @@ mongo_cc_library(
     name = "convert_utils",
     srcs = [
         "convert_utils.cpp",
-    ],
-    hdrs = [
-        "convert_utils.h",
     ],
     deps = [
         "//src/mongo:base",

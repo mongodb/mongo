@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "key_string.cpp",
     ],
-    hdrs = [
-        "key_string.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",
@@ -26,10 +23,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "key_string_test_util",
     srcs = ["key_string_test_util.cpp"],
-    hdrs = [
-        "key_string_test_util.h",
-    ],
-    private_hdrs = ["//src/mongo/bson:bsonobj_comparator.h"],
     deps = [
         "key_string",
         "//src/mongo/unittest",

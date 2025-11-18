@@ -14,9 +14,6 @@ mongo_cc_library(
     srcs = [
         "bson_extract.cpp",
     ],
-    hdrs = [
-        "bson_extract.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -29,12 +26,10 @@ mongo_cc_unit_test(
         "bson_extract_test.cpp",
         "builder_test.cpp",
     ],
-    private_hdrs = [":bson_check.h"],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":bson_extract",
         "//src/mongo:base",
-        "//src/mongo:core_headers_library",
         "//src/mongo/util:safe_num",
     ],
 )

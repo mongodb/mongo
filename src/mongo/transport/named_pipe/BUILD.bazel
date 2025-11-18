@@ -11,15 +11,10 @@ exports_files(
 
 mongo_cc_library(
     name = "named_pipe",
-    srcs = [] + select({
+    srcs_select = [{
         "@platforms//os:windows": ["named_pipe_windows.cpp"],
         "//conditions:default": ["named_pipe_posix.cpp"],
-    }),
-    hdrs = [
-        "input_object.h",
-        "io_error_message.h",
-        "named_pipe.h",
-    ],
+    }],
     deps = [
         "//src/mongo/db/query:query_knobs",
     ],

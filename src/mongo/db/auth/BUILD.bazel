@@ -16,9 +16,6 @@ mongo_cc_library(
     srcs = [
         "cluster_auth_mode.cpp",
     ],
-    hdrs = [
-        "cluster_auth_mode.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -67,12 +64,6 @@ mongo_cc_library(
     srcs = [
         "address_restriction.cpp",
         ":address_restriction_gen",
-    ],
-    private_hdrs = [
-        ":address_restriction.h",
-        ":restriction.h",
-        ":restriction_environment.h",
-        ":restriction_set.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -136,14 +127,6 @@ mongo_cc_library(
         "authz_session_external_state.cpp",
         ":authorization_manager_impl_parameters_gen",
     ],
-    hdrs = [
-        "authorization_manager_impl.h",
-        "authorization_router_impl.h",
-        "authorization_session_impl.h",
-        "authz_session_external_state.h",
-        "resource_pattern_search_list.h",
-    ],
-    private_hdrs = [":user_request_x509.h"],
     deps = [
         ":address_restriction",
         ":auth",
@@ -189,9 +172,6 @@ mongo_cc_library(
         "user_cache_invalidator_job.cpp",
         ":user_cache_invalidator_job_parameters_gen",
     ],
-    hdrs = [
-        "user_cache_invalidator_job.h",
-    ],
     deps = [
         ":auth",
         ":authorization_manager_global",
@@ -215,9 +195,6 @@ mongo_cc_library(
     srcs = [
         "security_key.cpp",
     ],
-    hdrs = [
-        "security_key.h",
-    ],
     deps = [
         ":auth",
         ":cluster_auth_mode",
@@ -238,10 +215,6 @@ mongo_cc_library(
     srcs = [
         "authorization_manager_global.cpp",
         "authorization_manager_global_parameters_gen",
-    ],
-    hdrs = [
-        "authorization_manager_impl.h",
-        "authorization_router_impl.h",
     ],
     deps = [
         ":auth",
@@ -271,10 +244,6 @@ mongo_cc_library(
         "sasl_payload.cpp",
         ":sasl_commands_gen",
     ],
-    hdrs = [
-        "sasl_commands.h",
-        "sasl_payload.h",
-    ],
     deps = [
         ":auth",
         ":auth_impl_internal",
@@ -291,9 +260,6 @@ mongo_cc_library(
     name = "security_file",
     srcs = [
         "security_file.cpp",
-    ],
-    hdrs = [
-        "security_file.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -344,16 +310,6 @@ mongo_cc_library(
         "privilege.cpp",
         "resource_pattern.cpp",
     ],
-    hdrs = [
-        "access_checks_gen",
-        "action_type_gen",
-        "auth_types_gen",
-        "authorization_contract_guard.h",
-        "parsed_privilege_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/auth:privilege_format.h",
-        "//src/mongo/db/query:explain_verbosity_gen",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:common",
@@ -370,10 +326,6 @@ mongo_cc_library(
         "oauth_discovery_factory.cpp",
         "oidc_protocol_gen",
     ],
-    hdrs = [
-        "oauth_discovery_factory.h",
-        "//src/mongo/db/query:explain_verbosity_gen",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/idl:idl_parser",
@@ -385,20 +337,6 @@ mongo_cc_library(
     name = "sasl_options",
     srcs = [
         "sasl_options.cpp",
-    ],
-    hdrs = [
-        "sasl_options.h",
-        "//src/mongo/db/auth:sasl_options_gen",
-        "//src/mongo/util/options_parser:constraints.h",
-        "//src/mongo/util/options_parser:environment.h",
-        "//src/mongo/util/options_parser:option_description.h",
-        "//src/mongo/util/options_parser:option_section.h",
-        "//src/mongo/util/options_parser:startup_option_init.h",
-        "//src/mongo/util/options_parser:startup_options.h",
-        "//src/mongo/util/options_parser:value.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/commands/server_status:server_status_core",
     ],
     deps = [
         "//src/mongo/db:server_base",
@@ -438,9 +376,6 @@ mongo_cc_library(
     srcs = [
         "role_name_or_string.cpp",
     ],
-    hdrs = [
-        "role_name_or_string.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -458,14 +393,6 @@ mongo_cc_library(
         "authorization_manager_factory.cpp",
         "authorization_router.cpp",
     ],
-    hdrs = [
-        "authorization_backend_interface.h",
-        "authorization_client_handle.h",
-        "authorization_manager_factory.h",
-        "//src/mongo/db/commands:authentication_commands.h",
-        "//src/mongo/util:sequence_util.h",
-    ],
-    private_hdrs = ["//src/mongo/util/concurrency:thread_pool.h"],
     deps = [
         "auth_options",
         "cluster_auth_mode",
@@ -488,15 +415,6 @@ mongo_cc_library(
         "authz_session_external_state_server_common.cpp",
         "authz_session_external_state_shard.cpp",
         ":enable_localhost_auth_bypass_parameter_gen",
-    ],
-    hdrs = [
-        "authorization_backend_local.h",
-        "authorization_client_handle_router.h",
-        "authorization_client_handle_shard.h",
-        "authorization_manager_factory_impl.h",
-        "authz_session_external_state_router.h",
-        "authz_session_external_state_server_common.h",
-        "authz_session_external_state_shard.h",
     ],
     deps = [
         ":auth",
@@ -522,12 +440,6 @@ mongo_cc_library(
         "authorization_manager_factory_mock.cpp",
         "authz_session_external_state_mock.cpp",
     ],
-    hdrs = [
-        "authorization_backend_mock.h",
-        "authorization_manager_factory_mock.h",
-        "authorization_router_impl_for_test.h",
-        "authz_session_external_state_mock.h",
-    ],
     deps = [
         ":auth",
         ":auth_impl_internal",
@@ -545,10 +457,6 @@ mongo_cc_library(
     name = "auth_checks",
     srcs = [
         "authorization_checks.cpp",
-    ],
-    hdrs = [
-        "authorization_checks.h",
-        "//src/mongo/db/local_catalog/ddl:coll_mod_gen",
     ],
     deps = [
         ":auth",
@@ -570,9 +478,6 @@ mongo_cc_library(
     srcs = [
         "user_management_commands_parser.cpp",
     ],
-    hdrs = [
-        "user_management_commands_parser.h",
-    ],
     deps = [
         ":address_restriction",  # TODO(SERVER-93876): Remove.
         ":auth",
@@ -589,9 +494,6 @@ mongo_cc_library(
     name = "builtin_roles",
     srcs = [
         "builtin_roles.cpp",
-    ],
-    hdrs = [
-        "builtin_roles.h",
     ],
     deps = [
         "auth",
@@ -619,10 +521,6 @@ mongo_cc_library(
         "security_token_authentication_guard.cpp",
         "validated_tenancy_scope_factory.cpp",
     ],
-    hdrs = [
-        "security_token_authentication_guard.h",
-        "validated_tenancy_scope_factory.h",
-    ],
     deps = [
         "authprivilege",
         "security_token",
@@ -640,9 +538,6 @@ mongo_cc_library(
     srcs = [
         "user.cpp",
     ],
-    hdrs = [
-        "user.h",
-    ],
     deps = [
         "auth",
         "authprivilege",
@@ -658,11 +553,6 @@ mongo_cc_library(
         "ldap_operation_stats.cpp",
         "user_cache_access_stats.cpp",
     ],
-    hdrs = [
-        "ldap_cumulative_operation_stats.h",
-        "ldap_operation_stats.h",
-        "user_cache_access_stats.h",
-    ],
     deps = [
         "auth",
         "//src/mongo/db:server_base",
@@ -674,9 +564,6 @@ mongo_cc_library(
     name = "user_document_parser",
     srcs = [
         "user_document_parser.cpp",
-    ],
-    hdrs = [
-        "user_document_parser.h",
     ],
     deps = [
         "address_restriction",
@@ -704,9 +591,6 @@ mongo_cc_library(
         "oidc_protocol_gen",
         "x509_protocol_gen",
     ],
-    hdrs = [
-        "oauth_discovery_factory.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/idl:idl_parser",
@@ -718,10 +602,6 @@ mongo_cc_library(
     name = "user_request_x509",
     srcs = [
         "user_request_x509.cpp",
-    ],
-    hdrs = [
-        "user_name.h",
-        "user_request_x509.h",
     ],
     deps = [
         ":auth",
@@ -740,27 +620,14 @@ mongo_cc_library(
         "sasl_mechanism_registry.cpp",
         "sasl_plain_server_conversation.cpp",
         "sasl_scram_server_conversation.cpp",
-    ] + select({
+    ],
+    private_hdrs = ["//src/mongo/crypto:mechanism_scram.h"],
+    srcs_select = [{
         "//bazel/config:ssl_enabled": [
             "sasl_x509_server_conversation.cpp",
         ],
         "//conditions:default": [],
-    }),
-    hdrs = [
-        "authentication_metrics.h",
-        "authentication_session.h",
-        "sasl_command_constants.h",
-        "sasl_mechanism_policies.h",
-        "sasl_mechanism_registry.h",
-        "sasl_plain_server_conversation.h",
-        "sasl_scram_server_conversation.h",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            "sasl_x509_server_conversation.h",
-        ],
-        "//conditions:default": [],
-    }),
-    private_hdrs = ["//src/mongo/crypto:mechanism_scram.h"],
+    }],
     deps = [
         # TODO(SERVER-93876): Remove all except authorization_manager_global.
         "//src/mongo/base:secure_allocator",
@@ -791,9 +658,6 @@ mongo_cc_library(
     srcs = [
         "authentication_session.cpp",
     ],
-    hdrs = [
-        "authentication_session.h",
-    ],
     deps = [
         ":auth",  # TODO(SERVER-93876): Remove.
         ":saslauth",
@@ -808,9 +672,6 @@ mongo_cc_library(
     name = "auth_op_observer",
     srcs = [
         "auth_op_observer.cpp",
-    ],
-    hdrs = [
-        "auth_op_observer.h",
     ],
     deps = [
         ":auth",
@@ -829,10 +690,6 @@ mongo_cc_library(
     srcs = [
         "authorization_session_for_test.cpp",
         "authorization_session_test_fixture.cpp",
-    ],
-    hdrs = [
-        "authorization_session_for_test.h",
-        "authorization_session_test_fixture.h",
     ],
     deps = [
         ":auth",
@@ -869,17 +726,14 @@ mongo_cc_unit_test(
         "user_acquisition_stats_test.cpp",
         "user_document_parser_test.cpp",
         "validated_tenancy_scope_test.cpp",
-    ] + select({
-        "//bazel/config:ssl_enabled": ["sasl_x509_test.cpp"],
-        "//conditions:default": [],
-    }),
+    ],
     data = [
         "//jstests/libs:test_pem_files",
     ],
-    private_hdrs = [
-        ":authorization_router_impl_for_test.h",
-        ":restriction_mock.h",
-    ],
+    srcs_select = [{
+        "//bazel/config:ssl_enabled": ["sasl_x509_test.cpp"],
+        "//conditions:default": [],
+    }],
     tags = [
         # Segfaults in sandbox
         "code_coverage_quarantine",
@@ -899,8 +753,6 @@ mongo_cc_unit_test(
         ":user",
         ":user_request_x509",
         "//src/mongo:base",
-        "//src/mongo/idl:server_parameter_test_controller",
-        "//src/mongo/util:tick_source_mock",
         "//src/mongo/util/net:mock_http_client",
     ],
 )

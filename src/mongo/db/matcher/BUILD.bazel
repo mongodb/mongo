@@ -15,10 +15,6 @@ mongo_cc_library(
         "path.cpp",
         "path_internal.cpp",
     ],
-    hdrs = [
-        "path.h",
-        "path_internal.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:common",
@@ -31,11 +27,6 @@ mongo_cc_library(
         "expression_text.cpp",
         "expression_where.cpp",
         "extensions_callback_real.cpp",
-    ],
-    hdrs = [
-        "expression_text.h",
-        "expression_where.h",
-        "extensions_callback_real.h",
     ],
     deps = [
         "//src/mongo/db:query_expressions",
@@ -50,9 +41,6 @@ mongo_cc_library(
     name = "expression_algo",
     srcs = [
         "expression_algo.cpp",
-    ],
-    hdrs = [
-        "expression_algo.h",
     ],
     deps = [
         "//src/mongo/db:query_expressions",
@@ -102,7 +90,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/test_output/matcher/debug_string_test:test_data",
         "//src/mongo/db/test_output/matcher/split_match_expression_expr_test:test_data",
     ],
-    private_hdrs = ["//src/mongo/db/query/compiler/rewrites/boolean_simplification:bitset_test_util.h"],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":expression_algo",
@@ -116,6 +103,5 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

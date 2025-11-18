@@ -59,6 +59,10 @@ mongo_cc_unit_test(
     srcs = [
         "test/socket_timeout_test.cpp",
     ],
+    private_hdrs = [
+        "//src/mongo/unittest:join_thread.h",
+        "//src/mongo/transport/asio:asio_socket_test_util.h",
+    ],
     tags = [
         "incompatible_with_bazel_remote_test",
         "mongo_unittest_fourth_group",

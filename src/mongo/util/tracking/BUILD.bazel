@@ -8,24 +8,7 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "tracking",
-    hdrs = [
-        "allocator.h",
-        "btree_map.h",
-        "context.h",
-        "flat_hash_set.h",
-        "inlined_vector.h",
-        "list.h",
-        "map.h",
-        "memory.h",
-        "set.h",
-        "string.h",
-        "string_map.h",
-        "unordered_map.h",
-        "vector.h",
-    ],
-)
+mongo_cc_library(name = "tracking")
 
 mongo_cc_unit_test(
     name = "tracking_allocator_test",

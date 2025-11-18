@@ -9,13 +9,7 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "algebra",
-    private_hdrs = [
-        ":operator.h",
-        ":polyvalue.h",
-    ],
-)
+mongo_cc_library(name = "algebra")
 
 mongo_cc_unit_test(
     name = "algebra_test",

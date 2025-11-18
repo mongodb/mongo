@@ -17,14 +17,6 @@ mongo_cc_library(
         "query_execution_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
     ],
-    hdrs = [
-        "extension_handle.h",
-        "host_portal_adapter.h",
-        "host_services_adapter.h",
-        "query_execution_context_adapter.h",
-        "query_shape_opts_adapter.h",
-        "//src/mongo/db/extension/host:host_portal.h",
-    ],
     deps = [
         "//src/mongo/db/extension/public:extensions_api_public",
         # Note, for the time being we are linking in the C++ SDK here to reduce code duplication.
@@ -45,14 +37,8 @@ mongo_cc_library(
         "host_services_adapter.cpp",
         "logger_adapter.cpp",
     ],
-    hdrs = [
-        "executable_agg_stage_adapter.h",
-        "host_services_adapter.h",
-        "logger_adapter.h",
-    ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo:core_headers_library",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/sdk:sdk_cpp",

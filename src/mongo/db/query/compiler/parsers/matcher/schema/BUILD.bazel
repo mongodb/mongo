@@ -15,11 +15,6 @@ mongo_cc_library(
         "json_schema_parser.cpp",
         "//src/mongo/db/matcher/schema:encrypt_schema_gen",
     ],
-    hdrs = [
-        "encrypt_schema_types_parser.h",
-        "json_schema_parser.h",
-        "//src/mongo/db/matcher/schema:encrypt_schema_gen",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
@@ -38,7 +33,6 @@ mongo_cc_unit_test(
         "object_keywords_test.cpp",
         "scalar_keywords_test.cpp",
     ],
-    private_hdrs = [":assert_serializes_to.h"],
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":json_schema_parser",

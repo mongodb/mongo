@@ -24,9 +24,6 @@ mongo_cc_library(
         "metrics_initialization.cpp",
         "metrics_settings_gen",
     ],
-    hdrs = [
-        "metrics_initialization.h",
-    ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.

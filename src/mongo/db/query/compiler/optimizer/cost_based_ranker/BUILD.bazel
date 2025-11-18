@@ -16,12 +16,6 @@ mongo_cc_library(
         "cbr_rewrites.cpp",
         "ce_cache.cpp",
     ],
-    hdrs = [
-        "cardinality_estimator.h",
-        "cbr_rewrites.h",
-        "ce_cache.h",
-        "//src/mongo/db/query:query_planner_params.h",
-    ],
     deps = [
         "ce_utils",
         "estimates",
@@ -38,10 +32,6 @@ mongo_cc_library(
     srcs = [
         "cost_estimator.cpp",
     ],
-    hdrs = [
-        "cost_estimator.h",
-        "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution.h",
-    ],
     deps = [
         "cardinality_estimator",
         "ce_utils",
@@ -56,12 +46,6 @@ mongo_cc_library(
     srcs = [
         "estimates.cpp",
     ],
-    hdrs = [
-        "estimates.h",
-        "estimates_storage.h",
-        "//src/mongo/db/query/util:named_enum.h",
-        "//src/mongo/util:fixed_string.h",
-    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
@@ -71,16 +55,6 @@ mongo_cc_library(
     name = "heuristic_estimator",
     srcs = [
         "heuristic_estimator.cpp",
-    ],
-    hdrs = [
-        "heuristic_estimator.h",
-        "//src/mongo/db/matcher:expression.h",
-        "//src/mongo/db/matcher:expression_visitor.h",
-        "//src/mongo/db/matcher:matchable.h",
-        "//src/mongo/db/matcher:path.h",
-        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
-        "//src/mongo/db/pipeline:variables.h",
-        "//src/mongo/db/query/compiler/dependency_analysis:dependencies.h",
     ],
     deps = [
         "ce_utils",
@@ -95,9 +69,6 @@ mongo_cc_library(
     name = "ce_utils",
     srcs = [
         "ce_utils.cpp",
-    ],
-    hdrs = [
-        "ce_utils.h",
     ],
     deps = [
         "estimates",
@@ -124,9 +95,6 @@ mongo_cc_library(
     srcs = [
         "cbr_test_utils.cpp",
     ],
-    hdrs = [
-        "cbr_test_utils.h",
-    ],
     deps = [
         ":cardinality_estimator",
         ":estimates",
@@ -146,14 +114,9 @@ mongo_cc_library(
 mongo_cc_library(
     name = "plan_ranking_utils",
     srcs = ["//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.cpp"],
-    private_hdrs = [
-        ":plan_ranking_utils.h",
-        "//src/mongo/dbtests:dbtests.h",
-    ],
     deps = [
         "//src/mongo/db/index_builds:multi_index_block",
         "//src/mongo/db/query:query_planner_test_lib",
-        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

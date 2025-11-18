@@ -16,16 +16,6 @@ mongo_cc_unit_test(
         "immutable_unordered_test.cpp",
         "immutable_vector_test.cpp",
     ],
-    private_hdrs = [
-        ":map.h",
-        ":set.h",
-        ":unordered_map.h",
-        ":unordered_set.h",
-        ":vector.h",
-        "//src/mongo/util/immutable/details:map.h",
-        "//src/mongo/util/immutable/details:memory_policy.h",
-        "//src/mongo/util/immutable/details:set.h",
-    ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         "//src/mongo:base",
@@ -35,16 +25,6 @@ mongo_cc_unit_test(
 mongo_cc_benchmark(
     name = "immutable_absl_comparison_bm",
     srcs = ["immutable_absl_comparison_bm.cpp"],
-    private_hdrs = [
-        ":map.h",
-        ":set.h",
-        ":unordered_map.h",
-        ":unordered_set.h",
-        ":vector.h",
-        "//src/mongo/util/immutable/details:map.h",
-        "//src/mongo/util/immutable/details:memory_policy.h",
-        "//src/mongo/util/immutable/details:set.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -53,13 +33,6 @@ mongo_cc_benchmark(
 mongo_cc_benchmark(
     name = "immutable_std_comparison_bm",
     srcs = ["immutable_std_comparison_bm.cpp"],
-    private_hdrs = [
-        ":map.h",
-        ":unordered_map.h",
-        ":unordered_set.h",
-        "//src/mongo/util/immutable/details:map.h",
-        "//src/mongo/util/immutable/details:memory_policy.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],

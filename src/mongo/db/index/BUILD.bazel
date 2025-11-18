@@ -16,11 +16,6 @@ mongo_cc_library(
         "expression_params.cpp",
         "s2_common.cpp",
     ],
-    hdrs = [
-        "2d_common.h",
-        "expression_params.h",
-        "s2_common.h",
-    ],
     deps = [
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:mongohasher",
@@ -37,9 +32,6 @@ mongo_cc_library(
     name = "multikey_paths",
     srcs = [
         "multikey_paths.cpp",
-    ],
-    hdrs = [
-        "multikey_paths.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -66,28 +58,6 @@ mongo_cc_library(
         "wildcard_validation.cpp",
         "//src/mongo/db/local_catalog:index_descriptor.cpp",
     ],
-    hdrs = [
-        "2d_access_method.h",
-        "2d_key_generator.h",
-        "btree_access_method.h",
-        "btree_key_generator.h",
-        "expression_keys_private.h",
-        "fts_access_method.h",
-        "hash_access_method.h",
-        "index_access_method.h",
-        "multikey_metadata_access_stats.h",
-        "multikey_paths.h",
-        "s2_access_method.h",
-        "s2_bucket_access_method.h",
-        "s2_key_generator.h",
-        "sort_key_generator.h",
-        "wildcard_access_method.h",
-        "wildcard_key_generator.h",
-        "wildcard_validation.h",
-        "//src/mongo/db/exec:index_path_projection.h",
-        "//src/mongo/db/local_catalog:index_descriptor.h",
-    ],
-    private_hdrs = ["//src/mongo/db/storage/kv:kv_engine.h"],
     deps = [
         ":expression_params",
         ":multikey_paths",
@@ -151,10 +121,6 @@ mongo_cc_library(
     srcs = [
         "preallocated_container_pool.cpp",
     ],
-    hdrs = [
-        "preallocated_container_pool.h",
-        "//src/mongo/util:auto_clear_ptr.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/storage/key_string",
@@ -193,7 +159,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:storage_options",
-        "//src/mongo/idl:server_parameter_test_controller",
         "//src/third_party/snappy",
     ],
 )

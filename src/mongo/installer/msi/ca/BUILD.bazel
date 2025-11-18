@@ -26,11 +26,6 @@ mongo_cc_library(
         "Advapi32.lib",
     ],
     linkshared = True,
-    private_hdrs = [
-        ":targetver.h",
-        "//src/mongo/platform:compiler.h",
-        "//src/mongo/util:scopeguard.h",
-    ],
     # We don't want any special allocator here either.
     skip_global_deps = [
         "allocator",

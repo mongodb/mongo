@@ -15,10 +15,6 @@ mongo_cc_library(
         "doc_validation_error.cpp",
         "doc_validation_util.cpp",
     ],
-    hdrs = [
-        "doc_validation_error.h",
-        "doc_validation_util.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
@@ -31,7 +27,6 @@ mongo_cc_unit_test(
         "doc_validation_error_json_schema_test.cpp",
         "doc_validation_error_test.cpp",
     ],
-    private_hdrs = [":doc_validation_error_test.h"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":doc_validation",

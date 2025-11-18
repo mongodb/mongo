@@ -18,6 +18,7 @@ ALLOW_LINES = [
     "--dtlto=False",
     "--pgo_profile_use=False",
     "--bolt_profile_use=False",
+    "common --all_headers=True",
 ]
 
 
