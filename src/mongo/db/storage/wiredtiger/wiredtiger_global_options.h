@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/environment.h"
 
 #include <cstddef>
@@ -64,7 +65,8 @@ public:
     double evictionUpdatesTriggerGB{0};
     std::string journalCompressor;
     int zstdCompressorLevel;
-    bool directoryForIndexes;
+    // NEEDS REPLACEMENT: this should really be a storage option not a WT option.
+    MONGO_MOD_NEEDS_REPLACEMENT bool directoryForIndexes;
     double maxCacheOverflowFileSizeGBDeprecated;
     std::string engineConfig;
     std::string liveRestoreSource;
@@ -93,6 +95,7 @@ public:
     }
 };
 
-extern WiredTigerGlobalOptions wiredTigerGlobalOptions;
+// NEEDS REPLACEMENT: this should really be a storage option not a WT option.
+MONGO_MOD_NEEDS_REPLACEMENT extern WiredTigerGlobalOptions wiredTigerGlobalOptions;
 
 }  // namespace mongo

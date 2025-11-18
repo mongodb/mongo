@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 #include <vector>
 
@@ -37,7 +39,9 @@ namespace mongo {
 class StringData;
 class ServiceContext;
 
-class WiredTigerExtensions {
+// NEEDS_REPLACEMENT: extentions are hard-coded config strings we shouldn't allow other modules to
+// control/modify (prefer something higher level).
+class MONGO_MOD_NEEDS_REPLACEMENT WiredTigerExtensions {
 public:
     static WiredTigerExtensions& get(ServiceContext* service);
 

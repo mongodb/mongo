@@ -43,6 +43,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <cstdint>

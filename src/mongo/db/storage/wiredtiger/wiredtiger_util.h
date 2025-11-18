@@ -34,6 +34,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/validate/validate_results.h"
+#include "mongo/util/modules.h"
 
 #include <span>
 
@@ -419,7 +420,7 @@ public:
      */
     static int handleWtEvictionEvent(WT_SESSION* session);
 
-    static long long getCancelledCacheMetric_forTest();
+    MONGO_MOD_PRIVATE static long long getCancelledCacheMetric_forTest();
 
 private:
     /**
