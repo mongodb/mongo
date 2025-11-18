@@ -76,15 +76,6 @@ function runTest(isOrderedWrite) {
     assert.eq(isOrderedWrite ? 2 : 1, stats.numBucketDocumentsTooLargeInsert, tojson(stats));
     assert.eq(0, stats.numBucketDocumentsTooLargeUpdate, tojson(stats));
 
-    // Check Results
-    // TODO(SERVER-108699): Remove this check.
-
-    let buckets = bucketsColl.find().toArray();
-    for (let i = 0; i < buckets.length; i++) {
-        let bucketDocSize = Object.bsonsize(buckets[i]);
-        assert.lte(bucketDocSize, 16 * 1024 * 1024);
-    }
-
     coll.drop();
 }
 
