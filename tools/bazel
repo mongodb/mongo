@@ -167,18 +167,32 @@ if [[ "$SLOW_PATH" == "1" ]]; then
     NO_COLOR='\033[0m'      
   
     echo -e "${GREEN}INFO:${NO_COLOR} running wrapper hook..." >&4      
-  
-    print_summary() {      
-        local exit_code=$?      
-        local end_epoch=$(date +%s)      
-        local duration=$(( end_epoch - WRAPPER_START_EPOCH ))      
-        if [[ $exit_code -ne 0 ]]; then      
-            echo -e "${RED}ERROR:${NO_COLOR} wrapper hook failed: " >&4   
-            cat "$LOGFILE" >&4  
-        else      
-            echo "Bazel wrapper finished. Exit code: ${exit_code}. Duration: ${duration}s" >&4      
-        fi      
-    }      
+
+    cleanup_logfile() {
+        if [[ -n "$LOGFILE" && -f "$LOGFILE" ]]; then
+            rm -f "$LOGFILE"
+        fi
+    }
+
+    print_summary() {
+        local exit_code=$?
+        local end_epoch duration
+
+        end_epoch=$(date +%s)
+        duration=$(( end_epoch - WRAPPER_START_EPOCH ))
+
+        # Only noisy on failure; quiet on success
+        if [[ $exit_code -ne 0 ]]; then
+            echo -e "${RED}ERROR:${NO_COLOR} wrapper hook failed (exit ${exit_code}, ${duration}s)." >&4
+            if [[ -n "$LOGFILE" && -f "$LOGFILE" ]]; then
+                echo -e "${RED}ERROR:${NO_COLOR} wrapper log output:" >&4
+                cat "$LOGFILE" >&4
+            fi
+        fi
+
+        # Also clean up here for early exits
+        cleanup_logfile
+    }
   
     trap 'print_summary' EXIT      
 fi 
@@ -277,9 +291,10 @@ if [[ $autocomplete_query == 1 ]]; then
   query_output=$("${new_args[@]@Q}")  
   echo $query_output $plus_targets | tr " " "\n" >&3  
 else  
-  trap - EXIT 
+  trap 'cleanup_logfile' EXIT
   # Slow path: restore stdout/stderr so Bazel prints normally  
-  exec 1>&3 2>&4  
+  exec 1>&3 2>&4
+
   
   $bazel_real "${new_args[@]}"  
   bazel_exit_code=$?  

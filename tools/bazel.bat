@@ -93,33 +93,48 @@ rem === Capture output to logfile starting now ===
 rem Note: We redirect Python installation and wrapper_hook.py output to logfile
 
 REM find existing python installs
-set python=""
-if exist %REPO_ROOT%\bazel-%cur_dir% (
-     call :find_pyhon
+set "python="
+if exist "%REPO_ROOT%\bazel-%cur_dir%" (
+    call :find_pyhon
 )
-if not exist "!python!" (
+
+if not defined python (
     (
         echo python prereq missing, using bazel to install python...
         "%BAZEL_REAL%" build --bes_backend= --bes_results_url= @py_windows_x86_64//:all
         if !ERRORLEVEL! NEQ 0 (
             "%BAZEL_REAL%" build --config=local @py_windows_x86_64//:all
             if !ERRORLEVEL! NEQ 0 (
-                if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit /b !ERRORLEVEL!
+                if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" (
+                    call :cleanup_logfile
+                    exit /b !ERRORLEVEL!
+                )
                 echo wrapper script failed to install python! falling back to normal bazel call...
                 "%BAZEL_REAL%" %*
-                exit /b !ERRORLEVEL!
+                set "fallback_exit=!ERRORLEVEL!"
+                call :cleanup_logfile
+                exit /b !fallback_exit!
             )
         )
     ) > "%LOGFILE%" 2>&1
     if !ERRORLEVEL! NEQ 0 (
         echo %ESC%[1;31mERROR:%ESC%[0m Python installation failed:
         type "%LOGFILE%"
+        call :cleanup_logfile
         exit /b !ERRORLEVEL!
     )
 )
 
-if not exist "!python!" (
+rem After install, locate python again
+if not defined python (
     call :find_pyhon
+)
+
+rem extra safety: bail if still not found
+if not defined python if not exist "!python!" (
+    echo %ESC%[1;31mERROR:%ESC%[0m Could not locate wrapper Python interpreter. 1>&2
+    call :cleanup_logfile
+    exit /b 1
 )
 
 rem === Call Python wrapper, log to file ===
@@ -130,8 +145,14 @@ rem Print info message to terminal (equivalent to bash echo to FD 4)
 echo %ESC%[0;32mINFO:%ESC%[0m running wrapper hook... 1>&2
 
 (
-    %python% %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
+    "%python%" %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
 ) >> "%LOGFILE%" 2>&1
+if !ERRORLEVEL! NEQ 0 (
+    echo %ESC%[1;31mERROR:%ESC%[0m Python installation failed:
+    type "%LOGFILE%"
+    call :cleanup_logfile
+    exit /b !ERRORLEVEL!
+)
 
 set "exit_code=%ERRORLEVEL%"
 
@@ -141,6 +162,7 @@ if %exit_code% EQU 3 (
     echo %ESC%[0;32mINFO:%ESC%[0m Run the following to try to auto-fix the errors: 1>&2
     echo. 1>&2
     echo bazel run lint --fix 1>&2
+    call :cleanup_logfile
     exit /b %exit_code%
 )
 
@@ -163,10 +185,15 @@ if %exit_code% NEQ 0 (
     echo %ESC%[1;31mERROR:%ESC%[0m wrapper hook failed: 1>&2
     type "%LOGFILE%" 1>&2
     
-    if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit /b %exit_code%  
+    if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" (
+        call :cleanup_logfile
+        exit /b %exit_code%
+    )
     echo wrapper script failed! falling back to normal bazel call... 1>&2  
     "%BAZEL_REAL%" %*  
-    exit /b %ERRORLEVEL%  
+    set "fallback_exit=%ERRORLEVEL%"
+    call :cleanup_logfile
+    exit /b %fallback_exit%
 )
 
 rem === Read new args back in ===
@@ -185,7 +212,9 @@ if "%MONGO_BAZEL_WRAPPER_DEBUG%"=="1" (
 )
 
 "%BAZEL_REAL%" !new_args!
-exit /b %ERRORLEVEL%
+set "bazel_exit=%ERRORLEVEL%"
+call :cleanup_logfile
+exit /b %bazel_exit%
 
 
 :: Functions
@@ -194,5 +223,9 @@ dir %REPO_ROOT% | C:\Windows\System32\find.exe "bazel-%cur_dir%" > %REPO_ROOT%\t
 for /f "tokens=2 delims=[" %%i in (%REPO_ROOT%\tmp_bazel_symlink_dir.txt) do set bazel_real_dir=%%i
 del %REPO_ROOT%\tmp_bazel_symlink_dir.txt
 set bazel_real_dir=!bazel_real_dir:~0,-1!
-set python="!bazel_real_dir!\..\..\external\_main~setup_mongo_python_toolchains~py_windows_x86_64\dist\python.exe"
+set "python=!bazel_real_dir!\..\..\external\_main~setup_mongo_python_toolchains~py_windows_x86_64\dist\python.exe"
 exit /b 0  
+
+:cleanup_logfile
+if defined LOGFILE if exist "!LOGFILE!" del "!LOGFILE!" >nul 2>&1
+goto :eof
