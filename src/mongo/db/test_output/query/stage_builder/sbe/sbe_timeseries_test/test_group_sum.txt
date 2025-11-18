@@ -1,12 +1,12 @@
 # Golden test output of SbeTimeseriesTest/TestGroupSum
-[4] sort [s21] [asc] [s20] 9223372036854775807ll 
-[4] project [s21 = getSortKeyAsc(s19)] 
-[3] project [s20 = newBsonObj("_id", s18, "sum", s19)] 
-[3] project [s19 = doubleDoubleSumFinalize(s17)] 
-[3] group [s18] [s17 = aggDoubleDoubleSum(s12)] spillSlots[s16] mergingExprs[aggMergeDoubleDoubleSums(s16)] 
-[3] project [s18 = (s15 ?: null)] 
-[3] extract_field_paths inputs[s11 = Get(_id)/Id, s12 = Get(a)/Id, s13 = Get(b)/Id, s14 = Get(time)/Id] outputs[s15 = Get(b)/Traverse/Get(a)/Traverse/Get(b)/Id] 
-[2] block_to_row blocks[s4, s5, s6, s7] row[s11, s12, s13, s14] s9 
+[4] sort [s19] [asc] [s18] 9223372036854775807ll 
+[4] project [s19 = getSortKeyAsc(s17)] 
+[3] project [s18 = newBsonObj("_id", s16, "sum", s17)] 
+[3] project [s17 = doubleDoubleSumFinalize(s15)] 
+[3] group [s16] [s15 = aggDoubleDoubleSum(s11)] spillSlots[s14] mergingExprs[aggMergeDoubleDoubleSums(s14)] 
+[3] project [s16 = (s13 ?: null)] 
+[3] extract_field_paths inputs[s11 = Get(a)/Id, s12 = Get(b)/Id] outputs[s13 = Get(b)/Traverse/Get(a)/Traverse/Get(b)/Id] 
+[2] block_to_row blocks[s5, s6] row[s11, s12] s9 
 [2] filter {!(valueBlockNone(s9, true))} 
 [2] project [s9 = valueBlockLogicalAnd(s3, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s8), Date(1738785568339)), false), s8))] 
 [2] ts_bucket_to_cellblock s2 pathReqs[s4 = ProjectPath(Get(_id)/Id), s5 = ProjectPath(Get(a)/Id), s6 = ProjectPath(Get(b)/Id), s7 = ProjectPath(Get(time)/Id), s8 = FilterPath(Get(time)/Traverse/Id)] bitmap = s3 

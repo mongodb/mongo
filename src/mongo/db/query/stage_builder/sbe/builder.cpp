@@ -5218,21 +5218,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         _data->metadataSlots.reset();
     }
 
-    // Clear non-required slots (excluding ~10 stages to preserve legacy behavior for now),
-    // and also clear ResultInfo if it's not required.
-    bool clearSlots = stageType != STAGE_VIRTUAL_SCAN && stageType != STAGE_LIMIT &&
-        stageType != STAGE_SKIP && stageType != STAGE_TEXT_MATCH && stageType != STAGE_RETURN_KEY &&
-        stageType != STAGE_AND_HASH && stageType != STAGE_AND_SORTED && stageType != STAGE_GROUP &&
-        stageType != STAGE_SEARCH && stageType != STAGE_UNPACK_TS_BUCKET;
-
-    if (clearSlots) {
-        // To preserve legacy behavior, in some cases we unconditionally retain the result object.
-        bool saveResultObj = stageType != STAGE_SORT_SIMPLE && stageType != STAGE_SORT_DEFAULT &&
-            stageType != STAGE_PROJECTION_SIMPLE && stageType != STAGE_PROJECTION_COVERED &&
-            stageType != STAGE_PROJECTION_DEFAULT;
-
-        outputs.clearNonRequiredSlots(reqsIn, saveResultObj);
-    }
+    outputs.clearNonRequiredSlots(reqsIn, false /*saveResultObj*/);
 
     return {std::move(stage), std::move(outputs)};
 }
