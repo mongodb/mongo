@@ -238,6 +238,8 @@ public:
         int32_t liveRestoreReadSizeMB{1};
         // This specifies the value for the statistics_log.wait configuration parameter.
         int32_t statisticsLogWaitSecs{0};
+        // This specifies the statistics collection mode.
+        std::string statisticsSetting{"fast"};
         // This specifies the value for the builtin_extension_config.zstd.compression_level
         // configuration parameter.
         int32_t zstdCompressorLevel{6};

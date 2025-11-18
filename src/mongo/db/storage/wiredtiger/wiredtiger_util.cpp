@@ -1025,10 +1025,12 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngineBase& engine,
     // Filter out irrelevant statistic fields.
     std::vector<std::string> categoriesToIgnore = {"LSM"};
 
+    std::stringstream ss;
+    ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
     Status status = WiredTigerUtil::exportTableToBSON(
         *session,
         "statistics:",
-        "statistics=(fast)",
+        ss.str(),
         bob,
         fieldsToInclude.empty() ? categoriesToIgnore : fieldsToInclude,
         fieldsToInclude.empty() ? FilterBehavior::kExcludeCategories
@@ -1057,8 +1059,10 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine& engine, BSONObjB
 
     const auto historyStorageStatUri = "statistics:file:WiredTigerHS.wt";
 
-    Status status = WiredTigerUtil::exportTableToBSON(
-        *session, historyStorageStatUri, "statistics=(fast)", bob);
+    std::stringstream ss;
+    ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
+    Status status =
+        WiredTigerUtil::exportTableToBSON(*session, historyStorageStatUri, ss.str(), bob);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));

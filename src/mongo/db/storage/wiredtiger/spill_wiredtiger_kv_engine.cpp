@@ -246,6 +246,7 @@ WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOpti
     wtConfig.evictionUpdatesTriggerMB =
         gSpillWiredTigerEvictionUpdatesTriggerPercentage * wtConfig.cacheSizeMB / 100;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
+    wtConfig.statisticsSetting = wiredTigerGlobalOptions.statisticsSetting;
     wtConfig.inMemory = false;
     wtConfig.logEnabled = false;
     wtConfig.prefetchEnabled = false;

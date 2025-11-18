@@ -1405,6 +1405,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/startup_shutdown/OWNERS.yml
 /jstests/noPassthrough/startup_shutdown/**/* @10gen/server-programmability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/statistics/OWNERS.yml
+/jstests/noPassthrough/statistics/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/timeseries/OWNERS.yml
 /jstests/noPassthrough/timeseries/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 

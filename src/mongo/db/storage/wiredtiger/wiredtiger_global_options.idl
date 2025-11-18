@@ -598,6 +598,14 @@ configs:
         validator:
             callback: WiredTigerGlobalOptions::validateWiredTigerLiveRestoreReadSizeMB
         default: 1
+    "storage.wiredTiger.engineConfig.statistics":
+        description: "Statistics collection mode [all|cache_walk|fast|none|clear|tree_walk]"
+        arg_vartype: String
+        cpp_varname: "wiredTigerGlobalOptions.statisticsSetting"
+        short_name: wiredTigerStatisticsSetting
+        validator:
+            callback: WiredTigerGlobalOptions::validateStatisticsSetting
+        default: "fast"
 
     # WiredTiger collection options
     "storage.wiredTiger.collectionConfig.blockCompressor":

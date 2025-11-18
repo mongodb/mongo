@@ -36,6 +36,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -88,8 +89,10 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     }
 
     WiredTigerSession* session = ru.getSession();
-    Status status = WiredTigerUtil::exportTableToBSON(
-        *session, "statistics:" + uri, "statistics=(fast)", *output);
+    std::stringstream ss;
+    ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
+    Status status =
+        WiredTigerUtil::exportTableToBSON(*session, "statistics:" + uri, ss.str(), *output);
     if (!status.isOK()) {
         output->append("error", "unable to retrieve statistics");
         output->append("code", static_cast<int>(status.code()));

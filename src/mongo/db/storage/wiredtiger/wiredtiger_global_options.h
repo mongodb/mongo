@@ -50,7 +50,8 @@ public:
           maxCacheOverflowFileSizeGBDeprecated(0),
           liveRestoreThreads(0),
           liveRestoreReadSizeMB(0),
-          useIndexPrefixCompression(false) {};
+          useIndexPrefixCompression(false),
+          statisticsSetting("fast") {};
 
     Status store(const optionenvironment::Environment& params);
 
@@ -75,12 +76,13 @@ public:
     bool useIndexPrefixCompression;
     std::string collectionConfig;
     std::string indexConfig;
+    std::string statisticsSetting;
 
     static Status validateWiredTigerCompressor(const std::string&);
     static Status validateSpillWiredTigerCompressor(const std::string&,
                                                     const boost::optional<TenantId>&);
     static Status validateWiredTigerLiveRestoreReadSizeMB(int);
-
+    static Status validateStatisticsSetting(const std::string&);
 
     /**
      * Returns current history file size limit in MB.

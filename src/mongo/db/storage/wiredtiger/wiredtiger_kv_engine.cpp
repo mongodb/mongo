@@ -367,7 +367,7 @@ std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerC
            << static_cast<size_t>(gWiredTigerCheckpointCleanupPeriodSeconds) << "),";
 
     ss << "config_base=false,";
-    ss << "statistics=(fast),";
+    ss << "statistics=(" << wtConfig.statisticsSetting << "),";
 
     // TODO: SERVER-109794 move this block into the corresponding persistence providers.
     if (wtConfig.inMemory) {
@@ -3250,6 +3250,7 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     wtConfig.liveRestoreThreadsMax = wiredTigerGlobalOptions.liveRestoreThreads;
     wtConfig.liveRestoreReadSizeMB = wiredTigerGlobalOptions.liveRestoreReadSizeMB;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
+    wtConfig.statisticsSetting = wiredTigerGlobalOptions.statisticsSetting;
     wtConfig.evictionThreadsMax = gWiredTigerEvictionThreadsMax.load();
     wtConfig.evictionThreadsMin = gWiredTigerEvictionThreadsMin.load();
     wtConfig.providerSupportsUnstableCheckpoints = provider.supportsUnstableCheckpoints();
