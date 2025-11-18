@@ -29,17 +29,74 @@
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 
-namespace mongo::join_ordering {
+#include <sstream>
 
+namespace mongo::join_ordering {
 PlanEnumeratorContext::PlanEnumeratorContext(const JoinGraph& joinGraph) : _joinGraph(joinGraph) {}
 
 const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
     return _joinSubsets[level];
 }
 
-void PlanEnumeratorContext::enumerateJoinSubsets() {
+void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
+                                        const JoinSubset& left,
+                                        const JoinSubset& right,
+                                        const std::vector<EdgeId>& edges,
+                                        JoinSubset& subset) {
+    // TODO SERVER-113059: Rudimentary cost metric/tracking.
+    subset.plans.push_back(
+        _registry.registerJoinNode(subset, method, left.bestPlan(), right.bestPlan()));
+}
+
+void PlanEnumeratorContext::enumerateJoinPlans(PlanTreeShape type,
+                                               const JoinSubset& left,
+                                               const JoinSubset& right,
+                                               JoinSubset& cur) {
+    if (left.plans.empty() || right.plans.empty()) {
+        return;
+    }
+
+    tassert(11336902,
+            "Expected union of subsets to produce output subset",
+            (left.subset | right.subset) == cur.subset);
+
+    tassert(11336903,
+            "Expected left and right subsets to be disjoint",
+            (left.subset & right.subset).none());
+
+    auto joinEdges = _joinGraph.getJoinEdges(left.subset, right.subset);
+    if (joinEdges.empty()) {
+        return;
+    }
+
+    // TODO SERVER-113717: enumerate INLJ plans.
+    switch (type) {
+        case PlanTreeShape::LEFT_DEEP:
+            // We create a left-deep tree by only generating plans that add a "base" join subset on
+            // the right.
+            if (right.isBasePlan()) {
+                addJoinPlan(JoinMethod::HJ, left, right, joinEdges, cur);
+                addJoinPlan(JoinMethod::NLJ, left, right, joinEdges, cur);
+            }
+            break;
+        case PlanTreeShape::RIGHT_DEEP:
+            // We create a right-deep tree by only generating plans that add a "base" join subset on
+            // the left.
+            if (left.isBasePlan()) {
+                addJoinPlan(JoinMethod::HJ, left, right, joinEdges, cur);
+                addJoinPlan(JoinMethod::NLJ, left, right, joinEdges, cur);
+            }
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11336906);
+    }
+}
+
+void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
     int numNodes = _joinGraph.numNodes();
     // Use CombinationSequence to efficiently calculate the final size of each level of the dynamic
     // programming table.
@@ -50,17 +107,21 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
 
     // Initialize base level of joinSubsets, representing single collections (no joins).
     for (int i = 0; i < numNodes; ++i) {
-        JoinSubset s{.subset = NodeSet{}.set(i)};
-        _joinSubsets[0].push_back(s);
+        _joinSubsets[0].push_back(JoinSubset(NodeSet{}.set(i)));
+        _joinSubsets[0].back().plans = {
+            _registry.registerBaseNode(_joinSubsets[0].back(), ScanMethod::COLLSCAN)};
     }
 
     // Initialize the rest of the joinSubsets.
     for (int level = 1; level < numNodes; ++level) {
-        const std::vector<JoinSubset>& joinSubsetsPrevLevel = _joinSubsets[level - 1];
+        const auto& joinSubsetsPrevLevel = _joinSubsets[level - 1];
         auto& joinSubsetsCurrLevel = _joinSubsets[level];
         // Preallocate entries for all subsets in the current level.
         joinSubsetsCurrLevel.reserve(cs.next());
-        stdx::unordered_set<NodeSet> seenSubsets;
+
+        // Tracks seen subsets along with their indexes in 'joinSubsetsCurrLevel'. This lets us
+        // quickly find a subset and update its plans if we see it again.
+        stdx::unordered_map<NodeSet, size_t> seenSubsetIndexes;
 
         // For each join subset of size level-1, iterate through nodes 0 to n-1 and use bitwise-or
         // to enumerate all possible join subsets of size level.
@@ -71,20 +132,62 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
                 if (prevJoinSubset.subset.test(i)) {
                     continue;
                 }
+
                 NodeSet newSubset = NodeSet{prevJoinSubset.subset}.set(i);
+                size_t subsetIdx;
+
                 // Ensure we don't generate the same subset twice (for example, AB | C and BC | A
                 // both produce ABC).
-                if (seenSubsets.contains(newSubset)) {
-                    // TODO SERVER-113369: Reuse this entry in the table to perform plan
-                    // enumeration, rather than continuing.
-                    continue;
+                if (auto it = seenSubsetIndexes.find(newSubset); it != seenSubsetIndexes.end()) {
+                    if (prevJoinSubset.isBasePlan()) {
+                        // We will have already enumerated all plans for joining these two base
+                        // collections (we already tried joining both A | B and B | A). No need
+                        // to enumerate more plans. As long as we always join with a base-collection
+                        // subset on one side, this is the only case where we could get duplicate
+                        // plans.
+                        continue;
+                    }
+                    subsetIdx = it->second;
+
+                } else {
+                    subsetIdx = joinSubsetsCurrLevel.size();
+                    seenSubsetIndexes.insert({newSubset, subsetIdx});
+                    joinSubsetsCurrLevel.push_back(JoinSubset(newSubset));
                 }
-                seenSubsets.insert(newSubset);
-                JoinSubset joinSubset{.subset = newSubset};
-                joinSubsetsCurrLevel.push_back(std::move(joinSubset));
+
+                auto& cur = joinSubsetsCurrLevel[subsetIdx];
+
+                enumerateJoinPlans(type, prevJoinSubset, _joinSubsets[0][i], cur);
+                enumerateJoinPlans(type, _joinSubsets[0][i], prevJoinSubset, cur);
             }
         }
     }
+}
+
+std::string PlanEnumeratorContext::toString() const {
+    const auto numNodes = _joinGraph.numNodes();
+    std::stringstream ss;
+    for (size_t level = 0; level < _joinSubsets.size(); level++) {
+        ss << "Level " << level << ":\n";
+        const auto n = _joinSubsets[level].size();
+        for (size_t i = 0; i < n; i++) {
+            ss << _joinSubsets[level][i].toString(numNodes);
+            if (i < n - 1) {
+                ss << ", ";
+            }
+        }
+        ss << "\n";
+
+        if (level == _joinSubsets.size() - 1) {
+            //  Print out only final level of plans.
+            tassert(11336907,
+                    "Expected a single subset on the final level",
+                    _joinSubsets[level].size() == 1);
+            ss << "\nOutput plans (best plan " << _joinSubsets[level][0].bestPlanIndex << "):\n"
+               << _registry.joinPlansToString(_joinSubsets[level][0].plans, numNodes);
+        }
+    }
+    return ss.str();
 }
 
 }  // namespace mongo::join_ordering

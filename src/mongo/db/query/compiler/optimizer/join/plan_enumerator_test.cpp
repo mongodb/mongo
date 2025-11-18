@@ -32,9 +32,13 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
+
+unittest::GoldenTestConfig config("src/mongo/db/test_output/query/join");
 
 TEST(PlanEnumeratorHelpers, CombinationsEdgeCases) {
     ASSERT_EQ(1, combinations(0, 0));
@@ -82,68 +86,218 @@ DEATH_TEST(PlanEnumeratorHelpers, TooManyInvocationsOfCombinationSequence, "1098
     cs.next();  // tasserts
 }
 
-TEST(JoinPlanEnumerator, InitializeSubsetsTwo) {
+TEST(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
+    unittest::GoldenTestContext goldenCtx(&config);
+
     JoinGraph graph;
-    graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
-    graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
-    PlanEnumeratorContext ctx{graph};
-    ctx.enumerateJoinSubsets();
+    auto id1 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
+    auto id2 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
+    graph.addSimpleEqualityEdge(id1, id2, 0, 1);
 
-    auto& level0 = ctx.getSubsets(0);
-    ASSERT_EQ(NodeSet{"01"}, level0[0].subset);
-    ASSERT_EQ(NodeSet{"10"}, level0[1].subset);
-    ASSERT_EQ(2, level0.size());
+    {
+        PlanEnumeratorContext ctx{graph};
+        ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
-    auto& level1 = ctx.getSubsets(1);
-    ASSERT_EQ(NodeSet{"11"}, level1[0].subset);
-    ASSERT_EQ(1, level1.size());
+        auto& level0 = ctx.getSubsets(0);
+        ASSERT_EQ(2, level0.size());
+        ASSERT_EQ(NodeSet{"01"}, level0[0].subset);
+        ASSERT_EQ(NodeSet{"10"}, level0[1].subset);
+
+        auto& level1 = ctx.getSubsets(1);
+        ASSERT_EQ(1, level1.size());
+        ASSERT_EQ(NodeSet{"11"}, level1[0].subset);
+
+        goldenCtx.outStream() << "LEFT DEEP, 2 Nodes" << "\n";
+        goldenCtx.outStream() << ctx.toString() << "\n" << std::endl;
+    }
+
+    {
+        PlanEnumeratorContext ctx{graph};
+        ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
+
+        auto& level0 = ctx.getSubsets(0);
+        ASSERT_EQ(2, level0.size());
+        ASSERT_EQ(NodeSet{"01"}, level0[0].subset);
+        ASSERT_EQ(NodeSet{"10"}, level0[1].subset);
+
+        auto& level1 = ctx.getSubsets(1);
+        ASSERT_EQ(1, level1.size());
+        ASSERT_EQ(NodeSet{"11"}, level1[0].subset);
+
+        goldenCtx.outStream() << "RIGHT DEEP, 2 Nodes" << "\n";
+        goldenCtx.outStream() << ctx.toString() << std::endl;
+    }
 }
 
-TEST(JoinPlanEnumerator, InitializeSubsetsThree) {
+TEST(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
+    unittest::GoldenTestContext goldenCtx(&config);
+
     JoinGraph graph;
-    graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
-    graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
-    graph.addNode(NamespaceString::createNamespaceString_forTest("c"), nullptr, boost::none);
-    PlanEnumeratorContext ctx{graph};
-    ctx.enumerateJoinSubsets();
+    auto id1 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
+    auto id2 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
+    auto id3 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("c"), nullptr, boost::none);
+    graph.addSimpleEqualityEdge(id1, id2, 0, 1);
+    graph.addSimpleEqualityEdge(id1, id3, 0, 2);
+    graph.addSimpleEqualityEdge(id2, id3, 1, 2);
 
-    auto& level0 = ctx.getSubsets(0);
-    ASSERT_EQ(NodeSet{"001"}, level0[0].subset);
-    ASSERT_EQ(NodeSet{"010"}, level0[1].subset);
-    ASSERT_EQ(NodeSet{"100"}, level0[2].subset);
-    ASSERT_EQ(3, level0.size());
+    {
+        PlanEnumeratorContext ctx{graph};
+        ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
-    auto& level1 = ctx.getSubsets(1);
-    ASSERT_EQ(NodeSet{"011"}, level1[0].subset);
-    ASSERT_EQ(NodeSet{"101"}, level1[1].subset);
-    ASSERT_EQ(NodeSet{"110"}, level1[2].subset);
-    ASSERT_EQ(3, level1.size());
+        auto& level0 = ctx.getSubsets(0);
+        ASSERT_EQ(3, level0.size());
+        ASSERT_EQ(NodeSet{"001"}, level0[0].subset);
+        ASSERT_EQ(NodeSet{"010"}, level0[1].subset);
+        ASSERT_EQ(NodeSet{"100"}, level0[2].subset);
 
-    auto& level2 = ctx.getSubsets(2);
-    ASSERT_EQ(NodeSet{"111"}, level2[0].subset);
-    ASSERT_EQ(1, level2.size());
+        auto& level1 = ctx.getSubsets(1);
+        ASSERT_EQ(3, level1.size());
+        ASSERT_EQ(NodeSet{"011"}, level1[0].subset);
+        ASSERT_EQ(NodeSet{"101"}, level1[1].subset);
+        ASSERT_EQ(NodeSet{"110"}, level1[2].subset);
+
+        auto& level2 = ctx.getSubsets(2);
+        ASSERT_EQ(1, level2.size());
+        ASSERT_EQ(NodeSet{"111"}, level2[0].subset);
+
+        goldenCtx.outStream() << "LEFT DEEP, 3 Nodes" << "\n";
+        goldenCtx.outStream() << ctx.toString() << std::endl;
+    }
+
+    {
+        PlanEnumeratorContext ctx{graph};
+        ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
+
+        auto& level0 = ctx.getSubsets(0);
+        ASSERT_EQ(3, level0.size());
+        ASSERT_EQ(NodeSet{"001"}, level0[0].subset);
+        ASSERT_EQ(NodeSet{"010"}, level0[1].subset);
+        ASSERT_EQ(NodeSet{"100"}, level0[2].subset);
+
+        auto& level1 = ctx.getSubsets(1);
+        ASSERT_EQ(3, level1.size());
+        ASSERT_EQ(NodeSet{"011"}, level1[0].subset);
+        ASSERT_EQ(NodeSet{"101"}, level1[1].subset);
+        ASSERT_EQ(NodeSet{"110"}, level1[2].subset);
+
+        auto& level2 = ctx.getSubsets(2);
+        ASSERT_EQ(1, level2.size());
+        ASSERT_EQ(NodeSet{"111"}, level2[0].subset);
+
+        goldenCtx.outStream() << "RIGHT DEEP, 3 Nodes" << "\n";
+        goldenCtx.outStream() << ctx.toString() << std::endl;
+    }
 }
 
-TEST(JoinPlanEnumerator, InitialzeLargeSubsets) {
+TEST(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
+    unittest::GoldenTestContext goldenCtx(&config);
+
+    JoinGraph graph;
+    auto id1 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
+    auto id2 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
+    auto id3 =
+        graph.addNode(NamespaceString::createNamespaceString_forTest("c"), nullptr, boost::none);
+    graph.addSimpleEqualityEdge(id1, id2, 0, 1);
+    graph.addSimpleEqualityEdge(id1, id3, 0, 2);
+
+    {
+        PlanEnumeratorContext ctx{graph};
+        ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
+
+        auto& level0 = ctx.getSubsets(0);
+        ASSERT_EQ(3, level0.size());
+        ASSERT_EQ(NodeSet{"001"}, level0[0].subset);
+        ASSERT_EQ(NodeSet{"010"}, level0[1].subset);
+        ASSERT_EQ(NodeSet{"100"}, level0[2].subset);
+
+        auto& level1 = ctx.getSubsets(1);
+        ASSERT_EQ(3, level1.size());
+        ASSERT_EQ(NodeSet{"011"}, level1[0].subset);
+        ASSERT_EQ(NodeSet{"101"}, level1[1].subset);
+        ASSERT_EQ(NodeSet{"110"}, level1[2].subset);
+
+        auto& level2 = ctx.getSubsets(2);
+        ASSERT_EQ(1, level2.size());
+        ASSERT_EQ(NodeSet{"111"}, level2[0].subset);
+
+        goldenCtx.outStream() << "LEFT DEEP, 3 Nodes" << "\n";
+        goldenCtx.outStream() << ctx.toString() << std::endl;
+    }
+
+    {
+        PlanEnumeratorContext ctx{graph};
+        ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
+
+        auto& level0 = ctx.getSubsets(0);
+        ASSERT_EQ(3, level0.size());
+        ASSERT_EQ(NodeSet{"001"}, level0[0].subset);
+        ASSERT_EQ(NodeSet{"010"}, level0[1].subset);
+        ASSERT_EQ(NodeSet{"100"}, level0[2].subset);
+
+        auto& level1 = ctx.getSubsets(1);
+        ASSERT_EQ(3, level1.size());
+        ASSERT_EQ(NodeSet{"011"}, level1[0].subset);
+        ASSERT_EQ(NodeSet{"101"}, level1[1].subset);
+        ASSERT_EQ(NodeSet{"110"}, level1[2].subset);
+
+        auto& level2 = ctx.getSubsets(2);
+        ASSERT_EQ(1, level2.size());
+        ASSERT_EQ(NodeSet{"111"}, level2[0].subset);
+
+        goldenCtx.outStream() << "RIGHT DEEP, 3 Nodes" << "\n";
+        goldenCtx.outStream() << ctx.toString() << std::endl;
+    }
+}
+
+void testLargeSubset(unittest::GoldenTestContext* goldenCtx, PlanTreeShape shape, int numNodes) {
     // Pick large enough number of nodes to exercise the enumeration code while small enough that
     // the test can finish in a reasonable amount of time.
-    constexpr int N = 15;
     JoinGraph graph;
-    for (int i = 0; i < N; ++i) {
-        graph.addNode(NamespaceString::createNamespaceString_forTest(""), nullptr, boost::none);
+    for (int i = 0; i < numNodes; ++i) {
+        auto id =
+            graph.addNode(NamespaceString::createNamespaceString_forTest(""), nullptr, boost::none);
+        // Make the graph fully connected in order to ensure we generate as many plans as possible.
+        for (size_t j = 0; j < graph.numNodes() - 1; ++j) {
+            graph.addSimpleEqualityEdge((NodeId)j, id, 0, 1);
+        }
     }
     PlanEnumeratorContext ctx{graph};
-    ctx.enumerateJoinSubsets();
-    ASSERT_EQ(N, ctx.getSubsets(0).size());
-    for (int k = 1; k < N; ++k) {
+    ctx.enumerateJoinSubsets(shape);
+    ASSERT_EQ(numNodes, ctx.getSubsets(0).size());
+    for (int k = 1; k < numNodes; ++k) {
         // The expected number of subsets for the k'th level is N choose k+1 (binomial coefficient).
-        int expectedLevelSize = combinations(N, k + 1);
+        int expectedLevelSize = combinations(numNodes, k + 1);
         auto& subsets = ctx.getSubsets(k);
         ASSERT_EQ(expectedLevelSize, subsets.size());
         for (auto&& s : subsets) {
             ASSERT_EQ(k + 1, s.subset.count());
         }
     }
+
+    if (goldenCtx) {
+        goldenCtx->outStream() << ctx.toString() << std::endl;
+    }
+}
+
+TEST(JoinPlanEnumeratorTest, LeftDeep8Nodes) {
+    unittest::GoldenTestContext goldenCtx(&config);
+    testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8);
+}
+
+TEST(JoinPlanEnumeratorTest, RightDeep8Nodes) {
+    unittest::GoldenTestContext goldenCtx(&config);
+    testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8);
+}
+
+TEST(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {
+    testLargeSubset(nullptr /* No golden test here. */, PlanTreeShape::LEFT_DEEP, 15);
 }
 
 using JoinPredicateEstimatorFixture = JoinOrderingTestFixture;

@@ -1,0 +1,63 @@
+LEFT DEEP, 2 Nodes
+Level 0:
+01, 10
+Level 1:
+11
+
+Output plans (best plan 0):
+0.[11] HJ
+ -> left:
+    [01] COLLSCAN
+ -> right:
+    [10] COLLSCAN
+
+1.[11] NLJ
+ -> left:
+    [01] COLLSCAN
+ -> right:
+    [10] COLLSCAN
+
+2.[11] HJ
+ -> left:
+    [10] COLLSCAN
+ -> right:
+    [01] COLLSCAN
+
+3.[11] NLJ
+ -> left:
+    [10] COLLSCAN
+ -> right:
+    [01] COLLSCAN
+
+
+RIGHT DEEP, 2 Nodes
+Level 0:
+01, 10
+Level 1:
+11
+
+Output plans (best plan 0):
+0.[11] HJ
+ -> left:
+    [01] COLLSCAN
+ -> right:
+    [10] COLLSCAN
+
+1.[11] NLJ
+ -> left:
+    [01] COLLSCAN
+ -> right:
+    [10] COLLSCAN
+
+2.[11] HJ
+ -> left:
+    [10] COLLSCAN
+ -> right:
+    [01] COLLSCAN
+
+3.[11] NLJ
+ -> left:
+    [10] COLLSCAN
+ -> right:
+    [01] COLLSCAN
+

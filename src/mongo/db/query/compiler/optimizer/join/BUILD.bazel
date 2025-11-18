@@ -41,10 +41,12 @@ mongo_cc_library(
 mongo_cc_library(
     name = "plan_enumerator",
     srcs = [
+        "join_plan.cpp",
         "plan_enumerator.cpp",
         "plan_enumerator_helpers.cpp",
     ],
     hdrs = [
+        "join_plan.h",
         "plan_enumerator.h",
         "plan_enumerator_helpers.h",
         "single_table_access.h",
@@ -68,6 +70,7 @@ mongo_cc_unit_test(
         "reorder_joins_test.cpp",
     ],
     data = [
+        "//src/mongo/db/test_output/query/join/join_plan_enumerator_test:test_data",
         "//src/mongo/db/test_output/query/join/reorder_graph_test:test_data",
     ],
     tags = ["mongo_unittest_third_group"],

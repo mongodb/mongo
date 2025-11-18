@@ -30,15 +30,14 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 
 namespace mongo::join_ordering {
 
 /**
- * Represents a subset of a JoinGraph.
+ * Describes shape of plan tree.
  */
-struct JoinSubset {
-    NodeSet subset;
-};
+enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP };
 
 /**
  * Context containing all the state for the bottom-up dynamic programming join plan enumeration
@@ -62,15 +61,43 @@ public:
     /**
      * Enumerates all join subsets in bottom-up fashion.
      */
-    void enumerateJoinSubsets();
+    void enumerateJoinSubsets(PlanTreeShape type = PlanTreeShape::LEFT_DEEP);
+
+    /**
+     * Used for testing & debugging.
+     */
+    std::string toString() const;
 
 private:
+    /**
+     * Enumerate plans by constructing possible joins between the 'left' and 'right' subsets and
+     * outputting those plans in 'cur'. Note that 'left' and 'right' must be disjoint, and their
+     * union must produce 'cur'.
+     */
+    void enumerateJoinPlans(PlanTreeShape type,
+                            const JoinSubset& left,
+                            const JoinSubset& right,
+                            JoinSubset& cur);
+
+    /**
+     * Helper for adding a join plan to subset 'cur', constructed using the specified join 'method'
+     * connecting the best plans from the provided subsets.
+     */
+    void addJoinPlan(JoinMethod method,
+                     const JoinSubset& left,
+                     const JoinSubset& right,
+                     const std::vector<EdgeId>& edges,
+                     JoinSubset& cur);
+
     const JoinGraph& _joinGraph;
 
     // Hold intermediate results of the enumeration algorithm. The index into the outer vector
     // represents the "level". The i'th level contains solutions for the optimal way to join all
     // possible subsets of size i+1.
     std::vector<std::vector<JoinSubset>> _joinSubsets;
+
+    // Memory management for trees so we can reuse nodes.
+    JoinPlanNodeRegistry _registry;
 };
 
 }  // namespace mongo::join_ordering
