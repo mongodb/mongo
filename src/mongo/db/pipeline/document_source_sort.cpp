@@ -153,17 +153,15 @@ REGISTER_DOCUMENT_SOURCE(sort,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(sort, DocumentSourceSort::id)
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalBoundedSort,
-                                       LiteParsedDocumentSourceDefault::parse,
-                                       DocumentSourceSort::parseBoundedSort,
-                                       ::mongo::getTestCommandsEnabled()
-                                           ? AllowedWithApiStrict::kNeverInVersion1
-                                           : AllowedWithApiStrict::kInternal,
-                                       ::mongo::getTestCommandsEnabled()
-                                           ? AllowedWithClientType::kAny
-                                           : AllowedWithClientType::kInternal,
-                                       nullptr,  // featureFlag
-                                       true);
+REGISTER_DOCUMENT_SOURCE_WITH_CLIENT_TYPE(_internalBoundedSort,
+                                          LiteParsedDocumentSourceDefault::parse,
+                                          DocumentSourceSort::parseBoundedSort,
+                                          ::mongo::getTestCommandsEnabled()
+                                              ? AllowedWithApiStrict::kNeverInVersion1
+                                              : AllowedWithApiStrict::kInternal,
+                                          ::mongo::getTestCommandsEnabled()
+                                              ? AllowedWithClientType::kAny
+                                              : AllowedWithClientType::kInternal);
 
 void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
                                                  const SerializationOptions& opts) const {

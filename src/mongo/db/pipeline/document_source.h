@@ -104,6 +104,16 @@ namespace mongo {
                                            nullptr, /* featureFlag */               \
                                            true)
 
+#define REGISTER_DOCUMENT_SOURCE_WITH_CLIENT_TYPE(                    \
+    key, liteParser, fullParser, allowedWithApiStrict, clientType)    \
+    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key,                       \
+                                           liteParser,                \
+                                           fullParser,                \
+                                           allowedWithApiStrict,      \
+                                           clientType,                \
+                                           nullptr, /* featureFlag */ \
+                                           true)
+
 /**
  * Like REGISTER_DOCUMENT_SOURCE, except the parser will only be registered when featureFlag is
  * enabled. We store featureFlag in the parserMap, so that it can be checked at runtime

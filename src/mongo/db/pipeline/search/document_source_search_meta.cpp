@@ -61,13 +61,11 @@ auto cloneEachOne(std::list<boost::intrusive_ptr<DocumentSource>> stages, const 
 }
 }  // namespace
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(searchMeta,
-                                       LiteParsedSearchStage::parse,
-                                       DocumentSourceSearchMeta::createFromBson,
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       AllowedWithClientType::kAny,
-                                       nullptr,  // featureFlag
-                                       true);
+REGISTER_DOCUMENT_SOURCE(searchMeta,
+                         LiteParsedSearchStage::parse,
+                         DocumentSourceSearchMeta::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(searchMeta, DocumentSourceSearchMeta::id)
 
 boost::optional<DocumentSource::DistributedPlanLogic>

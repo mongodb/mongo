@@ -58,13 +58,11 @@
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(fill,
-                                       LiteParsedDocumentSourceDefault::parse,
-                                       document_source_fill::createFromBson,
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       AllowedWithClientType::kAny,
-                                       nullptr,  // featureFlag
-                                       true);
+REGISTER_DOCUMENT_SOURCE(fill,
+                         LiteParsedDocumentSourceDefault::parse,
+                         document_source_fill::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
+
 namespace document_source_fill {
 
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
