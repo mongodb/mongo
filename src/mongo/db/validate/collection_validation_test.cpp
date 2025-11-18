@@ -748,7 +748,7 @@ protected:
     OperationContext* _opCtx{nullptr};
     CollectionOptions _options;
     CollectionValidation::ValidateMode _validateMode{
-        CollectionValidation::ValidateMode::kForegroundFullCheckBSON};
+        CollectionValidation::ValidateMode::kForeground};
 
 private:
     void setUp() override {

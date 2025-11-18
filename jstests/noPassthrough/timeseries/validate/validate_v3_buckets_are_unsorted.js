@@ -43,7 +43,7 @@ assert.commandWorked(
         getRawOperationSpec(testDB),
     ),
 );
-let res = assert.commandWorked(tsColl.validate({checkBSONConformance: true}));
+let res = assert.commandWorked(tsColl.validate());
 assert(res.valid);
 
 // Compressed bucket with the compressed time field in-order and version set to 3. This should fail,
@@ -77,7 +77,7 @@ assert.commandWorked(
         getRawOperationSpec(testDB),
     ),
 );
-res = assert.commandWorked(tsColl.validate({checkBSONConformance: true}));
+res = assert.commandWorked(tsColl.validate());
 assert(!res.valid);
 assert.eq(res.errors.length, 1);
 

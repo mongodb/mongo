@@ -299,7 +299,7 @@ getTimeseriesCollForRawOps(db, coll).updateOne(
     {"$set": {"control.max.temp": 800}},
     getRawOperationSpec(db),
 );
-res = coll.validate({checkBSONConformance: true});
+res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.errors.length, 1);
@@ -308,7 +308,7 @@ assert.eq(res.errors.length, 1);
 jsTestLog("Running validate on a version 2 bucket with everything correct, checking that no warnings are found.");
 setUpCollection(lotsOfData);
 coll = db.getCollection(collName);
-res = coll.validate({checkBSONConformance: true});
+res = coll.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);
@@ -319,7 +319,7 @@ jsTestLog(
 );
 setUpCollection(skipFieldData);
 coll = db.getCollection(collName);
-res = coll.validate({checkBSONConformance: true});
+res = coll.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);

@@ -63,7 +63,7 @@ getTimeseriesCollForRawOps(db, coll).updateOne(
     {"$set": {"control.count": 10}},
     getRawOperationSpec(db),
 );
-res = coll.validate({checkBSONConformance: true});
+res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.errors.length, 1);
