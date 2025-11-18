@@ -278,3 +278,15 @@ mongo_cc_integration_test(
         "//src/mongo/util:version_impl",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "search_task_executors_grpc_config_test",
+    srcs = [
+        "search_task_executors_grpc_config_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        "search_task_executors",
+        "//src/mongo/db:service_context",
+    ],
+)

@@ -77,7 +77,9 @@ struct State {
             searchIdxNetworkInterface =
                 makeNetworkInterfaceGRPC(kSearchIndexManagementExecutorName);
 #else
-            MONGO_UNREACHABLE;
+            uasserted(ErrorCodes::InvalidOptions,
+                      "useGrpcForSearch is enabled but this build was compiled without gRPC "
+                      "support. Rebuild with gRPC or disable useGrpcForSearch.");
 #endif
         } else {
             mongotExecutorNetworkInterface = makeNetworkInterface(
