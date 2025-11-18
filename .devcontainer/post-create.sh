@@ -49,26 +49,41 @@ echo "[OK] Volume and Git permissions fixed"
 # Configure Bazel with Docker information (one-time container setup)
 echo "Configuring Bazel with Docker server information..."
 
-# Helper function to add Bazel keyword if not already present
+# Helper function to add/update Bazel keyword with latest value
 add_bazel_keyword() {
     local keyword="$1"
     local value="$2"
     local bazelrc="${HOME}/.bazelrc"
 
-    if ! grep -q "devcontainer:${keyword}" "${bazelrc}" 2>/dev/null; then
-        echo "common --bes_keywords=devcontainer:${keyword}=\"${value}\"" >>"${bazelrc}"
-        echo "[OK] ${keyword} configured: ${value}"
-    else
-        echo "Info: ${keyword} already configured"
-    fi
+    # Ensure bazelrc exists
+    touch "${bazelrc}"
+
+    # Use a temporary file to avoid issues with in-place editing
+    grep -v "devcontainer:${keyword}" "${bazelrc}" >"${bazelrc}.tmp" 2>/dev/null || true
+    mv "${bazelrc}.tmp" "${bazelrc}"
+
+    # Add the keyword with current value
+    echo "common --bes_keywords=devcontainer:${keyword}=\"${value}\"" >>"${bazelrc}"
+    echo "[OK] ${keyword} configured: ${value}"
 }
 
-# Report Docker server platform
-DOCKER_PLATFORM=$(docker version --format '{{.Server.Platform.Name}}' 2>/dev/null || echo "unknown")
-add_bazel_keyword "docker_server_platform" "${DOCKER_PLATFORM}"
+# Report Docker server platform and version
+OS_NAME=$(docker info --format '{{.OperatingSystem}}' 2>/dev/null || echo "unknown")
+DOCKER_NAME=$(docker info --format '{{.Name}}' 2>/dev/null || echo "unknown")
+DOCKER_VERSION=$(docker info --format '{{.ServerVersion}}' 2>/dev/null || echo "unknown")
 
-# Report Docker server version
-DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null || echo "unknown")
+# Determine platform
+if [ "${OS_NAME}" = "Docker Desktop" ]; then
+    DOCKER_PLATFORM="Docker Desktop"
+elif [[ "${DOCKER_NAME}" =~ rancher ]]; then
+    DOCKER_PLATFORM="Rancher Desktop"
+elif [ "${OS_NAME}" != "unknown" ]; then
+    DOCKER_PLATFORM="${OS_NAME}"
+else
+    DOCKER_PLATFORM="unknown"
+fi
+
+add_bazel_keyword "docker_server_platform" "${DOCKER_PLATFORM}"
 add_bazel_keyword "docker_server_version" "${DOCKER_VERSION}"
 
 # Report architecture
