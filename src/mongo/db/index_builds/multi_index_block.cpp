@@ -143,8 +143,7 @@ auto makeOnSuppressedErrorFn(const CollectionPtr& coll,
 
         // If a key generation error was suppressed, record the document as "skipped" so the
         // index builder can retry at a point when data is consistent.
-        auto interceptor = entry->indexBuildInterceptor();
-        if (interceptor && interceptor->getSkippedRecordTracker()) {
+        if (auto interceptor = entry->indexBuildInterceptor()) {
             LOGV2_DEBUG(20684,
                         1,
                         "Recording suppressed key generation error to retry later"
@@ -157,7 +156,7 @@ auto makeOnSuppressedErrorFn(const CollectionPtr& coll,
             // internally and causes the cursor to be unpositioned.
 
             saveCursorBeforeWrite();
-            interceptor->getSkippedRecordTracker()->record(opCtx, coll, loc.value());
+            interceptor->getSkippedRecordTracker().record(opCtx, coll, loc.value());
             restoreCursorAfterWrite();
         }
     };
@@ -1209,7 +1208,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                 paths = std::move(multikeyPaths);
             }
 
-            multikeyPaths = interceptor->getSkippedRecordTracker()->getMultikeyPaths();
+            multikeyPaths = interceptor->getSkippedRecordTracker().getMultikeyPaths();
             if (multikeyPaths) {
                 // TODO(SERVER-103400): Investigate usage validity of
                 // CollectionPtr::CollectionPtr_UNSAFE
@@ -1396,7 +1395,7 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
             indexStateInfo.setDuplicateKeyTrackerTable(ident);
         }
 
-        if (!indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent()) {
+        if (!indexBuildInterceptor->getSkippedRecordTracker().getTableIdent()) {
             // IndexBuildInterceptor requires the the skipped records tracker table ident to
             // be present in the resume case, so create the table if it hasn't been created yet.
             // TODO(SERVER-111080): Remove the code to create the skipped records tracker table

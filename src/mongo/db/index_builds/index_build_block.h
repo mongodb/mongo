@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -46,7 +47,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Interface for building a single index from an index spec and persisting its state to disk.
@@ -157,4 +158,4 @@ private:
 
     std::unique_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

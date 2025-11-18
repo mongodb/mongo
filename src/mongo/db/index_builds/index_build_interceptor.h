@@ -47,6 +47,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -56,7 +57,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class IndexBuildInterceptor {
 public:
     using RetrySkippedRecordMode = SkippedRecordTracker::RetrySkippedRecordMode;
@@ -148,12 +149,20 @@ public:
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy);
 
-    SkippedRecordTracker* getSkippedRecordTracker() {
-        return &_skippedRecordTracker;
+    MONGO_MOD_PRIVATE SkippedRecordTracker& getSkippedRecordTracker() {
+        return _skippedRecordTracker;
     }
 
-    const SkippedRecordTracker* getSkippedRecordTracker() const {
-        return &_skippedRecordTracker;
+    MONGO_MOD_PRIVATE const SkippedRecordTracker& getSkippedRecordTracker() const {
+        return _skippedRecordTracker;
+    }
+
+    /**
+     * Returns true if any records were skipped. If this returns false, retrySkippedRecords() will
+     * be a no-op.
+     */
+    bool hasAnySkippedRecords(OperationContext* opCtx) const {
+        return !_skippedRecordTracker.areAllRecordsApplied(opCtx);
     }
 
     /**
@@ -260,4 +269,4 @@ private:
     mutable stdx::mutex _multikeyPathMutex;
     boost::optional<MultikeyPaths> _multikeyPaths;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

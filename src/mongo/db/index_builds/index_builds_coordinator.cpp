@@ -106,6 +106,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
@@ -125,8 +126,6 @@ MONGO_FAIL_POINT_DEFINE(failIndexBuildWithError);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
 MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
-
-extern FailPoint skipWriteConflictRetries;
 
 class IndexBuildsSSS : public ServerStatusSection {
 public:
@@ -169,8 +168,6 @@ public:
 };
 
 auto& indexBuildsSSS = *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds").forShard();
-
-namespace {
 
 constexpr StringData kCreateIndexesFieldName = "createIndexes"_sd;
 constexpr StringData kCommitIndexBuildFieldName = "commitIndexBuild"_sd;

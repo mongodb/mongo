@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/util/uuid.h"
+    mod_visibility: private
 
 imports:
     - "mongo/db/index_builds/commit_quorum.idl"

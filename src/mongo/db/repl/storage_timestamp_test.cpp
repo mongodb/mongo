@@ -2680,9 +2680,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
 
         // There should be one skipped record from the collection scan.
-        ASSERT_FALSE(
-            buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
-                _opCtx));
+        ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->hasAnySkippedRecords(_opCtx));
     }
 
     // As a primary, stop ignoring indexing errors.
@@ -2706,16 +2704,12 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
     }
 
     // There should skipped records from failed collection scans and writes.
-    ASSERT_FALSE(
-        buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
-            _opCtx));
+    ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->hasAnySkippedRecords(_opCtx));
     // This fails because the bad record is still invalid.
     auto status = indexer.retrySkippedRecords(_opCtx, collection.get());
     ASSERT_EQ(status.code(), ErrorCodes::CannotIndexParallelArrays);
 
-    ASSERT_FALSE(
-        buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
-            _opCtx));
+    ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->hasAnySkippedRecords(_opCtx));
     ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
 
     // Update one documents to be valid, and delete the other. These modifications are written
@@ -2740,9 +2734,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
 
     // This succeeds because the bad documents are now either valid or removed.
     ASSERT_OK(indexer.retrySkippedRecords(_opCtx, collection.get()));
-    ASSERT_TRUE(
-        buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
-            _opCtx));
+    ASSERT_FALSE(buildingIndex->indexBuildInterceptor()->hasAnySkippedRecords(_opCtx));
     ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
     ASSERT_OK(indexer.checkConstraints(_opCtx, collection.get()));
 

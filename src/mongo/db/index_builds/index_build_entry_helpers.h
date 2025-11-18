@@ -32,8 +32,7 @@
 #include "mongo/db/index_builds/index_build_entry_gen.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
-
-namespace mongo {
+#include "mongo/util/modules.h"
 
 /**
  * Format of IndexBuildEntry:
@@ -50,7 +49,7 @@ namespace mongo {
  *	}
  */
 
-namespace indexbuildentryhelpers {
+namespace mongo::indexbuildentryhelpers {
 
 /**
  * Creates the "config.system.indexBuilds" collection if it does not already exist.
@@ -60,7 +59,7 @@ namespace indexbuildentryhelpers {
  * The collection should exist before calling any other helper functions to prevent them from
  * failing.
  */
-void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx);
+MONGO_MOD_PUBLIC void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx);
 
 /**
  * Persist the host and port information about the replica set members that have voted to commit an
@@ -136,5 +135,4 @@ Status setCommitQuorum_forTest(OperationContext* opCtx,
                                UUID indexBuildUUID,
                                CommitQuorumOptions commitQuorumOptions);
 
-}  // namespace indexbuildentryhelpers
-}  // namespace mongo
+}  // namespace mongo::indexbuildentryhelpers

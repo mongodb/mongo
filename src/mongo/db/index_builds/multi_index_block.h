@@ -47,6 +47,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/uuid.h"
 
@@ -56,7 +57,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * Builds one or more indexes.
  *
@@ -392,4 +393,4 @@ private:
     // catalog entry pointers in IndexToBuild. This is necessary for index build performance.
     const Collection* _collForScan = nullptr;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

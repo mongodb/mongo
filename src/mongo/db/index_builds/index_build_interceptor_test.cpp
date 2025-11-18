@@ -116,7 +116,7 @@ protected:
     std::unique_ptr<TemporaryRecordStore> getSkippedRecordsTrackerTable(
         std::unique_ptr<IndexBuildInterceptor> interceptor) {
         interceptor->keepTemporaryTables();
-        auto skippedRecordsIdent = interceptor->getSkippedRecordTracker()->getTableIdent();
+        auto skippedRecordsIdent = interceptor->getSkippedRecordTracker().getTableIdent();
         // TODO(SERVER-111080): Remove this invariant when the skipped records tracker table is
         // initialized proactively.
         invariant(skippedRecordsIdent);
@@ -231,7 +231,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsIntRidTra
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
+    interceptor->getSkippedRecordTracker().record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));
@@ -251,7 +251,7 @@ TEST_F(IndexBuilderInterceptorTest,
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
+    interceptor->getSkippedRecordTracker().record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));
@@ -267,7 +267,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsTrackerTa
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
+    interceptor->getSkippedRecordTracker().record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));
@@ -287,7 +287,7 @@ TEST_F(IndexBuilderInterceptorTest,
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
+    interceptor->getSkippedRecordTracker().record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));

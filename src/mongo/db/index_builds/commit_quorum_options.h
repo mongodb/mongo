@@ -34,10 +34,11 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * 'CommitQuorumOptions' is used to determine when a primary should commit an index build. When the
  * specified 'quorum' of replica set members is reached, then the primary proceeds to commit the
@@ -108,4 +109,4 @@ public:
     std::string mode = "";
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

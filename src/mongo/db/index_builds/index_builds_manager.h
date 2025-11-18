@@ -46,6 +46,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <map>
@@ -55,7 +56,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 enum IndexBuildRecoveryState { Building, Verifying, Committing };
 
 /**
@@ -234,4 +235,4 @@ private:
     std::map<UUID, std::unique_ptr<MultiIndexBlock>> _builders;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

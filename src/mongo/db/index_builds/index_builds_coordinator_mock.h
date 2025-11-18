@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class IndexBuildsCoordinatorMock : public IndexBuildsCoordinator {
 public:
@@ -89,4 +90,4 @@ private:
                                                std::shared_ptr<ReplIndexBuildState> replState,
                                                const IndexBuildOptions& indexBuildOptions) override;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

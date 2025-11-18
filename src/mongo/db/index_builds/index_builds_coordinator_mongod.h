@@ -43,6 +43,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
@@ -51,7 +52,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This implementation of the IndexBuildsCoordinator is for replica set member and standalone nodes.
@@ -172,4 +173,4 @@ private:
     stdx::condition_variable _indexBuildFinished;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

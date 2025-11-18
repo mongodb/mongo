@@ -223,9 +223,8 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     if (_indexBuildInterceptor) {
         // Skipped records are only checked when we complete an index build as primary.
         const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const auto skippedRecordsTracker = _indexBuildInterceptor->getSkippedRecordTracker();
-        if (skippedRecordsTracker && replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
-            invariant(skippedRecordsTracker->areAllRecordsApplied(opCtx));
+        if (replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
+            invariant(!_indexBuildInterceptor->hasAnySkippedRecords(opCtx));
         }
 
         // An index build should never be completed with writes remaining in the interceptor.

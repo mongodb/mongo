@@ -48,6 +48,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <cstddef>
@@ -69,7 +70,7 @@ namespace mongo {
  * We assume the caller has whatever locks required.  This interface is not thread safe.
  *
  */
-class IndexAccessMethod {
+class MONGO_MOD_OPEN IndexAccessMethod {
     IndexAccessMethod(const IndexAccessMethod&) = delete;
     IndexAccessMethod& operator=(const IndexAccessMethod&) = delete;
 
@@ -229,7 +230,7 @@ public:
     // Bulk operations support
     //
 
-    class BulkBuilder {
+    class MONGO_MOD_OPEN BulkBuilder {
     public:
         virtual ~BulkBuilder() = default;
 
@@ -332,7 +333,7 @@ struct UpdateTicket {
 /**
  * Flags we can set for inserts and deletes (and updates, which are kind of both).
  */
-struct InsertDeleteOptions {
+struct MONGO_MOD_PUBLIC InsertDeleteOptions {
     // Are duplicate keys allowed in the index?
     bool dupsAllowed = false;
 
@@ -363,7 +364,7 @@ struct InsertDeleteOptions {
  * for the initialization and core functionality of this abstract class. To avoid any circular
  * dependencies, it is important that IndexAccessMethod remain an interface.
  */
-class SortedDataIndexAccessMethod : public IndexAccessMethod {
+class MONGO_MOD_OPEN SortedDataIndexAccessMethod : public IndexAccessMethod {
     SortedDataIndexAccessMethod(const SortedDataIndexAccessMethod&) = delete;
     SortedDataIndexAccessMethod& operator=(const SortedDataIndexAccessMethod&) = delete;
 
@@ -627,7 +628,7 @@ public:
 
     static long long getDuplicateKeyErrors_forTest();
 
-protected:
+private:
     /**
      * Perform some initial validation on the document to ensure it can be indexed before calling
      * the implementation-specific 'doGetKeys' method.
@@ -661,7 +662,6 @@ protected:
                            MultikeyPaths* multikeyPaths,
                            const boost::optional<RecordId>& id) const = 0;
 
-private:
     /**
      * Removes a single key from the index.
      *

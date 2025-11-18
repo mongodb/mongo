@@ -38,14 +38,12 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 
 namespace mongo {
-
-class IndexCatalogEntry;
-
 /**
  * Records keys that have violated duplicate key constraints on unique indexes. The keys are backed
  * by a temporary table that is created and destroyed by this tracker.

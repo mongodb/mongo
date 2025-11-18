@@ -47,6 +47,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
@@ -56,7 +57,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 // Indicates which protocol an index build is using.
 enum class IndexBuildProtocol {
@@ -113,6 +114,7 @@ enum class IndexBuildAction {
  */
 std::string indexBuildActionToString(IndexBuildAction action);
 
+namespace index_build_internal {
 /**
  * Represents the index build state. See _checkIfValidTransition() for valid state transitions.
  */
@@ -304,6 +306,7 @@ private:
     // TODO (SERVER-111304): Remove multikey information from IndexBuildState.
     std::vector<boost::optional<MultikeyPaths>> _multikey;
 };
+}  // namespace index_build_internal
 
 /**
  * Tracks the cross replica set progress of a particular index build identified by a build UUID.
@@ -643,7 +646,7 @@ private:
     std::unique_ptr<SharedPromise<IndexBuildAction>> _waitForNextAction;
 
     // Maintains the state of the index build.
-    IndexBuildState _indexBuildState;
+    index_build_internal::IndexBuildState _indexBuildState;
 
     // Indicates whether this node should produce any table writes during the index build. When
     // this is false, it means that this node is a secondary and is only applying writes received
@@ -670,4 +673,4 @@ private:
     bool _votedForCommitReadiness = false;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -35,6 +35,7 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -42,7 +43,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class IndexBuildOplogEntry {
 public:
@@ -64,4 +65,4 @@ public:
     repl::OpTime opTime;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

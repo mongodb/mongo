@@ -30,16 +30,15 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Describes an index build on a collection.
  */
 struct IndexBuildsEntry {
-    IndexBuildsEntry(UUID collUUID) : collUUID(collUUID) {}
-
     // Collection UUID.
     const UUID collUUID;
 
@@ -52,4 +51,4 @@ struct IndexBuildsEntry {
  */
 using IndexBuilds = stdx::unordered_map<UUID, IndexBuildsEntry, UUID::Hash>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -55,6 +55,8 @@ namespace mongo {
 
 namespace {
 
+using index_build_internal::IndexBuildState;
+
 /**
  * Parses index specs to generate list of index names for ReplIndexBuildState initialization.
  */

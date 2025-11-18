@@ -36,8 +36,9 @@
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * Creates an index if it does not already exist.
  */
@@ -66,4 +67,4 @@ Status initializeMultiIndexBlock(OperationContext* opCtx,
                                  MultiIndexBlock& indexer,
                                  const BSONObj& spec,
                                  MultiIndexBlock::OnInitFn onInit = MultiIndexBlock::kNoopOnInitFn);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

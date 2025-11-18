@@ -32,11 +32,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/version_context.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Encapsulates metadata fields associated with an index build.
@@ -109,4 +110,4 @@ std::vector<std::string> toIndexNames(const std::vector<IndexBuildInfo>& indexes
  */
 std::vector<BSONObj> toIndexSpecs(const std::vector<IndexBuildInfo>& indexes);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

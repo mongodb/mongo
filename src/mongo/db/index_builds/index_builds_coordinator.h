@@ -57,6 +57,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
@@ -82,7 +83,7 @@ namespace mongo {
  * accessible via the ServiceContext. It owns an IndexBuildsManager that manages all MultiIndexBlock
  * index builder instances.
  */
-class IndexBuildsCoordinator {
+class MONGO_MOD_PUBLIC IndexBuildsCoordinator {
 public:
     /**
      * Represents the set of different application modes used around building indexes that differ

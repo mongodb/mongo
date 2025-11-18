@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/index_builds/multi_index_block_validator.h"
+    mod_visibility: private
 
 imports:
     - "mongo/db/basic_types.idl"
