@@ -70,11 +70,10 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem,
                                                  const LiteParserOptions& options) {
-            return std::make_unique<LiteParsed>(specElem.fieldName());
+            return std::make_unique<LiteParsed>(specElem);
         }
 
-        LiteParsed(std::string parseTimeName)
-            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSource(spec) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

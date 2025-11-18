@@ -87,11 +87,11 @@ public:
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options);
 
-        LiteParsed(std::string parseTimeName,
+        LiteParsed(const BSONElement& spec,
                    const boost::optional<TenantId>& tenantId,
                    UserMode allUsers,
                    LocalOpsMode localOps)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
+            : LiteParsedDocumentSource(spec),
               _allUsers(allUsers),
               _localOps(localOps),
               _privileges(

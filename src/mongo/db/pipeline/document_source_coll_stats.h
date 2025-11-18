@@ -79,15 +79,13 @@ public:
                     specElem.type() == BSONType::object);
             auto spec = DocumentSourceCollStatsSpec::parse(specElem.embeddedObject(),
                                                            IDLParserContext(kStageName));
-            return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
+            return std::make_unique<LiteParsed>(specElem, nss, std::move(spec));
         }
 
-        explicit LiteParsed(std::string parseTimeName,
-                            NamespaceString nss,
-                            DocumentSourceCollStatsSpec spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _nss(std::move(nss)),
-              _spec(std::move(spec)) {}
+        LiteParsed(const BSONElement& specElem,
+                   NamespaceString nss,
+                   DocumentSourceCollStatsSpec spec)
+            : LiteParsedDocumentSource(specElem), _nss(std::move(nss)), _spec(std::move(spec)) {}
 
         bool isCollStats() const final {
             return true;

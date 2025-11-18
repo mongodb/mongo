@@ -97,7 +97,7 @@ HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
                     specObj.firstElementType() == BSONType::object);
 
         auto liteParsed = std::make_unique<DocumentSourceInternalSearchIdLookUp::LiteParsed>(
-            std::string(DocumentSourceInternalSearchIdLookUp::kStageName), specObj);
+            specObj.firstElement(), specObj);
 
         *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNode(
             std::make_unique<host::AggStageAstNode>(std::move(liteParsed))));

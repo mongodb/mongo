@@ -70,10 +70,10 @@ public:
                                                  const BSONElement& specElem,
                                                  const LiteParserOptions& options);
 
-        explicit LiteParsed(std::string parseTimeName,
+        explicit LiteParsed(const BSONElement& specElem,
                             NamespaceString nss,
                             DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+            : LiteParsedDocumentSource(specElem), _nss(std::move(nss)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {

@@ -94,15 +94,15 @@ public:
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options) {
             return std::make_unique<LiteParsed>(
-                spec.fieldName(),
+                spec,
                 nss.tenantId(),
                 listSessionsParseSpec(DocumentSourceListSessions::kStageName, spec));
         }
 
-        explicit LiteParsed(std::string parseTimeName,
-                            const boost::optional<TenantId>& tenantId,
-                            const ListSessionsSpec& spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
+        LiteParsed(const BSONElement& specElem,
+                   const boost::optional<TenantId>& tenantId,
+                   const ListSessionsSpec& spec)
+            : LiteParsedDocumentSource(specElem),
               _spec(spec),
               _privileges(listSessionsRequiredPrivileges(_spec, tenantId)) {}
 

@@ -85,13 +85,11 @@ public:
             uassert(6188500,
                     str::stream() << "$changeStream must take a nested object but found: " << spec,
                     spec.type() == BSONType::object);
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss, spec);
+            return std::make_unique<LiteParsed>(spec, nss);
         }
 
-        explicit LiteParsed(std::string parseTimeName, NamespaceString nss, const BSONElement& spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _nss(std::move(nss)),
-              _spec(spec) {}
+        LiteParsed(const BSONElement& spec, NamespaceString nss)
+            : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
 
         bool isChangeStream() const final {
             return true;
@@ -137,29 +135,29 @@ public:
                 uassert(ErrorCodes::APIStrictError,
                         "The 'showExpandedEvents' parameter to $changeStream is not supported in "
                         "API Version 1",
-                        _spec.Obj()[DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName]
+                        _originalBson
+                            .Obj()[DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName]
                             .eoo());
 
                 uassert(
                     ErrorCodes::APIStrictError,
                     "The 'showRawUpdateDescription' parameter to $changeStream is not supported in "
                     "API Version 1",
-                    _spec.Obj()[DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName]
+                    _originalBson
+                        .Obj()[DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName]
                         .eoo());
 
                 uassert(
                     ErrorCodes::APIStrictError,
                     "The 'showSystemEvents' parameter to $changeStream is not supported in API "
                     "Version 1",
-                    _spec.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName].eoo());
+                    _originalBson.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName]
+                        .eoo());
             }
         }
 
     protected:
         const NamespaceString _nss;
-
-    private:
-        BSONElement _spec;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
@@ -421,14 +419,11 @@ class LiteParsedDocumentSourceChangeStreamInternal final
 public:
     static std::unique_ptr<LiteParsedDocumentSourceChangeStreamInternal> parse(
         const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(
-            spec.fieldName(), nss, spec);
+        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(spec, nss);
     }
 
-    LiteParsedDocumentSourceChangeStreamInternal(std::string parseTimeName,
-                                                 NamespaceString nss,
-                                                 const BSONElement& spec)
-        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss), spec),
+    LiteParsedDocumentSourceChangeStreamInternal(const BSONElement& spec, NamespaceString nss)
+        : DocumentSourceChangeStream::LiteParsed(spec, std::move(nss)),
           _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
                                  ActionType::internal)}) {}
 

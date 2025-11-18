@@ -79,11 +79,10 @@ public:
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options);
 
-        LiteParsed(std::string parseTimeName,
+        LiteParsed(const BSONElement& spec,
                    const NamespaceString& nss,
                    std::vector<LiteParsedPipeline> pipelines)
-            : LiteParsedDocumentSourceNestedPipelines(
-                  std::move(parseTimeName), nss, std::move(pipelines)) {}
+            : LiteParsedDocumentSourceNestedPipelines(spec, nss, std::move(pipelines)) {}
 
 
         PrivilegeVector requiredPrivileges(bool isMongos,

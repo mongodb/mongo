@@ -88,10 +88,10 @@ public:
                                                  const BSONElement& specElem,
                                                  const LiteParserOptions& options);
 
-        explicit LiteParsed(std::string parseTimeName,
-                            NamespaceString nss,
-                            DocumentSourceListSampledQueriesSpec spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
+        LiteParsed(const BSONElement& specElem,
+                   NamespaceString nss,
+                   DocumentSourceListSampledQueriesSpec spec)
+            : LiteParsedDocumentSource(specElem),
               _nss(std::move(nss)),
               _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
                                      ActionType::listSampledQueries)}) {}

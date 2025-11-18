@@ -199,11 +199,8 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
         tassert(11282975, "$merge spec is missing the whenMatched pipeline", pipeline);
         liteParsedPipeline = LiteParsedPipeline(nss, *pipeline);
     }
-    return std::make_unique<DocumentSourceMerge::LiteParsed>(spec.fieldName(),
-                                                             std::move(targetNss),
-                                                             whenMatched,
-                                                             whenNotMatched,
-                                                             std::move(liteParsedPipeline));
+    return std::make_unique<DocumentSourceMerge::LiteParsed>(
+        spec, std::move(targetNss), whenMatched, whenNotMatched, std::move(liteParsedPipeline));
 }
 
 PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(

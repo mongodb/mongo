@@ -72,11 +72,11 @@ public:
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options);
 
-        LiteParsed(std::string parseTimeName,
+        LiteParsed(const BSONElement& spec,
                    const boost::optional<TenantId>& tenantId,
                    TransformAlgorithmEnum algorithm,
                    std::string hmacKey)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
+            : LiteParsedDocumentSource(spec),
               _algorithm(algorithm),
               _hmacKey(hmacKey),
               _privileges(

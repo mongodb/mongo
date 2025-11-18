@@ -68,7 +68,13 @@ public:
         : LiteParsedPipeline(
               request.getNamespace(), request.getPipeline(), isRunningAgainstView_ForHybridSearch) {
     }
-
+    /**
+     * Constructs a LiteParsedPipeline from the raw BSON stages in 'pipelineStages'.
+     *
+     * IMPORTANT: Each stage will store the BSONElement view into the original BSONObj, so the
+     * caller is responsible for ensuring the lifetime of the original BSONObj exceeds that of this
+     * LiteParsedPipeline.
+     */
     LiteParsedPipeline(const NamespaceString& nss,
                        const std::vector<BSONObj>& pipelineStages,
                        const bool isRunningAgainstView_ForHybridSearch = false,

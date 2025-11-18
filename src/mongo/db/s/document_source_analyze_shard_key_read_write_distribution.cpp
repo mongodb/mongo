@@ -89,7 +89,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse(
 
     auto spec = DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec::parse(
         specElem.embeddedObject(), IDLParserContext(kStageName));
-    return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
+    return std::make_unique<LiteParsed>(specElem, nss, std::move(spec));
 }
 
 }  // namespace analyze_shard_key

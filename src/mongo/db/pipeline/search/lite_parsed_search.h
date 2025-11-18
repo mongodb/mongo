@@ -42,7 +42,7 @@ public:
     static std::unique_ptr<LiteParsedSearchStage> parse(const NamespaceString& nss,
                                                         const BSONElement& spec,
                                                         const LiteParserOptions& options) {
-        return std::make_unique<LiteParsedSearchStage>(spec.fieldName(), std::move(nss));
+        return std::make_unique<LiteParsedSearchStage>(spec, std::move(nss));
     }
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -72,8 +72,8 @@ public:
         transactionNotSupported(getParseTimeName());
     }
 
-    explicit LiteParsedSearchStage(std::string parseTimeName, NamespaceString nss)
-        : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+    explicit LiteParsedSearchStage(const BSONElement& spec, NamespaceString nss)
+        : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
 
 private:
     const NamespaceString _nss;

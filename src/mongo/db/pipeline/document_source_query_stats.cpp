@@ -96,7 +96,7 @@ std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
-            spec.fieldName(), nss.tenantId(), algorithm, hmacKey);
+            spec, nss.tenantId(), algorithm, hmacKey);
     });
 }
 

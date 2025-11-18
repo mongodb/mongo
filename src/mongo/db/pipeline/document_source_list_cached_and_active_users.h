@@ -77,11 +77,11 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options) {
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
+            return std::make_unique<LiteParsed>(spec, nss.tenantId());
         }
 
-        explicit LiteParsed(std::string parseTimeName, const boost::optional<TenantId>& tenantId)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
+        LiteParsed(const BSONElement& spec, const boost::optional<TenantId>& tenantId)
+            : LiteParsedDocumentSource(spec),
               _requiredPrivilege(Privilege(ResourcePattern::forAnyNormalResource(tenantId),
                                            ActionType::listCachedAndActiveUsers)) {}
 

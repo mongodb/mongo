@@ -51,7 +51,7 @@ public:
     public:
         static std::unique_ptr<LiteParsedListSearchIndexes> parse(
             const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-            return std::make_unique<LiteParsedListSearchIndexes>(spec.fieldName(), nss);
+            return std::make_unique<LiteParsedListSearchIndexes>(spec, nss);
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -82,8 +82,8 @@ public:
             return true;
         }
 
-        explicit LiteParsedListSearchIndexes(std::string parseTimeName, NamespaceString nss)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+        LiteParsedListSearchIndexes(const BSONElement& spec, NamespaceString nss)
+            : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
 
     private:
         const NamespaceString _nss;

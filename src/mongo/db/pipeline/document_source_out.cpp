@@ -111,7 +111,7 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
         ErrorCodes::InvalidNamespace,
         fmt::format("Invalid {} target namespace, {}", kStageName, targetNss.toStringForErrorMsg()),
         targetNss.isValid());
-    return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
+    return std::make_unique<DocumentSourceOut::LiteParsed>(spec, std::move(targetNss));
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(

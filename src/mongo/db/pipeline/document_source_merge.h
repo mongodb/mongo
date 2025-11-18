@@ -99,13 +99,13 @@ public:
      */
     class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
     public:
-        LiteParsed(std::string parseTimeName,
+        LiteParsed(const BSONElement& spec,
                    NamespaceString foreignNss,
                    MergeWhenMatchedModeEnum whenMatched,
                    MergeWhenNotMatchedModeEnum whenNotMatched,
                    boost::optional<LiteParsedPipeline> onMatchedPipeline)
             : LiteParsedDocumentSourceNestedPipelines(
-                  std::move(parseTimeName), std::move(foreignNss), std::move(onMatchedPipeline)),
+                  spec, std::move(foreignNss), std::move(onMatchedPipeline)),
               _whenMatched(whenMatched),
               _whenNotMatched(whenNotMatched) {}
 

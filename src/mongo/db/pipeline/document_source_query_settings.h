@@ -86,11 +86,11 @@ public:
             uassert(7746800,
                     "$querySettings stage expects a document as argument",
                     spec.type() == BSONType::object);
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
+            return std::make_unique<LiteParsed>(spec, nss.tenantId());
         }
 
-        LiteParsed(std::string parseTimeName, const boost::optional<TenantId>& tenantId)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
+        LiteParsed(const BSONElement& spec, const boost::optional<TenantId>& tenantId)
+            : LiteParsedDocumentSource(spec),
               _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
                                      ActionType::querySettings)}) {}
 

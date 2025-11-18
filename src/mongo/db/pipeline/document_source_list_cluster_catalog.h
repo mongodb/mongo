@@ -64,11 +64,11 @@ public:
     static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                              const BSONElement& spec,
                                              const LiteParserOptions& options) {
-        return std::make_unique<LiteParsed>(spec.fieldName(), nss);
+        return std::make_unique<LiteParsed>(spec, nss);
     }
 
-    explicit LiteParsed(std::string parseTimeName, const NamespaceString& nss)
-        : LiteParsedDocumentSource(std::move(parseTimeName)) {
+    LiteParsed(const BSONElement& spec, const NamespaceString& nss)
+        : LiteParsedDocumentSource(spec) {
 
         if (nss.dbName() != DatabaseName::kAdmin) {
             if (nss.isCollectionlessAggregateNS()) {

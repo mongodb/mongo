@@ -96,7 +96,7 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
             fromElement);
 
     return std::make_unique<LiteParsed>(
-        spec.fieldName(), parseGraphLookupFromAndResolveNamespace(fromElement, nss.dbName()));
+        spec, parseGraphLookupFromAndResolveNamespace(fromElement, nss.dbName()));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,

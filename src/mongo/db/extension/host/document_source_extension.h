@@ -72,11 +72,13 @@ public:
                 spec.fieldName(), std::move(parseNode), nss, options);
         }
 
+        // TODO SERVER-114037 Preserve original spec if available. For now we create a dummy
+        // spec with the stage name, which is fine since it is only used to retrieve the name.
         LiteParsedExpandable(std::string stageName,
                              AggStageParseNodeHandle parseNode,
                              const NamespaceString& nss,
                              const LiteParserOptions& options)
-            : LiteParsedDocumentSource(std::move(stageName)),
+            : LiteParsedDocumentSource(BSON(stageName << BSONObj()).firstElement()),
               _parseNode(std::move(parseNode)),
               _nss(nss),
               _options(options),
@@ -167,7 +169,9 @@ public:
         LiteParsedExpanded(std::string stageName,
                            AggStageAstNodeHandle astNode,
                            const NamespaceString& nss)
-            : LiteParsedDocumentSource(std::move(stageName)),
+            // TODO SERVER-114037 Preserve original spec if available. For now we create a dummy
+            // spec with the stage name, which is fine since it is only used to retrieve the name.
+            : LiteParsedDocumentSource(BSON(stageName << BSONObj()).firstElement()),
               _astNode(std::move(astNode)),
               _properties(_astNode.getProperties()),
               _nss(nss) {}

@@ -106,7 +106,7 @@ DocumentSourceListSampledQueries::LiteParsed::parse(const NamespaceString& nss,
     if (spec.getNamespace()) {
         uassertStatusOK(validateNamespace(*spec.getNamespace()));
     }
-    return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
+    return std::make_unique<LiteParsed>(specElem, nss, std::move(spec));
 }
 
 }  // namespace analyze_shard_key

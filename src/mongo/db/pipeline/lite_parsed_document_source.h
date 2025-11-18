@@ -95,8 +95,14 @@ public:
         AllowedWithClientType allowedWithClientType;
     };
 
-    LiteParsedDocumentSource(std::string parseTimeName)
-        : _parseTimeName(std::move(parseTimeName)) {}
+    /**
+     * Constructs a LiteParsedDocumentSource from the user-supplied BSON.
+     *
+     * IMPORTANT: We store the BSONElement view into the original BSONObj stage spec, so the caller
+     * is responsible for ensuring the lifetime of the original BSONObj exceeds that of this class.
+     */
+    LiteParsedDocumentSource(const BSONElement& originalBson)
+        : _originalBson(originalBson), _parseTimeName(originalBson.fieldNameStringData()) {}
 
     virtual ~LiteParsedDocumentSource() = default;
 
@@ -299,6 +305,8 @@ public:
     }
 
 protected:
+    BSONElement _originalBson;
+
     void transactionNotSupported(StringData stageName) const {
         uasserted(ErrorCodes::OperationNotSupportedInTransaction,
                   str::stream() << "Operation not permitted in transaction :: caused by :: "
@@ -350,11 +358,11 @@ public:
      */
     static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(
         const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-        return std::make_unique<LiteParsedDocumentSourceDefault>(spec.fieldName());
+        return std::make_unique<LiteParsedDocumentSourceDefault>(spec);
     }
 
-    LiteParsedDocumentSourceDefault(std::string parseTimeName)
-        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+    LiteParsedDocumentSourceDefault(const BSONElement& originalBson)
+        : LiteParsedDocumentSource(originalBson) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();
@@ -383,11 +391,11 @@ public:
      */
     static std::unique_ptr<LiteParsedDocumentSourceInternal> parse(
         const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-        return std::make_unique<LiteParsedDocumentSourceInternal>(spec.fieldName());
+        return std::make_unique<LiteParsedDocumentSourceInternal>(spec);
     }
 
-    LiteParsedDocumentSourceInternal(std::string parseTimeName)
-        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+    LiteParsedDocumentSourceInternal(const BSONElement& originalBson)
+        : LiteParsedDocumentSource(originalBson) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();
@@ -404,8 +412,9 @@ public:
  */
 class LiteParsedDocumentSourceForeignCollection : public LiteParsedDocumentSource {
 public:
-    LiteParsedDocumentSourceForeignCollection(std::string parseTimeName, NamespaceString foreignNss)
-        : LiteParsedDocumentSource(std::move(parseTimeName)), _foreignNss(std::move(foreignNss)) {}
+    LiteParsedDocumentSourceForeignCollection(const BSONElement& originalBson,
+                                              NamespaceString foreignNss)
+        : LiteParsedDocumentSource(originalBson), _foreignNss(std::move(foreignNss)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {_foreignNss};
@@ -423,11 +432,11 @@ protected:
  */
 class LiteParsedDocumentSourceNestedPipelines : public LiteParsedDocumentSource {
 public:
-    LiteParsedDocumentSourceNestedPipelines(std::string parseTimeName,
+    LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
                                             std::vector<LiteParsedPipeline> pipelines);
 
-    LiteParsedDocumentSourceNestedPipelines(std::string parseTimeName,
+    LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
                                             boost::optional<LiteParsedPipeline> pipeline);
 

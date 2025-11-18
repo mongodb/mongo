@@ -282,7 +282,7 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
     }
 
     return std::make_unique<DocumentSourceUnionWith::LiteParsed>(
-        spec.fieldName(), std::move(unionNss), std::move(liteParsedPipeline));
+        spec, std::move(unionNss), std::move(liteParsedPipeline));
 }
 
 PrivilegeVector DocumentSourceUnionWith::LiteParsed::requiredPrivileges(

@@ -69,7 +69,7 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
         [nss](const auto& elem) { return LiteParsedPipeline(nss, parsePipelineFromBSON(elem)); });
 
     return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(
-        spec.fieldName(), nss, std::move(liteParsedPipelines));
+        spec, nss, std::move(liteParsedPipelines));
 }
 
 /**

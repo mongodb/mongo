@@ -71,11 +71,11 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options) {
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss);
+            return std::make_unique<LiteParsed>(spec, nss);
         }
 
-        explicit LiteParsed(std::string parseTimeName, NamespaceString nss)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+        LiteParsed(const BSONElement& spec, NamespaceString nss)
+            : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
 
         bool isIndexStats() const final {
             return true;

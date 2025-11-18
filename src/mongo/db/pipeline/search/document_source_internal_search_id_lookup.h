@@ -67,7 +67,7 @@ public:
             uassert(ErrorCodes::FailedToParse,
                     "$_internalSearchIdLookup specification must be an object",
                     spec.type() == BSONType::object);
-            return std::make_unique<LiteParsed>(spec.fieldName(), spec.Obj().getOwned());
+            return std::make_unique<LiteParsed>(spec, spec.Obj().getOwned());
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -91,8 +91,9 @@ public:
             return _ownedSpec;
         }
 
-        explicit LiteParsed(std::string parseTimeName, BSONObj spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
+        // TODO SERVER-114038 Remove redundancy of storing both originalBson and ownedSpec.
+        LiteParsed(const BSONElement& specElem, BSONObj spec)
+            : LiteParsedDocumentSource(specElem),
               _ownedSpec(spec.isOwned() ? std::move(spec) : spec.getOwned()) {}
 
     private:
