@@ -155,6 +155,7 @@
 #include <source_location>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
 #include <type_traits>
@@ -352,7 +353,7 @@ struct Config {
     uint32_t force_error = 0;              /* Force a simulated network error every N operations */
     uint32_t materialization_delay_ms = 0; /* Average length of materialization delay */
     uint64_t last_materialized_lsn = 0;    /* The last materialized LSN (0 if not set) */
-    uint32_t verbose = WT_VERBOSE_INFO;    /* Verbose level */
+    int32_t verbose = WT_VERBOSE_INFO;     /* Verbose level */
     bool verbose_msg = true;               /* Send verbose messages to msg callback interface */
     bool sql_trace = false;                /* Trace all SQLite calls */
     bool verify = true;                    /* Verify integrity of page delta chains */
@@ -476,22 +477,19 @@ session(WT_SESSION *s = INVALID_PTR)
     return s == INVALID_PTR ? sess : (sess = s);
 }
 
-template <typename... Args>
-void
-log(Config &config, WT_VERBOSE_LEVEL level, std::format_string<Args...> fmt, Args &&...args)
+/* Simplify path by removing the extension directory prefix */
+static std::string_view
+simplify_path(const char *path)
 {
-    if (level > config.verbose)
-        return;
+    static const std::string ext_dir = std::filesystem::path("/ext/").make_preferred().string();
+    std::string_view path_view(path);
 
-    std::string message = std::format(fmt, std::forward<Args>(args)...);
-    if (config.verbose_msg) {
-        auto api_printf =
-          (level <= WT_VERBOSE_WARNING) ? config.extapi->err_printf : config.extapi->msg_printf;
-        api_printf(config.extapi, session(), "%s", message.c_str());
-    } else {
-        std::cerr << message << std::endl;
-    }
-}
+    size_t pos = path_view.find(ext_dir);
+    if (pos == std::string_view::npos)
+        return path_view;
+
+    return path_view.substr(pos + 1); /* Skip the leading separator. */
+};
 
 template <typename... Args>
 void
@@ -501,10 +499,30 @@ log(std::source_location loc, Config &config, WT_VERBOSE_LEVEL level,
     if (level > config.verbose)
         return;
 
-    thread_local static std::string t_id =
-      (std::ostringstream{} << std::this_thread::get_id()).str();
-    log(config, level, "[{}] {}:{}: {}: {}", t_id, loc.file_name(), loc.line(), loc.function_name(),
-      std::format(fmt, std::forward<Args>(args)...));
+    std::string message = std::format("{}:{}: {}: {}", simplify_path(loc.file_name()), loc.line(),
+      loc.function_name(), std::format(fmt, std::forward<Args>(args)...));
+
+    if (config.verbose_msg) {
+        auto api_printf =
+          (level <= WT_VERBOSE_WARNING) ? config.extapi->err_printf : config.extapi->msg_printf;
+        api_printf(config.extapi, session(), "%s", message.c_str());
+    } else {
+        std::cerr << "[" << std::this_thread::get_id() << "], " << message << std::endl;
+    }
+}
+
+class PaliteException : public std::domain_error {
+public:
+    PaliteException() : std::domain_error("PALite exception") {}
+};
+
+template <typename... Args>
+void
+log_and_throw(
+  std::source_location loc, Config &config, std::format_string<Args...> fmt, Args &&...args)
+{
+    log(loc, config, WT_VERBOSE_ERROR, fmt, std::forward<Args>(args)...);
+    throw PaliteException();
 }
 
 #define LOG_AT(_lvl, ...)                                                      \
@@ -527,6 +545,8 @@ log(std::source_location loc, Config &config, WT_VERBOSE_LEVEL level,
             LOG_DIAG("{}", str); \
     } while (0)
 
+#define LOG_AND_THROW(...) log_and_throw(std::source_location::current(), config, __VA_ARGS__)
+
 /* Exception-safe template method that catches C++ exceptions */
 template <typename T, typename S, typename MemberFunc, typename... Args>
 static int
@@ -544,6 +564,9 @@ safe_call(WT_SESSION *sess, S *api, MemberFunc func, Args &&...args)
     Config &config = obj->config; /* needed for logging macros bellow */
     try {
         return std::invoke(func, obj, std::forward<Args>(args)...);
+    } catch (const PaliteException &) {
+        LOG_ERROR("Call failed");
+        return EINVAL;
     } catch (const std::bad_alloc &e) {
         LOG_ERROR("Memory allocation failed: {}", e.what());
         return ENOMEM;
@@ -567,20 +590,6 @@ safe_call(WT_SESSION *sess, S *api, MemberFunc func, Args &&...args)
         return EFAULT;
     }
 }
-
-template <typename Exception = std::runtime_error, typename... Args>
-void
-log_and_throw(
-  std::source_location loc, Config &config, std::format_string<Args...> fmt, Args &&...args)
-{
-    log(loc, config, WT_VERBOSE_ERROR, fmt, std::forward<Args>(args)...);
-
-    std::string message = std::format("{}:{}: {}: {}", loc.file_name(), loc.line(),
-      loc.function_name(), std::format(fmt, std::forward<Args>(args)...));
-    throw Exception(message);
-}
-
-#define LOG_AND_THROW(...) log_and_throw(std::source_location::current(), config, __VA_ARGS__)
 
 /*
  * Generic formatter for custom pointer types. Excludes char* and void* specializations provided by

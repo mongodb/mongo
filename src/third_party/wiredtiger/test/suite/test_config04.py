@@ -248,23 +248,37 @@ class test_config04(wttest.WiredTigerTestCase):
     def test_invalid_config(self):
         # The tiered/disagg hook modifies the wiredtiger_open configuration string.
         # This may influence what particular error message occurs in certain cases.
-        if self.runningHook('tiered') or self.runningHook('disagg'):
-            msg = '/./'
-        else:
-            msg = '/Unbalanced brackets/'
+        classic = not (self.runningHook('tiered') or self.runningHook('disagg'))
+        match_any = '/./'
 
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.wiredtiger_open('.', '}'), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.wiredtiger_open('.', '{'), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.wiredtiger_open('.', '{}}'), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.wiredtiger_open('.', '(]}'), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.wiredtiger_open('.', '(create=]}'), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.wiredtiger_open('.', '(create='), msg)
+        unbalanced_brackets = (['}', '{', '{}}', '(]}', '(create=]}', '(create='],
+                               '/Unbalanced brackets/' if classic else match_any)
+
+        unbalanced_quotes = (['"', '"""', '",', '"create=', 'create=,"', 'error_prefix="a'],
+                             '/Unbalanced quotes/' if classic else match_any)
+
+        unexpected_escape = ([f'error_prefix="{esc}"'
+                              for esc in ['\a', '\b', '\f', '\n', '\r', '\t', '\v']],
+                             '/Unexpected escaped character/' if classic else match_any)
+
+        for bad_configs, msg in (unbalanced_brackets, unbalanced_quotes, unexpected_escape):
+            for config in bad_configs:
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda cfg=config: self.wiredtiger_open('.', cfg), msg)
+
+    def test_valid_config_with_quotes(self):
+        valid_configs = [
+            '"create"',
+            '"",create',
+            'create,"",',
+            'create,log="(enabled)"',
+            'log="(enabled)",create']
+
+        home_dir = os.path.join('.', 'WT_HOME')
+        for config in valid_configs:
+            with self.temporaryDirectory(home_dir):
+                conn = self.wiredtiger_open(home_dir, config)
+                conn.close()
 
     def test_error_prefix(self):
         self.common_test('error_prefix="MyOwnPrefix"')

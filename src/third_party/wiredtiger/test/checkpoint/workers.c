@@ -284,7 +284,8 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
         if (g.sweep_stress)
             testutil_check(cursor->reset(cursor));
     } else {
-        if (new_val % 39 < 30) {
+        /* FIXME-WT-14467 should fix cursor->modify for layered tables. */
+        if (new_val % 39 < 30 && !g.opts.disagg_storage) {
             /* Do modify. */
             ret = cursor->search(cursor);
             if (ret == 0 && (type != FIX || !cursor_fix_at_zero(cursor))) {

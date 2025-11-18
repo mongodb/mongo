@@ -33,7 +33,7 @@ __rec_child_deleted(
      * underlying disk blocks and don't write anything in the internal page.
      */
     if (page_del == NULL)
-        return (__wt_ref_block_free(session, ref, false));
+        return (__wt_ref_block_free(session, ref, true));
 
     /*
      * Check visibility. If the truncation is visible to us, we'll also want to know if it's visible
@@ -181,7 +181,7 @@ __rec_child_deleted(
      * is ever a read into this part of the name space again, the cache read function instantiates
      * an entirely new page.)
      */
-    WT_RET(__wt_ref_block_free(session, ref, false));
+    WT_RET(__wt_ref_block_free(session, ref, true));
 
     /* Globally visible fast-truncate information is never used again, a NULL value is identical. */
     __wt_overwrite_and_free(session, ref->page_del);

@@ -75,7 +75,7 @@ struct WorkgenTimeStamp {
         if (ts <= last_ts)
             ts = last_ts + 1;
         last_ts = ts;
-        return ts;
+        return (ts);
     }
 };
 

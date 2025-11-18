@@ -250,10 +250,10 @@ static const int8_t goutf8_continue[256] = {A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A
  *	static void *goesc[] =
  *	{
  *		[0 ... 255] = &&l_bad,
- *		['"'] = &&l_unesc, ['\\'] = &&l_unesc,
- *		['/'] = &&l_unesc, ['b'] = &&l_unesc,
- *		['f'] = &&l_unesc, ['n'] = &&l_unesc,
- *		['r'] = &&l_unesc, ['t'] = &&l_unesc, ['u'] = &&l_unesc
+ *		['"'] = &&l_unesc, ['/'] = &&l_unesc, ['\\'] = &&l_unesc,
+ *		['a'] = &&l_unesc, ['b'] = &&l_unesc, ['f'] = &&l_unesc,
+ *      ['n'] = &&l_unesc, ['r'] = &&l_unesc, ['t'] = &&l_unesc,
+ *      ['u'] = &&l_unesc, ['v'] = &&l_unesc,
  *	};
  */
 static const int8_t goesc[256] = {A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -263,9 +263,9 @@ static const int8_t goesc[256] = {A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BA
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
-  A_BAD, A_UNESC, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_UNESC, A_BAD, A_BAD, A_BAD, A_UNESC, A_BAD,
+  A_BAD, A_UNESC, A_BAD, A_BAD, A_BAD, A_BAD, A_UNESC, A_UNESC, A_BAD, A_BAD, A_BAD, A_UNESC, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_UNESC, A_BAD, A_BAD, A_BAD, A_UNESC, A_BAD, A_UNESC,
-  A_UNESC, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
+  A_UNESC, A_UNESC, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -304,10 +304,13 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 
         case A_BAD:
             switch (*conf->cur) {
+            case '\a':
             case '\b':
+            case '\f':
             case '\n':
             case '\r':
             case '\t':
+            case '\v':
                 return (__config_err(conf, "Unexpected escaped character", EINVAL));
             default:
                 return (__config_err(conf, "Unexpected character", EINVAL));
@@ -416,11 +419,14 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
     if (conf->depth <= conf->top && key->len > 0)
         return (0);
 
-    /* We're either at the end of the string or we failed to parse. */
-    if (conf->depth == 0)
-        return (WT_NOTFOUND);
+    if (key->len == 0 && conf->go == gostring)
+        return (__config_err(conf, "Unbalanced quotes", EINVAL));
 
-    return (__config_err(conf, "Unbalanced brackets", EINVAL));
+    if (conf->depth != 0)
+        return (__config_err(conf, "Unbalanced brackets", EINVAL));
+
+    /* We're either at the end of the string or we failed to parse. */
+    return (WT_NOTFOUND);
 }
 
 /*

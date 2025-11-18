@@ -1728,7 +1728,7 @@ __wt_get_page_modify_ta(WT_SESSION_IMPL *session, WT_PAGE *page, WT_TIME_AGGREGA
  *     Free the on-disk block for a reference and clear the address.
  */
 static WT_INLINE int
-__wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref, bool page_replacement)
+__wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref, bool disagg_free_block)
 {
     WT_ADDR_COPY addr;
     WT_DECL_RET;
@@ -1739,7 +1739,7 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref, bool page_replacement
 
     if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
         WT_ERR(__wt_btree_block_free(session, addr.addr, addr.size));
-    else if (!page_replacement) {
+    else if (disagg_free_block) {
         WT_ERR(__wt_btree_block_free(session, addr.addr, addr.size));
         if (ref->page != NULL)
             ref->page->disagg_info->block_meta.page_id = WT_BLOCK_INVALID_PAGE_ID;

@@ -2658,6 +2658,9 @@ __wt_verbose_dump_txn_one(
     txn_shared = WT_SESSION_TXN_SHARED(txn_session);
     WT_ERROR_INFO *txn_err_info = &(txn_session->err_info);
 
+    if (txn == NULL || txn_shared == NULL || txn_err_info == NULL)
+        return (0);
+
     /*
      * Unless an error occurs, there's no need to print transactions without a snapshot, as they are
      * typically harmless to the database.
@@ -2741,7 +2744,7 @@ __wt_verbose_dump_txn_one(
         __wt_timestamp_to_string(txn_shared->pinned_durable_timestamp, ts_string[4]),
         __wt_timestamp_to_string(txn_shared->read_timestamp, ts_string[5]), ckpt_lsn_str,
         txn->full_ckpt ? "true" : "false", txn->flags, iso_tag, txn_err_info->err,
-        txn_err_info->sub_level_err, txn_err_info->err_msg));
+        txn_err_info->sub_level_err, txn_err_info->err_msg == NULL ? "" : txn_err_info->err_msg));
 
     /*
      * Log a message and return an error if error code and an optional error string has been passed.

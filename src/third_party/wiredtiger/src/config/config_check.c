@@ -174,7 +174,7 @@ __config_check(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int ch
         case WT_CONFIG_COMPILED_TYPE_CATEGORY:
             /* Deal with categories of the form: XXX=(XXX=blah). */
             ret = __config_check(session, check->subconfigs, check->subconfigs_entries,
-              check->subconfigs_jump, k.str + strlen(check->name) + 1, v.len);
+              check->subconfigs_jump, v.str, v.len);
             badtype = (ret == EINVAL);
             break;
         case WT_CONFIG_COMPILED_TYPE_FORMAT:

@@ -38,7 +38,7 @@ from __future__ import print_function
 import unittest
 
 from contextlib import contextmanager
-import errno, glob, os, re, shutil, sys, threading, time, traceback, types
+import errno, glob, os, re, shutil, sys, threading, time, traceback, types, shutil
 import abstract_test_case, test_result, wiredtiger, wthooks, wtscenario
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -982,6 +982,14 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         return a recno key
         """
         return i
+
+    @contextmanager
+    def temporaryDirectory(self, path, exist_ok=False):
+        os.makedirs(path, exist_ok=exist_ok)
+        try:
+            yield path
+        finally:
+            shutil.rmtree(path, ignore_errors=True)
 
 @contextmanager
 def open_cursor(session, uri: str, **kwargs):
