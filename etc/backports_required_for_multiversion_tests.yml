@@ -492,6 +492,8 @@ last-continuous:
       ticket: SERVER-113468
     - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
       ticket: SERVER-110953
+    - test_file: jstests/concurrency/fsm_workloads/timeseries/timeseries_create_indexes.js
+      ticket: SERVER-113887
   suites: null
 last-lts:
   all:
@@ -1041,4 +1043,6 @@ last-lts:
       ticket: SERVER-113468
     - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
       ticket: SERVER-110953
+    - test_file: jstests/concurrency/fsm_workloads/timeseries/timeseries_create_indexes.js
+      ticket: SERVER-113887
   suites: null
