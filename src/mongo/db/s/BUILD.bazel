@@ -78,6 +78,7 @@ mongo_cc_library(
     hdrs = [
         "balancer_stats_registry.h",
         "range_deleter_service.h",
+        "ready_range_deletions_processor.h",
         ":range_deletion_task_gen",
         "//src/mongo/db/sharding_environment:sharding_runtime_d_params.h",
     ],
@@ -689,6 +690,7 @@ mongo_cc_library(
         "range_deleter_service_op_observer.cpp",
         "range_deletion_task_gen",
         "range_deletion_util.cpp",
+        "ready_range_deletions_processor.cpp",
         "session_catalog_migration.cpp",
         "session_catalog_migration_destination.cpp",
         "session_catalog_migration_source.cpp",
@@ -798,6 +800,7 @@ mongo_cc_library(
         "range_deleter_service.h",
         "range_deleter_service_op_observer.h",
         "range_deletion_util.h",
+        "ready_range_deletions_processor.h",
         "session_catalog_migration.h",
         "session_catalog_migration_destination.h",
         "session_catalog_migration_source.h",
