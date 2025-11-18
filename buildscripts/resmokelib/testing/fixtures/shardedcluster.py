@@ -8,6 +8,7 @@ import pymongo
 import pymongo.errors
 import yaml
 
+from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.extensions import (
     delete_extension_configs,
     find_and_generate_extension_configs,
@@ -641,9 +642,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def get_mongos_kwargs(self):
         """Return options that may be passed to a mongos."""
         mongos_options = self.mongos_options.copy()
-        # This will be assigned at ShardedClusterFixture.setup() time, after ensuring that the config server
-        # is running.
-        mongos_options["configdb"] = None
+        if _config.DOCKER_COMPOSE_BUILD_IMAGES:
+            # Suites generating Docker Compose resources need to retrieve the connection string to the config server
+            # while constructing this fixture.
+            mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
+        else:
+            # Regular test suite execution: the connection string will be assigned at ShardedClusterFixture.setup() time,
+            # after ensuring that the stack of nodes and services backing the config server replica set has been correctly started.
+            mongos_options["configdb"] = None
         if self.config_shard is not None:
             if "set_parameters" not in mongos_options:
                 mongos_options["set_parameters"] = {}
