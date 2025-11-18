@@ -78,10 +78,11 @@ public:
 class LocalCappedInsertNotifier final : public Notifier {
 public:
     LocalCappedInsertNotifier(std::shared_ptr<CappedInsertNotifier> notifier)
-        : _notifier(std::move(notifier)) {}
+        : _notifier(std::move(notifier)) {
+        tassert(11321505, "notifier must not be null", _notifier);
+    }
 
     void prepareForWait(OperationContext* opCtx) final {
-        invariant(_notifier);
         _currentVersion = _notifier->getVersion();
     }
 
@@ -109,7 +110,7 @@ public:
     // Computes the OpTime to wait on by incrementing the current read timestamp.
     void prepareForWait(OperationContext* opCtx) final {
         auto readTs = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
-        invariant(readTs);
+        tassert(11321506, "readTs must not be none", readTs);
         _opTimeToBeMajorityCommitted =
             repl::OpTime(*readTs + 1, repl::ReplicationCoordinator::get(opCtx)->getTerm());
     }

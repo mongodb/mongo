@@ -69,7 +69,11 @@ bool shouldWaitForInserts(OperationContext* opCtx,
     // we should wait for inserts.
     if (shouldListenForInserts(opCtx, cq)) {
         // We expect awaitData cursors to be yielding.
-        invariant(yieldPolicy->canReleaseLocksDuringExecution());
+        tassert(
+            11321502,
+            fmt::format("Cannot create notifier with non-yielding PlanYieldPolicy::YieldPolicy {}",
+                        static_cast<int>(yieldPolicy->getPolicy())),
+            yieldPolicy->canReleaseLocksDuringExecution());
 
         // For operations with a last committed opTime, we are fetching oplog entries and should not
         // wait if the replication coordinator's lastCommittedOpTime has progressed past the
@@ -89,7 +93,10 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   PlanYieldPolicy* yieldPolicy) {
     // We don't expect to need a capped insert notifier for non-yielding plans.
-    invariant(yieldPolicy->canReleaseLocksDuringExecution());
+    tassert(11321503,
+            fmt::format("Cannot create notifier with non-yielding PlanYieldPolicy::YieldPolicy {}",
+                        static_cast<int>(yieldPolicy->getPolicy())),
+            yieldPolicy->canReleaseLocksDuringExecution());
 
     // In case of the read concern majority, return a majority committed point notifier, otherwise,
     // a notifier associated with that capped collection
@@ -102,8 +109,7 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
     } else {
         auto collCatalog = CollectionCatalog::get(opCtx);  // NOLINT TODO SERVER-112937 Remove this.
         auto collection = collCatalog->lookupCollectionByNamespace(opCtx, nss);
-        invariant(collection);
-
+        tassert(11321504, "collection must not be null", collection);
         return std::make_unique<LocalCappedInsertNotifier>(
             collection->getRecordStore()->capped()->getInsertNotifier());
     }

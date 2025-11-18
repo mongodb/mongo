@@ -70,10 +70,10 @@ namespace {
 
 CoreIndexInfo indexInfoFromIndexCatalogEntry(std::shared_ptr<const IndexCatalogEntry> ice) {
     auto desc = ice->descriptor();
-    invariant(desc);
+    tassert(11321500, "Index catalog entry descriptor must not be null", desc);
 
     auto accessMethod = ice->accessMethod();
-    invariant(accessMethod);
+    tassert(11321501, "Index catalog entry access method must not be null", accessMethod);
 
     const WildcardProjection* projExec = nullptr;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
