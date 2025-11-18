@@ -34,28 +34,25 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_contract_guard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/security_token_authentication_guard.h"
-#include "mongo/db/auth/user_acquisition_stats.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/curop.h"
@@ -64,7 +61,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/default_max_time_ms_cluster_parameter.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/initialize_operation_session_info.h"
@@ -97,7 +93,6 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role_helpers.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -131,7 +126,6 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_client_session.h"
 #include "mongo/rpc/op_msg.h"
@@ -139,39 +133,27 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
-#include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/hello_metrics.h"
-#include "mongo/transport/service_executor.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/future_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <mutex>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -186,7 +168,6 @@
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 
@@ -1225,16 +1206,21 @@ void RunCommandImpl::_epilogue() {
                 requestMatchesComment;
         });
 
-    service_entry_point_shard_role_helpers::waitForLinearizableReadConcern(opCtx);
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+        repl::ReadConcernLevel::kLinearizableReadConcern) {
+        uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx, Milliseconds::zero()));
+    }
 
-    // Wait for data to satisfy the read concern level, if necessary.
-    service_entry_point_shard_role_helpers::waitForSpeculativeMajorityReadConcern(opCtx);
+    if (auto speculativeReadInfo = repl::SpeculativeMajorityReadInfo::get(opCtx);
+        speculativeReadInfo.isSpeculativeRead()) {
+        uassertStatusOK(mongo::waitForSpeculativeMajorityReadConcern(opCtx, speculativeReadInfo));
+    }
 
     {
         auto body = replyBuilder->getBodyBuilder();
         auto status = CommandHelpers::extractOrAppendOkAndGetStatus(body);
         _ok = status.isOK();
-        service_entry_point_shard_role_helpers::attachCurOpErrInfo(opCtx, status);
+        CurOp::get(opCtx)->debug().errInfo = status;
 
         boost::optional<ErrorCodes::Error> code =
             _ok ? boost::none : boost::optional<ErrorCodes::Error>(status.code());
@@ -2336,7 +2322,7 @@ void HandleRequest::completeOperation(DbResponse& response) {
             LOGV2_DEBUG(21970, 1, "Note: not profiling because of recursive read lock");
         } else if (executionContext.client().isInDirectClient()) {
             LOGV2_DEBUG(21971, 1, "Note: not profiling because we are in DBDirectClient");
-        } else if (service_entry_point_shard_role_helpers::lockedForWriting()) {
+        } else if (lockedForWriting()) {
             LOGV2_DEBUG(21972, 1, "Note: not profiling because doing fsync+lock");
         } else if (opCtx->readOnly()) {
             LOGV2_DEBUG(21973, 1, "Note: not profiling because server is read-only");
