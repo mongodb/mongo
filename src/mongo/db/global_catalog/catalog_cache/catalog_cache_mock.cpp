@@ -30,6 +30,7 @@
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache_mock.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/global_catalog/catalog_cache/config_server_catalog_cache_loader_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
 

@@ -46,6 +46,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/read_through_cache.h"
 
@@ -62,14 +63,15 @@ namespace mongo {
 
 class ComparableDatabaseVersion;
 
-using DatabaseTypeCache = ReadThroughCache<DatabaseName,
-                                           DatabaseType,
-                                           ComparableDatabaseVersion,
-                                           ObservableMutex<stdx::mutex>>;
-using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
-using CachedDatabaseInfo = DatabaseTypeValueHandle;
+using DatabaseTypeCache MONGO_MOD_PRIVATE = ReadThroughCache<DatabaseName,
+                                                             DatabaseType,
+                                                             ComparableDatabaseVersion,
+                                                             ObservableMutex<stdx::mutex>>;
+using DatabaseTypeValueHandle MONGO_MOD_USE_REPLACEMENT(CachedDatabaseInfo) =
+    DatabaseTypeCache::ValueHandle;
+using CachedDatabaseInfo MONGO_MOD_PUBLIC = DatabaseTypeValueHandle;
 
-class CollectionRoutingInfo {
+class MONGO_MOD_PUBLIC CollectionRoutingInfo {
 public:
     CollectionRoutingInfo(ChunkManager&& chunkManager, CachedDatabaseInfo&& dbInfo)
         : _dbInfo(std::move(dbInfo)), _cm(std::move(chunkManager)) {}
@@ -119,7 +121,7 @@ private:
  *  - a sequence number to allow for forced catalog cache refreshes
  *  - a sequence number to disambiguate scenarios in which the DatabaseVersion isn't valid
  */
-class ComparableDatabaseVersion {
+class MONGO_MOD_PARENT_PRIVATE ComparableDatabaseVersion {
 public:
     /**
      * Creates a ComparableDatabaseVersion that wraps the given DatabaseVersion.
@@ -196,7 +198,7 @@ private:
  * in the sense that it only reads from the persistent store, but never writes to it. Instead
  * writes happen through the ShardingCatalogManager and the cache hierarchy needs to be invalidated.
  */
-class CatalogCache {
+class MONGO_MOD_PUBLIC CatalogCache {
     CatalogCache(const CatalogCache&) = delete;
     CatalogCache& operator=(const CatalogCache&) = delete;
 
@@ -482,7 +484,7 @@ private:
  *
  * This is only meant to be used for inconsistency-recovery situations.
  */
-class RouterRelaxCollectionUUIDConsistencyCheckBlock {
+class MONGO_MOD_NEEDS_REPLACEMENT RouterRelaxCollectionUUIDConsistencyCheckBlock {
 public:
     RouterRelaxCollectionUUIDConsistencyCheckBlock(OperationContext* opCtx);
     RouterRelaxCollectionUUIDConsistencyCheckBlock(

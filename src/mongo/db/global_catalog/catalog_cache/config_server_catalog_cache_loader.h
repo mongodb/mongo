@@ -29,22 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache_loader.h"
-#include "mongo/db/global_catalog/type_database_gen.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
-
-#include <memory>
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class ConfigServerCatalogCacheLoader : public CatalogCacheLoader {
-public:
-    ~ConfigServerCatalogCacheLoader() override = default;
-};
+class MONGO_MOD_PARENT_PRIVATE ConfigServerCatalogCacheLoader : public CatalogCacheLoader {};
 
 }  // namespace mongo

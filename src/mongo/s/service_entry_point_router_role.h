@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * The entry point from the TransportLayer into Mongos.
  */
-class ServiceEntryPointRouterRole final : public ServiceEntryPoint {
+class MONGO_MOD_PUBLIC ServiceEntryPointRouterRole final : public ServiceEntryPoint {
 public:
     static Future<DbResponse> handleRequestImpl(OperationContext* opCtx,
                                                 const Message& request,

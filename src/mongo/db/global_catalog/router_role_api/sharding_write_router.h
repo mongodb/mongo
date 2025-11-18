@@ -36,13 +36,18 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-class ShardingWriteRouter {
+/**
+ * TODO (SERVER-113356): This class should go away once resharding stops relying on the
+ * destinedRecipient oplog field.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingWriteRouter {
 public:
     ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss);
 

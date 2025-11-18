@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/global_catalog/catalog_cache/config_server_catalog_cache_loader.h"
 #include "mongo/db/global_catalog/catalog_cache/namespace_metadata_change_notifications.h"
 #include "mongo/db/global_catalog/catalog_cache/shard_server_catalog_cache_loader.h"
@@ -44,6 +43,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <list>
@@ -68,7 +68,8 @@ namespace mongo {
  * copy of that chunk metadata so shard secondaries can access the metadata. If a shard secondary,
  * retrieves chunk metadata from the shard persisted chunk metadata.
  */
-class ShardServerCatalogCacheLoaderImpl : public ShardServerCatalogCacheLoader {
+class MONGO_MOD_PARENT_PRIVATE ShardServerCatalogCacheLoaderImpl
+    : public ShardServerCatalogCacheLoader {
     ShardServerCatalogCacheLoaderImpl(const ShardServerCatalogCacheLoaderImpl&) = delete;
     ShardServerCatalogCacheLoaderImpl& operator=(const ShardServerCatalogCacheLoaderImpl&) = delete;
 

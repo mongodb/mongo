@@ -36,13 +36,23 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
 
 namespace mongo {
 
-class ShardCannotRefreshDueToLocksHeldInfo final : public ErrorExtraInfo {
+/**
+ * This exception is a workaround for the cases where switch from Shard to Router Role happens
+ * without releasing/stashing Shard Role's transaction resources (locks, recovery unit, etc). No new
+ * usages (throwers or catchers) should be added without consultation with the Shard Local Catalog
+ * Team (CAR).
+ *
+ * TODO (SERVER-113356): This exception needs to be removed.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT ShardCannotRefreshDueToLocksHeldInfo final
+    : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::ShardCannotRefreshDueToLocksHeld;
 
@@ -64,7 +74,7 @@ private:
     const NamespaceString _nss;
 };
 
-using ShardCannotRefreshDueToLocksHeldException =
+using ShardCannotRefreshDueToLocksHeldException MONGO_MOD_NEEDS_REPLACEMENT =
     ExceptionFor<ErrorCodes::ShardCannotRefreshDueToLocksHeld>;
 
 }  // namespace mongo

@@ -42,6 +42,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -49,7 +50,7 @@ namespace mongo {
 namespace sharding {
 namespace router {
 
-class RouterBase {
+class MONGO_MOD_PRIVATE RouterBase {
 protected:
     RouterBase(CatalogCache* catalogCache);
 
@@ -71,7 +72,7 @@ protected:
  * This class should mostly be used for routing of DDL operations which need to be coordinated from
  * the primary shard of the database.
  */
-class DBPrimaryRouter : public RouterBase {
+class MONGO_MOD_PUBLIC DBPrimaryRouter final : public RouterBase {
 public:
     DBPrimaryRouter(ServiceContext* service, const DatabaseName& db);
 
@@ -106,7 +107,7 @@ private:
 /**
  * Class which contains logic common to routers which target one or more collections.
  */
-class CollectionRouterCommon : public RouterBase {
+class MONGO_MOD_PRIVATE CollectionRouterCommon : public RouterBase {
 protected:
     CollectionRouterCommon(CatalogCache* catalogCache,
                            const std::vector<NamespaceString>& routingNamespaces);
@@ -125,7 +126,7 @@ protected:
  * This class should mostly be used for routing CRUD operations which need to have a view of the
  * entire routing table for a collection.
  */
-class CollectionRouter : public CollectionRouterCommon {
+class MONGO_MOD_PUBLIC CollectionRouter final : public CollectionRouterCommon {
 public:
     CollectionRouter(ServiceContext* service, NamespaceString nss);
 
@@ -171,7 +172,7 @@ private:
     }
 };
 
-class MultiCollectionRouter : public CollectionRouterCommon {
+class MONGO_MOD_PUBLIC MultiCollectionRouter final : public CollectionRouterCommon {
 public:
     MultiCollectionRouter(ServiceContext* service, const std::vector<NamespaceString>& nssList);
 

@@ -37,6 +37,11 @@ structs:
     GossipedRoutingCache:
         description: Gossip metadata related to a node's collection routing table cache version.
         strict: false
+        # TODO (SERVER-113356): This structure is private for the catalog_and_routing.router_role module, but due
+        # to the way the service entry point is organized, it needs to know the names of the
+        # fields of each subsystem, even if they are private. There should be a better way to
+        # achieve this that's not exposing private details of the module.
+        mod_visibility: needs_replacement
         fields:
             nss:
                 description: The collection this gossip relates to.

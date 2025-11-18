@@ -31,18 +31,16 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/global_catalog/catalog_cache/config_server_catalog_cache_loader.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 #include <vector>
@@ -57,14 +55,14 @@ namespace mongo {
  * Mocks the metadata refresh results with settable return values. The purpose of this class is to
  * facilitate testing of classes that use a ConfigServerCatalogCacheLoader.
  */
-class ConfigServerCatalogCacheLoaderMock final : public ConfigServerCatalogCacheLoader {
+class MONGO_MOD_NEEDS_REPLACEMENT ConfigServerCatalogCacheLoaderMock final
+    : public ConfigServerCatalogCacheLoader {
     ConfigServerCatalogCacheLoaderMock(const ConfigServerCatalogCacheLoaderMock&) = delete;
     ConfigServerCatalogCacheLoaderMock& operator=(const ConfigServerCatalogCacheLoaderMock&) =
         delete;
 
 public:
     ConfigServerCatalogCacheLoaderMock() = default;
-    ~ConfigServerCatalogCacheLoaderMock() override = default;
 
     void shutDown() override;
 

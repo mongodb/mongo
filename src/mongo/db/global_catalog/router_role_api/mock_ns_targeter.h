@@ -32,15 +32,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/router_role_api/ns_targeter.h"
-#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
-#include <set>
 #include <vector>
+
+// TODO (SERVER-113356): The NSTargeter(s) hierarchy is a mixture of router role and query-specific
+// canonicalization logic. It needs to be decomposed into these parts and removed.
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ namespace mongo {
  * A MockRange represents a range with endpoint that a MockNSTargeter uses to direct writes to
  * a particular endpoint.
  */
-struct MockRange {
+struct MONGO_MOD_NEEDS_REPLACEMENT MockRange {
     MockRange(const ShardEndpoint& endpoint, const BSONObj& minKey, const BSONObj& maxKey)
         : endpoint(endpoint), range(minKey, maxKey) {}
 
@@ -62,7 +63,7 @@ struct MockRange {
  *
  * No refreshing behavior is currently supported.
  */
-class MockNSTargeter : public NSTargeter {
+class MONGO_MOD_OPEN MockNSTargeter : public NSTargeter {
 public:
     MockNSTargeter(const NamespaceString& nss, std::vector<MockRange> mockRanges);
 
@@ -192,6 +193,7 @@ private:
     bool _isTrackedTimeSeriesNamespace = false;
 };
 
-void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB);
+MONGO_MOD_NEEDS_REPLACEMENT void assertEndpointsEqual(const ShardEndpoint& endpointA,
+                                                      const ShardEndpoint& endpointB);
 
 }  // namespace mongo

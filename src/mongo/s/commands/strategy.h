@@ -31,13 +31,14 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/request_execution_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * Legacy interface for processing client read/write/cmd requests.
  */
-class Strategy {
+class MONGO_MOD_PARENT_PRIVATE Strategy {
 public:
     /**
      * Executes a command from either OP_QUERY or OP_MSG wire protocols.

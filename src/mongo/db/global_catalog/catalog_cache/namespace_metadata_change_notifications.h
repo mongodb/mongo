@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <map>
@@ -44,12 +45,10 @@
 
 namespace mongo {
 
-class OperationContext;
-
 /**
  * Map of one-snot notifications for changes to a particular namespace.
  */
-class NamespaceMetadataChangeNotifications {
+class MONGO_MOD_PRIVATE NamespaceMetadataChangeNotifications {
     NamespaceMetadataChangeNotifications(const NamespaceMetadataChangeNotifications&) = delete;
     NamespaceMetadataChangeNotifications& operator=(const NamespaceMetadataChangeNotifications&) =
         delete;

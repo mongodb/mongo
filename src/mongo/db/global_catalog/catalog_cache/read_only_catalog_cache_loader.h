@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/global_catalog/catalog_cache/config_server_catalog_cache_loader_impl.h"
 #include "mongo/db/global_catalog/catalog_cache/shard_server_catalog_cache_loader.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
@@ -37,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -45,7 +45,8 @@ namespace mongo {
  * return, rather than invariant, so this class can be plugged into the shard server for read-only
  * mode, where persistence should not be attempted.
  */
-class ReadOnlyCatalogCacheLoader final : public ShardServerCatalogCacheLoader {
+class MONGO_MOD_NEEDS_REPLACEMENT ReadOnlyCatalogCacheLoader final
+    : public ShardServerCatalogCacheLoader {
 public:
     ReadOnlyCatalogCacheLoader() = default;
     ~ReadOnlyCatalogCacheLoader() override;

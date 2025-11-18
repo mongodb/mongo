@@ -42,6 +42,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
@@ -58,7 +59,7 @@ namespace mongo {
  * The ServerRole-independent core of `RouterCatalogCacheTestFixture` and its
  * `ShardCatalogCacheTestFixture` counterpart.
  */
-class CoreCatalogCacheTestFixture : public ShardingTestFixture {
+class MONGO_MOD_NEEDS_REPLACEMENT CoreCatalogCacheTestFixture : public ShardingTestFixture {
 protected:
     CoreCatalogCacheTestFixture()
         : ShardingTestFixture(false,  // No mock catalog cache
@@ -182,13 +183,15 @@ protected:
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };
 
-class RouterCatalogCacheTestFixture : public virtual service_context_test::RouterRoleOverride,
-                                      public CoreCatalogCacheTestFixture {
+class MONGO_MOD_OPEN RouterCatalogCacheTestFixture
+    : public virtual service_context_test::RouterRoleOverride,
+      public CoreCatalogCacheTestFixture {
     using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;
 };
 
-class ShardCatalogCacheTestFixture : public virtual service_context_test::ShardRoleOverride,
-                                     public CoreCatalogCacheTestFixture {
+class MONGO_MOD_OPEN ShardCatalogCacheTestFixture
+    : public virtual service_context_test::ShardRoleOverride,
+      public CoreCatalogCacheTestFixture {
     using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;
 };
 

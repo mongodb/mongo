@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/s/write_ops/write_command_ref.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -60,8 +61,11 @@ namespace mongo {
  * error handling.
  *
  * The interface must not be used from multiple threads.
+ *
+ * TODO (SERVER-113356): The NSTargeter(s) hierarchy is a mixture of router role and query-specific
+ * canonicalization logic. It needs to be decomposed into these parts and removed.
  */
-class NSTargeter {
+class MONGO_MOD_NEEDS_REPLACEMENT NSTargeter {
 public:
     struct TargetingResult {
         TargetingResult() = default;

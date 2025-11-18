@@ -40,7 +40,6 @@
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
-#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -53,6 +52,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -62,6 +62,8 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace cluster::unsplittable {

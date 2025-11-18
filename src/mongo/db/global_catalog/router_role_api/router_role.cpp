@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/global_catalog/router_role_api/router_role.h"
 
 #include "mongo/base/error_codes.h"

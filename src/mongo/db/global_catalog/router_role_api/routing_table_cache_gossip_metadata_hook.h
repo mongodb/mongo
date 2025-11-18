@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -44,8 +45,11 @@ namespace rpc {
 /**
  * Metadata hook that gossips-in sharding collection routing table versions from the metadata
  * reported on shard responses.
+ *
+ * TODO (SERVER-113356): Find a better way to install hooks on the network subsystem that doesn't
+ * involve exposing private implementation details of the module.
  */
-class RoutingTableCacheGossipMetadataHook : public EgressMetadataHook {
+class MONGO_MOD_NEEDS_REPLACEMENT RoutingTableCacheGossipMetadataHook : public EgressMetadataHook {
 public:
     RoutingTableCacheGossipMetadataHook(ServiceContext* serviceContext);
     ~RoutingTableCacheGossipMetadataHook() override = default;

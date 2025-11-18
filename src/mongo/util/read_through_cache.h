@@ -44,7 +44,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/invalidating_lru_cache.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -65,7 +65,7 @@ namespace mongo {
 /**
  * Serves as a container of the non-templatised parts of the ReadThroughCache class below.
  */
-class ReadThroughCacheBase {
+class MONGO_MOD_PRIVATE ReadThroughCacheBase {
     ReadThroughCacheBase(const ReadThroughCacheBase&) = delete;
     ReadThroughCacheBase& operator=(const ReadThroughCacheBase&) = delete;
 
@@ -120,7 +120,7 @@ private:
 };
 
 template <typename Result, typename Key, typename Value, typename Time, typename... LookupArgs>
-struct ReadThroughCacheLookup {
+struct MONGO_MOD_OPEN ReadThroughCacheLookup {
     using Fn = unique_function<Result(OperationContext*,
                                       const Key&,
                                       const Value& cachedValue,
@@ -129,7 +129,8 @@ struct ReadThroughCacheLookup {
 };
 
 template <typename Result, typename Key, typename Value, typename... LookupArgs>
-struct ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent, LookupArgs...> {
+struct MONGO_MOD_OPEN
+    ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent, LookupArgs...> {
     using Fn = unique_function<Result(
         OperationContext*, const Key&, const Value& cachedValue, const LookupArgs... lookupArgs)>;
 };

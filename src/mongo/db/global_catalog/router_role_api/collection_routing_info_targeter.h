@@ -31,9 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/oid.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
@@ -45,14 +43,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
-#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/modules.h"
 
-#include <map>
-#include <set>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -67,8 +61,11 @@ namespace mongo {
  * returns NamespaceNotFound status on applicable failures.
  *
  * Must be initialized before use, and initialization may fail.
+ *
+ * TODO (SERVER-113356): The NSTargeter(s) hierarchy is a mixture of router role and query-specific
+ * canonicalization logic. It needs to be decomposed into these parts and removed.
  */
-class CollectionRoutingInfoTargeter : public NSTargeter {
+class MONGO_MOD_NEEDS_REPLACEMENT CollectionRoutingInfoTargeter final : public NSTargeter {
 public:
     enum class LastErrorType {
         kCouldNotTarget,

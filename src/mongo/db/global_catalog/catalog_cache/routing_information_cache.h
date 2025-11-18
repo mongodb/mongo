@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -40,8 +41,7 @@ namespace mongo {
  * TODO (SERVER-97261): Delete this file and replace usages with the dedicated CatalogCache for
  * routing information.
  */
-class RoutingInformationCache : public CatalogCache {
-
+class MONGO_MOD_NEEDS_REPLACEMENT RoutingInformationCache : public CatalogCache {
 public:
     RoutingInformationCache(ServiceContext* serviceCtx);
 

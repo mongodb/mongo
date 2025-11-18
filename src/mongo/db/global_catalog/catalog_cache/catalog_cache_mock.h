@@ -32,15 +32,14 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
-#include "mongo/db/global_catalog/catalog_cache/config_server_catalog_cache_loader_mock.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -48,7 +47,7 @@ namespace mongo {
  * Mocks the metadata refresh results with settable return values. The purpose of this class is to
  * facilitate testing of classes that use a CatalogCacheLoader.
  */
-class CatalogCacheMock : public CatalogCache {
+class MONGO_MOD_OPEN CatalogCacheMock : public CatalogCache {
     CatalogCacheMock(const CatalogCacheMock&) = delete;
     CatalogCacheMock& operator=(const CatalogCacheMock&) = delete;
 

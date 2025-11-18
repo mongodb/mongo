@@ -31,8 +31,7 @@
 
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache_loader.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -44,7 +43,7 @@ namespace mongo {
  * copy of that chunk metadata so shard secondaries can access the metadata. If a shard secondary,
  * retrieves chunk metadata from the shard persisted chunk metadata.
  */
-class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
+class MONGO_MOD_PARENT_PRIVATE ShardServerCatalogCacheLoader : public CatalogCacheLoader {
 public:
     ~ShardServerCatalogCacheLoader() override = default;
 

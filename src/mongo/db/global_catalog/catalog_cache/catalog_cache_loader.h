@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -37,16 +36,13 @@
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-#include <functional>
-#include <memory>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -58,7 +54,7 @@ namespace mongo {
  * Interface through which the sharding catalog cache requests the set of changed chunks to be
  * retrieved from the persisted metadata store.
  */
-class CatalogCacheLoader {
+class MONGO_MOD_PARENT_PRIVATE CatalogCacheLoader {
 public:
     virtual ~CatalogCacheLoader();
 
