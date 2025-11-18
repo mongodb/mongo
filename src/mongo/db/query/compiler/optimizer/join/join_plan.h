@@ -28,7 +28,9 @@
  */
 #pragma once
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 
 namespace mongo::join_ordering {
 
@@ -89,15 +91,13 @@ enum class JoinMethod {
 };
 
 /**
- * The types of base collection accesses we support in JoinPlans.
- */
-enum class ScanMethod { COLLSCAN, IXSCAN };
-
-/**
- * A JoinPlan node representing a collection access.
+ * A JoinPlan node representing a base collection access.
  */
 struct BaseNode {
-    const ScanMethod method;
+    // Pointer to best access path obtained by CBR.
+    const QuerySolution* soln;
+    // Namespace this access path corresponds to.
+    const NamespaceString& nss;
 
     // Keeps a copy of the bitset representing the subgraph this originated from.
     const NodeSet bitset;
@@ -143,7 +143,9 @@ public:
                                     JoinMethod method,
                                     JoinPlanNodeId left,
                                     JoinPlanNodeId right);
-    JoinPlanNodeId registerBaseNode(const JoinSubset& subset, ScanMethod method);
+    JoinPlanNodeId registerBaseNode(const JoinSubset& subset,
+                                    const QuerySolution* soln,
+                                    const NamespaceString& nss);
 
     const JoinPlanNode& get(JoinPlanNodeId id) const {
         return _allJoinPlans[id];

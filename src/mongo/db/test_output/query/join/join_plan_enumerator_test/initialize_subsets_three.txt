@@ -11,61 +11,61 @@ Output plans (best plan 0):
  -> left:
     [011] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
  -> right:
-    [100] COLLSCAN
+    [100][test.nss2] COLLSCAN
 
 1.[111] NLJ
  -> left:
     [011] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
  -> right:
-    [100] COLLSCAN
+    [100][test.nss2] COLLSCAN
 
 2.[111] HJ
  -> left:
     [101] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
  -> right:
-    [010] COLLSCAN
+    [010][test.nss1] COLLSCAN
 
 3.[111] NLJ
  -> left:
     [101] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
  -> right:
-    [010] COLLSCAN
+    [010][test.nss1] COLLSCAN
 
 4.[111] HJ
  -> left:
     [110] HJ
      -> left:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
  -> right:
-    [001] COLLSCAN
+    [001][test.nss0] COLLSCAN
 
 5.[111] NLJ
  -> left:
     [110] HJ
      -> left:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
  -> right:
-    [001] COLLSCAN
+    [001][test.nss0] COLLSCAN
 
 RIGHT DEEP, 3 Nodes
 Level 0:
@@ -78,61 +78,61 @@ Level 2:
 Output plans (best plan 0):
 0.[111] HJ
  -> left:
-    [100] COLLSCAN
+    [100][test.nss2] COLLSCAN
  -> right:
     [011] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
 
 1.[111] NLJ
  -> left:
-    [100] COLLSCAN
+    [100][test.nss2] COLLSCAN
  -> right:
     [011] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
 
 2.[111] HJ
  -> left:
-    [010] COLLSCAN
+    [010][test.nss1] COLLSCAN
  -> right:
     [101] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
 
 3.[111] NLJ
  -> left:
-    [010] COLLSCAN
+    [010][test.nss1] COLLSCAN
  -> right:
     [101] HJ
      -> left:
-        [001] COLLSCAN
+        [001][test.nss0] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
 
 4.[111] HJ
  -> left:
-    [001] COLLSCAN
+    [001][test.nss0] COLLSCAN
  -> right:
     [110] HJ
      -> left:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
 
 5.[111] NLJ
  -> left:
-    [001] COLLSCAN
+    [001][test.nss0] COLLSCAN
  -> right:
     [110] HJ
      -> left:
-        [010] COLLSCAN
+        [010][test.nss1] COLLSCAN
      -> right:
-        [100] COLLSCAN
+        [100][test.nss2] COLLSCAN
 

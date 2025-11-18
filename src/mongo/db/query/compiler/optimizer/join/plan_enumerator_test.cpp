@@ -38,8 +38,6 @@
 
 namespace mongo::join_ordering {
 
-unittest::GoldenTestConfig config("src/mongo/db/test_output/query/join");
-
 TEST(PlanEnumeratorHelpers, CombinationsEdgeCases) {
     ASSERT_EQ(1, combinations(0, 0));
     ASSERT_EQ(0, combinations(0, -1));
@@ -86,18 +84,68 @@ DEATH_TEST(PlanEnumeratorHelpers, TooManyInvocationsOfCombinationSequence, "1098
     cs.next();  // tasserts
 }
 
-TEST(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
+class JoinPlanEnumeratorTest : public JoinOrderingTestFixture {
+public:
+    JoinPlanEnumeratorTest() : config{"src/mongo/db/test_output/query/join"} {}
+
+    void initGraph(size_t numNodes) {
+        for (size_t i = 0; i < numNodes; i++) {
+            auto nss =
+                NamespaceString::createNamespaceString_forTest("test", str::stream() << "nss" << i);
+            std::string fieldName = str::stream() << "a" << i;
+            auto filterBSON = BSON(fieldName << BSON("$gt" << 0));
+            auto cq = makeCanonicalQuery(nss, filterBSON);
+            solnsPerQuery.insert(
+                {cq.get(), makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone())});
+            graph.addNode(nss, std::move(cq), boost::none);
+        }
+    }
+
+    void testLargeSubset(unittest::GoldenTestContext* goldenCtx,
+                         PlanTreeShape shape,
+                         size_t numNodes) {
+        initGraph(numNodes);
+
+        for (size_t i = 1; i < numNodes; ++i) {
+            // Make the graph fully connected in order to ensure we generate as many plans as
+            // possible.
+            for (size_t j = 0; j < i; ++j) {
+                graph.addSimpleEqualityEdge((NodeId)j, (NodeId)i, 0, 1);
+            }
+        }
+
+        PlanEnumeratorContext ctx{graph, solnsPerQuery};
+        ctx.enumerateJoinSubsets(shape);
+        ASSERT_EQ(numNodes, ctx.getSubsets(0).size());
+        for (size_t k = 1; k < numNodes; ++k) {
+            // The expected number of subsets for the k'th level is N choose k+1 (binomial
+            // coefficient).
+            size_t expectedLevelSize = combinations(numNodes, k + 1);
+            auto& subsets = ctx.getSubsets(k);
+            ASSERT_EQ(expectedLevelSize, subsets.size());
+            for (auto&& s : subsets) {
+                ASSERT_EQ(k + 1, s.subset.count());
+            }
+        }
+
+        if (goldenCtx) {
+            goldenCtx->outStream() << ctx.toString() << std::endl;
+        }
+    }
+
+    unittest::GoldenTestConfig config;
+    QuerySolutionMap solnsPerQuery;
+    JoinGraph graph;
+};
+
+TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     unittest::GoldenTestContext goldenCtx(&config);
 
-    JoinGraph graph;
-    auto id1 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
-    auto id2 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
-    graph.addSimpleEqualityEdge(id1, id2, 0, 1);
+    initGraph(2);
+    graph.addSimpleEqualityEdge((NodeId)0, (NodeId)1, 0, 1);
 
     {
-        PlanEnumeratorContext ctx{graph};
+        PlanEnumeratorContext ctx{graph, solnsPerQuery};
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -114,7 +162,7 @@ TEST(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     }
 
     {
-        PlanEnumeratorContext ctx{graph};
+        PlanEnumeratorContext ctx{graph, solnsPerQuery};
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -131,22 +179,16 @@ TEST(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     }
 }
 
-TEST(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
+TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     unittest::GoldenTestContext goldenCtx(&config);
 
-    JoinGraph graph;
-    auto id1 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
-    auto id2 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
-    auto id3 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("c"), nullptr, boost::none);
-    graph.addSimpleEqualityEdge(id1, id2, 0, 1);
-    graph.addSimpleEqualityEdge(id1, id3, 0, 2);
-    graph.addSimpleEqualityEdge(id2, id3, 1, 2);
+    initGraph(3);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(2), 0, 2);
+    graph.addSimpleEqualityEdge(NodeId(1), NodeId(2), 1, 2);
 
     {
-        PlanEnumeratorContext ctx{graph};
+        PlanEnumeratorContext ctx{graph, solnsPerQuery};
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -170,7 +212,7 @@ TEST(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     }
 
     {
-        PlanEnumeratorContext ctx{graph};
+        PlanEnumeratorContext ctx{graph, solnsPerQuery};
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -194,21 +236,15 @@ TEST(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     }
 }
 
-TEST(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
+TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
     unittest::GoldenTestContext goldenCtx(&config);
 
-    JoinGraph graph;
-    auto id1 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("a"), nullptr, boost::none);
-    auto id2 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("b"), nullptr, boost::none);
-    auto id3 =
-        graph.addNode(NamespaceString::createNamespaceString_forTest("c"), nullptr, boost::none);
-    graph.addSimpleEqualityEdge(id1, id2, 0, 1);
-    graph.addSimpleEqualityEdge(id1, id3, 0, 2);
+    initGraph(3);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(2), 0, 2);
 
     {
-        PlanEnumeratorContext ctx{graph};
+        PlanEnumeratorContext ctx{graph, solnsPerQuery};
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -232,7 +268,7 @@ TEST(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
     }
 
     {
-        PlanEnumeratorContext ctx{graph};
+        PlanEnumeratorContext ctx{graph, solnsPerQuery};
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -256,47 +292,17 @@ TEST(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
     }
 }
 
-void testLargeSubset(unittest::GoldenTestContext* goldenCtx, PlanTreeShape shape, int numNodes) {
-    // Pick large enough number of nodes to exercise the enumeration code while small enough that
-    // the test can finish in a reasonable amount of time.
-    JoinGraph graph;
-    for (int i = 0; i < numNodes; ++i) {
-        auto id =
-            graph.addNode(NamespaceString::createNamespaceString_forTest(""), nullptr, boost::none);
-        // Make the graph fully connected in order to ensure we generate as many plans as possible.
-        for (size_t j = 0; j < graph.numNodes() - 1; ++j) {
-            graph.addSimpleEqualityEdge((NodeId)j, id, 0, 1);
-        }
-    }
-    PlanEnumeratorContext ctx{graph};
-    ctx.enumerateJoinSubsets(shape);
-    ASSERT_EQ(numNodes, ctx.getSubsets(0).size());
-    for (int k = 1; k < numNodes; ++k) {
-        // The expected number of subsets for the k'th level is N choose k+1 (binomial coefficient).
-        int expectedLevelSize = combinations(numNodes, k + 1);
-        auto& subsets = ctx.getSubsets(k);
-        ASSERT_EQ(expectedLevelSize, subsets.size());
-        for (auto&& s : subsets) {
-            ASSERT_EQ(k + 1, s.subset.count());
-        }
-    }
-
-    if (goldenCtx) {
-        goldenCtx->outStream() << ctx.toString() << std::endl;
-    }
-}
-
-TEST(JoinPlanEnumeratorTest, LeftDeep8Nodes) {
+TEST_F(JoinPlanEnumeratorTest, LeftDeep8Nodes) {
     unittest::GoldenTestContext goldenCtx(&config);
     testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8);
 }
 
-TEST(JoinPlanEnumeratorTest, RightDeep8Nodes) {
+TEST_F(JoinPlanEnumeratorTest, RightDeep8Nodes) {
     unittest::GoldenTestContext goldenCtx(&config);
     testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8);
 }
 
-TEST(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {
+TEST_F(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {
     testLargeSubset(nullptr /* No golden test here. */, PlanTreeShape::LEFT_DEEP, 15);
 }
 

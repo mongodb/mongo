@@ -43,19 +43,8 @@ std::string nodeSetToString(const NodeSet& set, size_t numNodesToPrint = kMaxNod
 }  // namespace
 
 std::string BaseNode::toString(size_t numNodesToPrint, std::string indentStr) const {
-    auto ss = std::stringstream() << indentStr << "[" << nodeSetToString(bitset, numNodesToPrint)
-                                  << "] ";
-    switch (method) {
-        case ScanMethod::COLLSCAN:
-            ss << "COLLSCAN";
-            break;
-        case ScanMethod::IXSCAN:
-            ss << "IXSCAN";
-            break;
-        default:
-            MONGO_UNREACHABLE_TASSERT(11336900);
-    }
-    return ss.str();
+    return str::stream() << indentStr << "[" << nodeSetToString(bitset, numNodesToPrint) << "]["
+                         << nss.toString_forTest() << "] " << soln->summaryString();
 }
 
 std::string JoiningNode::toString(size_t numNodesToPrint, std::string indentStr) const {
@@ -96,9 +85,11 @@ JoinPlanNodeId JoinPlanNodeRegistry::registerJoinNode(const JoinSubset& subset,
     return id;
 }
 
-JoinPlanNodeId JoinPlanNodeRegistry::registerBaseNode(const JoinSubset& subset, ScanMethod method) {
+JoinPlanNodeId JoinPlanNodeRegistry::registerBaseNode(const JoinSubset& subset,
+                                                      const QuerySolution* soln,
+                                                      const NamespaceString& nss) {
     JoinPlanNodeId id = _allJoinPlans.size();
-    _allJoinPlans.emplace_back(BaseNode{method, subset.subset});
+    _allJoinPlans.emplace_back(BaseNode{soln, nss, subset.subset});
     return id;
 }
 

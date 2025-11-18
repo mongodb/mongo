@@ -7,27 +7,27 @@ Level 1:
 Output plans (best plan 0):
 0.[11] HJ
  -> left:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
  -> right:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
 
 1.[11] NLJ
  -> left:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
  -> right:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
 
 2.[11] HJ
  -> left:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
  -> right:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
 
 3.[11] NLJ
  -> left:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
  -> right:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
 
 
 RIGHT DEEP, 2 Nodes
@@ -39,25 +39,25 @@ Level 1:
 Output plans (best plan 0):
 0.[11] HJ
  -> left:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
  -> right:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
 
 1.[11] NLJ
  -> left:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
  -> right:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
 
 2.[11] HJ
  -> left:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
  -> right:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
 
 3.[11] NLJ
  -> left:
-    [10] COLLSCAN
+    [10][test.nss1] COLLSCAN
  -> right:
-    [01] COLLSCAN
+    [01][test.nss0] COLLSCAN
 

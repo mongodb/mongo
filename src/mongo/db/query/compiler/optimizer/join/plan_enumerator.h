@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
+#include "mongo/db/query/compiler/optimizer/join/solution_storage.h"
 
 namespace mongo::join_ordering {
 
@@ -45,7 +46,7 @@ enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP };
  */
 class PlanEnumeratorContext {
 public:
-    PlanEnumeratorContext(const JoinGraph& joinGraph);
+    PlanEnumeratorContext(const JoinGraph& joinGraph, const QuerySolutionMap& map);
 
     // Delete copy and move operations to prevent issues with copying '_joinGraph'.
     PlanEnumeratorContext(const PlanEnumeratorContext&) = delete;
@@ -98,6 +99,9 @@ private:
 
     // Memory management for trees so we can reuse nodes.
     JoinPlanNodeRegistry _registry;
+
+    // Holds results from CBR.
+    const QuerySolutionMap& _cqsToQsns;
 };
 
 }  // namespace mongo::join_ordering

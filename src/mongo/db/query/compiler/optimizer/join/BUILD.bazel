@@ -168,5 +168,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/pipeline",
+        "//src/mongo/unittest",
     ],
 )

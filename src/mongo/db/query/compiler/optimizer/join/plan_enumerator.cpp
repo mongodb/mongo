@@ -36,7 +36,13 @@
 #include <sstream>
 
 namespace mongo::join_ordering {
-PlanEnumeratorContext::PlanEnumeratorContext(const JoinGraph& joinGraph) : _joinGraph(joinGraph) {}
+namespace {
+static constexpr size_t kBaseLevel = 0;
+}
+
+PlanEnumeratorContext::PlanEnumeratorContext(const JoinGraph& joinGraph,
+                                             const QuerySolutionMap& map)
+    : _joinGraph(joinGraph), _cqsToQsns(map) {}
 
 const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
     return _joinSubsets[level];
@@ -107,9 +113,11 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
 
     // Initialize base level of joinSubsets, representing single collections (no joins).
     for (int i = 0; i < numNodes; ++i) {
-        _joinSubsets[0].push_back(JoinSubset(NodeSet{}.set(i)));
-        _joinSubsets[0].back().plans = {
-            _registry.registerBaseNode(_joinSubsets[0].back(), ScanMethod::COLLSCAN)};
+        const auto* cq = _joinGraph.getNode((NodeId)i).accessPath.get();
+        const auto* qsn = _cqsToQsns.at(cq).get();
+        _joinSubsets[kBaseLevel].push_back(JoinSubset(NodeSet{}.set(i)));
+        _joinSubsets[kBaseLevel].back().plans = {
+            _registry.registerBaseNode(_joinSubsets[kBaseLevel].back(), qsn, cq->nss())};
     }
 
     // Initialize the rest of the joinSubsets.
@@ -157,8 +165,8 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
 
                 auto& cur = joinSubsetsCurrLevel[subsetIdx];
 
-                enumerateJoinPlans(type, prevJoinSubset, _joinSubsets[0][i], cur);
-                enumerateJoinPlans(type, _joinSubsets[0][i], prevJoinSubset, cur);
+                enumerateJoinPlans(type, prevJoinSubset, _joinSubsets[kBaseLevel][i], cur);
+                enumerateJoinPlans(type, _joinSubsets[kBaseLevel][i], prevJoinSubset, cur);
             }
         }
     }
@@ -183,8 +191,9 @@ std::string PlanEnumeratorContext::toString() const {
             tassert(11336907,
                     "Expected a single subset on the final level",
                     _joinSubsets[level].size() == 1);
-            ss << "\nOutput plans (best plan " << _joinSubsets[level][0].bestPlanIndex << "):\n"
-               << _registry.joinPlansToString(_joinSubsets[level][0].plans, numNodes);
+            ss << "\nOutput plans (best plan " << _joinSubsets[level][kBaseLevel].bestPlanIndex
+               << "):\n"
+               << _registry.joinPlansToString(_joinSubsets[level][kBaseLevel].plans, numNodes);
         }
     }
     return ss.str();
