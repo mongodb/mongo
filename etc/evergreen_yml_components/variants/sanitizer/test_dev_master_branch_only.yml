@@ -200,7 +200,7 @@ buildvariants:
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       compile_variant: *enterprise-rhel-8-64-bit-dynamic-debug-mode
       test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --excludeWithAnyTags=incompatible_slow_machine
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
@@ -285,7 +285,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls
         --modules=none
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
       compile_variant: *windows-debug-suggested
     tasks:
       - name: compile_test_serial_TG
@@ -328,7 +328,7 @@ buildvariants:
       resmoke_jobs_max: 1
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
     tasks:
       # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
       # It has a minimal amount of tasks because unoptimized builds are slow, which causes
@@ -354,7 +354,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_macos
         --modules=none
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
       resmoke_jobs_max: 6
       bazel_compile_flags: >-
         --dbg=True
@@ -381,7 +381,7 @@ buildvariants:
     expansions:
       compile_variant: *enterprise-macos
       test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --excludeWithAnyTags=incompatible_with_macos,requires_gcm
       bazel_compile_flags: >-
         --dbg=True
@@ -433,7 +433,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
         --runAllFeatureFlagTests
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
       multiversion_platform: rhel8
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
@@ -459,7 +459,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
       multiversion_platform: rhel8
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
@@ -498,7 +498,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks: &rhel8-debug-aubsan-task-list
@@ -533,7 +533,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
       - name: .multiversion_fuzzer
@@ -558,7 +558,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
         --excludeWithAnyTags=incompatible_aubsan
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks: *rhel8-debug-aubsan-task-list
@@ -579,7 +579,7 @@ buildvariants:
       test_flags: >-
         --benchmarkRepetitions=1
         --excludeWithAnyTags=incompatible_aubsan
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
       compile_variant: *rhel8-debug-aubsan-benchmarks
     tasks:
@@ -607,7 +607,7 @@ buildvariants:
       # fcv_upgrade_downgrade tests, when concurrent FCV upgrade/downgrades can keep batch write
       # operations from making progress on slow sanitizer variants.
       test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --excludeWithAnyTags=tsan_incompatible
         --runAllFeatureFlagTests
@@ -655,7 +655,7 @@ buildvariants:
       # fcv_upgrade_downgrade tests, when concurrent FCV upgrade/downgrades can keep batch write
       # operations from making progress on slow sanitizer variants.
       test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --excludeWithAnyTags=tsan_incompatible
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
