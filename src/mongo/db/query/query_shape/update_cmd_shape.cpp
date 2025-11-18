@@ -222,4 +222,50 @@ void UpdateCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
     UpdateCmdShapeComponents{parsedUpdate, _components.let, opts}.appendTo(bob, opts, expCtx);
 }
 
+QueryShapeHash UpdateCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {
+    // Allocate a buffer on the stack for serialization of parts of the "update" command shape.
+    constexpr std::size_t bufferSizeOnStack = 256;
+    StackBufBuilderBase<bufferSizeOnStack> updateCommandShapeBuffer;
+
+    // Write small or typically empty "update" command shape parts to the buffer.
+    updateCommandShapeBuffer.appendStrBytes(write_ops::UpdateCommandRequest::kCommandName);
+
+    // Append bits corresponding to the optional multi and upsert fields, representativeC, and
+    // representativeArrayFilters fields.
+    updateCommandShapeBuffer.appendNum(
+        static_cast<int>(_components.multi) << 3 | static_cast<int>(_components.upsert) << 2 |
+        static_cast<int>(_components.representativeC.has_value()) << 1 |
+        static_cast<int>(_components.representativeArrayFilters.has_value()));
+
+    tassert(11183700,
+            "nssOrUUID for an update must be a namespace string",
+            nssOrUUID.isNamespaceString());
+    auto nssDataRange = nssOrUUID.asDataRange();
+    updateCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
+    updateCommandShapeBuffer.appendBuf(collation.objdata(), collation.objsize());
+
+    // TODO(SERVER-110344): Revisit here when supporting representativeArrayFilters when
+    // shapifying update modifiers.
+    // TODO: Because representativeArrayFilters is variable-sized, updateCommandShapeBuffer could
+    // potentially exceed the stack allocation and require heap allocation. Consider using a
+    // BSONArray instead of a vector of BSONObj and pass in asDataRange(...) to computeHash(...).
+    if (_components.representativeArrayFilters) {
+        const auto& filters = *_components.representativeArrayFilters;
+        updateCommandShapeBuffer.appendNum(static_cast<uint32_t>(filters.size()));
+        for (const auto& filter : filters) {
+            updateCommandShapeBuffer.appendBuf(filter.objdata(), filter.objsize());
+        }
+    }
+
+    BSONObj representativeC = _components.representativeC.value_or(BSONObj{});
+    BSONObj representativeU = _components.getRepresentativeU().Obj();
+    return SHA256Block::computeHash(
+        {ConstDataRange{updateCommandShapeBuffer.buf(),
+                        static_cast<std::size_t>(updateCommandShapeBuffer.len())},
+         representativeU.asDataRange(),
+         _components.representativeQ.asDataRange(),
+         _components.let.shapifiedLet.asDataRange(),
+         representativeC.asDataRange()});
+}
+
 }  // namespace mongo::query_shape

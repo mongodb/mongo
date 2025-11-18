@@ -44,6 +44,53 @@ using write_ops::UpdateCommandRequest;
 static const NamespaceString kDefaultTestNss =
     NamespaceString::createNamespaceString_forTest("testDB.testColl");
 
+struct UpdateCmdBuilder {
+    std::string database;
+    std::string collection;
+    boost::optional<bool> multi;
+    boost::optional<bool> upsert;
+    BSONObj q;
+    BSONObj u;
+    boost::optional<BSONObj> c;
+    BSONObj let = BSONObj();
+    BSONObj collation = BSONObj();
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        builder.append("update", collection);
+        BSONArrayBuilder updates(builder.subarrayStart("updates"));
+        BSONObjBuilder updateObj;
+        updateObj.append("q", q);
+
+        if (u.couldBeArray()) {
+            updateObj.appendArray("u", u);
+        } else {
+            updateObj.append("u", u);
+        }
+        if (c.has_value()) {
+            updateObj.append("c", *c);
+        }
+
+        if (multi.has_value()) {
+            updateObj.append("multi", *multi);
+        }
+        if (upsert.has_value()) {
+
+            updateObj.append("upsert", *upsert);
+        }
+        if (!collation.isEmpty()) {
+            updateObj.append("collation", collation);
+        }
+        updates.append(updateObj.obj());
+        updates.done();
+        if (!let.isEmpty()) {
+            builder.append("let", let);
+        }
+        builder.append("$db", database);
+        return builder.obj();
+    }
+};
+
 class UpdateCmdShapeTest : public unittest::Test {
 public:
     void setUp() final {
@@ -54,7 +101,11 @@ public:
 
     std::vector<UpdateCmdShape> makeShapesFromUpdate(StringData updateCmd) {
         auto updateRequest = UpdateCommandRequest::parseOwned(fromjson(updateCmd));
+        return makeShapesFromUpdateRequest(updateRequest);
+    }
 
+    std::vector<UpdateCmdShape> makeShapesFromUpdateRequest(
+        const write_ops::UpdateCommandRequest& updateRequest) {
         std::vector<UpdateCmdShape> shapes;
         for (const auto& op : updateRequest.getUpdates()) {
             UpdateRequest request(op);
@@ -900,36 +951,88 @@ TEST_F(UpdateCmdShapeTest, IncludesOptionalValues) {
 // Verifies that "update" command shape hash value is stable (does not change between the
 // versions of the server).
 TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
-    auto shape = makeOneShapeFromUpdate(R"({
-        update: "testColl",
-        updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
-        "$db": "testDB"
-    })"_sd);
-
+    UpdateCmdBuilder updateCmd;
+    updateCmd.database = "testDB";
+    updateCmd.collection = "testColl";
+    updateCmd.q = BSON("x" << BSON("$eq" << 3));
+    updateCmd.u = BSON("foo" << "bar");
     auto serializationContext = SerializationContext::stateCommandRequest();
-    const auto hash = shape.sha256Hash(_operationContext.get(), serializationContext);
-    ASSERT_EQ("56593B6B2CE6C3968E03CC55DFED93AE728CA730A21E0659390360636BD96B15",
-              hash.toHexString());
+
+    auto verifyHash = [&](StringData expectedHash, const UpdateCmdBuilder& updateCmd) {
+        BSONObj updateBson = updateCmd.toBSON();
+        auto updateRequest = UpdateCommandRequest::parseOwned(std::move(updateBson));
+        auto shapes = makeShapesFromUpdateRequest(updateRequest);
+        ASSERT_EQ(shapes.size(), 1);
+        const auto& shape = shapes.front();
+
+        const auto hash = shape.sha256Hash(_operationContext.get(), serializationContext);
+        ASSERT_EQ(expectedHash, hash.toHexString());
+    };
+
+    std::string expectedHash = "9BE397CDA2A946681D8E330532C9F04FD4B06C2D32CA75CDA47D59E771043D36";
+    verifyHash(expectedHash, updateCmd);
+
+    // Changing the literal value in the query should not change the hash.
+    updateCmd.q = BSON("x" << BSON("$eq" << 4));
+    verifyHash(expectedHash, updateCmd);
+
+    // Changing the field name in the query should change the hash.
+    updateCmd.q = BSON("y" << BSON("$eq" << 4));
+    expectedHash = "4FD91619E9D50806A419D658D2978A2B3E931E0AA709D785F2D24028A2CF4DFC";
+    verifyHash(expectedHash, updateCmd);
+
+    // Setting upsert to false explicitly should not change the hash.
+    updateCmd.upsert = false;
+    verifyHash(expectedHash, updateCmd);
+
+    // Setting upsert from false to true should change the hash.
+    updateCmd.upsert = true;
+    expectedHash = "F6C4A4A410028676E3E51E4E1A8BE8169C8C6281AF929F029E3E437D3855D809";
+    verifyHash(expectedHash, updateCmd);
+
+    // Setting a let should change the hash.
+    updateCmd.let = BSON("z" << "abc");
+    expectedHash = "E153D6789FAF6EBEC990308CA2C29EABE03BCB5C9BE3CDF7C2E777A3DC55A683";
+    verifyHash(expectedHash, updateCmd);
+
+    // Setting a collation should change the hash.
+    updateCmd.collation = BSON("locale" << "fr");
+    expectedHash = "B5BFED37B52DF311A4369CFA6905329F02578207E6C14696AC7E1C9F1CC43990";
+    verifyHash(expectedHash, updateCmd);
+
+    // Changing the collection should change the hash.
+    updateCmd.collection = "testColl2";
+    expectedHash = "DF3AD468A336C41ABE3992A72F24DEC28E349B4D27614D19E4C2C9E8F3655F2E";
+    verifyHash(expectedHash, updateCmd);
+
+    // Changing the update to a pipeline style should change the hash.
+    updateCmd.u = BSON_ARRAY(BSON("$set" << BSON("foo" << "hello" << "num" << 42)));
+    expectedHash = "A6DDEE3675054450EA9BA40B25F7FF02897970502E084307A2539B9E18C8DB14";
+    verifyHash(expectedHash, updateCmd);
+
+    // Adding constants should change the hash.
+    updateCmd.c = BSON("myVar" << "hello" << "myNum" << 42);
+    expectedHash = "48BC89506D10C460EDEEFA55233CAFF58F07E21E1F6CEEFA78FB97C9EEC300E2";
+    verifyHash(expectedHash, updateCmd);
+
+    // Changing the literal values to constants should change the hash.
+    updateCmd.u = BSON_ARRAY(fromjson(R"({ "$set": { "foo": "$$myVar", "num": "$$myNum" }})"_sd));
+    expectedHash = "474D7DED0A5B2CB2FE8872E8144050C4AAC3A2C6E35A6B48ADB61DA277EF64A0";
+    verifyHash(expectedHash, updateCmd);
+
+    // Setting multi to false explicitly should not change the hash.
+    updateCmd.multi = false;
+    verifyHash(expectedHash, updateCmd);
+
+    // Setting multi from false to true should change the hash.
+    updateCmd.multi = true;
+    expectedHash = "F373308007DC7A9F0BC2A7D2BD1862E77EEE1D1EDE45C9618C20905A674A2815";
+    verifyHash(expectedHash, updateCmd);
+
+    // TODO(SERVER-110344): When shapifying update modifiers is supported and
+    // 'representativeArrayFilters' is set, test hash stability when 'representativeArrayFilters' is
 }
 
-TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValueWithConstants) {
-    auto shape = makeOneShapeFromUpdate(R"({
-        update: "testColl",
-        updates: [ { 
-            q: { x: {$eq: 3} }, 
-            u: [ { "$set": { "foo": "$$myVar", "num": "$$myNum" } } ],
-            c: { "myVar": "hello", "myNum": 42 },
-            multi: false, 
-            upsert: false 
-        } ],
-        "$db": "testDB"
-    })"_sd);
-
-    auto serializationContext = SerializationContext::stateCommandRequest();
-    const auto hash = shape.sha256Hash(_operationContext.get(), serializationContext);
-    ASSERT_EQ("12B31ED7147537EFBE834F3620782ECCBE4414916490E8B5ADCE529040313E59",
-              hash.toHexString());
-}
 
 TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
     auto shape = makeOneShapeFromUpdate(R"({
