@@ -91,15 +91,16 @@ constexpr UniqueArray<T, N> makeValidVersions(const std::array<T, N>& arr) {
     return result;
 }
 
-constexpr UniqueArray validOfcvVersions =
-    makeValidVersions(std::array{GenericFCV::kLatest,
-                                 GenericFCV::kLastContinuous,
-                                 GenericFCV::kLastLTS,
-                                 GenericFCV::kUpgradingFromLastLTSToLatest,
-                                 GenericFCV::kDowngradingFromLatestToLastLTS,
-                                 GenericFCV::kUpgradingFromLastContinuousToLatest,
-                                 GenericFCV::kDowngradingFromLatestToLastContinuous,
-                                 GenericFCV::kUpgradingFromLastLTSToLastContinuous});
+constexpr UniqueArray validOfcvVersions = makeValidVersions(
+    std::array{GenericFCV::kLatest,
+               GenericFCV::kLastContinuous,
+               GenericFCV::kLastLTS,
+               GenericFCV::kUpgradingFromLastLTSToLatest,
+               GenericFCV::kDowngradingFromLatestToLastLTS,
+               GenericFCV::kUpgradingFromLastContinuousToLatest,
+               GenericFCV::kDowngradingFromLatestToLastContinuous,
+               GenericFCV::kUpgradingFromLastLTSToLastContinuous,
+               multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior});
 
 constexpr UniqueArray validFcvVersions = makeValidVersions(
     std::array{GenericFCV::kLatest, GenericFCV::kLastContinuous, GenericFCV::kLastLTS});

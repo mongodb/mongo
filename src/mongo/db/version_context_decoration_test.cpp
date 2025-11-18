@@ -86,6 +86,17 @@ TEST_F(VersionContextDecorationTest, FixedOperationFCVRegion) {
     ASSERT_EQ(VersionContext{}, VersionContext::getDecoration(opCtx));
 }
 
+
+TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionWithUninitializedFCV) {
+    // (Generic FCV reference): used for testing
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+    VersionContext::FixedOperationFCVRegion fixedOperationFcvRegion(opCtx);
+    ASSERT_EQ(
+        VersionContext{multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior},
+        VersionContext::getDecoration(opCtx));
+}
+
 TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionReentrancy) {
     ASSERT_EQ(VersionContext{}, VersionContext::getDecoration(opCtx));
 

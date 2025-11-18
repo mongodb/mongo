@@ -66,6 +66,13 @@ TEST_F(VersionContextTest, FCVConstructorInitializesOFCVToLatest) {
     ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
 }
 
+TEST_F(VersionContextTest, FCVConstructorInitializesOFCVToUninitialized) {
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    VersionContext vCtx{multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior};
+    ASSERT_TRUE(getOFCV(vCtx).has_value());
+    ASSERT_FALSE(getOFCV(vCtx)->isVersionInitialized());
+}
+
 TEST_F(VersionContextTest, FCVSnapshotConstructorInitializesOFCVToLatest) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx(ServerGlobalParams::FCVSnapshot{GenericFCV::kLatest});
@@ -153,13 +160,17 @@ TEST_F(VersionContextTest, UpdatingThrowsWhenAlreadyInitializedWithDifferentValu
 
 TEST_F(VersionContextTest, SerializeDeserialize) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
-    // Verify that stable as well as transitory FCV states can be serialized and deserialized.
-    const std::vector<FCV> fcvs{GenericFCV::kLatest, GenericFCV::kUpgradingFromLastLTSToLatest};
+    // Verify that stable, transitory, as well as uninitialized FCV states can be serialized and
+    // deserialized.
+    const std::vector<FCV> fcvs{
+        GenericFCV::kLatest,
+        GenericFCV::kUpgradingFromLastLTSToLatest,
+        multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior};
     for (const auto fcv : fcvs) {
         VersionContext vCtxA{fcv};
         VersionContext vCtxB{vCtxA.toBSON()};
         ASSERT_TRUE(getOFCV(vCtxB).has_value());
-        ASSERT_EQ(getOFCV(vCtxB)->getVersion(), fcv);
+        ASSERT_EQ(vCtxB, vCtxA);
     }
 }
 
@@ -167,6 +178,8 @@ TEST_F(VersionContextTest, SerializeDeserialize) {
 constexpr auto kLastLTSFCVString = multiversion::toString(GenericFCV::kLastLTS);
 constexpr auto kLastContinuousFCVString = multiversion::toString(GenericFCV::kLastContinuous);
 constexpr auto kLatestFCVString = multiversion::toString(GenericFCV::kLatest);
+constexpr auto kUninitializedFCVString =
+    multiversion::toString(multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
 
 VersionContext makeFromOFCVString(StringData ofcvString) {
     return VersionContext{BSON(VersionContextMetadata::kOFCVFieldName << ofcvString)};
@@ -184,6 +197,9 @@ TEST_F(VersionContextTest, DeserializeFromValidDocument) {
     ASSERT_EQ(VersionContext{GenericFCV::kLastContinuous},
               makeFromOFCVString(kLastContinuousFCVString));
     ASSERT_EQ(VersionContext{GenericFCV::kLatest}, makeFromOFCVString(kLatestFCVString));
+    ASSERT_EQ(
+        VersionContext{multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior},
+        makeFromOFCVString(kUninitializedFCVString));
 
     // (Generic FCV reference): used for testing, should exist across LTS binary version
     ASSERT_EQ(VersionContext{GenericFCV::kUpgradingFromLastLTSToLatest},
@@ -228,7 +244,6 @@ TEST_F(VersionContextTest, DeserializeFromInvalidDocument) {
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("99999999999999999999999999999999.0"));
 
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("invalid"));
-    ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("unset"));
     ASSERT_THROWS_BAD_VALUE(
         makeFromOFCVString(fmt::format(StringData("{}\0", 3), kLastLTSFCVString)));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(
