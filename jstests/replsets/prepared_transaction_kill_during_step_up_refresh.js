@@ -57,6 +57,11 @@ jsTestLog("Allowing step up to continue");
 stepUpFP.off();
 assert(newPrimary, rst.getPrimary());
 
+// The prepare entry must be majority committed on the new primary before we issue the
+// commitTransaction command.
+jsTestLog("Ensure prepare entry made it into the committed snapshot on the new primary");
+PrepareHelpers.awaitMajorityCommitted(rst, prepareTimestamp);
+
 jsTestLog("Committing transaction on the new primary");
 // Create a proxy session to reuse the session state of the old primary.
 const newSession = new _DelegatingDriverSession(newPrimary, session);
