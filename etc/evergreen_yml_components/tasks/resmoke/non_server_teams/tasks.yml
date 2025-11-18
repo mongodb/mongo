@@ -355,8 +355,8 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
-  - <<: *gen_task_template
-    name: streams_aspio_gen
+  - <<: *task_template
+    name: streams_aspio
     tags:
       [
         "assigned_to_jira_team_streams",
@@ -365,9 +365,84 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
-          fallback_num_sub_suites: 2
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_aspio_iceberg_0
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "default",
+        "streams_release_test",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_aspio_iceberg_1
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "default",
+        "streams_release_test",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_aspio_iceberg_2
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "default",
+        "streams_release_test",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_aspio_iceberg_3
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "default",
+        "streams_release_test",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_aspio_iceberg_4
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "default",
+        "streams_release_test",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
           resmoke_jobs_max: 1
 
   - name: streams_build_only_gen
@@ -392,7 +467,6 @@ tasks:
       # Update with all gen tasks to depend on here and the display name in evergreen_gen_streams_build_and_push_task.py
       - name: streams_gen
       - name: streams_kafka_gen
-      - name: streams_aspio_gen
     commands:
       - func: "streams build and push"
 

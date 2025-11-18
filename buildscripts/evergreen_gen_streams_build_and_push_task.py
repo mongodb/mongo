@@ -77,7 +77,7 @@ def main(
     expansions = read_config_file(expansions_file)
     version_id = expansions.get("version_id")
     build_variant_name = expansions.get("build_variant")
-    required_tasks = {"streams", "streams_kafka", "streams_aspio"}
+    required_tasks = {"streams", "streams_kafka"}
     evg_version = evg_api.version_by_id(version_id)
     variant = evg_version.build_by_variant(build_variant_name)
     task_deps = []

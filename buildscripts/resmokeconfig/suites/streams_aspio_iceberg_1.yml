@@ -1,0 +1,19 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_column_1.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_column_2.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_validity_table_name.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_tpcc_orders.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1

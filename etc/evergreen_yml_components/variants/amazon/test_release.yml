@@ -522,7 +522,12 @@ buildvariants:
       - name: streams_lambda
       - name: streams_s3
       - name: streams_kinesis
-      - name: streams_aspio_gen
+      - name: streams_aspio
+      - name: streams_aspio_iceberg_0
+      - name: streams_aspio_iceberg_1
+      - name: streams_aspio_iceberg_2
+      - name: streams_aspio_iceberg_3
+      - name: streams_aspio_iceberg_4
       - name: streams_build_and_push_gen
       - name: generate_buildid_to_debug_symbols_mapping
 
@@ -568,7 +573,12 @@ buildvariants:
       - name: streams_lambda
       - name: streams_s3
       - name: aggregation
-      - name: streams_aspio_gen
+      - name: streams_aspio
+      - name: streams_aspio_iceberg_0
+      - name: streams_aspio_iceberg_1
+      - name: streams_aspio_iceberg_2
+      - name: streams_aspio_iceberg_3
+      - name: streams_aspio_iceberg_4
       - name: streams_build_and_push_gen
       # Only needed once to generate the streams manifest for both x86 and arm
       - name: streams_publish_manifest_al2023_gen
@@ -615,7 +625,12 @@ buildvariants:
       - name: streams_lambda
       - name: streams_s3
       - name: streams_kinesis
-      - name: streams_aspio_gen
+      - name: streams_aspio
+      - name: streams_aspio_iceberg_0
+      - name: streams_aspio_iceberg_1
+      - name: streams_aspio_iceberg_2
+      - name: streams_aspio_iceberg_3
+      - name: streams_aspio_iceberg_4
       - name: streams_build_and_push_gen
       - name: generate_buildid_to_debug_symbols_mapping
 
@@ -661,7 +676,12 @@ buildvariants:
       - name: streams_lambda
       - name: streams_s3
       - name: streams_kinesis
-      - name: streams_aspio_gen
+      - name: streams_aspio
+      - name: streams_aspio_iceberg_0
+      - name: streams_aspio_iceberg_1
+      - name: streams_aspio_iceberg_2
+      - name: streams_aspio_iceberg_3
+      - name: streams_aspio_iceberg_4
       - name: streams_build_and_push_gen
       # Only needed once to generate the streams manifest for both x86 and arm
       - name: streams_publish_manifest_gen

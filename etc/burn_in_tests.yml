@@ -9,7 +9,12 @@ selector:
       # its own broker
       - streams_kafka
       # This suite requires sidecar containers.
-      - streams_aspio_gen
+      - streams_aspio
+      - streams_aspio_iceberg_0
+      - streams_aspio_iceberg_1
+      - streams_aspio_iceberg_2
+      - streams_aspio_iceberg_3
+      - streams_aspio_iceberg_4
     # Exclude list of etc/evergreen.yml task names.
     exclude_tasks:
     # Exclude list of jstests file names.
