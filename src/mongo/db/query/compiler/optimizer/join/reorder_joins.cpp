@@ -30,11 +30,49 @@
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/random_utils.h"
+#include "mongo/util/assert_util.h"
+
+#include <variant>
 
 namespace mongo::join_ordering {
 
 namespace {
+/**
+ * Helper function to simplify creation of BinaryJoinEmbedding QSNs.
+ */
+std::unique_ptr<QuerySolutionNode> makeBinaryJoinEmbeddingQSN(
+    JoinMethod method,
+    std::vector<QSNJoinPredicate>&& joinPreds,
+    std::unique_ptr<QuerySolutionNode> leftChild,
+    boost::optional<FieldPath> leftEmbedPath,
+    std::unique_ptr<QuerySolutionNode> rightChild,
+    boost::optional<FieldPath> rightEmbedPath) {
+    switch (method) {
+        case JoinMethod::HJ:
+            return std::make_unique<HashJoinEmbeddingNode>(std::move(leftChild),
+                                                           std::move(rightChild),
+                                                           std::move(joinPreds),
+                                                           leftEmbedPath,
+                                                           rightEmbedPath);
+        case JoinMethod::NLJ:
+            return std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(leftChild),
+                                                                 std::move(rightChild),
+                                                                 std::move(joinPreds),
+                                                                 leftEmbedPath,
+                                                                 rightEmbedPath);
+        case JoinMethod::INLJ:
+            return std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(leftChild),
+                                                                        std::move(rightChild),
+                                                                        std::move(joinPreds),
+                                                                        leftEmbedPath,
+                                                                        rightEmbedPath);
+    }
+    MONGO_UNREACHABLE_TASSERT(11336909);
+}
 
 class ReorderContext {
 public:
@@ -46,7 +84,7 @@ public:
     ReorderContext& operator=(const ReorderContext&) = delete;
     ReorderContext& operator=(ReorderContext&&) = delete;
 
-    NodeId findMainCollectionNode() {
+    NodeId findMainCollectionNode() const {
         for (size_t i = 0; i < _joinGraph.numNodes(); i++) {
             if (_joinGraph.getNode(i).embedPath == boost::none) {
                 return i;
@@ -55,7 +93,9 @@ public:
         MONGO_UNREACHABLE_TASSERT(11075701);
     }
 
-    QSNJoinPredicate makePhysicalPredicate(JoinPredicate pred) {
+    QSNJoinPredicate makePhysicalPredicate(JoinPredicate pred,
+                                           bool expandLeftPath,
+                                           bool expandRightPath) const {
         QSNJoinPredicate::ComparisonOp op = [&pred] {
             switch (pred.op) {
                 case JoinPredicate::Eq:
@@ -68,21 +108,23 @@ public:
         // which comes from the current foreign collection, SBE does not expect it to be prefixed
         // with the foreign's collection as field.
         return {.op = op,
-                .leftField = expandEmbeddedPath(pred.left),
-                .rightField = _resolvedPaths[pred.right].fieldName};
+                .leftField = expandEmbeddedPath(pred.left, expandLeftPath),
+                .rightField = expandEmbeddedPath(pred.right, expandRightPath)};
     }
 
-    std::vector<QSNJoinPredicate> makeJoinPreds(const JoinEdge& edge) {
+    std::vector<QSNJoinPredicate> makeJoinPreds(const JoinEdge& edge,
+                                                bool expandLeftPath,
+                                                bool expandRightPath) const {
         std::vector<QSNJoinPredicate> preds;
         preds.reserve(edge.predicates.size());
         for (auto pred : edge.predicates) {
-            preds.push_back(makePhysicalPredicate(pred));
+            preds.push_back(makePhysicalPredicate(pred, expandLeftPath, expandRightPath));
         }
         return preds;
     }
 
     std::vector<IndexedJoinPredicate> makeIndexedJoinPreds(const JoinEdge& edge,
-                                                           NodeId currentNode) {
+                                                           NodeId currentNode) const {
         tassert(11233804, "left edge expected only one node", edge.left.count() == 1);
         tassert(11233805, "right edge expected only one node", edge.right.count() == 1);
         std::vector<IndexedJoinPredicate> res;
@@ -95,14 +137,104 @@ public:
         return res;
     }
 
+    std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(
+        JoinPlanNodeId nodeId, const JoinPlanNodeRegistry& registry) const {
+        std::unique_ptr<QuerySolutionNode> qsn;
+        std::visit(OverloadedVisitor{[this, &qsn, &registry](const JoiningNode& join) {
+                                         qsn = this->buildQSNFromJoiningNode(join, registry);
+                                     },
+                                     [&qsn](const BaseNode& base) {
+                                         // TODO SERVER-111913: Avoid this clone
+                                         qsn = base.soln->root()->clone();
+                                     }},
+                   registry.get(nodeId));
+        return qsn;
+    }
+
+    JoinEdge getEdge(NodeSet left, NodeSet right) const {
+        auto edges = _joinGraph.getJoinEdges(left, right);
+
+        // TODO SERVER-111798: Support join graphs with cycles & multiple predicates.
+        tassert(11233801,
+                "expecting a single edge between visted set and current node. random reorderer "
+                "does not support cycles yet",
+                edges.size() == 1);
+        auto edge = _joinGraph.getEdge(edges[0]);
+
+        // Ensure that edge is oriented the same way as the join (right side corresponds to
+        // Index Probe side). This order is important for generating the 'QSNJoinPredicate'
+        // which is order sensitive. Note that is a "cheating" a little bit because 'JoinEdge'
+        // is logically an undirected edge in the graph but implemented with left/right ordered
+        // members. We are exploiting this implementation detail to avoid doing duplicate work
+        // of determining the orientation in making the 'IndexedJoinPredicate' and the
+        // 'QSNJoinPredicate' below.
+        if ((edge.left & right).any()) {
+            edge = edge.reverseEdge();
+        }
+
+        return edge;
+    }
+
 private:
-    FieldPath expandEmbeddedPath(PathId pathId) {
+    FieldPath expandEmbeddedPath(PathId pathId, bool expand) const {
         const auto& resolvedPath = _resolvedPaths[pathId];
+        if (!expand) {
+            return resolvedPath.fieldName;
+        }
+
         const auto& node = _joinGraph.getNode(_resolvedPaths[pathId].nodeId);
         if (node.embedPath.has_value()) {
             return node.embedPath->concat(resolvedPath.fieldName);
         }
         return resolvedPath.fieldName;
+    }
+
+    const JoinNode& findFirstNode(NodeSet set) const {
+        for (size_t i = 0; i < kMaxNodesInJoin; i++) {
+            if (set.test(i)) {
+                return _joinGraph.getNode((NodeId)i);
+            }
+        }
+        MONGO_UNREACHABLE_TASSERT(11336910);
+    }
+
+    std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
+        const JoiningNode& join, const JoinPlanNodeRegistry& registry) const {
+        auto leftChild = buildQSNFromJoinPlan(join.left, registry);
+        auto rightChild = buildQSNFromJoinPlan(join.right, registry);
+
+        const auto& leftSubset = registry.getBitset(join.left);
+        const auto& rightSubset = registry.getBitset(join.right);
+
+        // TODO SERVER-111798: Support join graphs with cycles & multiple predicates.
+        auto edge = getEdge(leftSubset, rightSubset);
+
+        const bool isLeftBaseNode = leftSubset.count() == 1;
+        const bool isRightBaseNode = rightSubset.count() == 1;
+
+        boost::optional<FieldPath> leftEmbedding, rightEmbedding;
+        if (isLeftBaseNode) {
+            // Node on the left may be embedded- we need to retrieve its embedding.
+            const auto& leftNode = findFirstNode(leftSubset);
+            leftEmbedding = leftNode.embedPath;
+        }
+        if (isRightBaseNode) {
+            // Node on the right may be embedded- we need to retrieve its embedding.
+            const auto& rightNode = findFirstNode(rightSubset);
+            rightEmbedding = rightNode.embedPath;
+        }
+
+        // Only expand predicates for non-base nodes.
+        bool expandLeftPath = !isLeftBaseNode;
+        bool expandRightPath = !isRightBaseNode;
+        auto joinPreds = makeJoinPreds(edge, expandLeftPath, expandRightPath);
+
+        return makeBinaryJoinEmbeddingQSN(join.method,
+                                          std::move(joinPreds),
+                                          std::move(leftChild),
+                                          leftEmbedding,
+                                          std::move(rightChild),
+                                          rightEmbedding);
     }
 
     const JoinGraph& _joinGraph;
@@ -190,7 +322,8 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
     const JoinGraph& joinGraph,
     const std::vector<ResolvedPath>& resolvedPaths,
     const MultipleCollectionAccessor& mca,
-    int seed) {
+    int seed,
+    bool defaultHJ) {
     random_utils::PseudoRandomGenerator rand(seed);
     ReorderContext ctx(joinGraph, resolvedPaths);
 
@@ -221,33 +354,21 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
 
             // TODO SERVER-111913: Avoid this clone
             auto rhs = solns.at(currentNode.accessPath.get())->root()->clone();
+
             NodeSet currentNodeSet{};
             currentNodeSet.set(current);
-            auto edges = joinGraph.getJoinEdges(visited, currentNodeSet);
+            // TODO SERVER-111798: Support join graphs with cycles & multiple predicates.
+            auto edge = ctx.getEdge(visited, currentNodeSet);
+            auto joinPreds = ctx.makeJoinPreds(
+                edge, true /* TODO: SERVER-111581 */, false /* TODO: SERVER-111581 */);
+            auto indexedJoinPreds = ctx.makeIndexedJoinPreds(edge, current);
 
-            // TODO SERVER-111798: Support join graphs with cycles
-            tassert(11233801,
-                    "expecting a single edge between visted set and current node. random reorderer "
-                    "does not support cycles yet",
-                    edges.size() == 1);
-            auto edge = joinGraph.getEdge(edges[0]);
-
-            // Ensure that edge is oriented the same way as the join (right side corresponds to
-            // Index Probe side). This order is important for generating the 'QSNJoinPredicate'
-            // which is order sensitive. Note that is a "cheating" a little bit because 'JoinEdge'
-            // is logically an undirected edge in the graph but implemented with left/right ordered
-            // members. We are exploiting this implementation detail to avoid doing duplicate work
-            // of determining the orientation in making the 'IndexedJoinPredicate' and the
-            // 'QSNJoinPredicate' below.
-            if (edge.left.test(current)) {
-                edge = edge.reverseEdge();
-            }
-            auto joinPreds = ctx.makeIndexedJoinPreds(edge, current);
-
-            // Attempt to use INLJ if possible, otherwise fallback to NLJ.
+            // Attempt to use INLJ if possible, otherwise fallback to NLJ or HJ depending on the
+            // query knob.
+            JoinMethod method = JoinMethod::NLJ;
             if (auto indexEntry = bestIndexSatisfyingJoinPredicates(
                     *mca.lookupCollection(currentNode.collectionName)->getIndexCatalog(),
-                    joinPreds);
+                    indexedJoinPreds);
                 indexEntry.has_value()) {
                 rhs = std::make_unique<FetchNode>(std::make_unique<IndexProbeNode>(
                     currentNode.collectionName, std::move(indexEntry.value())));
@@ -256,24 +377,17 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
                     matchExpr != nullptr && !matchExpr->isTriviallyTrue()) {
                     rhs->filter = matchExpr->clone();
                 }
-                soln = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(soln),
-                                                                            std::move(rhs),
-                                                                            ctx.makeJoinPreds(edge),
-                                                                            boost::none,
-                                                                            currentNode.embedPath);
-            } else if (internalRandomJoinReorderDefaultToHashJoin.load()) {
-                soln = std::make_unique<HashJoinEmbeddingNode>(std::move(soln),
-                                                               std::move(rhs),
-                                                               ctx.makeJoinPreds(edge),
-                                                               boost::none,
-                                                               currentNode.embedPath);
-            } else {
-                soln = std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(soln),
-                                                                     std::move(rhs),
-                                                                     ctx.makeJoinPreds(edge),
-                                                                     boost::none,
-                                                                     currentNode.embedPath);
+                method = JoinMethod::INLJ;
+            } else if (defaultHJ) {
+                method = JoinMethod::HJ;
             }
+
+            soln = makeBinaryJoinEmbeddingQSN(method,
+                                              std::move(joinPreds),
+                                              std::move(soln),
+                                              boost::none,
+                                              std::move(rhs),
+                                              currentNode.embedPath);
         }
 
         frontier.pop_back();
@@ -301,6 +415,23 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
 
     auto ret = std::make_unique<QuerySolution>();
     ret->setRoot(std::move(soln));
+    return ret;
+}
+
+std::unique_ptr<QuerySolution> constructSolutionBottomUp(
+    QuerySolutionMap solns,
+    const join_ordering::JoinGraph& joinGraph,
+    const std::vector<ResolvedPath>& resolvedPaths,
+    const MultipleCollectionAccessor& catalog) {
+    PlanEnumeratorContext peCtx(joinGraph, solns);
+    ReorderContext rCtx(joinGraph, resolvedPaths);
+
+    peCtx.enumerateJoinSubsets();
+    auto bestPlanNodeId = peCtx.getBestFinalPlan();
+
+    // Build QSN based on best plan.
+    auto ret = std::make_unique<QuerySolution>();
+    ret->setRoot(rCtx.buildQSNFromJoinPlan(bestPlanNodeId, peCtx.registry()));
     return ret;
 }
 

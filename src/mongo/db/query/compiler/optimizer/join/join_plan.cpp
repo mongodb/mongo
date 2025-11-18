@@ -128,4 +128,8 @@ std::string JoinPlanNodeRegistry::joinPlansToString(const JoinPlans& plans,
     return ss.str();
 }
 
+NodeSet JoinPlanNodeRegistry::getBitset(JoinPlanNodeId id) const {
+    return std::visit([](const auto& n) { return n.bitset; }, get(id));
+}
+
 }  // namespace mongo::join_ordering

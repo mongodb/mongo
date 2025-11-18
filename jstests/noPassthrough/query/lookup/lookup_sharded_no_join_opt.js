@@ -19,7 +19,10 @@ function joinOptimizationRuns(db, baseColl, coll1, coll2) {
 
     const explain = db[baseColl].explain().aggregate(pipeline);
     jsTest.log.info({context: "Explain for pipeline", explain, output: db[baseColl].aggregate(pipeline).toArray()});
-    return getPlanStages(explain, "NESTED_LOOP_JOIN_EMBEDDING").length > 0;
+    return (
+        getPlanStages(explain, "NESTED_LOOP_JOIN_EMBEDDING").length > 0 ||
+        getPlanStages(explain, "HASH_JOIN_EMBEDDING").length > 0
+    );
 }
 
 // Set up a sharded cluster.

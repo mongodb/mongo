@@ -1271,7 +1271,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_math",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
-        "//src/mongo/db/query/compiler/optimizer/join:join_ordering",
+        "//src/mongo/db/query/compiler/optimizer/join:plan_enumerator",
         "//src/mongo/db/query/compiler/optimizer/join:reorder_joins",
         "//src/mongo/db/query/compiler/optimizer/join:solution_storage",
         "//src/mongo/db/query/plan_cache:query_plan_cache",

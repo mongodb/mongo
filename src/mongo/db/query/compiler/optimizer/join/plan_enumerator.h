@@ -64,6 +64,18 @@ public:
      */
     void enumerateJoinSubsets(PlanTreeShape type = PlanTreeShape::LEFT_DEEP);
 
+    JoinPlanNodeId getBestFinalPlan() const {
+        tassert(11336904,
+                "Expected subsets to have already been enumerated",
+                _joinSubsets.size() > 0 && _joinSubsets[_joinSubsets.size() - 1].size() == 1);
+        const auto& lastSubset = _joinSubsets[_joinSubsets.size() - 1][0];
+        return lastSubset.bestPlan();
+    }
+
+    const JoinPlanNodeRegistry& registry() const {
+        return _registry;
+    }
+
     /**
      * Used for testing & debugging.
      */

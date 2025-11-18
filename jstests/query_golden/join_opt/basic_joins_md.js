@@ -44,8 +44,14 @@ function runBasicJoinTest(pipeline) {
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const noJoinOptResults = coll.aggregate(pipeline).toArray();
 
-        subSection("With random order, seed 44, nested loop joins");
+        subSection("With bottom-up plan enumeration");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinReorderMode: "bottomUp"}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const bottomUpResults = coll.aggregate(pipeline).toArray();
+
+        subSection("With random order, seed 44, nested loop joins");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinReorderMode: "random"}));
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: 44}));
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const seed44NLJResults = coll.aggregate(pipeline).toArray();
@@ -70,6 +76,10 @@ function runBasicJoinTest(pipeline) {
 
         // Validate that all execution modes return the same results.
         assert(
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpResults),
+            "Results differ between no join opt and bottom-up join enumeration",
+        );
+        assert(
             _resultSetsEqualUnordered(noJoinOptResults, seed44NLJResults),
             "Results differ between no join opt and seed 44 NLJ",
         );
@@ -89,6 +99,7 @@ function runBasicJoinTest(pipeline) {
         // Reset flags.
         assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: false}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinReorderMode: "bottomUp"}));
     }
 }
 

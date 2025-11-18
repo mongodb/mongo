@@ -140,7 +140,7 @@ mongo_cc_library(
         "reorder_joins.h",
     ],
     deps = [
-        ":join_ordering",
+        ":plan_enumerator",
         ":solution_storage",
         "//src/mongo/db/query:random_utils",
     ],

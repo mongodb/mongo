@@ -342,6 +342,7 @@ mongo_cc_library(
     name = "query_knobs",
     srcs = [
         "framework_control.cpp",
+        "join_reorder_mode.cpp",
         "plan_ranker_mode.cpp",
         "query_feature_flags_gen",
         "query_knobs_gen",

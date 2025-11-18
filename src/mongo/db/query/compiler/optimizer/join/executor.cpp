@@ -34,9 +34,11 @@
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
+#include "mongo/util/assert_util.h"
 
 #include <algorithm>
 
@@ -126,14 +128,27 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         return swAccessPlans.getStatus();
     }
 
-    // Construct random-order join graph.
     auto& accessPlans = swAccessPlans.getValue();
-    auto qsn = constructSolutionWithRandomOrder(
-        std::move(accessPlans.solns),
-        model.graph,
-        model.resolvedPaths,
-        mca,
-        expCtx->getQueryKnobConfiguration().getRandomJoinOrderSeed());
+    const auto qkc = expCtx->getQueryKnobConfiguration();
+    std::unique_ptr<QuerySolution> qsn;
+    switch (qkc.getJoinReorderMode()) {
+        case JoinReorderModeEnum::kBottomUp:
+            // Optimize join order using bottom-up Sellinger-style algorithm.
+            qsn = constructSolutionBottomUp(
+                std::move(accessPlans.solns), model.graph, model.resolvedPaths, mca);
+            break;
+        case JoinReorderModeEnum::kRandom:
+            // Randomly reorder joins.
+            qsn = constructSolutionWithRandomOrder(std::move(accessPlans.solns),
+                                                   model.graph,
+                                                   model.resolvedPaths,
+                                                   mca,
+                                                   qkc.getRandomJoinOrderSeed(),
+                                                   qkc.getRandomJoinReorderDefaultToHashJoin());
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11336911);
+    }
 
     // Lower to SBE.
     // TODO SERVER-111581: permit the use of a different base collection for this query.

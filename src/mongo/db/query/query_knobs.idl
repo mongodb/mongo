@@ -87,6 +87,13 @@ enums:
             kNever: "never"
             kInDebug: "inDebug"
 
+    JoinReorderMode:
+        description: "Enum for possible values for JoinReorderMode."
+        type: string
+        values:
+            kBottomUp: "bottomUp"
+            kRandom: "random"
+
 structs:
     InternalQueryCutoffForSampleFromRandomCursorStorage:
         description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
@@ -527,6 +534,16 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
+    internalJoinReorderMode:
+        description: "Picks which method is used to reorder joins (when enabled)."
+        set_at: [startup, runtime]
+        cpp_class:
+            name: JoinReorderMode
+            data: synchronized_value<JoinReorderModeEnum>
+        default:
+            expr: JoinReorderModeEnum::kBottomUp
         redact: false
 
     internalQueryMaxPipelineRewrites:

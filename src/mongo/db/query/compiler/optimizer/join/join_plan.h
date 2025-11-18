@@ -151,6 +151,8 @@ public:
         return _allJoinPlans[id];
     }
 
+    NodeSet getBitset(JoinPlanNodeId id) const;
+
     std::string joinPlansToString(const JoinPlans& plans,
                                   size_t numNodesToPrint = kMaxNodesInJoin,
                                   std::string indentStr = "") const;

@@ -76,7 +76,11 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
         static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed());
 
     _isJoinOrderingEnabled = internalEnableJoinOptimization.load();
+    _randomJoinReorderDefaultToHashJoin = internalRandomJoinReorderDefaultToHashJoin.load();
     _randomJoinOrderSeed = internalRandomJoinOrderSeed.load();
+    _joinReorderMode = ServerParameterSet::getNodeParameterSet()
+                           ->get<JoinReorderMode>("internalJoinReorderMode")
+                           ->_data.get();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -101,6 +105,14 @@ size_t QueryKnobConfiguration::getRandomJoinOrderSeed() const {
 
 bool QueryKnobConfiguration::isJoinOrderingEnabled() const {
     return _isJoinOrderingEnabled;
+}
+
+bool QueryKnobConfiguration::getRandomJoinReorderDefaultToHashJoin() const {
+    return _randomJoinReorderDefaultToHashJoin;
+}
+
+JoinReorderModeEnum QueryKnobConfiguration::getJoinReorderMode() const {
+    return _joinReorderMode;
 }
 
 double QueryKnobConfiguration::getSamplingMarginOfError() const {
