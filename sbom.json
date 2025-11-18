@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:a973a3fe-5abe-4432-91fa-cc30c1034545",
-  "version": 8,
+  "version": 9,
   "metadata": {
-    "timestamp": "2025-11-15T06:04:26Z",
+    "timestamp": "2025-11-18T06:04:37Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.637"
+          "version": "v1.7.650"
         }
       ]
     }
@@ -1890,7 +1890,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+      "bom-ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "supplier": {
         "name": "MongoDB, Inc.",
         "url": [
@@ -1910,7 +1910,7 @@
       ],
       "copyright": "2009-present, MongoDB, Inc.",
       "cpe": "cpe:2.3:a:mongodb:c_driver:1.28.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+      "purl": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "externalReferences": [
         {
           "url": "https://github.com/mongodb/mongo-c-driver.git",
@@ -2608,7 +2608,7 @@
         "pkg:github/libtom/libtomcrypt@v1.18.2",
         "pkg:github/libunwind/libunwind@v1.8.1",
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
-        "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+        "pkg:github/mongodb/mongo-c-driver@1.28.1",
         "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
         "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
         "pkg:pypi/ocspbuilder@0.10.2",
@@ -2745,7 +2745,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+      "ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "dependsOn": []
     },
     {
