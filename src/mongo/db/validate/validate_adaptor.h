@@ -65,13 +65,14 @@ public:
      * Validates the record data and traverses through its key set to keep track of the
      * index consistency.
      */
-    virtual Status validateRecord(OperationContext* opCtx,
-                                  const RecordId& recordId,
-                                  const RecordData& record,
-                                  long long* nNonCompliantDocuments,
-                                  size_t* dataSize,
-                                  ValidateResults* results,
-                                  ValidationVersion validationVersion = currentValidationVersion);
+    Status validateRecord(OperationContext* opCtx,
+                          const RecordId& recordId,
+                          const RecordData& record,
+                          long long& nNonCompliantDocuments,
+                          long long& nInvalidDocuments,
+                          size_t* dataSize,
+                          ValidateResults* results,
+                          ValidationVersion validationVersion = currentValidationVersion);
     /**
      * Traverses the record store to retrieve every record and go through its document key
      * set to keep track of the index consistency during a validation.
