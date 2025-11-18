@@ -124,6 +124,8 @@ namespace mongo {
  *
  */
 class FailPoint {
+    class Impl;
+
 public:
     using ValType = unsigned;
     enum Mode { off, alwaysOn, random, nTimes, skip };
@@ -138,210 +140,6 @@ public:
     // please make sure that the new type is also BSON-compatible.
     using EntryCountT = long long;
 
-private:
-    // Equivalent to a lambda like `[](const BSONObj&) { return true; }`, but only
-    // requires a single template instantiation.
-    struct AlwaysRun {
-        bool operator()(const BSONObj&) const {
-            return true;
-        }
-    };
-    static constexpr AlwaysRun alwaysRun = {};
-
-    class Impl {
-    private:
-        enum class AlreadyCounted : bool {};
-
-        static constexpr auto _kWaitGranularity = Milliseconds(100);
-
-        static constexpr auto _kActiveBit = ValType{ValType{1} << 31};
-
-    public:
-        class LockHandle {
-        public:
-            LockHandle(Impl* impl, bool hit) : _impl(impl), _hit(hit) {}
-
-            ~LockHandle() {
-                if (MONGO_unlikely(_impl))
-                    _impl->_unlock();
-            }
-
-            LockHandle(const LockHandle&) = delete;
-            LockHandle& operator=(const LockHandle&) = delete;
-            LockHandle(LockHandle&& o) noexcept
-                : _impl{std::exchange(o._impl, nullptr)}, _hit{std::exchange(o._hit, false)} {}
-            LockHandle& operator=(LockHandle&&) = delete;
-
-            /**
-             * Returns true if this LockHandle associated with a FailPoint, and
-             * the lock outcome was a "hit". `lockHandle.isActive()` generally
-             * means the block of FailPoint special behavior should execute.
-             */
-            bool isActive() const {
-                return MONGO_unlikely(_hit);
-            }
-
-            /**
-             * Returns true if the fail point is still enabled.
-             *
-             * This function does not increment the underlying counter. Note that the fail point
-             * may have been changed in various ways while a LockHandle is held:
-             * - The fail point may be in the process of mutation which toggles to disabled until
-             *   LockHandles are released.
-             * - The fail point may have the modes "activationProbability", "skip", or
-             *   "times".
-             */
-            bool isStillEnabled() const {
-                return _impl->_shouldFail(AlreadyCounted{true}, alwaysRun);
-            }
-
-            /** May only be called if isActive() is true. */
-            const BSONObj& getData() const {
-                invariant(_impl, "getData without holding failpoint lock");
-                return _impl->_data;
-            }
-
-        private:
-            Impl* _impl = nullptr;
-            bool _hit = false;  //< True if this represents a tryLock "hit".
-        };
-
-        Impl(std::string name) : _name(std::move(name)) {}
-
-        template <std::predicate<const BSONObj&> Pred>
-        bool shouldFail(const Pred& pred) {
-            return _shouldFail(AlreadyCounted{false}, pred);
-        }
-
-        EntryCountT setMode(Mode mode, ValType val = 0, BSONObj extra = {});
-
-        EntryCountT waitForTimesEntered(Interruptible* interruptible,
-                                        EntryCountT targetTimesEntered) const;
-
-        BSONObj toBSON() const;
-
-        template <std::predicate<const BSONObj&> Pred>
-        LockHandle tryLock(const Pred& pred) {
-            return _tryLock(AlreadyCounted{false}, pred);
-        }
-
-        /** See `FailPoint::pauseWhileSet`. */
-        void pauseWhileSet(Interruptible* interruptible) {
-            auto alreadyCounted = AlreadyCounted{false};
-            while (MONGO_unlikely(_shouldFail(alreadyCounted, alwaysRun))) {
-                interruptible->sleepFor(_kWaitGranularity);
-                alreadyCounted = AlreadyCounted{true};
-            }
-        }
-
-        /** See `FailPoint::pauseWhileSetAndNotCanceled`. */
-        void pauseWhileSetAndNotCanceled(Interruptible* interruptible,
-                                         const CancellationToken& token) {
-            auto alreadyCounted = AlreadyCounted{false};
-            while (MONGO_unlikely(_shouldFail(alreadyCounted, alwaysRun))) {
-                uassert(
-                    ErrorCodes::Interrupted, "Failpoint has been canceled", !token.isCanceled());
-                interruptible->sleepFor(_kWaitGranularity);
-                alreadyCounted = AlreadyCounted{true};
-            }
-        }
-
-        const std::string& getName() const {
-            return _name;
-        }
-
-    private:
-        void _enable() {
-            _fpInfo.fetchAndBitOr(_kActiveBit);
-        }
-
-        void _disable() {
-            _fpInfo.fetchAndBitAnd(~_kActiveBit);
-        }
-
-        /** No default parameters. No-Frills shouldFail implementation. */
-        template <std::predicate<const BSONObj&> Pred>
-        bool _shouldFail(AlreadyCounted alreadyCounted, const Pred& pred) {
-            return _tryLock(alreadyCounted, pred).isActive();
-        }
-
-        /**
-         * Release a FailPoint lock previously acquired with `_tryLock`.
-         * Used only by `~LockHandle`.
-         */
-        void _unlock() {
-            _fpInfo.subtractAndFetch(1);
-        }
-
-        /**
-         * Attempt to access the fail point. If FailPoint is disabled, it
-         * cannot be accessed and this call will return a disengaged and
-         * inactive LockHandle.
-         *
-         * After successfully locking it, however, the caller will have
-         * received either a hit or a miss, observable by calling
-         * `result.isActive()`.  If true, then caller may further access the
-         * associated `const BSONObj&` payload with `result.getData()`.
-         *
-         * If `pred` is callable, `pred(data)` is invoked with the FailPoint
-         * BSON data payload. If it returns false, it specifies a user-defined
-         * Failpoint miss. In response, this function will return an inactive
-         * LockHandle.
-         *
-         * Otherwise the FailPoint determines whether this lock operation
-         * outcome is a hit or a miss based on the FailPoint's configured Mode.
-         *
-         * Unless `alreadyCounted` is true, such a hit will also increment
-         * `_hitCount` as a side effect. This complication enables the
-         * `pauseWhileSet` loop to evaluate the failpoint multiple times while
-         * only counting the first of those hits in terms of the `_hitCount`.
-         */
-        template <std::predicate<const BSONObj&> Pred>
-        LockHandle _tryLock(AlreadyCounted alreadyCounted, const Pred& pred) {
-            if (MONGO_likely((_fpInfo.loadRelaxed() & _kActiveBit) == 0))
-                return LockHandle{nullptr, false};  // Fast path
-
-            if ((_fpInfo.addAndFetch(1) & _kActiveBit) == 0)
-                return LockHandle{this, false};  // Took a reference to disabled in data race.
-
-            // Slow path.
-
-            if (!pred(_data))
-                return LockHandle{this, false};
-
-            if (!_evaluateByMode())
-                return LockHandle{this, false};
-            if (alreadyCounted == AlreadyCounted{false})
-                _hitCount.addAndFetch(1);
-            return LockHandle{this, true};
-        }
-
-        /**
-         * Use the configured mode to determine hit or miss.
-         * Return true to indicate a hit
-         */
-        bool _evaluateByMode();
-
-        // Bit layout:
-        // 31: tells whether this fail point is active.
-        // 0~30: ref counter: # of outstanding LockHandles.
-        AtomicWord<std::uint32_t> _fpInfo{0};
-
-        /* Number of times this has been locked with a `hit` result. */
-        AtomicWord<EntryCountT> _hitCount{0};
-
-        // Invariant: These should be read only if _kActiveBit of _fpInfo is set.
-        Mode _mode{off};
-        AtomicWord<int> _modeValue{0};
-        BSONObj _data;
-
-        const std::string _name;
-
-        // protects _mode, _modeValue, _data
-        mutable stdx::mutex _modMutex;
-    };
-
-public:
     /**
      * An object representing a FailPoint's interaction with the code it is
      * instrumenting. Users don't create these. They are only used within the
@@ -356,7 +154,7 @@ public:
      * Even an engaged LockHandle (holds a reference to a FailPoint)
      * can still have `isActive()==false`.
      *
-     * LockHandle `isActive()`, then `getData()` may be called on it to
+     * If LockHandle `isActive()`, then `getData()` may be called on it to
      * retrieve injected data from the associated FailPoint.
      *
      * Ex:
@@ -365,7 +163,54 @@ public:
      *         //  failPoint injects some behavior, informed by `data`.
      *     }
      */
-    using LockHandle = Impl::LockHandle;
+    class LockHandle {
+    public:
+        LockHandle(Impl* impl, bool hit) : _impl(impl), _hit(hit) {}
+
+        ~LockHandle() {
+            if (MONGO_unlikely(_impl))
+                _impl->_unlock();
+        }
+
+        LockHandle(const LockHandle&) = delete;
+        LockHandle& operator=(const LockHandle&) = delete;
+        LockHandle(LockHandle&& o) noexcept
+            : _impl{std::exchange(o._impl, nullptr)}, _hit{std::exchange(o._hit, false)} {}
+        LockHandle& operator=(LockHandle&&) = delete;
+
+        /**
+         * Returns true if this LockHandle associated with a FailPoint, and
+         * the lock outcome was a "hit". `lockHandle.isActive()` generally
+         * means the block of FailPoint special behavior should execute.
+         */
+        bool isActive() const {
+            return MONGO_unlikely(_hit);
+        }
+
+        /**
+         * Returns true if the fail point is still enabled.
+         *
+         * This function does not increment the underlying counter. Note that the fail point
+         * may have been changed in various ways while a LockHandle is held:
+         * - The fail point may be in the process of mutation which toggles to disabled until
+         *   LockHandles are released.
+         * - The fail point may have the modes "activationProbability", "skip", or
+         *   "times".
+         */
+        bool isStillEnabled() const {
+            return _impl->_shouldFail(Impl::AlreadyCounted{true}, alwaysRun);
+        }
+
+        /** May only be called if isActive() is true. */
+        const BSONObj& getData() const {
+            invariant(_impl, "getData without holding failpoint lock");
+            return _impl->_data;
+        }
+
+    private:
+        Impl* _impl = nullptr;
+        bool _hit = false;  //< True if this represents a tryLock "hit".
+    };
 
     /**
      * Explicitly resets the seed used for the PRNG in this thread.  If not called on a thread,
@@ -553,6 +398,160 @@ public:
     }
 
 private:
+    // Equivalent to a lambda like `[](const BSONObj&) { return true; }`, but only
+    // requires a single template instantiation.
+    struct AlwaysRun {
+        bool operator()(const BSONObj&) const {
+            return true;
+        }
+    };
+    static constexpr AlwaysRun alwaysRun = {};
+
+    class Impl {
+    private:
+        enum class AlreadyCounted : bool {};
+
+        static constexpr auto _kWaitGranularity = Milliseconds(100);
+
+        static constexpr auto _kActiveBit = ValType{ValType{1} << 31};
+
+    public:
+        friend class LockHandle;
+
+        Impl(std::string name) : _name(std::move(name)) {}
+
+        template <std::predicate<const BSONObj&> Pred>
+        bool shouldFail(const Pred& pred) {
+            return _shouldFail(AlreadyCounted{false}, pred);
+        }
+
+        EntryCountT setMode(Mode mode, ValType val = 0, BSONObj extra = {});
+
+        EntryCountT waitForTimesEntered(Interruptible* interruptible,
+                                        EntryCountT targetTimesEntered) const;
+
+        BSONObj toBSON() const;
+
+        template <std::predicate<const BSONObj&> Pred>
+        LockHandle tryLock(const Pred& pred) {
+            return _tryLock(AlreadyCounted{false}, pred);
+        }
+
+        /** See `FailPoint::pauseWhileSet`. */
+        void pauseWhileSet(Interruptible* interruptible) {
+            auto alreadyCounted = AlreadyCounted{false};
+            while (MONGO_unlikely(_shouldFail(alreadyCounted, alwaysRun))) {
+                interruptible->sleepFor(_kWaitGranularity);
+                alreadyCounted = AlreadyCounted{true};
+            }
+        }
+
+        /** See `FailPoint::pauseWhileSetAndNotCanceled`. */
+        void pauseWhileSetAndNotCanceled(Interruptible* interruptible,
+                                         const CancellationToken& token) {
+            auto alreadyCounted = AlreadyCounted{false};
+            while (MONGO_unlikely(_shouldFail(alreadyCounted, alwaysRun))) {
+                uassert(
+                    ErrorCodes::Interrupted, "Failpoint has been canceled", !token.isCanceled());
+                interruptible->sleepFor(_kWaitGranularity);
+                alreadyCounted = AlreadyCounted{true};
+            }
+        }
+
+        const std::string& getName() const {
+            return _name;
+        }
+
+    private:
+        void _enable() {
+            _fpInfo.fetchAndBitOr(_kActiveBit);
+        }
+
+        void _disable() {
+            _fpInfo.fetchAndBitAnd(~_kActiveBit);
+        }
+
+        /** No default parameters. No-Frills shouldFail implementation. */
+        template <std::predicate<const BSONObj&> Pred>
+        bool _shouldFail(AlreadyCounted alreadyCounted, const Pred& pred) {
+            return _tryLock(alreadyCounted, pred).isActive();
+        }
+
+        /**
+         * Release a FailPoint lock previously acquired with `_tryLock`.
+         * Used only by `~LockHandle`.
+         */
+        void _unlock() {
+            _fpInfo.subtractAndFetch(1);
+        }
+
+        /**
+         * Attempt to access the fail point. If FailPoint is disabled, it
+         * cannot be accessed and this call will return a disengaged and
+         * inactive LockHandle.
+         *
+         * After successfully locking it, however, the caller will have
+         * received either a hit or a miss, observable by calling
+         * `result.isActive()`.  If true, then caller may further access the
+         * associated `const BSONObj&` payload with `result.getData()`.
+         *
+         * If `pred` is callable, `pred(data)` is invoked with the FailPoint
+         * BSON data payload. If it returns false, it specifies a user-defined
+         * Failpoint miss. In response, this function will return an inactive
+         * LockHandle.
+         *
+         * Otherwise the FailPoint determines whether this lock operation
+         * outcome is a hit or a miss based on the FailPoint's configured Mode.
+         *
+         * Unless `alreadyCounted` is true, such a hit will also increment
+         * `_hitCount` as a side effect. This complication enables the
+         * `pauseWhileSet` loop to evaluate the failpoint multiple times while
+         * only counting the first of those hits in terms of the `_hitCount`.
+         */
+        template <std::predicate<const BSONObj&> Pred>
+        LockHandle _tryLock(AlreadyCounted alreadyCounted, const Pred& pred) {
+            if (MONGO_likely((_fpInfo.loadRelaxed() & _kActiveBit) == 0))
+                return LockHandle{nullptr, false};  // Fast path
+
+            if ((_fpInfo.addAndFetch(1) & _kActiveBit) == 0)
+                return LockHandle{this, false};  // Took a reference to disabled in data race.
+
+            // Slow path.
+
+            if (!pred(_data))
+                return LockHandle{this, false};
+
+            if (!_evaluateByMode())
+                return LockHandle{this, false};
+            if (alreadyCounted == AlreadyCounted{false})
+                _hitCount.addAndFetch(1);
+            return LockHandle{this, true};
+        }
+
+        /**
+         * Use the configured mode to determine hit or miss.
+         * Return true to indicate a hit
+         */
+        bool _evaluateByMode();
+
+        // Bit layout:
+        // 31: tells whether this fail point is active.
+        // 0~30: ref counter: # of outstanding LockHandles.
+        AtomicWord<std::uint32_t> _fpInfo{0};
+
+        /* Number of times this has been locked with a `hit` result. */
+        AtomicWord<EntryCountT> _hitCount{0};
+
+        // Invariant: These should be read only if _kActiveBit of _fpInfo is set.
+        Mode _mode{off};
+        AtomicWord<int> _modeValue{0};
+        BSONObj _data;
+
+        const std::string _name;
+
+        // protects _mode, _modeValue, _data
+        mutable stdx::mutex _modMutex;
+    };
     const Impl* _rawImpl() const {
         return reinterpret_cast<const Impl*>(&_implStorage);
     }
