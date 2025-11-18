@@ -103,13 +103,29 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
 
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, bool allowDiskUse, int64_t maxMemoryUsageBytes) {
+    return createMemoryUsageTrackerImpl(expCtx, allowDiskUse, maxMemoryUsageBytes);
+}
+
+MemoryUsageTracker OperationMemoryUsageTracker::createChunkedMemoryUsageTrackerForStage(
+    const ExpressionContext& expCtx, bool allowDiskUse, int64_t maxMemoryUsageBytes) {
+    return createMemoryUsageTrackerImpl(expCtx,
+                                        allowDiskUse,
+                                        maxMemoryUsageBytes,
+                                        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
+}
+
+MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerImpl(
+    const ExpressionContext& expCtx,
+    bool allowDiskUse,
+    int64_t maxMemoryUsageBytes,
+    int64_t chunkSize) {
     if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
         return MemoryUsageTracker{allowDiskUse, maxMemoryUsageBytes};
     }
 
     OperationContext* opCtx = expCtx.getOperationContext();
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes};
+    return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes, chunkSize};
 }
 
 std::unique_ptr<OperationMemoryUsageTracker> OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(

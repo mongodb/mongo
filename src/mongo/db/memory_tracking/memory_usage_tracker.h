@@ -204,8 +204,9 @@ public:
 
     MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
                        bool allowDiskUse = false,
-                       int64_t maxMemoryUsageBytes = 0)
-        : _allowDiskUse(allowDiskUse), _baseTracker(baseParent, maxMemoryUsageBytes) {}
+                       int64_t maxMemoryUsageBytes = 0,
+                       int64_t chunkSize = 0)
+        : _allowDiskUse(allowDiskUse), _baseTracker(baseParent, maxMemoryUsageBytes, chunkSize) {}
 
     MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0)
         : MemoryUsageTracker(nullptr, allowDiskUse, maxMemoryUsageBytes) {}

@@ -18,7 +18,18 @@
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const conn = MongoRunner.runMongod();
+const serverParams = {
+    setParameter: {
+        // Needed to avoid spilling to disk, which changes memory metrics.
+        allowDiskUseByDefault: false,
+        // Needed so that chunked memory tracking reaches CurOp
+        internalQueryMaxWriteToCurOpMemoryUsageBytes: 128,
+        // 'forceIncreasedSpilling' should not be enabled for the following tests.
+        internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never",
+    },
+};
+
+const conn = MongoRunner.runMongod(serverParams);
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB("test");
@@ -37,11 +48,6 @@ assert.commandWorked(
 );
 const pipeline = [{$group: {_id: "$groupKey", values: {$push: "$val"}}}];
 const pipelineWithLimit = [{$group: {_id: "$groupKey", values: {$push: "$val"}}}, {$limit: 2}];
-
-// 'forceIncreasedSpilling' should not be enabled for the following tests.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}),
-);
 
 // Since this test is run against all execution engine variants, we can save compute by only
 // checking the relevant stages for the variant; for example, we will get test coverage for SBE

@@ -257,6 +257,9 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumer) {
 TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumerMemoryTracking) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                true);
+    RAIIServerParameterControllerForTest curOpWriteBytes(
+        "internalQueryMaxWriteToCurOpMemoryUsageBytes", 64);
+
     // Create a pipeline that uses group, which will track memory.
     const size_t nInputDocs = 500;
     const size_t nOutputDocs = 250;

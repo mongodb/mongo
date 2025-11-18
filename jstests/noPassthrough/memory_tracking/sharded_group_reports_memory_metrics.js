@@ -15,6 +15,7 @@ import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server
 const st = new ShardingTest(Object.assign({shards: 2}));
 const testDB = st.s.getDB("test");
 setParameterOnAllNonConfigNodes(testDB.getMongo(), "internalQueryFrameworkControl", "forceClassicEngine");
+setParameterOnAllNonConfigNodes(testDB.getMongo(), "internalQueryMaxWriteToCurOpMemoryUsageBytes", 128);
 
 const collName = jsTestName();
 const coll = testDB[collName];

@@ -21,7 +21,16 @@
 
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 
-const conn = MongoRunner.runMongod();
+const serverParams = {
+    setParameter: {
+        // Needed to avoid spilling to disk, which changes memory metrics.
+        allowDiskUseByDefault: false,
+        // Needed so that chunked memory tracking reaches CurOp
+        internalQueryMaxWriteToCurOpMemoryUsageBytes: 256,
+    },
+};
+
+const conn = MongoRunner.runMongod(serverParams);
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB("test");
@@ -127,6 +136,9 @@ jsTest.log.info("Testing $lookup with subpipeline memory tracking");
         skipInUseTrackedMemBytesCheck: true,
         // TODO SERVER-96383 $lookup does not provide very good explain output for subpipelines.
         skipExplainStageCheck: true,
+        // Provide a path to the stage that contains a subpipeline. The test harness will look here
+        // for the memory metrics.
+        explainStageSubpipelinePath: {$lookup: {pipeline: {}}},
     });
 
     ordersColl.drop();

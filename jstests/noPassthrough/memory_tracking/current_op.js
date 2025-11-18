@@ -18,6 +18,8 @@ const serverParams = {
         internalQueryFrameworkControl: "forceClassicEngine",
         // Needed to avoid spilling to disk, which changes memory metrics.
         allowDiskUseByDefault: false,
+        // Needed so that chunked memory tracking reaches CurOp
+        internalQueryMaxWriteToCurOpMemoryUsageBytes: 256,
     },
 };
 

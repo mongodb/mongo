@@ -338,6 +338,8 @@ namespace {
 TEST_F(ClusterAggregateMemoryTrackingTest, MemoryTrackingWorksOnRouter) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                true);
+    RAIIServerParameterControllerForTest curOpWriteBytes(
+        "internalQueryMaxWriteToCurOpMemoryUsageBytes", 64);
     // Force the classic engine so we can use the classic $group stage.
     RAIIServerParameterControllerForTest paramController("internalQueryFrameworkControl",
                                                          "forceClassicEngine");

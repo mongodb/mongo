@@ -95,6 +95,15 @@ public:
         bool allowDiskUse = false,
         int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
+    /**
+     * Rate-limited memory tracker. Chunking refers to the fact that memory usage reporting will be
+     * done in discrete chunks (0, chunkSize, 2*chunkSize, etc.) rather than exact values.
+     */
+    static MemoryUsageTracker createChunkedMemoryUsageTrackerForStage(
+        const ExpressionContext& expCtx,
+        bool allowDiskUse = false,
+        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
+
     void propagateStatsToCurOp() const {
         CurOp::get(_opCtx)->setMemoryTrackingStats(inUseTrackedMemoryBytes(),
                                                    peakTrackedMemoryBytes());
@@ -124,6 +133,10 @@ private:
     static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(OperationContext* opCtx,
                                                                        int64_t maxMemoryUsageBytes,
                                                                        int64_t chunkSize = 0);
+    static MemoryUsageTracker createMemoryUsageTrackerImpl(const ExpressionContext& expCtx,
+                                                           bool allowDiskUse,
+                                                           int64_t maxMemoryUsageBytes,
+                                                           int64_t chunkSize = 0);
 
     OperationContext* _opCtx;
 };

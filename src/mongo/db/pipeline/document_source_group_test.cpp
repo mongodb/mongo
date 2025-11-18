@@ -806,6 +806,8 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
     auto expCtx = getExpCtx();
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                true);
+    RAIIServerParameterControllerForTest curOpWriteBytes(
+        "internalQueryMaxWriteToCurOpMemoryUsageBytes", 64);
 
     // Pause between input docs so we have a chance to check memory tracking.
     auto mock = exec::agg::MockStage::createForTest(
