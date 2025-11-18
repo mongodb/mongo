@@ -10,7 +10,9 @@
  *   requires_getmore,
  *   requires_fcv_83,
  *   # TODO SERVER-113572 remove this tag once '$_internalComputeGeoNearDistance' is fixed.
- *   known_query_shape_computation_problem
+ *   known_query_shape_computation_problem,
+ *   # TODO SERVER-109838: Remove 'incompatible_with_extensions' tag.
+ *   incompatible_with_extensions
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
@@ -288,24 +290,6 @@ const unpackTests = [
     }
 });
 
-// Skip all stages defined in the extensions module.
-const skippedExtensionsStages = [
-    "$assert",
-    "$checkNum",
-    "$debugLog",
-    "$explain",
-    "$log",
-    "$optionA",
-    "$shapify",
-    "$shapifyDesugar",
-    "$shardedExecutionSerialization",
-    "$stubStage",
-    "$testBar",
-    "$testFoo",
-    "$testFooSource",
-    "$toast",
-];
-
 // The following pipeline stages do not need to be tested for timeseries collections.
 // Stages that are skipped **must** be one of the following:
 // 1. Stages that only run on the admin database.
@@ -313,9 +297,7 @@ const skippedExtensionsStages = [
 // 3. Stages that are tested elsewhere.
 // 4. Stages that can only run in stream processors.
 // 5. Stages that cannot be made by user requests and run on oplog data.
-// 6. Stages that are defined in the extensions module.
 const skippedStages = [
-    ...skippedExtensionsStages,
     // All change stream stages are temporarily here. TODO SERVER-113494 enable tests here.
     "$changeStream",
     "$changeStreamSplitLargeEvent",
