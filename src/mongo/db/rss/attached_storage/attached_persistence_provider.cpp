@@ -61,6 +61,10 @@ std::string AttachedPersistenceProvider::getMainWiredTigerTableSettings() const 
     return "";
 }
 
+bool AttachedPersistenceProvider::mustUsePrimaryDrivenIndexBuilds() const {
+    return false;
+}
+
 bool AttachedPersistenceProvider::shouldUseReplicatedCatalogIdentifiers() const {
     return false;
 }

@@ -55,6 +55,7 @@
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_parameter.h"
@@ -289,10 +290,20 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive(), buildUUID.toString());
 
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (protocol == IndexBuildProtocol::kTwoPhase && fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const auto& vCtx = VersionContext::getDecoration(opCtx);
+    const bool usingPrimaryDrivenIndexBuilds = fcv.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcv);
+
+    auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
+    // TODO (SERVER-109664): uassert on build protocol rather than feature flag.
+    if (rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds()) {
+        uassert(11332800,
+                "Primary-driven index builds are required with the current persistence provider",
+                usingPrimaryDrivenIndexBuilds);
+    }
+
+    if (protocol == IndexBuildProtocol::kTwoPhase && usingPrimaryDrivenIndexBuilds) {
         invariant(indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven);
     }
 

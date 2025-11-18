@@ -79,6 +79,12 @@ public:
     virtual std::string getMainWiredTigerTableSettings() const = 0;
 
     /**
+     * If true, the provider requires that index builds will be led by the primary node and
+     * replicated through the oplog.
+     */
+    virtual bool mustUsePrimaryDrivenIndexBuilds() const = 0;
+
+    /**
      * If true, the provider expects that all catalog identifiers will be replicated and identical
      * between nodes.
      */

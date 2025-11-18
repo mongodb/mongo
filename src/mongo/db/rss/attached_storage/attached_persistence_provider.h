@@ -62,6 +62,11 @@ public:
     bool shouldUseReplicatedCatalogIdentifiers() const override;
 
     /**
+     * Attached storage does not require that indexes are built by the primary.
+     */
+    bool mustUsePrimaryDrivenIndexBuilds() const override;
+
+    /**
      * Attached storage does not require replicated RecordIds to function correctly.
      */
     bool shouldUseReplicatedRecordIds() const override;
