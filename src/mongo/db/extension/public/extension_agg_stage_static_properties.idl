@@ -115,3 +115,15 @@ structs:
             requiredPrivileges:
                 type: array<MongoExtensionRequiredPrivilege>
                 optional: true
+            requiredMetadataFields:
+                description: Metadata fields referenced by this stage.
+                type: array<string>
+                optional: true
+            providedMetadataFields:
+                description: Metadata fields that are added or modified by this stage.
+                type: array<string>
+                optional: true
+            preservesUpstreamMetadata:
+                description: Whether incoming metadata is retained and passed to downstream stages.
+                type: bool
+                default: true

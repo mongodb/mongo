@@ -273,6 +273,9 @@ TEST_F(AggStageTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds) {
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
     ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kNone);
     ASSERT_EQ(props.getRequiresInputDocSource(), true);
+    ASSERT_FALSE(props.getRequiredMetadataFields().has_value());
+    ASSERT_FALSE(props.getProvidedMetadataFields().has_value());
+    ASSERT_TRUE(props.getPreservesUpstreamMetadata());
 }
 
 TEST_F(AggStageTest, NonePosAstNodeSucceeds) {
@@ -336,7 +339,20 @@ TEST_F(AggStageTest, SearchLikeSourceAggStageAstNodeSucceeds) {
     auto props = handle.getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
     ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kAnyShard);
-    ASSERT_EQ(props.getRequiresInputDocSource(), false);
+    ASSERT_FALSE(props.getRequiresInputDocSource());
+    ASSERT_FALSE(props.getPreservesUpstreamMetadata());
+
+    const auto requiredFields = props.getRequiredMetadataFields();
+    const auto providedFields = props.getProvidedMetadataFields();
+
+    ASSERT_TRUE(requiredFields.has_value());
+    ASSERT_EQ(requiredFields->size(), 1u);
+    ASSERT_EQ((*requiredFields)[0], "searchScore");
+
+    ASSERT_TRUE(providedFields.has_value());
+    ASSERT_EQ(providedFields->size(), 2u);
+    ASSERT_EQ((*providedFields)[0], "searchScore");
+    ASSERT_EQ((*providedFields)[1], "searchHighlights");
 }
 
 TEST_F(AggStageTest, BadRequiresInputDocSourceTypeAggStageAstNodeFails) {

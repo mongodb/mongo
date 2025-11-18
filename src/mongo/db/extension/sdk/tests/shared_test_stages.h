@@ -706,8 +706,12 @@ public:
     SearchLikeSourceAggStageAstNode() : sdk::AggStageAstNode(kSearchLikeSourceStageName) {}
 
     BSONObj getProperties() const override {
-        return BSON("requiresInputDocSource" << false << "position" << "first" << "hostType"
-                                             << "anyShard");
+        return BSON("requiresInputDocSource"
+                    << false << "position" << "first" << "hostType"
+                    << "anyShard"
+                    << "requiredMetadataFields" << BSON_ARRAY("searchScore")
+                    << "providedMetadataFields" << BSON_ARRAY("searchScore" << "searchHighlights")
+                    << "preservesUpstreamMetadata" << false);
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
