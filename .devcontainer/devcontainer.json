@@ -3,6 +3,7 @@
   "runArgs": [
     "--name=mongo-dev-${containerWorkspaceFolderBasename}-${devcontainerId}"
   ],
+  "initializeCommand": "${localWorkspaceFolder}/.devcontainer/initialize.sh",
   "build": {
     "dockerfile": "./Dockerfile",
     "context": "..",

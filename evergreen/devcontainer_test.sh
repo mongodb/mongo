@@ -96,6 +96,17 @@ devcontainer_run() {
     devcontainer exec --workspace-folder . --id-label "test-id=${TEST_ID}" --remote-env CI=true "$@"
 }
 
+echo "Checking core dump pattern configuration..."
+CORE_PATTERN=$(devcontainer_run cat /proc/sys/kernel/core_pattern)
+if [[ "$CORE_PATTERN" == "dump_%e.%p.core" ]]; then
+    echo "✓ Core dump pattern correctly set to: $CORE_PATTERN"
+else
+    echo "✗ Core dump pattern is: $CORE_PATTERN (expected: dump_%e.%p.core)"
+    echo "  The initializeCommand may have failed to set the kernel parameter"
+    exit 1
+fi
+
+echo ""
 echo "Checking GCC version..."
 devcontainer_run gcc --version
 
