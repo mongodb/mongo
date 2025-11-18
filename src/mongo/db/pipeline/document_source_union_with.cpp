@@ -180,9 +180,16 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         } else {
             // This case only occurs in a sharded context where the database name is the same
             // as the current namespace, and will be resolved in the catch below.
-            // We do not use the result of 'makePipeline', since this is simply to raise
-            // 'CommandOnShardedViewNotSupportedOnMongod'.
-            pipeline_factory::makePipeline(pipeline, expCtx, {});
+            // We do not need to use the result of 'makePipeline', since this is simply to raise
+            // 'CommandOnShardedViewNotSupportedOnMongod', but we do, anyway, for future proofing
+            // and to make static analysis tools happy.
+            auto shared_pipeline = pipeline_factory::makePipeline(pipeline, expCtx, {});
+            _sharedState = std::make_shared<UnionWithSharedState>(
+                std::move(shared_pipeline),
+                nullptr,
+                UnionWithSharedState::ExecutionProgress::kIteratingSource,
+                Variables(),
+                VariablesParseState(Variables().useIdGenerator()));
         }
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         logShardedViewFound(e, pipeline);
