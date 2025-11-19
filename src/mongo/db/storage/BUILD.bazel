@@ -582,6 +582,7 @@ mongo_cc_unit_test(
         "index_entry_comparison_test.cpp",
         "mdb_catalog_test.cpp",
         "spill_table_test.cpp",
+        "storage_engine_impl_test.cpp",
         "storage_engine_lock_file_test.cpp",
         "storage_engine_metadata_test.cpp",
         "storage_repair_observer_test.cpp",

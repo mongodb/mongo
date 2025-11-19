@@ -47,10 +47,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/control/storage_control.h"
-#include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -767,10 +765,9 @@ public:
     }
 
     void waitForTimestampMonitorPass() {
-        auto timestampMonitor =
-            static_cast<StorageEngineImpl*>(_storageEngine)->getTimestampMonitor();
-        using TimestampType = StorageEngineImpl::TimestampMonitor::TimestampType;
-        using TimestampListener = StorageEngineImpl::TimestampMonitor::TimestampListener;
+        auto timestampMonitor = _storageEngine->getTimestampMonitor();
+        using TimestampType = StorageEngine::TimestampMonitor::TimestampType;
+        using TimestampListener = StorageEngine::TimestampMonitor::TimestampListener;
         auto pf = makePromiseFuture<void>();
         auto listener = TimestampListener(
             TimestampType::kOldest,
@@ -1033,194 +1030,6 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     NamespaceString orphanNs =
         NamespaceString::createNamespaceString_forTest("local.orphan." + identNs);
     ASSERT(!collectionExists(opCtx.get(), orphanNs));
-}
-
-/**
- * A test-only mock storage engine supporting timestamps.
- */
-class TimestampMockKVEngine final : public DevNullKVEngine {
-public:
-    bool supportsRecoveryTimestamp() const override {
-        return true;
-    }
-
-    // Increment the timestamps each time they are called for testing purposes.
-    Timestamp getCheckpointTimestamp() const override {
-        checkpointTimestamp = std::make_unique<Timestamp>(checkpointTimestamp->getInc() + 1);
-        return *checkpointTimestamp;
-    }
-    Timestamp getOldestTimestamp() const override {
-        oldestTimestamp = std::make_unique<Timestamp>(oldestTimestamp->getInc() + 1);
-        return *oldestTimestamp;
-    }
-    Timestamp getStableTimestamp() const override {
-        stableTimestamp = std::make_unique<Timestamp>(stableTimestamp->getInc() + 1);
-        return *stableTimestamp;
-    }
-
-    // Mutable for testing purposes to increment the timestamp.
-    mutable std::unique_ptr<Timestamp> checkpointTimestamp = std::make_unique<Timestamp>();
-    mutable std::unique_ptr<Timestamp> oldestTimestamp = std::make_unique<Timestamp>();
-    mutable std::unique_ptr<Timestamp> stableTimestamp = std::make_unique<Timestamp>();
-};
-
-class TimestampKVEngineTest : public ServiceContextTest {
-public:
-    using TimestampType = StorageEngineImpl::TimestampMonitor::TimestampType;
-    using TimestampListener = StorageEngineImpl::TimestampMonitor::TimestampListener;
-
-    /**
-     * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
-     */
-    void setUp() override {
-        ServiceContextTest::setUp();
-
-        auto opCtx = makeOperationContext();
-
-        auto runner = makePeriodicRunner(getServiceContext());
-        getServiceContext()->setPeriodicRunner(std::move(runner));
-
-        StorageEngineOptions options{/*directoryPerDB=*/false,
-                                     /*directoryForIndexes=*/false,
-                                     /*forRepair=*/false,
-                                     /*lockFileCreatedByUncleanShutdown=*/false};
-        _storageEngine =
-            std::make_unique<StorageEngineImpl>(opCtx.get(),
-                                                std::make_unique<TimestampMockKVEngine>(),
-                                                std::unique_ptr<KVEngine>(),
-                                                options);
-        _storageEngine->startTimestampMonitor(
-            {&catalog_helper::kCollectionCatalogCleanupTimestampListener});
-    }
-
-    void tearDown() override {
-#if __has_feature(address_sanitizer)
-        constexpr bool memLeakAllowed = false;
-#else
-        constexpr bool memLeakAllowed = true;
-#endif
-        _storageEngine->cleanShutdown(getServiceContext(), memLeakAllowed);
-        _storageEngine.reset();
-
-        ServiceContextTest::tearDown();
-    }
-
-    std::unique_ptr<StorageEngineImpl> _storageEngine;
-
-    TimestampType checkpoint = TimestampType::kCheckpoint;
-    TimestampType oldest = TimestampType::kOldest;
-    TimestampType stable = TimestampType::kStable;
-};
-
-TEST_F(TimestampKVEngineTest, TimestampMonitorRunning) {
-    // The timestamp monitor should only be running if the storage engine supports timestamps.
-    if (!_storageEngine->getEngine()->supportsRecoveryTimestamp())
-        return;
-
-    ASSERT_TRUE(_storageEngine->getTimestampMonitor()->isRunning_forTestOnly());
-}
-
-TEST_F(TimestampKVEngineTest, TimestampListeners) {
-    TimestampListener first(stable, [](OperationContext* opCtx, Timestamp timestamp) {});
-    TimestampListener second(oldest, [](OperationContext* opCtx, Timestamp timestamp) {});
-    TimestampListener third(stable, [](OperationContext* opCtx, Timestamp timestamp) {});
-
-    // Can only register the listener once.
-    _storageEngine->getTimestampMonitor()->addListener(&first);
-
-    _storageEngine->getTimestampMonitor()->removeListener(&first);
-    _storageEngine->getTimestampMonitor()->addListener(&first);
-
-    // Can register all three types of listeners.
-    _storageEngine->getTimestampMonitor()->addListener(&second);
-    _storageEngine->getTimestampMonitor()->addListener(&third);
-
-    _storageEngine->getTimestampMonitor()->removeListener(&first);
-    _storageEngine->getTimestampMonitor()->removeListener(&second);
-    _storageEngine->getTimestampMonitor()->removeListener(&third);
-}
-
-TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
-    stdx::mutex mutex;
-    stdx::condition_variable cv;
-
-    bool changes[4] = {false, false, false, false};
-
-    TimestampListener first(checkpoint, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[0]) {
-            changes[0] = true;
-            cv.notify_all();
-        }
-    });
-
-    TimestampListener second(oldest, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[1]) {
-            changes[1] = true;
-            cv.notify_all();
-        }
-    });
-
-    TimestampListener third(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[2]) {
-            changes[2] = true;
-            cv.notify_all();
-        }
-    });
-
-    TimestampListener fourth(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[3]) {
-            changes[3] = true;
-            cv.notify_all();
-        }
-    });
-
-    _storageEngine->getTimestampMonitor()->addListener(&first);
-    _storageEngine->getTimestampMonitor()->addListener(&second);
-    _storageEngine->getTimestampMonitor()->addListener(&third);
-    _storageEngine->getTimestampMonitor()->addListener(&fourth);
-
-    // Wait until all 4 listeners get notified at least once.
-    {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
-        cv.wait(lk, [&] {
-            for (auto const& change : changes) {
-                if (!change) {
-                    return false;
-                }
-            }
-            return true;
-        });
-    };
-
-
-    _storageEngine->getTimestampMonitor()->removeListener(&first);
-    _storageEngine->getTimestampMonitor()->removeListener(&second);
-    _storageEngine->getTimestampMonitor()->removeListener(&third);
-    _storageEngine->getTimestampMonitor()->removeListener(&fourth);
-}
-
-TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
-    Timestamp previous = Timestamp();
-    AtomicWord<int> timesNotified{0};
-
-    TimestampListener listener(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
-        ASSERT_TRUE(previous < timestamp);
-        previous = timestamp;
-        timesNotified.fetchAndAdd(1);
-    });
-    _storageEngine->getTimestampMonitor()->addListener(&listener);
-
-    // Let three rounds of notifications happen while ensuring that each new notification produces
-    // an increasing timestamp.
-    while (timesNotified.load() < 3) {
-        sleepmillis(100);
-    }
-
-    _storageEngine->getTimestampMonitor()->removeListener(&listener);
 }
 
 TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {

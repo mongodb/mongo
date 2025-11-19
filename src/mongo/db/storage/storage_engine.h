@@ -681,6 +681,11 @@ public:
     virtual std::shared_ptr<Ident> markIdentInUse(StringData ident) = 0;
 
     /**
+     * Accessor for this storage engine's timestamp monitor.
+     */
+    virtual TimestampMonitor* getTimestampMonitor() const = 0;
+
+    /**
      * Starts the timestamp monitor. This periodically drops idents queued by addDropPendingIdent,
      * and removes historical ident entries no longer necessary.
      */

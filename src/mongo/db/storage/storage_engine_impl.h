@@ -51,6 +51,7 @@
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -242,7 +243,7 @@ public:
 
     void closeMDBCatalog(OperationContext* opCtx) final;
 
-    TimestampMonitor* getTimestampMonitor() const {
+    TimestampMonitor* getTimestampMonitor() const override {
         return _timestampMonitor.get();
     }
 

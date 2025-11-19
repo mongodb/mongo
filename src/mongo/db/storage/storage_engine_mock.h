@@ -180,6 +180,9 @@ public:
     std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
         return nullptr;
     }
+    TimestampMonitor* getTimestampMonitor() const final {
+        return nullptr;
+    }
     void startTimestampMonitor(
         std::initializer_list<TimestampMonitor::TimestampListener*> listeners) final {}
     void stopTimestampMonitor() final {}
