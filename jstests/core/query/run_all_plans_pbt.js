@@ -32,6 +32,13 @@ import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {runDeoptimized, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+
+// TODO SERVER-114149 Remove this check once SBE tassert is fixed.
+if (checkSbeFullyEnabled(db)) {
+    jsTestLog("Returning early because SBE is fully enabled.");
+    quit();
+}
 
 if (isSlowBuild(db)) {
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
