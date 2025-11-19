@@ -374,6 +374,97 @@ done:
 }
 
 /*
+ * prepare_discover --
+ *     Claim pending prepared transactions, do a checkpoint then verify the consistency of the data
+ *     post claiming.
+ */
+void
+prepare_discover(WT_CONNECTION *conn, THREAD_DATA *td)
+{
+    WT_UNUSED(td);
+    /*
+     * Since RTS is not ran with precise checkpoint, we need to use prepare discover cursor to claim
+     * all pending prepared transactions. When precise checkpoint is not configure, there's no need
+     * to run prepare discover.
+     */
+    if (!g.precise_checkpoint)
+        return;
+
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    WT_SESSION *session;
+    uint64_t prepared_id;
+    uint32_t discover_count;
+    char buf[128];
+    char timestamp_buf[64];
+    bool should_commit;
+
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    /* Open the prepare discover cursor */
+    ret = session->open_cursor(session, "prepared_discover:", NULL, NULL, &cursor);
+    if (ret == WT_NOTFOUND) {
+        /* No prepared transactions found - this is normal */
+        testutil_check(session->close(session, NULL));
+        return;
+    }
+    testutil_check(ret);
+    /* Iterate through all prepared transactions and claim pending prepared transactions. */
+    discover_count = 0;
+    testutil_check(g.conn->query_timestamp(g.conn, timestamp_buf, "get=stable_timestamp"));
+    uint64_t current_stable = testutil_timestamp_parse(timestamp_buf);
+    while ((ret = cursor->next(cursor)) == 0) {
+        uint64_t commit_ts, durable_ts, rollback_ts;
+
+        ++discover_count;
+        testutil_check(cursor->get_key(cursor, &prepared_id));
+
+        /* Claim the prepared transaction */
+        testutil_snprintf(buf, sizeof(buf), "claim_prepared_id=%" PRIx64, prepared_id);
+        testutil_check(session->begin_transaction(session, buf));
+
+        /* Randomly decide whether to commit or roll back */
+        u_int rnd = __wt_random(&td->data_rnd);
+        should_commit = rnd % 2 == 0;
+
+        if (should_commit) {
+            /* Use timestamps greater than current stable */
+            commit_ts = current_stable + 1;
+            durable_ts = commit_ts + 1;
+
+            testutil_snprintf(buf, sizeof(buf),
+              "durable_timestamp=%" PRIx64 ",commit_timestamp=%" PRIx64, durable_ts, commit_ts);
+            testutil_check(session->commit_transaction(session, buf));
+
+        } else {
+
+            rollback_ts = current_stable + 2;
+            testutil_snprintf(buf, sizeof(buf), "rollback_timestamp=%" PRIx64, rollback_ts);
+            testutil_check(session->rollback_transaction(session, buf));
+        }
+    }
+    /* WT_NOTFOUND is expected when we reach the end of the cursor */
+    testutil_assert(ret == WT_NOTFOUND);
+
+    /* Report what we found and did */
+    printf(
+      "Prepare discover: found and claimed %" PRIu32 " prepared transactions\n", discover_count);
+    testutil_check(cursor->close(cursor));
+    if (discover_count > 0) {
+        /* Only modify stable timestamp if not in predictable replay mode */
+        if (!g.predictable_replay) {
+            g.ts_stable = current_stable + 3;
+            printf("Final: setting stable to %" PRIu64, g.ts_stable);
+            set_stable(g.ts_stable);
+        }
+        /* In both modes, do a checkpoint after processing prepared transactions */
+        session->checkpoint(session, NULL);
+        if ((ret = verify_consistency(session, WT_TS_NONE, true)) != 0)
+            log_print_err("verify_consistency (post prepare-discover)", ret, 1);
+    }
+    testutil_check(session->close(session, NULL));
+}
+
+/*
  * do_cursor_next --
  *     Wrapper around cursor->next to handle retry cases.
  */
