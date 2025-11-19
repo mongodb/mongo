@@ -1,5 +1,5 @@
 /**
- * Tests that serverStatus contains an indexBuilder section. This section reports
+ * Tests that serverStatus contains an indexBulkBuilder section. This section reports
  * globally-aggregated statistics about index builds and the external sorter.
  *
  * @tags: [

@@ -309,6 +309,14 @@ private:
 }  // namespace index_build_internal
 
 /**
+ * Tracks metrics for an index build of one or more indexes.
+ */
+struct IndexBuildMetrics {
+    // The time at which the index build begins.
+    Date_t startTime;
+};
+
+/**
  * Tracks the cross replica set progress of a particular index build identified by a build UUID.
  *
  * This is intended to only be used by the IndexBuildsCoordinator class.
@@ -324,7 +332,8 @@ public:
                         const UUID& collUUID,
                         const DatabaseName& dbName,
                         std::vector<IndexBuildInfo> indexes,
-                        IndexBuildProtocol protocol);
+                        IndexBuildProtocol protocol,
+                        Date_t startTime);
 
     const std::vector<IndexBuildInfo>& getIndexes() const {
         return _indexes;
@@ -554,6 +563,11 @@ public:
     void appendBuildInfo(BSONObjBuilder* builder) const;
 
     /**
+     * Returns the metrics for this index build.
+     */
+    IndexBuildMetrics getIndexBuildMetrics() const;
+
+    /**
      * Sets the multikey information for this index build.
      *
      * TODO (SERVER-111304): Remove this function.
@@ -671,6 +685,9 @@ private:
 
     // Set once before attempting to vote for commit readiness.
     bool _votedForCommitReadiness = false;
+
+    // Metrics for this index build. Used for server status reporting.
+    IndexBuildMetrics _metrics;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

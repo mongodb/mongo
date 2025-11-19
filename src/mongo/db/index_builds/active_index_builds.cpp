@@ -210,7 +210,6 @@ void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
 
 Status ActiveIndexBuilds::registerIndexBuild(
     std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
-
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     // Check whether any indexes are already being built with the same index name(s). (Duplicate
     // specs will be discovered by the index builder.)

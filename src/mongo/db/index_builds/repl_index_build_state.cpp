@@ -208,12 +208,14 @@ ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
                                          const UUID& collUUID,
                                          const DatabaseName& dbName,
                                          std::vector<IndexBuildInfo> indexes,
-                                         IndexBuildProtocol protocol)
+                                         IndexBuildProtocol protocol,
+                                         Date_t startTime)
     : buildUUID(indexBuildUUID),
       collectionUUID(collUUID),
       dbName(dbName),
       protocol(protocol),
-      _indexes(std::move(indexes)) {
+      _indexes(std::move(indexes)),
+      _metrics(IndexBuildMetrics{.startTime = startTime}) {
     _waitForNextAction = std::make_unique<SharedPromise<IndexBuildAction>>();
     if (protocol == IndexBuildProtocol::kTwoPhase)
         commitQuorumLock.emplace(indexBuildUUID.toString());
@@ -732,6 +734,11 @@ void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
     builder->append("resumable", !_lastOpTimeBeforeInterceptors.isNull());
 
     _indexBuildState.appendBuildInfo(builder);
+}
+
+IndexBuildMetrics ReplIndexBuildState::getIndexBuildMetrics() const {
+    stdx::lock_guard lk(_mutex);
+    return _metrics;
 }
 
 void ReplIndexBuildState::setMultikey(std::vector<boost::optional<MultikeyPaths>> multikey) {

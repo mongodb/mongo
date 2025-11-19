@@ -151,6 +151,7 @@ public:
         phases.append("processConstraintsViolatonTableOnCommit",
                       processConstraintsViolatonTableOnCommit.loadRelaxed());
         phases.append("commit", commit.loadRelaxed());
+        phases.append("lastCommittedMillis", lastCommittedMillis.loadRelaxed());
         phases.done();
 
         return indexBuilds.obj();
@@ -165,6 +166,8 @@ public:
     AtomicWord<int> drainSideWritesTableOnCommit{0};
     AtomicWord<int> processConstraintsViolatonTableOnCommit{0};
     AtomicWord<int> commit{0};
+    // The duration of the last committed index build.
+    AtomicWord<int> lastCommittedMillis{0};
 };
 
 auto& indexBuildsSSS = *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds").forShard();
@@ -533,6 +536,17 @@ auto_get_collection::Options makeAutoGetCollectionOptions(
         Lock::GlobalLockOptions{.skipRSTLLock = skipRSTL, .explicitIntent = explicitIntent});
 }
 
+
+/**
+ * Stores the duration of the most recently committed index build in the indexBuilds server
+ * status section.
+ */
+void storeLastCommittedDuration(const ReplIndexBuildState& replState) {
+    const auto metrics = replState.getIndexBuildMetrics();
+    const auto now = Date_t::now();
+    const auto elapsedTime = (now - metrics.startTime).count();
+    indexBuildsSSS.lastCommittedMillis.store(elapsedTime);
+}
 }  // namespace
 
 const auto getIndexBuildsCoord =
@@ -742,8 +756,12 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             }
         }
 
-        auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-            buildUUID, collWriter->uuid(), collWriter->ns().dbName(), indexes, protocol);
+        auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(buildUUID,
+                                                                         collWriter->uuid(),
+                                                                         collWriter->ns().dbName(),
+                                                                         indexes,
+                                                                         protocol,
+                                                                         Date_t::now());
 
         Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
         if (!status.isOK()) {
@@ -870,7 +888,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     auto protocol = IndexBuildProtocol::kTwoPhase;
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collection->uuid(), dbName, indexes, protocol);
+        buildUUID, collection->uuid(), dbName, indexes, protocol, Date_t::now());
 
     Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
     if (!status.isOK()) {
@@ -2577,7 +2595,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, dbName, filteredIndexes, protocol);
+        buildUUID, collectionUUID, dbName, filteredIndexes, protocol, Date_t::now());
     replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.get());
 
     auto status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
@@ -3484,7 +3502,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     if (MONGO_unlikely(hangIndexBuildBeforeCommit.shouldFail())) {
         LOGV2(4841706, "Hanging before committing index build");
-        hangIndexBuildBeforeCommit.pauseWhileSet();
+        hangIndexBuildBeforeCommit.pauseWhileSet(opCtx);
     }
 
     // Need to return the collection lock back to exclusive mode to complete the index build.
@@ -3585,7 +3603,9 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                     opCtx, collection.get(), replState->buildUUID));
             }
         }
+
         indexBuildsSSS.commit.addAndFetch(1);
+        storeLastCommittedDuration(*replState);
 
         std::vector<boost::optional<MultikeyPaths>> multikeys;
 
@@ -3912,5 +3932,4 @@ std::vector<IndexBuildInfo> IndexBuildsCoordinator::prepareSpecListForCreate(
 void IndexBuildsCoordinator::_incWaitForCommitQuorum() {
     indexBuildsSSS.waitForCommitQuorum.addAndFetch(1);
 }
-
 }  // namespace mongo
