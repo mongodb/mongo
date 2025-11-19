@@ -37,6 +37,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
+#include "mongo/s/shard_targeting_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -663,26 +664,13 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
                                           bool bypassIsFieldHashedCheck) const {
     const bool hasSimpleCollation = (collation.isEmpty() && !_rt->optRt->getDefaultCollator()) ||
         SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
-    if (!hasSimpleCollation) {
-        for (BSONElement elt : shardKey) {
-            // We must assume that if the field is specified as "hashed" in the shard key pattern,
-            // then the hash value could have come from a collatable type.
-            const bool isFieldHashed =
-                (_rt->optRt->getShardKeyPattern().isHashedPattern() &&
-                 _rt->optRt->getShardKeyPattern().getHashedField().fieldNameStringData() ==
-                     elt.fieldNameStringData());
+    const auto& elt = getFirstFieldWithIncompatibleCollation(
+        shardKey, _rt->optRt->getShardKeyPattern(), hasSimpleCollation, bypassIsFieldHashedCheck);
 
-            // If we want to skip the check in the special case where the _id field is hashed and
-            // used as the shard key, set bypassIsFieldHashedCheck. This assumes that a request with
-            // a query that contains an _id field can target a specific shard.
-            uassert(ErrorCodes::ShardKeyNotFound,
-                    str::stream() << "Cannot target single shard due to collation of key "
-                                  << elt.fieldNameStringData() << " for namespace "
-                                  << _rt->optRt->nss(),
-                    !CollationIndexKey::isCollatableType(elt.type()) &&
-                        (!isFieldHashed || bypassIsFieldHashedCheck));
-        }
-    }
+    uassert(ErrorCodes::ShardKeyNotFound,
+            str::stream() << "Cannot target single shard due to collation of key "
+                          << elt.fieldNameStringData() << " for namespace " << _rt->optRt->nss(),
+            elt.eoo());
 
     auto chunkInfo = _rt->optRt->findIntersectingChunk(shardKey);
 

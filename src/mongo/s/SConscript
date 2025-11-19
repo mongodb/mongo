@@ -75,6 +75,23 @@ env.Library(
 )
 
 env.Library(
+    target='sharding_helpers',
+    source=[
+        'shard_targeting_helpers.cpp',
+        'shard_key_pattern.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/matcher/path',
+        '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+    ],
+)
+
+env.Library(
     target='sharding_router_api',
     source=[
         'cluster_commands_helpers.cpp',
@@ -99,6 +116,7 @@ env.Library(
         'async_requests_sender',
         'grid',
         'query_analysis_sampler',
+        'sharding_helpers',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
@@ -270,7 +288,6 @@ env.Library(
         'resharding/type_collection_fields.idl',
         'shard_cannot_refresh_due_to_locks_held_exception.cpp',
         'shard_invalidated_for_targeting_exception.cpp',
-        'shard_key_pattern.cpp',
         'shard_version.cpp',
         'shard_version.idl',
         'shard_version_factory.cpp',
@@ -291,6 +308,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/caching',
         'analyze_shard_key_common',
+        'sharding_helpers',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/read_preference',
