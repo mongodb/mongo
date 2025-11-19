@@ -161,8 +161,6 @@ public:
 
     Timestamp getInitialDataTimestamp() const override;
 
-    void setOldestTimestampFromStable() override;
-
     void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
 
     Timestamp getOldestTimestamp() const override;

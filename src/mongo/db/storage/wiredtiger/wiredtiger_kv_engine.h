@@ -534,8 +534,6 @@ public:
 
     Timestamp getInitialDataTimestamp() const override;
 
-    void setOldestTimestampFromStable() override;
-
     /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. If force is true, oldest will be set to the given input value, unmodified, even if

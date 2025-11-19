@@ -804,18 +804,6 @@ public:
     virtual Timestamp getInitialDataTimestamp() const = 0;
 
     /**
-     * Uses the current stable timestamp to set the oldest timestamp for which the storage engine
-     * must maintain snapshot history through.
-     *
-     * oldest_timestamp will be set to stable_timestamp adjusted by
-     * 'minSnapshotHistoryWindowInSeconds' to create a window of available snapshots on the
-     * storage engine from oldest to stable. Furthermore, oldest_timestamp will never be set ahead
-     * of the oplog read timestamp, ensuring the oplog reader's 'read_timestamp' can always be
-     * serviced.
-     */
-    virtual void setOldestTimestampFromStable() = 0;
-
-    /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. Additionally, all future writes must be newer or equal to this value.
      */

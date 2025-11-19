@@ -785,10 +785,6 @@ Timestamp StorageEngineImpl::getInitialDataTimestamp() const {
     return _engine->getInitialDataTimestamp();
 }
 
-void StorageEngineImpl::setOldestTimestampFromStable() {
-    _engine->setOldestTimestampFromStable();
-}
-
 void StorageEngineImpl::setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
     _engine->setOldestTimestamp(newOldestTimestamp, force);
 }

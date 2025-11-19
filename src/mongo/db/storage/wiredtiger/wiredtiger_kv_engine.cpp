@@ -2419,13 +2419,6 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
         return;
     }
 
-    // Forward the oldest timestamp so that WiredTiger can clean up earlier timestamp data.
-    setOldestTimestampFromStable();
-}
-
-void WiredTigerKVEngine::setOldestTimestampFromStable() {
-    Timestamp stableTimestamp(_stableTimestamp.load());
-
     // Set the oldest timestamp to the stable timestamp to ensure that there is no lag window
     // between the two.
     if (MONGO_unlikely(WTSetOldestTSToStableTS.shouldFail())) {

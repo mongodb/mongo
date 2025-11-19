@@ -422,11 +422,6 @@ public:
     }
 
     /**
-     * See `StorageEngine::setOldestTimestampFromStable`
-     */
-    virtual void setOldestTimestampFromStable() {}
-
-    /**
      * See `StorageEngine::setOldestActiveTransactionTimestampCallback`
      */
     virtual void setOldestActiveTransactionTimestampCallback(
