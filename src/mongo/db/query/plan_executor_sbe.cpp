@@ -96,8 +96,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _yieldPolicy(std::move(yieldPolicy)),
       _remoteCursors(std::move(remoteCursors)),
       _remoteExplains(std::move(remoteExplains)) {
-    invariant(!_nss.isEmpty());
-    invariant(_root);
+    tassert(11321400, "nss must not be empty", !_nss.isEmpty());
+    tassert(11321401, "plan.root must not be null", _root);
     _root->attachCollectionAcquisition(mca);
     auto& env = _rootData.env;
     if (auto slot = _rootData.staticData->resultSlot) {
@@ -181,13 +181,13 @@ void PlanExecutorSBE::restoreState(const RestoreContext& context) {
 }
 
 void PlanExecutorSBE::detachFromOperationContext() {
-    invariant(_opCtx);
+    tassert(11321402, "_opCtx must not be null", _opCtx);
     _root->detachFromOperationContext();
     _opCtx = nullptr;
 }
 
 void PlanExecutorSBE::reattachToOperationContext(OperationContext* opCtx) {
-    invariant(!_opCtx);
+    tassert(11321403, "replacing existing _opCtx", !_opCtx);
     _root->attachToOperationContext(opCtx);
     _opCtx = opCtx;
 }
@@ -210,13 +210,19 @@ void PlanExecutorSBE::dispose(OperationContext* opCtx) {
 }
 
 void PlanExecutorSBE::stashResult(const BSONObj& obj) {
-    invariant(_state == State::kOpened);
-    invariant(!_isDisposed);
+    tassert(11321404,
+            fmt::format("Expected the _state to be OPENED, but found {}", serializeState(_state)),
+            _state == State::kOpened);
+    tassert(11321405,
+            "Invalid call to PlanExecutorSBE::stashResult() on a disposed executor",
+            !_isDisposed);
     _stash.push_front({obj.getOwned(), boost::none});
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document& objOut) {
-    invariant(!_isDisposed);
+    tassert(11321406,
+            "Invalid call to PlanExecutorSBE::getNextDocument() on a disposed executor",
+            !_isDisposed);
 
     checkFailPointPlanExecAlwaysFails();
 
@@ -224,7 +230,9 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document& objOut) {
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) {
-    invariant(!_isDisposed);
+    tassert(11321407,
+            "Invalid call to PlanExecutorSBE::getNext() on a disposed executor",
+            !_isDisposed);
 
     checkFailPointPlanExecAlwaysFails();
 
@@ -251,7 +259,9 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     constexpr bool isBson = std::is_same_v<ObjectType, BSONObj>;
     static_assert(isDocument || isBson);
 
-    invariant(!_isDisposed);
+    tassert(11321408,
+            "Invalid call to PlanExecutorSBE::getNextImpl() on a disposed executor",
+            !_isDisposed);
 
     // TODO SERVER-93079: This function expects to always produce an output document. This could be
     // optimized in the future if we wish to use SBE for count-like queries which do not need to
@@ -306,7 +316,9 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
             _root->open(false);
         }
 
-        invariant(_state == State::kOpened);
+        tassert(11321409,
+                fmt::format("Expected _state to be OPENED but found {}", serializeState(_state)),
+                _state == State::kOpened);
 
         const MetaDataAccessor* metadataAccessors = isDocument ||
                 (_cq &&
@@ -351,12 +363,15 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
             // There may be more results, keep going.
             continue;
         } else if (_resumeRecordIdSlot) {
-            invariant(_resultRecordId);
+            tassert(11052110, "_resultRecordId must not be null", _resultRecordId);
 
             std::tie(_tagLastRecordId, _valLastRecordId) = _resultRecordId->getViewOfValue();
         }
 
-        invariant(result == sbe::PlanState::ADVANCED);
+        tassert(11052111,
+                fmt::format("Expected 'result' to be sbe::PlanState::ADVANCED but found {}",
+                            static_cast<int>(result)),
+                result == sbe::PlanState::ADVANCED);
         if (_mustReturnOwnedBson) {
             if constexpr (isBson) {
                 _lastGetNext = *out;
@@ -365,7 +380,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
                 if (bson) {
                     // This basically means that the 'Document' is just a wrapper around BSON
                     // returned by the plan. In this case, 'out' must own it.
-                    invariant(out->isOwned());
+                    tassert(11052112, "Expected out to be owned", out->isOwned());
                     _lastGetNext = *bson;
                 } else {
                     // 'Document' was created from 'sbe::Object' and there is no backing BSON for
@@ -663,7 +678,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
     constexpr bool isBson = std::is_same_v<ObjectType, BSONObj>;
     static_assert(isDocument || isBson);
 
-    invariant(out);
+    tassert(11052114, "out must not be null", out);
     auto state = root->getNext();
 
     if (state == sbe::PlanState::IS_EOF) {
@@ -673,7 +688,10 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
         return state;
     }
 
-    invariant(state == sbe::PlanState::ADVANCED);
+    tassert(11052115,
+            fmt::format("Expected state to be sbe::PlanState::ADVANCED, but found {}",
+                        static_cast<int>(state)),
+            state == sbe::PlanState::ADVANCED);
 
     if (resultSlot) {
         auto [tag, val] = resultSlot->getViewOfValue();
@@ -719,7 +737,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
     }
 
     if (dlOut) {
-        invariant(recordIdSlot);
+        tassert(11052116, "recordIdSlot must not be null", recordIdSlot);
         auto [tag, val] = recordIdSlot->getViewOfValue();
         if (tag == sbe::value::TypeTags::RecordId) {
             *dlOut = *sbe::value::getRecordIdView(val);
@@ -783,5 +801,15 @@ template sbe::PlanState fetchNext<BSONObj::LargeSizeTrait>(sbe::PlanStage* root,
                                                            RecordId* dlOut,
                                                            bool returnOwnedBson);
 
+StringData PlanExecutorSBE::serializeState(PlanExecutorSBE::State state) {
+    switch (state) {
+        case PlanExecutorSBE::State::kClosed:
+            return "CLOSED"_sd;
+        case PlanExecutorSBE::State::kOpened:
+            return "OPENED"_sd;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11321413);
+    }
+}
 
 }  // namespace mongo

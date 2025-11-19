@@ -77,7 +77,12 @@ namespace {
  *         { 'a' : 'foo' }, { 'b' : 'bar' }
  */
 BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames) {
-    invariant(replace.nFields() == fieldNames.nFields());
+    tassert(
+        11321411,
+        fmt::format("'replace' and 'fieldNames' must have the same number of fields, but {} != {}",
+                    replace.nFields(),
+                    fieldNames.nFields()),
+        replace.nFields() == fieldNames.nFields());
 
     BSONObjBuilder bob;
     auto iter = fieldNames.begin();
@@ -403,7 +408,7 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("indexPrefix", tn->indexPrefix);
             bob->append("indexName", tn->index.identifier.catalogName);
             auto ftsQuery = dynamic_cast<fts::FTSQueryImpl*>(tn->ftsQuery.get());
-            invariant(ftsQuery);
+            tassert(11321412, "Invalid dynamic cast to fts::FTSQueryImpl", ftsQuery);
             bob->append("parsedTextQuery", ftsQuery->toBSON());
             bob->append("textIndexVersion", tn->index.version);
             break;

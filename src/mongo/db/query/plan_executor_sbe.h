@@ -176,7 +176,7 @@ public:
     }
 
     const PlanExplainer& getPlanExplainer() const final {
-        invariant(_planExplainer);
+        tassert(11321410, "_planExplainer must not be null", _planExplainer);
         return *_planExplainer;
     }
 
@@ -203,6 +203,8 @@ private:
                              const stage_builder::PlanStageMetadataSlots& metadataSlots);
 
     enum class State { kClosed, kOpened };
+
+    static StringData serializeState(State state);
 
     State _state{State::kClosed};
 
