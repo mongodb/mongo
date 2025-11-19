@@ -33,10 +33,12 @@
 #include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/dpl_array_container.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/dpl_array_container.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
@@ -533,6 +535,50 @@ DEATH_TEST_F(AggStageDeathTest, DPLArrayContainerAdapterNullContainerFails, "113
     [[maybe_unused]] auto handle =
         TestDPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
             std::unique_ptr<sdk::DPLArrayContainer>(nullptr))};
+};
+
+class DistributedPlanLogicVTableDeathTest : public unittest::Test {
+public:
+    class TestDistributedPlanLogicVTableHandle : public DistributedPlanLogicHandle {
+    public:
+        TestDistributedPlanLogicVTableHandle(
+            ::MongoExtensionDistributedPlanLogic* distributedPlanLogic)
+            : DistributedPlanLogicHandle(distributedPlanLogic) {};
+
+        void assertVTableConstraints(const VTable_t& vtable) {
+            _assertVTableConstraints(vtable);
+        }
+    };
+};
+
+DEATH_TEST_F(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetShards, "11027300") {
+    auto distributedPlanLogic = new sdk::ExtensionDistributedPlanLogicAdapter(
+        shared_test_stages::EmptyDistributedPlanLogic::make());
+    auto handle = TestDistributedPlanLogicVTableHandle{distributedPlanLogic};
+
+    auto vtable = handle.vtable();
+    vtable.get_shards_pipeline = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetMerging, "11027301") {
+    auto distributedPlanLogic = new sdk::ExtensionDistributedPlanLogicAdapter(
+        shared_test_stages::EmptyDistributedPlanLogic::make());
+    auto handle = TestDistributedPlanLogicVTableHandle{distributedPlanLogic};
+
+    auto vtable = handle.vtable();
+    vtable.get_merging_pipeline = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPattern, "11027302") {
+    auto distributedPlanLogic = new sdk::ExtensionDistributedPlanLogicAdapter(
+        shared_test_stages::EmptyDistributedPlanLogic::make());
+    auto handle = TestDistributedPlanLogicVTableHandle{distributedPlanLogic};
+
+    auto vtable = handle.vtable();
+    vtable.get_sort_pattern = nullptr;
+    handle.assertVTableConstraints(vtable);
 };
 
 }  // namespace

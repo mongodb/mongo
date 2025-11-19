@@ -506,6 +506,53 @@ typedef struct MongoExtensionDPLArrayContainerVTable {
                                       MongoExtensionDPLArray* array);
 } MongoExtensionDPLArrayContainerVTable;
 
+typedef struct MongoExtensionDistributedPlanLogic {
+    const struct MongoExtensionDistributedPlanLogicVTable* const vtable;
+} MongoExtensionDistributedPlanLogic;
+
+typedef struct MongoExtensionDistributedPlanLogicVTable {
+    /**
+     * Destroys `distributedPlanLogic` and frees any related resources.
+     */
+    void (*destroy)(MongoExtensionDistributedPlanLogic* distributedPlanLogic);
+
+    /**
+     * Returns the pipeline to execute on each shard in parallel.
+     * On success, if the stage has a component that can run on the shards, allocates a
+     * MongoExtensionDPLArrayContainer with the stages that make up the shards pipeline. The
+     * extension populates the provided output pointer, transferring ownership of the container to
+     * the caller. If a stage must run exclusively on the merging node, the output pointer is
+     * returned as a nullptr.
+     *
+     * Note: This is currently restricted to only a single shardsStage for parity with the
+     * DistributedPlanLogic shardsStage. If in the future an extension stage may return more than
+     * one shardsStage, we will remove that restriction and modify DistributedPlanLogic.
+     */
+    MongoExtensionStatus* (*get_shards_pipeline)(
+        MongoExtensionDistributedPlanLogic* distributedPlanLogic,
+        MongoExtensionDPLArrayContainer** output);
+
+    /**
+     * Returns the stages that will be run on the merging node.
+     * On success, if the stage has a component that must run on the merging node, allocates a
+     * MongoExtensionDPLArrayContainer with the stages that make up the merge pipeline. The
+     * extension populates the provided output pointer, transferring ownership of the container to
+     * the caller. If nothing can run on the merging node, the output pointer is returned as a
+     * nullptr.
+     */
+    MongoExtensionStatus* (*get_merging_pipeline)(
+        MongoExtensionDistributedPlanLogic* distributedPlanLogic,
+        MongoExtensionDPLArrayContainer** output);
+
+    /**
+     * Returns which fields are ascending and which fields are descending when merging streams
+     * together. Ownership of the ByteBuf is transferred to the caller. The MongoExtensionByteBuf
+     * will not be allocated if no sort pattern is required to merge the streams.
+     */
+    MongoExtensionStatus* (*get_sort_pattern)(
+        MongoExtensionDistributedPlanLogic* distributedPlanLogic, MongoExtensionByteBuf** output);
+} MongoExtensionDistributedPlanLogicVTable;
+
 /**
  * Virtual function table for MongoExtensionAggStageParseNode.
  */

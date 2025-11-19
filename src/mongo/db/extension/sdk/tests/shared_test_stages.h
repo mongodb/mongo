@@ -31,6 +31,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/distributed_plan_logic.h"
+#include "mongo/db/extension/sdk/dpl_array_container.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 
@@ -1093,6 +1095,25 @@ public:
 
 protected:
     NoOpExtensionExecAggStage() : sdk::ExecAggStage("$noOpExt") {}
+};
+
+class EmptyDistributedPlanLogic : public sdk::DistributedPlanLogicBase {
+public:
+    std::unique_ptr<sdk::DPLArrayContainer> getShardsPipeline() const override {
+        return {};
+    }
+
+    std::unique_ptr<sdk::DPLArrayContainer> getMergingPipeline() const override {
+        return {};
+    }
+
+    BSONObj getSortPattern() const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::DistributedPlanLogicBase> make() {
+        return std::make_unique<EmptyDistributedPlanLogic>();
+    }
 };
 
 }  // namespace mongo::extension::sdk::shared_test_stages

@@ -38,6 +38,7 @@
 #include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/dpl_array_container.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/dpl_array_container.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
@@ -1287,6 +1289,97 @@ TEST_F(AggStageTest, TestDPLArrayContainerRoundTrip) {
 
     ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 1);
     ASSERT_EQ(shared_test_stages::CountingParse::alive, 1);
+}
+
+class TestDistributedPlanLogic : public sdk::DistributedPlanLogicBase {
+public:
+    std::unique_ptr<sdk::DPLArrayContainer> getShardsPipeline() const override {
+        std::vector<extension::VariantDPLHandle> elements;
+        elements.emplace_back(_makeCountingLogicalStage());
+        elements.emplace_back(_makeCountingLogicalStage());
+        return std::make_unique<sdk::DPLArrayContainer>(std::move(elements));
+    }
+
+    std::unique_ptr<sdk::DPLArrayContainer> getMergingPipeline() const override {
+        std::vector<extension::VariantDPLHandle> elements;
+        elements.emplace_back(_makeCountingLogicalStage());
+        return std::make_unique<sdk::DPLArrayContainer>(std::move(elements));
+    }
+
+    BSONObj getSortPattern() const override {
+        return BSON("_id" << 1);
+    }
+
+    static inline std::unique_ptr<sdk::DistributedPlanLogicBase> make() {
+        return std::make_unique<TestDistributedPlanLogic>();
+    }
+
+private:
+    static extension::LogicalAggStageHandle _makeCountingLogicalStage() {
+        return extension::LogicalAggStageHandle{
+            new sdk::ExtensionLogicalAggStage(shared_test_stages::CountingLogicalStage::make())};
+    }
+};
+
+TEST_F(AggStageTest, TestDPLWithCountingStages) {
+    shared_test_stages::CountingLogicalStage::alive = 0;
+
+    auto handle = DistributedPlanLogicHandle(
+        new sdk::ExtensionDistributedPlanLogicAdapter(TestDistributedPlanLogic::make()));
+
+    // Confirm getShardsPipeline() returns a vector with 2 logical stages.
+    {
+        auto shardsPipeline = handle.getShardsPipeline();
+        ASSERT_EQ(shardsPipeline.size(), 2U);
+        ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(shardsPipeline[0]));
+        ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(shardsPipeline[1]));
+
+        ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 2);
+    }
+
+    // Stages are destroyed when shardsPipeline goes out of scope.
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 0);
+
+    // Confirm getMergingPipeline() returns a vector with 1 logical stage.
+    {
+        auto mergingPipeline = handle.getMergingPipeline();
+        ASSERT_EQ(mergingPipeline.size(), 1U);
+        ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(mergingPipeline[0]));
+
+        ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 1);
+    }
+
+    // Stages are destroyed when mergingPipeline goes out of scope.
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 0);
+
+    // Confirm getSortPattern() returns the appropriate sort pattern.
+    {
+        auto sortPattern = handle.getSortPattern();
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), sortPattern);
+    }
+}
+
+TEST_F(AggStageTest, TestEmptyDistributedPlanLogic) {
+    auto handle = DistributedPlanLogicHandle(new sdk::ExtensionDistributedPlanLogicAdapter(
+        shared_test_stages::EmptyDistributedPlanLogic::make()));
+
+    // Verify that getShardsPipeline() returns an empty vector when the C returns nullptr.
+    {
+        auto shardsPipeline = handle.getShardsPipeline();
+        ASSERT_EQ(shardsPipeline.size(), 0U);
+    }
+
+    // Verify that getMergingPipeline() returns an empty vector when the C API returns nullptr.
+    {
+        auto mergingPipeline = handle.getMergingPipeline();
+        ASSERT_EQ(mergingPipeline.size(), 0U);
+    }
+
+    // Verify that getSortPattern() returns an empty BSONObj.
+    {
+        auto sortPattern = handle.getSortPattern();
+        ASSERT_BSONOBJ_EQ(BSONObj(), sortPattern);
+    }
 }
 
 }  // namespace
