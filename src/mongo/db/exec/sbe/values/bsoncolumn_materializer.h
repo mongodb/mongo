@@ -29,13 +29,15 @@
 
 #pragma once
 
+#include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bson_element_storage.h"
-#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/modules.h"
 
+// TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
 
 namespace mongo::sbe {
 namespace bsoncolumn {
@@ -48,7 +50,7 @@ namespace bsoncolumn {
  * instance doing the decompressing will be responsible for freeing any heap-allocated memory
  * referenced by the produced SBE values.
  */
-struct SBEColumnMaterializer {
+struct MONGO_MOD_NEEDS_REPLACEMENT SBEColumnMaterializer {
     using Element = std::pair<value::TypeTags, value::Value>;
 
     static inline Element materialize(BSONElementStorage& allocator, bool val) {

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
 /**
  * A reusable id generator suitable for use with integer ids that generates each new id by adding an

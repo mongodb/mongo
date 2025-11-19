@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
-#include "mongo/db/exec/sbe/values/path_request.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

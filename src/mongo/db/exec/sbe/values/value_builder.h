@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

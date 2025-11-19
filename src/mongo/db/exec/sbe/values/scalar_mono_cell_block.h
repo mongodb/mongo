@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

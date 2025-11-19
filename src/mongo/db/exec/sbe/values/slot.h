@@ -35,8 +35,7 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
-
-#include <type_traits>
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe::value {
 /**

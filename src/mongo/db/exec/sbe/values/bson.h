@@ -31,22 +31,24 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <utility>
+
+// TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
 
 namespace mongo {
 namespace sbe {
 namespace bson {
 template <bool View>
-std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
-                                                     const char* end,
-                                                     size_t fieldNameSize);
+MONGO_MOD_NEEDS_REPLACEMENT std::pair<value::TypeTags, value::Value> convertFrom(
+    const char* be, const char* end, size_t fieldNameSize);
 
 template <bool View>
-std::pair<value::TypeTags, value::Value> convertFrom(const BSONElement& elem) {
+MONGO_MOD_NEEDS_REPLACEMENT std::pair<value::TypeTags, value::Value> convertFrom(
+    const BSONElement& elem) {
     return convertFrom<View>(
         elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1);
 }

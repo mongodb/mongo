@@ -31,6 +31,7 @@
 
 #include "mongo/config.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe::value {
 class SlotAccessorHelper {

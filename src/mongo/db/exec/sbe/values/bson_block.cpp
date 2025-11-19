@@ -29,6 +29,8 @@
 
 #include "mongo/db/exec/sbe/values/bson_block.h"
 
+#include "mongo/db/exec/sbe/values/object_walk_node.h"
+
 namespace mongo::sbe::value {
 class BSONExtractorImpl : public BSONCellExtractor {
 public:

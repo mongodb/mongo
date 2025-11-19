@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <string>

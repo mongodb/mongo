@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/object_walk_node.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/path_request.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::sbe::value {
 /**

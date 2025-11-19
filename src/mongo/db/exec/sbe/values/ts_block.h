@@ -30,16 +30,13 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
-#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/path_request.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/util/bufreader.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
-#include <type_traits>
 #include <utility>
 #include <vector>
 

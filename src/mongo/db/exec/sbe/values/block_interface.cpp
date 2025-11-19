@@ -29,6 +29,8 @@
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
 
+#include "mongo/base/compare_numbers.h"
+
 namespace mongo::sbe::value {
 
 template <class Stream>
