@@ -108,8 +108,6 @@ public:
             cmd.setTimestamp(placementVersion.getTimestamp());
             cmd.serialize(&cmdBuilder);
 
-            BSONObj remoteResult;
-
             // Throws, but handled at level above.  Don't want to rewrap to preserve exception
             // formatting.
             auto shard = uassertStatusOK(
