@@ -51,13 +51,20 @@ def _download_with_curl_or_wget(url: str, out_path: str) -> bool:
         )
         if code == 0:
             return True
+        else:
+            print(f"ERROR: {out}")
 
     # wget
+    print("curl not found, trying wget...")
     wget = shutil.which("wget")
     if wget:
-        code, out = _run([wget, "-q", *(_wget_cert_args()), "-O", out_path, url])
+        code, out = _run([wget, "-q", "-O", out_path, url])
         if code == 0:
             return True
+        else:
+            print(f"ERROR: {out}")
+    else:
+        print("wget not found")
 
     return False
 
@@ -80,17 +87,21 @@ def _fetch_remote_sha256_hash(s3_path: str):
             download_from_s3_with_boto(s3_path + ".sha256", temp_file.name)
             downloaded = True
         except Exception:
+            traceback.print_exc()
             try:
                 from buildscripts.util.download_utils import download_from_s3_with_requests
 
                 download_from_s3_with_requests(s3_path + ".sha256", temp_file.name)
                 downloaded = True
             except Exception:
+                traceback.print_exc()
                 # curl/wget fallback
                 downloaded = _download_with_curl_or_wget(s3_path + ".sha256", temp_file.name)
 
     if downloaded:
         result = read_sha_file(tempfile_name)
+    else:
+        print("ERROR: failed to download remote sha!")
 
     if tempfile_name and os.path.exists(tempfile_name):
         os.unlink(tempfile_name)
@@ -153,17 +164,23 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_n
                 download_from_s3_with_boto(s3_path, output_path)
                 ok = True
             except Exception:
+                traceback.print_exc()
                 try:
                     from buildscripts.util.download_utils import download_from_s3_with_requests
 
                     download_from_s3_with_requests(s3_path, output_path, raise_on_error=True)
                     ok = True
                 except Exception:
+                    traceback.print_exc()
                     ok = False
 
             if not ok:
                 # curl/wget fallback
-                ok = _download_with_curl_or_wget(s3_path, output_path)
+                try:
+                    ok = _download_with_curl_or_wget(s3_path, output_path)
+                except Exception:
+                    traceback.print_exc()
+                    ok = False
 
             if not ok:
                 if ignore_file_not_exist:

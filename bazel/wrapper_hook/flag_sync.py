@@ -2,6 +2,7 @@ import os
 import pathlib
 import sys
 import time
+import traceback
 from typing import Dict
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
@@ -60,6 +61,7 @@ def sync_flags(namespace: str) -> bool:
     try:
         sync_and_update(namespace)
     except Exception:
+        traceback.print_exc()
         print("Failed to sync bazel flags. Skipping...")
         return False
     wrapper_debug(f"flag sync time: {time.time() - start}")
