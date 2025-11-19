@@ -170,8 +170,6 @@ void validateForTimeseries(const DocumentSourceContainer* sources) {
 
 }  // namespace
 
-using boost::intrusive_ptr;
-
 using HostTypeRequirement = StageConstraints::HostTypeRequirement;
 using PositionRequirement = StageConstraints::PositionRequirement;
 using DiskUseRequirement = StageConstraints::DiskUseRequirement;
@@ -180,9 +178,10 @@ using StreamType = StageConstraints::StreamType;
 constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kAllowedMatcherFeatures;
 constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kGeoNearMatcherFeatures;
 
-Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
+Pipeline::Pipeline(const boost::intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 
-Pipeline::Pipeline(DocumentSourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
+Pipeline::Pipeline(DocumentSourceContainer stages,
+                   const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : _sources(std::move(stages)), pCtx(expCtx) {}
 
 std::unique_ptr<Pipeline> Pipeline::clone(
@@ -239,9 +238,10 @@ std::unique_ptr<Pipeline> Pipeline::parseCommon(
     return pipeline;
 }
 
-std::unique_ptr<Pipeline> Pipeline::parseFromArray(BSONElement rawPipelineElement,
-                                                   const intrusive_ptr<ExpressionContext>& expCtx,
-                                                   PipelineValidatorCallback validator) {
+std::unique_ptr<Pipeline> Pipeline::parseFromArray(
+    BSONElement rawPipelineElement,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineValidatorCallback validator) {
 
     tassert(6253719,
             "Expected array for Pipeline::parseFromArray",
@@ -255,20 +255,20 @@ std::unique_ptr<Pipeline> Pipeline::parseFromArray(BSONElement rawPipelineElemen
 }
 
 std::unique_ptr<Pipeline> Pipeline::parse(const std::vector<BSONObj>& rawPipeline,
-                                          const intrusive_ptr<ExpressionContext>& expCtx,
+                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           PipelineValidatorCallback validator) {
     return parseCommon<BSONObj>(rawPipeline, expCtx, validator, false, [](BSONObj o) { return o; });
 }
 
 std::unique_ptr<Pipeline> Pipeline::parseFacetPipeline(
     const std::vector<BSONObj>& rawPipeline,
-    const intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator) {
     return parseCommon<BSONObj>(rawPipeline, expCtx, validator, true, [](BSONObj o) { return o; });
 }
 
 std::unique_ptr<Pipeline> Pipeline::create(DocumentSourceContainer stages,
-                                           const intrusive_ptr<ExpressionContext>& expCtx) {
+                                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::unique_ptr<Pipeline> pipeline(new Pipeline(std::move(stages), expCtx));
 
     constexpr bool alreadyOptimized = false;
@@ -502,9 +502,9 @@ stdx::unordered_set<NamespaceString> Pipeline::getInvolvedCollections() const {
     return collectionNames;
 }
 
-
 std::vector<BSONObj> Pipeline::serializePipelineForLogging(const std::vector<BSONObj>& pipeline) {
     std::vector<BSONObj> redacted;
+    redacted.reserve(pipeline.size());
     for (auto&& b : pipeline) {
         redacted.push_back(redact(b));
     }
@@ -512,15 +512,17 @@ std::vector<BSONObj> Pipeline::serializePipelineForLogging(const std::vector<BSO
 }
 
 std::vector<BSONObj> Pipeline::serializeForLogging(
-    boost::optional<const SerializationOptions&> opts) const {
+    const boost::optional<const SerializationOptions&>& opts) const {
     std::vector<BSONObj> serialized = serializeToBson(opts);
     return serializePipelineForLogging(serialized);
 }
 
 std::vector<BSONObj> Pipeline::serializeContainerForLogging(
-    const DocumentSourceContainer& container, boost::optional<const SerializationOptions&> opts) {
+    const DocumentSourceContainer& container,
+    const boost::optional<const SerializationOptions&>& opts) {
     std::vector<Value> serialized = serializeContainer(container, opts);
     std::vector<BSONObj> redacted;
+    redacted.reserve(serialized.size());
     for (auto&& stage : serialized) {
         tassert(11282936,
                 "Expecting serialized stage to be of type BSONObject",
@@ -530,21 +532,27 @@ std::vector<BSONObj> Pipeline::serializeContainerForLogging(
     return redacted;
 }
 
-std::vector<Value> Pipeline::serializeContainer(const DocumentSourceContainer& container,
-                                                boost::optional<const SerializationOptions&> opts) {
+std::vector<Value> Pipeline::serializeContainer(
+    const DocumentSourceContainer& container,
+    const boost::optional<const SerializationOptions&>& opts) {
     std::vector<Value> serializedSources;
+    // This reserve may underestimate the number of elements needed for the target container, as
+    // pipeline step serialization can add a variable number of results for specific
+    // DocumentSources.
+    serializedSources.reserve(container.size());
     for (auto&& source : container) {
         source->serializeToArray(serializedSources, opts ? opts.get() : SerializationOptions());
     }
     return serializedSources;
 }
 
-std::vector<Value> Pipeline::serialize(boost::optional<const SerializationOptions&> opts) const {
+std::vector<Value> Pipeline::serialize(
+    const boost::optional<const SerializationOptions&>& opts) const {
     return serializeContainer(_sources, opts);
 }
 
 std::vector<BSONObj> Pipeline::serializeToBson(
-    boost::optional<const SerializationOptions&> opts) const {
+    const boost::optional<const SerializationOptions&>& opts) const {
     const auto serialized = serialize(opts);
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
@@ -559,6 +567,7 @@ std::vector<BSONObj> Pipeline::serializeToBson(
 
 std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
     std::vector<Value> array;
+    array.reserve(_sources.size());
     for (auto&& stage : _sources) {
         auto beforeSize = array.size();
         stage->serializeToArray(array, opts);
@@ -571,18 +580,18 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
     return array;
 }
 
-void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
+void Pipeline::addInitialSource(boost::intrusive_ptr<DocumentSource> source) {
     tassert(10706502,
             "unexpected attempt to modify a frozen pipeline in 'Pipeline::addInitialSource()'",
             !_frozen);
-    _sources.push_front(source);
+    _sources.push_front(std::move(source));
 }
 
-void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
+void Pipeline::addFinalSource(boost::intrusive_ptr<DocumentSource> source) {
     tassert(10706503,
             "unexpected attempt to modify a frozen pipeline in 'Pipeline::addFinalSource()'",
             !_frozen);
-    _sources.push_back(source);
+    _sources.push_back(std::move(source));
 }
 
 void Pipeline::addSourceAtPosition(boost::intrusive_ptr<DocumentSource> source, size_t index) {
@@ -595,7 +604,7 @@ void Pipeline::addSourceAtPosition(boost::intrusive_ptr<DocumentSource> source, 
 
     auto sourceIter = _sources.begin();
     std::advance(sourceIter, index);
-    _sources.insert(sourceIter, source);
+    _sources.insert(sourceIter, std::move(source));
 }
 
 void Pipeline::addVariableRefs(std::set<Variables::Id>* refs) const {

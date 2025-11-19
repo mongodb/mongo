@@ -267,18 +267,18 @@ public:
      * helpers, which handle redaction.
      */
     std::vector<Value> serialize(
-        boost::optional<const SerializationOptions&> opts = boost::none) const;
+        const boost::optional<const SerializationOptions&>& opts = boost::none) const;
     std::vector<BSONObj> serializeToBson(
-        boost::optional<const SerializationOptions&> opts = boost::none) const;
+        const boost::optional<const SerializationOptions&>& opts = boost::none) const;
     static std::vector<Value> serializeContainer(
         const DocumentSourceContainer& container,
-        boost::optional<const SerializationOptions&> opts = boost::none);
+        const boost::optional<const SerializationOptions&>& opts = boost::none);
 
     std::vector<BSONObj> serializeForLogging(
-        boost::optional<const SerializationOptions&> opts = boost::none) const;
+        const boost::optional<const SerializationOptions&>& opts = boost::none) const;
     static std::vector<BSONObj> serializeContainerForLogging(
         const DocumentSourceContainer& container,
-        boost::optional<const SerializationOptions&> opts = boost::none);
+        const boost::optional<const SerializationOptions&>& opts = boost::none);
     static std::vector<BSONObj> serializePipelineForLogging(const std::vector<BSONObj>& pipeline);
 
     // The initial source is special since it varies between mongos and mongod.
