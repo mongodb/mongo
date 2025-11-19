@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 
 namespace mongo::join_ordering {
@@ -117,4 +118,20 @@ private:
     stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;
 };
 
+/**
+ * Small utility function to make a namepace string from collection name.
+ */
+NamespaceString makeNSS(StringData collName);
+
+/**
+ * Creates a join graph node from the set of ids.
+ */
+NodeSet makeNodeSetFromIds(std::set<NodeId> ids);
+
+/**
+ * Creates a join graph node from a single id.
+ */
+inline NodeSet makeNodeSetFromId(NodeId id) {
+    return makeNodeSetFromIds({id});
+}
 }  // namespace mongo::join_ordering

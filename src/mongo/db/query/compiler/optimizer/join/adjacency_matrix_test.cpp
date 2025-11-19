@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/adjacency_matrix.h"
 
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 
@@ -42,10 +43,6 @@ AdjacencyMatrix makeMatrix(std::vector<std::string_view> rows) {
         matrix[i] = NodeSet{rows[i].data(), rows[i].size()};
     }
     return matrix;
-}
-
-NamespaceString makeNSS(StringData collName) {
-    return NamespaceString::makeLocalCollection(collName);
 }
 
 NodeId addNode(JoinGraph& graph) {

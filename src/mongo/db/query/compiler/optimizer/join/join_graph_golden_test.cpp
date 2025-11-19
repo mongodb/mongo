@@ -29,17 +29,12 @@
 
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
-namespace {
-NamespaceString makeNSS(StringData collName) {
-    return NamespaceString::makeLocalCollection(collName);
-}
-}  // namespace
-
 class JoinGraphGoldenTest : public unittest::Test {
 public:
     JoinGraphGoldenTest() : _cfg{"src/mongo/db/test_output/query/compiler/optimizer/join"} {

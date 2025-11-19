@@ -114,4 +114,15 @@ std::unique_ptr<ce::SamplingEstimator> JoinOrderingTestFixture::samplingEstimato
     return samplingEstimator;
 }
 
+NamespaceString makeNSS(StringData collName) {
+    return NamespaceString::makeLocalCollection(collName);
+}
+
+NodeSet makeNodeSetFromIds(std::set<NodeId> ids) {
+    NodeSet result;
+    for (auto id : ids) {
+        result.set(id);
+    }
+    return result;
+}
 }  // namespace mongo::join_ordering

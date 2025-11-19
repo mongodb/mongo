@@ -140,11 +140,19 @@ public:
                                  PathId rightPathId);
 
     const JoinNode& getNode(NodeId nodeId) const {
-        return _nodes[nodeId];
+        if constexpr (kDebugBuild) {
+            return _nodes.at(nodeId);
+        } else {
+            return _nodes[nodeId];
+        }
     }
 
     const JoinEdge& getEdge(EdgeId edgeId) const {
-        return _edges[edgeId];
+        if constexpr (kDebugBuild) {
+            return _edges.at(edgeId);
+        } else {
+            return _edges[edgeId];
+        }
     }
 
     size_t numNodes() const {

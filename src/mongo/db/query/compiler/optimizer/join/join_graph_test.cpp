@@ -29,31 +29,11 @@
 
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
-
-namespace {
-NamespaceString makeNSS(StringData collName) {
-    return NamespaceString::makeLocalCollection(collName);
-}
-
-NodeSet makeNodeSetFromIds(std::set<NodeId> ids) {
-    NodeSet result;
-    for (auto id : ids) {
-        result.set(id);
-    }
-    return result;
-}
-
-NodeSet makeNodeSetFromId(NodeId id) {
-    return makeNodeSetFromIds({id});
-}
-
-}  // namespace
-
-
 TEST(JoinGraphTests, AddNode) {
     JoinGraph graph{};
 
